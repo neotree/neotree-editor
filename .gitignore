@@ -1,0 +1,8 @@
+*.iml
+*.log
+.idea/
+app/
+dist/
+node_modules/
+src/config.jsx
+
