@@ -22,7 +22,10 @@
     "dev": "concurrently --kill-others \"npm run dev-server\" \"npm run dev-electron\"",
     "dev-server": "node -r babel-register tools/server.jsx",
     "dev-electron": "HOT=1 NODE_ENV=development electron -r babel-register -r babel-polyfill tools/main.development",
-    "package": "NODE_ENV=production node -r babel-register tools/package.builder.jsx"
+    "package": "NODE_ENV=production node -r babel-register tools/package.builder.jsx",
+    "web": "node -r babel-register web-tools/server.jsx",
+    "build-web-prod": "NODE_ENV=production node -r babel-register ./node_modules/webpack/bin/webpack --config web-tools/webpack.config.production.jsx --progress --profile --colors",
+    "web-prod": "node web-tools/server.prod.jsx"
   },
   "build": {
     "appId": "org.neotree.NeoTreeEditor",

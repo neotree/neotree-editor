@@ -42,3 +42,20 @@ npm run dev
 ```
 npm run package
 ```
+
+## NeoTree Editor Web
+
+### Run the project dev mode
+```
+npm run web
+```
+
+### Build the production web app
+```
+npm run build-web-prod
+```
+
+### Run the production web app
+```
+npm run web-prod
+```
