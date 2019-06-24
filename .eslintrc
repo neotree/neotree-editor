@@ -1,0 +1,23 @@
+{
+  "parser": "babel-eslint",
+  "extends": "rallycoding",
+  "plugins": ["babel"],
+  "rules": {
+    "babel/semi": 1,
+    "react/no-find-dom-node": 0,
+    "no-continue": 0,
+    "import/no-extraneous-dependencies": 0,
+    "import/no-named-as-default": 0,
+    "react/require-extension": 0,
+    "no-console": 1,
+    "arrow-body-style": 0,
+    "no-shadow": 0,
+    "no-unneeded-ternary": 0,
+    "max-len": 0,
+    "no-confusing-arrow": 0,
+    "no-underscore-dangle": 0,
+    "no-param-reassign": 0,
+    "global-require": 0,
+    "operator-assignment": 0
+  }
+}

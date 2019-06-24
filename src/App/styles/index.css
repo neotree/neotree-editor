@@ -1,0 +1,69 @@
+/*
+ * The MIT License (MIT)
+ * Copyright (c) 2016 Ubiqueworks Ltd and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+ * SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+ * OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
+
+@import "../../../node_modules/react-mdl/extra/css/material.blue-orange.min.css";
+@import "../../../node_modules/roboto-fontface/css/roboto/roboto-fontface.css";
+@import "../../../node_modules/material-design-icons-iconfont/dist/material-design-icons.css";
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: "Roboto", "Helvetica", "Arial", sans-serif !important;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.mdl-textfield__input {
+    font-family: "Roboto", "Helvetica", "Arial", sans-serif !important;
+}
+
+.mdl-toolbar__header {
+    align-items: center;
+    color: #999999;
+    display: flex;
+    flex-direction: row;
+}
+
+.mdl-toolbar__header .mdl-toolbar__left-nav {
+    color: #999999;
+    margin-left: 16px;
+    margin-right: 24px;
+}
+
+.mdl-toolbar__header .mdl-toolbar__right-nav .mdl-navigation__link {
+    color: #999999;
+}
+
+.mdl-toolbar__header .mdl-toolbar__header-row {
+    flex-grow: 1;
+    padding: 0;
+}
+
+.mdl-form-section {
+    margin-bottom: 16px;
+    color: #2196f3;
+    border-bottom: 1px solid #2196f3;
+}
+
+.mdl-form-section-top-space {
+    margin-top: 24px;
+}
