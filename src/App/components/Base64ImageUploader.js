@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-
+import PropTypes from 'prop-types';
 import {
     Button,
     FABButton,
@@ -8,18 +8,6 @@ import {
 } from 'react-mdl';
 
 export default class Base64ImageUploader extends Component {
-
-    static propTypes = {
-        name: React.PropTypes.string.isRequired,
-        fileInfo: React.PropTypes.object,
-        onFileUploaded: React.PropTypes.func.isRequired,
-        onFileDeleted: React.PropTypes.func.isRequired,
-    };
-
-    constructor(props) {
-        super(props);
-    }
-
     // componentWillMount() {
     //     const { name, fileInfo } = this.props;
     //
@@ -28,9 +16,8 @@ export default class Base64ImageUploader extends Component {
     // }
 
     componentWillReceiveProps(props) {
-        const { name, fileInfo } = props;
-        console.log("FILE INFO [" + name + "]:");
-        this.setState({...this.state, fileInfo: fileInfo});
+      const { fileInfo } = props;
+      this.setState({ ...this.state, fileInfo });
     }
 
     handleFormSubmit = (e) => {
@@ -154,3 +141,10 @@ export default class Base64ImageUploader extends Component {
         );
     }
 }
+
+Base64ImageUploader.propTypes = {
+    name: PropTypes.string.isRequired,
+    fileInfo: PropTypes.object,
+    onFileUploaded: PropTypes.func.isRequired,
+    onFileDeleted: PropTypes.func.isRequired,
+};

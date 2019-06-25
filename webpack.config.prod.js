@@ -10,15 +10,15 @@ const GLOBALS = {
 export default {
   mode: 'production',
   // devtool: 'source-map',
-  context: path.resolve(__dirname, './dist/src'),
+  context: path.resolve(__dirname, 'dist/src'),
   target: 'web',
-  entry: path.resolve(__dirname, './src/index.js'),
+  entry: path.resolve(__dirname, 'src/index.js'),
   output: {
-    path: path.resolve(__dirname, './dist/src'),
+    path: path.resolve(__dirname, 'dist/src'),
     publicPath: '/',
     filename: 'bundle.js'
   },
-  devServer: { contentBase: path.resolve(__dirname, './dist/src') },
+  devServer: { contentBase: path.resolve(__dirname, 'dist/src') },
   plugins: [
     new webpack.DefinePlugin(GLOBALS),
     // new ExtractTextPlugin('style.css', { allChunks: false })

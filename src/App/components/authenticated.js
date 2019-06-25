@@ -18,8 +18,9 @@ export class Authenticated extends React.Component {
   }
 
   render() {
-    const { Component, authenticatedUser } = this.props;
-    return authenticatedUser ? <Component /> : null;
+    const { Component, authenticatedUser, ...props } = this.props;
+    return authenticatedUser ?
+      <Component {...props} authenticatedUser={authenticatedUser} /> : null;
   }
 }
 

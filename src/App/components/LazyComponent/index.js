@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { hot } from 'react-hot-loader/root';
 
 class LazyComponent extends Component {
   state = {
@@ -48,10 +49,12 @@ LazyComponent.propTypes = {
 };
 
 export default (load, opts = {}) => {
-  return props => (
-    <LazyComponent load={load} {...opts} {...props}>
-      {Component => Component ?
-        <Component {...props} /> : null}
-    </LazyComponent>
+  return hot(
+    props => (
+      <LazyComponent load={load} {...opts} {...props}>
+        {Component => Component ?
+          <Component {...props} /> : null}
+      </LazyComponent>
+    )
   );
 };

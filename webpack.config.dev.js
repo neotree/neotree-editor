@@ -14,11 +14,11 @@ export default {
     './index.js'
   ],
   output: {
-    path: path.resolve(__dirname, './dist'),
+    path: path.resolve(__dirname, 'dist'),
     publicPath: '/',
     filename: 'bundle.js'
   },
-  devServer: { contentBase: path.resolve(__dirname, './src'), hot: true },
+  devServer: { contentBase: path.resolve(__dirname, 'src'), hot: true },
   plugins: [
     new webpack.HotModuleReplacementPlugin(),
     new webpack.NoEmitOnErrorsPlugin(),
