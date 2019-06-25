@@ -1,5 +1,6 @@
 import session from 'express-session';
 import { Pool } from 'pg';
+import connectPG from 'connect-pg-simple';
 import passport from './passport';
 import initialiseDatabase from './models';
 
@@ -13,11 +14,12 @@ export default (app, { dbConfig }) => {
 
   // Database
   const pool = Pool(dbConfig);
-  pool.on('connect', () => logger.log('connected to the Database'));
-  pool.on('remove', () => logger.log('client removed'));
-  app.db = pool;
+  // pool.on('connect', () => logger.log('Connected to the Database'));
+  // pool.on('remove', () => logger.log('Client removed'));
+  app.pool = pool;
 
-  initialiseDatabase(pool, (err, rslts) => logger.log('Initialise db', err, rslts));
+  initialiseDatabase(app, err => err &&
+    logger.log('ERROR: INITIALISE DATABASE TABLES:', err));
 
   //body-parser
   app.use(require('body-parser').json());
@@ -37,14 +39,13 @@ export default (app, { dbConfig }) => {
   }));
 
   //express session
+  const pgSession = connectPG(session);
   app.use(session({
     secret: 'neotree',
     saveUninitialized: false, // don't create session until something stored
     resave: false, //don't save session if unmodified
-    // store: new MongoStore({
-    //   mongooseConnection: conn,
-    //   ttl: 365 * 24 * 60 * 60 // = 365 days (exp date will be created from ttl opt)
-    // })
+    store: new pgSession({ pool }),
+    cookie: { maxAge: 365 * 24 * 60 * 60 } // = 365 days (exp date will be created from ttl opt)
   }));
 
   app = passport(app);
@@ -73,7 +74,7 @@ export default (app, { dbConfig }) => {
 
   httpServer.listen(PORT, err => {
     if (err) throw (err);
-    app.logger.log(`Server started on port ${PORT}`);
+    console.log(`Server started on port ${PORT}`); // eslint-disable-line
   });
 
   return app;

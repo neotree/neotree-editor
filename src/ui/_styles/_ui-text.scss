@@ -1,0 +1,16 @@
+$values: center, justify, left, right, inherit;
+$transform: uppercase, lowercase, capitalize;
+
+@mixin uiText($medium: '') {
+  @each $v in $values {
+    .ui__textAlign_#{$v} {
+      text-align: $v;
+    }
+  }
+
+  @each $v in $transform {
+    .ui__textTransform_#{$v} {
+      text-transform: $v;
+    }
+  }
+}

@@ -15,13 +15,19 @@ module.exports = app => (req, res, next) => { //eslint-disable-line
   }
 
   User.add(
+    app,
     params,
     (err, user, userProfile) => {
+      app.logger.log('User.add');
+
       //if something went wrong creating user
       if (err) {
         res.locals.setResponse(err);
         return next();
       }
+
+      user = user && user.rows[0];
+      userProfile = userProfile && userProfile.rows[0];
 
       if (!user) {
         res.locals.setResponse({ msg: 'Something went wrong' });

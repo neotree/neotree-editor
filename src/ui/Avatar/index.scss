@@ -1,0 +1,37 @@
+.ui__avatar {
+  border-radius: 50%;
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+
+  img {
+    width: inherit;
+    height: inherit;
+  }
+
+  .ui__avatarEditor {
+    position: absolute;
+    width: inherit;
+    height: inherit;
+    background: rgba(0,0,0,.3);
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    cursor: pointer;
+    transition: opacity .1s;
+  }
+
+  &:hover {
+
+    .ui__avatarEditor {
+      opacity: 1;
+    }
+  }
+}

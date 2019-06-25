@@ -5,7 +5,6 @@ import { hot } from 'react-hot-loader/root';
 import { Helmet } from 'react-helmet';
 import LazyComponent from 'LazyComponent'; // eslint-disable-line
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
-import './styles/index.css';
 
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));

@@ -1,0 +1,17 @@
+.ui__layoutHeader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 50px;
+  width: 100%;
+  background: #fff;
+  box-sizing: border-box;
+
+  .ui__layoutHeaderItem {
+    padding: 8px;
+
+    @media (min-width: 800px) {
+      padding: 10px;
+    }
+  }
+}

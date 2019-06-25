@@ -1,0 +1,42 @@
+$flexFlow: 'column', 'row', 'row wrap';
+$justify: 'flex-start', 'center', 'flex-end', 'space-around', 'space-between';
+$align: 'flex-start', 'center', 'flex-end', 'baseline', 'stretch';
+$alignSelf: join($align, ('auto'));
+
+@mixin flex($medium: "") {
+  .ui#{$medium}__flex {
+    display: flex;
+  }
+
+  .ui#{$medium}__inlineFlex {
+    display: inline-flex;
+  }
+
+  .ui#{$medium}__flexible {
+    flex: 1;
+  }
+
+  @each $flow in $flexFlow {
+    .ui#{$medium}__flex_#{join-string($flow, "_")} {
+      flex-flow: #{$flow};
+    }
+  }
+
+  @each $pos in $justify {
+    .ui#{$medium}__justifyContent_#{str-replace($pos, "-", "")} {
+      justify-content: #{$pos};
+    }
+  }
+
+  @each $pos in $align {
+    .ui#{$medium}__alignItems_#{str-replace($pos, "-", "")} {
+      align-items: #{$pos};
+    }
+  }
+
+  @each $pos in $alignSelf {
+    .ui#{$medium}__alignSelf_#{str-replace($pos, "-", "")} {
+      align-self: #{$pos};
+    }
+  }
+}

@@ -1,0 +1,59 @@
+@import "ui-variables";
+
+@font-face {
+  font-family: MainFont;
+  src: url(fonts/OpenSans-Light.woff);
+}
+@font-face {
+  font-family: MainFont-Bold;
+  src: url(fonts/OpenSans-Bold.woff);
+}
+@font-face {
+  font-family: MainFont-SemiBold;
+  src: url(fonts/OpenSans-SemiBold.woff);
+}
+@font-face {
+  font-family: MainFont-Regular;
+  src: url(fonts/OpenSans-Regular.woff);
+}
+
+@import "ui-fonts";
+@import "ui-colors";
+@import "ui-text";
+@import "ui-cursor";
+@import "ui-flex";
+
+@include uiColors;
+@include uiCursor;
+@include uiText;
+@include flex;
+
+[disabled] {
+  cursor: not-allowed;
+}
+
+.ui__shadow {
+  box-shadow: 0 1px 3px rgba(0,0,0,.13);
+}
+
+.ui__smallFontSize {
+  font-size: 16px;
+}
+
+.ui__superSmallFontSize {
+  font-size: 12px;
+}
+
+.ui__compact {
+  &, & * {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.ui__ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -7,6 +7,9 @@ import 'react-mdl/extra/material.js';
 import configureStore from 'store';  // eslint-disable-line
 import App from './App';
 
+import './ui/_styles/index.scss';
+import './App/styles/index.css';
+
 const store = configureStore();
 
 const render = Component => {

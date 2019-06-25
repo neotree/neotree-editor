@@ -1,94 +1,45 @@
-import React, { Component } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
-import { withRouter } from 'react-router-dom';
-import { Button, Textfield } from 'react-mdl';
+import cx from 'classnames';
 import reduxComponent from 'reduxComponent';  // eslint-disable-line
-import FormButtonBar from 'FormButtonBar'; // eslint-disable-line
+import { Container } from 'ui';  // eslint-disable-line
+import Form from './Form';
 
-export class LoginPage extends Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            username: 'm.giaccone@neotree.org',
-            password: 'password'
-        };
-    }
-
-    handleInputChange = (name, event) => {
-        this.setState({ ...this.state, [name]: event.target.value });
-    };
-
-    handleKeyPress = (event) => {
-        if (event.key === 'Enter') {
-            this.handleSubmitClick();
-        }
-    };
-
-    handleSubmitClick = () => {
-        const { actions, history } = this.props;
-        const { username, password } = this.state;
-        this.setState({ authenticating: true });
-        actions.post('sign-in', {
-          username,
-          password,
-          onResponse: () => {
-            this.setState({ authenticating: false });
-          },
-          onSuccess: () => {
-            history.push('/dashboard');
-          },
-          onFailure: authenticateError => {
-            this.setState({ authenticateError });
-          }
-        });
-    };
-
-    render() {
-        const { authenticateError } = this.state;
-        const styles = {
-            container: {
-                display: 'flex',
-                boxSizing: 'border-box',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-            },
-            form: {
-                width: '420px'
-            }
-        };
-
-        return (
-            <div style={styles.container}>
-                <div style={styles.form}>
-
-                    {authenticateError ?
-                      <div>{authenticateError.msg || authenticateError.message
-                        | JSON.stringify(authenticateError)}</div> : null}
-
-                    <Textfield
-                        style={{ width: '100%' }}
-                        floatingLabel
-                        label="Email address"
-                        onChange={this.handleInputChange.bind(this, 'username')}
-                        onKeyPress={this.handleKeyPress}
-                    />
-                    <Textfield
-                        style={{ width: '100%' }}
-                        type="password"
-                        floatingLabel
-                        label="Password"
-                        onChange={this.handleInputChange.bind(this, 'password')}
-                        onKeyPress={this.handleKeyPress}
-                    />
-
-                    <FormButtonBar>
-                        <Button onClick={this.handleSubmitClick}raised accent ripple>Login</Button>
-                    </FormButtonBar>
-                </div>
-            </div>
-        );
-    }
+export class LoginPage extends React.Component {
+  render() {
+    return (
+      <Container>
+        {({ windowHeight }) => (
+          <div
+            className={cx('ui__flex')}
+            style={{
+              height: windowHeight,
+              width: '100%',
+              left: 0,
+              right: 0,
+              position: 'fixed',
+              overflowY: 'auto',
+              padding: '25px 0',
+              boxSizing: 'border-box'
+            }}
+          >
+            <Form {...this.props} style={{ margin: 'auto' }} />
+          </div>
+        )}
+      </Container>
+    );
+  }
 }
 
-export default hot(withRouter(reduxComponent(LoginPage)));
+LoginPage.propTypes = {
+  authAction: PropTypes.oneOf(['sign-in', 'sign-up']).isRequired
+};
+
+export default hot(
+  reduxComponent(LoginPage, (state, ownProps) => {
+    return {
+      authAction: ownProps.authAction || ownProps.match.params.authAction
+    };
+  })
+);

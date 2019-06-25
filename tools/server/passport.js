@@ -1,21 +1,24 @@
 import passport from 'passport';
 import bcrypt from 'bcryptjs';
-import User from './models/User';
 
 const LocalStrategy = require('passport-local').Strategy;
 
 export default app => {
   passport.serializeUser((user, done) => {
-    done(null, { id: user.id, profile: user.profile });
+    // app.logger.log('passport.serializeUser');
+    done(null, { id: user.id });
   });
 
-  passport.deserializeUser((id, done) => {
-    User.findUser(
-      app.db,
-      { id },
-      'id',
-      (err, user) => {
-        done(null, user);
+  passport.deserializeUser((user, done) => {
+    // app.logger.log('passport.deserializeUser');
+    app.pool.query(
+      'SELECT id from users WHERE "id"=$1',
+      [user.id],
+      (err, rslts) => {
+        if (err) {
+          return done(err);
+        }
+        done(null, rslts.rows[0]);
       }
     );
   });
@@ -23,13 +26,15 @@ export default app => {
   /******************************************************************************
   *****************************LOCAL STRATEGY************************************/
   passport.use(new LocalStrategy((username, password, done) => {
-    User.findUser(
-      app.db,
-      { email: username },
-      'id email password',
-      (err, user) => {
-        if (err) return done(err);
-
+    // app.logger.log('new passport.LocalStrategy()');
+    app.pool.query(
+      'SELECT id, "email", "password" from users WHERE "email"=$1',
+      [username],
+      (err, rslts) => {
+        if (err) {
+          return done(err);
+        }
+        const user = rslts.rows[0];
         if (!user) {
           return done(null, false, { type: 'NOT_FOUND', msg: 'Incorrect username or password' });
         }
