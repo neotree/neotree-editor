@@ -6,7 +6,7 @@ import Toolbar from 'Toolbar'; // eslint-disable-line
 import ScreensList from '../../../Screens/List';
 import DiagnosisList from '../../../Diagnosis/List';
 
-export default class ScriptEdit extends Component {
+export default class Display extends Component {
   state = {
     activeTab: 0,
     script: {
@@ -14,23 +14,6 @@ export default class ScriptEdit extends Component {
       description: ''
     }
   };
-
-  componentWillMount() {
-    const { isEditMode, actions } = this.props;
-    if (isEditMode) {
-      const script = {
-        id: '-KO1TK4zMvLhxTw6eKia',
-        createdAt: 1469994062321,
-        description: 'Admission',
-        scriptId: '-KO1TK4zMvLhxTw6eKia',
-        source: 'editor',
-        title: 'NeoTree - Malawi',
-        updatedAt: 1558422326088
-      };
-      this.setState({ script });
-      actions.updateApiData({ script });
-    }
-  }
 
   handleBackClick = () => this.props.history.goBack();
 
@@ -165,7 +148,7 @@ export default class ScriptEdit extends Component {
   }
 }
 
-ScriptEdit.propTypes = {
+Display.propTypes = {
   actions: PropTypes.object.isRequired,
   history: PropTypes.object.isRequired,
   isEditMode: PropTypes.bool.isRequired,

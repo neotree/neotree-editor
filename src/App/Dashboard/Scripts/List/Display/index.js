@@ -144,7 +144,7 @@ class Display extends Component {
             <Icon name="add" />
         </FABButton>
         <div style={styles.container}>
-            {(scripts) ? renderTable : renderEmptyTable}
+            {scripts.length ? renderTable : renderEmptyTable}
         </div>
         {confirmDeleteDialog}
       </div>

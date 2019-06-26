@@ -6,43 +6,24 @@ import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Display from './Display';
 
 export class List extends React.Component {
+  state = {};
+
   componentWillMount() {
-    setTimeout(() => this.props.actions.updateApiData({
-      diagnosis: [
-        {
-          createdAt: 1484640928235,
-          description: 'VLBW',
-          diagnosisId: '-KafUfvh9W0W2mgpRkUi',
-          expression: '$BW > 999 and $BW < 1500',
-          name: 'Very Low Birth Weight (1000-1499g)',
-          source: 'editor',
-          updatedAt: 1484989464332
-        },
-        {
-          createdAt: 1484640023982,
-          description: 'LBW',
-          diagnosisId: '-KafRE9lw2W10fIlXulm',
-          expression: '$BW > 1499 and $BW < 2500',
-          name: 'Low Birth Weight (1500-2499g)',
-          source: 'editor',
-          text1: 'Keep warm',
-          updatedAt: 1511374119781
-        },
-        {
-          createdAt: 1484639885664,
-          description: 'Jaundice',
-          diagnosisId: '-KafQhNoWNH1PBcd2wYW',
-          expression: '$Colour = "Yell"',
-          name: 'Neonatal Jaundice',
-          source: 'editor',
-          updatedAt: 1484989440514
-        }
-      ]
-    }), 1000);
+    const { actions, scriptId } = this.props;
+    this.setState({ loadingDiagnoses: true });
+    actions.post('get-diagnoses', {
+      scriptId,
+      onResponse: () => this.setState({ loadingDiagnoses: false }),
+      onFailure: loadDiagnosesError => this.setState({ loadDiagnosesError }),
+      onSuccess: ({ payload }) => {
+      this.setState({ diagnoses: payload.diagnoses });
+      actions.updateApiData({ diagnoses: payload.diagnoses });
+      }
+    });
   }
 
   componentWillUnmount() {
-    this.props.actions.updateApiData({ scripts: [] });
+    this.props.actions.updateApiData({ diagnoses: [] });
   }
 
   render() {
@@ -56,6 +37,6 @@ List.propTypes = {
 
 export default hot(withRouter(
   reduxComponent(List, state => ({
-    diagnosis: state.apiData.diagnosis || []
+    diagnoses: state.apiData.diagnoses || []
   }))
 ));

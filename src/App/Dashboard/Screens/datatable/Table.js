@@ -1,21 +1,19 @@
 import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import clamp from 'clamp';
-import shadows from '../../utils/shadows';
-import randomstring from 'randomstring';
-
 import { IconButton } from 'react-mdl';
-
 import { SortableContainer, SortableElement, SortableHandle, arrayMove } from 'react-sortable-hoc';
+import randomstring from 'randomstring';
+import shadows from 'App/utils/shadows'; // eslint-disable-line
 
 export default class Table extends Component {
-
     static propTypes = {
-        className: React.PropTypes.string,
-        onSort: React.PropTypes.func,
-        rowKeyColumn: React.PropTypes.string,
-        rows: React.PropTypes.arrayOf(React.PropTypes.object).isRequired,
-        shadow: React.PropTypes.number
+        className: PropTypes.string,
+        onSort: PropTypes.func,
+        rowKeyColumn: PropTypes.string,
+        rows: PropTypes.arrayOf(PropTypes.object).isRequired,
+        shadow: PropTypes.number
     };
 
     // handleLeftNavClick = () => {

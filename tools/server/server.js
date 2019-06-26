@@ -16,7 +16,7 @@ app = setAppMiddlewares(app, { dbConfig });
 // app.use(serveFavicon(path.resolve(__dirname, '../src/favicon.ico')));
 
 //webpack
-const compiler = webpack(webpackConfig, (...args) => console.log('webpack', ...args));
+const compiler = webpack(webpackConfig);
 app.use(webpackDevMiddleware(compiler, {
   noInfo: true,
   publicPath: webpackConfig.output.publicPath

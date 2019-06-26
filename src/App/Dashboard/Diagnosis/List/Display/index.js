@@ -31,7 +31,7 @@ class Display extends Component {
       onFailure: deleteDiagnosisError => this.setState({ deleteDiagnosisError }),
       onSuccess: () => {
         actions.updateApiData(state =>
-          ({ scripts: state.scripts.filter(conf => conf.id !== id) }));
+          ({ diagnoses: state.diagnoses.filter(d => d.id !== id) }));
         this.closeDeleteConfirmDialog();
       }
     });
@@ -45,7 +45,7 @@ class Display extends Component {
   });
 
   render() {
-    const { diagnosis } = this.props;
+    const { diagnoses } = this.props;
 
     const styles = {
       diagnosis: {
@@ -89,8 +89,8 @@ class Display extends Component {
               <IconButton name="add" onClick={this.handleAddDiagnosisClick} />
             </div>
           </Toolbar>
-          {diagnosis.length > 0 ?
-            <DataTable style={{ width: '780px' }} shadow={0} rows={diagnosis || []}>
+          {diagnoses.length > 0 ?
+            <DataTable style={{ width: '780px' }} shadow={0} rows={diagnoses || []}>
               <TableHeader name="name">Name</TableHeader>
               <TableHeader name="description">Description</TableHeader>
               <TableHeader name="diagnosisId" style={{ width: '48px' }} cellFormatter={renderItemActions} />

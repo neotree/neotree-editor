@@ -3,11 +3,34 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
-import Editor from './Editor';
+import Display from './Display';
 
 export class ScriptEditor extends React.Component {
+  state = {};
+
+  componentWillMount() {
+    const { scriptId, actions, isEditMode } = this.props;
+
+    if (isEditMode) {
+      this.setState({ loadingScript: true });
+      actions.post('get-script', {
+         scriptId,
+         onResponse: () => this.setState({ loadingScript: false }),
+         onFailure: loadScriptError => this.setState({ loadScriptError }),
+         onSuccess: ({ payload }) => {
+           this.setState({ script: payload.script });
+           actions.updateApiData({ script: payload.script });
+         }
+      });
+    }
+  }
+
+  componentWillUnmount() {
+    this.props.actions.updateApiData({ script: null });
+  }
+
   render() {
-    return <Editor {...this.props} />;
+    return <Display {...this.props} />;
   }
 }
 
@@ -21,6 +44,6 @@ export default hot(withRouter(
   reduxComponent(ScriptEditor, (state, ownProps) => ({
     script: state.apiData.script,
     scriptId: ownProps.match.params.scriptId,
-    isEditMode: ownProps.match.params.scriptId !== 'new'
+    isEditMode: state.apiData.script ? true : false
   }))
 ));

@@ -6,38 +6,19 @@ import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import List from './List';
 
 export class ConfigKeys extends React.Component {
+  state = {};
+
   componentWillMount() {
-    setTimeout(() => this.props.actions.updateApiData({
-      configKeys: [
-        {
-          id: '-KNx1hamQK7hWcS7BZ8d',
-          configKey: 'Offline',
-          configKeyId: '-KNx1hamQK7hWcS7BZ8d',
-          createdAt: 1469902936651,
-          label: 'Offline mode only',
-          source: 'editor',
-          summary: 'Set offline mode'
-        },
-        {
-          id: '-KOumRfEbH0-ZmNmqx4X',
-          configKey: 'NoPulseOx',
-          configKeyId: '-KOumRfEbH0-ZmNmqx4X',
-          createdAt: 1470938860364,
-          label: 'Pulse oximeter unavailable',
-          source: 'editor',
-          summary: 'Set no pulse oximeter mode'
-        },
-        {
-          id: '-KOumf97Eyh88wnz_Aq1',
-          configKey: 'NoBSmon',
-          configKeyId: '-KOumf97Eyh88wnz_Aq1',
-          createdAt: 1470938919683,
-          label: 'Blood sugar monitor not available',
-          source: 'editor',
-          summary: 'Set no blood sugar monitor mode '
-        }
-      ]
-    }), 2000);
+    const { actions } = this.props;
+    this.setState({ loadingConfigKeys: true });
+    actions.post('get-config-keys', {
+      onResponse: () => this.setState({ loadingConfigKeys: false }),
+      onFailure: loadConfigKeysError => this.setState({ loadConfigKeysError }),
+      onSuccess: ({ payload }) => {
+        this.setState({ configKeys: payload.configKeys });
+        actions.updateApiData({ configKeys: payload.configKeys });
+      }
+    });
   }
 
   componentWillUnmount() {
