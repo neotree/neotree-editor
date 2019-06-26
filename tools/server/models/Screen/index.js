@@ -5,8 +5,13 @@ export const createScreensTable = app => {
   const table = `CREATE TABLE IF NOT EXISTS
       screens(
         id UUID PRIMARY KEY,
-        actions_text VARCHAR(128),
+        action_text VARCHAR(128),
+        content_text VARCHAR(128),
+        notes VARCHAR(128),
+        condition VARCHAR(128),
+        info_text VARCHAR(128),
         epic_id VARCHAR(128),
+        ref_id VARCHAR(128),
         title VARCHAR(128),
         source VARCHAR(128),
         step VARCHAR(128),
@@ -14,6 +19,8 @@ export const createScreensTable = app => {
         section_title VARCHAR(128),
         type VARCHAR(128),
         metadata: JSON,
+        order: INT NOT NULL,
+        position: INT NOT NULL,
         created_date TIMESTAMP,
         modified_date TIMESTAMP,
         author UUID NOT NULL,

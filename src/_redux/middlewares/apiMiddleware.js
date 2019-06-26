@@ -23,11 +23,11 @@ export const API_MIDDLEWARE = (/*store*/) => (next) => (action) => {
     payload: _payload,
     name
   });
-  
+
   postData(`/${name}`, _payload, API_METHOD)
     .then(r => {
       if (onResponse) onResponse(r);
-      if (!r.ok) return { error: { msg: 'Ooops, something went wrong' } };
+      if (!r.ok) return { error: { msg: `HTTP ERROR (${r.status}): ${r.statusText}` } };
       if (r.redirected) {
         global.window.location = r.url;
         return next({ type: 'FORCING_REDIRECT' });

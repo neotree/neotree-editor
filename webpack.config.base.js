@@ -17,7 +17,11 @@ export default {
     rules: [
       {
         test: /\.js$/,
-        include: path.resolve(__dirname, './src'),
+        include: [
+          path.resolve(__dirname, 'src'),
+          path.resolve(__dirname, '_config'),
+          path.resolve(__dirname, '_utils')
+        ],
         use: [{ loader: 'babel-loader' }]
       },
       {

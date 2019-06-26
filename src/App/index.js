@@ -9,6 +9,7 @@ import reduxComponent from 'reduxComponent'; // eslint-disable-line
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));
 const Dashboard = LazyComponent(() => import('./Dashboard'));
+const ImportFirebasePage = LazyComponent(() => import('./ImportFirebasePage'));
 
 export class App extends React.Component {
   state = {
@@ -46,6 +47,11 @@ export class App extends React.Component {
         </Helmet>
 
         <Switch>
+          <Route
+            exact
+            path="/import-firebase"
+            render={routeProps => <ImportFirebasePage {...this.props} {...routeProps} />}
+          />
           <Route
             path="/dashboard"
             render={routeProps => <Dashboard {...this.props} {...routeProps} />}

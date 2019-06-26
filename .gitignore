@@ -2,3 +2,4 @@ node_modules/
 *.log
 npm-debug.*
 _config/database.*
+tools/server/tmp_uploads
