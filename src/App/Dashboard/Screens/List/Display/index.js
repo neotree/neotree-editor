@@ -18,6 +18,7 @@ import { Table, TableHeader } from '../../datatable';
 import Toolbar from 'Toolbar';  // eslint-disable-line
 import { arrayMove } from 'App/utils'; // eslint-disable-line
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 /*eslint-disable quotes*/
 /*eslint-disable quote-props*/
@@ -29,70 +30,6 @@ class Display extends Component {
     screens: [],
     addScreenType: DEFAULT_SCREEN_TYPE
   };
-
-  componentWillMount() {
-    setTimeout(() => this.props.actions.updateApiData({
-      screen: {
-        "actionText" : "Further Triage",
-        "condition" : "$BabyCryTriage = false",
-        "contentText" : "Briefly check ABCD:\n\nA: Airway - is the airway open?\n\nB: Breathing - is the baby breathing?\n\nC: Circulation - is heart rate over 100? \n\nD: Disability - how is the tone?",
-        "createdAt" : 1470086025701,
-        "epicId" : "1.3",
-        "metadata" : {
-          "confidential" : false,
-          "dataType" : "id",
-          "items" : [{
-            "confidential" : false,
-            "dataType" : "id",
-            "id" : "NotBr",
-            "label" : "NOT BREATHING! ",
-            "position" : 1
-          }, {
-            "confidential" : false,
-            "dataType" : "id",
-            "id" : "Gasp",
-            "label" : "GASPING or irregular breathing ",
-            "position" : 2
-          }, {
-            "confidential" : false,
-            "dataType" : "id",
-            "id" : "HRLow",
-            "label" : "Normal breathing but HR < 100 ",
-            "position" : 3
-          }, {
-            "confidential" : false,
-            "dataType" : "id",
-            "id" : "Floppy",
-            "label" : "VERY FLOPPY (normal breathing & HR)",
-            "position" : 4
-          }, {
-            "confidential" : false,
-            "dataType" : "id",
-            "id" : "Stable",
-            "label" : "Stable ",
-            "position" : 5
-          }],
-          "key" : "FurtherTriage",
-          "label" : "Further Triage"
-        },
-        "order" : 4,
-        "position" : 2,
-        "refId" : "ABCD",
-        "screenId" : "-KO6x6XzXBCZvk3nyc8B",
-        "sectionTitle" : "Emergency Triage",
-        "source" : "editor",
-        "step" : "2/3",
-        "storyId" : "ET2",
-        "title" : "EMERGENCY TRIAGE ",
-        "type" : "single_select",
-        "updatedAt" : 1487321223314
-      }
-    }), 1000);
-  }
-
-  componentWillUnmount() {
-    this.props.actions.updateApiData({ screen: null });
-  }
 
   handleAddScreenClick = () => {
     const { actions, scriptId, history } = this.props;
@@ -170,11 +107,11 @@ class Display extends Component {
       }
     };
 
-    const renderItemActions = (screenId, rowData) => {
+    const renderItemActions = id => {
       return (
         <div style={{ display: 'flex', flexDirection:'row', alignContent: 'end', color: "#999999" }}>
-          <IconButton name="edit" onClick={this.handleEditScreenClick(rowData.$id)} />
-          <IconButton name="delete" onClick={this.handleDeleteScreenClick(rowData.$id)} />
+          <IconButton name="edit" onClick={this.handleEditScreenClick(id)} />
+          <IconButton name="delete" onClick={this.handleDeleteScreenClick(id)} />
         </div>
       );
     };
@@ -226,7 +163,7 @@ class Display extends Component {
           {(screens && screens.length > 0) ?
             <Table
               style={styles.table}
-              rows={(screens) ? screens : []}
+              rows={screens.map(scr => ({ id: scr.id, ...scr.data }))}
               rowKeyColumn="position"
               onSort={this.swapScreenItems}
             >
@@ -236,7 +173,7 @@ class Display extends Component {
                 <TableHeader name="storyId">Story</TableHeader>
                 <TableHeader name="refId">Ref.</TableHeader>
                 <TableHeader name="title" style={{ width: '100%' }} cellFormatter={ellipsizeTitle}>Title</TableHeader>
-                <TableHeader name="screenId" style={{ width: '48px' }} cellFormatter={renderItemActions} />
+                <TableHeader name="id" style={{ width: '48px' }} cellFormatter={renderItemActions} />
             </Table>
             :
             <CardText>

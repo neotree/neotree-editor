@@ -11,8 +11,19 @@ export default class Display extends Component {
     activeTab: 0,
     script: {
       title: '',
-      description: ''
+      description: '',
+      ...(this.props.script || {}).data
     }
+  };
+
+  componentWillUpdate(nextProps) {
+    if (nextProps.script !== this.props.script) {
+      this.setScriptAsState(nextProps);
+    }
+  }
+
+  setScriptAsState = (props = this.props) => {
+    if (props.script) this.setState({ script: props.script.data });
   };
 
   handleBackClick = () => this.props.history.goBack();
@@ -37,9 +48,11 @@ export default class Display extends Component {
 
     this.setState({ savingScript: true });
     actions.post(isEditMode ? 'update-script' : 'create-script', {
-      id: scriptId,
-      title: script.title,
-      description: script.description,
+      ...(isEditMode ? { id: scriptId } : {}),
+      data: {
+        title: script.title,
+        description: script.description
+      },
       onResponse: () => this.setState({ savingScript: true }),
       onFailure: saveScriptError => this.setState({ saveScriptError }),
       onSuccess: ({ payload }) => {

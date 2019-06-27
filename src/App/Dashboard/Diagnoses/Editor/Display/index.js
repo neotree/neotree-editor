@@ -14,7 +14,7 @@ import SymptomList from '../metadata/SymptomList';
 
 export class Display extends React.Component {
   state = {
-    diagnosis: this.props.diagnosis || {
+    diagnosis: this.props.diagnosis ? this.props.diagnosis.data : {
       name: null,
       description: null,
       expression: null,
@@ -26,6 +26,16 @@ export class Display extends React.Component {
       image3: null,
       symptoms: null
     }
+  };
+
+  componentWillUpdate(nextProps) {
+    if (nextProps.diagnosis !== this.props.diagnosis) {
+      this.setDiagnosisAsState(nextProps);
+    }
+  }
+
+  setDiagnosisAsState = (props = this.props) => {
+    if (props.diagnosis) this.setState({ diagnosis: props.diagnosis.data });
   };
 
   handleInputChange = (name, event) => this.setState({

@@ -28,7 +28,7 @@ export default (app, { scripts, created_date, author }, done) => {
       });
 
       const insertScreens = () => new Promise((resolve) => {
-        screens.forEach(({ createdAt, updatedAt, scriptId, screenId, ...screen }, i) => { // eslint-disable-line
+        screens.forEach(({ createdAt, updatedAt, scriptId, screenId, position, type, ...screen }, i) => { // eslint-disable-line
           const isLast = i === (screens.length - 1);
           const screen_id = uuid();
 
@@ -37,8 +37,8 @@ export default (app, { scripts, created_date, author }, done) => {
             script_id,
             created_date,
             author,
-            position: screen.position || null,
-            type: screen.type || null,
+            position,
+            type,
             data: JSON.stringify(screen)
           }, err => {
             if (err) console.log(err);

@@ -3,8 +3,8 @@ import uuid from 'uuidv4';
 export default {
   get: (pool, table, { select, where }, cb) => {
     select = select || ['*'];
-    const keys = Object.keys(where);
-    const values = Object.values(where);
+    const keys = Object.keys(where || {});
+    const values = Object.values(where || {});
     where = !keys.length ? '' : `WHERE ${keys.map((key, i) => `"${key}"=$${i + 1}`).join(', ')}`;
     const q = `SELECT ${select.join(', ')} from ${table} ${where};`.trim();
     console.log(q);

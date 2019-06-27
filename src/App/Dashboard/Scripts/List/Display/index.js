@@ -18,6 +18,7 @@ import {
     MenuItem,
     TableHeader
 } from 'react-mdl';
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 class Display extends Component {
   constructor(props) {
@@ -37,6 +38,7 @@ class Display extends Component {
   handleDeleteClick = () => {
     const { actions } = this.props;
     const id = this.state.scriptIdForAction;
+    this.setState({ deletingScript: true });
     actions.post('delete-script', {
       id,
       onResponse: () => this.setState({ deletingScript: false }),
@@ -58,11 +60,13 @@ class Display extends Component {
   closeDeleteConfirmDialog = () => this.setState({
     ...this.state,
     openDeleteConfirmDialog: false,
-    scriptIdForAction: null
+    scriptIdForAction: null,
+    deleteScriptError: null
   });
 
   render() {
     const { scripts } = this.props;
+    const { deletingScript, deleteScriptError } = this.state;
     const styles = {
       container: {
         display: 'flex',
@@ -83,14 +87,26 @@ class Display extends Component {
 
     const confirmDeleteDialog = (
       <Dialog open={this.state.openDeleteConfirmDialog}>
-        <DialogTitle>Delete</DialogTitle>
-        <DialogContent>
-            <p>Are you sure you want to delete this script?</p>
-        </DialogContent>
-        <DialogActions>
-          <Button type='button' onClick={this.handleDeleteClick} accent>Delete</Button>
-          <Button type='button' onClick={this.closeDeleteConfirmDialog}>Cancel</Button>
-        </DialogActions>
+        {[
+          <DialogTitle>Delete</DialogTitle>,
+          <DialogContent>
+            {deletingScript ?
+              <Spinner className="ui__flex ui__justifyContent_center" />
+              :
+              <div>
+                {deleteScriptError ?
+                  <div className="ui__dangerColor">{deleteScriptError.msg || deleteScriptError.message
+                    || JSON.stringify(deleteScriptError)}</div>
+                  :
+                  <p>Are you sure you want to delete this configuration key?</p>}
+              </div>}
+          </DialogContent>,
+          deletingScript ? null :
+            <DialogActions>
+              <Button type='button' onClick={this.handleDeleteClick} accent>Delete</Button>
+              <Button type='button' onClick={this.closeDeleteConfirmDialog}>Cancel</Button>
+            </DialogActions>
+        ].map((child, i) => child && React.cloneElement(child, { key: i }))}
       </Dialog>
     );
 
@@ -117,7 +133,11 @@ class Display extends Component {
 
     const renderTable = (
       <div>
-        <DataTable style={{ width: '780px' }} shadow={0} rows={scripts}>
+        <DataTable
+          style={{ width: '780px' }}
+          shadow={0}
+          rows={scripts.map(scr => ({ id: scr.id, ...scr.data }))}
+        >
           <TableHeader name="title">Title</TableHeader>
           <TableHeader name="description">Description</TableHeader>
           <TableHeader name="id" style={{ width: '64px' }} cellFormatter={renderEditButton} />

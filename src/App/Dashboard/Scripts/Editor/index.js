@@ -12,7 +12,7 @@ export class ScriptEditor extends React.Component {
   componentWillMount() {
     const { scriptId, actions } = this.props;
 
-    if (scriptId) {
+    if (scriptId && (scriptId !== 'new')) {
       this.setState({ loadingScript: true });
       actions.get('get-script', {
          id: scriptId,

@@ -4,20 +4,19 @@ import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Display from './Display';
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
-export class ScriptEditor extends React.Component {
+export class DiagnosisEditor extends React.Component {
   state = {};
 
   componentWillMount() {
-    const { scriptId, diagnosisId, actions, isEditMode } = this.props;
-
-    if (isEditMode) {
-      this.setState({ loadingScript: true });
+    const { diagnosisId, actions } = this.props;
+    if (diagnosisId && (diagnosisId !== 'new')) {
+      this.setState({ loadingDiagnosis: true });
       actions.get('get-diagnosis', {
          id: diagnosisId,
-         scriptId,
-         onResponse: () => this.setState({ loadingScript: false }),
-         onFailure: loadScriptError => this.setState({ loadScriptError }),
+         onResponse: () => this.setState({ loadingDiagnosis: false }),
+         onFailure: loadDiagnosisError => this.setState({ loadDiagnosisError }),
          onSuccess: ({ payload }) => {
            this.setState({ diagnosis: payload.diagnosis });
            actions.updateApiData({ diagnosis: payload.diagnosis });
@@ -31,18 +30,22 @@ export class ScriptEditor extends React.Component {
   }
 
   render() {
+    const { loadingDiagnosis } = this.state;
+
+    if (loadingDiagnosis) return <Spinner className="ui__flex ui__justifyContent_center" />;
+
     return <Display {...this.props} />;
   }
 }
 
-ScriptEditor.propTypes = {
+DiagnosisEditor.propTypes = {
   actions: PropTypes.object,
   diagnosisId: PropTypes.string.isRequired,
   isEditMode: PropTypes.bool.isRequired
 };
 
 export default hot(withRouter(
-  reduxComponent(ScriptEditor, (state, ownProps) => ({
+  reduxComponent(DiagnosisEditor, (state, ownProps) => ({
     diagnosis: state.apiData.diagnosis,
     diagnosisId: ownProps.match.params.diagnosisId,
     scriptId: ownProps.match.params.scriptId,

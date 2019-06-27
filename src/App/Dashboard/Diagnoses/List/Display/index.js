@@ -8,6 +8,7 @@ import {
   TableHeader
 } from 'react-mdl';
 import Toolbar from 'Toolbar'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 class Display extends Component {
   constructor(props) {
@@ -65,7 +66,7 @@ class Display extends Component {
       }
     };
 
-    const renderItemActions = (screenId, rowData) => {
+    const renderItemActions = id => {
       return (
         <div
           style={{
@@ -75,8 +76,8 @@ class Display extends Component {
             color: '#999999'
           }}
         >
-          <IconButton name="edit" onClick={this.handleEditDiagnosisClick(rowData.$id)} />
-          <IconButton name="delete" onClick={this.handleDeleteDiagnosisClick(rowData.$id)} />
+          <IconButton name="edit" onClick={this.handleEditDiagnosisClick(id)} />
+          <IconButton name="delete" onClick={this.handleDeleteDiagnosisClick(id)} />
         </div>
       );
     };
@@ -90,10 +91,14 @@ class Display extends Component {
             </div>
           </Toolbar>
           {diagnoses.length > 0 ?
-            <DataTable style={{ width: '780px' }} shadow={0} rows={diagnoses || []}>
+            <DataTable
+              style={{ width: '780px' }}
+              shadow={0}
+              rows={diagnoses.map(d => ({ id: d.id, ...d.data }))}
+            >
               <TableHeader name="name">Name</TableHeader>
               <TableHeader name="description">Description</TableHeader>
-              <TableHeader name="diagnosisId" style={{ width: '48px' }} cellFormatter={renderItemActions} />
+              <TableHeader name="id" style={{ width: '48px' }} cellFormatter={renderItemActions} />
             </DataTable>
             :
             <CardText>

@@ -15,6 +15,7 @@ import {
     TableHeader,
     Textfield
 } from 'react-mdl';
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 class List extends Component {
   constructor(props) {
@@ -23,7 +24,9 @@ class List extends Component {
       openDeleteConfirmDialog: false,
       openCreateConfigKeyDialog: false,
       configKeyIdForAction: '',
-      configKeys: ''
+      configKey: '',
+      label: '',
+      summary: ''
     };
   }
 
@@ -34,12 +37,10 @@ class List extends Component {
 
   handleCreateClick = () => {
     const { actions } = this.props;
-    const { addConfigKey, addConfigLabel, addConfigSummary } = this.state;
+    const { configKey, label, summary } = this.state;
     this.setState({ creatingConfigKey: true });
     actions.post('create-config-key', {
-      addConfigKey,
-      addConfigLabel,
-      addConfigSummary,
+      data: { configKey, label, summary },
       onResponse: () => this.setState({ creatingConfigKey: false }),
       onFailure: createConfigKeyError => this.setState({ createConfigKeyError }),
       onSuccess: newKey => {
@@ -74,9 +75,9 @@ class List extends Component {
   closeCreateConfigKeyDialog = () => this.setState({
     ...this.state,
     openCreateConfigKeyDialog: false,
-    addConfigKey: null,
-    addConfigLabel: null,
-    addConfigSummary: null
+    configKey: '',
+    label: '',
+    summary: ''
   });
 
   openDeleteConfirmDialog = (configKeyId) => this.setState({
@@ -88,13 +89,23 @@ class List extends Component {
   closeDeleteConfirmDialog = () => this.setState({
     ...this.state,
     openDeleteConfirmDialog: false,
-    configKeyIdForAction: null
+    configKeyIdForAction: null,
+    deleteScriptError: null,
+    createConfigKeyError: null
   });
 
   // TODO: Fix margin top to be more generic for all content
   render() {
     const { configKeys } = this.props;
-    const { addConfigKey, addConfigLabel, addConfigSummary } = this.state;
+    const {
+      configKey,
+      label,
+      summary,
+      deletingConfigKey,
+      deleteConfigKeyError,
+      creatingConfigKey,
+      createConfigKeyError
+    } = this.state;
 
     const styles = {
       container: {
@@ -122,43 +133,67 @@ class List extends Component {
             style={{ width: '100%' }}
             floatingLabel
             label='Key'
-            onChange={this.handleInputChange.bind(this, 'addConfigKey')}
-            value={addConfigKey}
+            onChange={this.handleInputChange.bind(this, 'configKey')}
+            value={configKey}
           />
 
           <Textfield
               style={{ width: '100%' }}
               floatingLabel
               label='Label'
-              onChange={this.handleInputChange.bind(this, 'addConfigLabel')}
-              value={addConfigLabel}
+              onChange={this.handleInputChange.bind(this, 'label')}
+              value={label}
           />
 
           <Textfield
               style={{ width: '100%' }}
               floatingLabel
               label='Summary'
-              onChange={this.handleInputChange.bind(this, 'addConfigSummary')}
-              value={addConfigSummary}
+              onChange={this.handleInputChange.bind(this, 'summary')}
+              value={summary}
 
           />
+          {createConfigKeyError ?
+            <div className="ui__dangerColor ui__textAlign_center">
+              {createConfigKeyError.msg || createConfigKeyError.message
+                || JSON.stringify(createConfigKeyError)}
+            </div>
+            :
+            null}
         </DialogContent>
         <DialogActions>
-            <Button type='button' onClick={this.handleCreateClick} accent>Create</Button>
-            <Button type='button' onClick={this.closeCreateConfigKeyDialog}>Cancel</Button>
+          {[
+            creatingConfigKey ? null :
+              <Button type='button' onClick={this.handleCreateClick} accent>Create</Button>,
+            creatingConfigKey ? null :
+              <Button type='button' onClick={this.closeCreateConfigKeyDialog}>Cancel</Button>,
+            creatingConfigKey ? <Spinner size={25} /> : null
+          ].map((child, i) => child && React.cloneElement(child, { key: i }))}
         </DialogActions>
       </Dialog>
     );
 
     const confirmDeleteDialog = (
       <Dialog open={this.state.openDeleteConfirmDialog}>
-        <DialogContent>
-          <p>Are you sure you want to delete this configuration key?</p>
-        </DialogContent>
-        <DialogActions>
-          <Button type='button' onClick={this.handleDeleteClick} accent>Delete</Button>
-          <Button type='button' onClick={this.closeDeleteConfirmDialog}>Cancel</Button>
-        </DialogActions>
+        {[
+          <DialogContent>
+            {deletingConfigKey ?
+              <Spinner className="ui__flex ui__justifyContent_center" />
+              :
+              <div>
+                {deleteConfigKeyError ?
+                  <div className="ui__dangerColor">{deleteConfigKeyError.msg || deleteConfigKeyError.message
+                    || JSON.stringify(deleteConfigKeyError)}</div>
+                  :
+                  <p>Are you sure you want to delete this configuration key?</p>}
+              </div>}
+          </DialogContent>,
+          deletingConfigKey ? null :
+            <DialogActions>
+              <Button type='button' onClick={this.handleDeleteClick} accent>Delete</Button>
+              <Button type='button' onClick={this.closeDeleteConfirmDialog}>Cancel</Button>
+            </DialogActions>
+        ].map((child, i) => child && React.cloneElement(child, { key: i }))}
       </Dialog>
     );
 
@@ -177,11 +212,14 @@ class List extends Component {
 
     const renderTable = (
       <div>
-        <DataTable style={{ width: '780px' }} shadow={0} rows={configKeys}>
+        <DataTable
+          style={{ width: '780px' }} shadow={0}
+          rows={configKeys.map(key => ({ id: key.id, ...key.data }))}
+        >
           <TableHeader name='configKey'>Key</TableHeader>
           <TableHeader name='label'>Label</TableHeader>
           <TableHeader name='summary'>Summary</TableHeader>
-          <TableHeader name='configKeyId' style={{ width: '32px' }} cellFormatter={renderItemActionButton} />
+          <TableHeader name='id' style={{ width: '32px' }} cellFormatter={renderItemActionButton} />
         </DataTable>
       </div>
     );
