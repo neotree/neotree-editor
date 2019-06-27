@@ -8,6 +8,7 @@ import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Context from './Context';
 import FileInput from 'ui/FileInput';  // eslint-disable-line
 import FileUploader from 'FileUploader'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 export class ImportFirebasePage extends React.Component {
   state = {
@@ -50,17 +51,20 @@ export class ImportFirebasePage extends React.Component {
               >{error.msg || error.message || JSON.stringify(error)}</div>
             ) : (
               <div>
-                {importingData ? <span>Importing data...</span> : (
-                  <div>
-                    {!data_import_info.date ?
-                      <FileInput
-                        value=''
-                        onChange={this.onFileInputChange}
-                      >
-                        <Button raised accent ripple>Upload firebase json file</Button>
-                      </FileInput> : <div>Firebase data was imported!!!</div>}
-                  </div>
-                )}
+                {importingData ?
+                  <Spinner className="ui__flex ui__justifyContent_center" />
+                  :
+                  (
+                    <div>
+                      {!data_import_info.date ?
+                        <FileInput
+                          value=''
+                          onChange={this.onFileInputChange}
+                        >
+                          <Button raised accent ripple>Upload firebase json file</Button>
+                        </FileInput> : <div>Firebase data was imported!!!</div>}
+                    </div>
+                  )}
               </div>
             )}
           </div>

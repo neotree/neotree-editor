@@ -51,7 +51,7 @@ export class Editor extends React.Component {
   componentWillMount() {
     const { scriptId, screenId, actions } = this.props;
     this.setState({ loadingScreen: true });
-    actions.post('get-screen', {
+    actions.get('get-screen', {
        scriptId,
        screenId,
        onResponse: () => this.setState({ loadingScreen: false }),

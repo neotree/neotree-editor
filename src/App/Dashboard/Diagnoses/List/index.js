@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 import Display from './Display';
 
 export class List extends React.Component {
@@ -11,8 +12,8 @@ export class List extends React.Component {
   componentWillMount() {
     const { actions, scriptId } = this.props;
     this.setState({ loadingDiagnoses: true });
-    actions.post('get-diagnoses', {
-      scriptId,
+    actions.get('get-diagnoses', {
+      script_id: scriptId,
       onResponse: () => this.setState({ loadingDiagnoses: false }),
       onFailure: loadDiagnosesError => this.setState({ loadDiagnosesError }),
       onSuccess: ({ payload }) => {
@@ -27,6 +28,10 @@ export class List extends React.Component {
   }
 
   render() {
+    const { loadingDiagnosess } = this.state;
+
+    if (loadingDiagnosess) return <Spinner className="ui__flex ui__justifyContent_center" />;
+
     return <Display {...this.props} />;
   }
 }

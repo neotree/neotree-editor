@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 import Display from './Display';
 
 export class List extends React.Component {
@@ -11,7 +12,7 @@ export class List extends React.Component {
   componentWillMount() {
     const { actions } = this.props;
     this.setState({ loadingScripts: true });
-    actions.post('get-scripts', {
+    actions.get('get-scripts', {
        onResponse: () => this.setState({ loadingScripts: false }),
        onFailure: loadScriptsError => this.setState({ loadScriptsError }),
        onSuccess: ({ payload }) => {
@@ -26,6 +27,10 @@ export class List extends React.Component {
   }
 
   render() {
+    const { loadingScripts } = this.state;
+
+    if (loadingScripts) return <Spinner className="ui__flex ui__justifyContent_center" />;
+
     return <Display {...this.props} />;
   }
 }

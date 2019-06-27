@@ -120,7 +120,7 @@ class Display extends Component {
         <DataTable style={{ width: '780px' }} shadow={0} rows={scripts}>
           <TableHeader name="title">Title</TableHeader>
           <TableHeader name="description">Description</TableHeader>
-          <TableHeader name="scriptId" style={{ width: '64px' }} cellFormatter={renderEditButton} />
+          <TableHeader name="id" style={{ width: '64px' }} cellFormatter={renderEditButton} />
         </DataTable>
       </div>
     );

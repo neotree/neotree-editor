@@ -13,7 +13,7 @@ export class ScriptEditor extends React.Component {
 
     if (isEditMode) {
       this.setState({ loadingScript: true });
-      actions.post('get-diagnosis', {
+      actions.get('get-diagnosis', {
          id: diagnosisId,
          scriptId,
          onResponse: () => this.setState({ loadingScript: false }),

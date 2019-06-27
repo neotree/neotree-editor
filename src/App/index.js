@@ -5,6 +5,7 @@ import { hot } from 'react-hot-loader/root';
 import { Helmet } from 'react-helmet';
 import LazyComponent from 'LazyComponent'; // eslint-disable-line
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));
@@ -30,7 +31,7 @@ export class App extends React.Component {
   render() {
     const { initialisingApp, initialiseAppError } = this.state;
 
-    if (initialisingApp) return <h1>Initialising app</h1>;
+    if (initialisingApp) return <Spinner className="ui__flex ui__justifyContent_center" />;
 
     if (initialiseAppError) {
       return (

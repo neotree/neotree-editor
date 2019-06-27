@@ -4,7 +4,7 @@ import { Button, Card, CardText, Textfield, Tab, Tabs } from 'react-mdl';
 import FormButtonBar from 'FormButtonBar'; // eslint-disable-line
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import ScreensList from '../../../Screens/List';
-import DiagnosisList from '../../../Diagnosis/List';
+import DiagnosisList from '../../../Diagnoses/List';
 
 export default class Display extends Component {
   state = {

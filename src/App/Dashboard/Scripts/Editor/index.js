@@ -3,18 +3,19 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import Spinner from 'ui/Spinner'; // eslint-disable-line
 import Display from './Display';
 
 export class ScriptEditor extends React.Component {
   state = {};
 
   componentWillMount() {
-    const { scriptId, actions, isEditMode } = this.props;
+    const { scriptId, actions } = this.props;
 
-    if (isEditMode) {
+    if (scriptId) {
       this.setState({ loadingScript: true });
-      actions.post('get-script', {
-         scriptId,
+      actions.get('get-script', {
+         id: scriptId,
          onResponse: () => this.setState({ loadingScript: false }),
          onFailure: loadScriptError => this.setState({ loadScriptError }),
          onSuccess: ({ payload }) => {
@@ -30,6 +31,10 @@ export class ScriptEditor extends React.Component {
   }
 
   render() {
+    const { loadingScript } = this.state;
+
+    if (loadingScript) return <Spinner className="ui__flex ui__justifyContent_center" />;
+
     return <Display {...this.props} />;
   }
 }

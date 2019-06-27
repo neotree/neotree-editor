@@ -1,6 +1,6 @@
-export const createScriptsTable = (
+export const createConfigKeysTable = (
   `CREATE TABLE IF NOT EXISTS
-      scripts(
+      config_keys(
         id UUID PRIMARY KEY,
         data JSON,
         created_date TIMESTAMP,

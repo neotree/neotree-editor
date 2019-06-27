@@ -3,6 +3,7 @@ import { createScriptsTable } from './Script';
 import { createDiagnosisTable } from './Diagnosis';
 import { createScreensTable } from './Screen';
 import { createFilesTable } from './File';
+import { createConfigKeysTable } from './ConfigKey';
 
 const createTables = (app, cb) => (...args) => {
   const last = args.length - 1;
@@ -48,5 +49,6 @@ export default (app, cb) => {
     createScriptsTable,
     createDiagnosisTable,
     createScreensTable,
+    createConfigKeysTable,
   );
 };

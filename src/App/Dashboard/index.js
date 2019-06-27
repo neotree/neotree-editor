@@ -24,7 +24,7 @@ import LazyComponent from 'LazyComponent'; // eslint-disable-line
 
 const AdminPassword = LazyComponent(() => import('./AdminPassword'));
 const ConfigKeys = LazyComponent(() => import('./ConfigKeys'));
-const DiagnosisEditor = LazyComponent(() => import('./Diagnosis/Editor'));
+const DiagnosisEditor = LazyComponent(() => import('./Diagnoses/Editor'));
 const ScreenEditor = LazyComponent(() => import('./Screens/Editor'));
 const ScriptEditor = LazyComponent(() => import('./Scripts/Editor'));
 const ScriptsList = LazyComponent(() => import('./Scripts/List'));
