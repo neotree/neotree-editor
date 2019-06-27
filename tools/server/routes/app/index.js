@@ -1,9 +1,11 @@
 import express from 'express';
 
-const router = express.Router();
+let router = express.Router();
 
 module.exports = app => {
   const { responseMiddleware } = app;
+
+  router = require('./importFromFirebaseMiddleware')(router, app);
 
   router.get(
     '/initialise-app',

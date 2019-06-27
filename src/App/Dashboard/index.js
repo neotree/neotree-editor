@@ -28,6 +28,7 @@ const DiagnosisEditor = LazyComponent(() => import('./Diagnosis/Editor'));
 const ScreenEditor = LazyComponent(() => import('./Screens/Editor'));
 const ScriptEditor = LazyComponent(() => import('./Scripts/Editor'));
 const ScriptsList = LazyComponent(() => import('./Scripts/List'));
+const ImportFirebasePage = LazyComponent(() => import('./ImportFirebasePage'));
 
 export class Dashboard extends React.Component {
   static childContextTypes = { setToolbarTitle: PropTypes.func };
@@ -102,11 +103,17 @@ export class Dashboard extends React.Component {
               <Link onClick={this.toggleDrawer} to="/dashboard/configkeys">Configuration</Link>
               {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
               <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
+              <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
               {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
             </Navigation>
           </Drawer>
           <Content style={styles.content}>
             <Switch>
+              <Route
+                exact
+                path="/dashboard/import-firebase"
+                render={routeProps => <ImportFirebasePage {...this.props} {...routeProps} />}
+              />
               <Route
                 exact
                 path="/dashboard"

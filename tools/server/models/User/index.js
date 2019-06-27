@@ -2,20 +2,19 @@
 import uuidv4 from 'uuidv4';
 import encryptPassword from '../encryptPassword';
 
-export const createUsersTable = app => {
-  const table = `CREATE TABLE IF NOT EXISTS
+export const createUsersTable = (
+  `CREATE TABLE IF NOT EXISTS
       users(
         id UUID PRIMARY KEY,
         email VARCHAR(128) UNIQUE NOT NULL,
         password VARCHAR(128) NOT NULL,
         created_date TIMESTAMP,
         modified_date TIMESTAMP
-      )`;
-  return app.pool.query(table);
-};
+      );`
+);
 
-export const createUserProfilesTable = app => {
-  const table = `CREATE TABLE IF NOT EXISTS
+export const createUserProfilesTable = (
+  `CREATE TABLE IF NOT EXISTS
       user_profiles(
         id UUID PRIMARY KEY,
         user_id UUID NOT NULL,
@@ -26,9 +25,8 @@ export const createUserProfilesTable = app => {
         created_date TIMESTAMP,
         modified_date TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
-      )`;
-  return app.pool.query(table);
-};
+      );`
+);
 
 const find = table => (...args) => {
   const app = args[0];

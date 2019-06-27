@@ -1,20 +1,19 @@
 /* eslint-disable camelcase*/
 import uuidv4 from 'uuidv4';
 
-export const createScriptsTable = app => {
-  const table = `CREATE TABLE IF NOT EXISTS
+export const createScriptsTable = (
+  `CREATE TABLE IF NOT EXISTS
       scripts(
         id UUID PRIMARY KEY,
-        title VARCHAR(128),
-        description VARCHAR(128),
-        source VARCHAR(128),
+        title VARCHAR,
+        description VARCHAR,
+        source VARCHAR,
         created_date TIMESTAMP,
         modified_date TIMESTAMP,
-        author UUID NOT NULL,
+        author UUID,
         FOREIGN KEY (author) REFERENCES users (id)
-      )`;
-  return app.pool.query(table);
-};
+      );`
+);
 
 export default {
   add: (app, params = {}, callback) => {

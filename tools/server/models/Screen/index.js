@@ -1,35 +1,33 @@
 /* eslint-disable camelcase*/
 import uuidv4 from 'uuidv4';
 
-export const createScreensTable = app => {
-  const table = `CREATE TABLE IF NOT EXISTS
+export const createScreensTable = (
+  `CREATE TABLE IF NOT EXISTS
       screens(
         id UUID PRIMARY KEY,
-        action_text VARCHAR(128),
-        content_text VARCHAR(128),
-        notes VARCHAR(128),
-        condition VARCHAR(128),
-        info_text VARCHAR(128),
-        epic_id VARCHAR(128),
-        ref_id VARCHAR(128),
-        title VARCHAR(128),
-        source VARCHAR(128),
-        step VARCHAR(128),
-        story_id VARCHAR(128),
-        section_title VARCHAR(128),
-        type VARCHAR(128),
-        metadata: JSON,
-        order: INT NOT NULL,
-        position: INT NOT NULL,
+        action_text VARCHAR,
+        content_text VARCHAR,
+        notes VARCHAR,
+        condition VARCHAR,
+        info_text VARCHAR,
+        epic_id VARCHAR,
+        ref_id VARCHAR,
+        title VARCHAR,
+        source VARCHAR,
+        step VARCHAR,
+        story_id VARCHAR,
+        section_title VARCHAR,
+        type VARCHAR,
+        metadata JSON,
+        position INT,
         created_date TIMESTAMP,
         modified_date TIMESTAMP,
-        author UUID NOT NULL,
-        script_id UUID NOT NULL,
+        author UUID,
+        script_id UUID,
         FOREIGN KEY (author) REFERENCES users (id),
         FOREIGN KEY (script_id) REFERENCES scripts (id)
-      )`;
-  return app.pool.query(table);
-};
+      );`
+);
 
 export default {
   add: (app, params = {}, callback) => {

@@ -18,8 +18,10 @@ export default (app, { dbConfig }) => {
   // pool.on('remove', () => logger.log('Client removed'));
   app.pool = pool;
 
-  initialiseDatabase(app, err => err &&
-    logger.log('ERROR: INITIALISE DATABASE TABLES:', err));
+  initialiseDatabase(app, (err, rslts) => {
+    if (err) return logger.log('ERROR: INITIALISE DATABASE TABLES:', err);
+    logger.log(rslts);
+  });
 
   //body-parser
   app.use(require('body-parser').json());

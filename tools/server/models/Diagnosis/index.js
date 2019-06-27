@@ -1,30 +1,29 @@
 /* eslint-disable camelcase*/
 import uuidv4 from 'uuidv4';
 
-export const createDiagnosisTable = app => {
-  const table = `CREATE TABLE IF NOT EXISTS
+export const createDiagnosisTable = (
+  `CREATE TABLE IF NOT EXISTS
       diagnoses(
         id UUID PRIMARY KEY,
-        name VARCHAR(128),
-        expression VARCHAR(128),
-        description VARCHAR(128),
-        source VARCHAR(128),
-        text1 VARCHAR(128),
-        image1 VARCHAR(128),
-        text2 VARCHAR(128),
-        image2 VARCHAR(128),
-        text3 VARCHAR(128),
-        image3 VARCHAR(128),
+        name VARCHAR,
+        expression VARCHAR,
+        description VARCHAR,
+        source VARCHAR,
+        text1 VARCHAR,
+        image1 VARCHAR,
+        text2 VARCHAR,
+        image2 VARCHAR,
+        text3 VARCHAR,
+        image3 VARCHAR,
         symptoms JSON,
         created_date TIMESTAMP,
         modified_date TIMESTAMP,
-        author UUID NOT NULL,
+        author UUID,
         script_id UUID NOT NULL,
         FOREIGN KEY (author) REFERENCES users (id),
         FOREIGN KEY (script_id) REFERENCES scripts (id)
-      )`;
-  return app.pool.query(table);
-};
+      );`
+);
 
 export default {
   add: (app, params = {}, callback) => {
