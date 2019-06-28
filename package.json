@@ -18,7 +18,7 @@
     "build:config": "babel _config --out-dir dist/_config --copy-files",
     "build:utils": "babel _utils --out-dir dist/_utils --copy-files",
     "prebuild": "npm-run-all clean-dist build:html build:server build:config build:utils",
-    "build": "babel-node tools/build.js",
+    "build": "NODE_ENV=production babel-node tools/build.js",
     "dist": "node dist/tools/server/server.prod.js"
   },
   "build": {
@@ -82,6 +82,7 @@
     "@babel/plugin-proposal-class-properties": "^7.4.4",
     "@babel/plugin-proposal-export-namespace-from": "^7.2.0",
     "@babel/plugin-syntax-dynamic-import": "^7.2.0",
+    "@babel/plugin-transform-runtime": "^7.4.4",
     "@babel/preset-env": "^7.4.5",
     "@babel/preset-react": "^7.0.0",
     "autoprefixer": "^9.6.0",
