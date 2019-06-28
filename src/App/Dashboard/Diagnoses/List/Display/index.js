@@ -19,8 +19,10 @@ class Display extends Component {
     };
   }
 
-  handleAddDiagnosisClick = () => this.props.history
-    .push('/dashboard/diagnosis/new');
+  handleAddDiagnosisClick = () => {
+    const { history, scriptId } = this.props;
+    history.push(`/dashboard/scripts/${scriptId}/diagnosis/new`);
+  };
 
   handleDeleteDiagnosisClick = id => () => {
     const { actions, scriptId } = this.props;

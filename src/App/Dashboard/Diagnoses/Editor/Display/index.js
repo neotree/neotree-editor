@@ -46,19 +46,30 @@ export class Display extends React.Component {
     }
   });
 
-  handleImageUpload = (name, fileInfo) => this.setState({ [name]: fileInfo });
+  handleImageUpload = (name, fileInfo) => this.setState({
+    diagnosis: {
+      ...this.state.diagnosis,
+      [name]: fileInfo
+    }
+  });
 
-  handleImageDelete = (name) => this.setState({ [name]: null });
+  handleImageDelete = (name) => this.setState({
+      diagnosis: {
+        ...this.state.diagnosis,
+        [name]: null
+      }
+  });
 
   handleBackClick = () => this.props.history.goBack();
 
   handleSubmitClick = () => {
-    const { isEditMode, history, actions, diagnosisId } = this.props;
+    const { isEditMode, history, actions, diagnosisId, scriptId } = this.props;
     const { diagnosis } = this.state;
 
     this.setState({ savingDiagnosis: true });
     actions.post(isEditMode ? 'update-diagnosis' : 'create-diagnosis', {
-      ...(diagnosisId ? { id: diagnosisId } : {}),
+      ...(isEditMode ? { id: diagnosisId } : {}),
+      script_id: scriptId,
       data: JSON.stringify(diagnosis),
       onResponse: () => this.setState({ savingDiagnosis: true }),
       onFailure: saveDiagnosisError => this.setState({ saveDiagnosisError }),
