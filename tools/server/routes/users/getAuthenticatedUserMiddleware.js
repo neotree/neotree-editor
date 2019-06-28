@@ -9,5 +9,5 @@ module.exports = app => (req, res, next) => { // eslint-disable-line
     return UserProfile.findOne({ where: { user_id: req.user.id } })
       .then(user => done(null, user)).catch(done);
   }
-  done(null, { authenticatedUser: null });
+  done(null, null);
 };
