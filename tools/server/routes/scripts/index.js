@@ -30,6 +30,12 @@ module.exports = app => {
   );
 
   router.post(
+    '/update-screens',
+    require('./updateScriptsMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
     '/delete-script',
     require('./deleteScriptMiddleware')(app),
     responseMiddleware

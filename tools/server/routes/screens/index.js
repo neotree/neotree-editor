@@ -17,5 +17,29 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/create-screen',
+    require('./createScreenMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/update-screen',
+    require('./updateScreenMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/update-screens',
+    require('./updateScreensMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/delete-screen',
+    require('./deleteScreenMiddleware')(app),
+    responseMiddleware
+  );
+
   return router;
 };

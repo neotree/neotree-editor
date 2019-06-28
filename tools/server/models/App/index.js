@@ -10,9 +10,9 @@ export default {
     },
     info: {
       type: Sequelize.JSON,
-      defaultValue: {},
-      get: function (value) {
-        return JSON.parse(this.getDataValue(value) || '{}');
+      defaultValue: JSON.stringify({}),
+      get: function () {
+        return JSON.parse(this.getDataValue('info') || '{}');
       },
       set: function (value) {
         this.setDataValue('info', typeof data === 'object' ? JSON.stringify(value) : value);

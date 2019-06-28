@@ -37,7 +37,7 @@ class Display extends Component {
 
     this.setState({ addingScreen: false });
     actions.post('create-screen', {
-      scriptId,
+      script_id: scriptId,
       type: addScreenType,
       onResponse: () => this.setState({ addingScreen: false }),
       onFailure: addScreenError => this.setState({ addScreenError }),
@@ -77,16 +77,16 @@ class Display extends Component {
   });
 
   swapScreenItems = (oldIndex, newIndex) => {
-      const { screens, scriptId } = this.props;
+      const { screens } = this.props;
       const updatedScreens = arrayMove([...screens], oldIndex, newIndex);
       const { actions } = this.props;
       this.setState({ sortingScreens: false });
-      actions.post('sort-screens', {
-        scriptId,
+      actions.post('update-screens', {
+        returnUpdated: true,
         screens: updatedScreens.map((scr, i) => ({ id: scr.id, position: i })),
         onResponse: () => this.setState({ sortingScreens: false }),
         onFailure: deleteScriptError => this.setState({ deleteScriptError }),
-        onSuccess: () => { /**/ }
+        onSuccess: ({ payload }) => actions.updateApiData({ screens: payload.screens })
       });
   };
 
@@ -163,7 +163,7 @@ class Display extends Component {
           {(screens && screens.length > 0) ?
             <Table
               style={styles.table}
-              rows={screens.map(scr => ({ id: scr.id, ...scr.data }))}
+              rows={screens.map(scr => ({ id: scr.id, position: scr.position, ...scr.data }))}
               rowKeyColumn="position"
               onSort={this.swapScreenItems}
             >

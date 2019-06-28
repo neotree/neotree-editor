@@ -71,19 +71,21 @@ export class Editor extends React.Component {
 
   handleBackClick = () => this.props.history.goBack();
 
-  handleSubmitClick = action => {
-    const { actions, history } = this.props;
+  handleSubmitClick = () => {
+    const { actions, history, isEditMode, screenId } = this.props;
     const { screen } = this.state;
+    const action = isEditMode ? 'update-screen' : 'create-screen';
     this.setState({ updatingScreen: true });
     actions.post(action, {
-       data: JSON.stringify(screen),
-       onResponse: () => this.setState({ updatingScreen: false }),
-       onFailure: updateScreenError => this.setState({ updateScreenError }),
-       onSuccess: ({ payload }) => {
-         this.setState({ screen: payload.screen });
-         actions.updateApiData({ screen: payload.screen });
-         if (action === 'update') history.goBack();
-       }
+      id: screenId,
+      data: JSON.stringify(screen),
+      onResponse: () => this.setState({ updatingScreen: false }),
+      onFailure: updateScreenError => this.setState({ updateScreenError }),
+      onSuccess: ({ payload }) => {
+      this.setState({ screen: payload.screen });
+        actions.updateApiData({ screen: payload.screen });
+        if (action === 'update-screen') history.goBack();
+      }
     });
   };
 

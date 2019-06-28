@@ -10,9 +10,9 @@ export default {
     },
     metadata: {
       type: Sequelize.JSON,
-      defaultValue: {},
-      get: function (value) {
-        return JSON.parse(this.getDataValue(value) || '{}');
+      defaultValue: JSON.stringify({}),
+      get: function () {
+        return JSON.parse(this.getDataValue('metadata') || '{}');
       },
       set: function (value) {
         this.setDataValue('metadata', typeof data === 'object' ? JSON.stringify(value) : value);
