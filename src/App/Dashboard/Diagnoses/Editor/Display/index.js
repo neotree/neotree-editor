@@ -53,14 +53,13 @@ export class Display extends React.Component {
   handleBackClick = () => this.props.history.goBack();
 
   handleSubmitClick = () => {
-    const { isEditMode, history, actions, scriptId, diagnosisId } = this.props;
+    const { isEditMode, history, actions, diagnosisId } = this.props;
     const { diagnosis } = this.state;
 
     this.setState({ savingDiagnosis: true });
     actions.post(isEditMode ? 'update-diagnosis' : 'create-diagnosis', {
       ...(diagnosisId ? { id: diagnosisId } : {}),
-      ...diagnosis,
-      scriptId,
+      data: JSON.stringify(diagnosis),
       onResponse: () => this.setState({ savingDiagnosis: true }),
       onFailure: saveDiagnosisError => this.setState({ saveDiagnosisError }),
       onSuccess: ({ payload }) => {

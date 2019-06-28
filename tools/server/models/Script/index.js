@@ -15,9 +15,7 @@ export default {
         return JSON.parse(this.getDataValue(value) || '{}');
       },
       set: function (value) {
-        const data = this.getDataValue(value);
-        console.log(value);
-        this.setDataValue(value, typeof data === 'object' ? JSON.stringify(data) : data);
+        this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
     author: {

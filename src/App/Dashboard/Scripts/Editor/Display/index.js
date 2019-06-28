@@ -49,10 +49,10 @@ export default class Display extends Component {
     this.setState({ savingScript: true });
     actions.post(isEditMode ? 'update-script' : 'create-script', {
       ...(isEditMode ? { id: scriptId } : {}),
-      data: {
+      data: JSON.stringify({
         title: script.title,
         description: script.description
-      },
+      }),
       onResponse: () => this.setState({ savingScript: true }),
       onFailure: saveScriptError => this.setState({ saveScriptError }),
       onSuccess: ({ payload }) => {

@@ -4,7 +4,7 @@ module.exports = () => (req, res, next) => {
   const {
     id,
     deleteAssociatedData,
-    ...payload
+    ...payload // eslint-disable-line
   } = req.body;
 
   const done = (err, script) => {
@@ -18,7 +18,7 @@ module.exports = () => (req, res, next) => {
     .then(s => {
       if (!s) return done({ msg: `Could not find script with "id" ${id}.` });
 
-      s.update(payload)
+      s.destroy({ id })
         .then(scripts => {
           if (deleteAssociatedData === false) return done(null, { scripts });
 

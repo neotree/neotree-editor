@@ -76,7 +76,7 @@ export class Editor extends React.Component {
     const { screen } = this.state;
     this.setState({ updatingScreen: true });
     actions.post(action, {
-       data: screen,
+       data: JSON.stringify(screen),
        onResponse: () => this.setState({ updatingScreen: false }),
        onFailure: updateScreenError => this.setState({ updateScreenError }),
        onSuccess: ({ payload }) => {
