@@ -17,5 +17,23 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/create-script',
+    require('./createScriptMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/update-script',
+    require('./updateScriptMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/delete-script',
+    require('./deleteScriptMiddleware')(app),
+    responseMiddleware
+  );
+
   return router;
 };

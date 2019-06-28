@@ -1,15 +1,13 @@
 import { UserProfile } from '../../models';
 
 module.exports = app => (req, res, next) => { // eslint-disable-line
+  const done = (err, user) => {
+    res.locals.setResponse(err, { authenticatedUser: user });
+    next();
+  };
   if (req.isAuthenticated()) {
-    const done = (err, user) => {
-      res.locals.setResponse(err, { authenticatedUser: user });
-      next();
-    };
-
-    UserProfile.findOne({ where: { user_id: req.user.id } })
+    return UserProfile.findOne({ where: { user_id: req.user.id } })
       .then(user => done(null, user)).catch(done);
   }
-  res.locals.setResponse(null, { authenticatedUser: null });
-  next();
+  done(null, { authenticatedUser: null });
 };

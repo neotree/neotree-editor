@@ -28,16 +28,16 @@ export default (app) => {
   }));
 
   //express session
-  // const SequelizeStore = require('connect-session-sequelize')(session.Store);
-  // const sessStore = new SequelizeStore({ db: app.sequelize });
+  const SequelizeStore = require('connect-session-sequelize')(session.Store);
+  const sessStore = new SequelizeStore({ db: app.sequelize });
   app.use(session({
     secret: 'neotree',
     saveUninitialized: false, // don't create session until something stored
     resave: false, //don't save session if unmodified
-    // store: sessStore,
+    store: sessStore,
     cookie: { maxAge: 365 * 24 * 60 * 60 } // = 365 days (exp date will be created from ttl opt)
   }));
-  // sessStore.sync();
+  sessStore.sync();
 
   app = passport(app);
 

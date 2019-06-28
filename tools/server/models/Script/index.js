@@ -10,8 +10,15 @@ export default {
     },
     data: {
       type: Sequelize.JSON,
-      defaultValue: JSON.stringify({}),
-      get: function () { return JSON.parse(this.getDataValue('data') || '{}'); },
+      defaultValue: {},
+      get: function (value) {
+        return JSON.parse(this.getDataValue(value) || '{}');
+      },
+      set: function (value) {
+        const data = this.getDataValue(value);
+        console.log(value);
+        this.setDataValue(value, typeof data === 'object' ? JSON.stringify(data) : data);
+      }
     },
     author: {
       type: Sequelize.UUID,

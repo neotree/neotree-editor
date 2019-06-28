@@ -9,13 +9,12 @@ import dbConfig from '../../_config/database.development.json';
 import setAppMiddlewares from './setAppMiddlewares';
 import { sequelize, dbInit } from './models';
 
+let app = express();
+app.sequelize = sequelize;
+
 const startServer = async function () {
   try {
     await dbInit();
-
-    let app = express();
-
-    app.sequelize = sequelize;
 
     app = setAppMiddlewares(app, { dbConfig });
 
