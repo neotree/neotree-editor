@@ -1,56 +1,50 @@
 import uuid from 'uuidv4';
-import Actions from '../../../models/actions';
+import { Script, Screen, Diagnosis } from '../../../models';
 
-export default (app, { scripts, created_date, author }, done) => {
+export default (app, { scripts, author }, done) => {
   scripts.forEach(({ screens, diagnoses, ...script }, scriptIndex) => {
     const isLastScript = scriptIndex === (scripts.length - 1);
     const script_id = uuid();
 
-    Actions.add(app.pool, 'scripts', { id: script_id, created_date, author, data: JSON.stringify(script) }, err => {
-      if (err) console.log(err);
+    Script.create({ id: script_id, author, data: JSON.stringify(script) })
+      .then(() => {
+        const insertDiagnoses = () => new Promise((resolve) => {
+          diagnoses.forEach(({ createdAt, updatedAt, scriptId, diagnosisId, ...diagnosis }, i) => { // eslint-disable-line
+            const isLast = i === (diagnoses.length - 1);
+            const diagnosis_id = uuid();
 
-      const insertDiagnoses = () => new Promise((resolve) => {
-        diagnoses.forEach(({ createdAt, updatedAt, scriptId, diagnosisId, ...diagnosis }, i) => { // eslint-disable-line
-          const isLast = i === (diagnoses.length - 1);
-          const diagnosis_id = uuid();
-
-          Actions.add(app.pool, 'diagnoses', {
-            id: diagnosis_id,
-            script_id,
-            created_date,
-            author,
-            data: JSON.stringify(diagnosis)
-          }, err => {
-            if (err) console.log(err);
-            if (isLast) resolve();
+            Diagnosis.create({
+              id: diagnosis_id,
+              script_id,
+              author,
+              data: JSON.stringify(diagnosis)
+            }).then(() => isLast && resolve())
+              .catch(err => console.log(err));
           });
         });
-      });
 
-      const insertScreens = () => new Promise((resolve) => {
-        screens.forEach(({ createdAt, updatedAt, scriptId, screenId, position, type, ...screen }, i) => { // eslint-disable-line
-          const isLast = i === (screens.length - 1);
-          const screen_id = uuid();
+        const insertScreens = () => new Promise((resolve) => {
+          screens.forEach(({ createdAt, updatedAt, scriptId, screenId, position, type, ...screen }, i) => { // eslint-disable-line
+            const isLast = i === (screens.length - 1);
+            const screen_id = uuid();
 
-          Actions.add(app.pool, 'screens', {
-            id: screen_id,
-            script_id,
-            created_date,
-            author,
-            position,
-            type,
-            data: JSON.stringify(screen)
-          }, err => {
-            if (err) console.log(err);
-            if (isLast) resolve();
+            Screen.create({
+              id: screen_id,
+              script_id,
+              author,
+              position,
+              type,
+              data: JSON.stringify(screen)
+            }).then(() => isLast && resolve())
+              .catch(err => console.log(err));
           });
         });
-      });
 
-      Promise.all([insertScreens(), insertDiagnoses()])
-        .then(() => { /**/ }).catch(err => console.log(err));
+        Promise.all([insertScreens(), insertDiagnoses()])
+          .then(() => { /**/ }).catch(err => console.log(err));
 
-      if (isLastScript) done();
-    });
+        if (isLastScript) done();
+      })
+      .catch(err => console.log(err));
   });
 };

@@ -1,63 +1,28 @@
-/* eslint-disable camelcase*/
-import uuidv4 from 'uuidv4';
-
-export const createFilesTable = (
-  `CREATE TABLE IF NOT EXISTS
-      files(
-        id UUID PRIMARY KEY,
-        uploaded_by UUID,
-        filename VARCHAR(128),
-        content_type VARCHAR(128),
-        size BIGINT,
-        data BYTEA,
-        created_date TIMESTAMP,
-        modified_date TIMESTAMP,
-        FOREIGN KEY (uploaded_by) REFERENCES users (id)
-      );`
-);
+import uuid from 'uuidv4';
 
 export default {
-  add: (app, params = {}, callback) => {
-    const id = uuidv4();
-
-    app.pool.query(
-      `INSERT INTO files (
-        id,
-        uploaded_by,
-        filename
-        contentType
-        size
-        data
-        created_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        id,
-        params.uploaded_by,
-        params.filename,
-        params.contentType,
-        params.size,
-        params.data,
-        new Date()
-      ],
-      err => {
-        if (err) {
-          app.logger.log('ERROR: add file:', err);
-          return callback(err);
-        }
-        app.pool.query(
-          `SELECT (
-            id,
-            uploaded_by,
-            filename,
-            contentType,
-            size,
-            created_date,
-            modified_date
-          ) from files WHERE "id"=$1`,
-          [id],
-          callback
-        );
-      }
-    );
-  }
+  getStructure: ({ User, Sequelize }) => ({ // eslint-disable-line
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: () => uuid(),
+      allowNull: false,
+      primaryKey: true
+    },
+    metadata: {
+      type: Sequelize.JSON,
+      defaultValue: JSON.stringify({}),
+      get: function () { return JSON.parse(this.getDataValue('metadata') || '{}'); }, // eslint-disable-line
+    },
+    filename: { type: Sequelize.STRING },
+    content_type: { type: Sequelize.STRING },
+    size: { type: Sequelize.BIGINT },
+    data: { type: Sequelize.BLOB('long') },
+    uploaded_by: {
+      type: Sequelize.UUID,
+      // references: {
+      //   model: User,
+      //   key: 'id'
+      // }
+    }
+  })
 };

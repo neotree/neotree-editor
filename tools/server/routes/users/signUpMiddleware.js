@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator/check';
-import User from '../../models/User';
+import { User } from '../../models';
 
 module.exports = app => (req, res, next) => { //eslint-disable-line
   const {
@@ -8,46 +8,24 @@ module.exports = app => (req, res, next) => { //eslint-disable-line
     ...params
   } = res.locals.signUpPayload || req.body;
 
+  const done = (err, user) => {
+    res.locals.setResponse(err, { user });
+    next();
+  };
+
   const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.locals.setResponse(errors.array());
-    return next();
-  }
+  if (!errors.isEmpty()) done(errors.array());
 
-  User.add(
-    app,
-    params,
-    (err, user, userProfile) => {
-      app.logger.log('User.add');
+  User.add(params)
+    .then(({ user, profile }) => {
+      if (!user) return done({ msg: 'Something went wrong' });
 
-      //if something went wrong creating user
-      if (err) {
-        res.locals.setResponse(err);
-        return next();
-      }
-
-      user = user && user.rows[0];
-      userProfile = userProfile && userProfile.rows[0];
-
-      if (!user) {
-        res.locals.setResponse({ msg: 'Something went wrong' });
-        return next();
-      }
-
-      if (loginOnSignUp === false) {
-        res.locals.setResponse(null, { user });
-        return next();
-      }
+      if (loginOnSignUp === false) return done(null, user);
 
       req.logIn(user, err => {
-        if (err) {
-          res.locals.setResponse(err);
-          return next();
-        }
+        if (err) done(err);
 
-        res.locals.setResponse(null, { user: userProfile || user });
-        next();
+        done(null, profile || user);
       });
-    }
-  );
+    }).catch(done);
 };

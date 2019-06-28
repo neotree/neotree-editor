@@ -1,5 +1,5 @@
 import multer from 'multer';
-import Actions from '../../../models/actions';
+import { ConfigKey } from '../../../models';
 import handleScripts from './handleScripts';
 
 const storage = multer.memoryStorage();
@@ -23,7 +23,6 @@ module.exports = (router, app) => {
       };
 
       const data = JSON.parse(req.file.buffer);
-      const created_date = new Date();
       const author = req.user ? req.user.id : null;
 
       const configKeys = Object.keys(data.configkeys).map(key => {
@@ -43,10 +42,12 @@ module.exports = (router, app) => {
       });
 
       configKeys.forEach(configKey => {
-        Actions.add(app.pool, 'config_keys', { created_date, author, data: JSON.stringify(configKey) });
+        ConfigKey.create({ author, data: JSON.stringify(configKey) })
+          .then(() => { /**/ })
+          .catch(err => console.log(configKey, err));
       });
 
-      handleScripts(app, { scripts, author, created_date }, done);
+      handleScripts(app, { scripts, author }, done);
     },
     responseMiddleware
   );

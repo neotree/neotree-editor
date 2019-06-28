@@ -4,6 +4,7 @@
   "plugins": ["babel"],
   "rules": {
     "camelcase": 0,
+    "object-shorthand": 0,
     "babel/semi": 1,
     "react/no-find-dom-node": 0,
     "no-continue": 0,

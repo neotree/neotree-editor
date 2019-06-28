@@ -1,14 +1,14 @@
-import Actions from '../../models/actions';
+import { Diagnosis } from '../../models';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   const payload = JSON.parse(req.query.payload || {});
 
-  Actions.get(app.pool, 'diagnoses', { where: payload }, (err, rslts) => {
-    if (err) {
-      res.locals.setResponse(err);
-    } else {
-      res.locals.setResponse(null, { diagnosis: rslts.rows[0] });
-    }
+  const done = (err, diagnosis) => {
+    res.locals.setResponse(err, { diagnosis });
     next();
-  });
+  };
+
+  Diagnosis.findOne({ where: payload })
+    .then((diagnosis) => done(null, diagnosis))
+    .catch(done);
 };

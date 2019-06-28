@@ -1,14 +1,14 @@
-import Actions from '../../models/actions';
+import { Screen } from '../../models';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   const payload = JSON.parse(req.query.payload || {});
 
-  Actions.get(app.pool, 'screens', { where: payload }, (err, rslts) => {
-    if (err) {
-      res.locals.setResponse(err);
-    } else {
-      res.locals.setResponse(null, { screens: rslts.rows });
-    }
+  const done = (err, screens) => {
+    res.locals.setResponse(err, { screens });
     next();
-  });
+  };
+
+  Screen.findAll({ where: payload })
+    .then(screens => done(null, screens))
+    .catch(done);
 };

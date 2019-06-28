@@ -1,27 +1,14 @@
+/* eslint-disable no-console */
 import session from 'express-session';
-import { Pool } from 'pg';
-import connectPG from 'connect-pg-simple';
 import passport from './passport';
-import initialiseDatabase from './models';
 
-export default (app, { dbConfig }) => {
+export default (app) => {
   const httpServer = require('http').Server(app);
   const io = require('socket.io')(httpServer);
 
   const PORT = app.PORT = 3000;
-  const logger = app.logger = require('../../_utils/logger');
+  app.logger = require('../../_utils/logger');
   app.io = io;
-
-  // Database
-  const pool = Pool(dbConfig);
-  // pool.on('connect', () => logger.log('Connected to the Database'));
-  // pool.on('remove', () => logger.log('Client removed'));
-  app.pool = pool;
-
-  initialiseDatabase(app, (err, rslts) => {
-    if (err) return logger.log('ERROR: INITIALISE DATABASE TABLES:', err);
-    logger.log(rslts);
-  });
 
   //body-parser
   app.use(require('body-parser').json());
@@ -41,14 +28,16 @@ export default (app, { dbConfig }) => {
   }));
 
   //express session
-  const pgSession = connectPG(session);
+  // const SequelizeStore = require('connect-session-sequelize')(session.Store);
+  // const sessStore = new SequelizeStore({ db: app.sequelize });
   app.use(session({
     secret: 'neotree',
     saveUninitialized: false, // don't create session until something stored
     resave: false, //don't save session if unmodified
-    store: new pgSession({ pool }),
+    // store: sessStore,
     cookie: { maxAge: 365 * 24 * 60 * 60 } // = 365 days (exp date will be created from ttl opt)
   }));
+  // sessStore.sync();
 
   app = passport(app);
 
@@ -76,7 +65,7 @@ export default (app, { dbConfig }) => {
 
   httpServer.listen(PORT, err => {
     if (err) throw (err);
-    console.log(`Server started on port ${PORT}`); // eslint-disable-line
+    console.log(`Server started on port ${PORT}`);
   });
 
   return app;

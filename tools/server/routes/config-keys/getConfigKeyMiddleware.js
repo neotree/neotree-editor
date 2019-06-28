@@ -1,14 +1,14 @@
-import Actions from '../../models/actions';
+import { ConfigKey } from '../../models';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   const payload = JSON.parse(req.query.payload || {});
 
-  Actions.get(app.pool, 'config_keys', { where: payload }, (err, rslts) => {
-    if (err) {
-      res.locals.setResponse(err);
-    } else {
-      res.locals.setResponse(null, { configKey: rslts.rows[0] });
-    }
+  const done = (err, configKey) => {
+    res.locals.setResponse(err, { configKey });
     next();
-  });
+  };
+
+  ConfigKey.findOne({ where: payload })
+    .then((configKey) => done(null, configKey))
+    .catch(done);
 };

@@ -1,11 +1,24 @@
-export const createConfigKeysTable = (
-  `CREATE TABLE IF NOT EXISTS
-      config_keys(
-        id UUID PRIMARY KEY,
-        data JSON,
-        created_date TIMESTAMP,
-        modified_date TIMESTAMP,
-        author UUID,
-        FOREIGN KEY (author) REFERENCES users (id)
-      );`
-);
+import uuid from 'uuidv4';
+
+export default {
+  getStructure: ({ User, Sequelize }) => ({ // eslint-disable-line
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: () => uuid(),
+      allowNull: false,
+      primaryKey: true
+    },
+    data: {
+      type: Sequelize.JSON,
+      defaultValue: JSON.stringify({}),
+      get: function () { return JSON.parse(this.getDataValue('data') || '{}'); }, // eslint-disable-line
+    },
+    author: {
+      type: Sequelize.UUID,
+      // references: {
+      //   model: User,
+      //   key: 'id'
+      // }
+    }
+  })
+};

@@ -1,32 +1,20 @@
 import uuid from 'uuidv4';
 
-export const createAppTable = (
-  `CREATE TABLE IF NOT EXISTS
-      app(
-        id UUID PRIMARY KEY,
-        info JSON,
-        admin_password VARCHAR,
-        created_date TIMESTAMP,
-        modified_date TIMESTAMP
-      );`
-);
-
-export const initialiseAppData = (pool, cb) => {
-  const select = 'SELECT id from app';
-  pool.query(select, (err, rslt) => {
-    if (err) {
-      console.log(select, err);
-      return cb && cb(err);
+export default {
+  getStructure: ({ Sequelize }) => ({
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: () => uuid(),
+      allowNull: false,
+      primaryKey: true
+    },
+    info: {
+      type: Sequelize.JSON,
+      defaultValue: JSON.stringify({}),
+      get: function () { return JSON.parse(this.getDataValue('info') || '{}'); }, // eslint-disable-line
+    },
+    admin_password: {
+      type: Sequelize.STRING
     }
-
-    const insert = 'INSERT INTO app (id, created_date, info) VALUES ($1, $2, $3)';
-    console.log(select);
-    if (!rslt.rows.length) {
-      pool.query(
-        insert,
-        [uuid(), new Date(), JSON.stringify({})],
-        cb
-      );
-    }
-  });
+  })
 };

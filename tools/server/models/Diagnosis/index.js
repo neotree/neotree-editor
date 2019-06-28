@@ -1,13 +1,31 @@
-export const createDiagnosisTable = (
-  `CREATE TABLE IF NOT EXISTS
-      diagnoses(
-        id UUID PRIMARY KEY,
-        data JSON,
-        created_date TIMESTAMP,
-        modified_date TIMESTAMP,
-        author UUID,
-        script_id UUID NOT NULL,
-        FOREIGN KEY (author) REFERENCES users (id),
-        FOREIGN KEY (script_id) REFERENCES scripts (id)
-      );`
-);
+import uuid from 'uuidv4';
+
+export default {
+  getStructure: ({ User, Script, Sequelize }) => ({ // eslint-disable-line
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: () => uuid(),
+      allowNull: false,
+      primaryKey: true
+    },
+    data: {
+      type: Sequelize.JSON,
+      defaultValue: JSON.stringify({}),
+      get: function () { return JSON.parse(this.getDataValue('data') || '{}'); }, // eslint-disable-line
+    },
+    script_id: {
+      type: Sequelize.UUID,
+      // references: {
+      //   model: Script,
+      //   key: 'id'
+      // }
+    },
+    author: {
+      type: Sequelize.UUID,
+      // references: {
+      //   model: User,
+      //   key: 'id'
+      // }
+    }
+  })
+};

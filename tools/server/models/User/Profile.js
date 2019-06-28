@@ -8,17 +8,23 @@ export default {
       allowNull: false,
       primaryKey: true
     },
-    data: {
-      type: Sequelize.JSON,
-      defaultValue: JSON.stringify({}),
-      get: function () { return JSON.parse(this.getDataValue('data') || '{}'); },
+    email: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      unique: true
     },
-    author: {
+    profile_name: {
+      type: Sequelize.STRING,
+      allowNull: false
+    },
+    user_id: {
       type: Sequelize.UUID,
       // references: {
       //   model: User,
       //   key: 'id'
       // }
-    }
+    },
+    firstname: { type: Sequelize.STRING },
+    lastname: { type: Sequelize.STRING }
   })
 };

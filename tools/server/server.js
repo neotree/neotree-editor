@@ -7,28 +7,42 @@ import webpackHotMiddleware from 'webpack-hot-middleware'; // eslint-disable-lin
 import webpackConfig from '../../webpack.config.dev';
 import dbConfig from '../../_config/database.development.json';
 import setAppMiddlewares from './setAppMiddlewares';
+import { sequelize, dbInit } from './models';
 
-let app = express();
+const startServer = async function () {
+  try {
+    await dbInit();
 
-app = setAppMiddlewares(app, { dbConfig });
+    let app = express();
 
-// favicon
-// app.use(serveFavicon(path.resolve(__dirname, '../src/favicon.ico')));
+    app.sequelize = sequelize;
 
-//webpack
-const compiler = webpack(webpackConfig);
-app.use(webpackDevMiddleware(compiler, {
-  noInfo: true,
-  publicPath: webpackConfig.output.publicPath
-}));
-app.use(webpackHotMiddleware(compiler));
+    app = setAppMiddlewares(app, { dbConfig });
 
-app.use(express.static(path.resolve(__dirname, '../../src')));
+    // favicon
+    // app.use(serveFavicon(path.resolve(__dirname, '../src/favicon.ico')));
 
-app = require('./routes')(app);
+    //webpack
+    const compiler = webpack(webpackConfig);
+    app.use(webpackDevMiddleware(compiler, {
+      noInfo: true,
+      publicPath: webpackConfig.output.publicPath
+    }));
+    app.use(webpackHotMiddleware(compiler));
 
-app.get('*',
-  (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../../src/index.html'));
+    app.use(express.static(path.resolve(__dirname, '../../src')));
+
+    app = require('./routes')(app);
+
+    app.get('*',
+      (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../../src/index.html'));
+      }
+    );
+  } catch (err) {
+    console.log('DATABASE ERROR:', err); // eslint-diable-line
+    process.exit(1);
   }
-);
+};
+
+startServer();

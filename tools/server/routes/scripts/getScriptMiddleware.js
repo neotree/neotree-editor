@@ -1,14 +1,14 @@
-import Actions from '../../models/actions';
+import { Script } from '../../models';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   const payload = JSON.parse(req.query.payload || {});
 
-  Actions.get(app.pool, 'scripts', { where: payload }, (err, rslts) => {
-    if (err) {
-      res.locals.setResponse(err);
-    } else {
-      res.locals.setResponse(null, { script: rslts.rows[0] });
-    }
+  const done = (err, script) => {
+    res.locals.setResponse(err, { script });
     next();
-  });
+  };
+
+  Script.findOne({ where: payload })
+    .then((script) => done(null, script))
+    .catch(done);
 };

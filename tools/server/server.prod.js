@@ -2,24 +2,37 @@ import express from 'express';
 import path from 'path';
 // import serveFavicon from 'serve-favicon';
 import compression from 'compression';
-import dbConfig from '../../_config/database.production.json';
 import setAppMiddlewares from './setAppMiddlewares';
+import { sequelize, dbInit } from './models';
 
-let app = express();
+const startServer = async function () {
+  try {
+    await dbInit();
 
-app = setAppMiddlewares(app, { dbConfig });
+    let app = express();
 
-// favicon
-// app.use(serveFavicon(path.resolve(__dirname, '../dist/favicon.ico')));
+    app.sequelize = sequelize;
 
-app.use(compression());
+    app = setAppMiddlewares(app);
 
-app.use(express.static(path.resolve(__dirname, '../../src')));
+    // favicon
+    // app.use(serveFavicon(path.resolve(__dirname, '../dist/favicon.ico')));
 
-app = require('./routes')(app);
+    app.use(compression());
 
-app.get('*',
-  (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../../src/index.html'));
+    app.use(express.static(path.resolve(__dirname, '../../src')));
+
+    app = require('./routes')(app);
+
+    app.get('*',
+      (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../../src/index.html'));
+      }
+    );
+  } catch (err) {
+    console.log('DATABASE ERROR:', err); // eslint-diable-line
+    process.exit(1);
   }
-);
+};
+
+startServer();
