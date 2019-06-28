@@ -30,7 +30,7 @@ module.exports = app => {
   );
 
   router.post(
-    '/update-screens',
+    '/update-scripts',
     require('./updateScriptsMiddleware')(app),
     responseMiddleware
   );
