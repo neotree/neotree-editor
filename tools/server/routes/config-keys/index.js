@@ -17,5 +17,29 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/create-config-key',
+    require('./createConfigKeyMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/update-config-key',
+    require('./updateConfigKeyMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/update-config-keys',
+    require('./updateConfigKeysMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.post(
+    '/delete-config-key',
+    require('./deleteConfigKeyMiddleware')(app),
+    responseMiddleware
+  );
+
   return router;
 };

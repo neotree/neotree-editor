@@ -40,12 +40,12 @@ class List extends Component {
     const { configKey, label, summary } = this.state;
     this.setState({ creatingConfigKey: true });
     actions.post('create-config-key', {
-      data: { configKey, label, summary },
+      data: JSON.stringify({ configKey, label, summary }),
       onResponse: () => this.setState({ creatingConfigKey: false }),
       onFailure: createConfigKeyError => this.setState({ createConfigKeyError }),
-      onSuccess: newKey => {
+      onSuccess: ({ payload }) => {
         actions.updateApiData(state =>
-          ({ configKeys: [newKey, ...state.configKeys] }));
+          ({ configKeys: [payload.configKey, ...state.configKeys] }));
         this.closeCreateConfigKeyDialog();
       }
     });
@@ -62,7 +62,7 @@ class List extends Component {
       onSuccess: () => {
         actions.updateApiData(state =>
           ({ configKeys: state.configKeys.filter(conf => conf.id !== id) }));
-        this.closeCreateConfigKeyDialog();
+        this.closeDeleteConfirmDialog();
       }
     });
   };
