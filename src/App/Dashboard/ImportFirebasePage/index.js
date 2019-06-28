@@ -23,13 +23,12 @@ export class ImportFirebasePage extends React.Component {
     });
     uploader.upload()
       .then(({ payload }) => {
-        this.setState({ importingData: false });
+        this.setState({ importingData: false, ...payload });
         actions.updateAppStatus({ ...payload });
       }).catch(error => this.setState({ error }));
   };
 
   render() {
-    const { data_import_info } = this.props;
     const { error, importingData } = this.state;
 
     return (
@@ -56,13 +55,15 @@ export class ImportFirebasePage extends React.Component {
                   :
                   (
                     <div>
-                      {!data_import_info.date ?
-                        <FileInput
-                          value=''
-                          onChange={this.onFileInputChange}
-                        >
-                          <Button raised accent ripple>Upload firebase json file</Button>
-                        </FileInput> : <div>Firebase data was imported!!!</div>}
+                      {this.state.data_import_info && this.state.data_import_info.date ?
+                        <p>Firebase data was imported!!!</p> : null}
+
+                      <FileInput
+                        value=''
+                        onChange={this.onFileInputChange}
+                      >
+                        <Button raised accent ripple>Upload firebase json file</Button>
+                      </FileInput>
                     </div>
                   )}
               </div>
