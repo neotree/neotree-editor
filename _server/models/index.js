@@ -10,9 +10,9 @@ import DiagnosisModel from './Diagnosis';
 import ConfigKeyModel from './ConfigKey';
 
 const dbConfig = process.env.NODE_ENV === 'production' ?
-  require('../../../_config/database.production.json')
+  require('../../_config/config.production.json').database
   :
-  require('../../../_config/database.development.json');
+  require('../../_config/config.development.json').database;
 
 export const sequelize = new Sequelize(
   dbConfig.database,
@@ -88,6 +88,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
 
   sequelize.authenticate()
   .then(() => {
+    console.log('Connected to the database.'); // eslint-disable-line
     Promise.all([
       // initSessionsTable,
       initUsersTable,

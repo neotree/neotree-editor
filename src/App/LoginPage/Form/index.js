@@ -100,7 +100,7 @@ export class Form extends Component {
     });
   };
 
-  redirectAuthenticated = () => this.props.history.push('/dashboard');
+  redirectAuthenticated = () => (global.window.location.href = '/dashboard');
 
   render() {
     const { copy, authAction, style } = this.props;

@@ -50,7 +50,7 @@ export class Dashboard extends React.Component {
   });
 
   handleLogoutClick = () => {
-    const { actions, history } = this.props;
+    const { actions } = this.props;
     this.setState({ loggingOut: true });
     actions.get('logout', {
       onResponse: () => this.setState({
@@ -60,7 +60,7 @@ export class Dashboard extends React.Component {
       onFailure: logOutFailure => this.setState({ logOutFailure }),
       onSuccess: () => {
         actions.updateAppStatus({ authenticatedUser: null });
-        history.push('/auth/sign-in');
+        global.window.location.href = '/auth/sign-in';
       }
     });
   };

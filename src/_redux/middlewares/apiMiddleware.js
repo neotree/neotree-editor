@@ -1,7 +1,8 @@
 /*eslint-disable no-console*/
 import postData from './postData';
 
-export const API_MIDDLEWARE = (/*store*/) => (next) => (action) => {
+export const API_MIDDLEWARE = store => next => action => {
+  const host = store.getState().appStatus.host;
   if (!(action.POST || action.GET)) return next(action);
 
   const API_METHOD = action.GET ? 'GET' : 'POST';
@@ -24,7 +25,7 @@ export const API_MIDDLEWARE = (/*store*/) => (next) => (action) => {
     name
   });
 
-  postData(`/${name}`, _payload, API_METHOD)
+  postData(`${host}/${name}`, _payload, API_METHOD)
     .then(r => {
       if (onResponse) onResponse(r);
       if (!r.ok) return { error: { msg: `HTTP ERROR (${r.status}): ${r.statusText}` } };

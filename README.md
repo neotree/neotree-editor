@@ -1,61 +1,37 @@
-## NeoTree Editor
+# NeoTree :: App designed for managing neonatal patients in low resource settings, providing a digital admission form for real time data collection and a platform for neonatal training.
 
-### Configuration
+![React, Redux, Router, Webpack, Sass](https://raw.githubusercontent.com/lamyfarai/react-playground-app/master/.git-assets/React-Redux-Router-Webpack-Sass.png)
 
-Add file **src/config.jsx**
-```
-const devFirebaseConfig = {
-    apiKey: "<FIREBASE DEV PROJECT KEY>",
-    authDomain: "<FIREBASE DEV PROJECT ID>.firebaseapp.com",
-    databaseURL: "https://<FIREBASE DEV PROJECT ID>.firebaseio.com",
-    storageBucket: "<FIREBASE DEV PROJECT ID>.appspot.com"
-};
+Perceived performance and development experience are key factors in this setup.
 
-const prodFirebaseConfig = {
-    apiKey: "<FIREBASE PRODUCTION PROJECT KEY>",
-    authDomain: "<FIREBASE PRODUCTION PROJECT ID>.firebaseapp.com",
-    databaseURL: "https://<FIREBASE PRODUCTION PROJECT ID>.firebaseio.com",
-    storageBucket: "<FIREBASE PRODUCTION PROJECT ID>.appspot.com",
-};
+## Setup
 
-export const firebaseConfig = (process.env.NODE_ENV === 'production') ? prodFirebaseConfig : devFirebaseConfig;
-```
+  `$ npm install`
 
-### Run the project dev mode
-```
-npm install (only once)
-npm run dev
-```
+  ### Development
 
-### Create signed distributable package (requires Apple Developer account)
+  Add: `_config/config.development.json`
 
-#### CI/Development Environment Variables
+  ```json
+    {
+      "port": "PORT (e.g. 3000)",
+      "host": "HOSTNAME (e.g. http://localhost:3000)"
+    }
+  ```
 
-| Variable                   | Description                                  | Required |
-|----------------------------|----------------------------------------------|----------|
-| CSC_LINK                   | Mac App - Developer ID certificate URL       | Yes      |
-| CSC_KEY_PASSWORD           | Mac App - Developer ID password              | Yes      |
-| CSC_INSTALLER_LINK         | Mac Installer - Developer ID certificate URL | No       |
-| CSC_INSTALLER_KEY_PASSWORD | Mac Installer - Developer ID password        | No       |
+  `$ npm start`
 
+  ### Production
 
-```
-npm run package
-```
+  Add `_config/config.production.json`
 
-## NeoTree Editor Web
+  ```json
+    {
+      "port": "PORT (e.g. 80)",
+      "host": "HOSTNAME (e.g. https://yoursite.com)"
+    }
+  ```
 
-### Run the project dev mode
-```
-npm run web
-```
+  First build the production bundle: `$ npm run build`
 
-### Build the production web app
-```
-npm run build-web-prod
-```
-
-### Run the production web app
-```
-npm run web-prod
-```
+  Then run the production bundle: `$ npm run dist`

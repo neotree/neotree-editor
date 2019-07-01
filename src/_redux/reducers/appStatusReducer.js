@@ -1,6 +1,6 @@
 import * as actions from '../actions';
 
-const defaultState = {};
+const defaultState = JSON.parse(__$INITIAL_DATA__ || '{}'); // eslint-disable-line
 
 export default (state = defaultState, action) => {
   const { type, payload, updater } = action;

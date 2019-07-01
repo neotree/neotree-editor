@@ -1,14 +1,6 @@
-/* eslint-disable no-console */
-import session from 'express-session';
-import passport from './passport';
-
-export default (app) => {
-  const httpServer = require('http').Server(app);
-  const io = require('socket.io')(httpServer);
-
-  const PORT = app.PORT = 3000;
-  app.logger = require('../../_utils/logger');
-  app.io = io;
+export default app => {
+  app = (process.env.NODE_ENV === 'production' ?
+    require('./middlewares.production') : require('./middlewares.development'))(app);
 
   //body-parser
   app.use(require('body-parser').json());
@@ -28,6 +20,7 @@ export default (app) => {
   }));
 
   //express session
+  const session = require('express-session');
   const SequelizeStore = require('connect-session-sequelize')(session.Store);
   const sessStore = new SequelizeStore({ db: app.sequelize });
   app.use(session({
@@ -39,7 +32,7 @@ export default (app) => {
   }));
   sessStore.sync();
 
-  app = passport(app);
+  app = require('./passport')(app);
 
   app.use((req, res, next) => {
     res.locals[req.originalUrl] = { payload: {} };
@@ -63,10 +56,7 @@ export default (app) => {
     res.json(response);
   };
 
-  httpServer.listen(PORT, err => {
-    if (err) throw (err);
-    console.log(`Server started on port ${PORT}`);
-  });
+  app = require('../routes')(app);
 
   return app;
 };

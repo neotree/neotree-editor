@@ -12,34 +12,7 @@ const LoginPage = LazyComponent(() => import('./LoginPage'));
 const Dashboard = LazyComponent(() => import('./Dashboard'));
 
 export class App extends React.Component {
-  state = {
-    initialisingApp: false,
-    appInitialised: false,
-    initialiseAppError: null
-  };
-
-  componentWillMount() {
-    const { actions } = this.props;
-    this.setState({ initialisingApp: true });
-    actions.get('initialise-app', {
-      onResponse: () => this.setState({ appInitialised: true, initialisingApp: false }),
-      onSuccess: ({ payload }) => actions.updateAppStatus(payload),
-      onFailure: initialiseAppError => this.setState({ initialiseAppError })
-    });
-  }
-
   render() {
-    const { initialisingApp, initialiseAppError } = this.state;
-
-    if (initialisingApp) return <Spinner className="ui__flex ui__justifyContent_center" />;
-
-    if (initialiseAppError) {
-      return (
-        <p>{initialiseAppError.msg || initialiseAppError.message
-          || JSON.stringify(initialiseAppError)}</p>
-      );
-    }
-
     return (
       <div id="neotree-app" className="neotree-app">
         <Helmet>

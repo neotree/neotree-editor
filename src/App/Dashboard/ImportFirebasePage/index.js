@@ -16,10 +16,10 @@ export class ImportFirebasePage extends React.Component {
   };
 
   onFileInputChange = e => {
-    const { actions } = this.props;
+    const { actions, host } = this.props;
     this.setState({ importDataError: null, importingData: true });
     const uploader = new FileUploader(e.target.files[0], {
-      url: '/import-from-firebase'
+      url: `${host}/import-from-firebase`
     });
     uploader.upload()
       .then(({ payload }) => {
@@ -81,6 +81,7 @@ ImportFirebasePage.propTypes = {
 
 export default hot(withRouter(
   reduxComponent(ImportFirebasePage, state => ({
+    host: state.appStatus.host,
     data_import_info: state.appStatus.data_import_info || {}
   }))
 ));
