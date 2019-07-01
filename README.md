@@ -6,11 +6,16 @@ Perceived performance and development experience are key factors in this setup.
 
 ## Configuration
 
-  `$ npm install`
+  ```
+  npm install
+  ```
 
   ### Development
 
-  Add: `_config/config.development.json`
+  Add dev config file:
+  ```
+  _config/config.development.json
+  ```
 
   ```json
     {
@@ -27,11 +32,16 @@ Perceived performance and development experience are key factors in this setup.
     }
   ```
 
-  `$ npm start`
+  ```
+  npm start
+  ```
 
   ### Production
 
-  Add `_config/config.production.json`
+  Add production config file:
+  ```
+  _config/config.production.json
+  ```
 
   ```json
     {
@@ -49,11 +59,11 @@ Perceived performance and development experience are key factors in this setup.
   ```
 
   First build the production bundle:
-    ```
-    npm run build
+  ```
+  npm run build
     ```
 
   Then run the production bundle:
-    ```
-    npm run dist
+  ```
+  npm run dist
     ```
