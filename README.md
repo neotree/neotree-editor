@@ -15,7 +15,15 @@ Perceived performance and development experience are key factors in this setup.
   ```json
     {
       "port": "PORT (e.g. 3000)",
-      "host": "HOSTNAME (e.g. http://localhost:3000)"
+      "host": "HOSTNAME (e.g. http://localhost:3000)",
+      "database": {
+        "user": "db user",
+        "database": "db name",
+        "password": "db user password",
+        "port": "port (optional, default 5432)",
+        "max": "(optional)",
+        "idleTimeoutMillis": "(optional)"
+      }
     }
   ```
 
@@ -28,7 +36,15 @@ Perceived performance and development experience are key factors in this setup.
   ```json
     {
       "port": "PORT (e.g. 80)",
-      "host": "HOSTNAME (e.g. https://yoursite.com)"
+      "host": "HOSTNAME (e.g. https://yoursite.com)",
+      "database": {
+        "user": "db user",
+        "database": "db name",
+        "password": "db user password",
+        "port": "port (optional, default 5432)",
+        "max": "(optional)",
+        "idleTimeoutMillis": "(optional)"
+      }
     }
   ```
 
