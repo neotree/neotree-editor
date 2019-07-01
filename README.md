@@ -1,10 +1,10 @@
 # NeoTree :: App designed for managing neonatal patients in low resource settings, providing a digital admission form for real time data collection and a platform for neonatal training.
 
-![React, Redux, Router, Webpack, Sass](https://raw.githubusercontent.com/lamyfarai/react-playground-app/master/.git-assets/React-Redux-Router-Webpack-Sass.png)
+![React, Redux, Router, Webpack, Sass](https://eu-west-1.console.aws.amazon.com/codesuite/codecommit/repositories/neotree-editor/browse/refs/heads/web/--/.git-assets/React-Redux-Router-Webpack-Sass.png)
 
 Perceived performance and development experience are key factors in this setup.
 
-## Setup
+## Configuration
 
   `$ npm install`
 
@@ -48,6 +48,12 @@ Perceived performance and development experience are key factors in this setup.
     }
   ```
 
-  First build the production bundle: `$ npm run build`
+  First build the production bundle:
+    ```
+    npm run build
+    ```
 
-  Then run the production bundle: `$ npm run dist`
+  Then run the production bundle:
+    ```
+    npm run dist
+    ```
