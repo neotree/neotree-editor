@@ -1,7 +1,5 @@
 # NeoTree :: App designed for managing neonatal patients in low resource settings, providing a digital admission form for real time data collection and a platform for neonatal training.
 
-![React, Redux, Router, Webpack, Sass](https://eu-west-1.console.aws.amazon.com/codesuite/codecommit/repositories/neotree-editor/browse/refs/heads/web/--/.git-assets/React-Redux-Router-Webpack-Sass.png)
-
 Perceived performance and development experience are key factors in this setup.
 
 ## Configuration
