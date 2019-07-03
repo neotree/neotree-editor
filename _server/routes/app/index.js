@@ -9,8 +9,7 @@ module.exports = app => {
 
   router.get(
     '/initialise-app',
-    require('./getAppMiddleware')(app),
-    require('../users/getAuthenticatedUserMiddleware')(app),
+    require('./initialiseAppMiddleware')(app),
     (req, res) => {
       const { app, ...payload } = res.locals.getResponsePayload() || {};
       res.json({

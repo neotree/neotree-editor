@@ -22,7 +22,7 @@
     "build": "NODE_ENV=production babel-node _tools/build.js",
     "dist": "NODE_ENV=production node dist/_server/index.js",
     "dev-electron": "HOT=1 NODE_ENV=development electron tools/main.development.jsx",
-    "build-app": "NODE_ENV=production node -r babel-register ./node_modules/webpack/bin/webpack --config tools/webpack.config.production.jsx --progress --profile --colors",
+    "build-app": "NODE_ENV=production node -r babel-register ./node_modules/webpack/bin/webpack --config tools/webpack.config.production.jsx --progress --profile --colors"
   },
   "build": {
     "appId": "org.neotree.NeoTreeEditor",

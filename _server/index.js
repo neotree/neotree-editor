@@ -29,20 +29,11 @@ app = setMiddlewares(app);
 app.use(express.static(path.resolve(__dirname, '../src'), { index: false }));
 
 app.get('*',
-  require('./routes/app/getAppMiddleware')(app),
-  require('./routes/users/getAuthenticatedUserMiddleware')(app),
+  require('./routes/app/initialiseAppMiddleware')(app),
   require('./middlewares/sendHTML')(app)
 );
 
 app.server = httpServer.listen(config.port, err => {
   if (err) throw (err);
   console.log(`Server started on port ${config.port}`); // eslint-disable-line
-});
-
-process.on('SIGTERM', () => {
-  console.log('Stopping dev server'); // eslint-disable-line
-  app.wdm.close();
-  app.server.close(() => {
-    process.exit(0);
-  });
 });
