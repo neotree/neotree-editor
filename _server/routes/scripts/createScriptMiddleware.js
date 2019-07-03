@@ -1,7 +1,7 @@
 import { Script } from '../../models';
 
-module.exports = () => (req, res, next) => {
-  const payload = req.body;
+module.exports = (app, params) => (req, res, next) => {
+  const payload = params || req.body;
 
   const done = (err, script) => {
     res.locals.setResponse(err, { script });

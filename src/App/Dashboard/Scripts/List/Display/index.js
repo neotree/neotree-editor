@@ -51,6 +51,25 @@ class Display extends Component {
     });
   };
 
+  handleDuplicateScript = id => {
+    const { actions } = this.props;
+    this.setState({ duplicatingScript: true });
+    actions.post('duplicate-script', {
+      id,
+      onResponse: () => this.setState({ duplicatingScript: false }),
+      onFailure: duplicateScriptError => this.setState({ duplicateScriptError }),
+      onSuccess: ({ payload }) => {
+        actions.updateApiData(state => {
+          const scripts = [...state.scripts];
+          const ogIndex = scripts.map((s, i) =>
+            s.id === id ? i : null).filter(i => i !== null)[0] || 0;
+          scripts.splice(ogIndex + 1, 0, payload.script);
+          return { scripts };
+        });
+      }
+    });
+  };
+
   openDeleteConfirmDialog = scriptId => this.setState({
     ...this.state,
     openDeleteConfirmDialog: true,
@@ -121,6 +140,9 @@ class Display extends Component {
             <Menu target={menuId} align="right">
                 <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, scriptId)}>
                   Delete
+                </MenuItem>
+                <MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
+                  Duplicate
                 </MenuItem>
             </Menu>
           </div>

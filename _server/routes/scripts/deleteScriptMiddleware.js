@@ -27,6 +27,8 @@ module.exports = () => (req, res, next) => {
             Diagnosis.destroy({ where: { script_id: id } })
           ]).then(associated => done(null, { scripts, associated }))
             .catch(err => done(null, { scripts, associatedErrors: err }));
+
+          return null;
         })
         .catch(done);
 

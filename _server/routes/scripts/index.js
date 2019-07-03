@@ -41,5 +41,11 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/duplicate-script',
+    require('./duplicateScriptMiddleware')(app),
+    responseMiddleware
+  );
+
   return router;
 };
