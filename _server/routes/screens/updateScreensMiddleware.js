@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, payload) => {
     res.locals.setResponse(err, payload);
-    next();
+    next(); return null;
   };
 
   Promise.all(screens.map(({ id, ...scr }) =>
@@ -16,5 +16,7 @@ module.exports = () => (req, res, next) => {
     Screen.findAll({ where: { id: screens.map(scr => scr.id) } })
       .then(screens => done(null, { screens }))
       .catch(done);
+
+    return null;
   }).catch(done);
 };

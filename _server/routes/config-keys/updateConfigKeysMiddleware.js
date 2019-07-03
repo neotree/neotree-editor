@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, payload) => {
     res.locals.setResponse(err, payload);
-    next();
+    next(); return null;
   };
 
   Promise.all(configKeys.map(({ id, ...scr }) =>
@@ -16,5 +16,7 @@ module.exports = () => (req, res, next) => {
     ConfigKey.findAll({ where: { id: configKeys.map(scr => scr.id) } })
       .then(configKeys => done(null, { configKeys }))
       .catch(done);
+
+    return null;
   }).catch(done);
 };

@@ -10,7 +10,7 @@ module.exports = app => (req, res, next) => { //eslint-disable-line
 
   const done = (err, user) => {
     res.locals.setResponse(err, { user });
-    next();
+    next(); return null;
   };
 
   const errors = validationResult(req);

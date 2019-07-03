@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, configKey) => {
     res.locals.setResponse(err, { configKey });
-    next();
+    next(); return null;
   };
 
   if (!id) return done({ msg: 'Required configKey "id" is not provided.' });
@@ -17,6 +17,8 @@ module.exports = () => (req, res, next) => {
       s.update(payload)
         .then(configKey => done(null, configKey))
         .catch(done);
+
+      return null;
     })
     .catch(done);
 };

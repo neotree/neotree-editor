@@ -17,7 +17,7 @@ module.exports = (router, app) => {
 
       const done = (err, file) => {
         res.locals.setResponse(err, { file });
-        return next();
+        next(); return null;
       };
 
       File.create({

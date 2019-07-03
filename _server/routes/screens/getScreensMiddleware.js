@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, screens) => {
     res.locals.setResponse(err, { screens });
-    next();
+    next(); return null;
   };
 
   Screen.findAll({ where: payload })

@@ -2,22 +2,22 @@ module.exports = app => (req, res, next) => {
   app.passport.authenticate('local', (error, user, info) => {
     if (error) {
       res.locals.setResponse(error);
-      return next();
+      next(); return null;
     }
 
     if (!user) {
       res.locals.setResponse(info);
-      return next();
+      next(); return null;
     }
 
     req.logIn(user, err => {
       if (err) {
         res.locals.setResponse(err);
-        return next();
+        next(); return null;
       }
 
       res.locals.setResponse(null, { user });
-      next();
+      next(); return null;
     });
   })(req, res, next);
 };

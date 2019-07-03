@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, script) => {
     res.locals.setResponse(err, { script });
-    next();
+    next(); return null;
   };
 
   if (!id) return done({ msg: 'Required script "id" is not provided.' });
@@ -17,6 +17,8 @@ module.exports = () => (req, res, next) => {
       s.update(payload)
         .then(script => done(null, script))
         .catch(done);
+
+      return null;
     })
     .catch(done);
 };

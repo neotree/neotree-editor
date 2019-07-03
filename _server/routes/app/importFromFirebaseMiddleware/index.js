@@ -19,7 +19,7 @@ module.exports = (router, app) => {
             imported_by: (req.user || {}).id || null
           }
         });
-        next();
+        next(); return null;
       };
 
       const data = JSON.parse(req.file.buffer);
@@ -43,7 +43,7 @@ module.exports = (router, app) => {
 
       configKeys.forEach(configKey => {
         ConfigKey.create({ author, data: JSON.stringify(configKey) })
-          .then(() => { /**/ })
+          .then(() => null)
           .catch(err => console.log(configKey, err));
       });
 

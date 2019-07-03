@@ -6,21 +6,22 @@ const LocalStrategy = require('passport-local').Strategy;
 
 module.exports = app => {
   passport.serializeUser((user, done) => {
-    app.logger.log('passport.serializeUser');
+    // app.logger.log('passport.serializeUser');
     done(null, { id: user.id });
+    return null;
   });
 
   passport.deserializeUser((user, done) => {
-    app.logger.log('passport.deserializeUser');
+    // app.logger.log('passport.deserializeUser');
     User.findOne({ where: { id: user.id }, attributes: ['id'] })
-      .then(user => done(null, user))
-      .catch(err => done(err));
+      .then(user => { done(null, user); return null; })
+      .catch(done);
   });
 
   /******************************************************************************
   *****************************LOCAL STRATEGY************************************/
   passport.use(new LocalStrategy((username, password, done) => {
-    app.logger.log('new passport.LocalStrategy()');
+    // app.logger.log('new passport.LocalStrategy()');
     User.findOne({ where: { email: username } })
       .then(user => {
         if (!user) {

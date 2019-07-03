@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, configKeys) => {
     res.locals.setResponse(err, { configKeys });
-    next();
+    next(); return null;
   };
 
   ConfigKey.findAll({ where: payload })

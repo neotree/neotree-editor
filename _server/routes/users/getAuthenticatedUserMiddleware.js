@@ -3,7 +3,7 @@ import { UserProfile } from '../../models';
 module.exports = app => (req, res, next) => { // eslint-disable-line
   const done = (err, user) => {
     res.locals.setResponse(err, { authenticatedUser: user });
-    next();
+    next(); return null;
   };
   if (req.isAuthenticated()) {
     return UserProfile.findOne({ where: { user_id: req.user.id } })

@@ -4,7 +4,7 @@ import getAuthenticatedUserMiddleware from '../users/getAuthenticatedUserMiddlew
 module.exports = app => (req, res, next) => {
   getAppMiddleware(app)(req, res, () => {
     getAuthenticatedUserMiddleware(app)(req, res, () => {
-      next();
+      next(); return null;
     });
   });
 };

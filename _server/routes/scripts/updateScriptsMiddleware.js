@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, payload) => {
     res.locals.setResponse(err, payload);
-    next();
+    next(); return null;
   };
 
   Promise.all(scripts.map(({ id, ...scr }) =>
@@ -16,5 +16,7 @@ module.exports = () => (req, res, next) => {
     Script.findAll({ where: { id: scripts.map(scr => scr.id) } })
       .then(scripts => done(null, { scripts }))
       .catch(done);
+
+    return null;
   }).catch(done);
 };

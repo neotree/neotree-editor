@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, diagnosis) => {
     res.locals.setResponse(err, { diagnosis });
-    next();
+    next(); return null;
   };
 
   if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
@@ -17,6 +17,8 @@ module.exports = () => (req, res, next) => {
       s.destroy({ where: { id } })
         .then(deleted => done(null, { deleted }))
         .catch(done);
+
+      return null;
     })
     .catch(done);
 };

@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, script) => {
     res.locals.setResponse(err, { script });
-    next();
+    next(); return null;
   };
 
   Script.create(payload)

@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, screen) => {
     res.locals.setResponse(err, { screen });
-    next();
+    next(); return null;
   };
 
   Screen.create(payload)

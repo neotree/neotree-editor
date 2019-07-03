@@ -18,7 +18,7 @@ export default (app, { scripts, author }, done) => {
               script_id,
               author,
               data: JSON.stringify(diagnosis)
-            }).then(() => isLast && resolve())
+            }).then(() => { if (isLast) resolve(); return null; })
               .catch(err => console.log(err));
           });
         });
@@ -35,15 +35,17 @@ export default (app, { scripts, author }, done) => {
               position,
               type,
               data: JSON.stringify(screen)
-            }).then(() => isLast && resolve())
+            }).then(() => { if (isLast) resolve(); return null; })
               .catch(err => console.log(err));
           });
         });
 
         Promise.all([insertScreens(), insertDiagnoses()])
-          .then(() => { /**/ }).catch(err => console.log(err));
+          .then(() => null).catch(err => console.log(err));
 
         if (isLastScript) done();
+
+        return null;
       })
       .catch(err => console.log(err));
   });

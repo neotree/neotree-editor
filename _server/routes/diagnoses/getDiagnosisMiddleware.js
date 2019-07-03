@@ -5,7 +5,7 @@ module.exports = () => (req, res, next) => {
 
   const done = (err, diagnosis) => {
     res.locals.setResponse(err, { diagnosis });
-    next();
+    next(); return null;
   };
 
   Diagnosis.findOne({ where: payload })
