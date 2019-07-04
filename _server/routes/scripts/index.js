@@ -43,7 +43,7 @@ module.exports = app => {
 
   router.post(
     '/duplicate-script',
-    require('./duplicateScriptMiddleware')(app),
+    require('./duplicateScriptMiddleware').default(app),
     responseMiddleware
   );
 
