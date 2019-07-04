@@ -103,7 +103,7 @@ export class Dashboard extends React.Component {
               <Link onClick={this.toggleDrawer} to="/dashboard/configkeys">Configuration</Link>
               {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
               <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
-              <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
+              <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import/Export</Link>
               {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
             </Navigation>
           </Drawer>

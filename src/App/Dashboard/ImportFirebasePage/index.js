@@ -3,33 +3,17 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import cx from 'classnames';
 import { withRouter } from 'react-router-dom';
-import { Button } from 'react-mdl';
+import { Tabs, Tab } from 'react-mdl';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Context from './Context';
-import FileInput from 'ui/FileInput';  // eslint-disable-line
-import FileUploader from 'FileUploader'; // eslint-disable-line
-import Spinner from 'ui/Spinner'; // eslint-disable-line
+import ImportSection from './ImportSection';
+import ExportSection from './ExportSection';
 
 export class ImportFirebasePage extends React.Component {
-  state = {
-    importingData: false,
-  };
-
-  onFileInputChange = e => {
-    const { actions, host } = this.props;
-    this.setState({ importDataError: null, importingData: true });
-    const uploader = new FileUploader(e.target.files[0], {
-      url: `${host}/import-from-firebase`
-    });
-    uploader.upload()
-      .then(({ payload }) => {
-        this.setState({ importingData: false, ...payload });
-        actions.updateAppStatus({ ...payload });
-      }).catch(error => this.setState({ error }));
-  };
+  state = { activeTab: 0 };
 
   render() {
-    const { error, importingData } = this.state;
+    const { activeTab } = this.state;
 
     return (
       <Context.Provider value={this}>
@@ -39,35 +23,23 @@ export class ImportFirebasePage extends React.Component {
             style={{
               background: '#fff',
               margin: 'auto',
-              padding: '25px 10px',
+              // padding: '25px 10px',
               minWidth: 250,
               textAlign: 'center'
             }}
           >
-            {error ? (
-              <div
-                className="ui__dangerColor"
-              >{error.msg || error.message || JSON.stringify(error)}</div>
-            ) : (
-              <div>
-                {importingData ?
-                  <Spinner className="ui__flex ui__justifyContent_center" />
-                  :
-                  (
-                    <div>
-                      {this.state.data_import_info && this.state.data_import_info.date ?
-                        <p>Firebase data was imported!!!</p> : null}
+            <Tabs
+              activeTab={activeTab}
+              onChange={activeTab => this.setState({ activeTab })}
+            >
+              <Tab>Import</Tab>
+              <Tab>Export</Tab>
+            </Tabs>
 
-                      <FileInput
-                        value=''
-                        onChange={this.onFileInputChange}
-                      >
-                        <Button raised accent ripple>Upload firebase json file</Button>
-                      </FileInput>
-                    </div>
-                  )}
-              </div>
-            )}
+            <div style={{ padding: '25px 10px' }}>
+              {activeTab === 0 && <ImportSection {...this.props} />}
+              {activeTab === 1 && <ExportSection {...this.props} />}
+            </div>
           </div>
         </div>
       </Context.Provider>
