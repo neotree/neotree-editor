@@ -49,7 +49,7 @@ function () {
           case 5:
             _context.prev = 5;
             _context.t0 = _context["catch"](0);
-            console.log('DATABASE INIT ERROR:', err); // eslint-disable-line
+            console.log('DATABASE INIT ERROR:', _context.t0); // eslint-disable-line
 
             process.exit(1);
 

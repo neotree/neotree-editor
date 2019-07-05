@@ -38,7 +38,7 @@ Perceived performance and development experience are key factors in this setup.
 
   Add production config file:
   ```
-  dist/_config/config.production.json
+  _config/config.production.json
   ```
 
   ```json

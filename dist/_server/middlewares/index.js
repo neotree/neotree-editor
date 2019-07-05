@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread"));
+var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -73,7 +73,7 @@ var _default = function _default(app) {
     res.locals.setResponse = function (error) {
       var payload = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
       if (error) res.locals[req.originalUrl][error.map ? 'errors' : 'error'] = error;
-      res.locals[req.originalUrl].payload = (0, _objectSpread2["default"])({}, res.locals[req.originalUrl].payload, payload);
+      res.locals[req.originalUrl].payload = (0, _objectSpread2["default"])({}, res.locals[req.originalUrl].payload, {}, payload);
     };
 
     res.locals.getResponse = function () {

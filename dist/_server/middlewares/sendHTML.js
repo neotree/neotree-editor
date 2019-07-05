@@ -2,7 +2,7 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread"));
+var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -28,7 +28,7 @@ module.exports = function (expressApp) {
 
     var __$INITIAL_DATA__ = JSON.stringify((0, _objectSpread2["default"])({
       host: config.host
-    }, payload, app, error ? {
+    }, payload, {}, app, {}, error ? {
       error: error
     } : {}));
 
