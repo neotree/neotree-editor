@@ -15,7 +15,7 @@ const initDatabase = async () => {
   try {
     await dbInit();
   } catch (e) {
-    console.log('DATABASE INIT ERROR:', err); // eslint-disable-line
+    console.log('DATABASE INIT ERROR:', e); // eslint-disable-line
     process.exit(1);
   }
 };
