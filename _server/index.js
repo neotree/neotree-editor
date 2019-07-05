@@ -26,6 +26,8 @@ app.io = require('socket.io')(httpServer);
 
 app = setMiddlewares(app);
 
+app.use('/resources', express.static(path.resolve(__dirname, '../src/resources'), { index: false }));
+
 app.use(express.static(path.resolve(__dirname, '../src'), { index: false }));
 
 app.get('*',
