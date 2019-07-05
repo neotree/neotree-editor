@@ -18,7 +18,7 @@ export const sequelize = new Sequelize(
   process.env.DATABASE_NAME || dbConfig.database,
   process.env.DATABASE_USERNAME || dbConfig.username,
   process.env.DATABASE_PASSWORD || dbConfig.password,
-  { host: 'localhost', dialect: 'postgres', logging: false }
+  { host: dbConfig.host || 'localhost', dialect: 'postgres', logging: false }
 );
 
 // export const Session = sequelize.define(

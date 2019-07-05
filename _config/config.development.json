@@ -5,6 +5,7 @@
     "username": "neotree",
     "database": "neotree",
     "password": "password",
-    "port": 5432
+    "port": 5432,
+    "host": "localhost"
   }
 }
