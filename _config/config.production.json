@@ -2,11 +2,9 @@
   "port": 3000,
   "host": "http://34.252.93.151:3000",
   "database": {
-    "user": "neotree",
+    "username": "neotree",
     "database": "neotree",
     "password": "neotree",
-    "port": 5432,
-    "max": 10,
-    "idleTimeoutMillis": 30000
+    "port": 5432
   }
 }

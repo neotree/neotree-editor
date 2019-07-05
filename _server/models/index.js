@@ -15,9 +15,9 @@ const dbConfig = process.env.NODE_ENV === 'production' ?
   require('../../_config/config.development.json').database;
 
 export const sequelize = new Sequelize(
-  dbConfig.database,
-  dbConfig.user,
-  dbConfig.password,
+  process.env.DATABASE_NAME || dbConfig.database,
+  process.env.DATABASE_USERNAME || dbConfig.username,
+  process.env.DATABASE_PASSWORD || dbConfig.password,
   { host: 'localhost', dialect: 'postgres', logging: false }
 );
 
