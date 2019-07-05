@@ -40,7 +40,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 var dbConfig = process.env.NODE_ENV === 'production' ? require('../../_config/config.production.json').database : require('../../_config/config.development.json').database;
 var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
-  host: dbConfig.host,
+  host: dbConfig.host || 'localhost',
   dialect: 'postgres',
   logging: false
 }); // export const Session = sequelize.define(
