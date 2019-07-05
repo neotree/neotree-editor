@@ -24,8 +24,7 @@ Perceived performance and development experience are key factors in this setup.
         "database": "db name",
         "password": "db user password",
         "port": "port (optional, default 5432)",
-        "max": "(optional)",
-        "idleTimeoutMillis": "(optional)"
+        "host": "db host (eg. localhost, default is localhost)"
       }
     }
   ```
@@ -50,8 +49,7 @@ Perceived performance and development experience are key factors in this setup.
         "database": "db name",
         "password": "db user password",
         "port": "port (optional, default 5432)",
-        "max": "(optional)",
-        "idleTimeoutMillis": "(optional)"
+        "host": "db host (eg. localhost, default is localhost)"
       }
     }
   ```
