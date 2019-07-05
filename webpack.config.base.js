@@ -1,6 +1,6 @@
 import path from 'path';
 
-export default config => ({
+export default () => ({
   resolve: {
     symlinks: false,
     modules: [
@@ -50,7 +50,7 @@ export default config => ({
               limit: 5000000,
               name: '[path][name].[ext]?[hash]',
               outputPath: 'resources',
-              publicPath: 'resources'
+              publicPath: '/resources/',
             }
           }
         ]
