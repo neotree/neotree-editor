@@ -26,5 +26,5 @@ export default {
     // new ExtractTextPlugin('style.css', { allChunks: false })
     // new UglifyJsPlugin()
   ],
-  ...base
+  ...base(config)
 };

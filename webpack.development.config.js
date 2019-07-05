@@ -26,5 +26,5 @@ export default {
     new webpack.NoEmitOnErrorsPlugin(),
     new webpack.NamedModulesPlugin()
   ],
-  ...base
+  ...base(config)
 };

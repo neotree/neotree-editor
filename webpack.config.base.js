@@ -1,6 +1,6 @@
 import path from 'path';
 
-export default {
+export default config => ({
   resolve: {
     symlinks: false,
     modules: [
@@ -48,11 +48,13 @@ export default {
             loader: 'file-loader',
             options: {
               limit: 5000000,
-              name: '[path][name].[ext]?[hash]'
+              name: '[path][name].[ext]?[hash]',
+              outputPath: 'resources',
+              publicPath: 'resources'
             }
           }
         ]
       }
     ]
   }
-};
+});
