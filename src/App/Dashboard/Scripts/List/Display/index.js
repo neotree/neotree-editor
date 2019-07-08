@@ -19,6 +19,7 @@ import {
     TableHeader
 } from 'react-mdl';
 import Spinner from 'ui/Spinner'; // eslint-disable-line
+import ExportLink from '../../../components/ExportLink';
 
 class Display extends Component {
   constructor(props) {
@@ -69,6 +70,19 @@ class Display extends Component {
       }
     });
   };
+
+  // handleExportScript = id => {
+  //   const { actions } = this.props;
+  //   this.setState({ exportingScript: true });
+  //   actions.get('export-data', {
+  //     script: id,
+  //     onResponse: () => this.setState({ exportingScript: false }),
+  //     onFailure: exportScriptError => this.setState({ exportScriptError }),
+  //     onSuccess: ({ payload }) => {
+  //       console.log(payload);
+  //     }
+  //   });
+  // };
 
   openDeleteConfirmDialog = scriptId => this.setState({
     ...this.state,
@@ -143,6 +157,11 @@ class Display extends Component {
                 </MenuItem>
                 <MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
                   Duplicate
+                </MenuItem>
+                <MenuItem onClick={() => this.handleExportScript(scriptId)}>
+                  <ExportLink
+                    options={{ script: scriptId }}
+                  />
                 </MenuItem>
             </Menu>
           </div>

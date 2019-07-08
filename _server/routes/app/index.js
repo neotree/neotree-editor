@@ -19,5 +19,7 @@ module.exports = app => {
     }
   );
 
+  router.get('/export-data', require('./exportDataMiddleware')(app));
+
   return router;
 };
