@@ -11,10 +11,13 @@ import {
     DialogContent,
     FABButton,
     TableHeader,
-    Textfield
+    Textfield,
+    Menu,
+    MenuItem
 } from 'react-mdl';
-import { MdDelete, MdAdd } from 'react-icons/md';
+import { MdAdd, MdMoreVert } from 'react-icons/md';
 import Spinner from 'ui/Spinner'; // eslint-disable-line
+import ExportLink from '../../components/ExportLink';
 
 class List extends Component {
   constructor(props) {
@@ -89,9 +92,28 @@ class List extends Component {
     ...this.state,
     openDeleteConfirmDialog: false,
     configKeyIdForAction: null,
-    deleteScriptError: null,
+    deleteConfigKeyError: null,
     createConfigKeyError: null
   });
+
+  handleDuplicateKey = id => {
+    const { actions } = this.props;
+    this.setState({ duplicatingConfigKey: true });
+    actions.post('duplicate-config-key', {
+      id,
+      onResponse: () => this.setState({ duplicatingConfigKey: false }),
+      onFailure: duplicateConfigKeyError => this.setState({ duplicateConfigKeyError }),
+      onSuccess: ({ payload }) => {
+        actions.updateApiData(state => {
+          const configKeys = [...state.configKeys];
+          const ogIndex = configKeys.map((s, i) =>
+            s.id === id ? i : null).filter(i => i !== null)[0] || 0;
+          configKeys.splice(ogIndex + 1, 0, payload.configKey);
+          return { configKeys };
+        });
+      }
+    });
+  };
 
   // TODO: Fix margin top to be more generic for all content
   render() {
@@ -196,15 +218,35 @@ class List extends Component {
       </Dialog>
     );
 
-    const renderItemActionButton = id => {
+    const renderItemActionButton = (id, rowData, index) => {
+      //return <IconButton name="edit" onClick={this.handleEditUserClick.bind(this, configKeyId)}/>;
+      const menuId = `more-user-action-menu${index}`;
       return (
         <div>
           <div
-            className="ui__cursor_pointer"
             style={{ position: 'relative', color: '#999999' }}
-            onClick={this.openDeleteConfirmDialog.bind(this, id)}
+            className="ui__flex ui__alignItems_center"
           >
-            <MdDelete style={{ fontSize: '24px' }} />
+            {/*<div
+              className="ui__cursor_pointer"
+              onClick={this.handleEditConfigKeyClick.bind(this, id)}
+            >
+              <MdCreate style={{ fontSize: '24px' }} />
+            </div>*/}&nbsp;
+            <div id={menuId} className="ui__cursor_pointer">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
+            <Menu target={menuId} align="right">
+                <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, id)}>
+                  Delete
+                </MenuItem>
+                <MenuItem onClick={() => this.handleDuplicateKey(id)}>
+                  Duplicate
+                </MenuItem>
+                <MenuItem>
+                  <ExportLink options={{ configKey: id }} />
+                </MenuItem>
+            </Menu>
           </div>
         </div>
       );

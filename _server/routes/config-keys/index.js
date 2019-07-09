@@ -41,5 +41,11 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/duplicate-config-key',
+    require('./duplicateConfigKeyMiddleware').default(app),
+    responseMiddleware
+  );
+
   return router;
 };
