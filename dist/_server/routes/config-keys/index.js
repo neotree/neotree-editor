@@ -23,6 +23,7 @@ module.exports = function (app) {
   router.post('/update-config-key', require('./updateConfigKeyMiddleware')(app), responseMiddleware);
   router.post('/update-config-keys', require('./updateConfigKeysMiddleware')(app), responseMiddleware);
   router.post('/delete-config-key', require('./deleteConfigKeyMiddleware')(app), responseMiddleware);
+  router.post('/duplicate-config-key', require('./duplicateConfigKeyMiddleware')["default"](app), responseMiddleware);
   return router;
 };
 
