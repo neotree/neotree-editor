@@ -72,7 +72,7 @@ var httpServer = require('http').Server(app);
 
 app.io = require('socket.io')(httpServer);
 app = (0, _middlewares["default"])(app);
-app.use('/resources', _express["default"]["static"](_path["default"].resolve(__dirname, '../src/resources'), {
+app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../src/assets'), {
   index: false
 }));
 app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {

@@ -49,8 +49,8 @@ export default () => ({
             options: {
               limit: 5000000,
               name: '[path][name].[ext]?[hash]',
-              outputPath: 'resources',
-              publicPath: '/resources/',
+              outputPath: 'assets',
+              publicPath: '/assets/',
             }
           }
         ]

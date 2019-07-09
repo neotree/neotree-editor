@@ -26,7 +26,7 @@ module.exports = function (expressApp) {
 
     var error = res.locals.getResponseError();
 
-    var __$INITIAL_DATA__ = JSON.stringify((0, _objectSpread2["default"])({
+    var __$APP__ = JSON.stringify((0, _objectSpread2["default"])({
       host: config.host
     }, payload, {}, app, {}, error ? {
       error: error
@@ -36,7 +36,7 @@ module.exports = function (expressApp) {
 
     var $ = _cheerio["default"].load(html);
 
-    $('head').append("<script type=\"text/javascript\">const __$INITIAL_DATA__ = ".concat(JSON.stringify(__$INITIAL_DATA__), ";</script>"));
+    $('head').append("<script type=\"text/javascript\">const __$APP__ = ".concat(JSON.stringify(__$APP__), ";</script>"));
     $('body').append("<script type=\"text/javascript\" src=\"".concat(config.host, "/bundle.js\"></script>"));
     res.send($.html());
   };

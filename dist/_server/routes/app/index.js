@@ -21,7 +21,7 @@ var router = _express["default"].Router();
 
 module.exports = function (app) {
   // const { responseMiddleware } = app;
-  router = require('./importFromFirebaseMiddleware')(router, app);
+  router = require('./importDataMiddleware')(router, app);
   router.get('/initialise-app', require('./initialiseAppMiddleware')(app), function (req, res) {
     var _ref = res.locals.getResponsePayload() || {},
         app = _ref.app,
@@ -32,6 +32,7 @@ module.exports = function (app) {
       payload: (0, _objectSpread2["default"])({}, payload, {}, app)
     });
   });
+  router.get('/export-data', require('./exportDataMiddleware')(app));
   return router;
 };
 

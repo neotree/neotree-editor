@@ -28,9 +28,9 @@ fs.readFile('src/index.html', 'utf8', (err, markup) => {
   });
 });
 
-// copy resources folder
-ncp(path.resolve(__dirname, '../src/resources'), path.resolve(__dirname, '../dist/src/resources'), err => {
+// copy assets folder
+ncp(path.resolve(__dirname, '../src/assets'), path.resolve(__dirname, '../dist/src/assets'), err => {
    if (err) return console.error(err);
-   console.log('resources folder copied to /dist/src/resources'.green);
+   console.log('assets folder copied to /dist/src/assets'.green);
   }
 );

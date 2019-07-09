@@ -35,7 +35,7 @@ var _default = function _default(app, _ref, done) {
     _models.Script.create({
       id: script_id,
       author: author,
-      data: JSON.stringify(script)
+      data: JSON.stringify(script.data || script)
     }).then(function () {
       var insertDiagnoses = function insertDiagnoses() {
         return new Promise(function (resolve) {
@@ -53,7 +53,7 @@ var _default = function _default(app, _ref, done) {
               id: diagnosis_id,
               script_id: script_id,
               author: author,
-              data: JSON.stringify(diagnosis)
+              data: JSON.stringify(diagnosis.data || diagnosis)
             }).then(function () {
               if (isLast) resolve();
               return null;
@@ -84,7 +84,7 @@ var _default = function _default(app, _ref, done) {
               author: author,
               position: position,
               type: type,
-              data: JSON.stringify(screen)
+              data: JSON.stringify(screen.data || screen)
             }).then(function () {
               if (isLast) resolve();
               return null;
@@ -119,7 +119,7 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importFromFirebaseMiddleware/handleScripts.js");
+  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importDataMiddleware/handleScripts.js");
 })();
 
 ;

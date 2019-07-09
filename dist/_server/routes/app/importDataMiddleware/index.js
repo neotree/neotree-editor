@@ -8,6 +8,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _multer = _interopRequireDefault(require("multer"));
 
+var _uuidv = _interopRequireDefault(require("uuidv4"));
+
 var _models = require("../../../models");
 
 var _handleScripts = _interopRequireDefault(require("./handleScripts"));
@@ -29,7 +31,7 @@ var upload = (0, _multer["default"])({
 
 module.exports = function (router, app) {
   var responseMiddleware = app.responseMiddleware;
-  router.post('/import-from-firebase', upload.single('file'), function (req, res, next) {
+  router.post('/import-data', upload.single('file'), function (req, res, next) {
     var done = function done(err) {
       res.locals.setResponse(err, err ? {} : {
         data_import_info: {
@@ -42,8 +44,25 @@ module.exports = function (router, app) {
     };
 
     var data = JSON.parse(req.file.buffer);
+    data.configKeys = data.configKeys || {};
+    data.scripts = data.scripts || {};
+
+    if (data.configKeys.map) {
+      data.configKeys = data.configKeys.reduce(function (acc, current) {
+        acc[current.id] = current;
+        return acc;
+      }, {});
+    }
+
+    if (data.scripts.map) {
+      data.scripts = data.scripts.reduce(function (acc, current) {
+        acc[current.id] = current;
+        return acc;
+      }, {});
+    }
+
     var author = req.user ? req.user.id : null;
-    var configKeys = Object.keys(data.configkeys).map(function (key) {
+    var configKeys = Object.keys(data.configkeys || {}).map(function (key) {
       var _data$configkeys$key = data.configkeys[key],
           createdAt = _data$configkeys$key.createdAt,
           updatedAt = _data$configkeys$key.updatedAt,
@@ -52,28 +71,29 @@ module.exports = function (router, app) {
 
       return configKey;
     });
-    var scripts = Object.keys(data.scripts).map(function (key) {
+    var scripts = Object.keys(data.scripts || {}).map(function (key) {
       var _data$scripts$key = data.scripts[key],
           createdAt = _data$scripts$key.createdAt,
           updatedAt = _data$scripts$key.updatedAt,
           scriptId = _data$scripts$key.scriptId,
           script = (0, _objectWithoutProperties2["default"])(_data$scripts$key, ["createdAt", "updatedAt", "scriptId"]); // eslint-disable-line
 
-      var screens = data.screens[key] || {};
-      var diagnoses = data.diagnosis[key] || {};
+      var screens = script.screens || data.screens[key] || {};
+      var diagnoses = script.diagnoses || data.diagnosis[key] || {};
       return (0, _objectSpread2["default"])({}, script, {
-        screens: Object.keys(screens).map(function (key) {
+        screens: script.screens || Object.keys(screens || {}).map(function (key) {
           return screens[key];
         }),
-        diagnoses: Object.keys(diagnoses).map(function (key) {
+        diagnoses: script.diagnoses || Object.keys(diagnoses || {}).map(function (key) {
           return diagnoses[key];
         })
       });
     });
     configKeys.forEach(function (configKey) {
       _models.ConfigKey.create({
+        id: (0, _uuidv["default"])(),
         author: author,
-        data: JSON.stringify(configKey)
+        data: JSON.stringify(configKey.data || configKey)
       }).then(function () {
         return null;
       })["catch"](function (err) {
@@ -84,6 +104,7 @@ module.exports = function (router, app) {
       scripts: scripts,
       author: author
     }, done);
+    if (configKeys.length === 0 && scripts.length === 0) done();
   }, responseMiddleware);
   return router;
 };
@@ -97,8 +118,8 @@ module.exports = function (router, app) {
     return;
   }
 
-  reactHotLoader.register(storage, "storage", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importFromFirebaseMiddleware/index.js");
-  reactHotLoader.register(upload, "upload", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importFromFirebaseMiddleware/index.js");
+  reactHotLoader.register(storage, "storage", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importDataMiddleware/index.js");
+  reactHotLoader.register(upload, "upload", "/home/bws/WorkBench/neotree-editor/_server/routes/app/importDataMiddleware/index.js");
 })();
 
 ;
