@@ -71,7 +71,7 @@ export class Dashboard extends React.Component {
       }),
       onFailure: logOutFailure => this.setState({ logOutFailure }),
       onSuccess: () => {
-        actions.updateAppStatus({ authenticatedUser: null });
+        actions.$updateApp({ authenticatedUser: null });
         global.window.location.href = '/auth/sign-in';
       }
     });

@@ -17,14 +17,14 @@ export const resetApiData = () => ({
   type: RESET_API_DATA
 });
 
-// UPDATE_APP_STATUS
-export const UPDATE_APP_STATUS = 'UPDATE_APP_STATUS';
-export const updateAppStatus = updateState(UPDATE_APP_STATUS);
+// $UPDATE_APP
+export const $UPDATE_APP = '$UPDATE_APP';
+export const $updateApp = updateState($UPDATE_APP);
 
-// RESET_APP_STATUS
-export const RESET_APP_STATUS = 'RESET_APP_STATUS';
+// $RESET_APP
+export const $RESET_APP = '$RESET_APP';
 export const resetAppStatus = () => ({
-  type: RESET_APP_STATUS
+  type: $RESET_APP
 });
 
 // API_REQUEST

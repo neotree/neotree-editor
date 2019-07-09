@@ -2,7 +2,7 @@
 import postData from './postData';
 
 export const API_MIDDLEWARE = store => next => action => {
-  const host = store.getState().appStatus.host;
+  const host = store.getState().$APP.host;
   if (!(action.POST || action.GET)) return next(action);
 
   const API_METHOD = action.GET ? 'GET' : 'POST';

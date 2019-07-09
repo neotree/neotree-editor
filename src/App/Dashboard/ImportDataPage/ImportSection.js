@@ -20,7 +20,7 @@ export class ImportSection extends React.Component {
     uploader.upload()
       .then(({ payload }) => {
         this.setState({ importingData: false, ...payload });
-        actions.updateAppStatus({ ...payload });
+        actions.$updateApp({ ...payload });
       }).catch(error => this.setState({ error }));
   };
 

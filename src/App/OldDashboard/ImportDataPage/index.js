@@ -53,7 +53,7 @@ ImportDataPage.propTypes = {
 
 export default hot(withRouter(
   reduxComponent(ImportDataPage, state => ({
-    host: state.appStatus.host,
-    data_import_info: state.appStatus.data_import_info || {}
+    host: state.$APP.host,
+    data_import_info: state.$APP.data_import_info || {}
   }))
 ));

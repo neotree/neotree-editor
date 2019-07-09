@@ -34,7 +34,7 @@ Authenticated.propTypes = {
 const AuthenticatedDecorated = hot(
   withRouter(
     reduxComponent(Authenticated, state => ({
-      authenticatedUser: state.appStatus.authenticatedUser
+      authenticatedUser: state.$APP.authenticatedUser
     }))
   )
 );

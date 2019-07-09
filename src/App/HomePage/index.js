@@ -25,5 +25,5 @@ HomePage.propTypes = {
 };
 
 export default hot(reduxComponent(HomePage, state => ({
-  authenticatedUser: state.appStatus.authenticatedUser
+  authenticatedUser: state.$APP.authenticatedUser
 })));

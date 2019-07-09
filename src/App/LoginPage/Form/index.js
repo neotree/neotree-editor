@@ -92,7 +92,7 @@ export class Form extends Component {
         ...(roles ? { roles } : {}),
         onResponse: () => this.setState({ authenticating: false }),
         onSuccess: ({ payload }) => {
-          actions.updateAppStatus({ authenticatedUser: payload.user });
+          actions.$updateApp({ authenticatedUser: payload.user });
           this.redirectAuthenticated();
         },
         onFailure: authenticateError => this.setState({ authenticateError })
@@ -197,6 +197,6 @@ export class Form extends Component {
 export default hot(withRouter(
   reduxComponent(Form, state => ({
     copy: (state.apiData.copy || {}).authentication || copy,
-    authenticatedUser: state.appStatus.authenticatedUser
+    authenticatedUser: state.$APP.authenticatedUser
   }))
 ));
