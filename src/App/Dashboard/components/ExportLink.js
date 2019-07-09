@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const ExportLink = ({ options }) => {
+const ExportLink = ({ children, options }) => {
   options = options || { allScripts: true, allConfigKeys: true };
   let q = '';
   Object.keys(options).forEach((key, i) => {
@@ -15,7 +15,7 @@ const ExportLink = ({ options }) => {
       style={{ color: 'inherit', textDecoration: 'none', fontWeight: 'inherit' }}
       rel="noopener noreferrer"
       href={`/export-data?${q}`}
-    >Export</a>
+    >{children || 'Export'}</a>
   );
 };
 

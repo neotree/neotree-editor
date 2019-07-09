@@ -6,7 +6,11 @@ export default (app, { scripts, author }, done) => {
     const isLastScript = scriptIndex === (scripts.length - 1);
     const script_id = uuid();
 
-    Script.create({ id: script_id, author, data: JSON.stringify(script) })
+    Script.create({
+      id: script_id,
+      author,
+      data: JSON.stringify(script.data || script)
+    })
       .then(() => {
         const insertDiagnoses = () => new Promise((resolve) => {
           diagnoses.forEach(({ createdAt, updatedAt, scriptId, diagnosisId, ...diagnosis }, i) => { // eslint-disable-line
@@ -17,7 +21,7 @@ export default (app, { scripts, author }, done) => {
               id: diagnosis_id,
               script_id,
               author,
-              data: JSON.stringify(diagnosis)
+              data: JSON.stringify(diagnosis.data || diagnosis)
             }).then(() => { if (isLast) resolve(); return null; })
               .catch(err => console.log(err));
           });
@@ -34,7 +38,7 @@ export default (app, { scripts, author }, done) => {
               author,
               position,
               type,
-              data: JSON.stringify(screen)
+              data: JSON.stringify(screen.data || screen)
             }).then(() => { if (isLast) resolve(); return null; })
               .catch(err => console.log(err));
           });

@@ -9,7 +9,7 @@ import Context from './Context';
 import ImportSection from './ImportSection';
 import ExportSection from './ExportSection';
 
-export class ImportFirebasePage extends React.Component {
+export class ImportDataPage extends React.Component {
   state = { activeTab: 0 };
 
   render() {
@@ -47,12 +47,12 @@ export class ImportFirebasePage extends React.Component {
   }
 }
 
-ImportFirebasePage.propTypes = {
+ImportDataPage.propTypes = {
   actions: PropTypes.object.isRequired
 };
 
 export default hot(withRouter(
-  reduxComponent(ImportFirebasePage, state => ({
+  reduxComponent(ImportDataPage, state => ({
     host: state.appStatus.host,
     data_import_info: state.appStatus.data_import_info || {}
   }))

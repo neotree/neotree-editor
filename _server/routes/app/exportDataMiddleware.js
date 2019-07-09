@@ -57,7 +57,8 @@ module.exports = () => (req, res) => {
       allScripts ? Script.findAll({}) : null,
       allScripts ? Screen.findAll({}) : null,
       allScripts ? Diagnosis.findAll({}) : null,
-    ]).then(([configKeys, scripts, screens, diagnoses]) => {
+    ]).then(rslts => {
+      const [configKeys, scripts, screens, diagnoses] = rslts;
       const data = {};
 
       if (configKeys) {
@@ -65,13 +66,16 @@ module.exports = () => (req, res) => {
       }
 
       if (scripts) {
-        data.scripts = scripts.map(script => ({
-          ...script.toJSON(),
-          screens: screens.filter(scr => scr.script_id === script.id)
-            .map(scr => scr.toJSON()),
-          diagnoses: diagnoses.filter(d => d.script_id === script.id)
-            .map(scr => scr.toJSON())
-        }));
+        data.scripts = scripts.map(script => {
+          script = script.toJSON();
+          return {
+            ...script,
+            screens: screens.filter(scr => scr.script_id === script.id)
+              .map(scr => scr.toJSON()),
+            diagnoses: diagnoses.filter(d => d.script_id === script.id)
+              .map(scr => scr.toJSON())
+          };
+        });
       }
 
       return done(null, data);

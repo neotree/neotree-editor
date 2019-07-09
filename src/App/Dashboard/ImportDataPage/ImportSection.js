@@ -15,7 +15,7 @@ export class ImportSection extends React.Component {
     const { actions, host } = this.props;
     this.setState({ importDataError: null, importingData: true });
     const uploader = new FileUploader(e.target.files[0], {
-      url: `${host}/import-from-firebase`
+      url: `${host}/import-data`
     });
     uploader.upload()
       .then(({ payload }) => {
