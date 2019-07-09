@@ -167,10 +167,8 @@ class Display extends Component {
                 <MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
                   Duplicate
                 </MenuItem>
-                <MenuItem onClick={() => this.handleExportScript(scriptId)}>
-                  <ExportLink
-                    options={{ script: scriptId }}
-                  />
+                <MenuItem>
+                  <ExportLink options={{ script: scriptId }} />
                 </MenuItem>
             </Menu>
           </div>
