@@ -8,13 +8,12 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    Icon,
-    IconButton,
     Radio,
     RadioGroup,
     TableHeader,
     Textfield
 } from 'react-mdl';
+import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import { SymptomType } from 'App/constants'; // eslint-disable-line
 import { arrayMove } from 'App/utils'; // eslint-disable-line
@@ -267,20 +266,35 @@ export default class SymptomList extends Component {
 
         const renderItemActions = (screenId, rowData, index) => {
             return (
-                <div style={{display: 'flex', flexDirection:'row', alignContent: 'end', color: "#999999"}}>
-                    <IconButton name="edit" onClick={this.openEditItemDialog(index)}/>
-                    <IconButton name="delete" onClick={this.openConfirmDeleteItemDialog(index)}/>
+              <div
+                className="ui__flex ui__alignItems_center"
+                style={{ color: '#999999' }}
+              >
+                <div
+                  className="ui__cursor_pointer"
+                  onClick={this.openEditItemDialog(index)}
+                >
+                  <MdCreate style={{ fontSize: '24px' }} />
+                </div>&nbsp;
+                <div
+                  className="ui__cursor_pointer"
+                  onClick={this.openConfirmDeleteItemDialog(index)}
+                >
+                  <MdDelete style={{ fontSize: '24px' }} />
                 </div>
-            )
+              </div>
+            );
         };
 
         return (
             <div>
                 <Card shadow={0} style={styles.container}>
                     <Toolbar title="Signs/Risks">
-                        <div style={{display: 'flex', flexDirection: 'row'}}>
-                            <IconButton name="add" onClick={this.openNewItemDialog} />
-                        </div>
+                      <div
+                        className="ui__cursor_pointer"
+                        style={{ fontSize: '24px' }}
+                        onClick={this.openNewItemDialog}
+                      ><MdAdd /></div>
                     </Toolbar>
 
                     {(items && items.length > 0) ?

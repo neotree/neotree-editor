@@ -6,7 +6,7 @@ import {
     CardText,
     Textfield,
 } from 'react-mdl';
-import Base64ImageUploader from 'Dashboard/components/Base64ImageUploader'; // eslint-disable-line
+import Base64ImageUploader from 'OldDashboard/components/Base64ImageUploader'; // eslint-disable-line
 import FormButtonBar from 'FormButtonBar'; // eslint-disable-line
 import FormSection from 'FormSection'; // eslint-disable-line
 import Toolbar from 'Toolbar'; // eslint-disable-line

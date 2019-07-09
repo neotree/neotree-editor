@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import Display from './Display';
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 export class ScreenEditor extends React.Component {
@@ -33,7 +34,7 @@ export class ScreenEditor extends React.Component {
 
     if (loadingScreens) return <Spinner className="ui__flex ui__justifyContent_center" />;
 
-    return <h1>Screen Editor</h1>;
+    return <Display {...this.props} />;
   }
 }
 

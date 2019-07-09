@@ -4,6 +4,7 @@ import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
+import List from './List';
 
 export class ConfigKeys extends React.Component {
   state = {};
@@ -32,7 +33,7 @@ export class ConfigKeys extends React.Component {
 
     return (
       <div>
-        <h1>Config keys</h1>
+        <List {...this.props} />
       </div>
     );
   }

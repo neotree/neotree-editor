@@ -8,12 +8,12 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    IconButton,
     Radio,
     RadioGroup,
 //    TableHeader,
 //    Textfield
 } from 'react-mdl';
+import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
 import { Table, TableHeader } from '../../datatable';
 import Toolbar from 'Toolbar';  // eslint-disable-line
 import { arrayMove } from 'App/utils'; // eslint-disable-line
@@ -109,9 +109,22 @@ class Display extends Component {
 
     const renderItemActions = id => {
       return (
-        <div style={{ display: 'flex', flexDirection:'row', alignContent: 'end', color: "#999999" }}>
-          <IconButton name="edit" onClick={this.handleEditScreenClick(id)} />
-          <IconButton name="delete" onClick={this.handleDeleteScreenClick(id)} />
+        <div
+          className="ui__flex ui__alignItems_center"
+          style={{ color: "#999999" }}
+        >
+          <div
+            className="ui__cursor_pointer"
+            onClick={this.handleEditScreenClick(id)}
+          >
+            <MdCreate style={{ fontSize: '24px' }} />
+          </div>&nbsp;
+          <div
+            className="ui__cursor_pointer"
+            onClick={this.handleDeleteScreenClick(id)}
+          >
+            <MdDelete style={{ fontSize: '24px' }} />
+          </div>
         </div>
       );
     };
@@ -155,8 +168,12 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
-            <div style={{ display: 'flex', flexDirection: 'row' }}>
-              <IconButton name="add" onClick={this.openSelectScreenTypeDialog} />
+            <div className="ui__flex ui__alignItems_center">
+              <div
+                className="ui__cursor_pointer"
+                style={{ fontSize: '24px' }}
+                onClick={this.openSelectScreenTypeDialog}
+              ><MdAdd /></div>
             </div>
           </Toolbar>
 

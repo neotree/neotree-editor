@@ -4,6 +4,7 @@ import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
+import Display from './Display';
 
 export class ScriptEditor extends React.Component {
   state = {};
@@ -34,7 +35,7 @@ export class ScriptEditor extends React.Component {
 
     if (loadingScript) return <Spinner className="ui__flex ui__justifyContent_center" />;
 
-    return <h1>Script Editor</h1>;
+    return <Display {...this.props} />;
   }
 }
 

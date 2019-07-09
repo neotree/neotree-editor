@@ -19,7 +19,7 @@
 
 @import "../../../node_modules/react-mdl/extra/css/material.blue-orange.min.css";
 @import "../../../node_modules/roboto-fontface/css/roboto/roboto-fontface.css";
-@import "../../../node_modules/material-design-icons-iconfont/dist/material-design-icons.css";
+/* @import "../../../node_modules/material-design-icons-iconfont/dist/material-design-icons.css"; */
 
 html, body {
     height: 100%;

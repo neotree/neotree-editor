@@ -1,11 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import {
-    Button,
-    FABButton,
-    Icon,
-    IconButton
-} from 'react-mdl';
+import { FABButton } from 'react-mdl';
+import { MdDelete, MdAdd } from 'react-icons/md';
 
 export default class Base64ImageUploader extends Component {
     // componentWillMount() {
@@ -126,12 +122,12 @@ export default class Base64ImageUploader extends Component {
                 <div style={styles.flexContainer}>
                     <div style={styles.iconLeft}>
                         <FABButton mini colored onClick={this.handleFileUploadRequest.bind(this, "upload")}>
-                            <Icon name="add" />
+                            <MdAdd />
                         </FABButton>
                     </div>
                     <div style={styles.iconRight}>
                         <FABButton mini onClick={this.handleFileDelete.bind(this, "delete")}>
-                            <Icon name="delete" />
+                            <MdDelete />
                         </FABButton>
                     </div>
                 </div>

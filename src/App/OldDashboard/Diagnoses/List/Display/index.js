@@ -4,9 +4,9 @@ import {
   Card,
   CardText,
   DataTable,
-  IconButton,
   TableHeader
 } from 'react-mdl';
+import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 
@@ -71,15 +71,21 @@ class Display extends Component {
     const renderItemActions = id => {
       return (
         <div
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignContent: 'end',
-            color: '#999999'
-          }}
+          className="ui__flex ui__alignItems_center"
+          style={{ color: '#999999' }}
         >
-          <IconButton name="edit" onClick={this.handleEditDiagnosisClick(id)} />
-          <IconButton name="delete" onClick={this.handleDeleteDiagnosisClick(id)} />
+          <div
+            className="ui__cursor_pointer"
+            onClick={this.handleEditDiagnosisClick(id)}
+          >
+            <MdCreate style={{ fontSize: '24px' }} />
+          </div>&nbsp;
+          <div
+            className="ui__cursor_pointer"
+            onClick={this.handleDeleteDiagnosisClick(id)}
+          >
+            <MdDelete style={{ fontSize: '24px' }} />
+          </div>
         </div>
       );
     };
@@ -88,9 +94,11 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
-            <div style={{ display: 'flex', flexDirection: 'row' }}>
-              <IconButton name="add" onClick={this.handleAddDiagnosisClick} />
-            </div>
+            <div
+              className="ui__cursor_pointer"
+              style={{ fontSize: '24px' }}
+              onClick={this.handleAddDiagnosisClick}
+            ><MdAdd /></div>
           </Toolbar>
           {diagnoses.length > 0 ?
             <DataTable

@@ -4,7 +4,6 @@ import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import reduxComponent from 'reduxComponent'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
-import Display from './Display';
 
 export class List extends React.Component {
   state = {};
@@ -32,7 +31,7 @@ export class List extends React.Component {
 
     if (loadingDiagnosess) return <Spinner className="ui__flex ui__justifyContent_center" />;
 
-    return <Display {...this.props} />;
+    return <h1>Diagnoses</h1>;
   }
 }
 

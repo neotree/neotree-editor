@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Textfield } from 'react-mdl';
 
 import { DataType } from 'App/constants'; // eslint-disable-line
-import Base64ImageUploader from 'Dashboard/components/Base64ImageUploader';  // eslint-disable-line
+import Base64ImageUploader from 'OldDashboard/components/Base64ImageUploader';  // eslint-disable-line
 
 export default class ManagementMetadata extends Component {
     componentWillMount() {

@@ -12,12 +12,11 @@ import {
     DialogTitle,
     DialogContent,
     FABButton,
-    Icon,
-    IconButton,
     Menu,
     MenuItem,
     TableHeader
 } from 'react-mdl';
+import { MdAdd, MdMoreVert, MdCreate } from 'react-icons/md';
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 import ExportLink from '../../../components/ExportLink';
 
@@ -148,9 +147,19 @@ class Display extends Component {
       const menuId = `more-user-action-menu${index}`;
       return (
         <div>
-          <div style={{ position: 'relative', color: '#999999' }}>
-            <IconButton name="edit" onClick={this.handleEditScriptClick.bind(this, scriptId)} />
-            <IconButton name="more_vert" id={menuId} />
+          <div
+            style={{ position: 'relative', color: '#999999' }}
+            className="ui__flex ui__alignItems_center"
+          >
+            <div
+              className="ui__cursor_pointer"
+              onClick={this.handleEditScriptClick.bind(this, scriptId)}
+            >
+              <MdCreate style={{ fontSize: '24px' }} />
+            </div>&nbsp;
+            <div id={menuId} className="ui__cursor_pointer">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
             <Menu target={menuId} align="right">
                 <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, scriptId)}>
                   Delete
@@ -202,7 +211,7 @@ class Display extends Component {
     return (
       <div>
         <FABButton style={styles.fab} colored ripple onClick={this.handleAddScriptClick}>
-            <Icon name="add" />
+            <MdAdd />
         </FABButton>
         <div style={styles.container}>
             {scripts.length ? renderTable : renderEmptyTable}

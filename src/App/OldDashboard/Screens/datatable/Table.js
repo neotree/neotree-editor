@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import clamp from 'clamp';
-import { IconButton } from 'react-mdl';
-import { SortableContainer, SortableElement, SortableHandle, arrayMove } from 'react-sortable-hoc';
+import { MdDragHandle } from 'react-icons/md';
+import { SortableContainer, SortableElement, SortableHandle } from 'react-sortable-hoc';
 import randomstring from 'randomstring';
 import shadows from 'App/utils/shadows'; // eslint-disable-line
 
@@ -71,7 +71,8 @@ export default class Table extends Component {
 
         const columnChildren = !!children ? React.Children.toArray(children) : null;
 
-        const RowHandle = SortableHandle(() => <IconButton name="drag_handle" />);
+        const RowHandle = SortableHandle(() =>
+          <MdDragHandle style={{ fontSize: '24px' }} className="ui__cursor_pointer" />);
 
         const TableRow = SortableElement(({row, index}) =>
             <tr className={row.className}>

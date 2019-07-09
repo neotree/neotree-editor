@@ -10,11 +10,10 @@ import {
     DialogActions,
     DialogContent,
     FABButton,
-    Icon,
-    IconButton,
     TableHeader,
     Textfield
 } from 'react-mdl';
+import { MdDelete, MdAdd } from 'react-icons/md';
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 class List extends Component {
@@ -200,11 +199,12 @@ class List extends Component {
     const renderItemActionButton = id => {
       return (
         <div>
-          <div style={{ position: 'relative', color: '#999999' }}>
-            <IconButton
-              name='delete'
-              onClick={this.openDeleteConfirmDialog.bind(this, id)}
-            />
+          <div
+            className="ui__cursor_pointer"
+            style={{ position: 'relative', color: '#999999' }}
+            onClick={this.openDeleteConfirmDialog.bind(this, id)}
+          >
+            <MdDelete style={{ fontSize: '24px' }} />
           </div>
         </div>
       );
@@ -240,7 +240,7 @@ class List extends Component {
     return (
       <div>
         <FABButton style={styles.fab} colored ripple onClick={this.openCreateConfigKeyDialog}>
-            <Icon name='add' />
+            <MdAdd style={{ fontSize: '24px' }} />
         </FABButton>
         <div style={styles.container}>
             {(configKeys && configKeys.length > 0) ? renderTable : renderEmptyTable}

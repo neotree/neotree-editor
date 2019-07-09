@@ -10,6 +10,7 @@ import Spinner from 'ui/Spinner'; // eslint-disable-line
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));
 const Dashboard = LazyComponent(() => import('./Dashboard'));
+const OldDashboard = LazyComponent(() => import('./OldDashboard'));
 
 export class App extends React.Component {
   render() {
@@ -21,8 +22,12 @@ export class App extends React.Component {
 
         <Switch>
           <Route
-            path="/dashboard"
+            path="/dashboard/new"
             render={routeProps => <Dashboard {...this.props} {...routeProps} />}
+          />
+          <Route
+            path="/dashboard"
+            render={routeProps => <OldDashboard {...this.props} {...routeProps} />}
           />
           <Route
             exact
