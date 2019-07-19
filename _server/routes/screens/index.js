@@ -17,6 +17,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/get-full-screen',
+    require('./getFullScreenMiddleware')(app),
+    responseMiddleware
+  );
+
   router.post(
     '/create-screen',
     require('./createScreenMiddleware')(app),

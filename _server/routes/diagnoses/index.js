@@ -17,6 +17,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/get-full-diagnosis',
+    require('./getFullDiagnosisMiddleware')(app),
+    responseMiddleware
+  );
+
   router.post(
     '/create-diagnosis',
     require('./createDiagnosisMiddleware')(app),

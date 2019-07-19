@@ -4,11 +4,15 @@ import {
   Card,
   CardText,
   DataTable,
-  TableHeader
+  TableHeader,
+  Menu,
+  MenuItem,
 } from 'react-mdl';
-import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
+import { MdDelete, MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
+import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
+import PasteBoard from 'DashboardComponents/PasteBoard';
 
 class Display extends Component {
   constructor(props) {
@@ -18,6 +22,8 @@ class Display extends Component {
       scriptIdForAction: null
     };
   }
+
+  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
 
   handleAddDiagnosisClick = () => {
     const { history, scriptId } = this.props;
@@ -48,7 +54,7 @@ class Display extends Component {
   });
 
   render() {
-    const { diagnoses } = this.props;
+    const { diagnoses, scriptId } = this.props;
 
     const styles = {
       diagnosis: {
@@ -74,6 +80,9 @@ class Display extends Component {
           className="ui__flex ui__alignItems_center"
           style={{ color: '#999999' }}
         >
+          <div className="ui__cursor_pointer" style={{ fontSize: '24px' }}>
+            <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'diagnosis' })} />
+          </div>
           <div
             className="ui__cursor_pointer"
             onClick={this.handleEditDiagnosisClick(id)}
@@ -94,11 +103,19 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
-            <div
-              className="ui__cursor_pointer"
-              style={{ fontSize: '24px' }}
-              onClick={this.handleAddDiagnosisClick}
-            ><MdAdd /></div>
+            <div id="add_new" className="ui__cursor_pointer">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
+              <div>
+                <Menu target="add_new" align="right">
+                  <MenuItem onClick={this.handleAddDiagnosisClick}>
+                    Add new
+                  </MenuItem>
+                  <MenuItem onClick={this.togglePasteBoard}>
+                    Paste
+                  </MenuItem>
+                </Menu>
+            </div>
           </Toolbar>
           {diagnoses.length > 0 ?
             <DataTable
@@ -117,6 +134,12 @@ class Display extends Component {
               </div>
             </CardText>}
         </Card>
+        <PasteBoard
+          onClose={this.togglePasteBoard}
+          open={this.state.openPasteBoard}
+          destination={{ dataId: scriptId, dataType: 'diagnosis' }}
+          redirectTo={payload => `/dashboard/scripts/${scriptId}/diagnosis/${payload.diagnosis.id}`}
+        />
       </div>
     );
   }

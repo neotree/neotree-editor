@@ -217,6 +217,7 @@ class Display extends Component {
           onClose={this.togglePasteBoard}
           open={this.state.openPasteBoard}
           destination={{ dataId: scriptId, dataType: 'script' }}
+          redirectTo={payload => `/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`}
         />
       </div>
     );

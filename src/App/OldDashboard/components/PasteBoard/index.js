@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
+import { withRouter } from 'react-router';
 import { Dialog, DialogContent, DialogActions, Button } from 'react-mdl';
 import Spinner from 'ui/Spinner';
 import reduxComponent from 'reduxComponent';
@@ -13,7 +14,7 @@ export class PasteBoard extends React.Component {
     this.setState({ error: null });
 
     if (content) {
-      const { actions, host, destination } = this.props;
+      const { actions, host, destination, history, redirectTo } = this.props;
       const invalidDataErr = 'Ooops! Seems like you pasted invalid content.';
 
       try {
@@ -28,7 +29,7 @@ export class PasteBoard extends React.Component {
             source: { ...source, ...JSON.parse(data) },
             onResponse: () => this.setState({ saving: false }),
             onFailure: error => this.setState({ error }),
-            onSuccess: ({ payload }) => console.log(payload)
+            onSuccess: ({ payload }) => history.push(redirectTo(payload))
           });
         });
       } catch (e) {
@@ -97,9 +98,10 @@ PasteBoard.propTypes = {
   options: PropTypes.object,
   actions: PropTypes.func.isRequired,
   destination: PropTypes.func.isRequired,
-  host: PropTypes.string.isRequired
+  host: PropTypes.string.isRequired,
+  redirectTo: PropTypes.func.isRequired
 };
 
-export default reduxComponent(PasteBoard, state => ({
+export default withRouter(reduxComponent(PasteBoard, state => ({
   host: state.$APP.host
-}));
+})));

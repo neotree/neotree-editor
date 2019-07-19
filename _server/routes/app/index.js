@@ -3,7 +3,7 @@ import express from 'express';
 let router = express.Router();
 
 module.exports = app => {
-  // const { responseMiddleware } = app;
+  const { responseMiddleware } = app;
 
   router = require('./importDataMiddleware')(router, app);
 
@@ -20,6 +20,12 @@ module.exports = app => {
   );
 
   router.get('/export-data', require('./exportDataMiddleware')(app));
+
+  router.post(
+    '/copy-data',
+    require('./copyDataMiddleware')(app),
+    responseMiddleware
+  );
 
   return router;
 };
