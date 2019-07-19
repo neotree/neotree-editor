@@ -1,17 +1,32 @@
-import path from 'path';
+const path = require('path');
 
-export default () => ({
+module.exports = {
   resolve: {
     symlinks: false,
+
     modules: [
       path.resolve(__dirname, './node_modules'),
       path.resolve(__dirname, './_utils'),
       path.resolve(__dirname, './_config'),
       path.resolve(__dirname, './src'),
-      path.resolve(__dirname, './src/App'),
       path.resolve(__dirname, './src/_redux'),
+      path.resolve(__dirname, './src/ui'),
+      path.resolve(__dirname, './src/App'),
       path.resolve(__dirname, './src/App/components'),
-    ]
+      path.resolve(__dirname, './src/App/OldDashboard'),
+      path.resolve(__dirname, './src/App/OldDashboard/components')
+    ],
+    alias: {
+      config: path.resolve(__dirname, '_config/'),
+      utils: path.resolve(__dirname, '_utils/'),
+      root: path.resolve(__dirname, 'src/'),
+      ui: path.resolve(__dirname, 'src/ui/'),
+      App: path.resolve(__dirname, 'src/App/'),
+      AppUtils: path.resolve(__dirname, 'src/App/_utils/'),
+      AppComponents: path.resolve(__dirname, 'src/App/components/'),
+      Dashboard: path.resolve(__dirname, 'src/App/OldDashboard/'),
+      DashboardComponents: path.resolve(__dirname, 'src/App/OldDashboard/components/')
+    },
   },
   module: {
     rules: [
@@ -50,11 +65,11 @@ export default () => ({
               limit: 5000000,
               name: '[path][name].[ext]?[hash]',
               outputPath: 'assets',
-              publicPath: '/assets/',
+              publicPath: '/assets/'
             }
           }
         ]
       }
     ]
   }
-});
+};

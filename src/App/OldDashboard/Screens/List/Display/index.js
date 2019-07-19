@@ -10,15 +10,17 @@ import {
     DialogContent,
     Radio,
     RadioGroup,
-//    TableHeader,
-//    Textfield
+    Menu,
+    MenuItem,
 } from 'react-mdl';
-import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
+import { MdDelete, MdCreate, MdMoreVert } from 'react-icons/md';
+import Toolbar from 'Toolbar';
+import { arrayMove } from 'App/utils';
+import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
+// import Spinner from 'ui/Spinner';
+import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
+import PasteBoard from 'DashboardComponents/PasteBoard';
 import { Table, TableHeader } from '../../datatable';
-import Toolbar from 'Toolbar';  // eslint-disable-line
-import { arrayMove } from 'App/utils'; // eslint-disable-line
-import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants'; // eslint-disable-line
-import Spinner from 'ui/Spinner'; // eslint-disable-line
 
 /*eslint-disable quotes*/
 /*eslint-disable quote-props*/
@@ -30,6 +32,8 @@ class Display extends Component {
     screens: [],
     addScreenType: DEFAULT_SCREEN_TYPE
   };
+
+  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
 
   handleAddScreenClick = () => {
     const { actions, scriptId, history } = this.props;
@@ -92,7 +96,7 @@ class Display extends Component {
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { screens } = this.props;
+    const { screens, scriptId } = this.props;
     const { addScreenType } = this.state;
     const styles = {
       screens: { marginTop: '24px', width: '780px' },
@@ -113,6 +117,9 @@ class Display extends Component {
           className="ui__flex ui__alignItems_center"
           style={{ color: "#999999" }}
         >
+          <div className="ui__cursor_pointer" style={{ fontSize: '24px' }}>
+            <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'screen' })} />
+          </div>
           <div
             className="ui__cursor_pointer"
             onClick={this.handleEditScreenClick(id)}
@@ -168,12 +175,18 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
-            <div className="ui__flex ui__alignItems_center">
-              <div
-                className="ui__cursor_pointer"
-                style={{ fontSize: '24px' }}
-                onClick={this.openSelectScreenTypeDialog}
-              ><MdAdd /></div>
+            <div>
+              <div id="add_new" className="ui__cursor_pointer">
+                <MdMoreVert style={{ fontSize: '24px' }} />
+              </div>
+              <Menu target="add_new" align="right">
+                  <MenuItem onClick={this.openSelectScreenTypeDialog}>
+                    Add new
+                  </MenuItem>
+                  <MenuItem onClick={this.togglePasteBoard}>
+                    Paste
+                  </MenuItem>
+              </Menu>
             </div>
           </Toolbar>
 
@@ -200,6 +213,11 @@ class Display extends Component {
             </CardText>}
         </Card>
         {selectScreenTypeDialog}
+        <PasteBoard
+          onClose={this.togglePasteBoard}
+          open={this.state.openPasteBoard}
+          destination={{ dataId: scriptId, dataType: 'script' }}
+        />
       </div>
     );
   }

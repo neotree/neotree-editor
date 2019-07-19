@@ -21,5 +21,12 @@
     "no-param-reassign": 0,
     "global-require": 0,
     "operator-assignment": 0
+  },
+  "settings": {
+    "import/resolver": {
+      "webpack": {
+        "config": "./webpack.config.base.js"
+      }
+    }
   }
 }
