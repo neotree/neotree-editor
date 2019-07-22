@@ -17,6 +17,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/get-full-config-key',
+    require('./getFullConfigKeyMiddleware')(app),
+    responseMiddleware
+  );
+
   router.post(
     '/create-config-key',
     require('./createConfigKeyMiddleware')(app),

@@ -10,6 +10,7 @@ class CopyToClipBoard extends React.Component {
   onCopy = () => {
     this.input.select();
     document.execCommand('copy');
+    this.input.blur();
   };
 
   render() {
@@ -30,6 +31,7 @@ class CopyToClipBoard extends React.Component {
         <input
           ref={el => (this.input = el)}
           value={JSON.stringify({ neotree: { data, host } })}
+          onChange={() => ({})}
           // disabled
           style={{ position: 'absolute', zIndex: -1 }}
         />

@@ -18,6 +18,12 @@ module.exports = app => {
   );
 
   router.get(
+    '/get-full-script',
+    require('./getFullScriptMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
     '/get-script-items',
     require('./getScriptItemsMiddleware')(app),
     responseMiddleware

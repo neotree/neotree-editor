@@ -16,7 +16,9 @@ import {
     MenuItem
 } from 'react-mdl';
 import { MdAdd, MdMoreVert } from 'react-icons/md';
-import Spinner from 'ui/Spinner'; // eslint-disable-line
+import Spinner from 'ui/Spinner';
+import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
+import PasteBoard from 'DashboardComponents/PasteBoard';
 import ExportLink from '../../components/ExportLink';
 
 class List extends Component {
@@ -31,6 +33,8 @@ class List extends Component {
       summary: ''
     };
   }
+
+  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
 
   handleInputChange = (name, event) => this.setState({
     ...this.state,
@@ -117,7 +121,7 @@ class List extends Component {
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { configKeys } = this.props;
+    const { configKeys, actions } = this.props;
     const {
       configKey,
       label,
@@ -244,6 +248,17 @@ class List extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
+                  <CopyToClipBoard
+                    data={JSON.stringify({
+                      dataId: id,
+                      dataType: 'configKey',
+                      dataTypeHyphenated: 'config-key'
+                    })}
+                  >
+                    <span>Copy</span>
+                  </CopyToClipBoard>
+                </MenuItem>
+                <MenuItem>
                   <ExportLink options={{ configKey: id }} />
                 </MenuItem>
             </Menu>
@@ -280,7 +295,16 @@ class List extends Component {
     );
 
     return (
-      <div>
+      <PasteBoard
+        modal={{
+          onClose: this.togglePasteBoard,
+          open: this.state.openPasteBoard,
+        }}
+        data={{}}
+        redirectTo={() => '/dashboard/configkeys'}
+        onSuccess={payload => actions.updateApiData(state =>
+          ({ configKeys: [payload.configKey, ...state.configKeys] }))}
+      >
         <FABButton style={styles.fab} colored ripple onClick={this.openCreateConfigKeyDialog}>
             <MdAdd style={{ fontSize: '24px' }} />
         </FABButton>
@@ -289,7 +313,7 @@ class List extends Component {
         </div>
         {createConfigKeyDialog}
         {confirmDeleteDialog}
-      </div>
+      </PasteBoard>
     );
   }
 }

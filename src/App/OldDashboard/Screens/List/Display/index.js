@@ -20,7 +20,7 @@ import { arrayMove } from 'App/utils';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard, { validateData } from 'DashboardComponents/PasteBoard';
+import PasteBoard from 'DashboardComponents/PasteBoard';
 import { Table, TableHeader } from '../../datatable';
 
 
@@ -29,23 +29,6 @@ class Display extends Component {
     openSelectScreenTypeDialog: false,
     screens: [],
     addScreenType: DEFAULT_SCREEN_TYPE
-  };
-
-  componentDidMount() {
-    window.addEventListener('paste', this.onPaste, true);
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener('paste', this.onPaste, true);
-  }
-
-  onPaste = e => {
-    const data = e.clipboardData.getData('text/plain');
-    validateData(data)
-      .then(() => this.setState({
-        togglePasteBoard: true,
-        clipboardData: data
-      }));
   };
 
   togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
@@ -193,7 +176,14 @@ class Display extends Component {
     };
 
     return (
-      <div>
+      <PasteBoard
+        modal={{
+          onClose: this.togglePasteBoard,
+          open: this.state.openPasteBoard,
+        }}
+        data={{ dataId: scriptId, dataType: 'script' }}
+        redirectTo={payload => `/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`}
+      >
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
             <div>
@@ -234,14 +224,7 @@ class Display extends Component {
             </CardText>}
         </Card>
         {selectScreenTypeDialog}
-        <PasteBoard
-          onClose={this.togglePasteBoard}
-          open={this.state.openPasteBoard}
-          clipboardData={this.state.clipboardData}
-          destination={{ dataId: scriptId, dataType: 'script' }}
-          redirectTo={payload => `/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`}
-        />
-      </div>
+      </PasteBoard>
     );
   }
 }

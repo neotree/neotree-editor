@@ -100,7 +100,14 @@ class Display extends Component {
     };
 
     return (
-      <div>
+      <PasteBoard
+        modal={{
+          onClose: this.togglePasteBoard,
+          open: this.state.openPasteBoard,
+        }}
+        data={{ dataId: scriptId, dataType: 'diagnosis' }}
+        redirectTo={payload => `/dashboard/scripts/${scriptId}/diagnosis/${payload.diagnosis.id}`}
+      >
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
             <div id="add_new" className="ui__cursor_pointer">
@@ -134,13 +141,7 @@ class Display extends Component {
               </div>
             </CardText>}
         </Card>
-        <PasteBoard
-          onClose={this.togglePasteBoard}
-          open={this.state.openPasteBoard}
-          destination={{ dataId: scriptId, dataType: 'diagnosis' }}
-          redirectTo={payload => `/dashboard/scripts/${scriptId}/diagnosis/${payload.diagnosis.id}`}
-        />
-      </div>
+      </PasteBoard>
     );
   }
 }

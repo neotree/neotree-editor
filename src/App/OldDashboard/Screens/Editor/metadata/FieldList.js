@@ -16,7 +16,7 @@ import FormSection from 'FormSection';
 import Toolbar from 'Toolbar';
 import { arrayMove } from 'App/utils';
 import { DataType, DefaultValueType, FieldType } from 'App/constants';
-import { MdAdd, MdCreate, MdDelete, MdSwapVert, MdArrowUp, MdArrowDown } from 'react-icons/md';
+import { MdAdd, MdCreate, MdDelete, MdSwapVert, MdArrowUpward, MdArrowDownward } from 'react-icons/md';
 import { Table, TableHeader } from '../../datatable';
 
 const RESET_STATE = {
@@ -638,13 +638,13 @@ export default class FieldList extends Component {
                               <div
                                 style={{ fontSize: '24px', cursor: 'pointer' }}
                                 onClick={this.handleFieldActionClick.bind(this, 'move_up')}
-                              ><MdArrowUp />&nbsp;</div>
+                              ><MdArrowUpward />&nbsp;</div>
                             ) : null}
                             {(enableFieldMoveDownAction) ? (
                               <div
                                 style={{ fontSize: '24px', cursor: 'pointer' }}
                                 onClick={this.handleFieldActionClick.bind(this, 'move_down')}
-                              ><MdArrowDown />&nbsp;</div>
+                              ><MdArrowDownward />&nbsp;</div>
                             ) : null}
                         </div>
                     </Toolbar>

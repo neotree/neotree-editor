@@ -17,7 +17,9 @@ import {
     TableHeader
 } from 'react-mdl';
 import { MdAdd, MdMoreVert, MdCreate } from 'react-icons/md';
-import Spinner from 'ui/Spinner'; // eslint-disable-line
+import Spinner from 'ui/Spinner';
+import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
+import PasteBoard from 'DashboardComponents/PasteBoard';
 import ExportLink from '../../../components/ExportLink';
 
 class Display extends Component {
@@ -28,6 +30,8 @@ class Display extends Component {
       scriptIdForAction: null
     };
   }
+
+  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
 
   handleAddScriptClick = () => this.props.history
     .push('/dashboard/scripts/new');
@@ -168,6 +172,11 @@ class Display extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
+                  <CopyToClipBoard data={JSON.stringify({ dataId: scriptId, dataType: 'script' })}>
+                    <span>Copy</span>
+                  </CopyToClipBoard>
+                </MenuItem>
+                <MenuItem>
                   <ExportLink options={{ script: scriptId }} />
                 </MenuItem>
             </Menu>
@@ -207,7 +216,14 @@ class Display extends Component {
     );
 
     return (
-      <div>
+      <PasteBoard
+        modal={{
+          onClose: this.togglePasteBoard,
+          open: this.state.openPasteBoard,
+        }}
+        data={{}}
+        redirectTo={payload => `/dashboard/scripts/${payload.script.id}`}
+      >
         <FABButton style={styles.fab} colored ripple onClick={this.handleAddScriptClick}>
             <MdAdd />
         </FABButton>
@@ -215,7 +231,7 @@ class Display extends Component {
             {scripts.length ? renderTable : renderEmptyTable}
         </div>
         {confirmDeleteDialog}
-      </div>
+      </PasteBoard>
     );
   }
 }
