@@ -7,17 +7,17 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  IconButton,
   Radio,
   RadioGroup,
   Textfield,
   Switch
 } from 'react-mdl';
-import FormSection from 'FormSection'; // eslint-disable-line
-import Toolbar from 'Toolbar'; // eslint-disable-line
+import FormSection from 'FormSection';
+import Toolbar from 'Toolbar';
+import { arrayMove } from 'App/utils';
+import { DataType, DefaultValueType, FieldType } from 'App/constants';
+import { MdAdd, MdCreate, MdDelete, MdSwapVert, MdArrowUp, MdArrowDown } from 'react-icons/md';
 import { Table, TableHeader } from '../../datatable';
-import { arrayMove } from 'App/utils';  // eslint-disable-line
-import { DataType, DefaultValueType, FieldType } from 'App/constants'; // eslint-disable-line
 
 const RESET_STATE = {
     enableFieldSwapAction: false,
@@ -306,7 +306,7 @@ export default class FieldList extends Component {
             table: {
                 width: '100%'
             },
-            emptyMessageContainer : {
+            emptyMessageContainer: {
                 display: 'flex',
                 boxSizing: 'border-box',
                 alignItems: 'center',
@@ -314,7 +314,7 @@ export default class FieldList extends Component {
                 color: '#757575',
                 fontSize: '16px'
             },
-            flexRow : {
+            flexRow: {
                 display: 'flex',
                 flexDirection: 'row'
             }
@@ -349,54 +349,58 @@ export default class FieldList extends Component {
 
                 {/*fieldCondition,*/}
                 <Textfield
-                    style={{width : "100%"}}
+                    style={{ width: '100%' }}
                     floatingLabel
                     label="Conditional expression"
-                    value={fieldCondition || ""}
+                    value={fieldCondition || ''}
                     onChange={this.handleInputChange.bind(this, 'fieldCondition')}
                 />
-                <div style={{fontSize: '12px', fontStyle: 'italic', marginBottom: '12px'}}>Example: <span style={{fontWeight:'bold'}}>($key = true and $key2 = false) or $key3 = 'HD'</span></div>
+                <div style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '12px' }}>
+                  Example: <span style={{ fontWeight: 'bold' }}>($key = true and $key2 = false) or $key3 = 'HD'</span>
+                </div>
 
-                <FormSection label="PROPERTIES" topSpace/>
+                <FormSection label="PROPERTIES" topSpace />
 
                 {/*fieldKey,*/}
                 <Textfield
-                    style={{width: "100%"}}
-                    floatingLabel
-                    label="Key"
-                    required={true}
-                    pattern="[a-zA-Z0-9]+"
-                    onChange={this.handleInputChange.bind(this, 'fieldKey')}
-                    value={fieldKey || ""} />
+                  style={{ width: '100%' }}
+                  floatingLabel
+                  label="Key"
+                  required
+                  pattern="[a-zA-Z0-9]+"
+                  onChange={this.handleInputChange.bind(this, 'fieldKey')}
+                  value={fieldKey || ''}
+                />
 
 
                 {/*fieldLabel,*/}
                 <Textfield
-                    style={{width: "100%"}}
-                    floatingLabel
-                    label="Label"
-                    required={true}
-                    onChange={this.handleInputChange.bind(this, 'fieldLabel')}
-                    value={fieldLabel || ""} />
+                  style={{ width: '100%' }}
+                  floatingLabel
+                  label="Label"
+                  required
+                  onChange={this.handleInputChange.bind(this, 'fieldLabel')}
+                  value={fieldLabel || ''}
+                />
 
                 <div style={styles.flexRow}>
                     {/*fieldConfidential*/}
 
-                    <div style={{flex: 1, marginRight: "12px"}}>
-                        <Switch id="fieldConfidential"
-                                checked={fieldConfidential || false}
-                                onChange={this.handleSwitchChange('fieldConfidential')}>
-                            Confidential
-                        </Switch>
+                    <div style={{ flex: 1, marginRight: '12px' }}>
+                        <Switch
+                          id="fieldConfidential"
+                          checked={fieldConfidential || false}
+                          onChange={this.handleSwitchChange('fieldConfidential')}
+                        >Confidential</Switch>
                     </div>
 
                     {/*fieldOptional*/}
-                    <div style={{flex: 1, marginLeft: "12px"}}>
-                        <Switch id="fieldOptional"
-                                checked={fieldOptional || false}
-                                onChange={this.handleSwitchChange('fieldOptional')}>
-                            Optional
-                        </Switch>
+                    <div style={{ flex: 1, marginLeft: '12px' }}>
+                        <Switch
+                          id="fieldOptional"
+                          checked={fieldOptional || false}
+                          onChange={this.handleSwitchChange('fieldOptional')}
+                        >Optional</Switch>
                     </div>
                 </div>
 
@@ -415,29 +419,32 @@ export default class FieldList extends Component {
 
                         <div style={styles.flexRow}>
                             <Textfield
-                                style={{flex: 1, marginRight: "12px"}}
-                                floatingLabel
-                                label="Format"
-                                pattern="#*"
-                                onChange={this.handleInputChange.bind(this, 'fieldFormat')}
-                                value={fieldFormat || ""} />
+                              style={{ flex: 1, marginRight: '12px' }}
+                              floatingLabel
+                              label="Format"
+                              pattern="#*"
+                              onChange={this.handleInputChange.bind(this, 'fieldFormat')}
+                              value={fieldFormat || ''}
+                            />
                             <Textfield
-                                style={{flex: 1, marginLeft: "12px", marginRight: "12px"}}
-                                floatingLabel
-                                label="Min Value"
-                                pattern="-?[0-9]*(\.[0-9]+)?"
-                                onChange={this.handleInputChange.bind(this, 'fieldMinValue')}
-                                value={fieldMinValue || ""} />
+                              style={{ flex: 1, marginLeft: '12px', marginRight: '12px' }}
+                              floatingLabel
+                              label="Min Value"
+                              pattern="-?[0-9]*(\.[0-9]+)?"
+                              onChange={this.handleInputChange.bind(this, 'fieldMinValue')}
+                              value={fieldMinValue || ''}
+                            />
                             <Textfield
-                                style={{flex: 1, marginLeft: "12px"}}
-                                floatingLabel
-                                label="Max Value"
-                                pattern="-?[0-9]*(\.[0-9]+)?"
-                                onChange={this.handleInputChange.bind(this, 'fieldMaxValue')}
-                                value={fieldMaxValue || ""} />
+                              style={{ flex: 1, marginLeft: '12px' }}
+                              floatingLabel
+                              label="Max Value"
+                              pattern="-?[0-9]*(\.[0-9]+)?"
+                              onChange={this.handleInputChange.bind(this, 'fieldMaxValue')}
+                              value={fieldMaxValue || ''}
+                            />
                         </div>
-                        <div style={{fontSize: '12px', fontStyle: 'italic', marginBottom: '12px'}}>
-                            Format: Add as many <span style={{fontWeight:'bold'}}>#</span> as the number of decimal digits or leave empty
+                        <div style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '12px' }}>
+                            Format: Add as many <span style={{ fontWeight: 'bold' }}>#</span> as the number of decimal digits or leave empty
                         </div>
 
                         {/*<FormSection label="DEFAULT" topSpace/>*/}
@@ -459,13 +466,13 @@ export default class FieldList extends Component {
                 {/*fieldDefaultValue,*/}
                 { (fieldType !== FieldType.TEXT) ? null :
                     <div>
-                        <FormSection label="DEFAULT" topSpace/>
+                        <FormSection label="DEFAULT" topSpace />
                         <RadioGroup
-                            style={{marginBottom: "24px"}}
+                            style={{ marginBottom: '24px' }}
                             container="div"
                             childContainer="div"
                             name="fieldDefaultValue"
-                            value={fieldDefaultValue || ""}
+                            value={fieldDefaultValue || ''}
                             onChange={this.handleInputChange.bind(this, 'fieldDefaultValue')}
                         >
                             <Radio value={DefaultValueType.EMPTY} ripple>Empty</Radio>
@@ -477,13 +484,13 @@ export default class FieldList extends Component {
                 {/*fieldDefaultValue,*/}
                 { (fieldType !== FieldType.DATE && fieldType !== FieldType.DATETIME) ? null :
                     <div>
-                        <FormSection label="DEFAULT" topSpace/>
+                        <FormSection label="DEFAULT" topSpace />
                         <RadioGroup
-                        style={{marginBottom: "24px"}}
+                        style={{ marginBottom: '24px' }}
                         container="div"
                         childContainer="div"
                         name="fieldDefaultValue"
-                        value={fieldDefaultValue || ""}
+                        value={fieldDefaultValue || ''}
                         onChange={this.handleInputChange.bind(this, 'fieldDefaultValue')}
                         >
                             <Radio value={DefaultValueType.EMPTY} ripple>Empty</Radio>
@@ -497,27 +504,31 @@ export default class FieldList extends Component {
                 {/*fieldValues,*/}
                 { (fieldType !== FieldType.DROPDOWN) ? null :
                     <Textfield
-                        style={{width: "100%"}}
-                        floatingLabel
-                        label="Dropdown Values"
-                        rows={5}
-                        required={true}
-                        onChange={this.handleInputChange.bind(this, 'fieldValues')}
-                        value={fieldValues || ""}/>
+                      style={{ width: '100%' }}
+                      floatingLabel
+                      label="Dropdown Values"
+                      rows={5}
+                      required
+                      onChange={this.handleInputChange.bind(this, 'fieldValues')}
+                      value={fieldValues || ''}
+                    />
                 }
 
                 {/*fieldCalculation, for period reference*/}
                 { (fieldType !== FieldType.PERIOD) ? null :
-                    <div style={{marginBottom: "24px"}}>
+                    <div style={{ marginBottom: '24px' }}>
                         <Textfield
-                            style={{width: "100%"}}
-                            floatingLabel
-                            label="Reference Expression"
-                            pattern="(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?"
-                            required={true}
-                            onChange={this.handleInputChange.bind(this, 'fieldCalculation')}
-                            value={fieldCalculation || ""}/>
-                        <div style={{fontSize: '12px', fontStyle: 'italic', marginBottom: '12px'}}>Example: <span style={{fontWeight:'bold'}}>$key</span></div>
+                          style={{ width: '100%' }}
+                          floatingLabel
+                          label="Reference Expression"
+                          pattern="(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?"
+                          required
+                          onChange={this.handleInputChange.bind(this, 'fieldCalculation')}
+                          value={fieldCalculation || ''}
+                        />
+                        <div style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '12px' }}>
+                          Example: <span style={{ fontWeight: 'bold' }}>$key</span>
+                        </div>
                     </div>
                 }
 
@@ -531,7 +542,7 @@ export default class FieldList extends Component {
                     container="div"
                     childContainer="div"
                     name="fieldType"
-                    value={fieldDataType || ""}
+                    value={fieldDataType || ''}
                     onChange={this.handleInputChange.bind(this, 'fieldType')}
                 >
                     <Radio value={FieldType.DATE} ripple>Date</Radio>
@@ -548,7 +559,7 @@ export default class FieldList extends Component {
         const openFieldDialog = (openNewFieldDialog || openEditFieldDialog);
         const editFieldDialog = (
             <Dialog open={openFieldDialog} style={(!fieldDataType) ? styles.dialogType : styles.dialogEdit}>
-                {(fieldDataType && fieldDataType !== "") ? editDialogContent : selectFieldTypeDialogContent}
+                {(fieldDataType && fieldDataType !== '') ? editDialogContent : selectFieldTypeDialogContent}
                 <DialogActions>
                     { (!openNewFieldDialog) ? null :
                         <div>
@@ -580,23 +591,31 @@ export default class FieldList extends Component {
 
         const renderFieldActions = (screenId, rowData, index) => {
             return (
-                <div style={{display: 'flex', flexDirection:'row', alignContent: 'end', color: "#999999"}}>
-                    <IconButton name="edit" onClick={this.openEditFieldDialog(index)}/>
-                    <IconButton name="delete" onClick={this.openConfirmDeleteFieldDialog(index)}/>
+                <div style={{ display: 'flex', flexDirection: 'row', alignContent: 'end', color: '#999999' }}>
+                    <div
+                      style={{ fontSize: '24px', cursor: 'pointer' }}
+                      onClick={this.openEditFieldDialog(index)}
+                    ><MdCreate />&nbsp;</div>
+                    <div
+                      style={{ fontSize: '24px', cursor: 'pointer' }}
+                      onClick={this.openConfirmDeleteFieldDialog(index)}
+                    ><MdDelete /></div>
                 </div>
-            )
+            );
         };
 
-        let fieldsTable = (
-            <Table style={styles.table}
-                   rows={fields}
-                   rowKeyColumn="position"
-                   onSort={this.swapFields}>
+        const fieldsTable = (
+            <Table
+              style={styles.table}
+              rows={fields}
+              rowKeyColumn="position"
+              onSort={this.swapFields}
+            >
 
                 <TableHeader name="type">Key</TableHeader>
                 <TableHeader name="key">Key</TableHeader>
-                <TableHeader name="label" style={{width: '100%'}}>Label</TableHeader>
-                <TableHeader name="$index" style={{width: '48px'}} cellFormatter={renderFieldActions} />
+                <TableHeader name="label" style={{ width: '100%' }}>Label</TableHeader>
+                <TableHeader name="$index" style={{ width: '48px' }} cellFormatter={renderFieldActions} />
             </Table>
         );
 
@@ -604,11 +623,29 @@ export default class FieldList extends Component {
             <div>
                 <Card shadow={0} style={styles.container}>
                     <Toolbar title="Fields">
-                        <div style={{display: 'flex', flexDirection: 'row'}}>
-                            <IconButton name="add" onClick={this.openNewFieldDialog} />
-                            {(enableFieldSwapAction) ? <IconButton name="swap_vert" onClick={this.handleFieldActionClick.bind(this, 'swap')} /> : null}
-                            {(enableFieldMoveUpAction) ? <IconButton name="arrow_upward" onClick={this.handleFieldActionClick.bind(this, 'move_up')} /> : null}
-                            {(enableFieldMoveDownAction) ? <IconButton name="arrow_downward" onClick={this.handleFieldActionClick.bind(this, 'move_down')} /> : null}
+                        <div style={{ display: 'flex', flexDirection: 'row' }}>
+                            <div
+                              style={{ fontSize: '24px', cursor: 'pointer' }}
+                              onClick={this.openNewFieldDialog}
+                            ><MdAdd />&nbsp;</div>
+                            {(enableFieldSwapAction) ? (
+                              <div
+                                style={{ fontSize: '24px', cursor: 'pointer' }}
+                                onClick={this.handleFieldActionClick.bind(this, 'swap')}
+                              ><MdSwapVert />&nbsp;</div>
+                            ) : null}
+                            {(enableFieldMoveUpAction) ? (
+                              <div
+                                style={{ fontSize: '24px', cursor: 'pointer' }}
+                                onClick={this.handleFieldActionClick.bind(this, 'move_up')}
+                              ><MdArrowUp />&nbsp;</div>
+                            ) : null}
+                            {(enableFieldMoveDownAction) ? (
+                              <div
+                                style={{ fontSize: '24px', cursor: 'pointer' }}
+                                onClick={this.handleFieldActionClick.bind(this, 'move_down')}
+                              ><MdArrowDown />&nbsp;</div>
+                            ) : null}
                         </div>
                     </Toolbar>
 

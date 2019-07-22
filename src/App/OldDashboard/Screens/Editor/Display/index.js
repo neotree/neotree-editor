@@ -55,7 +55,12 @@ export class Editor extends React.Component {
   }
 
   setScreenAsState = (props = this.props) => {
-    if (props.screen) this.setState({ screen: props.screen.data });
+    if (props.screen) {
+      this.setState({
+        type: props.screen.type,
+        screen: { ...props.screen.data, type: props.screen.type }
+      });
+    }
   };
 
   // getChildContext = () => ({ screenType: this.state.screen.type });
@@ -107,13 +112,13 @@ export class Editor extends React.Component {
   });
 
   render() {
-    const { screen, skippable } = this.state;
+    const { type, screen, skippable } = this.state;
     const styles = {
       container: {
         display: 'flex',
         boxSizing: 'border-box',
         justifyContent: 'center',
-        height: '100%'
+        // height: '100%'
       },
       form: {
         width: '780px'
@@ -138,13 +143,13 @@ export class Editor extends React.Component {
     let metadataEditor = null;
     let itemsEditor = null;
 
-    switch (screen.type) {
+    switch (type) {
       case ScreenType.CHECKLIST:
       case ScreenType.LIST:
       case ScreenType.PROGRESS:
       case ScreenType.MULTI_SELECT:
       case ScreenType.SINGLE_SELECT:
-        if (screen.type === ScreenType.MULTI_SELECT || screen.type === ScreenType.SINGLE_SELECT) {
+        if (type === ScreenType.MULTI_SELECT || type === ScreenType.SINGLE_SELECT) {
           metadataEditor = <SelectMetadata metadata={screen.metadata} onUpdateMetadata={this.handleUpdateMetadata} />;
         }
 
