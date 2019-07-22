@@ -19,6 +19,8 @@ module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
   router.get('/get-scripts', require('./getScriptsMiddleware')(app), responseMiddleware);
   router.get('/get-script', require('./getScriptMiddleware')(app), responseMiddleware);
+  router.get('/get-full-script', require('./getFullScriptMiddleware')(app), responseMiddleware);
+  router.get('/get-script-items', require('./getScriptItemsMiddleware')(app), responseMiddleware);
   router.post('/create-script', require('./createScriptMiddleware')(app), responseMiddleware);
   router.post('/update-script', require('./updateScriptMiddleware')(app), responseMiddleware);
   router.post('/update-scripts', require('./updateScriptsMiddleware')(app), responseMiddleware);

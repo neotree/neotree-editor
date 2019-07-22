@@ -20,7 +20,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  // const { responseMiddleware } = app;
+  var responseMiddleware = app.responseMiddleware;
   router = require('./importDataMiddleware')(router, app);
   router.get('/initialise-app', require('./initialiseAppMiddleware')(app), function (req, res) {
     var _ref = res.locals.getResponsePayload() || {},
@@ -33,6 +33,7 @@ module.exports = function (app) {
     });
   });
   router.get('/export-data', require('./exportDataMiddleware')(app));
+  router.post('/copy-data', require('./copyDataMiddleware')(app), responseMiddleware);
   return router;
 };
 
