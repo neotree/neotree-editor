@@ -24,13 +24,14 @@ class PasteBoard extends Component {
   };
 
   render() {
-    const { children, modal, data, redirectTo, onSuccess } = this.props;
+    const { children, modal, data, redirectTo, onSuccess, accept } = this.props;
 
     return (
       <div>
         {children}
         <Modal
           {...modal}
+          accept={accept}
           onSuccess={onSuccess}
           clipboardData={this.state.clipboardData}
           destination={data}
@@ -52,7 +53,8 @@ PasteBoard.propTypes = {
     dataType: PropTypes.string,
   }).isRequired,
   redirectTo: PropTypes.func.isRequired,
-  onSuccess: PropTypes.func
+  onSuccess: PropTypes.func,
+  accept: PropTypes.string.isRequired
 };
 
 export default PasteBoard;

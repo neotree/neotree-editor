@@ -1,3 +1,4 @@
+/* global alert */
 import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
@@ -45,14 +46,27 @@ export class Modal extends React.Component {
     this.setState({ error: null });
 
     if (content) {
-      const { actions, host, destination, history, redirectTo, onSuccess } = this.props;
+      const {
+        actions,
+        host,
+        destination,
+        history,
+        redirectTo,
+        onSuccess,
+        accept
+      } = this.props;
 
       validateData(content)
         .then(({ data, ...source }) => {
-          this.setState({ saving: true }, () => {
+          data = JSON.parse(data);
+          const acceptDataType = data.dataType === accept;
+
+          if (!acceptDataType) return alert(`You can only paste a '${accept}' here, you pasted a '${data.dataType}' instead.`);
+
+          this.setState({ saving: true }, !acceptDataType ? undefined : () => {
             actions.post('copy-data', {
               destination: { host, ...destination },
-              source: { ...source, ...JSON.parse(data) },
+              source: { ...source, ...data },
               onResponse: () => this.setState({ saving: false }),
               onFailure: error => this.setState({ error }),
               onSuccess: ({ payload }) => {
@@ -124,7 +138,8 @@ Modal.propTypes = {
   destination: PropTypes.object.isRequired,
   host: PropTypes.string.isRequired,
   redirectTo: PropTypes.func.isRequired,
-  onSuccess: PropTypes.func
+  onSuccess: PropTypes.func,
+  accept: PropTypes.string.isRequired
 };
 
 export default withRouter(reduxComponent(Modal, state => ({

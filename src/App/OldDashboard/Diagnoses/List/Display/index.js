@@ -105,6 +105,7 @@ class Display extends Component {
           onClose: this.togglePasteBoard,
           open: this.state.openPasteBoard,
         }}
+        accept="diagnosis"
         data={{ dataId: scriptId, dataType: 'diagnosis' }}
         redirectTo={payload => `/dashboard/scripts/${scriptId}/diagnosis/${payload.diagnosis.id}`}
       >

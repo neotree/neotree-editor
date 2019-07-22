@@ -300,6 +300,7 @@ class List extends Component {
           onClose: this.togglePasteBoard,
           open: this.state.openPasteBoard,
         }}
+        accept="configKey"
         data={{}}
         redirectTo={() => '/dashboard/configkeys'}
         onSuccess={payload => actions.updateApiData(state =>
