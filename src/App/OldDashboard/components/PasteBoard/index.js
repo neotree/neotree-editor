@@ -6,41 +6,62 @@ import { Dialog, DialogContent, DialogActions, Button } from 'react-mdl';
 import Spinner from 'ui/Spinner';
 import reduxComponent from 'reduxComponent';
 
-export class PasteBoard extends React.Component {
-  state = { content: '' };
-
-  onChange = e => {
-    const content = e.target.value;
-    this.setState({ error: null });
-
-    if (content) {
-      const { actions, host, destination, history, redirectTo } = this.props;
+export const validateData = data => {
+  return new Promise((resolve, reject) => {
+    if (data) {
       const invalidDataErr = 'Ooops! Seems like you pasted invalid content.';
 
       try {
-        const obj = JSON.parse(content);
-        if (!(obj.neotree && obj.neotree.data && obj.neotree.host)) throw new Error(invalidDataErr);
-
-        const { data, ...source } = obj.neotree;
-
-        this.setState({ saving: true }, () => {
-          actions.post('copy-data', {
-            destination: { host, ...destination },
-            source: { ...source, ...JSON.parse(data) },
-            onResponse: () => this.setState({ saving: false }),
-            onFailure: error => this.setState({ error }),
-            onSuccess: ({ payload }) => history.push(redirectTo(payload))
-          });
-        });
+        const obj = JSON.parse(data);
+        if (!(obj.neotree && obj.neotree.data && obj.neotree.host)) {
+          reject(invalidDataErr);
+        } else {
+          resolve(obj.neotree);
+        }
       } catch (e) {
-        this.setState({ error: { msg: invalidDataErr } });
+        reject(invalidDataErr);
       }
+    } else {
+      reject('No data copied to clipboard');
     }
-  };
+  });
+};
+
+export class PasteBoard extends React.Component {
+  state = { content: '' };
+
+  componentWillUpdate(nextProps) {
+    if (nextProps.clipboardData !== this.props.clipboardData) {
+      this.validateAndSave(nextProps.clipboardData);
+    }
+  }
 
   onClose = () => {
     this.setState({ error: null });
     this.props.onClose();
+  };
+
+  validateAndSave = content => {
+    this.setState({ error: null });
+
+    if (content) {
+      const { actions, host, destination, history, redirectTo } = this.props;
+
+      validateData(content)
+        .then(({ data, ...source }) => {
+          this.setState({ saving: true }, () => {
+            actions.post('copy-data', {
+              destination: { host, ...destination },
+              source: { ...source, ...JSON.parse(data) },
+              onResponse: () => this.setState({ saving: false }),
+              onFailure: error => this.setState({ error }),
+              onSuccess: ({ payload }) => history.push(redirectTo(payload))
+            });
+          });
+        }).catch(error => this.setState({
+          error: { msg: error.msg || error.message || JSON.stringify(error) }
+        }));
+    }
   };
 
   render() {
@@ -65,7 +86,7 @@ export class PasteBoard extends React.Component {
               <textarea
                 autoFocus
                 ref={el => (this.input = el)}
-                onChange={this.onChange}
+                onChange={e => this.validateAndSave(e.target.value)}
                 value={content}
                 style={{
                   position: 'absolute',

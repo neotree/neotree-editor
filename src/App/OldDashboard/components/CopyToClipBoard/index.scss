@@ -9,23 +9,23 @@
     display: inline;
     position: relative;
 
-    &::before {
-      content: 'copied';
-      display: block;
-      font-size: 10px;
-      position: absolute;
-      right: 0;
-      transition: transform .05s;
-      transform: scaleY(0);
-      transform-origin: bottom;
-      top: -10px;
-    }
-
-    &:active {
-
-      &::before {
-        transform: scaleY(1);
-      }
-    }
+    // &::before {
+    //   content: 'copied';
+    //   display: block;
+    //   font-size: 10px;
+    //   position: absolute;
+    //   right: 0;
+    //   transition: transform .05s;
+    //   transform: scaleY(0);
+    //   transform-origin: bottom;
+    //   top: -10px;
+    // }
+    //
+    // &:active {
+    //
+    //   &::before {
+    //     transform: scaleY(1);
+    //   }
+    // }
   }
 }

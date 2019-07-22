@@ -1,3 +1,4 @@
+/* global window */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -13,24 +14,38 @@ import {
     Menu,
     MenuItem,
 } from 'react-mdl';
-import { MdDelete, MdCreate, MdMoreVert } from 'react-icons/md';
+import { MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { arrayMove } from 'App/utils';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard from 'DashboardComponents/PasteBoard';
+import PasteBoard, { validateData } from 'DashboardComponents/PasteBoard';
 import { Table, TableHeader } from '../../datatable';
 
-/*eslint-disable quotes*/
-/*eslint-disable quote-props*/
-/*eslint-disable key-spacing*/
 
 class Display extends Component {
   state = {
     openSelectScreenTypeDialog: false,
     screens: [],
     addScreenType: DEFAULT_SCREEN_TYPE
+  };
+
+  componentDidMount() {
+    window.addEventListener('paste', this.onPaste, true);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('paste', this.onPaste, true);
+  }
+
+  onPaste = e => {
+    const data = e.clipboardData.getData('text/plain');
+    validateData(data)
+      .then(() => this.setState({
+        togglePasteBoard: true,
+        clipboardData: data
+      }));
   };
 
   togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
@@ -101,7 +116,7 @@ class Display extends Component {
     const styles = {
       screens: { marginTop: '24px', width: '780px' },
       table: { width: '100%' },
-      emptyMessageContainer : {
+      emptyMessageContainer: {
         display: 'flex',
         boxSizing: 'border-box',
         alignItems: 'center',
@@ -115,22 +130,28 @@ class Display extends Component {
       return (
         <div
           className="ui__flex ui__alignItems_center"
-          style={{ color: "#999999" }}
+          style={{ color: '#999999' }}
         >
-          <div className="ui__cursor_pointer" style={{ fontSize: '24px' }}>
-            <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'screen' })} />
-          </div>
           <div
             className="ui__cursor_pointer"
             onClick={this.handleEditScreenClick(id)}
           >
             <MdCreate style={{ fontSize: '24px' }} />
           </div>&nbsp;
-          <div
-            className="ui__cursor_pointer"
-            onClick={this.handleDeleteScreenClick(id)}
-          >
-            <MdDelete style={{ fontSize: '24px' }} />
+          <div>
+            <div id={`menu_${id}`} className="ui__cursor_pointer">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
+            <Menu target={`menu_${id}`} align="right">
+                <MenuItem>
+                  <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'screen' })}>
+                    <span>Copy</span>
+                  </CopyToClipBoard>
+                </MenuItem>
+                <MenuItem onClick={this.handleDeleteScreenClick(id)}>
+                  Delete
+                </MenuItem>
+            </Menu>
           </div>
         </div>
       );
@@ -167,7 +188,7 @@ class Display extends Component {
 
     const ellipsizeTitle = (screenId, rowData) => {
       const text = rowData.title;
-      if (!text) return "";
+      if (!text) return '';
       return (text.length <= 30) ? text : `${text.substring(0, 29)}...`;
     };
 
@@ -216,6 +237,7 @@ class Display extends Component {
         <PasteBoard
           onClose={this.togglePasteBoard}
           open={this.state.openPasteBoard}
+          clipboardData={this.state.clipboardData}
           destination={{ dataId: scriptId, dataType: 'script' }}
           redirectTo={payload => `/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`}
         />
