@@ -92,6 +92,25 @@ class Display extends Component {
       });
   };
 
+  handleDuplicateScreen = id => {
+    const { actions } = this.props;
+    this.setState({ duplicatingScreen: true });
+    actions.post('duplicate-screen', {
+      id,
+      onResponse: () => this.setState({ duplicatingScreen: false }),
+      onFailure: duplicateScreenError => this.setState({ duplicateScreenError }),
+      onSuccess: ({ payload }) => {
+        actions.updateApiData(state => {
+          const screens = [...state.screens];
+          const ogIndex = screens.map((s, i) =>
+            s.id === id ? i : null).filter(i => i !== null)[0] || 0;
+          screens.splice(ogIndex + 1, 0, payload.screen);
+          return { screens };
+        });
+      }
+    });
+  };
+
   // TODO: Fix margin top to be more generic for all content
   render() {
     const { screens, scriptId } = this.props;
@@ -126,6 +145,9 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
+                <MenuItem onClick={() => this.handleDuplicateScreen(id)}>
+                  Duplicate
+                </MenuItem>
                 <MenuItem>
                   <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'screen' })}>
                     <span>Copy</span>

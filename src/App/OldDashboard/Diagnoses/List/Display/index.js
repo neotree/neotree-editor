@@ -53,6 +53,25 @@ class Display extends Component {
     [name]: event.target.value
   });
 
+  handleDuplicateDiagnosis = id => {
+    const { actions } = this.props;
+    this.setState({ duplicatingDiagnosis: true });
+    actions.post('duplicate-diagnosis', {
+      id,
+      onResponse: () => this.setState({ duplicatingDiagnosis: false }),
+      onFailure: duplicateDiagnosisError => this.setState({ duplicateDiagnosisError }),
+      onSuccess: ({ payload }) => {
+        actions.updateApiData(state => {
+          const diagnoses = [...state.diagnoses];
+          const ogIndex = diagnoses.map((s, i) =>
+            s.id === id ? i : null).filter(i => i !== null)[0] || 0;
+          diagnoses.splice(ogIndex + 1, 0, payload.diagnosis);
+          return { diagnoses };
+        });
+      }
+    });
+  };
+
   render() {
     const { diagnoses, scriptId } = this.props;
 
@@ -88,6 +107,9 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
+              <MenuItem onClick={() => this.handleDuplicateDiagnosis(id)}>
+                Duplicate
+              </MenuItem>
                 <MenuItem>
                   <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'diagnosis' })}>
                     <span>Copy</span>
