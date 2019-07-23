@@ -57,10 +57,7 @@ class Display extends Component {
     const { diagnoses, scriptId } = this.props;
 
     const styles = {
-      diagnosis: {
-        marginTop: '24px',
-        width: '780px'
-      },
+      diagnosis: { overflow: 'unset', width: '100%', minWidth: '700px' },
       table: {
         width: '100%'
       },
@@ -117,18 +114,20 @@ class Display extends Component {
       >
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
-            <div id="add_new" className="ui__cursor_pointer">
-              <MdMoreVert style={{ fontSize: '24px' }} />
-            </div>
-              <div>
-                <Menu target="add_new" align="right">
-                  <MenuItem onClick={this.handleAddDiagnosisClick}>
-                    Add new
-                  </MenuItem>
-                  <MenuItem onClick={this.togglePasteBoard}>
-                    Paste
-                  </MenuItem>
-                </Menu>
+            <div style={{ position: 'relative' }}>
+              <div id="add_new" className="ui__cursor_pointer">
+                <MdMoreVert style={{ fontSize: '24px' }} />
+              </div>
+                <div>
+                  <Menu target="add_new" align="right">
+                    <MenuItem onClick={this.handleAddDiagnosisClick}>
+                      Add new
+                    </MenuItem>
+                    <MenuItem onClick={this.togglePasteBoard}>
+                      Paste
+                    </MenuItem>
+                  </Menu>
+              </div>
             </div>
           </Toolbar>
           {diagnoses.length > 0 ?

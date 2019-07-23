@@ -97,7 +97,7 @@ class Display extends Component {
     const { screens, scriptId } = this.props;
     const { addScreenType } = this.state;
     const styles = {
-      screens: { marginTop: '24px', width: '780px' },
+      screens: { overflow: 'unset', width: '100%', minWidth: '700px' },
       table: { width: '100%' },
       emptyMessageContainer: {
         display: 'flex',
