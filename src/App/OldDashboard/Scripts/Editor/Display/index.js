@@ -73,7 +73,7 @@ export default class Display extends Component {
         display: 'flex',
         boxSizing: 'border-box',
         justifyContent: 'center',
-        height: '100%'
+        // height: '100%'
       },
       form: {
           width: '780px'
