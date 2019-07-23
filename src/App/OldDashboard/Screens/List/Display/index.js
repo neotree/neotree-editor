@@ -121,7 +121,7 @@ class Display extends Component {
           >
             <MdCreate style={{ fontSize: '24px' }} />
           </div>&nbsp;
-          <div>
+          <div style={{ position: 'relative' }}>
             <div id={`menu_${id}`} className="ui__cursor_pointer">
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>

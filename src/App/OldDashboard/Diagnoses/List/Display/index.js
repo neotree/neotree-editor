@@ -8,7 +8,7 @@ import {
   Menu,
   MenuItem,
 } from 'react-mdl';
-import { MdDelete, MdCreate, MdMoreVert } from 'react-icons/md';
+import { MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
@@ -80,20 +80,26 @@ class Display extends Component {
           className="ui__flex ui__alignItems_center"
           style={{ color: '#999999' }}
         >
-          <div className="ui__cursor_pointer" style={{ fontSize: '24px' }}>
-            <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'diagnosis' })} />
-          </div>
           <div
             className="ui__cursor_pointer"
             onClick={this.handleEditDiagnosisClick(id)}
           >
             <MdCreate style={{ fontSize: '24px' }} />
           </div>&nbsp;
-          <div
-            className="ui__cursor_pointer"
-            onClick={this.handleDeleteDiagnosisClick(id)}
-          >
-            <MdDelete style={{ fontSize: '24px' }} />
+          <div style={{ position: 'relative' }}>
+            <div id={`menu_${id}`} className="ui__cursor_pointer">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
+            <Menu target={`menu_${id}`} align="right">
+                <MenuItem>
+                  <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'diagnosis' })}>
+                    <span>Copy</span>
+                  </CopyToClipBoard>
+                </MenuItem>
+                <MenuItem onClick={this.handleDeleteDiagnosisClick(id)}>
+                  Delete
+                </MenuItem>
+            </Menu>
           </div>
         </div>
       );
