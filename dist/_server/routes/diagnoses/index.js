@@ -24,6 +24,7 @@ module.exports = function (app) {
   router.post('/update-diagnosis', require('./updateDiagnosisMiddleware')(app), responseMiddleware);
   router.post('/update-diagnoses', require('./updateDiagnosesMiddleware')(app), responseMiddleware);
   router.post('/delete-diagnosis', require('./deleteDiagnosisMiddleware')(app), responseMiddleware);
+  router.post('/duplicate-diagnosis', require('./duplicateDiagnosisMiddleware')["default"](app), responseMiddleware);
   return router;
 };
 
