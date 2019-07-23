@@ -16,18 +16,17 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (expressApp) {
+module.exports = function () {
   return function (req, res) {
-    var config = expressApp.config;
-
     var _ref = res.locals.getResponsePayload() || {},
         app = _ref.app,
         payload = (0, _objectWithoutProperties2["default"])(_ref, ["app"]);
 
     var error = res.locals.getResponseError();
+    var host = "".concat(req.protocol, "://").concat(req.headers.host);
 
     var __$APP__ = JSON.stringify((0, _objectSpread2["default"])({
-      host: config.host
+      host: host
     }, payload, {}, app, {}, error ? {
       error: error
     } : {}));
@@ -37,7 +36,7 @@ module.exports = function (expressApp) {
     var $ = _cheerio["default"].load(html);
 
     $('head').append("<script type=\"text/javascript\">const __$APP__ = ".concat(JSON.stringify(__$APP__), ";</script>"));
-    $('body').append("<script type=\"text/javascript\" src=\"".concat(config.host, "/bundle.js\"></script>"));
+    $('body').append("<script type=\"text/javascript\" src=\"".concat(host, "/bundle.js\"></script>"));
     res.send($.html());
   };
 };

@@ -36,8 +36,12 @@ var callRemote = function callRemote(req, url) {
       });
       response.on('end', function () {
         if (data) {
-          data = JSON.parse(data);
-          return data.error ? reject(data.error) : resolve(data);
+          try {
+            data = JSON.parse(data);
+            return data.error ? reject(data.error) : resolve(data);
+          } catch (e) {
+            reject(e);
+          }
         }
 
         reject({
