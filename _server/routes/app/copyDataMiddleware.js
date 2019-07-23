@@ -12,8 +12,12 @@ const callRemote = (req, url) => {
 
       response.on('end', () => {
         if (data) {
-          data = JSON.parse(data);
-          return data.error ? reject(data.error) : resolve(data);
+          try {
+            data = JSON.parse(data);
+            return data.error ? reject(data.error) : resolve(data);
+          } catch (e) {
+            reject(e);
+          }
         }
         reject({ msg: `Something went wrong fetching the original ${source.dataType}.` });
       });
