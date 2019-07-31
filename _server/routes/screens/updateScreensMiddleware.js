@@ -13,7 +13,7 @@ module.exports = () => (req, res, next) => {
   ).then(rslts => {
     if (!returnUpdated) return done(null, { rslts });
 
-    Screen.findAll({ where: { id: screens.map(scr => scr.id) } })
+    Screen.findAll({ where: { id: screens.map(scr => scr.id) }, order: [['position', 'ASC']] })
       .then(screens => done(null, { screens }))
       .catch(done);
 

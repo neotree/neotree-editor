@@ -1,10 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Button } from 'react-mdl';
+import FileInput from 'ui/FileInput';
+import Spinner from 'ui/Spinner';
+import FileUploader from 'FileUploader';
 import Context from './Context';
-import FileInput from 'ui/FileInput';  // eslint-disable-line
-import Spinner from 'ui/Spinner'; // eslint-disable-line
-import FileUploader from 'FileUploader'; // eslint-disable-line
 
 export class ImportSection extends React.Component {
   state = {

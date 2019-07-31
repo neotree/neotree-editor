@@ -12,6 +12,7 @@ module.exports = {
       path.resolve(__dirname, './src/_redux'),
       path.resolve(__dirname, './src/ui'),
       path.resolve(__dirname, './src/App'),
+      path.resolve(__dirname, './src/App/reducers'),
       path.resolve(__dirname, './src/App/components'),
       path.resolve(__dirname, './src/App/OldDashboard'),
       path.resolve(__dirname, './src/App/OldDashboard/components')
@@ -23,6 +24,7 @@ module.exports = {
       ui: path.resolve(__dirname, 'src/ui/'),
       App: path.resolve(__dirname, 'src/App/'),
       AppUtils: path.resolve(__dirname, 'src/App/_utils/'),
+      AppReducers: path.resolve(__dirname, 'src/App/reducers/'),
       AppComponents: path.resolve(__dirname, 'src/App/components/'),
       Dashboard: path.resolve(__dirname, 'src/App/OldDashboard/'),
       DashboardComponents: path.resolve(__dirname, 'src/App/OldDashboard/components/')

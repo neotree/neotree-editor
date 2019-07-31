@@ -48,18 +48,23 @@ export class Editor extends React.Component {
     }
   };
 
+  componentWillMount() {
+    this.setScreenAsState(this.props);
+  }
+
   componentWillUpdate(nextProps) {
-    if (nextProps.screen !== this.props.screen) {
+    if (JSON.stringify(nextProps.screen || {}) !== JSON.stringify(this.props.screen || {})) {
       this.setScreenAsState(nextProps);
     }
   }
 
   setScreenAsState = (props = this.props) => {
     if (props.screen) {
-      this.setState({
+      const newState = {
         type: props.screen.type,
         screen: { ...props.screen.data, type: props.screen.type }
-      });
+      };
+      this.setState(newState);
     }
   };
 
@@ -98,8 +103,13 @@ export class Editor extends React.Component {
 
   handleUpdateMetadata = update => this.setState({
     screen: {
+      ...this.props.screen,
       ...this.state.screen,
-      metadata: { ...this.state.screen.metadata, ...update }
+      metadata: {
+        ...this.props.screen.metadata,
+        ...this.state.screen.metadata,
+        ...update
+      }
     }
   });
 
@@ -112,8 +122,8 @@ export class Editor extends React.Component {
   });
 
   render() {
-    const { screen, skippable } = this.state;
-    const type = (this.props.screen || {}).type;
+    const { type, screen, skippable } = this.state;
+    // const type = (this.props.screen || {}).type;
 
     const styles = {
       container: {

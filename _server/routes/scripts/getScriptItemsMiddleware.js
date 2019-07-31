@@ -9,7 +9,7 @@ module.exports = () => (req, res, next) => {
   };
 
   Promise.all([
-    Screen.findAll({ where: payload }),
+    Screen.findAll({ where: payload, order: [['position', 'ASC']] }),
     Diagnosis.findAll({ where: payload })
   ]).catch(done)
     .then(([screens, diagnoses]) => done(null, screens, diagnoses));

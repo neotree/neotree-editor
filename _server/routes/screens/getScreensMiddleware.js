@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next(); return null;
   };
 
-  Screen.findAll({ where: payload })
+  Screen.findAll({ where: payload, order: [['position', 'ASC']] })
     .then(screens => done(null, screens))
     .catch(done);
 };
