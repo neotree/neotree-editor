@@ -24,7 +24,8 @@ module.exports = function () {
     };
 
     Promise.all([_models.Screen.findAll({
-      where: payload
+      where: payload,
+      order: [['position', 'ASC']]
     }), _models.Diagnosis.findAll({
       where: payload
     })])["catch"](done).then(function (_ref) {

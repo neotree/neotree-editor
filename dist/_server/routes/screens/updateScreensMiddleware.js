@@ -42,7 +42,8 @@ module.exports = function () {
           id: screens.map(function (scr) {
             return scr.id;
           })
-        }
+        },
+        order: [['position', 'ASC']]
       }).then(function (screens) {
         return done(null, {
           screens: screens

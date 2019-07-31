@@ -19,7 +19,8 @@ module.exports = function () {
     };
 
     _models.Screen.findAll({
-      where: payload
+      where: payload,
+      order: [['position', 'ASC']]
     }).then(function (screens) {
       return done(null, screens);
     })["catch"](done);
