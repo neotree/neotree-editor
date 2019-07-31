@@ -8,12 +8,11 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    IconButton,
     Radio,
     RadioGroup,
     TableHeader
 } from 'react-mdl';
-
+import { MdCreate, MdDelete, MdAdd } from 'react-icons/md';
 // import {
 //     Table,
 //     TableHeader
@@ -112,8 +111,8 @@ export default class DiagnosisList extends Component {
         const renderItemActions = (screenId, rowData, index) => {
             return (
                 <div style={{display: 'flex', flexDirection:'row', alignContent: 'end', color: "#999999"}}>
-                    <IconButton name="edit" onClick={this.handleEditDiagnosesClick(rowData.$id)}/>
-                    <IconButton name="delete" onClick={this.handleDeleteDiagnosesClick(rowData.$id)}/>
+                    <MdCreate className="ui__defaultIconSize ui__cursor_pointer" onClick={this.handleEditDiagnosesClick(rowData.$id)}/>
+                    <MdDelete className="ui__defaultIconSize ui__cursor_pointer" onClick={this.handleDeleteDiagnosesClick(rowData.$id)}/>
                 </div>
             )
         };
@@ -123,7 +122,7 @@ export default class DiagnosisList extends Component {
                 <Card shadow={0} style={styles.diagnosis}>
                     <Toolbar title="Diagnosis">
                         <div style={{display: 'flex', flexDirection: 'row'}}>
-                            <IconButton name="add" onClick={this.handleAddDiagnosesClick} />
+                            <MdAdd className="ui__defaultIconSize ui__cursor_pointer" onClick={this.handleAddDiagnosesClick} />
                         </div>
                     </Toolbar>
                     {(diagnosis && diagnosis.length > 0) ?

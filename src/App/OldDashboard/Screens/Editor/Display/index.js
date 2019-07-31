@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import reduxComponent from 'reduxComponent';
 import {
     Button,
     Card,
@@ -13,17 +13,17 @@ import {
     Textfield,
     Switch
 } from 'react-mdl';
-import FormButtonBar from 'FormButtonBar'; // eslint-disable-line
-import FormSection from 'FormSection'; // eslint-disable-line
-import Toolbar from 'Toolbar'; // eslint-disable-line
+import FormButtonBar from 'FormButtonBar';
+import FormSection from 'FormSection';
+import Toolbar from 'Toolbar';
+// import { DataType, ScreenType } from 'App/constants';
+import * as constants from 'App/constants';
 import SelectMetadata from '../metadata/SelectMetadata';
 import FieldList from '../metadata/FieldList';
 import ItemList from '../metadata/ItemList';
 import ManagementMetadata from '../metadata/ManagementMetadata';
 import TimerMetadata from '../metadata/TimerMetadata';
 import YesNoMetadata from '../metadata/YesNoMetadata';
-import { DataType, ScreenType } from 'App/constants';  // eslint-disable-line
-import * as constants from 'App/constants';  // eslint-disable-line
 
 export class Editor extends React.Component {
   state = {
@@ -112,7 +112,9 @@ export class Editor extends React.Component {
   });
 
   render() {
-    const { type, screen, skippable } = this.state;
+    const { screen, skippable } = this.state;
+    const type = (this.props.screen || {}).type;
+
     const styles = {
       container: {
         display: 'flex',
@@ -144,24 +146,25 @@ export class Editor extends React.Component {
     let itemsEditor = null;
 
     switch (type) {
-      case ScreenType.CHECKLIST:
-      case ScreenType.LIST:
-      case ScreenType.PROGRESS:
-      case ScreenType.MULTI_SELECT:
-      case ScreenType.SINGLE_SELECT:
-        if (type === ScreenType.MULTI_SELECT || type === ScreenType.SINGLE_SELECT) {
+      case constants.ScreenType.CHECKLIST:
+      case constants.ScreenType.LIST:
+      case constants.ScreenType.PROGRESS:
+      case constants.ScreenType.MULTI_SELECT:
+      case constants.ScreenType.SINGLE_SELECT:
+        if (type === constants.ScreenType.MULTI_SELECT || type === constants.ScreenType.SINGLE_SELECT) {
           metadataEditor = <SelectMetadata metadata={screen.metadata} onUpdateMetadata={this.handleUpdateMetadata} />;
         }
 
         itemsEditor = (
           <ItemList
             metadata={screen.metadata}
+            screenType={type}
             onItemsChanged={this.handleItemsChanged}
             onUpdateMetadata={this.handleUpdateMetadata}
           />
         );
         break;
-      case ScreenType.FORM:
+      case constants.ScreenType.FORM:
         itemsEditor = (
           <FieldList
             metadata={screen.metadata}
@@ -170,13 +173,13 @@ export class Editor extends React.Component {
           />
         );
         break;
-      case ScreenType.TIMER:
+      case constants.ScreenType.TIMER:
         metadataEditor = <TimerMetadata metadata={screen.metadata} onUpdateMetadata={this.handleUpdateMetadata} />;
         break;
-      case ScreenType.YESNO:
+      case constants.ScreenType.YESNO:
         metadataEditor = <YesNoMetadata metadata={screen.metadata} onUpdateMetadata={this.handleUpdateMetadata} />;
         break;
-      case ScreenType.MANAGEMENT:
+      case constants.ScreenType.MANAGEMENT:
         metadataEditor = <ManagementMetadata metadata={screen.metadata} onUpdateMetadata={this.handleUpdateMetadata} />;
         break;
       default:
