@@ -15,6 +15,8 @@ var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 var _models = require("../../models");
 
+var _updateScreensMiddleware = require("./updateScreensMiddleware");
+
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
   enterModule && enterModule(module);
@@ -45,7 +47,7 @@ var copyScreen = function copyScreen(req, screen) {
 
 exports.copyScreen = copyScreen;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var id = req.body.id;
 
@@ -73,6 +75,25 @@ var _default = function _default() {
       });
       screen = screen.toJSON();
       copyScreen(req, screen).then(function (screen) {
+        // update screens positions
+        (0, _updateScreensMiddleware.findAndUpdateScreens)({
+          attributes: ['id'],
+          where: {
+            script_id: screen.script_id
+          },
+          order: [['position', 'ASC']]
+        }, function (screens) {
+          return screens.map(function (scr, i) {
+            return (0, _objectSpread2["default"])({}, scr, {
+              position: i + 1
+            });
+          });
+        }).then(function () {
+          return null;
+        })["catch"](function (err) {
+          app.logger.log(err);
+          return null;
+        });
         return done(null, screen);
       })["catch"](done);
       return null;

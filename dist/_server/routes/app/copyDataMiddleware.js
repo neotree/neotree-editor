@@ -16,6 +16,8 @@ var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 var _models = require("../../models");
 
+var _updateScreensMiddleware = require("../../routes/screens/updateScreensMiddleware");
+
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
   enterModule && enterModule(module);
@@ -77,8 +79,7 @@ module.exports = function () {
 
       var persitScriptItems = function persitScriptItems(Model, _ref) {
         var data = _ref.data,
-            isSingle = _ref.isSingle,
-            params = (0, _objectWithoutProperties2["default"])(_ref, ["data", "isSingle"]);
+            params = (0, _objectWithoutProperties2["default"])(_ref, ["data"]);
         return new Promise(function (resolve, reject) {
           var done = function done(err, item) {
             if (err) {
@@ -90,30 +91,16 @@ module.exports = function () {
             return null;
           };
 
-          var persist = function persist(otherParams) {
-            return Model.create((0, _objectSpread2["default"])({}, data, {
-              data: JSON.stringify(data.data || {}),
-              details: JSON.stringify((0, _objectSpread2["default"])({}, data.details || {}, {
-                originalHost: source.host,
-                originalId: data.id
-              })),
-              id: id,
-              author: author
-            }, params, {}, otherParams)).then(function (s) {
-              return done(null, s);
-            })["catch"](done);
-          };
-
-          if (isSingle === false) return persist();
-          Model.count({
-            where: {
-              script_id: destination.dataId
-            }
-          }).then(function (position) {
-            return persist({
-              position: position,
-              script_id: destination.dataId
-            });
+          Model.create((0, _objectSpread2["default"])({}, data, {
+            data: JSON.stringify(data.data || {}),
+            details: JSON.stringify((0, _objectSpread2["default"])({}, data.details || {}, {
+              originalHost: source.host,
+              originalId: data.id
+            })),
+            id: id,
+            author: author
+          }, params)).then(function (s) {
+            return done(null, s);
           })["catch"](done);
           return null;
         });
@@ -134,8 +121,28 @@ module.exports = function () {
 
         case 'screen':
           return persitScriptItems(_models.Screen, {
-            data: dataToImport
+            data: (0, _objectSpread2["default"])({}, dataToImport, {
+              position: 1,
+              script_id: destination.dataId
+            })
           }).then(function (item) {
+            (0, _updateScreensMiddleware.findAndUpdateScreens)({
+              attributes: ['id'],
+              where: {
+                script_id: item.script_id
+              },
+              order: [['position', 'ASC']]
+            }, function (screens) {
+              return screens.map(function (scr, i) {
+                return (0, _objectSpread2["default"])({}, scr, {
+                  position: i + 1
+                });
+              });
+            }).then(function () {
+              return null;
+            })["catch"](function () {
+              return null;
+            });
             return done(null, item);
           })["catch"](done);
 
@@ -165,8 +172,7 @@ module.exports = function () {
                   id: (0, _uuidv["default"])(),
                   data: (0, _objectSpread2["default"])({}, screen, {
                     script_id: s.id
-                  }),
-                  isSingle: false
+                  })
                 });
               })), (0, _toConsumableArray2["default"])(payload.diagnoses.map(function (d, position) {
                 return persitScriptItems(_models.Diagnosis, {
@@ -174,8 +180,7 @@ module.exports = function () {
                   id: (0, _uuidv["default"])(),
                   data: (0, _objectSpread2["default"])({}, d, {
                     script_id: s.id
-                  }),
-                  isSingle: false
+                  })
                 });
               })));
               Promise.all(promises).then(function () {
