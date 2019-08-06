@@ -1,5 +1,6 @@
 import uuid from 'uuidv4';
 import { Screen } from '../../models';
+import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 export const copyScreen = (req, screen) => {
   const author = (req.user || {}).id || null;
@@ -20,7 +21,7 @@ export const copyScreen = (req, screen) => {
   });
 };
 
-export default () => (req, res, next) => {
+export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, screen) => {
@@ -39,7 +40,19 @@ export default () => (req, res, next) => {
       screen = screen.toJSON();
 
       copyScreen(req, screen)
-        .then(screen => done(null, screen))
+        .then(screen => {
+          // update screens positions
+          findAndUpdateScreens(
+            {
+              attributes: ['id'],
+              where: { script_id: screen.script_id },
+              order: [['position', 'ASC']]
+            },
+            screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
+          ).then(() => null).catch(err => { app.logger.log(err); return null; });
+
+          return done(null, screen);
+        })
         .catch(done);
 
       return null;

@@ -1,6 +1,7 @@
 import { Screen } from '../../models';
+import { findAndUpdateScreens } from './updateScreensMiddleware';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, screen) => {
@@ -15,7 +16,19 @@ module.exports = () => (req, res, next) => {
       if (!s) return done({ msg: `Could not find script with "id" ${id}.` });
 
       s.destroy({ where: { id } })
-        .then(deleted => done(null, { deleted }))
+        .then(deleted => {
+          // update screens positions
+          findAndUpdateScreens(
+            {
+              attributes: ['id'],
+              where: { script_id: s.script_id },
+              order: [['position', 'ASC']]
+            },
+            screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
+          ).then(() => null).catch(err => { app.logger.log(err); return null; });
+
+          return done(null, { deleted });
+        })
         .catch(done);
 
       return null;

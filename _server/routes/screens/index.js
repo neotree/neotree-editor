@@ -37,7 +37,7 @@ module.exports = app => {
 
   router.post(
     '/update-screens',
-    require('./updateScreensMiddleware')(app),
+    require('./updateScreensMiddleware').default(app),
     responseMiddleware
   );
 

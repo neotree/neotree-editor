@@ -16,7 +16,6 @@ import {
 } from 'react-mdl';
 import { MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar';
-import { arrayMove } from 'App/utils';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
@@ -60,8 +59,10 @@ class Display extends Component {
       onResponse: () => this.setState({ deletingScreen: false }),
       onFailure: deleteScreenError => this.setState({ deleteScreenError }),
       onSuccess: () => {
-        actions.updateApiData(state =>
-          ({ screens: state.screens.filter(scr => scr.id !== id) }));
+        actions.updateApiData(state => ({
+          screens: state.screens.filter(scr => scr.id !== id)
+            .map((screen, i) => ({ ...screen, position: i + 1 }))
+        }));
       }
     });
   };
@@ -111,7 +112,9 @@ class Display extends Component {
           const ogIndex = screens.map((s, i) =>
             s.id === id ? i : null).filter(i => i !== null)[0] || 0;
           screens.splice(ogIndex + 1, 0, payload.screen);
-          return { screens };
+          return {
+            screens: screens.map((screen, i) => ({ ...screen, position: i + 1 }))
+          };
         });
       }
     });
