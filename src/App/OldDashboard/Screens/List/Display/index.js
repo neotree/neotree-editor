@@ -20,8 +20,8 @@ import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
 import PasteBoard from 'DashboardComponents/PasteBoard';
+import isMobileBrowser from 'AppUtils/isMobileBrowser';
 import { Table, TableHeader } from '../../datatable';
-
 
 class Display extends Component {
   state = {
@@ -226,9 +226,10 @@ class Display extends Component {
                   <MenuItem onClick={this.openSelectScreenTypeDialog}>
                     Add new
                   </MenuItem>
-                  <MenuItem onClick={this.togglePasteBoard}>
-                    Paste
-                  </MenuItem>
+                  {isMobileBrowser() ?
+                    <MenuItem onClick={this.togglePasteBoard}>
+                      Paste
+                    </MenuItem> : null}
               </Menu>
             </div>
           </Toolbar>
