@@ -22,7 +22,7 @@ import {
   MdArrowDownward
 } from 'react-icons/md';
 import Toolbar from 'Toolbar';
-import { arrayMove } from 'App/utils';
+import { arrayMove } from 'AppUtils';
 import { DataType, ScreenType } from 'App/constants';
 import { Table, TableHeader } from '../../datatable';
 

@@ -20,7 +20,7 @@ import Toolbar from 'components/Toolbar';
 import { SymptomType } from '../../../constants';
 
 
-import { arrayMove } from '../../../utils';
+import { arrayMove } from 'AppUtils';
 
 const RESET_STATE = {
     openNewItemDialog: false,

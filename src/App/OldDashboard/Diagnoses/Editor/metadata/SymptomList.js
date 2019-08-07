@@ -16,7 +16,7 @@ import {
 import { MdDelete, MdCreate, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import { SymptomType } from 'App/constants'; // eslint-disable-line
-import { arrayMove } from 'App/utils'; // eslint-disable-line
+import { arrayMove } from 'AppUtils'; // eslint-disable-line
 
 const RESET_STATE = {
     openNewItemDialog: false,

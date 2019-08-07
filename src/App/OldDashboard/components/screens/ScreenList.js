@@ -23,7 +23,7 @@ import {
 import Toolbar from 'components/Toolbar';
 
 import { createScreen, deleteScreen, updateScreenOrder, subscribeScreenChanges, unsubscribeScreenChanges } from '../../actions/datastore';
-import { arrayMove } from '../../utils';
+import { arrayMove } from 'AppUtils';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from '../../constants';
 
 export default class ScreenList extends Component {

@@ -4,7 +4,7 @@ import clamp from 'clamp';
 import { MdDragHandle } from 'react-icons/md';
 import { SortableContainer, SortableElement, SortableHandle, arrayMove } from 'react-sortable-hoc';
 import randomstring from 'randomstring';
-import shadows from 'App/utils/shadows'; // eslint-disable-line
+import shadows from 'AppUtils/shadows'; // eslint-disable-line
 
 export default class Table extends Component {
 

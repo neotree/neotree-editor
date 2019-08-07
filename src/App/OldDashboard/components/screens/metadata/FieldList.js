@@ -45,7 +45,7 @@ import {
 } from '../../datatable';
 
 import { createScreen, deleteScreen, subscribeScreenChanges, unsubscribeScreenChanges } from 'actions/datastore';
-import { arrayMove } from '../../../utils';
+import { arrayMove } from 'AppUtils';
 import { DataType, DefaultValueType, FieldType } from '../../../constants';
 
 const RESET_STATE = {

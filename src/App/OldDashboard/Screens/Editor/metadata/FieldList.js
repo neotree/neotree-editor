@@ -14,7 +14,7 @@ import {
 } from 'react-mdl';
 import FormSection from 'FormSection';
 import Toolbar from 'Toolbar';
-import { arrayMove } from 'App/utils';
+import { arrayMove } from 'AppUtils';
 import { DataType, DefaultValueType, FieldType } from 'App/constants';
 import { MdAdd, MdCreate, MdDelete, MdSwapVert, MdArrowUpward, MdArrowDownward } from 'react-icons/md';
 import { Table, TableHeader } from '../../datatable';
