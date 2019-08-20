@@ -97,7 +97,7 @@ module.exports = () => (req, res, next) => {
             })
             .catch(done);
         case 'diagnosis':
-          return persitScriptItems(Diagnosis, { data: dataToImport })
+          return persitScriptItems(Diagnosis, { data: { ...dataToImport, position: 1, script_id: destination.dataId } })
             .then(item => done(null, item))
             .catch(done);
         case 'script':
