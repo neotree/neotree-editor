@@ -148,7 +148,10 @@ module.exports = function () {
 
         case 'diagnosis':
           return persitScriptItems(_models.Diagnosis, {
-            data: dataToImport
+            data: (0, _objectSpread2["default"])({}, dataToImport, {
+              position: 1,
+              script_id: destination.dataId
+            })
           }).then(function (item) {
             return done(null, item);
           })["catch"](done);

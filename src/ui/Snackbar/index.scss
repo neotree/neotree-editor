@@ -1,0 +1,16 @@
+.ui__snackbar {
+  padding: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,.1);
+  background: #fff;
+  border-radius: 2px;
+  min-width: 100px;
+  position: fixed;
+  top: 0;
+  z-index: 99999;
+  transition: transform .5s;
+  transform: translate3d(0,-100%,0);
+
+  &.visible {
+    transform: translate3d(0,0,0);
+  }
+}
