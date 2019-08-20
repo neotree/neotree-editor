@@ -13,7 +13,6 @@ import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
 import PasteBoard from 'DashboardComponents/PasteBoard';
-import isMobileBrowser from 'AppUtils/isMobileBrowser';
 
 class Display extends Component {
   constructor(props) {
@@ -146,10 +145,9 @@ class Display extends Component {
                     <MenuItem onClick={this.handleAddDiagnosisClick}>
                       Add new
                     </MenuItem>
-                    {isMobileBrowser() ?
-                      <MenuItem onClick={this.togglePasteBoard}>
-                        Paste
-                      </MenuItem> : null}
+                    <MenuItem onClick={this.togglePasteBoard}>
+                      Paste
+                    </MenuItem>
                   </Menu>
               </div>
             </div>
