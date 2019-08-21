@@ -18,8 +18,9 @@ import { MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
-import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard from 'DashboardComponents/PasteBoard';
+import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import ClipboardPasteBtn from 'DashboardComponents/Clipboard/ClipboardPasteBtn';
+import Api from 'AppUtils/Api';
 import { Table, TableHeader } from '../../datatable';
 
 class Display extends Component {
@@ -29,41 +30,33 @@ class Display extends Component {
     addScreenType: DEFAULT_SCREEN_TYPE
   };
 
-  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
-
   handleAddScreenClick = () => {
-    const { actions, scriptId, history } = this.props;
+    const { updateState, scriptId, history } = this.props;
     const { addScreenType } = this.state;
 
-    this.setState({ addingScreen: false });
-    actions.post('create-screen', {
-      script_id: scriptId,
-      type: addScreenType,
-      onResponse: () => this.setState({ addingScreen: false }),
-      onFailure: addScreenError => this.setState({ addScreenError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(({ screen: payload.screen }));
+    this.setState({ addingScreen: true });
+    Api.post('/create-screen', { script_id: scriptId, type: addScreenType })
+      .catch(addScreenError => this.setState({ addScreenError, addingScreen: false }))
+      .then(({ payload }) => {
+        this.setState({ addingScreen: false });
+        updateState(({ screen: payload.screen }));
         history.push(`/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`);
         this.closeSelectScreenTypeDialog();
-      }
-    });
+      });
   };
 
   handleDeleteScreenClick = id => () => {
-    const { actions, scriptId } = this.props;
+    const { updateState, scriptId } = this.props;
     this.setState({ deletingScreen: false });
-    actions.post('delete-screen', {
-      id,
-      scriptId,
-      onResponse: () => this.setState({ deletingScreen: false }),
-      onFailure: deleteScreenError => this.setState({ deleteScreenError }),
-      onSuccess: () => {
-        actions.updateApiData(state => ({
+    Api.post('/delete-screen', { id, scriptId })
+      .catch(deleteScreenError => this.setState({ deleteScreenError, deletingScreen: false }))
+      .then(() => {
+        this.setState({ deletingScreen: false });
+        updateState(state => ({
           screens: state.screens.filter(scr => scr.id !== id)
             .map((screen, i) => ({ ...screen, position: i + 1 }))
         }));
-      }
-    });
+      });
   };
 
   handleEditScreenClick = index => () => this.props.onEditScreenClick(index);
@@ -79,34 +72,34 @@ class Display extends Component {
   });
 
   swapScreenItems = (oldIndex, newIndex) => {
-      const { actions, screens } = this.props;
+      const { updateState, screens } = this.props;
       let updatedScreens = Object.assign([], screens);
       const screen = updatedScreens[oldIndex];
       updatedScreens.splice(oldIndex, 1);
       updatedScreens.splice(newIndex, 0, screen);
       updatedScreens = updatedScreens.map((scr, i) => ({ ...scr, position: i + 1 }));
 
-      actions.updateApiData({ screens: updatedScreens });
+      updateState({ screens: updatedScreens });
 
       this.setState({ sortingScreens: false });
-      actions.post('update-screens', {
+      Api.post('/update-screens', {
         returnUpdated: false,
-        screens: updatedScreens.map(({ id, position }) => ({ id, position })),
-        onResponse: () => this.setState({ sortingScreens: false }),
-        onFailure: deleteScriptError => this.setState({ deleteScriptError }),
-        // onSuccess: ({ payload }) => actions.updateApiData({ screens: payload.screens })
-      });
+        screens: updatedScreens.map(({ id, position }) => ({ id, position }))
+      }).catch(deleteScriptError => this.setState({ deleteScriptError, sortingScreens: false }))
+        .then(() => this.setState({ sortingScreens: false }));
   };
 
   handleDuplicateScreen = id => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     this.setState({ duplicatingScreen: true });
-    actions.post('duplicate-screen', {
-      id,
-      onResponse: () => this.setState({ duplicatingScreen: false }),
-      onFailure: duplicateScreenError => this.setState({ duplicateScreenError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(state => {
+    Api.post('/duplicate-screen', { id })
+      .catch(duplicateScreenError => this.setState({
+        duplicateScreenError,
+        duplicatingScreen: false
+      }))
+      .then(({ payload }) => {
+        this.setState({ duplicatingScreen: false });
+        updateState(state => {
           const screens = [...state.screens];
           const ogIndex = screens.map((s, i) =>
             s.id === id ? i : null).filter(i => i !== null)[0] || 0;
@@ -115,13 +108,12 @@ class Display extends Component {
             screens: screens.map((screen, i) => ({ ...screen, position: i + 1 }))
           };
         });
-      }
-    });
+      });
   };
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { screens, scriptId } = this.props;
+    const { screens } = this.props;
     const { addScreenType } = this.state;
     const styles = {
       screens: { overflow: 'unset', width: '100%', minWidth: '700px' },
@@ -157,9 +149,9 @@ class Display extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'screen' })}>
+                  <ClipboardCopyBtn data={{ dataId: id, dataType: 'screen' }}>
                     <span>Copy</span>
-                  </CopyToClipBoard>
+                  </ClipboardCopyBtn>
                 </MenuItem>
                 <MenuItem onClick={this.handleDeleteScreenClick(id)}>
                   Delete
@@ -206,15 +198,7 @@ class Display extends Component {
     };
 
     return (
-      <PasteBoard
-        modal={{
-          onClose: this.togglePasteBoard,
-          open: this.state.openPasteBoard,
-        }}
-        accept="screen"
-        data={{ dataId: scriptId, dataType: 'script' }}
-        redirectTo={payload => `/dashboard/scripts/${scriptId}/screens/${payload.screen.id}`}
-      >
+      <div>
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
             <div>
@@ -225,8 +209,8 @@ class Display extends Component {
                   <MenuItem onClick={this.openSelectScreenTypeDialog}>
                     Add new
                   </MenuItem>
-                  <MenuItem onClick={this.togglePasteBoard}>
-                    Paste
+                  <MenuItem>
+                    <ClipboardPasteBtn>Paste</ClipboardPasteBtn>
                   </MenuItem>
               </Menu>
             </div>
@@ -255,14 +239,14 @@ class Display extends Component {
             </CardText>}
         </Card>
         {selectScreenTypeDialog}
-      </PasteBoard>
+      </div>
     );
   }
 }
 
 Display.propTypes = {
   screens: PropTypes.array.isRequired,
-  actions: PropTypes.object.isRequired,
+  updateState: PropTypes.func.isRequired,
   scriptId: PropTypes.string.isRequired,
   onEditScreenClick: PropTypes.func.isRequired
 };

@@ -18,8 +18,9 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert, MdCreate } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard from 'DashboardComponents/PasteBoard';
+import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import ClipboardPasteBox from 'DashboardComponents/Clipboard/ClipboardPasteBox';
+import Api from 'AppUtils/Api';
 import ExportLink from '../../../components/ExportLink';
 
 class Display extends Component {
@@ -31,7 +32,7 @@ class Display extends Component {
     };
   }
 
-  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
+  toggleClipboardPasteBox = () => this.setState({ openClipboardPasteBox: !this.state.openClipboardPasteBox });
 
   handleAddScriptClick = () => this.props.history
     .push('/dashboard/scripts/new');
@@ -40,38 +41,40 @@ class Display extends Component {
     .push(`/dashboard/scripts/${scriptId}`);
 
   handleDeleteClick = () => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     const id = this.state.scriptIdForAction;
     this.setState({ deletingScript: true });
-    actions.post('delete-script', {
-      id,
-      onResponse: () => this.setState({ deletingScript: false }),
-      onFailure: deleteScriptError => this.setState({ deleteScriptError }),
-      onSuccess: () => {
-        actions.updateApiData(state =>
+    Api.post('/delete-script', { id })
+      .catch(deleteScriptError => this.setState({
+        deleteScriptError,
+        deletingScript: false
+      }))
+      .then(() => {
+        this.setState({ deletingScript: false });
+        updateState(state =>
           ({ scripts: state.scripts.filter(conf => conf.id !== id) }));
         this.closeDeleteConfirmDialog();
-      }
-    });
+      });
   };
 
   handleDuplicateScript = id => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     this.setState({ duplicatingScript: true });
-    actions.post('duplicate-script', {
-      id,
-      onResponse: () => this.setState({ duplicatingScript: false }),
-      onFailure: duplicateScriptError => this.setState({ duplicateScriptError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(state => {
+    Api.post('/duplicate-script', { id })
+      .catch(duplicateScriptError => this.setState({
+        duplicateScriptError,
+        duplicatingScript: false
+      }))
+      .then(({ payload }) => {
+        this.setState({ duplicatingScript: false });
+        updateState(state => {
           const scripts = [...state.scripts];
           const ogIndex = scripts.map((s, i) =>
             s.id === id ? i : null).filter(i => i !== null)[0] || 0;
           scripts.splice(ogIndex + 1, 0, payload.script);
           return { scripts };
         });
-      }
-    });
+      });
   };
 
   // handleExportScript = id => {
@@ -101,7 +104,7 @@ class Display extends Component {
   });
 
   render() {
-    const { scripts } = this.props;
+    const { scripts, updateState } = this.props;
     const { deletingScript, deleteScriptError } = this.state;
     const styles = {
       container: {
@@ -172,9 +175,9 @@ class Display extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <CopyToClipBoard data={JSON.stringify({ dataId: scriptId, dataType: 'script' })}>
+                  <ClipboardCopyBtn data={{ dataId: scriptId, dataType: 'script' }}>
                     <span>Copy</span>
-                  </CopyToClipBoard>
+                  </ClipboardCopyBtn>
                 </MenuItem>
                 <MenuItem>
                   <ExportLink options={{ script: scriptId }} />
@@ -216,14 +219,11 @@ class Display extends Component {
     );
 
     return (
-      <PasteBoard
-        modal={{
-          onClose: this.togglePasteBoard,
-          open: this.state.openPasteBoard,
-        }}
-        accept="script"
+      <ClipboardPasteBox
+        accept={['script']}
         data={{}}
-        redirectTo={payload => `/dashboard/scripts/${payload.script.id}`}
+        onSuccess={({ payload }) => updateState(state =>
+          ({ scripts: [payload.script, ...state.scripts] }))}
       >
         <FABButton style={styles.fab} colored ripple onClick={this.handleAddScriptClick}>
             <MdAdd />
@@ -232,7 +232,7 @@ class Display extends Component {
             {scripts.length ? renderTable : renderEmptyTable}
         </div>
         {confirmDeleteDialog}
-      </PasteBoard>
+      </ClipboardPasteBox>
     );
   }
 }

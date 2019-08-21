@@ -1,47 +1,50 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
-import reduxComponent from 'reduxComponent';
+import useScreensReducer from 'AppHooks/screensReducer';
+import Api from 'AppUtils/Api';
 import Spinner from 'ui/Spinner';
 import Display from './Display';
 
-export class List extends React.Component {
-  state = {};
+const Screens = props => {
+  const [loading, setLoading] = useState(false);
+  const [
+    loadingError, // eslint-disable-line
+    setLoadingError
+  ] = useState(null);
 
-  componentWillMount() {
-    const { actions, scriptId } = this.props;
-    this.setState({ loadingScreens: true });
-    actions.get('get-screens', {
-      script_id: scriptId,
-      onResponse: () => this.setState({ loadingScreens: false }),
-      onFailure: loadScreensError => this.setState({ loadScreensError }),
-      onSuccess: ({ payload }) => {
-      this.setState({ screens: payload.screens });
-      actions.updateApiData({ screens: payload.screens });
-      }
-    });
-  }
+  const [
+    { screens },
+    dispatchScreensActions,
+    screensActions
+  ] = useScreensReducer();
 
-  componentWillUnmount() {
-    this.props.actions.updateApiData({ screens: [] });
-  }
+  useEffect(() => {
+    setLoading(true);
+    Api.get('/get-screens')
+      .then(r => { setLoading(false); return r; })
+      .then(({ payload }) => {
+        setLoading(false);
+        dispatchScreensActions(screensActions.updateState({ screens: payload.screens || [] }));
+      }).catch(loadingError => { setLoading(false); setLoadingError(loadingError); });
+  }, []);
 
-  render() {
-    const { loadingScreens } = this.state;
-
-    if (loadingScreens) return <Spinner className="ui__flex ui__justifyContent_center" />;
-
-    return <Display {...this.props} />;
-  }
-}
-
-List.propTypes = {
-  actions: PropTypes.object
+  return (
+    <div>
+      {!screens.length && loading && <Spinner className="ui__flex ui__justifyContent_center" />}
+      {!screens.length && loading ? null :
+        <Display
+          {...props}
+          screens={screens}
+          updateState={state => dispatchScreensActions(screensActions.updateState(state))}
+        />}
+    </div>
+  );
 };
 
-export default hot(withRouter(
-  reduxComponent(List, state => ({
-    screens: state.apiData.screens || []
-  }))
-));
+Screens.propTypes = {
+  match: PropTypes.object
+};
+
+export default hot(withRouter(Screens));

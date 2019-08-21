@@ -6,7 +6,7 @@ import { useReducer, useEffect } from 'react';
 
 const useForceUpdate = () => useReducer(state => !state, false)[1];
 
-export default (reducer, initialState) => {
+export default (reducer, initialState, ...args) => {
   const subscribers = [];
   let state = initialState;
 
@@ -28,7 +28,7 @@ export default (reducer, initialState) => {
 
       return cleanup;
     }, []);
-    return [state, dispatch];
+    return [state, dispatch, ...args];
   };
 
   return useSharedState;

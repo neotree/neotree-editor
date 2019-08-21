@@ -11,8 +11,9 @@ import {
 import { MdCreate, MdMoreVert } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
-import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard from 'DashboardComponents/PasteBoard';
+import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import ClipboardPasteBtn from 'DashboardComponents/Clipboard/ClipboardPasteBtn';
+import Api from 'AppUtils/Api';
 
 class Display extends Component {
   constructor(props) {
@@ -23,27 +24,24 @@ class Display extends Component {
     };
   }
 
-  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
-
   handleAddDiagnosisClick = () => {
     const { history, scriptId } = this.props;
     history.push(`/dashboard/scripts/${scriptId}/diagnosis/new`);
   };
 
   handleDeleteDiagnosisClick = id => () => {
-    const { actions, scriptId } = this.props;
+    const { updateState, scriptId } = this.props;
     this.setState({ deletingDiagnosis: true });
-    actions.post('delete-diagnosis', {
-      id,
-      scriptId,
-      onResponse: () => this.setState({ deletingDiagnosis: false }),
-      onFailure: deleteDiagnosisError => this.setState({ deleteDiagnosisError }),
-      onSuccess: () => {
-        actions.updateApiData(state =>
+    Api.post('/delete-diagnosis', { id, scriptId })
+      .then(() => {
+        this.setState({ deletingDiagnosis: false });
+        updateState(state =>
           ({ diagnoses: state.diagnoses.filter(d => d.id !== id) }));
         this.closeDeleteConfirmDialog();
-      }
-    });
+      }).catch(deleteDiagnosisError => this.setState({
+        deleteDiagnosisError,
+        deletingDiagnosis: false
+      }));
   };
 
   handleEditDiagnosisClick = index => () => this.props.onEditDiagnosisClick(index);
@@ -54,26 +52,27 @@ class Display extends Component {
   });
 
   handleDuplicateDiagnosis = id => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     this.setState({ duplicatingDiagnosis: true });
-    actions.post('duplicate-diagnosis', {
-      id,
-      onResponse: () => this.setState({ duplicatingDiagnosis: false }),
-      onFailure: duplicateDiagnosisError => this.setState({ duplicateDiagnosisError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(state => {
+    Api.post('/duplicate-diagnosis', { id })
+      .then(({ payload }) => {
+        this.setState({ duplicatingDiagnosis: false });
+        updateState(state => {
           const diagnoses = [...state.diagnoses];
           const ogIndex = diagnoses.map((s, i) =>
             s.id === id ? i : null).filter(i => i !== null)[0] || 0;
           diagnoses.splice(ogIndex + 1, 0, payload.diagnosis);
           return { diagnoses };
         });
-      }
-    });
+      })
+      .catch(duplicateDiagnosisError => this.setState({
+        duplicateDiagnosisError,
+        duplicatingDiagnosis: false
+      }));
   };
 
   render() {
-    const { diagnoses, scriptId } = this.props;
+    const { diagnoses } = this.props;
 
     const styles = {
       diagnosis: { overflow: 'unset', width: '100%', minWidth: '700px' },
@@ -111,9 +110,9 @@ class Display extends Component {
                 Duplicate
               </MenuItem>
                 <MenuItem>
-                  <CopyToClipBoard data={JSON.stringify({ dataId: id, dataType: 'diagnosis' })}>
+                  <ClipboardCopyBtn data={{ dataId: id, dataType: 'diagnosis' }}>
                     <span>Copy</span>
-                  </CopyToClipBoard>
+                  </ClipboardCopyBtn>
                 </MenuItem>
                 <MenuItem onClick={this.handleDeleteDiagnosisClick(id)}>
                   Delete
@@ -125,15 +124,7 @@ class Display extends Component {
     };
 
     return (
-      <PasteBoard
-        modal={{
-          onClose: this.togglePasteBoard,
-          open: this.state.openPasteBoard,
-        }}
-        accept="diagnosis"
-        data={{ dataId: scriptId, dataType: 'diagnosis' }}
-        redirectTo={payload => `/dashboard/scripts/${scriptId}/diagnosis/${payload.diagnosis.id}`}
-      >
+      <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
             <div style={{ position: 'relative' }}>
@@ -145,8 +136,8 @@ class Display extends Component {
                     <MenuItem onClick={this.handleAddDiagnosisClick}>
                       Add new
                     </MenuItem>
-                    <MenuItem onClick={this.togglePasteBoard}>
-                      Paste
+                    <MenuItem>
+                      <ClipboardPasteBtn>Paste</ClipboardPasteBtn>
                     </MenuItem>
                   </Menu>
               </div>
@@ -169,7 +160,7 @@ class Display extends Component {
               </div>
             </CardText>}
         </Card>
-      </PasteBoard>
+      </div>
     );
   }
 }

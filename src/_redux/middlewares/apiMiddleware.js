@@ -1,13 +1,13 @@
 /*eslint-disable no-console*/
-import postData from './postData';
+import Api from 'AppUtils/Api';
 
 export const API_MIDDLEWARE = store => next => action => {
   const host = store.getState().$APP.host;
   if (!(action.POST || action.GET)) return next(action);
 
-  const API_METHOD = action.GET ? 'GET' : 'POST';
+  const API_METHOD = action.GET ? 'get' : 'post';
 
-  const { types, name, payload } = action[API_METHOD];
+  const { types, name, payload } = action[API_METHOD !== 'get' ? 'POST' : 'GET'];
   const { requestType, successType, failureType } = types;
   payload.redirect = payload.redirect || {};
   const {
@@ -25,16 +25,9 @@ export const API_MIDDLEWARE = store => next => action => {
     name
   });
 
-  postData(`${host}/${name}`, _payload, API_METHOD)
-    .then(r => {
-      if (onResponse) onResponse(r);
-      if (!r.ok) return { error: { msg: `HTTP ERROR (${r.status}): ${r.statusText}` } };
-      if (r.redirected) {
-        global.window.location = r.url;
-        return next({ type: 'FORCING_REDIRECT' });
-      }
-      return r.json();
-    }).then(response => {
+  Api[API_METHOD](`${host}/${name}`, _payload)
+    .then(response => { 
+      if (onResponse) onResponse(response);
       if (response.redirectURL && response.refresh) {
         global.window.location = response.redirectURL;
         return next({ type: 'FORCING_REDIRECT' });

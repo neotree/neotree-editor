@@ -17,8 +17,9 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import CopyToClipBoard from 'DashboardComponents/CopyToClipBoard';
-import PasteBoard from 'DashboardComponents/PasteBoard';
+import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import ClipboardPasteBox from 'DashboardComponents/Clipboard/ClipboardPasteBox';
+import Api from 'AppUtils/Api';
 import ExportLink from '../../components/ExportLink';
 
 class List extends Component {
@@ -34,7 +35,7 @@ class List extends Component {
     };
   }
 
-  togglePasteBoard = () => this.setState({ openPasteBoard: !this.state.openPasteBoard });
+  toggleClipboardPasteBox = () => this.setState({ openClipboardPasteBox: !this.state.openClipboardPasteBox });
 
   handleInputChange = (name, event) => this.setState({
     ...this.state,
@@ -42,35 +43,35 @@ class List extends Component {
   });
 
   handleCreateClick = () => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     const { configKey, label, summary } = this.state;
     this.setState({ creatingConfigKey: true });
-    actions.post('create-config-key', {
-      data: JSON.stringify({ configKey, label, summary }),
-      onResponse: () => this.setState({ creatingConfigKey: false }),
-      onFailure: createConfigKeyError => this.setState({ createConfigKeyError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(state =>
+    Api.post('/create-config-key', { data: JSON.stringify({ configKey, label, summary }) })
+      .then(({ payload }) => {
+        this.setState({ creatingConfigKey: false });
+        updateState(state =>
           ({ configKeys: [payload.configKey, ...state.configKeys] }));
         this.closeCreateConfigKeyDialog();
-      }
-    });
+      }).catch(createConfigKeyError => this.setState({
+        createConfigKeyError,
+        creatingConfigKey: false
+      }));
   };
 
   handleDeleteClick = () => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     const id = this.state.configKeyIdForAction;
     this.setState({ deletingConfigKey: true });
-    actions.post('delete-config-key', {
-      id,
-      onResponse: () => this.setState({ deletingConfigKey: false }),
-      onFailure: deleteConfigKeyError => this.setState({ deleteConfigKeyError }),
-      onSuccess: () => {
-        actions.updateApiData(state =>
+    Api.post('/delete-config-key', { id })
+      .then(() => {
+        this.setState({ deletingConfigKey: false });
+        updateState(state =>
           ({ configKeys: state.configKeys.filter(conf => conf.id !== id) }));
         this.closeDeleteConfirmDialog();
-      }
-    });
+      }).catch(deleteConfigKeyError => this.setState({
+        deleteConfigKeyError,
+        deletingConfigKey: false
+      }));
   };
 
   openCreateConfigKeyDialog = () => this.setState({
@@ -101,27 +102,27 @@ class List extends Component {
   });
 
   handleDuplicateKey = id => {
-    const { actions } = this.props;
+    const { updateState } = this.props;
     this.setState({ duplicatingConfigKey: true });
-    actions.post('duplicate-config-key', {
-      id,
-      onResponse: () => this.setState({ duplicatingConfigKey: false }),
-      onFailure: duplicateConfigKeyError => this.setState({ duplicateConfigKeyError }),
-      onSuccess: ({ payload }) => {
-        actions.updateApiData(state => {
+    Api.post('/duplicate-config-key', { id })
+      .then(({ payload }) => {
+        this.setState({ duplicatingConfigKey: false });
+        updateState(state => {
           const configKeys = [...state.configKeys];
           const ogIndex = configKeys.map((s, i) =>
             s.id === id ? i : null).filter(i => i !== null)[0] || 0;
           configKeys.splice(ogIndex + 1, 0, payload.configKey);
           return { configKeys };
         });
-      }
-    });
+      }).catch(duplicateConfigKeyError => this.setState({
+        duplicateConfigKeyError,
+        duplicatingConfigKey: false
+      }));
   };
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { configKeys, actions } = this.props;
+    const { configKeys, updateState } = this.props;
     const {
       configKey,
       label,
@@ -248,15 +249,15 @@ class List extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <CopyToClipBoard
-                    data={JSON.stringify({
+                  <ClipboardCopyBtn
+                    data={{
                       dataId: id,
                       dataType: 'configKey',
                       dataTypeHyphenated: 'config-key'
-                    })}
+                    }}
                   >
                     <span>Copy</span>
-                  </CopyToClipBoard>
+                  </ClipboardCopyBtn>
                 </MenuItem>
                 <MenuItem>
                   <ExportLink options={{ configKey: id }} />
@@ -295,15 +296,10 @@ class List extends Component {
     );
 
     return (
-      <PasteBoard
-        modal={{
-          onClose: this.togglePasteBoard,
-          open: this.state.openPasteBoard,
-        }}
-        accept="configKey"
+      <ClipboardPasteBox
+        accept={['configKey']}
         data={{}}
-        redirectTo={() => '/dashboard/configkeys'}
-        onSuccess={payload => actions.updateApiData(state =>
+        onSuccess={({ payload }) => updateState(state =>
           ({ configKeys: [payload.configKey, ...state.configKeys] }))}
       >
         <FABButton style={styles.fab} colored ripple onClick={this.openCreateConfigKeyDialog}>
@@ -314,7 +310,7 @@ class List extends Component {
         </div>
         {createConfigKeyDialog}
         {confirmDeleteDialog}
-      </PasteBoard>
+      </ClipboardPasteBox>
     );
   }
 }
