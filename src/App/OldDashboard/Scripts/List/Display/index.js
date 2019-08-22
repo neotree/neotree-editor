@@ -222,8 +222,11 @@ class Display extends Component {
       <ClipboardPasteBox
         accept={['script']}
         data={{}}
-        onSuccess={({ payload }) => updateState(state =>
-          ({ scripts: [payload.script, ...state.scripts] }))}
+        onSuccess={({ payload }) => {
+          this.handleEditScriptClick(payload.script.id);
+          // updateState(state =>
+          //   ({ scripts: [payload.script, ...state.scripts] }));
+        }}
       >
         <FABButton style={styles.fab} colored ripple onClick={this.handleAddScriptClick}>
             <MdAdd />

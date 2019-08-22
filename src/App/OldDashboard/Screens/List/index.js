@@ -8,7 +8,10 @@ import Spinner from 'ui/Spinner';
 import Display from './Display';
 
 const Screens = props => {
+  const scriptId = props.match.params.scriptId;
+
   const [loading, setLoading] = useState(false);
+
   const [
     loadingError, // eslint-disable-line
     setLoadingError
@@ -22,7 +25,7 @@ const Screens = props => {
 
   useEffect(() => {
     setLoading(true);
-    Api.get('/get-screens')
+    Api.get('/get-screens', { script_id: scriptId })
       .then(r => { setLoading(false); return r; })
       .then(({ payload }) => {
         setLoading(false);
