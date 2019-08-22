@@ -21,6 +21,8 @@ const actions = (() => {
 
     getClipboardData,
 
+    clearClipboardData: () => localStorage.removeItem('neotree__clipboard'),
+
     copyToClipboard: data => {
       try {
         data = JSON.parse(data);

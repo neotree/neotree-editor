@@ -8,11 +8,10 @@ import {
   Menu,
   MenuItem,
 } from 'react-mdl';
-import { MdCreate, MdMoreVert } from 'react-icons/md';
+import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
-import ClipboardPasteBtn from 'DashboardComponents/Clipboard/ClipboardPasteBtn';
 import Api from 'AppUtils/Api';
 
 class Display extends Component {
@@ -127,20 +126,8 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
-            <div style={{ position: 'relative' }}>
-              <div id="add_new" className="ui__cursor_pointer">
-                <MdMoreVert style={{ fontSize: '24px' }} />
-              </div>
-                <div>
-                  <Menu target="add_new" align="right">
-                    <MenuItem onClick={this.handleAddDiagnosisClick}>
-                      Add new
-                    </MenuItem>
-                    <MenuItem>
-                      <ClipboardPasteBtn>Paste</ClipboardPasteBtn>
-                    </MenuItem>
-                  </Menu>
-              </div>
+            <div onClick={this.handleAddDiagnosisClick} className="ui__cursor_pointer">
+              <MdAdd style={{ fontSize: '24px' }} />
             </div>
           </Toolbar>
           {diagnoses.length > 0 ?

@@ -14,12 +14,11 @@ import {
     Menu,
     MenuItem,
 } from 'react-mdl';
-import { MdCreate, MdMoreVert } from 'react-icons/md';
+import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
-import ClipboardPasteBtn from 'DashboardComponents/Clipboard/ClipboardPasteBtn';
 import Api from 'AppUtils/Api';
 import { Table, TableHeader } from '../../datatable';
 
@@ -201,18 +200,8 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
-            <div>
-              <div id="add_new" className="ui__cursor_pointer">
-                <MdMoreVert style={{ fontSize: '24px' }} />
-              </div>
-              <Menu target="add_new" align="right">
-                  <MenuItem onClick={this.openSelectScreenTypeDialog}>
-                    Add new
-                  </MenuItem>
-                  <MenuItem>
-                    <ClipboardPasteBtn>Paste</ClipboardPasteBtn>
-                  </MenuItem>
-              </Menu>
+            <div onClick={this.openSelectScreenTypeDialog} className="ui__cursor_pointer">
+              <MdAdd style={{ fontSize: '24px' }} />
             </div>
           </Toolbar>
 

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import useClipboardReducer from 'AppHooks/clipboardReducer';
 import reduxComponent from 'reduxComponent';
 
-const ClipboardCopyBtn = ({
+const ClipboardPasteBtn = ({
   container,
   children,
   onSuccess,
@@ -32,11 +32,11 @@ const ClipboardCopyBtn = ({
   );
 };
 
-ClipboardCopyBtn.propTypes = {
+ClipboardPasteBtn.propTypes = {
   children: PropTypes.node,
   onClick: PropTypes.func
 };
 
-export default reduxComponent(ClipboardCopyBtn, state => ({
+export default reduxComponent(ClipboardPasteBtn, state => ({
   host: state.$APP.host
 }));
