@@ -2,9 +2,7 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _getAppMiddleware = _interopRequireDefault(require("./getAppMiddleware"));
-
-var _getAuthenticatedUserMiddleware = _interopRequireDefault(require("../users/getAuthenticatedUserMiddleware"));
+var _CustomMiddleware = _interopRequireDefault(require("../../../_utils/CustomMiddleware"));
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -12,11 +10,20 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function (app) {
   return function (req, res, next) {
-    (0, _getAppMiddleware["default"])(app)(req, res, function () {
-      (0, _getAuthenticatedUserMiddleware["default"])(app)(req, res, function () {
-        next();
-        return null;
-      });
+    var middleware = new _CustomMiddleware["default"]();
+    middleware.use(function (next) {
+      return require('./getAppMiddleware')(app)(req, res, next);
     });
+    middleware.use(function (next) {
+      return require('../users/getAuthenticatedUserMiddleware')(app)(req, res, next);
+    });
+
+    if (req.user) {
+      middleware.use(function (next) {
+        return require('../user-interfaces/getMyUIMiddleware')(app)(req, res, next);
+      });
+    }
+
+    middleware.go(next);
   };
 };

@@ -5,7 +5,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.App = exports.UserProfile = exports.File = exports.User = exports.sequelize = void 0;
+exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.App = exports.UserProfile = exports.File = exports.UserInterface = exports.User = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
@@ -28,6 +28,8 @@ var _Screen = _interopRequireDefault(require("./Screen"));
 var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
 
 var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
+
+var _UserInterface = _interopRequireDefault(require("./UserInterface"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -55,6 +57,13 @@ var User = sequelize.define('user', _User["default"].getStructure({
 exports.User = User;
 Object.keys(_User["default"]).forEach(function (key) {
   return User[key] = _User["default"][key];
+});
+var UserInterface = sequelize.define('user_interface', _UserInterface["default"].getStructure({
+  Sequelize: _sequelize["default"]
+}));
+exports.UserInterface = UserInterface;
+Object.keys(_UserInterface["default"]).forEach(function (key) {
+  return UserInterface[key] = _UserInterface["default"][key];
 });
 var File = sequelize.define('file', _File["default"].getStructure({
   User: User,
@@ -277,11 +286,31 @@ var dbInit = function dbInit() {
         }
       }, _callee8);
     }))();
+    var initUserInterfaceTable = (0, _asyncToGenerator2["default"])(
+    /*#__PURE__*/
+    _regenerator["default"].mark(function _callee9() {
+      return _regenerator["default"].wrap(function _callee9$(_context9) {
+        while (1) {
+          switch (_context9.prev = _context9.next) {
+            case 0:
+              _context9.next = 2;
+              return UserInterface.sync();
+
+            case 2:
+              return _context9.abrupt("return", _context9.sent);
+
+            case 3:
+            case "end":
+              return _context9.stop();
+          }
+        }
+      }, _callee9);
+    }))();
     sequelize.authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
       Promise.all([// initSessionsTable,
-      initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
+      initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initUserInterfaceTable]).then(function (rslts) {
         return resolve(rslts);
       })["catch"](function (err) {
         return reject(err);
@@ -305,6 +334,7 @@ exports.dbInit = dbInit;
   reactHotLoader.register(dbConfig, "dbConfig", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(sequelize, "sequelize", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(User, "User", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
+  reactHotLoader.register(UserInterface, "UserInterface", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(File, "File", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(UserProfile, "UserProfile", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(App, "App", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
