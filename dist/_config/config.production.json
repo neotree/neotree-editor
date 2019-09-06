@@ -3,7 +3,7 @@
   "host": "http://52.214.209.187",
   "database": {
     "username": "neotree",
-    "database": "neotree-db1",
+    "database": "neotree_db1",
     "password": "x3dFlQAfNFcBqzdEqBM1",
     "port": 5432,
     "host": "neotree-db1.cpgplvwz7wtn.eu-west-1.rds.amazonaws.com"
