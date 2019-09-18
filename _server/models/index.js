@@ -10,6 +10,8 @@ import DiagnosisModel from './Diagnosis';
 import ConfigKeyModel from './ConfigKey';
 import UserInterfaceModel from './UserInterface';
 
+import * as firebase from '../firebase';
+
 const dbConfig = process.env.NODE_ENV === 'production' ?
   require('../../_config/config.production.json').database
   :
@@ -62,24 +64,76 @@ export const Script = sequelize.define(
   'script',
   ScriptModel.getStructure({ User, Sequelize })
 );
+Script.afterCreate(script => {
+  const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
+  firebase.set('screens', id, {});
+  firebase.set('diagnosis', id, {});
+  firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
+  return new Promise(resolve => resolve(script));
+});
+Script.afterUpdate(script => {
+  const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
+  firebase.update('screens', id, {});
+  firebase.update('diagnosis', id, {});
+  firebase.update('scripts', id, { ...data, ...scr, scriptId: id });
+  return new Promise(resolve => resolve(script));
+});
 Object.keys(ScriptModel).forEach(key => (Script[key] = ScriptModel[key]));
 
 export const Screen = sequelize.define(
   'screen',
   ScreenModel.getStructure({ User, Sequelize })
 );
+Screen.afterCreate(screen => {
+  const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
+  firebase.update('screens', script_id, {
+    [id]: { ...data, ...scr, screenId: id }
+  });
+  return new Promise(resolve => resolve(screen));
+});
+Screen.afterUpdate(screen => {
+  const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
+  firebase.update('screens', script_id, {
+    [id]: { ...data, ...scr, screenId: id }
+  });
+  return new Promise(resolve => resolve(screen));
+});
 Object.keys(ScreenModel).forEach(key => (Screen[key] = ScreenModel[key]));
 
 export const Diagnosis = sequelize.define(
   'diagnosis',
   DiagnosisModel.getStructure({ User, Sequelize })
 );
+Diagnosis.afterCreate(diagnosis => {
+  const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
+  firebase.update('diagnosis', script_id, {
+    [id]: { ...data, ...d, diagnosisId: id }
+  });
+  return new Promise(resolve => resolve(diagnosis));
+});
+Diagnosis.afterUpdate(diagnosis => {
+  const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
+  firebase.update('diagnosis', script_id, {
+    [id]: { ...data, ...d, diagnosisId: id }
+  });
+  return new Promise(resolve => resolve(diagnosis));
+});
 Object.keys(DiagnosisModel).forEach(key => (Diagnosis[key] = DiagnosisModel[key]));
 
 export const ConfigKey = sequelize.define(
   'config_key',
   ConfigKeyModel.getStructure({ User, Sequelize }),
 );
+ConfigKey.afterCreate(configKey => {
+  const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
+  firebase.set('configkeys', id, { ...data, ...cKey, configKeyId: id });
+  return new Promise(resolve => resolve(configKey));
+});
+ConfigKey.afterUpdate(configKey => {
+  const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
+  firebase.update('configkeys', id, { ...data, ...cKey, configKeyId: id });
+  return new Promise(resolve => resolve(configKey));
+});
 Object.keys(ConfigKeyModel).forEach(key => (ConfigKey[key] = ConfigKeyModel[key]));
 
 export const dbInit = () => new Promise((resolve, reject) => {
