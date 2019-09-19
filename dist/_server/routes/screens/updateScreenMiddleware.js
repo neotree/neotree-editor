@@ -28,18 +28,13 @@ module.exports = function () {
       msg: 'Required screen "id" is not provided.'
     });
 
-    _models.Screen.findOne({
+    _models.Screen.update(payload, {
       where: {
         id: id
-      }
-    }).then(function (s) {
-      if (!s) return done({
-        msg: "Could not find screen with \"id\" ".concat(id, ".")
-      });
-      s.update(payload).then(function (screen) {
-        return done(null, screen);
-      })["catch"](done);
-      return null;
+      },
+      individualHooks: true
+    }).then(function (screen) {
+      return done(null, screen);
     })["catch"](done);
   };
 };

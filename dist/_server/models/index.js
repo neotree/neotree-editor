@@ -135,6 +135,14 @@ Script.afterUpdate(function (script) {
     return resolve(script);
   });
 });
+Script.afterDestroy(function (instance) {
+  firebase.remove('screens', instance.id);
+  firebase.remove('diagnosis', instance.id);
+  firebase.remove('scripts', instance.id);
+  return new Promise(function (resolve) {
+    return resolve(instance);
+  });
+});
 Object.keys(_Script["default"]).forEach(function (key) {
   return Script[key] = _Script["default"][key];
 });
@@ -169,6 +177,12 @@ Screen.afterUpdate(function (screen) {
   })));
   return new Promise(function (resolve) {
     return resolve(screen);
+  });
+});
+Screen.afterDestroy(function (instance) {
+  firebase.remove('screens', instance.id);
+  return new Promise(function (resolve) {
+    return resolve(instance);
   });
 });
 Object.keys(_Screen["default"]).forEach(function (key) {
@@ -207,6 +221,12 @@ Diagnosis.afterUpdate(function (diagnosis) {
     return resolve(diagnosis);
   });
 });
+Diagnosis.afterDestroy(function (instance) {
+  firebase.remove('diagnosis', instance.id);
+  return new Promise(function (resolve) {
+    return resolve(instance);
+  });
+});
 Object.keys(_Diagnosis["default"]).forEach(function (key) {
   return Diagnosis[key] = _Diagnosis["default"][key];
 });
@@ -239,6 +259,12 @@ ConfigKey.afterUpdate(function (configKey) {
   }));
   return new Promise(function (resolve) {
     return resolve(configKey);
+  });
+});
+ConfigKey.afterDestroy(function (instance) {
+  firebase.remove('configkeys', instance.id);
+  return new Promise(function (resolve) {
+    return resolve(instance);
   });
 });
 Object.keys(_ConfigKey["default"]).forEach(function (key) {

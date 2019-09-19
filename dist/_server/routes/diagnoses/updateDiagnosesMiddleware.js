@@ -30,7 +30,8 @@ module.exports = function () {
       return _models.Diagnosis.update((0, _objectSpread2["default"])({}, scr), {
         where: {
           id: id
-        }
+        },
+        individualHooks: true
       });
     })).then(function (rslts) {
       if (!returnUpdated) return done(null, {

@@ -31,7 +31,8 @@ var updateScreens = function updateScreens(screens) {
       return _models.Screen.update((0, _objectSpread2["default"])({}, scr), {
         where: {
           id: id
-        }
+        },
+        individualHooks: true
       });
     })).then(function (rslts) {
       if (!returnUpdated) return resolve({

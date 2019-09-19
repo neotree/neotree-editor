@@ -28,18 +28,13 @@ module.exports = function () {
       msg: 'Required configKey "id" is not provided.'
     });
 
-    _models.ConfigKey.findOne({
+    _models.ConfigKey.update(payload, {
       where: {
         id: id
-      }
-    }).then(function (s) {
-      if (!s) return done({
-        msg: "Could not find configKey with \"id\" ".concat(id, ".")
-      });
-      s.update(payload).then(function (configKey) {
-        return done(null, configKey);
-      })["catch"](done);
-      return null;
+      },
+      individualHooks: true
+    }).then(function (configKey) {
+      return done(null, configKey);
     })["catch"](done);
   };
 };

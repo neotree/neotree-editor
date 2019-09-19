@@ -2,14 +2,20 @@
 
 var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
 
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.admin = exports.set = exports.update = void 0;
+exports.admin = exports.sync = exports.remove = exports.update = exports.set = void 0;
+
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
 var admin = _interopRequireWildcard(require("firebase-admin"));
 
 exports.admin = admin;
+
+var _models = require("./models");
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -27,23 +33,78 @@ admin.initializeApp({
   databaseURL: "https://".concat(serviceAccount.project_id, ".firebaseio.com")
 });
 
-var update = function update(refKey, child) {
-  var data = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-  var db = admin.database();
-  var ref = db.ref(refKey).child(child);
-  ref.update(data);
+var set = function set(collection, key, data) {
+  return admin.database().ref(collection).child(key).set(data);
+};
+
+exports.set = set;
+
+var update = function update(collection, key, data) {
+  return admin.database().ref(collection).child(key).update(data);
 };
 
 exports.update = update;
 
-var set = function set(refKey, child) {
-  var data = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-  var db = admin.database();
-  var ref = db.ref(refKey).child(child);
-  ref.set(data);
+var remove = function remove(collection, child) {
+  return admin.database().ref(collection).child(child).remove();
 };
 
-exports.set = set;
+exports.remove = remove;
+
+var sync = function sync() {
+  Promise.all([_models.ConfigKey.findAll({}), _models.Script.findAll({}), _models.Screen.findAll({}), _models.Diagnosis.findAll({})]).then(function (_ref) {
+    var _ref2 = (0, _slicedToArray2["default"])(_ref, 4),
+        cKeys = _ref2[0],
+        scripts = _ref2[1],
+        screens = _ref2[2],
+        diagnoses = _ref2[3];
+
+    var promises = [];
+    cKeys.forEach(function (item) {
+      return promises.push(_models.ConfigKey.update({
+        updatedAt: new Date()
+      }, {
+        where: {
+          id: item.id
+        },
+        individualHooks: true
+      }));
+    });
+    scripts.forEach(function (item) {
+      return promises.push(_models.Script.update({
+        updatedAt: new Date()
+      }, {
+        where: {
+          id: item.id
+        },
+        individualHooks: true
+      }));
+    });
+    screens.forEach(function (item) {
+      return promises.push(_models.Screen.update({
+        updatedAt: new Date()
+      }, {
+        where: {
+          id: item.id
+        },
+        individualHooks: true
+      }));
+    });
+    diagnoses.forEach(function (item) {
+      return promises.push(_models.Diagnosis.update({
+        updatedAt: new Date()
+      }, {
+        where: {
+          id: item.id
+        },
+        individualHooks: true
+      }));
+    });
+    Promise.all(promises);
+  });
+};
+
+exports.sync = sync;
 ;
 
 (function () {
@@ -53,8 +114,10 @@ exports.set = set;
     return;
   }
 
-  reactHotLoader.register(update, "update", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
   reactHotLoader.register(set, "set", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
+  reactHotLoader.register(update, "update", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
+  reactHotLoader.register(remove, "remove", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
+  reactHotLoader.register(sync, "sync", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
 })();
 
 ;

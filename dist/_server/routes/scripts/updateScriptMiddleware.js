@@ -28,18 +28,13 @@ module.exports = function () {
       msg: 'Required script "id" is not provided.'
     });
 
-    _models.Script.findOne({
+    _models.Script.update(payload, {
       where: {
         id: id
-      }
-    }).then(function (s) {
-      if (!s) return done({
-        msg: "Could not find script with \"id\" ".concat(id, ".")
-      });
-      s.update(payload).then(function (script) {
-        return done(null, script);
-      })["catch"](done);
-      return null;
+      },
+      individualHooks: true
+    }).then(function (script) {
+      return done(null, script);
     })["catch"](done);
   };
 };

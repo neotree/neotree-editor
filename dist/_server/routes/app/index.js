@@ -34,7 +34,6 @@ module.exports = function (app) {
   });
   router.get('/export-data', require('./exportDataMiddleware')(app));
   router.post('/copy-data', require('./copyDataMiddleware')(app), responseMiddleware);
-  router.get('/sync-firebase', require('./syncFirebaseMiddleware')(app));
   return router;
 };
 

@@ -28,18 +28,13 @@ module.exports = function () {
       msg: 'Required diagnosis "id" is not provided.'
     });
 
-    _models.Diagnosis.findOne({
+    _models.Diagnosis.update(payload, {
       where: {
         id: id
-      }
-    }).then(function (s) {
-      if (!s) return done({
-        msg: "Could not find diagnosis with \"id\" ".concat(id, ".")
-      });
-      s.update(payload).then(function (diagnosis) {
-        return done(null, diagnosis);
-      })["catch"](done);
-      return null;
+      },
+      individualHooks: true
+    }).then(function (diagnosis) {
+      return done(null, diagnosis);
     })["catch"](done);
   };
 };
