@@ -26,7 +26,9 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var serviceAccount = require(process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY);
+var serviceAccountKeySource = process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY || '../_config/firebase-service-account-key.json';
+
+var serviceAccount = require(serviceAccountKeySource);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -114,6 +116,7 @@ exports.sync = sync;
     return;
   }
 
+  reactHotLoader.register(serviceAccountKeySource, "serviceAccountKeySource", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
   reactHotLoader.register(set, "set", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
   reactHotLoader.register(update, "update", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
   reactHotLoader.register(remove, "remove", "/home/bws/WorkBench/neotree-editor/_server/firebase.js");
