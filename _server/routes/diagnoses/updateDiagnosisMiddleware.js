@@ -10,15 +10,7 @@ module.exports = () => (req, res, next) => {
 
   if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
 
-  Diagnosis.findOne({ where: { id } })
-    .then(s => {
-      if (!s) return done({ msg: `Could not find diagnosis with "id" ${id}.` });
-
-      s.update(payload)
-        .then(diagnosis => done(null, diagnosis))
-        .catch(done);
-
-      return null;
-    })
+  Diagnosis.update(payload, { where: { id }, individualHooks: true })
+    .then(diagnosis => done(null, diagnosis))
     .catch(done);
 };

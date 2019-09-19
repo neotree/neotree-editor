@@ -9,7 +9,7 @@ module.exports = () => (req, res, next) => {
   };
 
   Promise.all(scripts.map(({ id, ...scr }) =>
-    Script.update({ ...scr }, { where: { id } }))
+    Script.update({ ...scr }, { where: { id }, individualHooks: true }))
   ).then(rslts => {
     if (!returnUpdated) return done(null, { rslts });
 

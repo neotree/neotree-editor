@@ -2,7 +2,7 @@ import { Screen } from '../../models';
 
 export const updateScreens = (screens, returnUpdated = false) => new Promise((resolve, reject) =>
   Promise.all(screens.map(({ id, ...scr }) =>
-    Screen.update({ ...scr }, { where: { id } }))
+    Screen.update({ ...scr }, { where: { id }, individualHooks: true }))
   ).then(rslts => {
     if (!returnUpdated) return resolve({ rslts });
 

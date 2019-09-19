@@ -10,15 +10,7 @@ module.exports = () => (req, res, next) => {
 
   if (!id) return done({ msg: 'Required screen "id" is not provided.' });
 
-  Screen.findOne({ where: { id } })
-    .then(s => {
-      if (!s) return done({ msg: `Could not find screen with "id" ${id}.` });
-
-      s.update(payload)
-        .then(screen => done(null, screen))
-        .catch(done);
-
-      return null;
-    })
+  Screen.update(payload, { where: { id }, individualHooks: true })
+    .then(screen => done(null, screen))
     .catch(done);
 };

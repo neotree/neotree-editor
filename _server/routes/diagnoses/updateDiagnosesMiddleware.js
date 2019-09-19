@@ -9,7 +9,7 @@ module.exports = () => (req, res, next) => {
   };
 
   Promise.all(diagnoses.map(({ id, ...scr }) =>
-    Diagnosis.update({ ...scr }, { where: { id } }))
+    Diagnosis.update({ ...scr }, { where: { id }, individualHooks: true }))
   ).then(rslts => {
     if (!returnUpdated) return done(null, { rslts });
 

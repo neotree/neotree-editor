@@ -9,7 +9,7 @@ module.exports = () => (req, res, next) => {
   };
 
   Promise.all(configKeys.map(({ id, ...scr }) =>
-    ConfigKey.update({ ...scr }, { where: { id } }))
+    ConfigKey.update({ ...scr }, { where: { id }, individualHooks: true }))
   ).then(rslts => {
     if (!returnUpdated) return done(null, { rslts });
 

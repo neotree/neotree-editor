@@ -27,7 +27,5 @@ module.exports = app => {
     responseMiddleware
   );
 
-  router.get('/sync-firebase', require('./syncFirebaseMiddleware')(app));
-
   return router;
 };
