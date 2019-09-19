@@ -78,6 +78,12 @@ Script.afterUpdate(script => {
   firebase.update('scripts', id, { ...data, ...scr, scriptId: id });
   return new Promise(resolve => resolve(script));
 });
+Script.afterDestroy(instance => {
+  firebase.remove('screens', instance.id);
+  firebase.remove('diagnosis', instance.id);
+  firebase.remove('scripts', instance.id);
+  return new Promise(resolve => resolve(instance));
+});
 Object.keys(ScriptModel).forEach(key => (Script[key] = ScriptModel[key]));
 
 export const Screen = sequelize.define(
@@ -97,6 +103,10 @@ Screen.afterUpdate(screen => {
     [id]: { ...data, ...scr, screenId: id }
   });
   return new Promise(resolve => resolve(screen));
+});
+Screen.afterDestroy(instance => {
+  firebase.remove('screens', instance.id);
+  return new Promise(resolve => resolve(instance));
 });
 Object.keys(ScreenModel).forEach(key => (Screen[key] = ScreenModel[key]));
 
@@ -118,6 +128,10 @@ Diagnosis.afterUpdate(diagnosis => {
   });
   return new Promise(resolve => resolve(diagnosis));
 });
+Diagnosis.afterDestroy(instance => {
+  firebase.remove('diagnosis', instance.id);
+  return new Promise(resolve => resolve(instance));
+});
 Object.keys(DiagnosisModel).forEach(key => (Diagnosis[key] = DiagnosisModel[key]));
 
 export const ConfigKey = sequelize.define(
@@ -133,6 +147,10 @@ ConfigKey.afterUpdate(configKey => {
   const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
   firebase.update('configkeys', id, { ...data, ...cKey, configKeyId: id });
   return new Promise(resolve => resolve(configKey));
+});
+ConfigKey.afterDestroy(instance => {
+  firebase.remove('configkeys', instance.id);
+  return new Promise(resolve => resolve(instance));
 });
 Object.keys(ConfigKeyModel).forEach(key => (ConfigKey[key] = ConfigKeyModel[key]));
 

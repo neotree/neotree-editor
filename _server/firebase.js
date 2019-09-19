@@ -8,17 +8,14 @@ admin.initializeApp({
   databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
 });
 
-export const update = (refKey, child, data = {}) => {
-  const db = admin.database();
-  const ref = db.ref(refKey).child(child);
-  ref.update(data);
-};
+export const set = (collection, key, data) => admin.database()
+  .ref(collection).child(key).set(data);
 
-export const set = (refKey, child, data = {}) => {
-  const db = admin.database();
-  const ref = db.ref(refKey).child(child);
-  ref.set(data);
-};
+export const update = (collection, key, data) => admin.database()
+  .ref(collection).child(key).update(data);
+
+export const remove = (collection, child) => admin.database()
+  .ref(collection).child(child).remove();
 
 export const sync = () => {
   Promise.all([
