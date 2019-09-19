@@ -1,5 +1,7 @@
 "use strict";
 
+var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
+
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
 Object.defineProperty(exports, "__esModule", {
@@ -10,6 +12,12 @@ exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = export
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
+
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
@@ -30,6 +38,8 @@ var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
 var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
 
 var _UserInterface = _interopRequireDefault(require("./UserInterface"));
+
+var firebase = _interopRequireWildcard(require("../firebase"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -95,6 +105,36 @@ var Script = sequelize.define('script', _Script["default"].getStructure({
   Sequelize: _sequelize["default"]
 }));
 exports.Script = Script;
+Script.afterCreate(function (script) {
+  var _JSON$parse = JSON.parse(JSON.stringify(script)),
+      id = _JSON$parse.id,
+      data = _JSON$parse.data,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data"]);
+
+  firebase.set('screens', id, {});
+  firebase.set('diagnosis', id, {});
+  firebase.set('scripts', id, (0, _objectSpread2["default"])({}, data, {}, scr, {
+    scriptId: id
+  }));
+  return new Promise(function (resolve) {
+    return resolve(script);
+  });
+});
+Script.afterUpdate(function (script) {
+  var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
+      id = _JSON$parse2.id,
+      data = _JSON$parse2.data,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "data"]);
+
+  firebase.update('screens', id, {});
+  firebase.update('diagnosis', id, {});
+  firebase.update('scripts', id, (0, _objectSpread2["default"])({}, data, {}, scr, {
+    scriptId: id
+  }));
+  return new Promise(function (resolve) {
+    return resolve(script);
+  });
+});
 Object.keys(_Script["default"]).forEach(function (key) {
   return Script[key] = _Script["default"][key];
 });
@@ -103,6 +143,34 @@ var Screen = sequelize.define('screen', _Screen["default"].getStructure({
   Sequelize: _sequelize["default"]
 }));
 exports.Screen = Screen;
+Screen.afterCreate(function (screen) {
+  var _JSON$parse3 = JSON.parse(JSON.stringify(screen)),
+      id = _JSON$parse3.id,
+      script_id = _JSON$parse3.script_id,
+      data = _JSON$parse3.data,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "script_id", "data"]);
+
+  firebase.update('screens', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, scr, {
+    screenId: id
+  })));
+  return new Promise(function (resolve) {
+    return resolve(screen);
+  });
+});
+Screen.afterUpdate(function (screen) {
+  var _JSON$parse4 = JSON.parse(JSON.stringify(screen)),
+      id = _JSON$parse4.id,
+      script_id = _JSON$parse4.script_id,
+      data = _JSON$parse4.data,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "script_id", "data"]);
+
+  firebase.update('screens', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, scr, {
+    screenId: id
+  })));
+  return new Promise(function (resolve) {
+    return resolve(screen);
+  });
+});
 Object.keys(_Screen["default"]).forEach(function (key) {
   return Screen[key] = _Screen["default"][key];
 });
@@ -111,6 +179,34 @@ var Diagnosis = sequelize.define('diagnosis', _Diagnosis["default"].getStructure
   Sequelize: _sequelize["default"]
 }));
 exports.Diagnosis = Diagnosis;
+Diagnosis.afterCreate(function (diagnosis) {
+  var _JSON$parse5 = JSON.parse(JSON.stringify(diagnosis)),
+      id = _JSON$parse5.id,
+      script_id = _JSON$parse5.script_id,
+      data = _JSON$parse5.data,
+      d = (0, _objectWithoutProperties2["default"])(_JSON$parse5, ["id", "script_id", "data"]);
+
+  firebase.update('diagnosis', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, d, {
+    diagnosisId: id
+  })));
+  return new Promise(function (resolve) {
+    return resolve(diagnosis);
+  });
+});
+Diagnosis.afterUpdate(function (diagnosis) {
+  var _JSON$parse6 = JSON.parse(JSON.stringify(diagnosis)),
+      id = _JSON$parse6.id,
+      script_id = _JSON$parse6.script_id,
+      data = _JSON$parse6.data,
+      d = (0, _objectWithoutProperties2["default"])(_JSON$parse6, ["id", "script_id", "data"]);
+
+  firebase.update('diagnosis', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, d, {
+    diagnosisId: id
+  })));
+  return new Promise(function (resolve) {
+    return resolve(diagnosis);
+  });
+});
 Object.keys(_Diagnosis["default"]).forEach(function (key) {
   return Diagnosis[key] = _Diagnosis["default"][key];
 });
@@ -119,6 +215,32 @@ var ConfigKey = sequelize.define('config_key', _ConfigKey["default"].getStructur
   Sequelize: _sequelize["default"]
 }));
 exports.ConfigKey = ConfigKey;
+ConfigKey.afterCreate(function (configKey) {
+  var _JSON$parse7 = JSON.parse(JSON.stringify(configKey)),
+      id = _JSON$parse7.id,
+      data = _JSON$parse7.data,
+      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse7, ["id", "data"]);
+
+  firebase.set('configkeys', id, (0, _objectSpread2["default"])({}, data, {}, cKey, {
+    configKeyId: id
+  }));
+  return new Promise(function (resolve) {
+    return resolve(configKey);
+  });
+});
+ConfigKey.afterUpdate(function (configKey) {
+  var _JSON$parse8 = JSON.parse(JSON.stringify(configKey)),
+      id = _JSON$parse8.id,
+      data = _JSON$parse8.data,
+      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse8, ["id", "data"]);
+
+  firebase.update('configkeys', id, (0, _objectSpread2["default"])({}, data, {}, cKey, {
+    configKeyId: id
+  }));
+  return new Promise(function (resolve) {
+    return resolve(configKey);
+  });
+});
 Object.keys(_ConfigKey["default"]).forEach(function (key) {
   return ConfigKey[key] = _ConfigKey["default"][key];
 });
