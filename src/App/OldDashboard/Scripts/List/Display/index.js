@@ -18,8 +18,7 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert, MdCreate } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
-import ClipboardPasteBox from 'DashboardComponents/Clipboard/ClipboardPasteBox';
+import { withClipboard, ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import ExportLink from '../../../components/ExportLink';
 
@@ -104,7 +103,7 @@ class Display extends Component {
   });
 
   render() {
-    const { scripts, updateState } = this.props;
+    const { scripts } = this.props;
     const { deletingScript, deleteScriptError } = this.state;
     const styles = {
       container: {
@@ -175,9 +174,9 @@ class Display extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <ClipboardCopyBtn data={{ dataId: scriptId, dataType: 'script' }}>
+                  <ClipboardCopyButton data={{ dataId: scriptId, dataType: 'script' }}>
                     <span>Copy</span>
-                  </ClipboardCopyBtn>
+                  </ClipboardCopyButton>
                 </MenuItem>
                 <MenuItem>
                   <ExportLink options={{ script: scriptId }} />
@@ -219,15 +218,7 @@ class Display extends Component {
     );
 
     return (
-      <ClipboardPasteBox
-        accept={['script']}
-        data={{}}
-        onSuccess={({ payload }) => {
-          this.handleEditScriptClick(payload.script.id);
-          // updateState(state =>
-          //   ({ scripts: [payload.script, ...state.scripts] }));
-        }}
-      >
+      <div>
         <FABButton style={styles.fab} colored ripple onClick={this.handleAddScriptClick}>
             <MdAdd />
         </FABButton>
@@ -235,7 +226,7 @@ class Display extends Component {
             {scripts.length ? renderTable : renderEmptyTable}
         </div>
         {confirmDeleteDialog}
-      </ClipboardPasteBox>
+      </div>
     );
   }
 }
@@ -245,4 +236,4 @@ Display.propTypes = {
   actions: PropTypes.object.isRequired
 };
 
-export default hot(Display);
+export default hot(withClipboard(['script'])(Display));

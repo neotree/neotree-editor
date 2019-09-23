@@ -11,13 +11,14 @@ import {
 import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
-import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import { ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 
 class Display extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      selected: [],
       openDeleteConfirmDialog: false,
       scriptIdForAction: null
     };
@@ -72,6 +73,7 @@ class Display extends Component {
 
   render() {
     const { diagnoses } = this.props;
+    const { selected } = this.state;
 
     const styles = {
       diagnosis: { overflow: 'unset', width: '100%', minWidth: '700px' },
@@ -109,9 +111,9 @@ class Display extends Component {
                 Duplicate
               </MenuItem>
                 <MenuItem>
-                  <ClipboardCopyBtn data={{ dataId: id, dataType: 'diagnosis' }}>
+                  <ClipboardCopyButton data={{ dataId: id, dataType: 'diagnosis' }}>
                     <span>Copy</span>
-                  </ClipboardCopyBtn>
+                  </ClipboardCopyButton>
                 </MenuItem>
                 <MenuItem onClick={this.handleDeleteDiagnosisClick(id)}>
                   Delete
@@ -126,12 +128,25 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
+            {selected.length > 0 && (
+              <div>
+                <ClipboardCopyButton data={{ dataId: selected, dataType: 'diagnosis' }}>
+                  <span className="ui__cursor_pointer">Copy</span>
+                </ClipboardCopyButton>
+              </div>
+            )}
             <div onClick={this.handleAddDiagnosisClick} className="ui__cursor_pointer">
               <MdAdd style={{ fontSize: '24px' }} />
             </div>
           </Toolbar>
           {diagnoses.length > 0 ?
             <DataTable
+              selectable
+              onSelectionChanged={sel => this.setState({
+                selected: sel.map(index => diagnoses.filter((d, i) => i === index)[0])
+                  .filter(d => d)
+                  .map(d => d.id)
+              })}
               style={{ width: '780px' }}
               shadow={0}
               rows={diagnoses.map(d => ({ id: d.id, ...d.data }))}

@@ -6,7 +6,7 @@ import { MdDragHandle } from 'react-icons/md';
 import { SortableContainer, SortableElement, SortableHandle } from 'react-sortable-hoc';
 import randomstring from 'randomstring';
 import shadows from 'AppUtils/shadows'; // eslint-disable-line
-
+import { Checkbox } from 'react-mdl';
 export default class Table extends Component {
     static propTypes = {
         className: PropTypes.string,
@@ -61,7 +61,17 @@ export default class Table extends Component {
     };
 
     render() {
-        const { className, shadow, children, onSort, rowKeyColumn, rows, ...otherProps } = this.props;
+        const {
+          className,
+          shadow,
+          children,
+          onSort,
+          rowKeyColumn,
+          rows,
+          selected,
+          onSelect,
+          ...otherProps
+        } = this.props;
         const hasShadow = typeof shadow !== 'undefined';
         const shadowLevel = clamp(shadow || 0, 0, shadows.length - 1);
 
@@ -76,6 +86,18 @@ export default class Table extends Component {
 
         const TableRow = SortableElement(({row, index}) =>
             <tr className={row.className}>
+                <td>
+                  <Checkbox
+                    value={row.id}
+                    checked={selected.includes(row.id)}
+                    onChange={({ target: { value } }) => {
+                      onSelect(!selected.includes(value) ?
+                        [...selected, value]
+                        :
+                        selected.filter(id => id !== value)
+                      );
+                    }}
+                  /></td>
                 <td><RowHandle /></td>
                 {columnChildren.map((child) => this.renderCell(child.props, row, index))}
             </tr>
@@ -95,6 +117,7 @@ export default class Table extends Component {
             <table className={classes} {...otherProps}>
                 <thead>
                 <tr>
+                    <th>&nbsp;</th>
                     <th>&nbsp;</th>
                     {columnChildren}
                 </tr>

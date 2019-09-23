@@ -17,8 +17,7 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
-import ClipboardPasteBox from 'DashboardComponents/Clipboard/ClipboardPasteBox';
+import { withClipboard, ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import ExportLink from '../../components/ExportLink';
 
@@ -122,7 +121,7 @@ class List extends Component {
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { configKeys, updateState } = this.props;
+    const { configKeys } = this.props;
     const {
       configKey,
       label,
@@ -249,15 +248,11 @@ class List extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <ClipboardCopyBtn
-                    data={{
-                      dataId: id,
-                      dataType: 'configKey',
-                      dataTypeHyphenated: 'config-key'
-                    }}
+                  <ClipboardCopyButton
+                    data={{ dataId: id, dataType: 'configKey' }}
                   >
                     <span>Copy</span>
-                  </ClipboardCopyBtn>
+                  </ClipboardCopyButton>
                 </MenuItem>
                 <MenuItem>
                   <ExportLink options={{ configKey: id }} />
@@ -296,12 +291,7 @@ class List extends Component {
     );
 
     return (
-      <ClipboardPasteBox
-        accept={['configKey']}
-        data={{}}
-        onSuccess={({ payload }) => updateState(state =>
-          ({ configKeys: [payload.configKey, ...state.configKeys] }))}
-      >
+      <div>
         <FABButton style={styles.fab} colored ripple onClick={this.openCreateConfigKeyDialog}>
             <MdAdd style={{ fontSize: '24px' }} />
         </FABButton>
@@ -310,9 +300,9 @@ class List extends Component {
         </div>
         {createConfigKeyDialog}
         {confirmDeleteDialog}
-      </ClipboardPasteBox>
+      </div>
     );
   }
 }
 
-export default List;
+export default withClipboard(['configKey'])(List);

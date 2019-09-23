@@ -3,11 +3,11 @@ import PropTypes from 'prop-types';
 import { Button, Card, CardText, Textfield, Tab, Tabs } from 'react-mdl';
 import FormButtonBar from 'FormButtonBar';
 import Toolbar from 'Toolbar';
-import ClipboardPasteBox from 'DashboardComponents/Clipboard/ClipboardPasteBox';
+import { withClipboard, } from 'DashboardComponents/Clipboard';
 import ScreensList from '../../../Screens/List';
 import DiagnosisList from '../../../Diagnoses/List';
 
-export default class Display extends Component {
+class Display extends Component {
   state = {
     activeTab: 0,
     script: {
@@ -64,7 +64,7 @@ export default class Display extends Component {
   };
 
   render() {
-    const { isEditMode, scriptId, history } = this.props;
+    const { isEditMode, scriptId } = this.props;
     const { activeTab, script } = this.state;
     const formTitle = `${isEditMode ? 'Edit' : 'Add'} script`;
     const actionLabel = isEditMode ? 'Update' : 'Create';
@@ -161,15 +161,7 @@ export default class Display extends Component {
     );
 
     return !isEditMode ? renderChildren() : (
-      <ClipboardPasteBox
-        accept={['screen', 'diagnosis']}
-        data={{ dataId: scriptId, dataType: 'script' }}
-        onSuccess={({ payload }) => {
-          const itemId = payload.screen ? payload.screen.id : payload.diagnosis.id;
-          const itemType = payload.screen ? 'screens' : 'diagnosis';
-          history.push(`/dashboard/scripts/${scriptId}/${itemType}/${itemId}`);
-        }}
-      >{renderChildren()}</ClipboardPasteBox>
+      <div>{renderChildren()}</div>
     );
   }
 }
@@ -181,3 +173,5 @@ Display.propTypes = {
   scriptId: PropTypes.string.isRequired,
   script: PropTypes.object,
 };
+
+export default withClipboard(['screen', 'diagnosis'])(Display);

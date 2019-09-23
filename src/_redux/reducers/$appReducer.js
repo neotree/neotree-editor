@@ -1,7 +1,7 @@
 /* global __$APP__*/
 import * as actions from '../actions';
 
-const defaultState = JSON.parse(__$APP__ || '{}');
+const defaultState = __$APP__;
 
 export default (state = defaultState, action) => {
   const { type, payload, updater } = action;

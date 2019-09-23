@@ -18,7 +18,7 @@ import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
-import ClipboardCopyBtn from 'DashboardComponents/Clipboard/ClipboardCopyBtn';
+import { ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import { Table, TableHeader } from '../../datatable';
 
@@ -26,6 +26,7 @@ class Display extends Component {
   state = {
     openSelectScreenTypeDialog: false,
     screens: [],
+    selected: [],
     addScreenType: DEFAULT_SCREEN_TYPE
   };
 
@@ -113,7 +114,7 @@ class Display extends Component {
   // TODO: Fix margin top to be more generic for all content
   render() {
     const { screens } = this.props;
-    const { addScreenType } = this.state;
+    const { addScreenType, selected } = this.state;
     const styles = {
       screens: { overflow: 'unset', width: '100%', minWidth: '700px' },
       table: { width: '100%' },
@@ -148,9 +149,9 @@ class Display extends Component {
                   Duplicate
                 </MenuItem>
                 <MenuItem>
-                  <ClipboardCopyBtn data={{ dataId: id, dataType: 'screen' }}>
+                  <ClipboardCopyButton data={{ dataId: id, dataType: 'screen' }}>
                     <span>Copy</span>
-                  </ClipboardCopyBtn>
+                  </ClipboardCopyButton>
                 </MenuItem>
                 <MenuItem onClick={this.handleDeleteScreenClick(id)}>
                   Delete
@@ -200,7 +201,17 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
-            <div onClick={this.openSelectScreenTypeDialog} className="ui__cursor_pointer">
+            {selected.length > 0 && (
+              <div>
+                <ClipboardCopyButton data={{ dataId: selected, dataType: 'screen' }}>
+                  <span className="ui__cursor_pointer">Copy</span>
+                </ClipboardCopyButton>
+              </div>
+            )}
+            <div
+              onClick={this.openSelectScreenTypeDialog}
+              className="ui__cursor_pointer"
+            >
               <MdAdd style={{ fontSize: '24px' }} />
             </div>
           </Toolbar>
@@ -211,6 +222,8 @@ class Display extends Component {
               rows={screens.map(scr => ({ ...scr.data, id: scr.id, position: scr.position }))}
               rowKeyColumn="position"
               onSort={this.swapScreenItems}
+              selected={selected}
+              onSelect={selected => this.setState({ selected })}
             >
                 {/*<TableHeader name="$aVoid" cellFormatter={(aVoid, rowData, index) => `${index + 1}`} />*/}
                 <TableHeader name="position">Pos</TableHeader>

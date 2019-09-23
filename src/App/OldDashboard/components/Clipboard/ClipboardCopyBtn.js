@@ -11,11 +11,7 @@ const ClipboardCopyBtn = ({
   actions, // eslint-disable-line
   ...props
 }) => {
-  const [
-    clipboardState, // eslint-disable-line
-    dispatchClipboardActions, // eslint-disable-line
-    { copyToClipboard, ...clipboardActions }
-  ] = useClipboardReducer();
+  const [clipboard, dispatchClipboardActions, clipboardActions] = useClipboardReducer();
   const Container = container || React.Fragment;
 
   return (
@@ -23,10 +19,21 @@ const ClipboardCopyBtn = ({
       <div
         {...props}
         onClick={e => {
-          const copiedData = { ...data, host };
-          copyToClipboard(copiedData);
+          const copiedData = (clipboard.data ? clipboard.data[data.dataType] : null) || { host, ids: [] };
+          const ids = (() => {
+            const dataIds = data.dataId ? (data.dataId.map ? data.dataId : [data.dataId]) : [];
+            let copiedDataIds = copiedData.ids;
+            dataIds.forEach(dataId => {
+              copiedDataIds = copiedDataIds.includes(dataId) ?
+                copiedDataIds.filter(id => id !== dataId)
+                :
+                [...copiedDataIds, dataId];
+            });
+            return copiedDataIds;
+          })();
+
           dispatchClipboardActions(clipboardActions.updateState({
-            copiedData
+            data: ids.length ? { [data.dataType]: { ...copiedData, ids } } : null
           }));
           if (props.onClick) props.onClick(e);
         }}

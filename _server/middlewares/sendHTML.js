@@ -18,7 +18,7 @@ module.exports = () => (req, res) => {
   const html = fs.readFileSync(path.resolve(__dirname, '../../src/index.html'), 'utf8');
   const $ = cheerio.load(html);
 
-  $('head').append(`<script type="text/javascript">const __$APP__ = ${JSON.stringify(__$APP__)};</script>`);
+  $('head').append(`<script type="text/javascript">const __$APP__ = ${__$APP__};</script>`);
   $('body').append(`<script type="text/javascript" src="${host}/bundle.js"></script>`);
   res.send($.html());
 };
