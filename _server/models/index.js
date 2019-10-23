@@ -8,7 +8,6 @@ import ScriptModel from './Script';
 import ScreenModel from './Screen';
 import DiagnosisModel from './Diagnosis';
 import ConfigKeyModel from './ConfigKey';
-import UserInterfaceModel from './UserInterface';
 
 import * as firebase from '../firebase';
 
@@ -34,12 +33,6 @@ export const User = sequelize.define(
   UserModel.getStructure({ Sequelize })
 );
 Object.keys(UserModel).forEach(key => (User[key] = UserModel[key]));
-
-export const UserInterface = sequelize.define(
-  'user_interface',
-  UserInterfaceModel.getStructure({ Sequelize })
-);
-Object.keys(UserInterfaceModel).forEach(key => (UserInterface[key] = UserInterfaceModel[key]));
 
 export const File = sequelize.define(
   'file',
@@ -68,7 +61,7 @@ Script.afterCreate(script => {
   const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
   firebase.set('screens', id, {});
   firebase.set('diagnosis', id, {});
-  firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
+  // firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
   return new Promise(resolve => resolve(script));
 });
 Script.afterUpdate(script => {
@@ -164,7 +157,6 @@ export const dbInit = () => new Promise((resolve, reject) => {
   const initScreensTable = (async () => await Screen.sync())();
   const initDiagnosesTable = (async () => await Diagnosis.sync())();
   const initConfigKeysTable = (async () => await ConfigKey.sync())();
-  const initUserInterfaceTable = (async () => await UserInterface.sync())();
 
   sequelize.authenticate()
   .then(() => {
@@ -179,7 +171,6 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initScreensTable,
       initDiagnosesTable,
       initConfigKeysTable,
-      initUserInterfaceTable,
     ]).then(rslts => resolve(rslts))
       .catch(err => reject(err));
   }).catch(err => {

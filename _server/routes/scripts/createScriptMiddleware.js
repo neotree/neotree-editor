@@ -1,3 +1,4 @@
+import firebase from '../../firebase';
 import { Script } from '../../models';
 
 module.exports = (app, params) => (req, res, next) => {
@@ -8,7 +9,29 @@ module.exports = (app, params) => (req, res, next) => {
     next(); return null;
   };
 
-  Script.create(payload)
-    .then((script) => done(null, script))
-    .catch(done);
+  const saveToFirebase = () => new Promise((resolve, reject) => {
+    firebase.database().ref('scripts').push().then(snap => {
+      const { data, ...rest } = payload;
+
+      const scriptId = snap.key;
+
+      resolve(scriptId);
+
+      const _data = data ? JSON.parse(data) : null;
+      firebase.database()
+        .ref('scripts').child(scriptId).update({
+          ...rest,
+          ..._data,
+          scriptId
+        });
+    })
+    .catch(reject);
+  });
+
+  saveToFirebase()
+    .then(id => {
+      Script.create({ ...payload, id })
+        .then((script) => done(null, script))
+        .catch(done);
+    }).catch(done);
 };

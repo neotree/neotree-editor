@@ -1,10 +1,7 @@
-import uuid from 'uuidv4';
-
 export default {
   getStructure: ({ User, Script, Sequelize }) => ({ // eslint-disable-line
     id: {
-      type: Sequelize.UUID,
-      defaultValue: () => uuid(),
+      type: Sequelize.STRING,
       allowNull: false,
       primaryKey: true
     },
@@ -35,14 +32,14 @@ export default {
       type: Sequelize.INTEGER
     },
     script_id: {
-      type: Sequelize.UUID,
+      type: Sequelize.STRING,
       // references: {
       //   model: Script,
       //   key: 'id'
       // }
     },
     author: {
-      type: Sequelize.UUID,
+      type: Sequelize.STRING,
       // references: {
       //   model: User,
       //   key: 'id'

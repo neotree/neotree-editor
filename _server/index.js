@@ -2,7 +2,6 @@ import path from 'path';
 import express from 'express';
 import setMiddlewares from './middlewares';
 import { sequelize, dbInit } from './models';
-import * as firebase from './firebase';
 
 let app = express();
 
@@ -40,5 +39,3 @@ app.server = httpServer.listen(config.port, err => {
   if (err) throw (err);
   console.log(`Server started on port ${config.port}`); // eslint-disable-line
 });
-
-firebase.sync();

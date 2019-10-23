@@ -1,10 +1,7 @@
-import uuid from 'uuidv4';
-
 export default {
   getStructure: ({ User, Sequelize }) => ({ // eslint-disable-line
     id: {
-      type: Sequelize.UUID,
-      defaultValue: () => uuid(),
+      type: Sequelize.STRING,
       allowNull: false,
       primaryKey: true
     },
