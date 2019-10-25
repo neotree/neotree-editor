@@ -2,6 +2,7 @@ import path from 'path';
 import express from 'express';
 import setMiddlewares from './middlewares';
 import { sequelize, dbInit } from './models';
+import syncFirebase from './firebase/syncFirebase';
 
 let app = express();
 
@@ -14,6 +15,7 @@ app.logger = require('../_utils/logger');
 const initDatabase = async () => {
   try {
     await dbInit();
+    syncFirebase();
   } catch (e) {
     console.log('DATABASE INIT ERROR:', e); // eslint-disable-line
     process.exit(1);
