@@ -244,7 +244,7 @@ class List extends Component {
                 <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, id)}>
                   Delete
                 </MenuItem>
-                <MenuItem onClick={() => this.handleDuplicateKey(id)}>
+                {/*<MenuItem onClick={() => this.handleDuplicateKey(id)}>
                   Duplicate
                 </MenuItem>
                 <MenuItem>
@@ -253,7 +253,7 @@ class List extends Component {
                   >
                     <span>Copy</span>
                   </ClipboardCopyButton>
-                </MenuItem>
+                </MenuItem>*/}
                 <MenuItem>
                   <ExportLink options={{ configKey: id }} />
                 </MenuItem>

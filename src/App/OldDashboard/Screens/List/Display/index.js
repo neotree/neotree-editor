@@ -145,14 +145,14 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
-                <MenuItem onClick={() => this.handleDuplicateScreen(id)}>
+                {/*<MenuItem onClick={() => this.handleDuplicateScreen(id)}>
                   Duplicate
                 </MenuItem>
                 <MenuItem>
                   <ClipboardCopyButton data={{ dataId: id, dataType: 'screen' }}>
                     <span>Copy</span>
                   </ClipboardCopyButton>
-                </MenuItem>
+                </MenuItem>*/}
                 <MenuItem onClick={this.handleDeleteScreenClick(id)}>
                   Delete
                 </MenuItem>
@@ -203,9 +203,9 @@ class Display extends Component {
           <Toolbar title="Screens">
             {selected.length > 0 && (
               <div>
-                <ClipboardCopyButton data={{ dataId: selected, dataType: 'screen' }}>
+                {/*<ClipboardCopyButton data={{ dataId: selected, dataType: 'screen' }}>
                   <span className="ui__cursor_pointer">Copy</span>
-                </ClipboardCopyButton>
+                </ClipboardCopyButton>*/}
               </div>
             )}
             <div

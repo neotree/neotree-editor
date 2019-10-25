@@ -107,14 +107,14 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
-              <MenuItem onClick={() => this.handleDuplicateDiagnosis(id)}>
+              {/*<MenuItem onClick={() => this.handleDuplicateDiagnosis(id)}>
                 Duplicate
               </MenuItem>
                 <MenuItem>
                   <ClipboardCopyButton data={{ dataId: id, dataType: 'diagnosis' }}>
                     <span>Copy</span>
                   </ClipboardCopyButton>
-                </MenuItem>
+                </MenuItem>*/}
                 <MenuItem onClick={this.handleDeleteDiagnosisClick(id)}>
                   Delete
                 </MenuItem>
@@ -130,9 +130,9 @@ class Display extends Component {
           <Toolbar title="Diagnosis">
             {selected.length > 0 && (
               <div>
-                <ClipboardCopyButton data={{ dataId: selected, dataType: 'diagnosis' }}>
+                {/*<ClipboardCopyButton data={{ dataId: selected, dataType: 'diagnosis' }}>
                   <span className="ui__cursor_pointer">Copy</span>
-                </ClipboardCopyButton>
+                </ClipboardCopyButton>*/}
               </div>
             )}
             <div onClick={this.handleAddDiagnosisClick} className="ui__cursor_pointer">
