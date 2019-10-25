@@ -32,42 +32,24 @@ var copyScript = function copyScript(req, _ref) {
   var screens = _ref.screens,
       diagnoses = _ref.diagnoses,
       script = (0, _objectWithoutProperties2["default"])(_ref, ["screens", "diagnoses"]);
-  var author = (req.user || {}).id || null;
   return new Promise(function (resolve, reject) {
     _models.Script.create((0, _objectSpread2["default"])({}, script, {
       id: (0, _uuidv["default"])(),
-      author: author,
-      data: JSON.stringify(script.data),
-      details: JSON.stringify({
-        original_script_id: script.id,
-        original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-      })
+      data: JSON.stringify(script.data)
     })).then(function (script) {
       Promise.all([].concat((0, _toConsumableArray2["default"])(screens.map(function (screen) {
         screen = screen.toJSON();
         return _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
           id: (0, _uuidv["default"])(),
-          author: author,
           script_id: script.id,
-          data: JSON.stringify(screen.data),
-          details: JSON.stringify({
-            original_script_id: script.id,
-            original_screen_id: screen.id,
-            original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-          })
+          data: JSON.stringify(screen.data)
         }));
       })), (0, _toConsumableArray2["default"])(diagnoses.map(function (d) {
         d = d.toJSON();
         return _models.Diagnosis.create((0, _objectSpread2["default"])({}, d, {
           id: (0, _uuidv["default"])(),
-          author: author,
           script_id: script.id,
-          data: JSON.stringify(d.data),
-          details: JSON.stringify({
-            original_script_id: script.id,
-            original_diagnosis_id: d.id,
-            original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-          })
+          data: JSON.stringify(d.data)
         }));
       })))).then(function (_ref2) {
         var _ref3 = (0, _slicedToArray2["default"])(_ref2, 2),

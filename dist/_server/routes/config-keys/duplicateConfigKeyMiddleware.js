@@ -25,16 +25,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var copyConfigKey = function copyConfigKey(req, configKey) {
-  var author = (req.user || {}).id || null;
   return new Promise(function (resolve, reject) {
     _models.ConfigKey.create((0, _objectSpread2["default"])({}, configKey, {
       id: (0, _uuidv["default"])(),
-      author: author,
-      data: JSON.stringify(configKey.data),
-      details: JSON.stringify({
-        original_config_key_id: configKey.id,
-        original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-      })
+      data: JSON.stringify(configKey.data)
     })).then(function (configKey) {
       return resolve(configKey);
     })["catch"](function (err) {

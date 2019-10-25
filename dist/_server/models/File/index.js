@@ -9,8 +9,6 @@ exports["default"] = void 0;
 
 var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
-
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
   enterModule && enterModule(module);
@@ -27,10 +25,7 @@ var _default = {
     return {
       // eslint-disable-line
       id: {
-        type: Sequelize.UUID,
-        defaultValue: function defaultValue() {
-          return (0, _uuidv["default"])();
-        },
+        type: Sequelize.STRING,
         allowNull: false,
         primaryKey: true
       },

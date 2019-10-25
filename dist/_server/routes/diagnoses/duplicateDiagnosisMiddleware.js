@@ -25,16 +25,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var copyDiagnosis = function copyDiagnosis(req, diagnosis) {
-  var author = (req.user || {}).id || null;
   return new Promise(function (resolve, reject) {
     _models.Diagnosis.create((0, _objectSpread2["default"])({}, diagnosis, {
       id: (0, _uuidv["default"])(),
-      author: author,
-      data: JSON.stringify(diagnosis.data),
-      details: JSON.stringify({
-        original_config_key_id: diagnosis.id,
-        original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-      })
+      data: JSON.stringify(diagnosis.data)
     })).then(function (diagnosis) {
       return resolve(diagnosis);
     })["catch"](function (err) {

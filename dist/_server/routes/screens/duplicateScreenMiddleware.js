@@ -27,16 +27,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var copyScreen = function copyScreen(req, screen) {
-  var author = (req.user || {}).id || null;
   return new Promise(function (resolve, reject) {
     _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
       id: (0, _uuidv["default"])(),
-      author: author,
-      data: JSON.stringify(screen.data),
-      details: JSON.stringify({
-        original_config_key_id: screen.id,
-        original_host: "".concat(req.protocol, "://").concat(req.headers.host)
-      })
+      data: JSON.stringify(screen.data)
     })).then(function (screen) {
       return resolve(screen);
     })["catch"](function (err) {

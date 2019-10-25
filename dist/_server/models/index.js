@@ -7,7 +7,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.App = exports.UserProfile = exports.File = exports.UserInterface = exports.User = exports.sequelize = void 0;
+exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.App = exports.UserProfile = exports.File = exports.User = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
@@ -36,8 +36,6 @@ var _Screen = _interopRequireDefault(require("./Screen"));
 var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
 
 var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
-
-var _UserInterface = _interopRequireDefault(require("./UserInterface"));
 
 var firebase = _interopRequireWildcard(require("../firebase"));
 
@@ -68,13 +66,6 @@ exports.User = User;
 Object.keys(_User["default"]).forEach(function (key) {
   return User[key] = _User["default"][key];
 });
-var UserInterface = sequelize.define('user_interface', _UserInterface["default"].getStructure({
-  Sequelize: _sequelize["default"]
-}));
-exports.UserInterface = UserInterface;
-Object.keys(_UserInterface["default"]).forEach(function (key) {
-  return UserInterface[key] = _UserInterface["default"][key];
-});
 var File = sequelize.define('file', _File["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
@@ -103,28 +94,20 @@ Object.keys(_App["default"]).forEach(function (key) {
 var Script = sequelize.define('script', _Script["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-}));
+})); // Script.afterCreate(script => {
+//   const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
+//   firebase.set('screens', id, {});
+//   firebase.set('diagnosis', id, {});
+//   // firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
+//   return new Promise(resolve => resolve(script));
+// });
+
 exports.Script = Script;
-Script.afterCreate(function (script) {
+Script.afterUpdate(function (script) {
   var _JSON$parse = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse.id,
       data = _JSON$parse.data,
       scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data"]);
-
-  firebase.set('screens', id, {});
-  firebase.set('diagnosis', id, {});
-  firebase.set('scripts', id, (0, _objectSpread2["default"])({}, data, {}, scr, {
-    scriptId: id
-  }));
-  return new Promise(function (resolve) {
-    return resolve(script);
-  });
-});
-Script.afterUpdate(function (script) {
-  var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
-      id = _JSON$parse2.id,
-      data = _JSON$parse2.data,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "data"]);
 
   firebase.update('screens', id, {});
   firebase.update('diagnosis', id, {});
@@ -149,28 +132,21 @@ Object.keys(_Script["default"]).forEach(function (key) {
 var Screen = sequelize.define('screen', _Screen["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-}));
-exports.Screen = Screen;
-Screen.afterCreate(function (screen) {
-  var _JSON$parse3 = JSON.parse(JSON.stringify(screen)),
-      id = _JSON$parse3.id,
-      script_id = _JSON$parse3.script_id,
-      data = _JSON$parse3.data,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "script_id", "data"]);
+})); // Screen.afterCreate(screen => {
+//   const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
+//   firebase.update('screens', script_id, {
+//     [id]: { ...data, ...scr, screenId: id }
+//   });
+//   return new Promise(resolve => resolve(screen));
+// });
 
-  firebase.update('screens', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, scr, {
-    screenId: id
-  })));
-  return new Promise(function (resolve) {
-    return resolve(screen);
-  });
-});
+exports.Screen = Screen;
 Screen.afterUpdate(function (screen) {
-  var _JSON$parse4 = JSON.parse(JSON.stringify(screen)),
-      id = _JSON$parse4.id,
-      script_id = _JSON$parse4.script_id,
-      data = _JSON$parse4.data,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "script_id", "data"]);
+  var _JSON$parse2 = JSON.parse(JSON.stringify(screen)),
+      id = _JSON$parse2.id,
+      script_id = _JSON$parse2.script_id,
+      data = _JSON$parse2.data,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "script_id", "data"]);
 
   firebase.update('screens', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, scr, {
     screenId: id
@@ -191,28 +167,21 @@ Object.keys(_Screen["default"]).forEach(function (key) {
 var Diagnosis = sequelize.define('diagnosis', _Diagnosis["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-}));
-exports.Diagnosis = Diagnosis;
-Diagnosis.afterCreate(function (diagnosis) {
-  var _JSON$parse5 = JSON.parse(JSON.stringify(diagnosis)),
-      id = _JSON$parse5.id,
-      script_id = _JSON$parse5.script_id,
-      data = _JSON$parse5.data,
-      d = (0, _objectWithoutProperties2["default"])(_JSON$parse5, ["id", "script_id", "data"]);
+})); // Diagnosis.afterCreate(diagnosis => {
+//   const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
+//   firebase.update('diagnosis', script_id, {
+//     [id]: { ...data, ...d, diagnosisId: id }
+//   });
+//   return new Promise(resolve => resolve(diagnosis));
+// });
 
-  firebase.update('diagnosis', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, d, {
-    diagnosisId: id
-  })));
-  return new Promise(function (resolve) {
-    return resolve(diagnosis);
-  });
-});
+exports.Diagnosis = Diagnosis;
 Diagnosis.afterUpdate(function (diagnosis) {
-  var _JSON$parse6 = JSON.parse(JSON.stringify(diagnosis)),
-      id = _JSON$parse6.id,
-      script_id = _JSON$parse6.script_id,
-      data = _JSON$parse6.data,
-      d = (0, _objectWithoutProperties2["default"])(_JSON$parse6, ["id", "script_id", "data"]);
+  var _JSON$parse3 = JSON.parse(JSON.stringify(diagnosis)),
+      id = _JSON$parse3.id,
+      script_id = _JSON$parse3.script_id,
+      data = _JSON$parse3.data,
+      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "script_id", "data"]);
 
   firebase.update('diagnosis', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, d, {
     diagnosisId: id
@@ -233,26 +202,18 @@ Object.keys(_Diagnosis["default"]).forEach(function (key) {
 var ConfigKey = sequelize.define('config_key', _ConfigKey["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-}));
-exports.ConfigKey = ConfigKey;
-ConfigKey.afterCreate(function (configKey) {
-  var _JSON$parse7 = JSON.parse(JSON.stringify(configKey)),
-      id = _JSON$parse7.id,
-      data = _JSON$parse7.data,
-      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse7, ["id", "data"]);
+})); // ConfigKey.afterCreate(configKey => {
+//   const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
+//   firebase.set('configkeys', id, { ...data, ...cKey, configKeyId: id });
+//   return new Promise(resolve => resolve(configKey));
+// });
 
-  firebase.set('configkeys', id, (0, _objectSpread2["default"])({}, data, {}, cKey, {
-    configKeyId: id
-  }));
-  return new Promise(function (resolve) {
-    return resolve(configKey);
-  });
-});
+exports.ConfigKey = ConfigKey;
 ConfigKey.afterUpdate(function (configKey) {
-  var _JSON$parse8 = JSON.parse(JSON.stringify(configKey)),
-      id = _JSON$parse8.id,
-      data = _JSON$parse8.data,
-      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse8, ["id", "data"]);
+  var _JSON$parse4 = JSON.parse(JSON.stringify(configKey)),
+      id = _JSON$parse4.id,
+      data = _JSON$parse4.data,
+      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "data"]);
 
   firebase.update('configkeys', id, (0, _objectSpread2["default"])({}, data, {}, cKey, {
     configKeyId: id
@@ -434,31 +395,11 @@ var dbInit = function dbInit() {
         }
       }, _callee8);
     }))();
-    var initUserInterfaceTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee9() {
-      return _regenerator["default"].wrap(function _callee9$(_context9) {
-        while (1) {
-          switch (_context9.prev = _context9.next) {
-            case 0:
-              _context9.next = 2;
-              return UserInterface.sync();
-
-            case 2:
-              return _context9.abrupt("return", _context9.sent);
-
-            case 3:
-            case "end":
-              return _context9.stop();
-          }
-        }
-      }, _callee9);
-    }))();
     sequelize.authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
       Promise.all([// initSessionsTable,
-      initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initUserInterfaceTable]).then(function (rslts) {
+      initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
         return resolve(rslts);
       })["catch"](function (err) {
         return reject(err);
@@ -482,7 +423,6 @@ exports.dbInit = dbInit;
   reactHotLoader.register(dbConfig, "dbConfig", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(sequelize, "sequelize", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(User, "User", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(UserInterface, "UserInterface", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(File, "File", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(UserProfile, "UserProfile", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(App, "App", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");

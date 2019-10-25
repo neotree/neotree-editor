@@ -17,13 +17,6 @@ module.exports = function (app) {
     middleware.use(function (next) {
       return require('../users/getAuthenticatedUserMiddleware')(app)(req, res, next);
     });
-
-    if (req.user) {
-      middleware.use(function (next) {
-        return require('../user-interfaces/getMyUIMiddleware')(app)(req, res, next);
-      });
-    }
-
     middleware.go(next);
   };
 };

@@ -1,7 +1,5 @@
 "use strict";
 
-var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
-
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -15,8 +13,6 @@ var _express = _interopRequireDefault(require("express"));
 var _middlewares = _interopRequireDefault(require("./middlewares"));
 
 var _models = require("./models");
-
-var firebase = _interopRequireWildcard(require("./firebase"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -87,7 +83,6 @@ app.server = httpServer.listen(config.port, function (err) {
   if (err) throw err;
   console.log("Server started on port ".concat(config.port)); // eslint-disable-line
 });
-firebase.sync();
 ;
 
 (function () {

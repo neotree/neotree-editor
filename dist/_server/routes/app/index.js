@@ -8,6 +8,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _express = _interopRequireDefault(require("express"));
 
+var _import = _interopRequireDefault(require("../../firebase/import"));
+
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
   enterModule && enterModule(module);
@@ -21,7 +23,18 @@ var router = _express["default"].Router();
 
 module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
-  router = require('./importDataMiddleware')(router, app);
+  router.post('/import-firebase', function (req, res, next) {
+    var done = function done(err, data) {
+      res.locals.setResponse(err, data);
+      next();
+    };
+
+    (0, _import["default"])().then(function () {
+      return done(null, {
+        success: true
+      });
+    })["catch"](done);
+  }, responseMiddleware);
   router.get('/initialise-app', require('./initialiseAppMiddleware')(app), function (req, res) {
     var _ref = res.locals.getResponsePayload() || {},
         app = _ref.app,
