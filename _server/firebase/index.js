@@ -18,6 +18,26 @@ export const update = (collection, key, data) => admin.database()
 export const remove = (collection, child) => admin.database()
   .ref(collection).child(child).remove();
 
+export const save = (collection, item, payload) => new Promise((resolve, reject) => {
+  admin.database().ref(collection).push().then(snap => {
+    const { data, ...rest } = payload;
+
+    const id = snap.key;
+
+    resolve(id);
+
+    const _data = data ? JSON.parse(data) : null;
+
+    admin.database()
+      .ref(collection).child(id).update({
+        ...rest,
+        ..._data,
+        [`${item}Id`]: id
+      });
+  })
+  .catch(reject);
+});
+
 export { admin };
 
 export default admin;

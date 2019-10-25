@@ -2,18 +2,11 @@ import uuid from 'uuidv4';
 import { ConfigKey } from '../../models';
 
 export const copyConfigKey = (req, configKey) => {
-  const author = (req.user || {}).id || null;
-
   return new Promise((resolve, reject) => {
     ConfigKey.create({
       ...configKey,
       id: uuid(),
-      author,
       data: JSON.stringify(configKey.data),
-      details: JSON.stringify({
-        original_config_key_id: configKey.id,
-        original_host: `${req.protocol}://${req.headers.host}`
-      })
     })
       .then(configKey => resolve(configKey))
       .catch(err => reject(err));

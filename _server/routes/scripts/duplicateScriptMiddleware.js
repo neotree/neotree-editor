@@ -2,18 +2,11 @@ import uuid from 'uuidv4';
 import { Script, Screen, Diagnosis } from '../../models';
 
 export const copyScript = (req, { screens, diagnoses, ...script }) => {
-  const author = (req.user || {}).id || null;
-
   return new Promise((resolve, reject) => {
     Script.create({
       ...script,
       id: uuid(),
-      author,
       data: JSON.stringify(script.data),
-      details: JSON.stringify({
-        original_script_id: script.id,
-        original_host: `${req.protocol}://${req.headers.host}`
-      })
     })
       .then(script => {
         Promise.all([
@@ -22,14 +15,8 @@ export const copyScript = (req, { screens, diagnoses, ...script }) => {
             return Screen.create({
               ...screen,
               id: uuid(),
-              author,
               script_id: script.id,
               data: JSON.stringify(screen.data),
-              details: JSON.stringify({
-                original_script_id: script.id,
-                original_screen_id: screen.id,
-                original_host: `${req.protocol}://${req.headers.host}`
-              })
             });
           }),
           ...diagnoses.map(d => {
@@ -37,14 +24,8 @@ export const copyScript = (req, { screens, diagnoses, ...script }) => {
             return Diagnosis.create({
               ...d,
               id: uuid(),
-              author,
               script_id: script.id,
               data: JSON.stringify(d.data),
-              details: JSON.stringify({
-                original_script_id: script.id,
-                original_diagnosis_id: d.id,
-                original_host: `${req.protocol}://${req.headers.host}`
-              })
             });
           })
         ])

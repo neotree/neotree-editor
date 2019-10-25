@@ -3,18 +3,11 @@ import { Screen } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 export const copyScreen = (req, screen) => {
-  const author = (req.user || {}).id || null;
-
   return new Promise((resolve, reject) => {
     Screen.create({
       ...screen,
       id: uuid(),
-      author,
       data: JSON.stringify(screen.data),
-      details: JSON.stringify({
-        original_config_key_id: screen.id,
-        original_host: `${req.protocol}://${req.headers.host}`
-      })
     })
       .then(screen => resolve(screen))
       .catch(err => reject(err));

@@ -2,18 +2,11 @@ import uuid from 'uuidv4';
 import { Diagnosis } from '../../models';
 
 export const copyDiagnosis = (req, diagnosis) => {
-  const author = (req.user || {}).id || null;
-
   return new Promise((resolve, reject) => {
     Diagnosis.create({
       ...diagnosis,
       id: uuid(),
-      author,
       data: JSON.stringify(diagnosis.data),
-      details: JSON.stringify({
-        original_config_key_id: diagnosis.id,
-        original_host: `${req.protocol}://${req.headers.host}`
-      })
     })
       .then(diagnosis => resolve(diagnosis))
       .catch(err => reject(err));
