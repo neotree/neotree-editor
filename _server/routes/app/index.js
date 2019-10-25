@@ -1,11 +1,21 @@
 import express from 'express';
+import importFirebase from '../../firebase/import';
 
-let router = express.Router();
+const router = express.Router();
 
 module.exports = app => {
   const { responseMiddleware } = app;
 
-  router = require('./importDataMiddleware')(router, app);
+  router.post('/import-firebase', (req, res, next) => {
+    const done = (err, data) => {
+      res.locals.setResponse(err, data);
+      next();
+    };
+
+    importFirebase()
+      .then(() => done(null, { success: true }))
+      .catch(done);
+  }, responseMiddleware);
 
   router.get(
     '/initialise-app',
