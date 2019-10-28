@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import firebase, { sanitizeDataForFirebase } from '../../firebase';
 import { Script } from '../../models';
 
 module.exports = (app, params) => (req, res, next) => {
@@ -19,11 +19,11 @@ module.exports = (app, params) => (req, res, next) => {
 
       const _data = data ? JSON.parse(data) : null;
       firebase.database()
-        .ref('scripts').child(scriptId).update({
+        .ref('scripts').child(scriptId).update(sanitizeDataForFirebase({
           ...rest,
           ..._data,
           scriptId
-        });
+        }));
     })
     .catch(reject);
   });

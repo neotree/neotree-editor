@@ -1,5 +1,5 @@
 import { Diagnosis } from '../../models';
-import firebase from '../../firebase';
+import firebase, { sanitizeDataForFirebase } from '../../firebase';
 
 module.exports = () => (req, res, next) => {
   const payload = req.body;
@@ -19,12 +19,12 @@ module.exports = () => (req, res, next) => {
 
       const _data = data ? JSON.parse(data) : null;
       firebase.database()
-        .ref(`diagnosis/${payload.script_id}`).child(diagnosisId).update({
+        .ref(`diagnosis/${payload.script_id}`).child(diagnosisId).update(sanitizeDataForFirebase({
           ...rest,
           ..._data,
           diagnosisId,
           scriptId: payload.script_id
-        });
+        }));
     })
     .catch(reject);
   });

@@ -58,7 +58,7 @@ export const Script = sequelize.define(
   ScriptModel.getStructure({ User, Sequelize })
 );
 // Script.afterCreate(script => {
-//   const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
+//   const { id } = JSON.parse(JSON.stringify(script));
 //   firebase.set('screens', id, {});
 //   firebase.set('diagnosis', id, {});
 //   // firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
@@ -98,7 +98,7 @@ Screen.afterUpdate(screen => {
   return new Promise(resolve => resolve(screen));
 });
 Screen.afterDestroy(instance => {
-  firebase.remove('screens', instance.id);
+  firebase.remove(`screens/${instance.script_id}`, instance.id);
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(ScreenModel).forEach(key => (Screen[key] = ScreenModel[key]));
@@ -122,7 +122,7 @@ Diagnosis.afterUpdate(diagnosis => {
   return new Promise(resolve => resolve(diagnosis));
 });
 Diagnosis.afterDestroy(instance => {
-  firebase.remove('diagnosis', instance.id);
+  firebase.remove(`diagnosis/${instance.script_id}`, instance.id);
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(DiagnosisModel).forEach(key => (Diagnosis[key] = DiagnosisModel[key]));

@@ -1,6 +1,6 @@
 import { Screen } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
-import firebase from '../../firebase';
+import firebase, { sanitizeDataForFirebase } from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   const payload = req.body;
@@ -20,12 +20,12 @@ module.exports = app => (req, res, next) => {
 
       const _data = data ? JSON.parse(data) : null;
       firebase.database()
-        .ref(`screens/${payload.script_id}`).child(screenId).update({
+        .ref(`screens/${payload.script_id}`).child(screenId).update(sanitizeDataForFirebase({
           ...rest,
           ..._data,
           screenId,
           scriptId: payload.script_id
-        });
+        }));
     })
     .catch(reject);
   });

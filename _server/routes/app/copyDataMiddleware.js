@@ -58,11 +58,6 @@ module.exports = () => (req, res, next) => {
             Model.create({
               ...data,
               data: JSON.stringify(data.data || {}),
-              details: JSON.stringify({
-                ...data.details || {},
-                originalHost: source.host,
-                originalId: data.id
-              }),
               id,
               author,
               ...params,
@@ -77,10 +72,6 @@ module.exports = () => (req, res, next) => {
             return ConfigKey.create({
               ...dataToImport,
               data: JSON.stringify(dataToImport.data || {}),
-              details: JSON.stringify({
-                ...dataToImport.details || {},
-                originalHost: source.host
-              }),
               id,
               author
             }).then(s => done(null, s)).catch(done);
@@ -106,10 +97,6 @@ module.exports = () => (req, res, next) => {
             return Script.create({
               ...dataToImport,
               data: JSON.stringify(dataToImport.data || {}),
-              details: JSON.stringify({
-                ...dataToImport.details || {},
-                originalHost: source.host
-              }),
               id,
               author
             }).then(s => {
