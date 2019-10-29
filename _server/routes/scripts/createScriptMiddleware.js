@@ -1,4 +1,4 @@
-import firebase, { sanitizeDataForFirebase } from '../../firebase';
+import firebase from '../../firebase';
 import { Script } from '../../models';
 
 module.exports = (app, params) => (req, res, next) => {
@@ -15,15 +15,18 @@ module.exports = (app, params) => (req, res, next) => {
 
       const scriptId = snap.key;
 
-      resolve(scriptId);
-
       const _data = data ? JSON.parse(data) : null;
+
       firebase.database()
-        .ref('scripts').child(scriptId).update(sanitizeDataForFirebase({
+        .ref(`scripts/${scriptId}`).set({
           ...rest,
           ..._data,
-          scriptId
-        }));
+          scriptId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          resolve(scriptId);
+        })
+        .catch(reject);
     })
     .catch(reject);
   });

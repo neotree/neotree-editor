@@ -1,5 +1,5 @@
 import { Diagnosis } from '../../models';
-import firebase, { sanitizeDataForFirebase } from '../../firebase';
+import firebase from '../../firebase';
 
 module.exports = () => (req, res, next) => {
   const payload = req.body;
@@ -15,16 +15,19 @@ module.exports = () => (req, res, next) => {
 
       const diagnosisId = snap.key;
 
-      resolve(diagnosisId);
-
       const _data = data ? JSON.parse(data) : null;
+
       firebase.database()
-        .ref(`diagnosis/${payload.script_id}`).child(diagnosisId).update(sanitizeDataForFirebase({
+        .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set({
           ...rest,
           ..._data,
           diagnosisId,
-          scriptId: payload.script_id
-        }));
+          scriptId: payload.script_id,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          resolve(diagnosisId);
+        })
+        .catch(reject);
     })
     .catch(reject);
   });

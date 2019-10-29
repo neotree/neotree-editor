@@ -1,5 +1,5 @@
 import { ConfigKey } from '../../models';
-import firebase, { sanitizeDataForFirebase } from '../../firebase';
+import firebase from '../../firebase';
 
 module.exports = () => (req, res, next) => {
   const payload = req.body;
@@ -15,15 +15,18 @@ module.exports = () => (req, res, next) => {
 
       const configKeyId = snap.key;
 
-      resolve(configKeyId);
-
       const _data = data ? JSON.parse(data) : null;
+
       firebase.database()
-        .ref('configkeys').child(configKeyId).set(sanitizeDataForFirebase({
+        .ref(`configkeys/${configKeyId}`).set({
           ...rest,
           ..._data,
-          configKeyId
-        }));
+          configKeyId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          resolve(configKeyId);
+        })
+        .catch(reject);
     })
     .catch(reject);
   });

@@ -9,7 +9,7 @@ import ScreenModel from './Screen';
 import DiagnosisModel from './Diagnosis';
 import ConfigKeyModel from './ConfigKey';
 
-import * as firebase from '../firebase';
+import firebase from '../firebase';
 
 const dbConfig = process.env.NODE_ENV === 'production' ?
   require('../../_config/config.production.json').database
@@ -57,24 +57,19 @@ export const Script = sequelize.define(
   'script',
   ScriptModel.getStructure({ User, Sequelize })
 );
-// Script.afterCreate(script => {
-//   const { id } = JSON.parse(JSON.stringify(script));
-//   firebase.set('screens', id, {});
-//   firebase.set('diagnosis', id, {});
-//   // firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
-//   return new Promise(resolve => resolve(script));
-// });
 Script.afterUpdate(script => {
-  const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
-  firebase.update('screens', id, {});
-  firebase.update('diagnosis', id, {});
-  firebase.update('scripts', id, { ...data, ...scr, scriptId: id });
+  const { id, data, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  firebase.database().ref(`scripts/${id}`).update({
+    ...data,
+    ...scr,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  });
   return new Promise(resolve => resolve(script));
 });
 Script.afterDestroy(instance => {
-  firebase.remove('screens', instance.id);
-  firebase.remove('diagnosis', instance.id);
-  firebase.remove('scripts', instance.id);
+  firebase.database().ref(`screens/${instance.id}`).remove();
+  firebase.database().ref(`diagnosis/${instance.id}`).remove();
+  firebase.database().ref(`scripts/${instance.id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(ScriptModel).forEach(key => (Script[key] = ScriptModel[key]));
@@ -83,22 +78,17 @@ export const Screen = sequelize.define(
   'screen',
   ScreenModel.getStructure({ User, Sequelize })
 );
-// Screen.afterCreate(screen => {
-//   const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
-//   firebase.update('screens', script_id, {
-//     [id]: { ...data, ...scr, screenId: id }
-//   });
-//   return new Promise(resolve => resolve(screen));
-// });
-Screen.afterUpdate(screen => {
-  const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
-  firebase.update('screens', script_id, {
-    [id]: { ...data, ...scr, screenId: id }
+Screen.afterUpdate(script => {
+  const { id, data, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  firebase.database().ref(`screens/${script.script_id}/${id}`).update({
+    ...data,
+    ...scr,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
   });
-  return new Promise(resolve => resolve(screen));
+  return new Promise(resolve => resolve(script));
 });
 Screen.afterDestroy(instance => {
-  firebase.remove(`screens/${instance.script_id}`, instance.id);
+  firebase.database().ref(`screens/${instance.script_id}/${instance.id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(ScreenModel).forEach(key => (Screen[key] = ScreenModel[key]));
@@ -107,22 +97,17 @@ export const Diagnosis = sequelize.define(
   'diagnosis',
   DiagnosisModel.getStructure({ User, Sequelize })
 );
-// Diagnosis.afterCreate(diagnosis => {
-//   const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
-//   firebase.update('diagnosis', script_id, {
-//     [id]: { ...data, ...d, diagnosisId: id }
-//   });
-//   return new Promise(resolve => resolve(diagnosis));
-// });
 Diagnosis.afterUpdate(diagnosis => {
-  const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
-  firebase.update('diagnosis', script_id, {
-    [id]: { ...data, ...d, diagnosisId: id }
+  const { id, data, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
+  firebase.database().ref(`diagnosis/${diagnosis.script_id}/${id}`).update({
+    ...data,
+    ...d,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
   });
   return new Promise(resolve => resolve(diagnosis));
 });
 Diagnosis.afterDestroy(instance => {
-  firebase.remove(`diagnosis/${instance.script_id}`, instance.id);
+  firebase.database().ref(`diagnosis/${instance.script_id}/${instance.id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(DiagnosisModel).forEach(key => (Diagnosis[key] = DiagnosisModel[key]));
@@ -131,18 +116,17 @@ export const ConfigKey = sequelize.define(
   'config_key',
   ConfigKeyModel.getStructure({ User, Sequelize }),
 );
-// ConfigKey.afterCreate(configKey => {
-//   const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
-//   firebase.set('configkeys', id, { ...data, ...cKey, configKeyId: id });
-//   return new Promise(resolve => resolve(configKey));
-// });
-ConfigKey.afterUpdate(configKey => {
-  const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
-  firebase.update('configkeys', id, { ...data, ...cKey, configKeyId: id });
-  return new Promise(resolve => resolve(configKey));
+ConfigKey.afterUpdate(cKey => {
+  const { id, data, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
+  firebase.database().ref(`configkeys/${id}`).update({
+    ...data,
+    ...c,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+  return new Promise(resolve => resolve(cKey));
 });
 ConfigKey.afterDestroy(instance => {
-  firebase.remove('configkeys', instance.id);
+  firebase.database().ref(`configkeys/${instance.id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(ConfigKeyModel).forEach(key => (ConfigKey[key] = ConfigKeyModel[key]));
