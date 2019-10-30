@@ -1,15 +1,31 @@
-import uuid from 'uuidv4';
 import { ConfigKey } from '../../models';
+import firebase from '../../firebase';
 
-export const copyConfigKey = (req, configKey) => {
+export const copyConfigKey = (configKey) => {
   return new Promise((resolve, reject) => {
-    ConfigKey.create({
-      ...configKey,
-      id: uuid(),
-      data: JSON.stringify(configKey.data),
+    firebase.database().ref('configkeys').push().then(snap => {
+      const { data, ...rest } = configKey;
+
+      const configKeyId = snap.key;
+
+      firebase.database()
+        .ref(`configkeys/${configKeyId}`).set({
+          ...rest,
+          ...data,
+          configKeyId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          ConfigKey.create({
+            ...configKey,
+            id: configKeyId,
+            data: JSON.stringify(configKey.data),
+          })
+            .then(configKey => resolve(configKey))
+            .catch(reject);
+        })
+        .catch(reject);
     })
-      .then(configKey => resolve(configKey))
-      .catch(err => reject(err));
+    .catch(reject);
   });
 };
 
@@ -31,7 +47,7 @@ export default () => (req, res, next) => {
 
       configKey = configKey.toJSON();
 
-      copyConfigKey(req, configKey)
+      copyConfigKey(configKey)
         .then(configKey => done(null, configKey))
         .catch(done);
 

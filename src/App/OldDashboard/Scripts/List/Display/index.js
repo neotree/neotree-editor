@@ -170,10 +170,10 @@ class Display extends Component {
                 <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, scriptId)}>
                   Delete
                 </MenuItem>
-                {/*<MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
+                <MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
                   Duplicate
                 </MenuItem>
-                <MenuItem>
+                {/*<MenuItem>
                   <ClipboardCopyButton data={{ dataId: scriptId, dataType: 'script' }}>
                     <span>Copy</span>
                   </ClipboardCopyButton>

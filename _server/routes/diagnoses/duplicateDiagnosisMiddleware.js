@@ -1,15 +1,32 @@
-import uuid from 'uuidv4';
+import firebase from '../../firebase';
 import { Diagnosis } from '../../models';
 
-export const copyDiagnosis = (req, diagnosis) => {
+export const copyDiagnosis = (diagnosis) => {
   return new Promise((resolve, reject) => {
-    Diagnosis.create({
-      ...diagnosis,
-      id: uuid(),
-      data: JSON.stringify(diagnosis.data),
+    firebase.database().ref(`diagnosis/${diagnosis.script_id}`).push().then(snap => {
+      const { data, ...rest } = diagnosis;
+
+      const diagnosisId = snap.key;
+
+      firebase.database()
+        .ref(`diagnosis/${diagnosis.script_id}/${diagnosisId}`).set({
+          ...rest,
+          ...data,
+          diagnosisId,
+          scriptId: diagnosis.script_id,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          Diagnosis.create({
+            ...diagnosis,
+            id: diagnosisId,
+            data: JSON.stringify(diagnosis.data),
+          })
+            .then(diagnosis => resolve(diagnosis))
+            .catch(err => reject(err));
+        })
+        .catch(reject);
     })
-      .then(diagnosis => resolve(diagnosis))
-      .catch(err => reject(err));
+    .catch(reject);
   });
 };
 
@@ -31,7 +48,7 @@ export default () => (req, res, next) => {
 
       diagnosis = diagnosis.toJSON();
 
-      copyDiagnosis(req, diagnosis)
+      copyDiagnosis(diagnosis)
         .then(diagnosis => done(null, diagnosis))
         .catch(done);
 

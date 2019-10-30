@@ -1,40 +1,56 @@
-import uuid from 'uuidv4';
+import firebase from '../../firebase';
 import { Script, Screen, Diagnosis } from '../../models';
+import { copyScreen } from '../screens/duplicateScreenMiddleware';
+import { copyDiagnosis } from '../diagnoses/duplicateDiagnosisMiddleware';
 
-export const copyScript = (req, { screens, diagnoses, ...script }) => {
+export const copyScript = ({ screens, diagnoses, ...script }) => {
   return new Promise((resolve, reject) => {
-    Script.create({
-      ...script,
-      id: uuid(),
-      data: JSON.stringify(script.data),
-    })
-      .then(script => {
-        Promise.all([
-          ...screens.map(screen => {
-            screen = screen.toJSON();
-            return Screen.create({
-              ...screen,
-              id: uuid(),
-              script_id: script.id,
-              data: JSON.stringify(screen.data),
-            });
-          }),
-          ...diagnoses.map(d => {
-            d = d.toJSON();
-            return Diagnosis.create({
-              ...d,
-              id: uuid(),
-              script_id: script.id,
-              data: JSON.stringify(d.data),
-            });
-          })
-        ])
-          .then(([screens, diagnoses]) => resolve({ script, screens, diagnoses }))
-          .catch(error => resolve({ script, screens: [], diagnoses: [], error }));
+    firebase.database().ref('scripts').push().then(snap => {
+      const { data, ...rest } = script;
 
-        return null;
-      })
-      .catch(err => reject(err));
+      const scriptId = snap.key;
+
+      firebase.database()
+        .ref(`scripts/${scriptId}`).set({
+          ...rest,
+          ...data,
+          scriptId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          Script.create({
+            ...script,
+            id: scriptId,
+            data: JSON.stringify(script.data),
+          })
+            .then(script => {
+              Promise.all([
+                ...screens.map(screen => {
+                  screen = screen.toJSON();
+                  return copyScreen({
+                    ...screen,
+                    script_id: script.id,
+                    data: JSON.stringify(screen.data),
+                  });
+                }),
+                ...diagnoses.map(d => {
+                  d = d.toJSON();
+                  return copyDiagnosis({
+                    ...d,
+                    script_id: script.id,
+                    data: JSON.stringify(d.data),
+                  });
+                })
+              ])
+                .then(([screens, diagnoses]) => resolve({ script, screens, diagnoses }))
+                .catch(error => resolve({ script, screens: [], diagnoses: [], error }));
+
+              return null;
+            })
+            .catch(err => reject(err));
+        })
+        .catch(reject);
+    })
+    .catch(reject);
   });
 };
 
@@ -58,7 +74,7 @@ export default () => (req, res, next) => {
 
       s = s.toJSON();
 
-      copyScript(req, { screens, diagnoses, ...s })
+      copyScript({ screens, diagnoses, ...s })
         .then(({ script }) => done(null, script))
         .catch(done);
 

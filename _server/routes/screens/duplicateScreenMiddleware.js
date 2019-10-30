@@ -1,16 +1,33 @@
-import uuid from 'uuidv4';
+import firebase from '../../firebase';
 import { Screen } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
-export const copyScreen = (req, screen) => {
+export const copyScreen = (screen) => {
   return new Promise((resolve, reject) => {
-    Screen.create({
-      ...screen,
-      id: uuid(),
-      data: JSON.stringify(screen.data),
+    firebase.database().ref(`screens/${screen.script_id}`).push().then(snap => {
+      const { data, ...rest } = screen;
+
+      const screenId = snap.key;
+
+      firebase.database()
+        .ref(`screens/${screen.script_id}/${screenId}`).set({
+          ...rest,
+          ...data,
+          screenId,
+          scriptId: screen.script_id,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          Screen.create({
+            ...screen,
+            id: screenId,
+            data: JSON.stringify(screen.data),
+          })
+            .then(screen => resolve(screen))
+            .catch(err => reject(err));
+        })
+        .catch(reject);
     })
-      .then(screen => resolve(screen))
-      .catch(err => reject(err));
+    .catch(reject);
   });
 };
 
@@ -32,7 +49,7 @@ export default app => (req, res, next) => {
 
       screen = screen.toJSON();
 
-      copyScreen(req, screen)
+      copyScreen(screen)
         .then(screen => {
           // update screens positions
           findAndUpdateScreens(
