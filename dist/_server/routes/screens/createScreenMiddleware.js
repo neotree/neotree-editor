@@ -34,14 +34,16 @@ module.exports = function (app) {
           var data = payload.data,
               rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
           var screenId = snap.key;
-          resolve(screenId);
 
           var _data = data ? JSON.parse(data) : null;
 
-          _firebase["default"].database().ref("screens/".concat(payload.script_id)).child(screenId).update((0, _objectSpread2["default"])({}, rest, {}, _data, {
+          _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set((0, _objectSpread2["default"])({}, rest, {}, _data, {
             screenId: screenId,
-            scriptId: payload.script_id
-          }));
+            scriptId: payload.script_id,
+            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+          })).then(function () {
+            resolve(screenId);
+          })["catch"](reject);
         })["catch"](reject);
       });
     };

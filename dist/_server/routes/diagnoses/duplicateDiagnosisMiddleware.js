@@ -11,7 +11,9 @@ var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/sli
 
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _models = require("../../models");
 
@@ -24,16 +26,28 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var copyDiagnosis = function copyDiagnosis(req, diagnosis) {
+var copyDiagnosis = function copyDiagnosis(diagnosis) {
   return new Promise(function (resolve, reject) {
-    _models.Diagnosis.create((0, _objectSpread2["default"])({}, diagnosis, {
-      id: (0, _uuidv["default"])(),
-      data: JSON.stringify(diagnosis.data)
-    })).then(function (diagnosis) {
-      return resolve(diagnosis);
-    })["catch"](function (err) {
-      return reject(err);
-    });
+    _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id)).push().then(function (snap) {
+      var data = diagnosis.data,
+          rest = (0, _objectWithoutProperties2["default"])(diagnosis, ["data"]);
+      var diagnosisId = snap.key;
+
+      _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosisId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+        diagnosisId: diagnosisId,
+        scriptId: diagnosis.script_id,
+        createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+      })).then(function () {
+        _models.Diagnosis.create((0, _objectSpread2["default"])({}, diagnosis, {
+          id: diagnosisId,
+          data: JSON.stringify(diagnosis.data)
+        })).then(function (diagnosis) {
+          return resolve(diagnosis);
+        })["catch"](function (err) {
+          return reject(err);
+        });
+      })["catch"](reject);
+    })["catch"](reject);
   });
 };
 
@@ -66,7 +80,7 @@ var _default = function _default() {
         msg: "Could not find diagnosis with \"id\" ".concat(id, ".")
       });
       diagnosis = diagnosis.toJSON();
-      copyDiagnosis(req, diagnosis).then(function (diagnosis) {
+      copyDiagnosis(diagnosis).then(function (diagnosis) {
         return done(null, diagnosis);
       })["catch"](done);
       return null;

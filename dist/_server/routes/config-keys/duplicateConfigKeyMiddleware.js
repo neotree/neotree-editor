@@ -11,9 +11,11 @@ var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/sli
 
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _models = require("../../models");
+
+var _firebase = _interopRequireDefault(require("../../firebase"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -24,16 +26,25 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var copyConfigKey = function copyConfigKey(req, configKey) {
+var copyConfigKey = function copyConfigKey(configKey) {
   return new Promise(function (resolve, reject) {
-    _models.ConfigKey.create((0, _objectSpread2["default"])({}, configKey, {
-      id: (0, _uuidv["default"])(),
-      data: JSON.stringify(configKey.data)
-    })).then(function (configKey) {
-      return resolve(configKey);
-    })["catch"](function (err) {
-      return reject(err);
-    });
+    _firebase["default"].database().ref('configkeys').push().then(function (snap) {
+      var data = configKey.data,
+          rest = (0, _objectWithoutProperties2["default"])(configKey, ["data"]);
+      var configKeyId = snap.key;
+
+      _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+        configKeyId: configKeyId,
+        createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+      })).then(function () {
+        _models.ConfigKey.create((0, _objectSpread2["default"])({}, configKey, {
+          id: configKeyId,
+          data: JSON.stringify(configKey.data)
+        })).then(function (configKey) {
+          return resolve(configKey);
+        })["catch"](reject);
+      })["catch"](reject);
+    })["catch"](reject);
   });
 };
 
@@ -66,7 +77,7 @@ var _default = function _default() {
         msg: "Could not find configKey with \"id\" ".concat(id, ".")
       });
       configKey = configKey.toJSON();
-      copyConfigKey(req, configKey).then(function (configKey) {
+      copyConfigKey(configKey).then(function (configKey) {
         return done(null, configKey);
       })["catch"](done);
       return null;

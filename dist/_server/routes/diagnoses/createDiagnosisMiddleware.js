@@ -32,14 +32,16 @@ module.exports = function () {
           var data = payload.data,
               rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
           var diagnosisId = snap.key;
-          resolve(diagnosisId);
 
           var _data = data ? JSON.parse(data) : null;
 
-          _firebase["default"].database().ref("diagnosis/".concat(payload.script_id)).child(diagnosisId).update((0, _objectSpread2["default"])({}, rest, {}, _data, {
+          _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set((0, _objectSpread2["default"])({}, rest, {}, _data, {
             diagnosisId: diagnosisId,
-            scriptId: payload.script_id
-          }));
+            scriptId: payload.script_id,
+            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+          })).then(function () {
+            resolve(diagnosisId);
+          })["catch"](reject);
         })["catch"](reject);
       });
     };

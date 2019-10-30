@@ -98,10 +98,6 @@ module.exports = function () {
 
               Model.create((0, _objectSpread2["default"])({}, data, {
                 data: JSON.stringify(data.data || {}),
-                details: JSON.stringify((0, _objectSpread2["default"])({}, data.details || {}, {
-                  originalHost: source.host,
-                  originalId: data.id
-                })),
                 id: id,
                 author: author
               }, params)).then(function (s) {
@@ -115,9 +111,6 @@ module.exports = function () {
             case 'configKey':
               return _models.ConfigKey.create((0, _objectSpread2["default"])({}, dataToImport, {
                 data: JSON.stringify(dataToImport.data || {}),
-                details: JSON.stringify((0, _objectSpread2["default"])({}, dataToImport.details || {}, {
-                  originalHost: source.host
-                })),
                 id: id,
                 author: author
               })).then(function (s) {
@@ -164,9 +157,6 @@ module.exports = function () {
             case 'script':
               return _models.Script.create((0, _objectSpread2["default"])({}, dataToImport, {
                 data: JSON.stringify(dataToImport.data || {}),
-                details: JSON.stringify((0, _objectSpread2["default"])({}, dataToImport.details || {}, {
-                  originalHost: source.host
-                })),
                 id: id,
                 author: author
               })).then(function (s) {

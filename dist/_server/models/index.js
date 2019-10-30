@@ -1,7 +1,5 @@
 "use strict";
 
-var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
-
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
 Object.defineProperty(exports, "__esModule", {
@@ -12,8 +10,6 @@ exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = export
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
-
-var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
@@ -37,7 +33,7 @@ var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
 
 var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
 
-var firebase = _interopRequireWildcard(require("../firebase"));
+var _firebase = _interopRequireDefault(require("../firebase"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -94,34 +90,31 @@ Object.keys(_App["default"]).forEach(function (key) {
 var Script = sequelize.define('script', _Script["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-})); // Script.afterCreate(script => {
-//   const { id, data, ...scr } = JSON.parse(JSON.stringify(script));
-//   firebase.set('screens', id, {});
-//   firebase.set('diagnosis', id, {});
-//   // firebase.set('scripts', id, { ...data, ...scr, scriptId: id });
-//   return new Promise(resolve => resolve(script));
-// });
-
+}));
 exports.Script = Script;
 Script.afterUpdate(function (script) {
   var _JSON$parse = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse.id,
       data = _JSON$parse.data,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data"]);
+      createdAt = _JSON$parse.createdAt,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data", "createdAt"]); // eslint-disable-line
 
-  firebase.update('screens', id, {});
-  firebase.update('diagnosis', id, {});
-  firebase.update('scripts', id, (0, _objectSpread2["default"])({}, data, {}, scr, {
-    scriptId: id
+
+  _firebase["default"].database().ref("scripts/".concat(id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
+    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
+
   return new Promise(function (resolve) {
     return resolve(script);
   });
 });
 Script.afterDestroy(function (instance) {
-  firebase.remove('screens', instance.id);
-  firebase.remove('diagnosis', instance.id);
-  firebase.remove('scripts', instance.id);
+  _firebase["default"].database().ref("screens/".concat(instance.id)).remove();
+
+  _firebase["default"].database().ref("diagnosis/".concat(instance.id)).remove();
+
+  _firebase["default"].database().ref("scripts/".concat(instance.id)).remove();
+
   return new Promise(function (resolve) {
     return resolve(instance);
   });
@@ -132,31 +125,27 @@ Object.keys(_Script["default"]).forEach(function (key) {
 var Screen = sequelize.define('screen', _Screen["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-})); // Screen.afterCreate(screen => {
-//   const { id, script_id, data, ...scr } = JSON.parse(JSON.stringify(screen));
-//   firebase.update('screens', script_id, {
-//     [id]: { ...data, ...scr, screenId: id }
-//   });
-//   return new Promise(resolve => resolve(screen));
-// });
-
+}));
 exports.Screen = Screen;
-Screen.afterUpdate(function (screen) {
-  var _JSON$parse2 = JSON.parse(JSON.stringify(screen)),
+Screen.afterUpdate(function (script) {
+  var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse2.id,
-      script_id = _JSON$parse2.script_id,
       data = _JSON$parse2.data,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "script_id", "data"]);
+      createdAt = _JSON$parse2.createdAt,
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "data", "createdAt"]); // eslint-disable-line
 
-  firebase.update('screens', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, scr, {
-    screenId: id
-  })));
+
+  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
+    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+  }));
+
   return new Promise(function (resolve) {
-    return resolve(screen);
+    return resolve(script);
   });
 });
 Screen.afterDestroy(function (instance) {
-  firebase.remove('screens', instance.id);
+  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.id)).remove();
+
   return new Promise(function (resolve) {
     return resolve(instance);
   });
@@ -167,31 +156,27 @@ Object.keys(_Screen["default"]).forEach(function (key) {
 var Diagnosis = sequelize.define('diagnosis', _Diagnosis["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-})); // Diagnosis.afterCreate(diagnosis => {
-//   const { id, script_id, data, ...d } = JSON.parse(JSON.stringify(diagnosis));
-//   firebase.update('diagnosis', script_id, {
-//     [id]: { ...data, ...d, diagnosisId: id }
-//   });
-//   return new Promise(resolve => resolve(diagnosis));
-// });
-
+}));
 exports.Diagnosis = Diagnosis;
 Diagnosis.afterUpdate(function (diagnosis) {
   var _JSON$parse3 = JSON.parse(JSON.stringify(diagnosis)),
       id = _JSON$parse3.id,
-      script_id = _JSON$parse3.script_id,
       data = _JSON$parse3.data,
-      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "script_id", "data"]);
+      createdAt = _JSON$parse3.createdAt,
+      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "data", "createdAt"]); // eslint-disable-line
 
-  firebase.update('diagnosis', script_id, (0, _defineProperty2["default"])({}, id, (0, _objectSpread2["default"])({}, data, {}, d, {
-    diagnosisId: id
-  })));
+
+  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(id)).update((0, _objectSpread2["default"])({}, data, {}, d, {
+    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+  }));
+
   return new Promise(function (resolve) {
     return resolve(diagnosis);
   });
 });
 Diagnosis.afterDestroy(function (instance) {
-  firebase.remove('diagnosis', instance.id);
+  _firebase["default"].database().ref("diagnosis/".concat(instance.script_id, "/").concat(instance.id)).remove();
+
   return new Promise(function (resolve) {
     return resolve(instance);
   });
@@ -202,28 +187,27 @@ Object.keys(_Diagnosis["default"]).forEach(function (key) {
 var ConfigKey = sequelize.define('config_key', _ConfigKey["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
-})); // ConfigKey.afterCreate(configKey => {
-//   const { id, data, ...cKey } = JSON.parse(JSON.stringify(configKey));
-//   firebase.set('configkeys', id, { ...data, ...cKey, configKeyId: id });
-//   return new Promise(resolve => resolve(configKey));
-// });
-
+}));
 exports.ConfigKey = ConfigKey;
-ConfigKey.afterUpdate(function (configKey) {
-  var _JSON$parse4 = JSON.parse(JSON.stringify(configKey)),
+ConfigKey.afterUpdate(function (cKey) {
+  var _JSON$parse4 = JSON.parse(JSON.stringify(cKey)),
       id = _JSON$parse4.id,
       data = _JSON$parse4.data,
-      cKey = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "data"]);
+      createdAt = _JSON$parse4.createdAt,
+      c = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "data", "createdAt"]); // eslint-disable-line
 
-  firebase.update('configkeys', id, (0, _objectSpread2["default"])({}, data, {}, cKey, {
-    configKeyId: id
+
+  _firebase["default"].database().ref("configkeys/".concat(id)).update((0, _objectSpread2["default"])({}, data, {}, c, {
+    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
+
   return new Promise(function (resolve) {
-    return resolve(configKey);
+    return resolve(cKey);
   });
 });
 ConfigKey.afterDestroy(function (instance) {
-  firebase.remove('configkeys', instance.id);
+  _firebase["default"].database().ref("configkeys/".concat(instance.id)).remove();
+
   return new Promise(function (resolve) {
     return resolve(instance);
   });

@@ -11,7 +11,9 @@ var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/sli
 
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _models = require("../../models");
 
@@ -26,16 +28,28 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var copyScreen = function copyScreen(req, screen) {
+var copyScreen = function copyScreen(screen) {
   return new Promise(function (resolve, reject) {
-    _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
-      id: (0, _uuidv["default"])(),
-      data: JSON.stringify(screen.data)
-    })).then(function (screen) {
-      return resolve(screen);
-    })["catch"](function (err) {
-      return reject(err);
-    });
+    _firebase["default"].database().ref("screens/".concat(screen.script_id)).push().then(function (snap) {
+      var data = screen.data,
+          rest = (0, _objectWithoutProperties2["default"])(screen, ["data"]);
+      var screenId = snap.key;
+
+      _firebase["default"].database().ref("screens/".concat(screen.script_id, "/").concat(screenId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+        screenId: screenId,
+        scriptId: screen.script_id,
+        createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+      })).then(function () {
+        _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
+          id: screenId,
+          data: JSON.stringify(screen.data)
+        })).then(function (screen) {
+          return resolve(screen);
+        })["catch"](function (err) {
+          return reject(err);
+        });
+      })["catch"](reject);
+    })["catch"](reject);
   });
 };
 
@@ -68,7 +82,7 @@ var _default = function _default(app) {
         msg: "Could not find screen with \"id\" ".concat(id, ".")
       });
       screen = screen.toJSON();
-      copyScreen(req, screen).then(function (screen) {
+      copyScreen(screen).then(function (screen) {
         // update screens positions
         (0, _updateScreensMiddleware.findAndUpdateScreens)({
           attributes: ['id'],

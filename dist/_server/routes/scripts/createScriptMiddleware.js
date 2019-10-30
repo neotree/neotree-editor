@@ -32,13 +32,15 @@ module.exports = function (app, params) {
           var data = payload.data,
               rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
           var scriptId = snap.key;
-          resolve(scriptId);
 
           var _data = data ? JSON.parse(data) : null;
 
-          _firebase["default"].database().ref('scripts').child(scriptId).update((0, _objectSpread2["default"])({}, rest, {}, _data, {
-            scriptId: scriptId
-          }));
+          _firebase["default"].database().ref("scripts/".concat(scriptId)).set((0, _objectSpread2["default"])({}, rest, {}, _data, {
+            scriptId: scriptId,
+            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+          })).then(function () {
+            resolve(scriptId);
+          })["catch"](reject);
         })["catch"](reject);
       });
     };
