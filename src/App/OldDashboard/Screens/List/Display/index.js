@@ -145,10 +145,10 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
-                <MenuItem onClick={() => this.handleDuplicateScreen(id)}>
+                {/*<MenuItem onClick={() => this.handleDuplicateScreen(id)}>
                   Duplicate
                 </MenuItem>
-                {/*<MenuItem>
+                <MenuItem>
                   <ClipboardCopyButton data={{ dataId: id, dataType: 'screen' }}>
                     <span>Copy</span>
                   </ClipboardCopyButton>
