@@ -72,6 +72,9 @@ export default class Table extends Component {
           onSelect,
           ...otherProps
         } = this.props;
+
+        const _selected = selected || [];
+
         const hasShadow = typeof shadow !== 'undefined';
         const shadowLevel = clamp(shadow || 0, 0, shadows.length - 1);
 
@@ -89,12 +92,12 @@ export default class Table extends Component {
                 <td>
                   <Checkbox
                     value={row.id}
-                    checked={selected.includes(row.id)}
+                    checked={_selected.includes(row.id)}
                     onChange={({ target: { value } }) => {
-                      onSelect(!selected.includes(value) ?
-                        [...selected, value]
+                      onSelect(!_selected.includes(value) ?
+                        [..._selected, value]
                         :
-                        selected.filter(id => id !== value)
+                        _selected.filter(id => id !== value)
                       );
                     }}
                   /></td>

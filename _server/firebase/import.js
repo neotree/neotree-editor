@@ -37,7 +37,7 @@ export default () => new Promise((resolve, reject) => {
           defaults: {
             script_id,
             position,
-            type: screens[script_id].type,
+            type: screens[script_id][id].type,
             data: JSON.stringify(screens[script_id][id])
           }
         }));
