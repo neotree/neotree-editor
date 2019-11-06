@@ -72,7 +72,7 @@ var _default = function _default() {
             },
             defaults: {
               script_id: script_id,
-              position: position,
+              position: screens[script_id][id].position || position,
               type: screens[script_id][id].type,
               data: JSON.stringify(screens[script_id][id])
             }
