@@ -58,7 +58,7 @@ export const Script = sequelize.define(
   ScriptModel.getStructure({ User, Sequelize })
 );
 Script.afterUpdate(script => {
-  const { id, data, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
   firebase.database().ref(`scripts/${id}`).update({
     ...data,
     ...scr,
@@ -79,7 +79,7 @@ export const Screen = sequelize.define(
   ScreenModel.getStructure({ User, Sequelize })
 );
 Screen.afterUpdate(script => {
-  const { id, data, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
   firebase.database().ref(`screens/${script.script_id}/${id}`).update({
     ...data,
     ...scr,
@@ -98,7 +98,7 @@ export const Diagnosis = sequelize.define(
   DiagnosisModel.getStructure({ User, Sequelize })
 );
 Diagnosis.afterUpdate(diagnosis => {
-  const { id, data, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
+  const { id, data: { createdAt: cAt, ...data }, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
   firebase.database().ref(`diagnosis/${diagnosis.script_id}/${id}`).update({
     ...data,
     ...d,
@@ -117,7 +117,7 @@ export const ConfigKey = sequelize.define(
   ConfigKeyModel.getStructure({ User, Sequelize }),
 );
 ConfigKey.afterUpdate(cKey => {
-  const { id, data, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
+  const { id, data: { createdAt: cAt, ...data }, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
   firebase.database().ref(`configkeys/${id}`).update({
     ...data,
     ...c,
