@@ -95,7 +95,9 @@ exports.Script = Script;
 Script.afterUpdate(function (script) {
   var _JSON$parse = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse.id,
-      data = _JSON$parse.data,
+      _JSON$parse$data = _JSON$parse.data,
+      cAt = _JSON$parse$data.createdAt,
+      data = (0, _objectWithoutProperties2["default"])(_JSON$parse$data, ["createdAt"]),
       createdAt = _JSON$parse.createdAt,
       scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data", "createdAt"]); // eslint-disable-line
 
@@ -130,7 +132,9 @@ exports.Screen = Screen;
 Screen.afterUpdate(function (script) {
   var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse2.id,
-      data = _JSON$parse2.data,
+      _JSON$parse2$data = _JSON$parse2.data,
+      cAt = _JSON$parse2$data.createdAt,
+      data = (0, _objectWithoutProperties2["default"])(_JSON$parse2$data, ["createdAt"]),
       createdAt = _JSON$parse2.createdAt,
       scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "data", "createdAt"]); // eslint-disable-line
 
@@ -161,7 +165,9 @@ exports.Diagnosis = Diagnosis;
 Diagnosis.afterUpdate(function (diagnosis) {
   var _JSON$parse3 = JSON.parse(JSON.stringify(diagnosis)),
       id = _JSON$parse3.id,
-      data = _JSON$parse3.data,
+      _JSON$parse3$data = _JSON$parse3.data,
+      cAt = _JSON$parse3$data.createdAt,
+      data = (0, _objectWithoutProperties2["default"])(_JSON$parse3$data, ["createdAt"]),
       createdAt = _JSON$parse3.createdAt,
       d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "data", "createdAt"]); // eslint-disable-line
 
@@ -192,7 +198,9 @@ exports.ConfigKey = ConfigKey;
 ConfigKey.afterUpdate(function (cKey) {
   var _JSON$parse4 = JSON.parse(JSON.stringify(cKey)),
       id = _JSON$parse4.id,
-      data = _JSON$parse4.data,
+      _JSON$parse4$data = _JSON$parse4.data,
+      cAt = _JSON$parse4$data.createdAt,
+      data = (0, _objectWithoutProperties2["default"])(_JSON$parse4$data, ["createdAt"]),
       createdAt = _JSON$parse4.createdAt,
       c = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "data", "createdAt"]); // eslint-disable-line
 
