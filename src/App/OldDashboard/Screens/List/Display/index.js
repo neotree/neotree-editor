@@ -11,14 +11,13 @@ import {
     DialogContent,
     Radio,
     RadioGroup,
-    Menu,
-    MenuItem,
 } from 'react-mdl';
-import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
+import { MdCreate, MdAdd, MdDelete } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
 import Api from 'AppUtils/Api';
+import Copy from 'Dashboard/Scripts/CopyItems';
 import { Table, TableHeader } from '../../datatable';
 
 class Display extends Component {
@@ -139,18 +138,8 @@ class Display extends Component {
           >
             <MdCreate style={{ fontSize: '24px' }} />
           </div>&nbsp;
-          <div style={{ position: 'relative' }}>
-            <div id={`menu_${id}`} className="ui__cursor_pointer">
-              <MdMoreVert style={{ fontSize: '24px' }} />
-            </div>
-            <Menu target={`menu_${id}`} align="right">
-                <MenuItem onClick={() => this.handleDuplicateScreen(id)}>
-                  Duplicate
-                </MenuItem>
-                <MenuItem onClick={this.handleDeleteScreenClick(id)}>
-                  Delete
-                </MenuItem>
-            </Menu>
+          <div className="ui__cursor_pointer" onClick={this.handleDeleteScreenClick(id)}>
+            <MdDelete style={{ fontSize: '24px' }} />
           </div>
         </div>
       );
@@ -196,11 +185,7 @@ class Display extends Component {
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
             {selected.length > 0 && (
-              <div>
-                {/*<ClipboardCopyButton data={{ dataId: selected, dataType: 'screen' }}>
-                  <span className="ui__cursor_pointer">Copy</span>
-                </ClipboardCopyButton>*/}
-              </div>
+              <Copy itemsType="screens" data={{ ids: selected }} />
             )}
             <div
               onClick={this.openSelectScreenTypeDialog}

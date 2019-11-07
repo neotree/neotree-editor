@@ -12,6 +12,7 @@ import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar'; // eslint-disable-line
 import Spinner from 'ui/Spinner'; // eslint-disable-line
 import Api from 'AppUtils/Api';
+import Copy from 'Dashboard/Scripts/CopyItems';
 
 class Display extends Component {
   constructor(props) {
@@ -72,6 +73,7 @@ class Display extends Component {
 
   render() {
     const { diagnoses } = this.props;
+    const { selected } = this.state;
 
     const styles = {
       diagnosis: { overflow: 'unset', width: '100%', minWidth: '700px' },
@@ -121,6 +123,9 @@ class Display extends Component {
       <div>
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
+            {selected.length > 0 && (
+              <Copy itemsType="diagnoses" data={{ ids: selected }} />
+            )}
             <div onClick={this.handleAddDiagnosisClick} className="ui__cursor_pointer">
               <MdAdd style={{ fontSize: '24px' }} />
             </div>
