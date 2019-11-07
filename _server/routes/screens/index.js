@@ -5,6 +5,12 @@ const router = express.Router();
 module.exports = app => {
   const { responseMiddleware } = app;
 
+  router.post(
+    '/copy-screens',
+    require('./copyScreensMiddleware')(app),
+    responseMiddleware
+  );
+
   router.get(
     '/get-screens',
     require('./getScreensMiddleware')(app),
