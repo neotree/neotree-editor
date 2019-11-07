@@ -17,6 +17,7 @@ var router = _express["default"].Router();
 
 module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
+  router.post('/copy-diagnoses', require('./copyDiagnosesMiddleware')(app), responseMiddleware);
   router.get('/get-diagnoses', require('./getDiagnosesMiddleware')(app), responseMiddleware);
   router.get('/get-diagnosis', require('./getDiagnosisMiddleware')(app), responseMiddleware);
   router.get('/get-full-diagnosis', require('./getFullDiagnosisMiddleware')(app), responseMiddleware);

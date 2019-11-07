@@ -17,6 +17,7 @@ var router = _express["default"].Router();
 
 module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
+  router.post('/copy-screens', require('./copyScreensMiddleware')(app), responseMiddleware);
   router.get('/get-screens', require('./getScreensMiddleware')(app), responseMiddleware);
   router.get('/get-screen', require('./getScreenMiddleware')(app), responseMiddleware);
   router.get('/get-full-screen', require('./getFullScreenMiddleware')(app), responseMiddleware);

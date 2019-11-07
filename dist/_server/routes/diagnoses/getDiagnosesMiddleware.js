@@ -19,7 +19,8 @@ module.exports = function () {
     };
 
     _models.Diagnosis.findAll({
-      where: payload
+      where: payload,
+      order: [['createdAt', 'DESC']]
     }).then(function (diagnoses) {
       return done(null, diagnoses);
     })["catch"](done);
