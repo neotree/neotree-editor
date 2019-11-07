@@ -3,8 +3,9 @@ import PropTypes from 'prop-types';
 import { Button, Dialog, DialogContent, DialogActions } from 'react-mdl';
 import Api from 'AppUtils/Api';
 import Spinner from 'ui/Spinner';
+import ucFirst from 'AppUtils/ucFirst';
 
-const Copy = ({ data, children, itemsType }) => {
+const Copy = ({ data, children, itemsType, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
@@ -12,6 +13,7 @@ const Copy = ({ data, children, itemsType }) => {
   const [error, setError] = useState(null);
   const [copying, setCopying] = useState(false);
   const [script_id, setScriptId] = useState('');
+  const [displaySuccessModal, setDisplaySuccessModal] = useState(false);
 
   useEffect(() => {
     setError(null);
@@ -50,7 +52,13 @@ const Copy = ({ data, children, itemsType }) => {
               <p>Copy to</p>
               <select
                 value={script_id || ''}
-                style={{ maxWidth: 200 }}
+                style={{
+                  maxWidth: 200,
+                  background: 'transparent',
+                  border: '1px solid #ddd',
+                  padding: 10,
+                  outline: 'none !important'
+                }}
                 onChange={e => setScriptId(e.target.value)}
               >
                 <option value="">Select script</option>
@@ -70,10 +78,12 @@ const Copy = ({ data, children, itemsType }) => {
                   setCopying(true);
                   setError(null);
                   Api.post(`/copy-${itemsType}`, { ...data, script_id })
-                    .then(({ error }) => {
+                    .then(({ error, payload: { items } }) => {
                       setError(error);
                       setCopying(false);
                       setScriptId('');
+                      if (onSuccess) onSuccess(items, script_id);
+                      setDisplaySuccessModal(true);
                     })
                     .catch(err => {
                       setError(err);
@@ -94,6 +104,23 @@ const Copy = ({ data, children, itemsType }) => {
               )}
             </DialogActions>
           </>}
+      </Dialog>
+
+      <Dialog open={displaySuccessModal} onClose={() => setDisplaySuccessModal(false)}>
+        <DialogContent>
+          <div style={{ textAlign: 'center' }}>
+            <p>{ucFirst(itemsType)} copied successfully.</p>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            accent
+            onClick={() => {
+              setOpen(false);
+              setDisplaySuccessModal(false);
+            }}
+          >OK</Button>
+        </DialogActions>
       </Dialog>
     </>
   );

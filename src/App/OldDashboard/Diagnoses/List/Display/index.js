@@ -72,7 +72,7 @@ class Display extends Component {
   };
 
   render() {
-    const { diagnoses } = this.props;
+    const { diagnoses, match, updateState } = this.props;
     const { selected } = this.state;
 
     const styles = {
@@ -124,7 +124,17 @@ class Display extends Component {
         <Card shadow={0} style={styles.diagnosis}>
           <Toolbar title="Diagnosis">
             {selected.length > 0 && (
-              <Copy itemsType="diagnoses" data={{ ids: selected }} />
+              <Copy
+                itemsType="diagnoses"
+                data={{ ids: selected }}
+                onSuccess={(items, script_id) => {
+                  if (match.params.scriptId === script_id) {
+                    updateState(({ diagnoses }) => ({
+                      screens: [...items, ...diagnoses]
+                    }));
+                  }
+                }}
+              />
             )}
             <div onClick={this.handleAddDiagnosisClick} className="ui__cursor_pointer">
               <MdAdd style={{ fontSize: '24px' }} />

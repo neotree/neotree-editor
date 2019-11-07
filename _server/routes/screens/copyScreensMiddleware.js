@@ -5,8 +5,9 @@ import firebase from '../../firebase';
 module.exports = app => (req, res, next) => {
   const payload = req.body;
 
-  const done = (err, screen) => {
-    res.locals.setResponse(err, { screen });
+  const done = (err, items) => {
+    if (err) app.logger.log(err);
+    res.locals.setResponse(err, { items });
     next(); return null;
   };
 
@@ -37,29 +38,33 @@ module.exports = app => (req, res, next) => {
     .catch(reject);
   });
 
-  Screen.findAll({ where: { id: { in: payload.ids } } })
+  Screen.findAll({ where: { id: payload.ids } })
     .then(screens => {
-      Promise.all(screens.map(({ createdAt, updateAt, id, ...scr }) => { // eslint-disable-line
-        return saveToFirebase(scr);
+      Promise.all(screens.map(screen => {
+        screen = JSON.parse(JSON.stringify(screen));
+        const { createdAt, updateAt, id, ...scr } = screen; // eslint-disable-line
+        return saveToFirebase({ ...scr, script_id: payload.script_id });
       }))
-      .then(scr => {
-        Screen.create({ ...scr, position: 1 })
-          .then(screen => {
+      .then(items => Promise.all(items.map((item, i) => Screen.create({
+        ...item,
+        position: i + 1
+      })))
+        .then(items => {
+          Promise.all(items.map(item => {
             // update screens positions
-            findAndUpdateScreens(
+            return findAndUpdateScreens(
               {
                 attributes: ['id'],
-                where: { script_id: screen.script_id },
+                where: { script_id: item.script_id },
                 order: [['position', 'ASC']]
               },
               screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
-            ).then(() => null).catch(err => { app.logger.log(err); return null; });
-
-            return done(null, screen);
-          })
-          .catch(done);
-      })
-      .catch(done);
+            );
+          }))
+          .then(() => done(null, items))
+          .catch(() => done(null, items));
+        }))
+        .catch(done);
     })
     .catch(done);
 };

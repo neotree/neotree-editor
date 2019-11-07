@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next(); return null;
   };
 
-  Diagnosis.findAll({ where: payload })
+  Diagnosis.findAll({ where: payload, order: [['createdAt', 'DESC']] })
     .then(diagnoses => done(null, diagnoses))
     .catch(done);
 };

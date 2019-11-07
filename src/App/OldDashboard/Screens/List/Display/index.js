@@ -111,7 +111,7 @@ class Display extends Component {
 
   // TODO: Fix margin top to be more generic for all content
   render() {
-    const { screens } = this.props;
+    const { screens, match, updateState } = this.props;
     const { addScreenType, selected } = this.state;
     const styles = {
       screens: { overflow: 'unset', width: '100%', minWidth: '700px' },
@@ -185,7 +185,17 @@ class Display extends Component {
         <Card shadow={0} style={styles.screens}>
           <Toolbar title="Screens">
             {selected.length > 0 && (
-              <Copy itemsType="screens" data={{ ids: selected }} />
+              <Copy
+                itemsType="screens"
+                data={{ ids: selected }}
+                onSuccess={(items, script_id) => {
+                  if (match.params.scriptId === script_id) {
+                    updateState(({ screens }) => ({
+                      screens: [...items, ...screens]
+                    }));
+                  }
+                }}
+              />
             )}
             <div
               onClick={this.openSelectScreenTypeDialog}

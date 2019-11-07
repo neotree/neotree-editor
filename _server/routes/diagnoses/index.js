@@ -5,6 +5,12 @@ const router = express.Router();
 module.exports = app => {
   const { responseMiddleware } = app;
 
+  router.post(
+    '/copy-diagnoses',
+    require('./copyDiagnosesMiddleware')(app),
+    responseMiddleware
+  );
+
   router.get(
     '/get-diagnoses',
     require('./getDiagnosesMiddleware')(app),
