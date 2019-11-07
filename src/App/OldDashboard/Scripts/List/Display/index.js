@@ -18,7 +18,6 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert, MdCreate } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import { withClipboard, ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import ExportLink from '../../../components/ExportLink';
 
@@ -236,4 +235,4 @@ Display.propTypes = {
   actions: PropTypes.object.isRequired
 };
 
-export default hot(withClipboard(['script'])(Display));
+export default hot(Display);

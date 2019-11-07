@@ -18,7 +18,6 @@ import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
 import Toolbar from 'Toolbar';
 import { DEFAULT_SCREEN_TYPE, ScreenType } from 'App/constants';
 // import Spinner from 'ui/Spinner';
-import { ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import { Table, TableHeader } from '../../datatable';
 
@@ -145,14 +144,9 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
-                {/*<MenuItem onClick={() => this.handleDuplicateScreen(id)}>
+                <MenuItem onClick={() => this.handleDuplicateScreen(id)}>
                   Duplicate
                 </MenuItem>
-                <MenuItem>
-                  <ClipboardCopyButton data={{ dataId: id, dataType: 'screen' }}>
-                    <span>Copy</span>
-                  </ClipboardCopyButton>
-                </MenuItem>*/}
                 <MenuItem onClick={this.handleDeleteScreenClick(id)}>
                   Delete
                 </MenuItem>

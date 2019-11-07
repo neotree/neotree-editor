@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { Button, Card, CardText, Textfield, Tab, Tabs } from 'react-mdl';
 import FormButtonBar from 'FormButtonBar';
 import Toolbar from 'Toolbar';
-import { withClipboard, } from 'DashboardComponents/Clipboard';
 import ScreensList from '../../../Screens/List';
 import DiagnosisList from '../../../Diagnoses/List';
 
@@ -174,4 +173,4 @@ Display.propTypes = {
   script: PropTypes.object,
 };
 
-export default withClipboard(['screen', 'diagnosis'])(Display);
+export default Display;

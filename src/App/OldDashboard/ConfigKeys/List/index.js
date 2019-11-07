@@ -17,7 +17,6 @@ import {
 } from 'react-mdl';
 import { MdAdd, MdMoreVert } from 'react-icons/md';
 import Spinner from 'ui/Spinner';
-import { withClipboard, ClipboardCopyButton } from 'DashboardComponents/Clipboard';
 import Api from 'AppUtils/Api';
 import ExportLink from '../../components/ExportLink';
 
@@ -231,12 +230,6 @@ class List extends Component {
             style={{ position: 'relative', color: '#999999' }}
             className="ui__flex ui__alignItems_center"
           >
-            {/*<div
-              className="ui__cursor_pointer"
-              onClick={this.handleEditConfigKeyClick.bind(this, id)}
-            >
-              <MdCreate style={{ fontSize: '24px' }} />
-            </div>*/}&nbsp;
             <div id={menuId} className="ui__cursor_pointer">
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
@@ -244,16 +237,9 @@ class List extends Component {
                 <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, id)}>
                   Delete
                 </MenuItem>
-                {/*<MenuItem onClick={() => this.handleDuplicateKey(id)}>
+                <MenuItem onClick={() => this.handleDuplicateKey(id)}>
                   Duplicate
                 </MenuItem>
-                <MenuItem>
-                  <ClipboardCopyButton
-                    data={{ dataId: id, dataType: 'configKey' }}
-                  >
-                    <span>Copy</span>
-                  </ClipboardCopyButton>
-                </MenuItem>*/}
                 <MenuItem>
                   <ExportLink options={{ configKey: id }} />
                 </MenuItem>
@@ -305,4 +291,4 @@ class List extends Component {
   }
 }
 
-export default withClipboard(['configKey'])(List);
+export default List;

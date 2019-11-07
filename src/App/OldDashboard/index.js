@@ -22,7 +22,6 @@ import {
   MenuItem
 } from 'react-mdl';
 import LazyComponent from 'LazyComponent';
-import ClipboardWrapper from 'DashboardComponents/Clipboard/ClipboardWrapper';
 
 const AdminPassword = LazyComponent(() => import('./AdminPassword'));
 const ConfigKeys = LazyComponent(() => import('./ConfigKeys'));
@@ -101,89 +100,87 @@ export class Dashboard extends React.Component {
     };
 
     return (
-      <ClipboardWrapper>
-        <div style={styles.container}>
-          <Layout ref="layout" fixedHeader fixedDrawer>
-            <Header id="dashboard-header" title={toolbarTitle}>
-              <div className="ui__cursor_pointer" id="actionbar-menu">
-                <MdMoreVert style={{ fontSize: '24px' }} />
-              </div>
-              <Menu target="actionbar-menu" align="right">
-                <MenuItem>Profile</MenuItem>
-                <MenuItem onClick={this.openLogoutConfirmDialog}>Sign out</MenuItem>
-              </Menu>
-            </Header>
-            <Drawer title="Neo Tree">
-              <Navigation>
-                <Link onClick={this.toggleDrawer} to="/dashboard/adminpassword">Admin Password</Link>
-                <Link onClick={this.toggleDrawer} to="/dashboard/configkeys">Configuration</Link>
-                {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
-                <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
-                <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
-                {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
-              </Navigation>
-            </Drawer>
-            <Content style={styles.content}>
-              <Switch>
-                <Route
-                  exact
-                  path="/dashboard/import-firebase"
-                  render={routeProps => <ImportDataPage {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard"
-                  render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/scripts"
-                  render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/scripts/:scriptId"
-                  render={routeProps => <ScriptEditor {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/scripts/:scriptId/screens/:screenId"
-                  render={routeProps => <ScreenEditor {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/scripts/:scriptId/diagnosis/:diagnosisId"
-                  render={routeProps => <DiagnosisEditor {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/adminpassword"
-                  render={routeProps => <AdminPassword {...this.props} {...routeProps} />}
-                />
-                <Route
-                  exact
-                  path="/dashboard/configkeys"
-                  render={routeProps => <ConfigKeys {...this.props} {...routeProps} />}
-                />
-                <Route
-                  path="*"
-                  render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
-                />
-              </Switch>
-            </Content>
-          </Layout>
-          <Dialog open={this.state.openLogoutConfirmDialog}>
-            <DialogTitle>Sign out</DialogTitle>
-            <DialogContent>
-              <p>You are about to sign out. All unsaved changes will be lost.</p>
-            </DialogContent>
-            <DialogActions>
-              <Button type='button' onClick={this.handleLogoutClick} accent>Sign out</Button>
-              <Button type='button' onClick={this.closeLogoutConfirmDialog}>Cancel</Button>
-            </DialogActions>
-          </Dialog>
-        </div>
-      </ClipboardWrapper>
+      <div style={styles.container}>
+        <Layout ref="layout" fixedHeader fixedDrawer>
+          <Header id="dashboard-header" title={toolbarTitle}>
+            <div className="ui__cursor_pointer" id="actionbar-menu">
+              <MdMoreVert style={{ fontSize: '24px' }} />
+            </div>
+            <Menu target="actionbar-menu" align="right">
+              <MenuItem>Profile</MenuItem>
+              <MenuItem onClick={this.openLogoutConfirmDialog}>Sign out</MenuItem>
+            </Menu>
+          </Header>
+          <Drawer title="Neo Tree">
+            <Navigation>
+              <Link onClick={this.toggleDrawer} to="/dashboard/adminpassword">Admin Password</Link>
+              <Link onClick={this.toggleDrawer} to="/dashboard/configkeys">Configuration</Link>
+              {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
+              <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
+              <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
+              {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
+            </Navigation>
+          </Drawer>
+          <Content style={styles.content}>
+            <Switch>
+              <Route
+                exact
+                path="/dashboard/import-firebase"
+                render={routeProps => <ImportDataPage {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard"
+                render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/scripts"
+                render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/scripts/:scriptId"
+                render={routeProps => <ScriptEditor {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/scripts/:scriptId/screens/:screenId"
+                render={routeProps => <ScreenEditor {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/scripts/:scriptId/diagnosis/:diagnosisId"
+                render={routeProps => <DiagnosisEditor {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/adminpassword"
+                render={routeProps => <AdminPassword {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/configkeys"
+                render={routeProps => <ConfigKeys {...this.props} {...routeProps} />}
+              />
+              <Route
+                path="*"
+                render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
+              />
+            </Switch>
+          </Content>
+        </Layout>
+        <Dialog open={this.state.openLogoutConfirmDialog}>
+          <DialogTitle>Sign out</DialogTitle>
+          <DialogContent>
+            <p>You are about to sign out. All unsaved changes will be lost.</p>
+          </DialogContent>
+          <DialogActions>
+            <Button type='button' onClick={this.handleLogoutClick} accent>Sign out</Button>
+            <Button type='button' onClick={this.closeLogoutConfirmDialog}>Cancel</Button>
+          </DialogActions>
+        </Dialog>
+      </div>
     );
   }
 }
