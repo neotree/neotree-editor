@@ -126,7 +126,7 @@ class Display extends Component {
             {selected.length > 0 && (
               <Copy
                 itemsType="diagnoses"
-                data={{ ids: selected }}
+                data={{ ids: diagnoses.map(d => selected.includes(d.id) ? d.id : null).filter(id => id !== null) }}
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ diagnoses }) => ({
@@ -150,7 +150,9 @@ class Display extends Component {
               })}
               style={{ width: '780px' }}
               shadow={0}
-              rows={diagnoses.map(d => ({ id: d.id, ...d.data }))}
+              rows={diagnoses
+                // .sort((a, b) => a.position - b.position)
+                .map(d => ({ id: d.id, ...d.data }))}
             >
               <TableHeader name="name">Name</TableHeader>
               <TableHeader name="description">Description</TableHeader>

@@ -13,7 +13,7 @@ module.exports = app => (req, res, next) => {
 
   const saveToFirebase = payload => new Promise((resolve, reject) => {
     firebase.database().ref(`screens/${payload.script_id}`).push().then(snap => {
-      const { data, ...rest } = payload;
+      const { data: { position, ...data }, ...rest } = payload; // eslint-disable-line
 
       const screenId = snap.key;
 
@@ -38,17 +38,21 @@ module.exports = app => (req, res, next) => {
     .catch(reject);
   });
 
-  Screen.findAll({ where: { id: payload.ids } })
-    .then(screens => {
-      Promise.all(screens.map(screen => {
+  Promise.all([
+    Screen.count({ where: { script_id: payload.script_id } }),
+    Screen.findAll({ where: { id: payload.ids } })
+  ])
+    .then(([count, screens]) => {
+      Promise.all(screens.map((screen, i) => {
         screen = JSON.parse(JSON.stringify(screen));
         const { createdAt, updateAt, id, ...scr } = screen; // eslint-disable-line
-        return saveToFirebase({ ...scr, script_id: payload.script_id });
+        return saveToFirebase({
+          ...scr,
+          position: count + (i + 1),
+          script_id: payload.script_id
+        });
       }))
-      .then(items => Promise.all(items.map((item, i) => Screen.create({
-        ...item,
-        position: i + 1
-      })))
+      .then(items => Promise.all(items.map(item => Screen.create({ ...item })))
         .then(items => {
           Promise.all(items.map(item => {
             // update screens positions

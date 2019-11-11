@@ -12,7 +12,7 @@ module.exports = app => (req, res, next) => {
 
   const saveToFirebase = payload => new Promise((resolve, reject) => {
     firebase.database().ref(`diagnosis/${payload.script_id}`).push().then(snap => {
-      const { data, ...rest } = payload;
+      const { data: { position, ...data }, ...rest } = payload; // eslint-disable-line
 
       const diagnosisId = snap.key;
 
@@ -37,18 +37,22 @@ module.exports = app => (req, res, next) => {
     .catch(reject);
   });
 
-  Diagnosis.findAll({ where: { id: payload.ids } })
-    .then(diagnoses => {
-      Promise.all(diagnoses.map(diagnosis => {
+  Promise.all([
+    Diagnosis.count({ where: { script_id: payload.script_id } }),
+    Diagnosis.findAll({ where: { id: payload.ids } })
+  ])
+    .then(([count, diagnoses]) => {
+      Promise.all(diagnoses.map((diagnosis, i) => {
         diagnosis = JSON.parse(JSON.stringify(diagnosis));
-        const { createdAt, updateAt, id, ...scr } = diagnosis; // eslint-disable-line
-        return saveToFirebase({ ...scr, script_id: payload.script_id });
+        const { createdAt, updateAt, id, ...d } = diagnosis; // eslint-disable-line
+        return saveToFirebase({
+          ...d,
+          position: count + (i + 1),
+          script_id: payload.script_id
+        });
       }))
       .then(items =>
-        Promise.all(items.map((item, i) => Diagnosis.create({
-          ...item,
-          position: i + 1
-        })))
+        Promise.all(items.map(item => Diagnosis.create({ ...item })))
           .then(items => {
             return done(null, items);
           })
