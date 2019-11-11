@@ -2,6 +2,8 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
@@ -30,8 +32,11 @@ module.exports = function (app) {
     var saveToFirebase = function saveToFirebase(payload) {
       return new Promise(function (resolve, reject) {
         _firebase["default"].database().ref("diagnosis/".concat(payload.script_id)).push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
+          var _payload$data = payload.data,
+              position = _payload$data.position,
+              data = (0, _objectWithoutProperties2["default"])(_payload$data, ["position"]),
+              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]); // eslint-disable-line
+
           var diagnosisId = snap.key;
           var diagnosis = (0, _objectSpread2["default"])({}, rest, {}, data, {
             diagnosisId: diagnosisId,
@@ -49,27 +54,34 @@ module.exports = function (app) {
       });
     };
 
-    _models.Diagnosis.findAll({
+    Promise.all([_models.Diagnosis.count({
+      where: {
+        script_id: payload.script_id
+      }
+    }), _models.Diagnosis.findAll({
       where: {
         id: payload.ids
       }
-    }).then(function (diagnoses) {
-      Promise.all(diagnoses.map(function (diagnosis) {
+    })]).then(function (_ref) {
+      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+          count = _ref2[0],
+          diagnoses = _ref2[1];
+
+      Promise.all(diagnoses.map(function (diagnosis, i) {
         diagnosis = JSON.parse(JSON.stringify(diagnosis));
         var _diagnosis = diagnosis,
             createdAt = _diagnosis.createdAt,
             updateAt = _diagnosis.updateAt,
             id = _diagnosis.id,
-            scr = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id"]); // eslint-disable-line
+            d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id"]); // eslint-disable-line
 
-        return saveToFirebase((0, _objectSpread2["default"])({}, scr, {
+        return saveToFirebase((0, _objectSpread2["default"])({}, d, {
+          position: count + (i + 1),
           script_id: payload.script_id
         }));
       })).then(function (items) {
-        return Promise.all(items.map(function (item, i) {
-          return _models.Diagnosis.create((0, _objectSpread2["default"])({}, item, {
-            position: i + 1
-          }));
+        return Promise.all(items.map(function (item) {
+          return _models.Diagnosis.create((0, _objectSpread2["default"])({}, item));
         })).then(function (items) {
           return done(null, items);
         })["catch"](done);

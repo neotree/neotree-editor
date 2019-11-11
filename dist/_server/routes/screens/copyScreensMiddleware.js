@@ -2,6 +2,8 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
@@ -32,8 +34,11 @@ module.exports = function (app) {
     var saveToFirebase = function saveToFirebase(payload) {
       return new Promise(function (resolve, reject) {
         _firebase["default"].database().ref("screens/".concat(payload.script_id)).push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
+          var _payload$data = payload.data,
+              position = _payload$data.position,
+              data = (0, _objectWithoutProperties2["default"])(_payload$data, ["position"]),
+              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]); // eslint-disable-line
+
           var screenId = snap.key;
           var screen = (0, _objectSpread2["default"])({}, rest, {}, data, {
             screenId: screenId,
@@ -51,12 +56,20 @@ module.exports = function (app) {
       });
     };
 
-    _models.Screen.findAll({
+    Promise.all([_models.Screen.count({
+      where: {
+        script_id: payload.script_id
+      }
+    }), _models.Screen.findAll({
       where: {
         id: payload.ids
       }
-    }).then(function (screens) {
-      Promise.all(screens.map(function (screen) {
+    })]).then(function (_ref) {
+      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+          count = _ref2[0],
+          screens = _ref2[1];
+
+      Promise.all(screens.map(function (screen, i) {
         screen = JSON.parse(JSON.stringify(screen));
         var _screen = screen,
             createdAt = _screen.createdAt,
@@ -65,13 +78,12 @@ module.exports = function (app) {
             scr = (0, _objectWithoutProperties2["default"])(_screen, ["createdAt", "updateAt", "id"]); // eslint-disable-line
 
         return saveToFirebase((0, _objectSpread2["default"])({}, scr, {
+          position: count + (i + 1),
           script_id: payload.script_id
         }));
       })).then(function (items) {
-        return Promise.all(items.map(function (item, i) {
-          return _models.Screen.create((0, _objectSpread2["default"])({}, item, {
-            position: i + 1
-          }));
+        return Promise.all(items.map(function (item) {
+          return _models.Screen.create((0, _objectSpread2["default"])({}, item));
         })).then(function (items) {
           Promise.all(items.map(function (item) {
             // update screens positions
