@@ -5,6 +5,7 @@ module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
+    if (err) app.logger.log(err);
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };
@@ -24,7 +25,7 @@ module.exports = app => (req, res, next) => {
               where: { script_id: d.script_id },
               order: [['position', 'ASC']]
             },
-            screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
+            diagnoses => diagnoses.map((d, i) => ({ ...d, position: i + 1 }))
           ).then(() => null).catch(err => { app.logger.log(err); return null; });
 
           return done(null, { deleted });

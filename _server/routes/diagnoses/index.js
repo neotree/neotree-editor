@@ -43,7 +43,7 @@ module.exports = app => {
 
   router.post(
     '/update-diagnoses',
-    require('./updateDiagnosesMiddleware')(app),
+    require('./updateDiagnosesMiddleware').default(app),
     responseMiddleware
   );
 

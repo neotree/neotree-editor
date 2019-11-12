@@ -25,7 +25,7 @@ module.exports = app => (req, res, next) => {
       };
 
       firebase.database()
-        .ref(`diagnoses/${payload.script_id}/${diagnosisId}`).set(diagnosis).then(() => {
+        .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set(diagnosis).then(() => {
           resolve({
             ...rest,
             id: diagnosisId,

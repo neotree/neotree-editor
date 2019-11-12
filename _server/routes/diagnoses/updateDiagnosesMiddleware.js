@@ -1,6 +1,35 @@
 import { Diagnosis } from '../../models';
 
-module.exports = () => (req, res, next) => {
+export const updateDiagnoses = (diagnoses, returnUpdated = false) => new Promise((resolve, reject) =>
+  Promise.all(diagnoses.map(({ id, ...d }) =>
+    Diagnosis.update({ ...d }, { where: { id }, individualHooks: true }))
+  ).then(rslts => {
+    if (!returnUpdated) return resolve({ rslts });
+
+    Diagnosis.findAll({ where: { id: diagnoses.map(d => d.id) }, order: [['position', 'ASC']] })
+      .then(diagnoses => resolve({ diagnoses }))
+      .catch(reject);
+
+    return null;
+  }).catch(reject)
+);
+
+export const findAndUpdateDiagnoses = (
+  finder = {},
+  updater,
+  returnUpdated = false
+) =>
+  new Promise((resolve, reject) => {
+    Diagnosis.findAll(finder).then(diagnoses => {
+      diagnoses = updater(JSON.parse(JSON.stringify(diagnoses)));
+      updateDiagnoses(diagnoses, returnUpdated)
+        .then(resolve)
+        .catch(reject);
+      return null;
+    }).catch(reject);
+  });
+
+export default () => (req, res, next) => {
   const { diagnoses, returnUpdated } = req.body;
 
   const done = (err, payload) => {
@@ -8,15 +37,7 @@ module.exports = () => (req, res, next) => {
     next(); return null;
   };
 
-  Promise.all(diagnoses.map(({ id, ...scr }) =>
-    Diagnosis.update({ ...scr }, { where: { id }, individualHooks: true }))
-  ).then(rslts => {
-    if (!returnUpdated) return done(null, { rslts });
-
-    Diagnosis.findAll({ where: { id: diagnoses.map(scr => scr.id) } })
-      .then(diagnoses => done(null, { diagnoses }))
-      .catch(done);
-
-    return null;
-  }).catch(done);
+  updateDiagnoses(diagnoses, returnUpdated)
+    .then(payload => done(null, payload))
+    .catch(done);
 };

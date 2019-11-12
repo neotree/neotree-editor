@@ -16,11 +16,12 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var payload = req.body;
 
     var done = function done(err, diagnosis) {
+      if (err) app.logger.log(err);
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });

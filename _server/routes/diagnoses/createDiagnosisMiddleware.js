@@ -1,10 +1,11 @@
 import { Diagnosis } from '../../models';
 import firebase from '../../firebase';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const payload = req.body;
 
   const done = (err, diagnosis) => {
+    if (err) app.logger.log(err);
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

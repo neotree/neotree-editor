@@ -44,7 +44,7 @@ module.exports = function (app) {
             createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
           });
 
-          _firebase["default"].database().ref("diagnoses/".concat(payload.script_id, "/").concat(diagnosisId)).set(diagnosis).then(function () {
+          _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(diagnosis).then(function () {
             resolve((0, _objectSpread2["default"])({}, rest, {
               id: diagnosisId,
               data: JSON.stringify(diagnosis)

@@ -17,6 +17,7 @@ module.exports = function (app) {
     var id = req.body.id;
 
     var done = function done(err, diagnosis) {
+      if (err) app.logger.log(err);
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });
@@ -48,9 +49,9 @@ module.exports = function (app) {
             script_id: d.script_id
           },
           order: [['position', 'ASC']]
-        }, function (screens) {
-          return screens.map(function (scr, i) {
-            return (0, _objectSpread2["default"])({}, scr, {
+        }, function (diagnoses) {
+          return diagnoses.map(function (d, i) {
+            return (0, _objectSpread2["default"])({}, d, {
               position: i + 1
             });
           });
