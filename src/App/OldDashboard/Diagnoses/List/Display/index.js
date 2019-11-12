@@ -130,7 +130,7 @@ class Display extends Component {
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ diagnoses }) => ({
-                      screens: [...items, ...diagnoses]
+                      diagnoses: [...diagnoses, ...items]
                     }));
                   }
                 }}
