@@ -2,13 +2,13 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _models = require("../../models");
-
-var _updateScreensMiddleware = require("./updateScreensMiddleware");
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
@@ -21,6 +21,7 @@ module.exports = function (app) {
     var payload = req.body;
 
     var done = function done(err, screen) {
+      if (err) app.logger.log(err);
       res.locals.setResponse(err, {
         screen: screen
       });
@@ -48,30 +49,19 @@ module.exports = function (app) {
       });
     };
 
-    saveToFirebase().then(function (id) {
+    Promise.all([_models.Screen.count({
+      where: {
+        script_id: payload.script_id
+      }
+    }), saveToFirebase()]).then(function (_ref) {
+      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+          position = _ref2[0],
+          id = _ref2[1];
+
       _models.Screen.create((0, _objectSpread2["default"])({}, payload, {
-        position: 1,
+        position: position || 1,
         id: id
       })).then(function (screen) {
-        // update screens positions
-        (0, _updateScreensMiddleware.findAndUpdateScreens)({
-          attributes: ['id'],
-          where: {
-            script_id: screen.script_id
-          },
-          order: [['position', 'ASC']]
-        }, function (screens) {
-          return screens.map(function (scr, i) {
-            return (0, _objectSpread2["default"])({}, scr, {
-              position: i + 1
-            });
-          });
-        }).then(function () {
-          return null;
-        })["catch"](function (err) {
-          app.logger.log(err);
-          return null;
-        });
         return done(null, screen);
       })["catch"](done);
     })["catch"](done);

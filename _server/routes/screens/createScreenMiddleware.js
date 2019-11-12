@@ -1,11 +1,11 @@
 import { Screen } from '../../models';
-import { findAndUpdateScreens } from './updateScreensMiddleware';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   const payload = req.body;
 
   const done = (err, screen) => {
+    if (err) app.logger.log(err);
     res.locals.setResponse(err, { screen });
     next(); return null;
   };
@@ -33,22 +33,13 @@ module.exports = app => (req, res, next) => {
     .catch(reject);
   });
 
-  saveToFirebase()
-    .then(id => {
-      Screen.create({ ...payload, position: 1, id })
-        .then((screen) => {
-          // update screens positions
-          findAndUpdateScreens(
-            {
-              attributes: ['id'],
-              where: { script_id: screen.script_id },
-              order: [['position', 'ASC']]
-            },
-            screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
-          ).then(() => null).catch(err => { app.logger.log(err); return null; });
-
-          return done(null, screen);
-        })
+  Promise.all([
+    Screen.count({ where: { script_id: payload.script_id } }),
+    saveToFirebase()
+  ])
+    .then(([position, id]) => {
+      Screen.create({ ...payload, position: position || 1, id })
+        .then((screen) => done(null, screen))
         .catch(done);
     }).catch(done);
 };

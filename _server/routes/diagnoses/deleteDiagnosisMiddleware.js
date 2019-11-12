@@ -1,6 +1,7 @@
 import { Diagnosis } from '../../models';
+import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
@@ -11,11 +12,23 @@ module.exports = () => (req, res, next) => {
   if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
 
   Diagnosis.findOne({ where: { id } })
-    .then(s => {
-      if (!s) return done({ msg: `Could not find script with "id" ${id}.` });
+    .then(d => {
+      if (!d) return done({ msg: `Could not find script with "id" ${id}.` });
 
-      s.destroy({ where: { id } })
-        .then(deleted => done(null, { deleted }))
+      d.destroy({ where: { id } })
+        .then(deleted => {
+          // update diagnoses positions
+          findAndUpdateDiagnoses(
+            {
+              attributes: ['id'],
+              where: { script_id: d.script_id },
+              order: [['position', 'ASC']]
+            },
+            screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
+          ).then(() => null).catch(err => { app.logger.log(err); return null; });
+
+          return done(null, { deleted });
+        })
         .catch(done);
 
       return null;

@@ -45,10 +45,15 @@ export default () => new Promise((resolve, reject) => {
     });
 
     Object.keys(diagnosis).forEach(script_id => {
-      Object.keys(diagnosis[script_id]).forEach((id) => {
+      Object.keys(diagnosis[script_id]).forEach((id, position) => {
+        position = position + 1;
         promises.push(Diagnosis.findOrCreate({
           where: { id },
-          defaults: { script_id, data: JSON.stringify(diagnosis[script_id][id]) }
+          defaults: {
+            script_id,
+            position: diagnosis[script_id][id].position || position,
+            data: JSON.stringify(diagnosis[script_id][id])
+          }
         }));
       });
     });

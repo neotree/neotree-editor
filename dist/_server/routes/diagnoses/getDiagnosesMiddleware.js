@@ -20,7 +20,7 @@ module.exports = function () {
 
     _models.Diagnosis.findAll({
       where: payload,
-      order: [['createdAt', 'DESC']]
+      order: [['position', 'ASC']]
     }).then(function (diagnoses) {
       return done(null, diagnoses);
     })["catch"](done);

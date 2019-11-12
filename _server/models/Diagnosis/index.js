@@ -15,6 +15,9 @@ export default {
         this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
+    position: {
+      type: Sequelize.INTEGER
+    },
     script_id: {
       type: Sequelize.STRING,
       // references: {

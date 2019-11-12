@@ -40,6 +40,9 @@ var _default = {
           this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
         }
       },
+      position: {
+        type: Sequelize.INTEGER
+      },
       script_id: {
         type: Sequelize.STRING // references: {
         //   model: Script,

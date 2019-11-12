@@ -80,13 +80,15 @@ var _default = function _default() {
         });
       });
       Object.keys(diagnosis).forEach(function (script_id) {
-        Object.keys(diagnosis[script_id]).forEach(function (id) {
+        Object.keys(diagnosis[script_id]).forEach(function (id, position) {
+          position = position + 1;
           promises.push(_models.Diagnosis.findOrCreate({
             where: {
               id: id
             },
             defaults: {
               script_id: script_id,
+              position: diagnosis[script_id][id].position || position,
               data: JSON.stringify(diagnosis[script_id][id])
             }
           }));

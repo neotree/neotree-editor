@@ -32,9 +32,12 @@ module.exports = () => (req, res, next) => {
     .catch(reject);
   });
 
-  saveToFirebase()
-    .then(id => {
-      Diagnosis.create({ ...payload, id })
+  Promise.all([
+    Diagnosis.count({ where: { script_id: payload.script_id } }),
+    saveToFirebase()
+  ])
+    .then(([position, id]) => {
+      Diagnosis.create({ ...payload, position: position || 1, id })
         .then((diagnosis) => done(null, diagnosis))
         .catch(done);
     }).catch(done);

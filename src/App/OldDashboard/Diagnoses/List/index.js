@@ -39,7 +39,7 @@ const Diagnoses = props => {
       {!diagnoses.length && loading ? null :
         <Display
           {...props}
-          diagnoses={diagnoses}
+          diagnoses={diagnoses.sort((a, b) => a.position - b.position)}
           updateState={state => dispatchDiagnosesActions(diagnosesActions.updateState(state))}
         />}
     </div>
