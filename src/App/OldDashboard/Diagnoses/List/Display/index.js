@@ -150,9 +150,7 @@ class Display extends Component {
               })}
               style={{ width: '780px' }}
               shadow={0}
-              rows={diagnoses
-                // .sort((a, b) => a.position - b.position)
-                .map(d => ({ id: d.id, ...d.data }))}
+              rows={diagnoses.map(d => ({ id: d.id, ...d.data }))}
             >
               <TableHeader name="name">Name</TableHeader>
               <TableHeader name="description">Description</TableHeader>

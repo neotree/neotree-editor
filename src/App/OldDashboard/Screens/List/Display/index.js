@@ -208,7 +208,7 @@ class Display extends Component {
           {(screens && screens.length > 0) ?
             <Table
               style={styles.table}
-              rows={screens.sort((a, b) => a.position - b.position).map(scr => ({ ...scr.data, id: scr.id, position: scr.position }))}
+              rows={screens.map(scr => ({ ...scr.data, id: scr.id, position: scr.position }))}
               rowKeyColumn="position"
               onSort={this.swapScreenItems}
               selected={selected}

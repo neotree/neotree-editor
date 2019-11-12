@@ -39,7 +39,7 @@ const Screens = props => {
       {!screens.length && loading ? null :
         <Display
           {...props}
-          screens={screens}
+          screens={screens.sort((a, b) => a.position - b.position)}
           updateState={state => dispatchScreensActions(screensActions.updateState(state))}
         />}
     </div>
