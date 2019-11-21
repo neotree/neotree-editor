@@ -12,9 +12,9 @@ import ConfigKeyModel from './ConfigKey';
 import firebase from '../firebase';
 
 const dbConfig = process.env.NODE_ENV === 'production' ?
-  require('../../_config/config.production.json').database
+  require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.production.json').database
   :
-  require('../../_config/config.development.json').database;
+  require(process.env.NEOTREE_DEV_CONFIG_FILE || '../../_config/config.development.json').database;
 
 export const sequelize = new Sequelize(
   process.env.DATABASE_NAME || dbConfig.database,

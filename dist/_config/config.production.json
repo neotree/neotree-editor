@@ -1,11 +1,11 @@
 {
-  "port": 3000,
-  "host": "http://52.214.209.187",
+  "port": "port",
+  "host": "http://example.com",
   "database": {
-    "username": "neotree",
-    "database": "neotree_db1",
-    "password": "x3dFlQAfNFcBqzdEqBM1",
-    "port": 5432,
-    "host": "neotree-db1.cpgplvwz7wtn.eu-west-1.rds.amazonaws.com"
+    "username": "DB USERNAME",
+    "database": "DB NAME",
+    "password": "DB PASSWORD",
+    "port": "DB PORT",
+    "host": "DB HOST"
   }
 }

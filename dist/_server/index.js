@@ -24,7 +24,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var app = (0, _express["default"])();
-var config = app.config = process.env.NODE_ENV === 'production' ? require('../_config/config.production.json') : require('../_config/config.development.json');
+var config = app.config = process.env.NODE_ENV === 'production' ? require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.production.json') : require(process.env.NEOTREE_DEV_CONFIG_FILE || '../_config/config.development.json');
 app.sequelize = _models.sequelize;
 app.logger = require('../_utils/logger');
 

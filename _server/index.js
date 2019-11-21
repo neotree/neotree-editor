@@ -6,7 +6,9 @@ import { sequelize, dbInit } from './models';
 let app = express();
 
 const config = app.config = process.env.NODE_ENV === 'production' ?
-  require('../_config/config.production.json') : require('../_config/config.development.json');
+  require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.production.json')
+  :
+  require(process.env.NEOTREE_DEV_CONFIG_FILE || '../_config/config.development.json');
 
 app.sequelize = sequelize;
 app.logger = require('../_utils/logger');

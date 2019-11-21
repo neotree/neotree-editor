@@ -44,7 +44,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var dbConfig = process.env.NODE_ENV === 'production' ? require('../../_config/config.production.json').database : require('../../_config/config.development.json').database;
+var dbConfig = process.env.NODE_ENV === 'production' ? require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.production.json').database : require(process.env.NEOTREE_DEV_CONFIG_FILE || '../../_config/config.development.json').database;
 var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
   host: dbConfig.host || 'localhost',
   dialect: 'postgres',
