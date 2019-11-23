@@ -2,8 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import cx from 'classnames';
-import reduxComponent from 'reduxComponent';  // eslint-disable-line
-import { Container } from 'ui';  // eslint-disable-line
+import reduxComponent from 'reduxComponent';
+import Container from 'AppComponents/Container';
 import Form from './Form';
 
 export class LoginPage extends React.Component {

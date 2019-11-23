@@ -17,9 +17,9 @@ export default class Toolbar extends Component {
       className,
       hideSpacer,
       leftNavIcon,
-      onLeftNavItemClicked, // eslint-disable-line
+      onLeftNavItemClicked, 
       title,
-      transparent, // eslint-disable-line
+      transparent, 
       ...otherProps
     } = this.props;
 

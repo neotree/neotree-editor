@@ -1,46 +1,53 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
-import Spinner from 'ui/Spinner'; // eslint-disable-line
+import useDiagnosesReducer from 'AppHooks/diagnosesReducer';
+import Api from 'AppUtils/Api';
+import Spinner from 'AppComponents/Spinner';
+import Display from './Display';
 
-export class List extends React.Component {
-  state = {};
+const Diagnoses = props => {
+  const scriptId = props.match.params.scriptId;
 
-  componentWillMount() {
-    const { actions, scriptId } = this.props;
-    this.setState({ loadingDiagnoses: true });
-    actions.get('get-diagnoses', {
-      script_id: scriptId,
-      onResponse: () => this.setState({ loadingDiagnoses: false }),
-      onFailure: loadDiagnosesError => this.setState({ loadDiagnosesError }),
-      onSuccess: ({ payload }) => {
-      this.setState({ diagnoses: payload.diagnoses });
-      actions.updateApiData({ diagnoses: payload.diagnoses });
-      }
-    });
-  }
+  const [loading, setLoading] = useState(false);
 
-  componentWillUnmount() {
-    this.props.actions.updateApiData({ diagnoses: [] });
-  }
+  const [
+    loadingError, 
+    setLoadingError
+  ] = useState(null);
 
-  render() {
-    const { loadingDiagnosess } = this.state;
+  const [
+    { diagnoses },
+    dispatchDiagnosesActions,
+    diagnosesActions
+  ] = useDiagnosesReducer();
 
-    if (loadingDiagnosess) return <Spinner className="ui__flex ui__justifyContent_center" />;
+  useEffect(() => {
+    setLoading(true);
+    Api.get('/get-diagnoses', { script_id: scriptId })
+      .then(r => { setLoading(false); return r; })
+      .then(({ payload }) => {
+        setLoading(false);
+        dispatchDiagnosesActions(diagnosesActions.updateState({ diagnoses: payload.diagnoses || [] }));
+      }).catch(loadingError => { setLoading(false); setLoadingError(loadingError); });
+  }, []);
 
-    return <h1>Diagnoses</h1>;
-  }
-}
-
-List.propTypes = {
-  actions: PropTypes.object
+  return (
+    <div>
+      {!diagnoses.length && loading && <Spinner className="ui__flex ui__justifyContent_center" />}
+      {!diagnoses.length && loading ? null :
+        <Display
+          {...props}
+          diagnoses={diagnoses.sort((a, b) => a.position - b.position)}
+          updateState={state => dispatchDiagnosesActions(diagnosesActions.updateState(state))}
+        />}
+    </div>
+  );
 };
 
-export default hot(withRouter(
-  reduxComponent(List, state => ({
-    diagnoses: state.apiData.diagnoses || []
-  }))
-));
+Diagnoses.propTypes = {
+  match: PropTypes.object
+};
+
+export default hot(withRouter(Diagnoses));

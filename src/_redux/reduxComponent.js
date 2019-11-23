@@ -1,6 +1,6 @@
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import * as actions from 'actions'; // eslint-disable-line
+import * as actions from 'actions'; 
 
 const mapStateToProps = stateToPropsMapper => (state, ownProps) =>
   stateToPropsMapper ? stateToPropsMapper(state, ownProps) : {};

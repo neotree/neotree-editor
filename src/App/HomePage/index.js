@@ -1,8 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
-import LazyComponent from 'LazyComponent'; // eslint-disable-line
+import reduxComponent from 'reduxComponent'; 
+import LazyComponent from 'LazyComponent'; 
 
 export class HomePage extends React.Component {
   componentWillMount() {

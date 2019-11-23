@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { withRouter } from 'react-router-dom';
 import { hot } from 'react-hot-loader/root';
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import reduxComponent from 'reduxComponent'; 
 
 export class Authenticated extends React.Component {
   componentWillMount() {

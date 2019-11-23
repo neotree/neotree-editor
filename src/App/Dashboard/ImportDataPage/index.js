@@ -4,7 +4,7 @@ import { hot } from 'react-hot-loader/root';
 import cx from 'classnames';
 import { withRouter } from 'react-router-dom';
 import { Tabs, Tab } from 'react-mdl';
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
+import reduxComponent from 'reduxComponent'; 
 import Context from './Context';
 import ImportSection from './ImportSection';
 import ExportSection from './ExportSection';
@@ -28,7 +28,11 @@ export class ImportDataPage extends React.Component {
               textAlign: 'center'
             }}
           >
-            <Tabs
+            <div style={{ padding: '25px 10px' }}>
+              <ImportSection {...this.props} />
+            </div>
+            
+            {/*<Tabs
               activeTab={activeTab}
               onChange={activeTab => this.setState({ activeTab })}
             >
@@ -39,7 +43,7 @@ export class ImportDataPage extends React.Component {
             <div style={{ padding: '25px 10px' }}>
               {activeTab === 0 && <ImportSection {...this.props} />}
               {activeTab === 1 && <ExportSection {...this.props} />}
-            </div>
+            </div>*/}
           </div>
         </div>
       </Context.Provider>

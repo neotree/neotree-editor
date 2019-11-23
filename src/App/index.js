@@ -3,14 +3,13 @@ import PropTypes from 'prop-types';
 import { withRouter, Switch, Route } from 'react-router-dom';
 import { hot } from 'react-hot-loader/root';
 import { Helmet } from 'react-helmet';
-import LazyComponent from 'LazyComponent'; // eslint-disable-line
-import reduxComponent from 'reduxComponent'; // eslint-disable-line
-import Spinner from 'ui/Spinner'; // eslint-disable-line
+import LazyComponent from 'LazyComponent';
+import reduxComponent from 'reduxComponent';
+import Spinner from 'AppComponents/Spinner';
 
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));
 const Dashboard = LazyComponent(() => import('./Dashboard'));
-const OldDashboard = LazyComponent(() => import('./OldDashboard'));
 
 export class App extends React.Component {
   render() {
@@ -22,12 +21,8 @@ export class App extends React.Component {
 
         <Switch>
           <Route
-            path="/dashboard/new"
-            render={routeProps => <Dashboard {...this.props} {...routeProps} />}
-          />
-          <Route
             path="/dashboard"
-            render={routeProps => <OldDashboard {...this.props} {...routeProps} />}
+            render={routeProps => <Dashboard {...this.props} {...routeProps} />}
           />
           <Route
             exact

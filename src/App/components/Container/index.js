@@ -1,9 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
-import './index.scss';
 
-export class Card extends React.Component {
+export class Container extends React.Component {
   state = {
     boundingRect: null,
     windowHeight: global.window.innerHeight,
@@ -71,7 +70,7 @@ export class Card extends React.Component {
   }
 }
 
-Card.propTypes = {
+Container.propTypes = {
   updateOnScroll: PropTypes.bool,
   updateOnResize: PropTypes.bool,
   className: PropTypes.string,
@@ -79,4 +78,4 @@ Card.propTypes = {
   children: PropTypes.oneOfType([PropTypes.func, PropTypes.node])
 };
 
-export default Card;
+export default Container;

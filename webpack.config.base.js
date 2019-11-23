@@ -15,8 +15,8 @@ module.exports = {
       path.resolve(__dirname, './src/App'),
       path.resolve(__dirname, './src/App/.hooks'),
       path.resolve(__dirname, './src/App/components'),
-      path.resolve(__dirname, './src/App/OldDashboard'),
-      path.resolve(__dirname, './src/App/OldDashboard/components')
+      path.resolve(__dirname, './src/App/Dashboard'),
+      path.resolve(__dirname, './src/App/Dashboard/components')
     ],
     alias: {
       config: path.resolve(__dirname, '_config'),
@@ -27,8 +27,8 @@ module.exports = {
       AppUtils: path.resolve(__dirname, 'src/_utils'),
       AppHooks: path.resolve(__dirname, 'src/App/.hooks'),
       AppComponents: path.resolve(__dirname, 'src/App/components'),
-      Dashboard: path.resolve(__dirname, 'src/App/OldDashboard'),
-      DashboardComponents: path.resolve(__dirname, 'src/App/OldDashboard/components')
+      Dashboard: path.resolve(__dirname, 'src/App/Dashboard'),
+      DashboardComponents: path.resolve(__dirname, 'src/App/Dashboard/components')
     },
   },
   module: {

@@ -2,12 +2,11 @@ import React, { Component } from 'react';
 import { hot } from 'react-hot-loader/root';
 import { withRouter } from 'react-router-dom';
 import { Button, Textfield } from 'react-mdl';
-import copy from 'copy/authenticationCopy'; // eslint-disable-line
-import reduxComponent from 'reduxComponent';  // eslint-disable-line
-import emailRegex from 'emailRegex';  // eslint-disable-line
-import Logo from 'Logo';  // eslint-disable-line
-import Container from 'ui/Container'; // eslint-disable-line
-import FormButtonBar from 'FormButtonBar'; // eslint-disable-line
+import copy from 'copy/authenticationCopy';
+import reduxComponent from 'reduxComponent';
+import emailRegex from 'emailRegex';
+import Logo from 'Logo';  
+import FormButtonBar from 'FormButtonBar';
 import cx from 'classnames';
 
 export class Form extends Component {
