@@ -55,11 +55,11 @@ module.exports = function (app) {
       }
     }), saveToFirebase()]).then(function (_ref) {
       var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          position = _ref2[0],
+          count = _ref2[0],
           id = _ref2[1];
 
       _models.Screen.create((0, _objectSpread2["default"])({}, payload, {
-        position: position || 1,
+        position: count + 1,
         id: id
       })).then(function (screen) {
         return done(null, screen);
