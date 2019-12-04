@@ -43,6 +43,10 @@ module.exports = app => (req, res, next) => {
     Screen.findAll({ where: { id: payload.ids } })
   ])
     .then(([count, screens]) => {
+      screens = payload.ids
+        .map(id => screens.filter(scr => scr.id === id)[0])
+        .filter(scr => scr);
+        
       Promise.all(screens.map((screen, i) => {
         screen = JSON.parse(JSON.stringify(screen));
         const { createdAt, updateAt, id, ...scr } = screen; // eslint-disable-line
