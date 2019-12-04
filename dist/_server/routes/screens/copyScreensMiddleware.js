@@ -69,6 +69,13 @@ module.exports = function (app) {
           count = _ref2[0],
           screens = _ref2[1];
 
+      screens = payload.ids.map(function (id) {
+        return screens.filter(function (scr) {
+          return scr.id === id;
+        })[0];
+      }).filter(function (scr) {
+        return scr;
+      });
       Promise.all(screens.map(function (screen, i) {
         screen = JSON.parse(JSON.stringify(screen));
         var _screen = screen,
