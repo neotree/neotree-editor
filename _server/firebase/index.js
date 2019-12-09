@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 
-const serviceAccountKeySource = process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY || '../_config/firebase-service-account-key.json';
+const serviceAccountKeySource = process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY || '../../_config/firebase-service-account-key.json';
 
 const serviceAccount = require(serviceAccountKeySource);
 
