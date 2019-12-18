@@ -19,6 +19,6 @@ module.exports = () => (req, res) => {
   const $ = cheerio.load(html);
 
   $('head').append(`<script type="text/javascript">const __$APP__ = ${__$APP__};</script>`);
-  $('body').append(`<script type="text/javascript" src="${host}/bundle.js"></script>`);
+  // $('body').append(`<script type="text/javascript" src="${host}/bundle.js"></script>`);
   res.send($.html());
 };
