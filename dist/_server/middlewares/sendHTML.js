@@ -35,8 +35,8 @@ module.exports = function () {
 
     var $ = _cheerio["default"].load(html);
 
-    $('head').append("<script type=\"text/javascript\">const __$APP__ = ".concat(__$APP__, ";</script>"));
-    $('body').append("<script type=\"text/javascript\" src=\"".concat(host, "/bundle.js\"></script>"));
+    $('head').append("<script type=\"text/javascript\">const __$APP__ = ".concat(__$APP__, ";</script>")); // $('body').append(`<script type="text/javascript" src="${host}/bundle.js"></script>`);
+
     res.send($.html());
   };
 };
