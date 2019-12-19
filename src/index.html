@@ -1,56 +1,17 @@
 <!DOCTYPE html>
-<!--
-  ~ The MIT License (MIT)
-  ~ Copyright (c) 2016 Ubiqueworks Ltd and contributors
-  ~
-  ~ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
-  ~ files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify,
-  ~ merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-  ~ furnished to do so, subject to the following conditions:
-  ~
-  ~ The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-  ~
-  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-  ~ TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-  ~ SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-  ~ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-  ~ OR OTHER DEALINGS IN THE SOFTWARE.
-  ~
-  -->
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Neo Tree</title>
 
-<html class="no-js" lang="en">
-<head>
-    <title>Neo Tree - Content Manager</title>
-
-    <meta charset="UTF-8">
-    <meta name="description" content="NeoTree - Script Editor">
-    <meta name="author" content="Matteo Giaccone <m.giaccone@ubiqueworks.com>">
-    <meta name="viewport" content="initial-scale=1.0,user-scalable=no,maximum-scale=1,width=device-width">
-    <meta name="viewport" content="initial-scale=1.0,user-scalable=no,maximum-scale=1" media="(device-height: 568px)">
-</head>
-<body>
-    <!-- Root node -->
-    <div id="root" style="height: 100%;"></div>
-
-    <!-- Scripts -->
-    <script>
-        // Load application styles
-        (function() {
-            const cssLink = document.createElement('link');
-            cssLink.rel = "stylesheet";
-            cssLink.type = "text/css";
-            cssLink.href = "neotree.css";
-            document.getElementsByTagName("head")[0].appendChild(cssLink);
-        }());
-
-        // Load application code
-        (function() {
-            const script = document.createElement('script');
-            script.src = "neotree.js";
-            script.type = "text/javascript";
-            script.async = "true";
-            document.write(script.outerHTML);
-        }());
-    </script>
-</body>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta http-equiv="content-type" content="text/html;charset=UTF-8">
+    <meta name="viewport" content="width=device-width"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/javascript" src="/bundle.js"></script>
+  </body>
 </html>

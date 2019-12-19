@@ -1,0 +1,13 @@
+$cursors: (
+  pointer,
+  not-allowed,
+  move
+);
+
+@mixin uiCursor($medium: '') {
+  @each $c in $cursors{
+    .ui#{$medium}__cursor_#{$c} {
+      cursor: #{$c};
+    }
+  }
+}

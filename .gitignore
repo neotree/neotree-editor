@@ -1,8 +1,4 @@
-*.iml
-*.log
-.idea/
-app/
-dist/
 node_modules/
-src/config.jsx
-
+*.log
+npm-debug.*
+firebase-service-account-key.json

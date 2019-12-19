@@ -16,7 +16,7 @@
  * OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-
+const path = require('path');
 const electron = require('electron');
 //const autoUpdater = require('auto-updater');
 const os = require('os').platform();
@@ -56,11 +56,17 @@ const createWindow = async () => {
     // const fillPercent = 0.8;
 
     mainWindow = new BrowserWindow({ width: 1080, height: 860, center: true });
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.loadURL(`file://${__dirname}/index.development.html`);
-    } else {
-        mainWindow.loadURL(`file://${__dirname}/index.html`);
-    }
+    // const indexPath = path.resolve(__dirname, '../src/index.html');
+    // mainWindow.loadURL(`file://${indexPath}`);
+    // if (process.env.NODE_ENV === 'development') {
+    //     mainWindow.loadURL(`file://${__dirname}/index.development.html`);
+    // } else {
+    //     mainWindow.loadURL(`file://${__dirname}/index.html`);
+    // }
+
+    const config = process.env.NODE_ENV === 'production' ?
+      require('../_config/config.production.json') : require('../_config/config.development.json');
+    mainWindow.loadURL(config.host);
 
     mainWindow.on('closed', () => {
         mainWindow = null;

@@ -1,0 +1,25 @@
+$fonts: (
+  regular: OpenSans-Regular,
+  light: OpenSans-Light,
+  bold: OpenSans-SemiBold,
+  extraBold: OpenSans-Bold
+);
+
+@function getUIFonts() {
+  @if variable-exists(uiFonts) {
+    @return map-merge($fonts, $uiFonts);
+  }
+  @return $fonts;
+}
+
+@each $key, $value in getUIFonts() {
+  .ui__#{$key}Font {
+    font-family: $value;
+  }
+}
+
+@each $key, $value in getUIFontSizes() {
+  .ui__#{$key} {
+    font-size: $value;
+  }
+}

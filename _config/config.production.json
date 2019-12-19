@@ -1,0 +1,11 @@
+{
+  "port": "port",
+  "host": "http://example.com",
+  "database": {
+    "username": "DB USERNAME",
+    "database": "DB NAME",
+    "password": "DB PASSWORD",
+    "port": "DB PORT",
+    "host": "DB HOST"
+  }
+}

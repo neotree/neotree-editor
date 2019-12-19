@@ -22,9 +22,9 @@
 
 require('babel-polyfill');
 
-const builder = require("electron-builder");
+const builder = require('electron-builder');
 const del = require('del');
-const packageJson = require("../package.json");
+const packageJson = require('../package.json');
 const path = require('path');
 const webpack = require('webpack');
 const webpackElectron = require('./webpack.config.electron');
@@ -32,9 +32,9 @@ const webpackProduction = require('./webpack.config.production');
 
 const Platform = builder.Platform;
 
-const appDir = path.resolve(__dirname, "../app");
-const distDir = path.resolve(__dirname, "../dist");
-const resourcesDir = path.resolve(__dirname, "../tools/resources");
+const appDir = path.resolve(__dirname, '../app');
+const distDir = path.resolve(__dirname, '../dist');
+const resourcesDir = path.resolve(__dirname, '../tools/resources');
 
 function startPack() {
     console.log('start pack...');
