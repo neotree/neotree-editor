@@ -1,10 +1,29 @@
 import express from 'express';
 import { check } from 'express-validator/check';
+import { User } from '../../models';
 
 let router = express.Router(); //eslint-disable-line
 
 module.exports = app => {
   const { responseMiddleware } = app;
+
+  router.post(
+    '/lookup-username',
+    (req, res, next) => {
+      const done = (err, rslt) => {
+        res.locals.setResponse(err, rslt);
+        next(); return null;
+      };
+
+      User.findOne({ where: { email: req.body.username } })
+        .then(user => done(null, {
+          usernameIsRegistered: user ? true : false,
+          userIsActive: user && user.password ? true : false
+        }))
+        .catch(done);
+    },
+    responseMiddleware
+  );
 
   router.post(
     '/sign-in',
