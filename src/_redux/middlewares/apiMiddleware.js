@@ -1,8 +1,8 @@
 /*eslint-disable no-console*/
 import Api from 'AppUtils/Api';
 
-export const API_MIDDLEWARE = store => next => action => {
-  const host = store.getState().$APP.host;
+export const API_MIDDLEWARE = (/*store*/) => next => action => {
+  // const host = store.getState().$APP.host;
   if (!(action.POST || action.GET)) return next(action);
 
   const API_METHOD = action.GET ? 'get' : 'post';
@@ -25,8 +25,9 @@ export const API_MIDDLEWARE = store => next => action => {
     name
   });
 
-  Api[API_METHOD](`${host}/${name}`, _payload)
-    .then(response => { 
+  // Api[API_METHOD](`${host}/${name}`, _payload)
+  Api[API_METHOD](`/${name}`, _payload)
+    .then(response => {
       if (onResponse) onResponse(response);
       if (response.redirectURL && response.refresh) {
         global.window.location = response.redirectURL;
