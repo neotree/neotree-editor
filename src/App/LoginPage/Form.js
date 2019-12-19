@@ -149,9 +149,10 @@ const Form = ({
                     onClick={() => {
                       setLoading(true);
                       Api.post('/lookup-username', { username })
-                        .then(({ payload: { usernameIsRegistered, userIsActive } }) => {
+                        .then(({ payload: { userId, usernameIsRegistered, userIsActive } }) => {
                           setLoading(false);
                           if (usernameIsRegistered) {
+                            setForm({ id: userId });
                             setAcountIsRegistered(true);
                             if (!userIsActive) setAuthAction('sign-up');
                           } else {
