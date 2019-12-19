@@ -1,8 +1,6 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import { hot } from 'react-hot-loader/root';
 import cx from 'classnames';
-import reduxComponent from 'reduxComponent';
 import Container from 'AppComponents/Container';
 import Form from './Form';
 
@@ -24,7 +22,11 @@ export class LoginPage extends React.Component {
               boxSizing: 'border-box'
             }}
           >
-            <Form {...this.props} style={{ margin: 'auto' }} />
+            <Form
+              {...this.props}
+              authAction="sign-in"
+              style={{ margin: 'auto' }}
+            />
           </div>
         )}
       </Container>
@@ -32,14 +34,4 @@ export class LoginPage extends React.Component {
   }
 }
 
-LoginPage.propTypes = {
-  authAction: PropTypes.oneOf(['sign-in', 'sign-up']).isRequired
-};
-
-export default hot(
-  reduxComponent(LoginPage, (state, ownProps) => {
-    return {
-      authAction: ownProps.authAction || ownProps.match.params.authAction
-    };
-  })
-);
+export default hot(LoginPage);

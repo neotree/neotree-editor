@@ -26,7 +26,7 @@ export class App extends React.Component {
           />
           <Route
             exact
-            path="/auth/:authAction"
+            path="/auth/sign-in"
             render={routeProps => <LoginPage {...this.props} {...routeProps} />}
           />
           <Route
