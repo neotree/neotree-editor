@@ -46,7 +46,8 @@ var _default = {
   add: function add(_ref2) {
     var _this = this;
 
-    var username = _ref2.username,
+    var id = _ref2.id,
+        username = _ref2.username,
         password = _ref2.password;
     var Profile = this.Profile;
     var emailSplit = username.split('@');
@@ -65,21 +66,36 @@ var _default = {
             countUsersWithEmail = _ref4[0],
             countProfilesWithProfileName = _ref4[1];
 
-        if (countUsersWithEmail) return reject({
+        if (!id && countUsersWithEmail) return reject({
           msg: 'Username is taken.'
         }); //2. encrypt password
 
         (0, _encryptPassword["default"])(password, function (err, encryptedPassword) {
           if (err) return reject(err);
-          var userId = (0, _uuidv["default"])();
+          var userId = id || (0, _uuidv["default"])();
           var profileId = (0, _uuidv["default"])();
           profile_name = countProfilesWithProfileName ? "".concat(profile_name, "-").concat(profileId) : profile_name;
-
-          _this.create({
+          var promise = id ? new Promise(function (resolve, reject) {
+            _this.update({
+              password: encryptedPassword
+            }, {
+              where: {
+                id: id
+              },
+              individualHooks: true
+            }).then(function () {
+              return _this.findOne({
+                where: {
+                  id: id
+                }
+              }).then(resolve)["catch"](reject);
+            })["catch"](reject);
+          }) : _this.create({
             id: userId,
             email: username,
             password: encryptedPassword
-          }).then(function (user) {
+          });
+          promise.then(function (user) {
             // resolve user if no Profile model is supplied
             // add user profile
             if (Profile) {
