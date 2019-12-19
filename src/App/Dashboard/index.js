@@ -30,6 +30,7 @@ const ScreenEditor = LazyComponent(() => import('./Screens/Editor'));
 const ScriptEditor = LazyComponent(() => import('./Scripts/Editor'));
 const ScriptsList = LazyComponent(() => import('./Scripts/List'));
 const ImportDataPage = LazyComponent(() => import('./ImportDataPage'));
+const Users = LazyComponent(() => import('./Users'));
 
 export class Dashboard extends React.Component {
   static childContextTypes = { setToolbarTitle: PropTypes.func };
@@ -118,6 +119,7 @@ export class Dashboard extends React.Component {
               {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
               <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
               <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
+              <Link onClick={this.toggleDrawer} to="/dashboard/users">Users</Link>
               {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
             </Navigation>
           </Drawer>
@@ -162,6 +164,11 @@ export class Dashboard extends React.Component {
                 exact
                 path="/dashboard/configkeys"
                 render={routeProps => <ConfigKeys {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/users"
+                render={routeProps => <Users {...this.props} {...routeProps} />}
               />
               <Route
                 path="*"
