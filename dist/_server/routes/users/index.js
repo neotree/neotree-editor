@@ -59,6 +59,27 @@ module.exports = function (app) {
       });
     })["catch"](done);
   }, responseMiddleware);
+  router.post('/delete-user', function (req, res, next) {
+    var done = function done(err, rslt) {
+      res.locals.setResponse(err, {
+        rslt: rslt
+      });
+      next();
+      return null;
+    };
+
+    Promise.all([_models.User.destroy({
+      where: {
+        id: req.body.id
+      }
+    }), _models.UserProfile.destroy({
+      where: {
+        user_id: req.body.id
+      }
+    })]).then(function (rslt) {
+      return done(null, rslt);
+    })["catch"](done);
+  }, responseMiddleware);
   router.post('/add-user', function (req, res, next) {
     var done = function done(err, user) {
       res.locals.setResponse(err, {

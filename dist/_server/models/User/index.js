@@ -40,13 +40,18 @@ var _default = {
       },
       password: {
         type: Sequelize.STRING
+      },
+      role: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0
       }
     };
   },
   add: function add(_ref2) {
     var _this = this;
 
-    var id = _ref2.id,
+    var role = _ref2.role,
+        id = _ref2.id,
         username = _ref2.username,
         password = _ref2.password;
     var Profile = this.Profile;
@@ -92,6 +97,7 @@ var _default = {
             })["catch"](reject);
           }) : _this.create({
             id: userId,
+            role: role || 0,
             email: username,
             password: encryptedPassword
           });

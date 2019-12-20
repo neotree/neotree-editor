@@ -1,5 +1,11 @@
 "use strict";
 
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
+
+var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _models = require("../../models");
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
@@ -18,12 +24,22 @@ module.exports = function (app) {
     };
 
     if (req.isAuthenticated()) {
-      return _models.UserProfile.findOne({
+      return Promise.all([_models.User.findOne({
+        where: {
+          id: req.user.id
+        }
+      }), _models.UserProfile.findOne({
         where: {
           user_id: req.user.id
         }
-      }).then(function (user) {
-        return done(null, user);
+      })]).then(function (_ref) {
+        var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+            user = _ref2[0],
+            profile = _ref2[1];
+
+        return done(null, !profile ? null : (0, _objectSpread2["default"])({
+          role: user ? user.role : 0
+        }, JSON.parse(JSON.stringify(profile))));
       })["catch"](done);
     }
 

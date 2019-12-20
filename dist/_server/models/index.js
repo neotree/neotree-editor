@@ -392,7 +392,13 @@ var dbInit = function dbInit() {
 
       Promise.all([// initSessionsTable,
       initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
-        return resolve(rslts);
+        resolve(rslts);
+        User.count({}).then(function (count) {
+          if (!count) User.create({
+            email: 'ldt@bwsonline.co.za',
+            role: 1
+          });
+        });
       })["catch"](function (err) {
         return reject(err);
       });
