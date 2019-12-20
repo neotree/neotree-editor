@@ -6,10 +6,14 @@ import TableCell from '@material-ui/core/TableCell';
 import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
 import usersReducer from 'AppHooks/usersReducer';
+import appReducer from 'AppHooks/appReducer';
 import Api from 'AppUtils/Api';
 import Form from './Form';
+import Delete from './Delete';
 
 const Users = () => {
+  const [{ authenticatedUser }] = appReducer();
+
   const [{ users }, dispatchUsersActions, usersActions] = usersReducer();
   const updateState = s => dispatchUsersActions(usersActions.updateState(s));
 
@@ -32,6 +36,7 @@ const Users = () => {
         <TableHead>
           <TableRow>
             <TableCell>Email</TableCell>
+            <TableCell>Action</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -39,6 +44,13 @@ const Users = () => {
             return (
               <TableRow key={`user-${i}`}>
                 <TableCell>{u.email}</TableCell>
+                <TableCell>
+                  <Delete
+                    user={u}
+                    disabled={authenticatedUser.email === u.email}
+                    updateState={updateState}
+                  />
+                </TableCell>
               </TableRow>
             );
           })}

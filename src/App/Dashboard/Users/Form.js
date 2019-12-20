@@ -8,6 +8,7 @@ import DialogActions from '@material-ui/core/DialogActions';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import FormControl from '@material-ui/core/FormControl';
+import Typography from '@material-ui/core/Typography';
 import Api from 'AppUtils/Api';
 
 const Form = ({ updateState }) => {
@@ -50,6 +51,8 @@ const Form = ({ updateState }) => {
         </DialogContent>
 
         <DialogActions>
+          {!error ? null :
+            <Typography>{error.msg || error.message || JSON.stringify(error)}</Typography>}
           <Button
             color="primary"
             onClick={() => {

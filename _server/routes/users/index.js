@@ -1,6 +1,6 @@
 import express from 'express';
 import { check } from 'express-validator/check';
-import { User } from '../../models';
+import { User, UserProfile } from '../../models';
 
 let router = express.Router(); //eslint-disable-line
 
@@ -36,6 +36,24 @@ module.exports = app => {
           usernameIsRegistered: user ? true : false,
           userIsActive: user && user.password ? true : false
         }))
+        .catch(done);
+    },
+    responseMiddleware
+  );
+
+  router.post(
+    '/delete-user',
+    (req, res, next) => {
+      const done = (err, rslt) => {
+        res.locals.setResponse(err, { rslt });
+        next(); return null;
+      };
+
+      Promise.all([
+        User.destroy({ where: { id: req.body.id } }),
+        UserProfile.destroy({ where: { user_id: req.body.id } })
+      ])
+        .then(rslt => done(null, rslt))
         .catch(done);
     },
     responseMiddleware
