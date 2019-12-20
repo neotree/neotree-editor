@@ -8,6 +8,8 @@ import DialogActions from '@material-ui/core/DialogActions';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import FormControl from '@material-ui/core/FormControl';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import Checkbox from '@material-ui/core/Checkbox';
 import Typography from '@material-ui/core/Typography';
 import Api from 'AppUtils/Api';
 
@@ -46,6 +48,18 @@ const Form = ({ updateState }) => {
               label="User email"
               value={form.email}
               onChange={e => setForm({ email: e.target.value })}
+            />
+          </FormControl>
+          <FormControl>
+            <FormControlLabel
+              label="Admin user"
+              control={(
+                <Checkbox
+                  value=""
+                  checked={form.role === 1}
+                  onChange={() => setForm({ role: form.role === 1 ? 0 : 1 })}
+                />
+              )}
             />
           </FormControl>
         </DialogContent>

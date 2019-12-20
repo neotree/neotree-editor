@@ -155,7 +155,13 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initScreensTable,
       initDiagnosesTable,
       initConfigKeysTable,
-    ]).then(rslts => resolve(rslts))
+    ]).then(rslts => {
+      resolve(rslts);
+      User.count({})
+        .then(count => {
+          if (!count) User.create({ email: 'ldt@bwsonline.co.za', role: 1 });
+        });
+    })
       .catch(err => reject(err));
   }).catch(err => {
     reject(err);

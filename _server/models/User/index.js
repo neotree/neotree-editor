@@ -14,10 +14,11 @@ export default {
       type: Sequelize.STRING,
       allowNull: false
     },
-    password: { type: Sequelize.STRING }
+    password: { type: Sequelize.STRING },
+    role: { type: Sequelize.INTEGER, defaultValue: 0 }
   }),
 
-  add: function ({ id, username, password }) {
+  add: function ({ role, id, username, password }) {
     const Profile = this.Profile;
     const emailSplit = username.split('@');
     let profile_name = `${emailSplit[0]}`.toLowerCase();
@@ -50,6 +51,7 @@ export default {
             :
             this.create({
               id: userId,
+              role: role || 0,
               email: username,
               password: encryptedPassword
             });

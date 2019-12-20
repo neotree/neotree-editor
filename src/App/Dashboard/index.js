@@ -94,6 +94,7 @@ export class Dashboard extends React.Component {
   };
 
   render() {
+    const { authenticatedUser } = this.props;
     const { toolbarTitle } = this.state;
     const styles = {
       container: { height: '100%' },
@@ -119,7 +120,8 @@ export class Dashboard extends React.Component {
               {/*<Link onClick={this.toggleDrawer} to="/images">Images</Link>*/}
               <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
               <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
-              <Link onClick={this.toggleDrawer} to="/dashboard/users">Users</Link>
+              {authenticatedUser.role > 0 &&
+                <Link onClick={this.toggleDrawer} to="/dashboard/users">Users</Link>}
               {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
             </Navigation>
           </Drawer>
@@ -165,11 +167,12 @@ export class Dashboard extends React.Component {
                 path="/dashboard/configkeys"
                 render={routeProps => <ConfigKeys {...this.props} {...routeProps} />}
               />
-              <Route
-                exact
-                path="/dashboard/users"
-                render={routeProps => <Users {...this.props} {...routeProps} />}
-              />
+              {authenticatedUser.role > 0 &&
+                <Route
+                  exact
+                  path="/dashboard/users"
+                  render={routeProps => <Users {...this.props} {...routeProps} />}
+                />}
               <Route
                 path="*"
                 render={routeProps => <ScriptsList {...this.props} {...routeProps} />}
