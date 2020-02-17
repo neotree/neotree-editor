@@ -5,7 +5,7 @@ import clamp from 'clamp';
 import { MdDragHandle } from 'react-icons/md';
 import { SortableContainer, SortableElement, SortableHandle } from 'react-sortable-hoc';
 import randomstring from 'randomstring';
-import shadows from 'AppUtils/shadows'; 
+import shadows from 'AppUtils/shadows';
 import { Checkbox } from 'react-mdl';
 export default class Table extends Component {
     static propTypes = {
@@ -89,7 +89,7 @@ export default class Table extends Component {
 
         const TableRow = SortableElement(({row, index}) =>
             <tr className={row.className}>
-                <td>
+                {!onSelect ? null : <td>
                   <Checkbox
                     value={row.id}
                     checked={_selected.includes(row.id)}
@@ -100,7 +100,8 @@ export default class Table extends Component {
                         _selected.filter(id => id !== value)
                       );
                     }}
-                  /></td>
+                  />
+                </td>}
                 <td><RowHandle /></td>
                 {columnChildren.map((child) => this.renderCell(child.props, row, index))}
             </tr>
@@ -120,7 +121,7 @@ export default class Table extends Component {
             <table className={classes} {...otherProps}>
                 <thead>
                 <tr>
-                    <th>&nbsp;</th>
+                    {!onSelect ? null : <th>&nbsp;</th>}
                     <th>&nbsp;</th>
                     {columnChildren}
                 </tr>
