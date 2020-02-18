@@ -19,7 +19,7 @@ export const copyScreen = (screen) => {
         }).then(() => {
           Screen.create({
             ...screen,
-            id: screenId,
+            screen_id: screenId,
             data: JSON.stringify(screen.data),
           })
             .then(screen => resolve(screen))

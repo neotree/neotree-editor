@@ -28,7 +28,7 @@ module.exports = app => (req, res, next) => {
         .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set(diagnosis).then(() => {
           resolve({
             ...rest,
-            id: diagnosisId,
+            diagnosis_id: diagnosisId,
             data: JSON.stringify(diagnosis)
           });
         })
@@ -44,7 +44,7 @@ module.exports = app => (req, res, next) => {
     .then(([count, diagnoses]) => {
       Promise.all(diagnoses.map((diagnosis, i) => {
         diagnosis = JSON.parse(JSON.stringify(diagnosis));
-        const { createdAt, updateAt, id, ...d } = diagnosis; // eslint-disable-line
+        const { createdAt, updateAt, id, diagnosis_id, ...d } = diagnosis; // eslint-disable-line
         return saveToFirebase({
           ...d,
           position: count + (i + 1),

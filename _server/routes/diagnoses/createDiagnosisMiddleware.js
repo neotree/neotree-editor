@@ -37,8 +37,8 @@ module.exports = app => (req, res, next) => {
     Diagnosis.count({ where: { script_id: payload.script_id } }),
     saveToFirebase()
   ])
-    .then(([count, id]) => {
-      Diagnosis.create({ ...payload, position: count + 1, id })
+    .then(([count, diagnosis_id]) => {
+      Diagnosis.create({ ...payload, position: count + 1, diagnosis_id })
         .then((diagnosis) => done(null, diagnosis))
         .catch(done);
     }).catch(done);

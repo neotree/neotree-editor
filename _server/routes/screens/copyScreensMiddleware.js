@@ -29,7 +29,7 @@ module.exports = app => (req, res, next) => {
         .ref(`screens/${payload.script_id}/${screenId}`).set(screen).then(() => {
           resolve({
             ...rest,
-            id: screenId,
+            screen_id: screenId,
             data: JSON.stringify(screen)
           });
         })
@@ -46,10 +46,10 @@ module.exports = app => (req, res, next) => {
       screens = payload.ids
         .map(id => screens.filter(scr => scr.id === id)[0])
         .filter(scr => scr);
-        
+
       Promise.all(screens.map((screen, i) => {
         screen = JSON.parse(JSON.stringify(screen));
-        const { createdAt, updateAt, id, ...scr } = screen; // eslint-disable-line
+        const { createdAt, updateAt, id, screen_id, ...scr } = screen; // eslint-disable-line
         return saveToFirebase({
           ...scr,
           position: count + (i + 1),

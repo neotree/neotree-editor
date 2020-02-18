@@ -37,8 +37,8 @@ module.exports = app => (req, res, next) => {
     Screen.count({ where: { script_id: payload.script_id } }),
     saveToFirebase()
   ])
-    .then(([count, id]) => {
-      Screen.create({ ...payload, position: count + 1, id })
+    .then(([count, screen_id]) => {
+      Screen.create({ ...payload, position: count + 1, screen_id })
         .then((screen) => done(null, screen))
         .catch(done);
     }).catch(done);

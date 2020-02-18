@@ -81,7 +81,7 @@ Screen.afterUpdate(script => {
   return new Promise(resolve => resolve(script));
 });
 Screen.afterDestroy(instance => {
-  firebase.database().ref(`screens/${instance.script_id}/${instance.id}`).remove();
+  firebase.database().ref(`screens/${instance.script_id}/${instance.screen_id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(ScreenModel).forEach(key => (Screen[key] = ScreenModel[key]));
@@ -100,7 +100,7 @@ Diagnosis.afterUpdate(diagnosis => {
   return new Promise(resolve => resolve(diagnosis));
 });
 Diagnosis.afterDestroy(instance => {
-  firebase.database().ref(`diagnosis/${instance.script_id}/${instance.id}`).remove();
+  firebase.database().ref(`diagnosis/${instance.script_id}/${instance.diagnosis_id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 Object.keys(DiagnosisModel).forEach(key => (Diagnosis[key] = DiagnosisModel[key]));

@@ -18,7 +18,7 @@ export const copyDiagnosis = (diagnosis) => {
         }).then(() => {
           Diagnosis.create({
             ...diagnosis,
-            id: diagnosisId,
+            diagnosis_id: diagnosisId,
             data: JSON.stringify(diagnosis.data),
           })
             .then(diagnosis => resolve(diagnosis))
