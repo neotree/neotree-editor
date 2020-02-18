@@ -39,7 +39,7 @@ var copyDiagnosis = function copyDiagnosis(diagnosis) {
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
         _models.Diagnosis.create((0, _objectSpread2["default"])({}, diagnosis, {
-          id: diagnosisId,
+          diagnosis_id: diagnosisId,
           data: JSON.stringify(diagnosis.data)
         })).then(function (diagnosis) {
           return resolve(diagnosis);

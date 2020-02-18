@@ -41,7 +41,7 @@ var copyScreen = function copyScreen(screen) {
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
         _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
-          id: screenId,
+          screen_id: screenId,
           data: JSON.stringify(screen.data)
         })).then(function (screen) {
           return resolve(screen);

@@ -46,7 +46,7 @@ module.exports = function (app) {
 
           _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(diagnosis).then(function () {
             resolve((0, _objectSpread2["default"])({}, rest, {
-              id: diagnosisId,
+              diagnosis_id: diagnosisId,
               data: JSON.stringify(diagnosis)
             }));
           })["catch"](reject);
@@ -73,7 +73,8 @@ module.exports = function (app) {
             createdAt = _diagnosis.createdAt,
             updateAt = _diagnosis.updateAt,
             id = _diagnosis.id,
-            d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id"]); // eslint-disable-line
+            diagnosis_id = _diagnosis.diagnosis_id,
+            d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id", "diagnosis_id"]); // eslint-disable-line
 
         return saveToFirebase((0, _objectSpread2["default"])({}, d, {
           position: count + (i + 1),

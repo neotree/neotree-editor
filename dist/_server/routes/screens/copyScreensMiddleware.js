@@ -48,7 +48,7 @@ module.exports = function (app) {
 
           _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set(screen).then(function () {
             resolve((0, _objectSpread2["default"])({}, rest, {
-              id: screenId,
+              screen_id: screenId,
               data: JSON.stringify(screen)
             }));
           })["catch"](reject);
@@ -82,7 +82,8 @@ module.exports = function (app) {
             createdAt = _screen.createdAt,
             updateAt = _screen.updateAt,
             id = _screen.id,
-            scr = (0, _objectWithoutProperties2["default"])(_screen, ["createdAt", "updateAt", "id"]); // eslint-disable-line
+            screen_id = _screen.screen_id,
+            scr = (0, _objectWithoutProperties2["default"])(_screen, ["createdAt", "updateAt", "id", "screen_id"]); // eslint-disable-line
 
         return saveToFirebase((0, _objectSpread2["default"])({}, scr, {
           position: count + (i + 1),

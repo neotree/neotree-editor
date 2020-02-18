@@ -139,7 +139,7 @@ Screen.afterUpdate(function (script) {
   });
 });
 Screen.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.id)).remove();
+  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.screen_id)).remove();
 
   return new Promise(function (resolve) {
     return resolve(instance);
@@ -173,7 +173,7 @@ Diagnosis.afterUpdate(function (diagnosis) {
   });
 });
 Diagnosis.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("diagnosis/".concat(instance.script_id, "/").concat(instance.id)).remove();
+  _firebase["default"].database().ref("diagnosis/".concat(instance.script_id, "/").concat(instance.diagnosis_id)).remove();
 
   return new Promise(function (resolve) {
     return resolve(instance);

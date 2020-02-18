@@ -56,11 +56,11 @@ module.exports = function (app) {
     }), saveToFirebase()]).then(function (_ref) {
       var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
           count = _ref2[0],
-          id = _ref2[1];
+          screen_id = _ref2[1];
 
       _models.Screen.create((0, _objectSpread2["default"])({}, payload, {
         position: count + 1,
-        id: id
+        screen_id: screen_id
       })).then(function (screen) {
         return done(null, screen);
       })["catch"](done);
