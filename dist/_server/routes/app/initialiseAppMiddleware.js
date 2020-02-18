@@ -12,9 +12,6 @@ module.exports = function (app) {
   return function (req, res, next) {
     var middleware = new _CustomMiddleware["default"]();
     middleware.use(function (next) {
-      return require('./getAppMiddleware')(app)(req, res, next);
-    });
-    middleware.use(function (next) {
       return require('../users/getAuthenticatedUserMiddleware')(app)(req, res, next);
     });
     middleware.go(next);

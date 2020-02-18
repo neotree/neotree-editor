@@ -53,43 +53,45 @@ var _default = function _default() {
           }
         }));
       });
-      Object.keys(scripts).forEach(function (id) {
-        return promises.push(_models.Script.findOrCreate({
+      Object.keys(scripts).forEach(function (script_id) {
+        promises.push(_models.Script.findOrCreate({
           where: {
-            id: id
+            id: script_id
           },
           defaults: {
-            data: JSON.stringify(scripts[id])
+            data: JSON.stringify(scripts[script_id])
           }
         }));
-      });
-      Object.keys(screens).forEach(function (script_id) {
-        Object.keys(screens[script_id]).forEach(function (id, position) {
+        Object.keys(screens[script_id] || {}).forEach(function (screen_id, position) {
+          var s = screens[script_id][screen_id];
           position = position + 1;
           promises.push(_models.Screen.findOrCreate({
             where: {
-              id: id
+              screen_id: screen_id,
+              script_id: script_id
             },
             defaults: {
               script_id: script_id,
-              position: screens[script_id][id].position || position,
-              type: screens[script_id][id].type,
-              data: JSON.stringify(screens[script_id][id])
+              screen_id: screen_id,
+              position: s.position || position,
+              type: s.type,
+              data: JSON.stringify(s)
             }
           }));
         });
-      });
-      Object.keys(diagnosis).forEach(function (script_id) {
-        Object.keys(diagnosis[script_id]).forEach(function (id, position) {
+        Object.keys(diagnosis[script_id] || {}).forEach(function (diagnosis_id, position) {
+          var d = diagnosis[script_id][diagnosis_id];
           position = position + 1;
           promises.push(_models.Diagnosis.findOrCreate({
             where: {
-              id: id
+              diagnosis_id: diagnosis_id,
+              script_id: script_id
             },
             defaults: {
               script_id: script_id,
-              position: diagnosis[script_id][id].position || position,
-              data: JSON.stringify(diagnosis[script_id][id])
+              diagnosis_id: diagnosis_id,
+              position: d.position || position,
+              data: JSON.stringify(d)
             }
           }));
         });

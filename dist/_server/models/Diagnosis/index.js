@@ -26,9 +26,13 @@ var _default = {
     return {
       // eslint-disable-line
       id: {
-        type: Sequelize.STRING,
-        allowNull: false,
+        type: Sequelize.INTEGER,
+        autoIncrement: true,
         primaryKey: true
+      },
+      diagnosis_id: {
+        type: Sequelize.STRING,
+        allowNull: false
       },
       data: {
         type: Sequelize.JSON,

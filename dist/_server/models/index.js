@@ -5,7 +5,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.App = exports.UserProfile = exports.File = exports.User = exports.sequelize = void 0;
+exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.UserProfile = exports.File = exports.User = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
@@ -20,8 +20,6 @@ var _sequelize = _interopRequireDefault(require("sequelize"));
 var _User = _interopRequireDefault(require("./User"));
 
 var _File = _interopRequireDefault(require("./File"));
-
-var _App = _interopRequireDefault(require("./App"));
 
 var _Profile = _interopRequireDefault(require("./User/Profile"));
 
@@ -79,14 +77,6 @@ Object.keys(_Profile["default"]).forEach(function (key) {
   return UserProfile[key] = _Profile["default"][key];
 });
 User.Profile = UserProfile;
-var App = sequelize.define('app', _App["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.App = App;
-Object.keys(_App["default"]).forEach(function (key) {
-  return App[key] = _App["default"][key];
-});
 var Script = sequelize.define('script', _Script["default"].getStructure({
   User: User,
   Sequelize: _sequelize["default"]
@@ -132,14 +122,15 @@ exports.Screen = Screen;
 Screen.afterUpdate(function (script) {
   var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
       id = _JSON$parse2.id,
+      screen_id = _JSON$parse2.screen_id,
       _JSON$parse2$data = _JSON$parse2.data,
       cAt = _JSON$parse2$data.createdAt,
       data = (0, _objectWithoutProperties2["default"])(_JSON$parse2$data, ["createdAt"]),
       createdAt = _JSON$parse2.createdAt,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "data", "createdAt"]); // eslint-disable-line
+      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "screen_id", "data", "createdAt"]); // eslint-disable-line
 
 
-  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
+  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(screen_id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
     updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
 
@@ -165,14 +156,15 @@ exports.Diagnosis = Diagnosis;
 Diagnosis.afterUpdate(function (diagnosis) {
   var _JSON$parse3 = JSON.parse(JSON.stringify(diagnosis)),
       id = _JSON$parse3.id,
+      diagnosis_id = _JSON$parse3.diagnosis_id,
       _JSON$parse3$data = _JSON$parse3.data,
       cAt = _JSON$parse3$data.createdAt,
       data = (0, _objectWithoutProperties2["default"])(_JSON$parse3$data, ["createdAt"]),
       createdAt = _JSON$parse3.createdAt,
-      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "data", "createdAt"]); // eslint-disable-line
+      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "diagnosis_id", "data", "createdAt"]); // eslint-disable-line
 
 
-  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(id)).update((0, _objectSpread2["default"])({}, data, {}, d, {
+  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosis_id)).update((0, _objectSpread2["default"])({}, data, {}, d, {
     updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
 
@@ -287,7 +279,7 @@ var dbInit = function dbInit() {
         }
       }, _callee3);
     }))();
-    var initAppTable = (0, _asyncToGenerator2["default"])(
+    var initScriptsTable = (0, _asyncToGenerator2["default"])(
     /*#__PURE__*/
     _regenerator["default"].mark(function _callee4() {
       return _regenerator["default"].wrap(function _callee4$(_context4) {
@@ -295,7 +287,7 @@ var dbInit = function dbInit() {
           switch (_context4.prev = _context4.next) {
             case 0:
               _context4.next = 2;
-              return App.sync();
+              return Script.sync();
 
             case 2:
               return _context4.abrupt("return", _context4.sent);
@@ -307,7 +299,7 @@ var dbInit = function dbInit() {
         }
       }, _callee4);
     }))();
-    var initScriptsTable = (0, _asyncToGenerator2["default"])(
+    var initScreensTable = (0, _asyncToGenerator2["default"])(
     /*#__PURE__*/
     _regenerator["default"].mark(function _callee5() {
       return _regenerator["default"].wrap(function _callee5$(_context5) {
@@ -315,7 +307,7 @@ var dbInit = function dbInit() {
           switch (_context5.prev = _context5.next) {
             case 0:
               _context5.next = 2;
-              return Script.sync();
+              return Screen.sync();
 
             case 2:
               return _context5.abrupt("return", _context5.sent);
@@ -327,7 +319,7 @@ var dbInit = function dbInit() {
         }
       }, _callee5);
     }))();
-    var initScreensTable = (0, _asyncToGenerator2["default"])(
+    var initDiagnosesTable = (0, _asyncToGenerator2["default"])(
     /*#__PURE__*/
     _regenerator["default"].mark(function _callee6() {
       return _regenerator["default"].wrap(function _callee6$(_context6) {
@@ -335,7 +327,7 @@ var dbInit = function dbInit() {
           switch (_context6.prev = _context6.next) {
             case 0:
               _context6.next = 2;
-              return Screen.sync();
+              return Diagnosis.sync();
 
             case 2:
               return _context6.abrupt("return", _context6.sent);
@@ -347,7 +339,7 @@ var dbInit = function dbInit() {
         }
       }, _callee6);
     }))();
-    var initDiagnosesTable = (0, _asyncToGenerator2["default"])(
+    var initConfigKeysTable = (0, _asyncToGenerator2["default"])(
     /*#__PURE__*/
     _regenerator["default"].mark(function _callee7() {
       return _regenerator["default"].wrap(function _callee7$(_context7) {
@@ -355,7 +347,7 @@ var dbInit = function dbInit() {
           switch (_context7.prev = _context7.next) {
             case 0:
               _context7.next = 2;
-              return Diagnosis.sync();
+              return ConfigKey.sync();
 
             case 2:
               return _context7.abrupt("return", _context7.sent);
@@ -367,31 +359,11 @@ var dbInit = function dbInit() {
         }
       }, _callee7);
     }))();
-    var initConfigKeysTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee8() {
-      return _regenerator["default"].wrap(function _callee8$(_context8) {
-        while (1) {
-          switch (_context8.prev = _context8.next) {
-            case 0:
-              _context8.next = 2;
-              return ConfigKey.sync();
-
-            case 2:
-              return _context8.abrupt("return", _context8.sent);
-
-            case 3:
-            case "end":
-              return _context8.stop();
-          }
-        }
-      }, _callee8);
-    }))();
     sequelize.authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
       Promise.all([// initSessionsTable,
-      initUsersTable, initFilesTable, initUserProfilesTable, initAppTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
+      initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
         resolve(rslts);
         User.count({}).then(function (count) {
           if (!count) User.create({
@@ -423,7 +395,6 @@ exports.dbInit = dbInit;
   reactHotLoader.register(User, "User", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(File, "File", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(UserProfile, "UserProfile", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(App, "App", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(Script, "Script", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(Screen, "Screen", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
   reactHotLoader.register(Diagnosis, "Diagnosis", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
