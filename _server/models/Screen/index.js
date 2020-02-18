@@ -1,9 +1,13 @@
 export default {
   getStructure: ({ User, Script, Sequelize }) => ({ // eslint-disable-line
     id: {
+      type: Sequelize.INTEGER,
+      autoIncrement: true,
+      primaryKey: true
+    },
+    screen_id: {
       type: Sequelize.STRING,
       allowNull: false,
-      primaryKey: true
     },
     data: {
       type: Sequelize.JSON,

@@ -2,7 +2,6 @@ import Sequelize from 'sequelize';
 // import SessionModel from './Session';
 import UserModel from './User';
 import FileModel from './File';
-import AppModel from './App';
 import UserProfileModel from './User/Profile';
 import ScriptModel from './Script';
 import ScreenModel from './Screen';
@@ -47,12 +46,6 @@ export const UserProfile = sequelize.define(
 Object.keys(UserProfileModel).forEach(key => (UserProfile[key] = UserProfileModel[key]));
 User.Profile = UserProfile;
 
-export const App = sequelize.define(
-  'app',
-  AppModel.getStructure({ User, Sequelize })
-);
-Object.keys(AppModel).forEach(key => (App[key] = AppModel[key]));
-
 export const Script = sequelize.define(
   'script',
   ScriptModel.getStructure({ User, Sequelize })
@@ -79,8 +72,8 @@ export const Screen = sequelize.define(
   ScreenModel.getStructure({ User, Sequelize })
 );
 Screen.afterUpdate(script => {
-  const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
-  firebase.database().ref(`screens/${script.script_id}/${id}`).update({
+  const { id, screen_id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  firebase.database().ref(`screens/${script.script_id}/${screen_id}`).update({
     ...data,
     ...scr,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
@@ -98,8 +91,8 @@ export const Diagnosis = sequelize.define(
   DiagnosisModel.getStructure({ User, Sequelize })
 );
 Diagnosis.afterUpdate(diagnosis => {
-  const { id, data: { createdAt: cAt, ...data }, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
-  firebase.database().ref(`diagnosis/${diagnosis.script_id}/${id}`).update({
+  const { id, diagnosis_id, data: { createdAt: cAt, ...data }, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
+  firebase.database().ref(`diagnosis/${diagnosis.script_id}/${diagnosis_id}`).update({
     ...data,
     ...d,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
@@ -136,7 +129,6 @@ export const dbInit = () => new Promise((resolve, reject) => {
   const initUsersTable = (async () => await User.sync())();
   const initFilesTable = (async () => await File.sync())();
   const initUserProfilesTable = (async () => await UserProfile.sync())();
-  const initAppTable = (async () => await App.sync())();
   const initScriptsTable = (async () => await Script.sync())();
   const initScreensTable = (async () => await Screen.sync())();
   const initDiagnosesTable = (async () => await Diagnosis.sync())();
@@ -150,7 +142,6 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initUsersTable,
       initFilesTable,
       initUserProfilesTable,
-      initAppTable,
       initScriptsTable,
       initScreensTable,
       initDiagnosesTable,

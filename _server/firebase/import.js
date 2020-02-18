@@ -22,37 +22,39 @@ export default () => new Promise((resolve, reject) => {
       })
     ));
 
-    Object.keys(scripts).forEach(id => promises.push(
-      Script.findOrCreate({
-        where: { id },
-        defaults: { data: JSON.stringify(scripts[id]) }
-      })
-    ));
+    Object.keys(scripts).forEach(script_id => {
+      promises.push(
+        Script.findOrCreate({
+          where: { id: script_id },
+          defaults: { data: JSON.stringify(scripts[script_id]) }
+        })
+      );
 
-    Object.keys(screens).forEach(script_id => {
-      Object.keys(screens[script_id]).forEach((id, position) => {
+      Object.keys(screens[script_id] || {}).forEach((screen_id, position) => {
+        const s = screens[script_id][screen_id];
         position = position + 1;
         promises.push(Screen.findOrCreate({
-          where: { id },
+          where: { screen_id, script_id },
           defaults: {
             script_id,
-            position: screens[script_id][id].position || position,
-            type: screens[script_id][id].type,
-            data: JSON.stringify(screens[script_id][id])
+            screen_id,
+            position: s.position || position,
+            type: s.type,
+            data: JSON.stringify(s)
           }
         }));
       });
-    });
 
-    Object.keys(diagnosis).forEach(script_id => {
-      Object.keys(diagnosis[script_id]).forEach((id, position) => {
+      Object.keys(diagnosis[script_id] || {}).forEach((diagnosis_id, position) => {
+        const d = diagnosis[script_id][diagnosis_id];
         position = position + 1;
         promises.push(Diagnosis.findOrCreate({
-          where: { id },
+          where: { diagnosis_id, script_id },
           defaults: {
             script_id,
-            position: diagnosis[script_id][id].position || position,
-            data: JSON.stringify(diagnosis[script_id][id])
+            diagnosis_id,
+            position: d.position || position,
+            data: JSON.stringify(d)
           }
         }));
       });
