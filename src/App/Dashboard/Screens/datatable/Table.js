@@ -91,8 +91,8 @@ export default class Table extends Component {
             <tr className={row.className}>
                 {!onSelect ? null : <td>
                   <Checkbox
-                    value={row.id}
-                    checked={_selected.includes(row.id)}
+                    value={`${row.id}`}
+                    checked={_selected.includes(`${row.id}`)}
                     onChange={({ target: { value } }) => {
                       onSelect(!_selected.includes(value) ?
                         [..._selected, value]
