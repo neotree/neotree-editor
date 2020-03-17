@@ -9,8 +9,8 @@ import {
   MenuItem,
 } from 'react-mdl';
 import { MdCreate, MdMoreVert, MdAdd } from 'react-icons/md';
-import Toolbar from 'Toolbar'; 
-import Spinner from 'AppComponents/Spinner'; 
+import Toolbar from 'Toolbar';
+import Spinner from 'AppComponents/Spinner';
 import Api from 'AppUtils/Api';
 import Copy from 'Dashboard/Scripts/CopyItems';
 
@@ -126,7 +126,7 @@ class Display extends Component {
             {selected.length > 0 && (
               <Copy
                 itemsType="diagnoses"
-                data={{ ids: diagnoses.map(d => selected.includes(d.id) ? d.id : null).filter(id => id !== null) }}
+                data={{ ids: diagnoses.map(d => selected.includes(`${d.id}`) ? d.id : null).filter(id => id !== null) }}
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ diagnoses }) => ({

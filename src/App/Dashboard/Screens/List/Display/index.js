@@ -192,7 +192,7 @@ class Display extends Component {
             {selected.length > 0 && (
               <Copy
                 itemsType="screens"
-                data={{ ids: screens.map(s => selected.includes(s.id) ? s.id : null).filter(id => id !== null) }}
+                data={{ ids: screens.map(s => selected.includes(`${s.id}`) ? s.id : null).filter(id => id !== null) }}
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ screens }) => ({
