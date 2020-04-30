@@ -4,3 +4,6 @@ npm-debug.*
 
 _config/*
 !_config/server.js
+
+dist/_config/*
+!dist/_config/server.js

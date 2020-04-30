@@ -14,6 +14,8 @@ var _middlewares = _interopRequireDefault(require("./middlewares"));
 
 var _models = require("./models");
 
+var _server = _interopRequireDefault(require("../_config/server"));
+
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
   enterModule && enterModule(module);
@@ -24,7 +26,6 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var app = (0, _express["default"])();
-var config = app.config = process.env.NODE_ENV === 'production' ? require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.production.json') : require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.development.json');
 app.sequelize = _models.sequelize;
 app.logger = require('../_utils/logger');
 
@@ -79,9 +80,9 @@ app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../sr
   index: false
 }));
 app.get('*', require('./routes/app/initialiseAppMiddleware')(app), require('./middlewares/sendHTML')(app));
-app.server = httpServer.listen(config.port, function (err) {
+app.server = httpServer.listen(_server["default"].port, function (err) {
   if (err) throw err;
-  console.log("Server started on port ".concat(config.port)); // eslint-disable-line
+  console.log("Server started on port ".concat(_server["default"].port)); // eslint-disable-line
 });
 ;
 
@@ -93,7 +94,6 @@ app.server = httpServer.listen(config.port, function (err) {
   }
 
   reactHotLoader.register(app, "app", "/home/bws/WorkBench/neotree-editor/_server/index.js");
-  reactHotLoader.register(config, "config", "/home/bws/WorkBench/neotree-editor/_server/index.js");
   reactHotLoader.register(initDatabase, "initDatabase", "/home/bws/WorkBench/neotree-editor/_server/index.js");
   reactHotLoader.register(httpServer, "httpServer", "/home/bws/WorkBench/neotree-editor/_server/index.js");
 })();

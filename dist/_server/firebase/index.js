@@ -1,5 +1,7 @@
 "use strict";
 
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
+
 var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
 
 Object.defineProperty(exports, "__esModule", {
@@ -8,6 +10,8 @@ Object.defineProperty(exports, "__esModule", {
 exports["default"] = void 0;
 
 var admin = _interopRequireWildcard(require("firebase-admin"));
+
+var _server = _interopRequireDefault(require("../../_config/server"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -18,10 +22,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var serviceAccountKeySource = process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY || '../../_config/firebase-service-account-key.json';
-
-var serviceAccount = require(serviceAccountKeySource);
-
+var serviceAccount = _server["default"].firebaseConfig;
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://".concat(serviceAccount.project_id, ".firebaseio.com")
@@ -38,7 +39,7 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(serviceAccountKeySource, "serviceAccountKeySource", "/home/bws/WorkBench/neotree-editor/_server/firebase/index.js");
+  reactHotLoader.register(serviceAccount, "serviceAccount", "/home/bws/WorkBench/neotree-editor/_server/firebase/index.js");
   reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/firebase/index.js");
 })();
 

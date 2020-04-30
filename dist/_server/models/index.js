@@ -17,6 +17,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
+var _server = _interopRequireDefault(require("../../_config/server"));
+
 var _User = _interopRequireDefault(require("./User"));
 
 var _File = _interopRequireDefault(require("./File"));
@@ -42,7 +44,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var dbConfig = process.env.NODE_ENV === 'production' ? require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.production.json').database : require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.development.json').database;
+var dbConfig = _server["default"].database;
 var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
   host: dbConfig.host || 'localhost',
   dialect: 'postgres',
