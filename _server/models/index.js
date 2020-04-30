@@ -1,4 +1,5 @@
 import Sequelize from 'sequelize';
+import config from '../../_config/server';
 // import SessionModel from './Session';
 import UserModel from './User';
 import FileModel from './File';
@@ -10,10 +11,7 @@ import ConfigKeyModel from './ConfigKey';
 
 import firebase from '../firebase';
 
-const dbConfig = process.env.NODE_ENV === 'production' ?
-  require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.production.json').database
-  :
-  require(process.env.NEOTREE_CONFIG_FILE || '../../_config/config.development.json').database;
+const dbConfig = config.database;
 
 export const sequelize = new Sequelize(
   process.env.DATABASE_NAME || dbConfig.database,

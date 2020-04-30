@@ -1,11 +1,11 @@
 {
-  "port": "port",
-  "host": "http://example.com",
+  "port": 3000,
+  "host": "http://localhost:3000",
   "database": {
-    "username": "DB USERNAME",
-    "database": "DB NAME",
-    "password": "DB PASSWORD",
-    "port": "DB PORT",
-    "host": "DB HOST"
+    "username": "neotree",
+    "database": "neotree",
+    "password": "password",
+    "port": 5432,
+    "host": "localhost"
   }
 }

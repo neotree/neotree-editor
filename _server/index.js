@@ -2,13 +2,9 @@ import path from 'path';
 import express from 'express';
 import setMiddlewares from './middlewares';
 import { sequelize, dbInit } from './models';
+import config from '../_config/server';
 
 let app = express();
-
-const config = app.config = process.env.NODE_ENV === 'production' ?
-  require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.production.json')
-  :
-  require(process.env.NEOTREE_CONFIG_FILE || '../_config/config.development.json');
 
 app.sequelize = sequelize;
 app.logger = require('../_utils/logger');

@@ -1,8 +1,7 @@
 import * as admin from 'firebase-admin';
+import config from '../../_config/server';
 
-const serviceAccountKeySource = process.env.NEOTREE_FIREBASE_SERVICE_ACCOUNT_KEY || '../../_config/firebase-service-account-key.json';
-
-const serviceAccount = require(serviceAccountKeySource);
+const serviceAccount = config.firebaseConfig;
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
