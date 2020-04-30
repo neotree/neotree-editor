@@ -1,4 +1,6 @@
 node_modules/
 *.log
 npm-debug.*
-firebase-service-account-key.json
+
+_config/*
+!_config/server.js
