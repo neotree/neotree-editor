@@ -99,7 +99,7 @@ module.exports = function (app) {
     return;
   }
 
-  reactHotLoader.register(LocalStrategy, "LocalStrategy", "/home/bws/WorkBench/neotree-editor/_server/middlewares/passport.js");
+  reactHotLoader.register(LocalStrategy, "LocalStrategy", "/home/lamyfarai/Workbench/neotree-editor/_server/middlewares/passport.js");
 })();
 
 ;

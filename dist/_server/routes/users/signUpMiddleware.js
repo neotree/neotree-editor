@@ -6,7 +6,7 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _check = require("express-validator/check");
 
-var _models = require("../../models");
+var _addUser = _interopRequireDefault(require("./addUser"));
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -30,8 +30,7 @@ module.exports = function (app) {
 
     var errors = (0, _check.validationResult)(req);
     if (!errors.isEmpty()) done(errors.array());
-
-    _models.User.add(params).then(function (_ref2) {
+    (0, _addUser["default"])(params).then(function (_ref2) {
       var user = _ref2.user,
           profile = _ref2.profile;
       if (!user) return done({

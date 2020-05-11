@@ -151,8 +151,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(copyScript, "copyScript", "/home/bws/WorkBench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
+  reactHotLoader.register(copyScript, "copyScript", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
 })();
 
 ;

@@ -103,9 +103,9 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(updateScreens, "updateScreens", "/home/bws/WorkBench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
-  reactHotLoader.register(findAndUpdateScreens, "findAndUpdateScreens", "/home/bws/WorkBench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
+  reactHotLoader.register(updateScreens, "updateScreens", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
+  reactHotLoader.register(findAndUpdateScreens, "findAndUpdateScreens", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/updateScreensMiddleware.js");
 })();
 
 ;

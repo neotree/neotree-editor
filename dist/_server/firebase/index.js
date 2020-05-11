@@ -39,8 +39,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(serviceAccount, "serviceAccount", "/home/bws/WorkBench/neotree-editor/_server/firebase/index.js");
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/firebase/index.js");
+  reactHotLoader.register(serviceAccount, "serviceAccount", "/home/lamyfarai/Workbench/neotree-editor/_server/firebase/index.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/firebase/index.js");
 })();
 
 ;

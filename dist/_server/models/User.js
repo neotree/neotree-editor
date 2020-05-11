@@ -7,7 +7,11 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _bcryptjs = _interopRequireDefault(require("bcryptjs"));
+var _uuidv = _interopRequireDefault(require("uuidv4"));
+
+var _sequelize = _interopRequireDefault(require("sequelize"));
+
+var _sequelize2 = _interopRequireDefault(require("./sequelize"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -18,15 +22,29 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var _default = function _default(password, callback) {
-  return _bcryptjs["default"].genSalt(10, function (err, salt) {
-    _bcryptjs["default"].hash(password, salt, function (err, hash) {
-      if (err) return callback(err);
-      callback(null, hash);
-    });
-  });
-};
+var User = _sequelize2["default"].define('user', {
+  id: {
+    type: _sequelize["default"].UUID,
+    defaultValue: function defaultValue() {
+      return (0, _uuidv["default"])();
+    },
+    allowNull: false,
+    primaryKey: true
+  },
+  email: {
+    type: _sequelize["default"].STRING,
+    allowNull: false
+  },
+  password: {
+    type: _sequelize["default"].STRING
+  },
+  role: {
+    type: _sequelize["default"].INTEGER,
+    defaultValue: 0
+  }
+});
 
+var _default = User;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -38,7 +56,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/models/encryptPassword.js");
+  reactHotLoader.register(User, "User", "/home/lamyfarai/Workbench/neotree-editor/_server/models/User.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/User.js");
 })();
 
 ;

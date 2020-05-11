@@ -7,7 +7,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
+var _sequelize = _interopRequireDefault(require("sequelize"));
+
+var _sequelize2 = _interopRequireDefault(require("./sequelize"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -18,30 +20,17 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var _default = {
-  getStructure: function getStructure(_ref) {
-    var User = _ref.User,
-        Sequelize = _ref.Sequelize;
-    return {
-      // eslint-disable-line
-      id: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        primaryKey: true
-      },
-      data: {
-        type: Sequelize.JSON,
-        defaultValue: JSON.stringify({}),
-        get: function get() {
-          return JSON.parse(this.getDataValue('data') || '{}');
-        },
-        set: function set(value) {
-          this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
-        }
-      }
-    };
-  }
-};
+var Session = _sequelize2["default"].define('session', {
+  sid: {
+    type: _sequelize["default"].STRING,
+    primaryKey: true
+  },
+  userId: _sequelize["default"].STRING,
+  expires: _sequelize["default"].DATE,
+  data: _sequelize["default"].STRING(50000)
+});
+
+var _default = Session;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -53,7 +42,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/models/ConfigKey/index.js");
+  reactHotLoader.register(Session, "Session", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Session.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Session.js");
 })();
 
 ;

@@ -112,7 +112,7 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/firebase/import.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/firebase/import.js");
 })();
 
 ;

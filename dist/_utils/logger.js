@@ -32,7 +32,7 @@ module.exports = {
     return;
   }
 
-  reactHotLoader.register(isProd, "isProd", "/home/bws/WorkBench/neotree-editor/_utils/logger.js");
+  reactHotLoader.register(isProd, "isProd", "/home/lamyfarai/Workbench/neotree-editor/_utils/logger.js");
 })();
 
 ;

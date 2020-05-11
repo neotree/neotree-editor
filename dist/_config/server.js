@@ -40,7 +40,7 @@ try {
     return;
   }
 
-  reactHotLoader.register(firebaseConfig, "firebaseConfig", "/home/bws/WorkBench/neotree-editor/_config/server.js");
+  reactHotLoader.register(firebaseConfig, "firebaseConfig", "/home/lamyfarai/Workbench/neotree-editor/_config/server.js");
 })();
 
 ;

@@ -30,7 +30,7 @@ module.exports = function (app) {
     return;
   }
 
-  reactHotLoader.register(router, "router", "/home/bws/WorkBench/neotree-editor/_server/routes/files/index.js");
+  reactHotLoader.register(router, "router", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/files/index.js");
 })();
 
 ;

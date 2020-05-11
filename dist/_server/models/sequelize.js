@@ -5,9 +5,17 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+Object.defineProperty(exports, "Sequelize", {
+  enumerable: true,
+  get: function get() {
+    return _sequelize["default"];
+  }
+});
 exports["default"] = void 0;
 
-var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
+var _sequelize = _interopRequireDefault(require("sequelize"));
+
+var _server = _interopRequireDefault(require("../../_config/server"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -18,30 +26,13 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var _default = {
-  getStructure: function getStructure(_ref) {
-    var User = _ref.User,
-        Sequelize = _ref.Sequelize;
-    return {
-      // eslint-disable-line
-      id: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        primaryKey: true
-      },
-      data: {
-        type: Sequelize.JSON,
-        defaultValue: JSON.stringify({}),
-        get: function get() {
-          return JSON.parse(this.getDataValue('data') || '{}');
-        },
-        set: function set(value) {
-          this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
-        }
-      }
-    };
-  }
-};
+var dbConfig = _server["default"].database;
+var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
+  host: dbConfig.host || 'localhost',
+  dialect: 'postgres',
+  logging: false
+});
+var _default = sequelize;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -53,7 +44,9 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/models/Script/index.js");
+  reactHotLoader.register(dbConfig, "dbConfig", "/home/lamyfarai/Workbench/neotree-editor/_server/models/sequelize.js");
+  reactHotLoader.register(sequelize, "sequelize", "/home/lamyfarai/Workbench/neotree-editor/_server/models/sequelize.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/sequelize.js");
 })();
 
 ;

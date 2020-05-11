@@ -93,6 +93,7 @@ var _default = function _default(app) {
 
   app.responseMiddleware = function (req, res) {
     var response = res.locals.getResponse();
+    if (response.error || response.errors) console.log(response.error || response.errors);
     res.json(response);
   };
 
@@ -111,7 +112,7 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/middlewares/index.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/middlewares/index.js");
 })();
 
 ;

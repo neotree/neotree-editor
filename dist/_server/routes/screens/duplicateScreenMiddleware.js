@@ -120,8 +120,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(copyScreen, "copyScreen", "/home/bws/WorkBench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
+  reactHotLoader.register(copyScreen, "copyScreen", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
 })();
 
 ;

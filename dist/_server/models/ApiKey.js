@@ -1,9 +1,15 @@
 "use strict";
 
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports["default"] = void 0;
+
+var _sequelize = _interopRequireDefault(require("sequelize"));
+
+var _sequelize2 = _interopRequireDefault(require("./sequelize"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -14,20 +20,19 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var _default = {
-  getStructure: function getStructure(_ref) {
-    var Sequelize = _ref.Sequelize;
-    return {
-      sid: {
-        type: Sequelize.STRING,
-        primaryKey: true
-      },
-      userId: Sequelize.STRING,
-      expires: Sequelize.DATE,
-      data: Sequelize.STRING(50000)
-    };
+var ApiKey = _sequelize2["default"].define('api_key', {
+  id: {
+    type: _sequelize["default"].INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
+  key: {
+    type: _sequelize["default"].STRING,
+    allowNull: false
   }
-};
+});
+
+var _default = ApiKey;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -39,7 +44,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/bws/WorkBench/neotree-editor/_server/models/Session/index.js");
+  reactHotLoader.register(ApiKey, "ApiKey", "/home/lamyfarai/Workbench/neotree-editor/_server/models/ApiKey.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/ApiKey.js");
 })();
 
 ;

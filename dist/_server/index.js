@@ -93,9 +93,9 @@ app.server = httpServer.listen(_server["default"].port, function (err) {
     return;
   }
 
-  reactHotLoader.register(app, "app", "/home/bws/WorkBench/neotree-editor/_server/index.js");
-  reactHotLoader.register(initDatabase, "initDatabase", "/home/bws/WorkBench/neotree-editor/_server/index.js");
-  reactHotLoader.register(httpServer, "httpServer", "/home/bws/WorkBench/neotree-editor/_server/index.js");
+  reactHotLoader.register(app, "app", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
+  reactHotLoader.register(initDatabase, "initDatabase", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
+  reactHotLoader.register(httpServer, "httpServer", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
 })();
 
 ;

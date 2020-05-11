@@ -5,25 +5,67 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.dbInit = exports.ConfigKey = exports.Diagnosis = exports.Screen = exports.Script = exports.UserProfile = exports.File = exports.User = exports.sequelize = void 0;
+Object.defineProperty(exports, "User", {
+  enumerable: true,
+  get: function get() {
+    return _User["default"];
+  }
+});
+Object.defineProperty(exports, "File", {
+  enumerable: true,
+  get: function get() {
+    return _File["default"];
+  }
+});
+Object.defineProperty(exports, "UserProfile", {
+  enumerable: true,
+  get: function get() {
+    return _UserProfile["default"];
+  }
+});
+Object.defineProperty(exports, "Script", {
+  enumerable: true,
+  get: function get() {
+    return _Script["default"];
+  }
+});
+Object.defineProperty(exports, "Screen", {
+  enumerable: true,
+  get: function get() {
+    return _Screen["default"];
+  }
+});
+Object.defineProperty(exports, "Diagnosis", {
+  enumerable: true,
+  get: function get() {
+    return _Diagnosis["default"];
+  }
+});
+Object.defineProperty(exports, "ConfigKey", {
+  enumerable: true,
+  get: function get() {
+    return _ConfigKey["default"];
+  }
+});
+Object.defineProperty(exports, "ApiKey", {
+  enumerable: true,
+  get: function get() {
+    return _ApiKey["default"];
+  }
+});
+exports.dbInit = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
-
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
-
-var _sequelize = _interopRequireDefault(require("sequelize"));
-
-var _server = _interopRequireDefault(require("../../_config/server"));
+var _sequelize = _interopRequireDefault(require("./sequelize"));
 
 var _User = _interopRequireDefault(require("./User"));
 
 var _File = _interopRequireDefault(require("./File"));
 
-var _Profile = _interopRequireDefault(require("./User/Profile"));
+var _UserProfile = _interopRequireDefault(require("./UserProfile"));
 
 var _Script = _interopRequireDefault(require("./Script"));
 
@@ -33,7 +75,7 @@ var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
 
 var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
 
-var _firebase = _interopRequireDefault(require("../firebase"));
+var _ApiKey = _interopRequireDefault(require("./ApiKey"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -44,183 +86,11 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var dbConfig = _server["default"].database;
-var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
-  host: dbConfig.host || 'localhost',
-  dialect: 'postgres',
-  logging: false
-}); // export const Session = sequelize.define(
-//   'Session',
-//   SessionModel.getStructure({ Sequelize })
-// );
-
+var sequelize = _sequelize["default"];
 exports.sequelize = sequelize;
-var User = sequelize.define('user', _User["default"].getStructure({
-  Sequelize: _sequelize["default"]
-}));
-exports.User = User;
-Object.keys(_User["default"]).forEach(function (key) {
-  return User[key] = _User["default"][key];
-});
-var File = sequelize.define('file', _File["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.File = File;
-Object.keys(_File["default"]).forEach(function (key) {
-  return File[key] = _File["default"][key];
-});
-var UserProfile = sequelize.define('user_profile', _Profile["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.UserProfile = UserProfile;
-Object.keys(_Profile["default"]).forEach(function (key) {
-  return UserProfile[key] = _Profile["default"][key];
-});
-User.Profile = UserProfile;
-var Script = sequelize.define('script', _Script["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.Script = Script;
-Script.afterUpdate(function (script) {
-  var _JSON$parse = JSON.parse(JSON.stringify(script)),
-      id = _JSON$parse.id,
-      _JSON$parse$data = _JSON$parse.data,
-      cAt = _JSON$parse$data.createdAt,
-      data = (0, _objectWithoutProperties2["default"])(_JSON$parse$data, ["createdAt"]),
-      createdAt = _JSON$parse.createdAt,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data", "createdAt"]); // eslint-disable-line
-
-
-  _firebase["default"].database().ref("scripts/".concat(id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
-    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-  }));
-
-  return new Promise(function (resolve) {
-    return resolve(script);
-  });
-});
-Script.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("screens/".concat(instance.id)).remove();
-
-  _firebase["default"].database().ref("diagnosis/".concat(instance.id)).remove();
-
-  _firebase["default"].database().ref("scripts/".concat(instance.id)).remove();
-
-  return new Promise(function (resolve) {
-    return resolve(instance);
-  });
-});
-Object.keys(_Script["default"]).forEach(function (key) {
-  return Script[key] = _Script["default"][key];
-});
-var Screen = sequelize.define('screen', _Screen["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.Screen = Screen;
-Screen.afterUpdate(function (script) {
-  var _JSON$parse2 = JSON.parse(JSON.stringify(script)),
-      id = _JSON$parse2.id,
-      screen_id = _JSON$parse2.screen_id,
-      _JSON$parse2$data = _JSON$parse2.data,
-      cAt = _JSON$parse2$data.createdAt,
-      data = (0, _objectWithoutProperties2["default"])(_JSON$parse2$data, ["createdAt"]),
-      createdAt = _JSON$parse2.createdAt,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["id", "screen_id", "data", "createdAt"]); // eslint-disable-line
-
-
-  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(screen_id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
-    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-  }));
-
-  return new Promise(function (resolve) {
-    return resolve(script);
-  });
-});
-Screen.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.screen_id)).remove();
-
-  return new Promise(function (resolve) {
-    return resolve(instance);
-  });
-});
-Object.keys(_Screen["default"]).forEach(function (key) {
-  return Screen[key] = _Screen["default"][key];
-});
-var Diagnosis = sequelize.define('diagnosis', _Diagnosis["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.Diagnosis = Diagnosis;
-Diagnosis.afterUpdate(function (diagnosis) {
-  var _JSON$parse3 = JSON.parse(JSON.stringify(diagnosis)),
-      id = _JSON$parse3.id,
-      diagnosis_id = _JSON$parse3.diagnosis_id,
-      _JSON$parse3$data = _JSON$parse3.data,
-      cAt = _JSON$parse3$data.createdAt,
-      data = (0, _objectWithoutProperties2["default"])(_JSON$parse3$data, ["createdAt"]),
-      createdAt = _JSON$parse3.createdAt,
-      d = (0, _objectWithoutProperties2["default"])(_JSON$parse3, ["id", "diagnosis_id", "data", "createdAt"]); // eslint-disable-line
-
-
-  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosis_id)).update((0, _objectSpread2["default"])({}, data, {}, d, {
-    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-  }));
-
-  return new Promise(function (resolve) {
-    return resolve(diagnosis);
-  });
-});
-Diagnosis.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("diagnosis/".concat(instance.script_id, "/").concat(instance.diagnosis_id)).remove();
-
-  return new Promise(function (resolve) {
-    return resolve(instance);
-  });
-});
-Object.keys(_Diagnosis["default"]).forEach(function (key) {
-  return Diagnosis[key] = _Diagnosis["default"][key];
-});
-var ConfigKey = sequelize.define('config_key', _ConfigKey["default"].getStructure({
-  User: User,
-  Sequelize: _sequelize["default"]
-}));
-exports.ConfigKey = ConfigKey;
-ConfigKey.afterUpdate(function (cKey) {
-  var _JSON$parse4 = JSON.parse(JSON.stringify(cKey)),
-      id = _JSON$parse4.id,
-      _JSON$parse4$data = _JSON$parse4.data,
-      cAt = _JSON$parse4$data.createdAt,
-      data = (0, _objectWithoutProperties2["default"])(_JSON$parse4$data, ["createdAt"]),
-      createdAt = _JSON$parse4.createdAt,
-      c = (0, _objectWithoutProperties2["default"])(_JSON$parse4, ["id", "data", "createdAt"]); // eslint-disable-line
-
-
-  _firebase["default"].database().ref("configkeys/".concat(id)).update((0, _objectSpread2["default"])({}, data, {}, c, {
-    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-  }));
-
-  return new Promise(function (resolve) {
-    return resolve(cKey);
-  });
-});
-ConfigKey.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("configkeys/".concat(instance.id)).remove();
-
-  return new Promise(function (resolve) {
-    return resolve(instance);
-  });
-});
-Object.keys(_ConfigKey["default"]).forEach(function (key) {
-  return ConfigKey[key] = _ConfigKey["default"][key];
-});
 
 var dbInit = function dbInit() {
   return new Promise(function (resolve, reject) {
-    // const initSessionsTable = (async () => await Session.sync())();
     var initUsersTable = (0, _asyncToGenerator2["default"])(
     /*#__PURE__*/
     _regenerator["default"].mark(function _callee() {
@@ -229,7 +99,7 @@ var dbInit = function dbInit() {
           switch (_context.prev = _context.next) {
             case 0:
               _context.next = 2;
-              return User.sync();
+              return _User["default"].sync();
 
             case 2:
               return _context.abrupt("return", _context.sent);
@@ -249,7 +119,7 @@ var dbInit = function dbInit() {
           switch (_context2.prev = _context2.next) {
             case 0:
               _context2.next = 2;
-              return File.sync();
+              return _File["default"].sync();
 
             case 2:
               return _context2.abrupt("return", _context2.sent);
@@ -269,7 +139,7 @@ var dbInit = function dbInit() {
           switch (_context3.prev = _context3.next) {
             case 0:
               _context3.next = 2;
-              return UserProfile.sync();
+              return _UserProfile["default"].sync();
 
             case 2:
               return _context3.abrupt("return", _context3.sent);
@@ -289,7 +159,7 @@ var dbInit = function dbInit() {
           switch (_context4.prev = _context4.next) {
             case 0:
               _context4.next = 2;
-              return Script.sync();
+              return _Script["default"].sync();
 
             case 2:
               return _context4.abrupt("return", _context4.sent);
@@ -309,7 +179,7 @@ var dbInit = function dbInit() {
           switch (_context5.prev = _context5.next) {
             case 0:
               _context5.next = 2;
-              return Screen.sync();
+              return _Screen["default"].sync();
 
             case 2:
               return _context5.abrupt("return", _context5.sent);
@@ -329,7 +199,7 @@ var dbInit = function dbInit() {
           switch (_context6.prev = _context6.next) {
             case 0:
               _context6.next = 2;
-              return Diagnosis.sync();
+              return _Diagnosis["default"].sync();
 
             case 2:
               return _context6.abrupt("return", _context6.sent);
@@ -349,7 +219,7 @@ var dbInit = function dbInit() {
           switch (_context7.prev = _context7.next) {
             case 0:
               _context7.next = 2;
-              return ConfigKey.sync();
+              return _ConfigKey["default"].sync();
 
             case 2:
               return _context7.abrupt("return", _context7.sent);
@@ -361,14 +231,35 @@ var dbInit = function dbInit() {
         }
       }, _callee7);
     }))();
-    sequelize.authenticate().then(function () {
+    var initApiKeysTable = (0, _asyncToGenerator2["default"])(
+    /*#__PURE__*/
+    _regenerator["default"].mark(function _callee8() {
+      return _regenerator["default"].wrap(function _callee8$(_context8) {
+        while (1) {
+          switch (_context8.prev = _context8.next) {
+            case 0:
+              _context8.next = 2;
+              return _ApiKey["default"].sync();
+
+            case 2:
+              return _context8.abrupt("return", _context8.sent);
+
+            case 3:
+            case "end":
+              return _context8.stop();
+          }
+        }
+      }, _callee8);
+    }))();
+
+    _sequelize["default"].authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
-      Promise.all([// initSessionsTable,
-      initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable]).then(function (rslts) {
+      Promise.all([initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initApiKeysTable]).then(function (rslts) {
         resolve(rslts);
-        User.count({}).then(function (count) {
-          if (!count) User.create({
+
+        _User["default"].count({}).then(function (count) {
+          if (!count) _User["default"].create({
             email: 'ldt@bwsonline.co.za',
             role: 1
           });
@@ -392,16 +283,8 @@ exports.dbInit = dbInit;
     return;
   }
 
-  reactHotLoader.register(dbConfig, "dbConfig", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(sequelize, "sequelize", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(User, "User", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(File, "File", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(UserProfile, "UserProfile", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(Script, "Script", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(Screen, "Screen", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(Diagnosis, "Diagnosis", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(ConfigKey, "ConfigKey", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(dbInit, "dbInit", "/home/bws/WorkBench/neotree-editor/_server/models/index.js");
+  reactHotLoader.register(sequelize, "sequelize", "/home/lamyfarai/Workbench/neotree-editor/_server/models/index.js");
+  reactHotLoader.register(dbInit, "dbInit", "/home/lamyfarai/Workbench/neotree-editor/_server/models/index.js");
 })();
 
 ;

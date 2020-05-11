@@ -64,7 +64,7 @@ exports["default"] = CustomMiddleware;
     return;
   }
 
-  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/home/bws/WorkBench/neotree-editor/_utils/CustomMiddleware.js");
+  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/home/lamyfarai/Workbench/neotree-editor/_utils/CustomMiddleware.js");
 })();
 
 ;

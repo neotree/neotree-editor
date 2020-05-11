@@ -6,6 +6,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function (app) {
   app.use(require('./app')(app));
+  app.use('/api', require('./api')(app));
   app.use(require('./files')(app));
   app.use(require('./users')(app));
   app.use(require('./scripts')(app));
