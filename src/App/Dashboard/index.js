@@ -30,7 +30,7 @@ const ScreenEditor = LazyComponent(() => import('./Screens/Editor'));
 const ScriptEditor = LazyComponent(() => import('./Scripts/Editor'));
 const ScriptsList = LazyComponent(() => import('./Scripts/List'));
 const ImportDataPage = LazyComponent(() => import('./ImportDataPage'));
-const Users = LazyComponent(() => import('./Users'));
+const Settings = LazyComponent(() => import('./Settings'));
 
 export class Dashboard extends React.Component {
   static childContextTypes = { setToolbarTitle: PropTypes.func };
@@ -121,7 +121,7 @@ export class Dashboard extends React.Component {
               <Link onClick={this.toggleDrawer} to="/dashboard/scripts">Scripts</Link>
               <Link onClick={this.toggleDrawer} to="/dashboard/import-firebase">Import firebase</Link>
               {authenticatedUser.role > 0 &&
-                <Link onClick={this.toggleDrawer} to="/dashboard/users">Users</Link>}
+                <Link onClick={this.toggleDrawer} to="/dashboard/settings">Settings</Link>}
               {/*<Link onClick={this.toggleDrawer} to="/users">Users</Link>*/}
             </Navigation>
           </Drawer>
@@ -167,12 +167,16 @@ export class Dashboard extends React.Component {
                 path="/dashboard/configkeys"
                 render={routeProps => <ConfigKeys {...this.props} {...routeProps} />}
               />
-              {authenticatedUser.role > 0 &&
-                <Route
-                  exact
-                  path="/dashboard/users"
-                  render={routeProps => <Users {...this.props} {...routeProps} />}
-                />}
+              <Route
+                exact
+                path="/dashboard/settings"
+                render={routeProps => <Settings {...this.props} {...routeProps} />}
+              />
+              <Route
+                exact
+                path="/dashboard/settings/:section"
+                render={routeProps => <Settings {...this.props} {...routeProps} />}
+              />
               <Route
                 path="*"
                 render={routeProps => <ScriptsList {...this.props} {...routeProps} />}

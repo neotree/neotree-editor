@@ -6,6 +6,7 @@ import Script from './Script';
 import Screen from './Screen';
 import Diagnosis from './Diagnosis';
 import ConfigKey from './ConfigKey';
+import ApiKey from './ApiKey';
 
 export {
   User,
@@ -15,6 +16,7 @@ export {
   Screen,
   Diagnosis,
   ConfigKey,
+  ApiKey,
 };
 
 export const sequelize = sqlz;
@@ -27,12 +29,12 @@ export const dbInit = () => new Promise((resolve, reject) => {
   const initScreensTable = (async () => await Screen.sync())();
   const initDiagnosesTable = (async () => await Diagnosis.sync())();
   const initConfigKeysTable = (async () => await ConfigKey.sync())();
+  const initApiKeysTable = (async () => await ApiKey.sync())();
 
   sqlz.authenticate()
   .then(() => {
     console.log('Connected to the database.'); // eslint-disable-line
     Promise.all([
-      // initSessionsTable,
       initUsersTable,
       initFilesTable,
       initUserProfilesTable,
@@ -40,6 +42,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initScreensTable,
       initDiagnosesTable,
       initConfigKeysTable,
+      initApiKeysTable,
     ]).then(rslts => {
       resolve(rslts);
       User.count({})

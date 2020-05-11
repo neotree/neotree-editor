@@ -71,7 +71,7 @@
     "react-mdc-web": "^0.17.0",
     "react-mdl": "^1.11.0",
     "react-redux": "^7.1.0",
-    "react-router-dom": "^5.0.1",
+    "react-router-dom": "^5.1.2",
     "react-sortable-hoc": "^1.9.1",
     "redux": "^4.0.1",
     "redux-logger": "^3.0.6",
