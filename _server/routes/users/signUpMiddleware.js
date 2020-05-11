@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator/check';
-import { User } from '../../models';
+import addUser from './addUser';
 
 module.exports = app => (req, res, next) => { //eslint-disable-line
   const {
@@ -16,7 +16,7 @@ module.exports = app => (req, res, next) => { //eslint-disable-line
   const errors = validationResult(req);
   if (!errors.isEmpty()) done(errors.array());
 
-  User.add(params)
+  addUser(params)
     .then(({ user, profile }) => {
       if (!user) return done({ msg: 'Something went wrong' });
 

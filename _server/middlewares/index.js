@@ -53,6 +53,7 @@ export default app => {
 
   app.responseMiddleware = (req, res) => {
     const response = res.locals.getResponse();
+    if (response.error || response.errors) console.log(response.error || response.errors);
     res.json(response);
   };
 

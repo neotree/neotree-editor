@@ -1,5 +1,9 @@
-export default {
-  getStructure: ({ User, Sequelize }) => ({ // eslint-disable-line
+import Sequelize from 'sequelize';
+import sqlz from './sequelize';
+
+const File = sqlz.define(
+  'file',
+  {
     id: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -26,5 +30,7 @@ export default {
       //   key: 'id'
       // }
     }
-  })
-};
+  }
+);
+
+export default File;

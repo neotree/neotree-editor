@@ -1,7 +1,10 @@
 import uuid from 'uuidv4';
+import Sequelize from 'sequelize';
+import sqlz from './sequelize';
 
-export default {
-  getStructure: ({ User, Sequelize }) => ({ // eslint-disable-line
+const UserProfile = sqlz.define(
+  'user_profile',
+  {
     id: {
       type: Sequelize.UUID,
       defaultValue: () => uuid(),
@@ -26,5 +29,7 @@ export default {
     },
     firstname: { type: Sequelize.STRING },
     lastname: { type: Sequelize.STRING }
-  })
-};
+  }
+);
+
+export default UserProfile;

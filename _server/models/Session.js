@@ -1,5 +1,9 @@
-export default {
-  getStructure: ({ Sequelize }) => ({
+import Sequelize from 'sequelize';
+import sqlz from './sequelize';
+
+const Session = sqlz.define(
+  'session',
+  {
     sid: {
       type: Sequelize.STRING,
       primaryKey: true
@@ -7,5 +11,7 @@ export default {
     userId: Sequelize.STRING,
     expires: Sequelize.DATE,
     data: Sequelize.STRING(50000)
-  })
-};
+  }
+);
+
+export default Session;
