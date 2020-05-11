@@ -4,7 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _express = _interopRequireDefault(require("express"));
 
-var _models = require("../../models");
+var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -19,46 +19,12 @@ var router = _express["default"].Router();
 
 module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
-  router.get('/key', function (req, res, next) {
-    _models.ApiKey.findOne({
-      where: {}
-    }).then(function (apiKey) {
-      res.locals.setResponse(null, {
-        apiKey: apiKey
-      });
-      next();
-    })["catch"](function (e) {
-      res.locals.setResponse(e);
-      next();
-    });
-  }, responseMiddleware);
-  router.post('/generate-key', function (req, res, next) {
-    var apiKey = req.body.apiKey;
-
-    var getRandString = function getRandString() {
-      return Math.random().toString(36).substring(2).toUpperCase();
-    };
-
-    var key = "".concat(getRandString()).concat(getRandString()).concat(getRandString());
-    (apiKey ? _models.ApiKey.update({
-      key: key
-    }, {
-      where: {
-        id: apiKey.id
-      },
-      individualHooks: true
-    }) : _models.ApiKey.create({
-      key: key
-    })).then(function (apiKey) {
-      res.locals.setResponse(null, {
-        apiKey: apiKey
-      });
-      next();
-    })["catch"](function (e) {
-      res.locals.setResponse(e);
-      next();
-    });
-  }, responseMiddleware);
+  router.get('/key', require('./getApiKeyMiddleware')(app), responseMiddleware);
+  router.post('/generate-key', require('./generateApiKeyMiddleware')(app), responseMiddleware);
+  router.get('/get-scripts', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptsMiddleware')(app), responseMiddleware);
+  router.get('/get-script', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptMiddleware')(app), responseMiddleware);
+  router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
+  router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
   return router;
 };
 
