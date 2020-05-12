@@ -20,6 +20,7 @@ var router = _express["default"].Router();
 module.exports = function (app) {
   var responseMiddleware = app.responseMiddleware;
   router.get('/key', require('./getApiKeyMiddleware')(app), responseMiddleware);
+  router.get('/download-api-config', require('./downloadApiConfigFileMiddleware')(app), responseMiddleware);
   router.post('/generate-key', require('./generateApiKeyMiddleware')(app), responseMiddleware);
   router.get('/get-scripts', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptsMiddleware')(app), responseMiddleware);
   router.get('/get-script', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptMiddleware')(app), responseMiddleware);
