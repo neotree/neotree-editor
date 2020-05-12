@@ -80,16 +80,33 @@ const ApiKey = () => {
                     />
                   </Grid>
 
-                  {!apiKey ? null : (
-                    <Grid item xs={2} sm={1}>
-                      <IconButton onClick={() => inputRef.current.focus()}>
-                        <CopyIcon />
-                      </IconButton>
-                    </Grid>
-                  )}
+                  <Grid item xs={12} sm={8}>
+                    {!apiKey ? null : (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => inputRef.current.focus()}
+                        >
+                          <CopyIcon fontSize="small" />
+                        </IconButton>&nbsp;&nbsp;
 
-                  <Grid item xs={10} sm={7}>
+                        <a
+                          href="/api/download-api-config"
+                          target="__blank"
+                          style={{ textDecoration: 'none', outline: 'none !important' }}
+                        >
+                          <Button
+                            size="small"
+                            color="primary"
+                          >
+                            Download api config file
+                          </Button>
+                        </a>&nbsp;&nbsp;
+                      </>
+                    )}
+
                     <Button
+                      size="small"
                       variant="contained"
                       color="primary"
                       disabled={generatingKey}

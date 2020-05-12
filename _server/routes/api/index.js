@@ -12,6 +12,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/download-api-config',
+    require('./downloadApiConfigFileMiddleware')(app),
+    responseMiddleware
+  );
+
   router.post(
     '/generate-key',
     require('./generateApiKeyMiddleware')(app),
