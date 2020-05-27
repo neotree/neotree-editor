@@ -4,6 +4,8 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
 
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
 var _models = require("../../models");
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
@@ -12,16 +14,19 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function () {
   return function (req, res, next) {
-    var payload = JSON.parse(req.query.payload || {});
+    var _JSON$parse = JSON.parse(req.query.payload || {}),
+        filters = _JSON$parse.filters,
+        payload = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["filters"]);
 
     var done = function done(e, payload) {
       res.locals.setResponse(e, payload);
       next();
     };
 
-    _models.Screen.findAll({
-      where: (0, _objectSpread2["default"])({}, payload)
-    }).then(function (screens) {
+    _models.Screen.findAll((0, _objectSpread2["default"])({
+      where: payload,
+      order: [['position', 'ASC']]
+    }, filters)).then(function (screens) {
       return done(null, {
         screens: screens
       });
