@@ -1,6 +1,6 @@
 import { Script, Screen, Diagnosis } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = (app) => (req, res, next) => {
   const {
     id,
     deleteAssociatedData,
@@ -8,6 +8,7 @@ module.exports = () => (req, res, next) => {
   } = req.body;
 
   const done = (err, script) => {
+    if (!err) app.io.emit('delete_scripts', { scripts: [{ id }] });
     res.locals.setResponse(err, { script });
     next(); return null;
   };

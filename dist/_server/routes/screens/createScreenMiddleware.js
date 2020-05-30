@@ -22,6 +22,11 @@ module.exports = function (app) {
 
     var done = function done(err, screen) {
       if (err) app.logger.log(err);
+      if (screen) app.io.emit('create_screens', {
+        screens: [{
+          id: screen.id
+        }]
+      });
       res.locals.setResponse(err, {
         screen: screen
       });

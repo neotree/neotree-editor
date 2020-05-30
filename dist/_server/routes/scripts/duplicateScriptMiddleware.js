@@ -91,11 +91,16 @@ var copyScript = function copyScript(_ref) {
 
 exports.copyScript = copyScript;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var id = req.body.id;
 
     var done = function done(err, script) {
+      if (script) app.io.emit('create_scripts', {
+        scripts: [{
+          id: script.id
+        }]
+      });
       res.locals.setResponse(err, {
         script: script
       });

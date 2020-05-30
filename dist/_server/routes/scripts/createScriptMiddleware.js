@@ -19,6 +19,11 @@ module.exports = function (app, params) {
     var payload = params || req.body;
 
     var done = function done(err, script) {
+      if (script) app.io.emit('create_scripts', {
+        scripts: [{
+          id: script.id
+        }]
+      });
       res.locals.setResponse(err, {
         script: script
       });

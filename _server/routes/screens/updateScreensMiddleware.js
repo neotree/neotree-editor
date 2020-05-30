@@ -29,10 +29,11 @@ export const findAndUpdateScreens = (
     }).catch(reject);
   });
 
-export default () => (req, res, next) => {
+export default (app) => (req, res, next) => {
   const { screens, returnUpdated } = req.body;
 
   const done = (err, payload) => {
+    app.io.emit('update_screens', { screens: screens.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };

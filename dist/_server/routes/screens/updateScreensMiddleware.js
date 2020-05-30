@@ -74,13 +74,20 @@ var findAndUpdateScreens = function findAndUpdateScreens() {
 
 exports.findAndUpdateScreens = findAndUpdateScreens;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var _req$body = req.body,
         screens = _req$body.screens,
         returnUpdated = _req$body.returnUpdated;
 
     var done = function done(err, payload) {
+      app.io.emit('update_screens', {
+        screens: screens.map(function (s) {
+          return {
+            id: s.id
+          };
+        })
+      });
       res.locals.setResponse(err, payload);
       next();
       return null;

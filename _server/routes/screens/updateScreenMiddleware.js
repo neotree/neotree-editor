@@ -1,9 +1,10 @@
 import { Screen } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = (app) => (req, res, next) => {
   const { id, ...payload } = req.body;
 
   const done = (err, screen) => {
+    if (screen) app.io.emit('update_screens', { screens: [{ id }] });
     res.locals.setResponse(err, { screen });
     next(); return null;
   };

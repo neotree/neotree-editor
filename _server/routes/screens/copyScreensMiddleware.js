@@ -5,8 +5,9 @@ import firebase from '../../firebase';
 module.exports = app => (req, res, next) => {
   const payload = req.body;
 
-  const done = (err, items) => {
+  const done = (err, items = []) => {
     if (err) app.logger.log(err);
+    if (items.length) app.io.emit('create_screens', { screens: items.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, { items });
     next(); return null;
   };

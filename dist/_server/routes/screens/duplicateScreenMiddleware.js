@@ -60,6 +60,11 @@ var _default = function _default(app) {
     var id = req.body.id;
 
     var done = function done(err, screen) {
+      if (screen) app.io.emit('create_screens', {
+        screens: [{
+          id: screen.id
+        }]
+      });
       res.locals.setResponse(err, {
         screen: screen
       });

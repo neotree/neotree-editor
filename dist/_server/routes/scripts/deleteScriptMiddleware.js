@@ -10,7 +10,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var _req$body = req.body,
         id = _req$body.id,
@@ -18,6 +18,11 @@ module.exports = function () {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id", "deleteAssociatedData"]);
 
     var done = function done(err, script) {
+      if (!err) app.io.emit('delete_scripts', {
+        scripts: [{
+          id: id
+        }]
+      });
       res.locals.setResponse(err, {
         script: script
       });

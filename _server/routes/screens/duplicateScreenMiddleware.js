@@ -35,6 +35,7 @@ export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, screen) => {
+    if (screen) app.io.emit('create_screens', { screens: [{ id: screen.id }] });
     res.locals.setResponse(err, { screen });
     next(); return null;
   };

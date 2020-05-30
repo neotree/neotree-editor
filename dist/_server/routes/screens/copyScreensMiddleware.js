@@ -22,8 +22,16 @@ module.exports = function (app) {
   return function (req, res, next) {
     var payload = req.body;
 
-    var done = function done(err, items) {
+    var done = function done(err) {
+      var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
       if (err) app.logger.log(err);
+      if (items.length) app.io.emit('create_screens', {
+        screens: items.map(function (s) {
+          return {
+            id: s.id
+          };
+        })
+      });
       res.locals.setResponse(err, {
         items: items
       });

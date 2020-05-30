@@ -54,10 +54,11 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
   });
 };
 
-export default () => (req, res, next) => {
+export default (app) => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, script) => {
+    if (script) app.io.emit('create_scripts', { scripts: [{ id: script.id }] });
     res.locals.setResponse(err, { script });
     next(); return null;
   };

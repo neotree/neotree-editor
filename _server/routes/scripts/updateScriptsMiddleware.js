@@ -1,9 +1,10 @@
 import { Script } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = (app) => (req, res, next) => {
   const { scripts, returnUpdated } = req.body;
 
   const done = (err, payload) => {
+    if (!err) app.io.emit('update_scripts', { scripts: scripts.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };
