@@ -40,11 +40,16 @@ If `export NEOTREE_FIREBASE_CONFIG_FILE=/path/to/firebase.config.json` is set, t
 
 If `export NEOTREE_FIREBASE_CONFIG_FILE=/path/to/firebase.config.json` is set, then `/path/to/firebase.config.json` will be used as the firebase config file, otherwise add the firebase config file to the project folder: `dist/_config/firebase.config.json`
 
+**enviroment variables for `npm run prod-server` config files must be prefixed `NEOTREE_PRODUCTION_`
+**enviroment variables for `npm run stage-server` config files must be prefixed `NEOTREE_STAGE_`
+
 **dist/_config is a public folder, for better security use enviroment variables**
 
 ## Scripts
 
 * `npm install` - install dependencies
 * `npm start` - run development server
-* `npm run dist` - run production server
 * `npm run build` - build app for deployment
+* `npm run dist` - run production server
+* `npm run prod-server` - run production server (looks for config files prefixed `NEOTREE_PRODUCTION_`)
+* `npm run stage-server` - run production (stage) server (looks for config files prefixed `NEOTREE_STAGE_`)
