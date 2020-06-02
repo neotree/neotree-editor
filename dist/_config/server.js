@@ -29,7 +29,7 @@ if (serverType === 'stage') {
 
 var firebaseConfig = function () {
   try {
-    return require(process.env[firebaseConfigFileName]);
+    return require(firebaseConfigFileName);
   } catch (e) {
     return require('./firebase.config.json');
   }
@@ -38,7 +38,7 @@ var firebaseConfig = function () {
 try {
   module.exports = (0, _objectSpread2["default"])({
     firebaseConfig: firebaseConfig
-  }, require(process.env[serverConfigFileName]));
+  }, require(serverConfigFileName));
 } catch (e) {
   module.exports = (0, _objectSpread2["default"])({
     firebaseConfig: firebaseConfig
