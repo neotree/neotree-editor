@@ -31,7 +31,6 @@ var firebaseConfig = function () {
   try {
     return require(firebaseConfigFileName);
   } catch (e) {
-    console(e);
     return require('./firebase.config.json');
   }
 }();
