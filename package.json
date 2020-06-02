@@ -8,7 +8,8 @@
   "bin": {
     "concurrently": "./node_modules/.bin/concurrently",
     "rimraf": "node_modules/.bin/rimraf",
-    "babel": "./node_modules/.bin/babel"
+    "babel": "./node_modules/.bin/babel",
+    "cross-env": "./node_modules/.bin/cross-env"
   },
   "scripts": {
     "start": "NEOTREE_SERVER_TYPE=development&& babel-node _server/index.js",
