@@ -15,7 +15,7 @@ if (serverType === 'stage') {
 
 const firebaseConfig = (function () {
   try {
-    return require(firebaseConfigFileName);
+    return require(process.env[firebaseConfigFileName]);
   } catch (e) {
     return require('./firebase.config.json');
   }
@@ -24,7 +24,7 @@ const firebaseConfig = (function () {
 try {
   module.exports = {
     firebaseConfig,
-    ...require(serverConfigFileName)
+    ...require(process.env[serverConfigFileName])
   };
 } catch (e) {
   module.exports = {
