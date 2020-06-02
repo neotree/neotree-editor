@@ -11,7 +11,7 @@
     "babel": "./node_modules/.bin/babel"
   },
   "scripts": {
-    "start": "babel-node _server/index.js",
+    "start": "env NEOTREE_SERVER_TYPE=development babel-node _server/index.js",
     "clean-dist": "npm run remove-dist && mkdir dist && mkdir dist/src",
     "remove-dist": "rimraf ./dist",
     "build:html": "babel-node _tools/buildHtml.js",
@@ -21,7 +21,8 @@
     "build:utils": "babel _utils --out-dir dist/_utils --copy-files",
     "prebuild": "npm-run-all clean-dist build:html build:server build:config build:utils",
     "build": "babel-node _tools/build.js",
-    "dist": "pm2 start dist/_server/index.js --name neotree --watch --no-daemon"
+    "prod-server": "env NEOTREE_SERVER_TYPE=production pm2 start dist/_server/index.js --name neotree_prod --watch --no-daemon",
+    "stage-server": "env NEOTREE_SERVER_TYPE=stage pm2 start dist/_server/index.js --name neotree_stage --watch --no-daemon"
   },
   "build": {
     "appId": "org.neotree.NeoTreeEditor",

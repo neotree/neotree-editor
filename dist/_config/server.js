@@ -13,9 +13,23 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
+var serverType = process.env.NEOTREE_SERVER_TYPE;
+var firebaseConfigFileName = 'NEOTREE_FIREBASE_CONFIG_FILE';
+var serverConfigFileName = 'NEOTREE_CONFIG_FILE';
+
+if (serverType === 'production') {
+  firebaseConfigFileName = 'NEOTREE_PRODUCTION_FIREBASE_CONFIG_FILE';
+  serverConfigFileName = 'NEOTREE_PRODUCTION_CONFIG_FILE';
+}
+
+if (serverType === 'stage') {
+  firebaseConfigFileName = 'NEOTREE_STAGE_FIREBASE_CONFIG_FILE';
+  serverConfigFileName = 'NEOTREE_STAGE_CONFIG_FILE';
+}
+
 var firebaseConfig = function () {
   try {
-    return require(process.env.NEOTREE_FIREBASE_CONFIG_FILE);
+    return require(firebaseConfigFileName);
   } catch (e) {
     return require('./firebase.config.json');
   }
@@ -24,7 +38,7 @@ var firebaseConfig = function () {
 try {
   module.exports = (0, _objectSpread2["default"])({
     firebaseConfig: firebaseConfig
-  }, require(process.env.NEOTREE_CONFIG_FILE));
+  }, require(serverConfigFileName));
 } catch (e) {
   module.exports = (0, _objectSpread2["default"])({
     firebaseConfig: firebaseConfig
@@ -40,6 +54,9 @@ try {
     return;
   }
 
+  reactHotLoader.register(serverType, "serverType", "/home/lamyfarai/Workbench/neotree-editor/_config/server.js");
+  reactHotLoader.register(firebaseConfigFileName, "firebaseConfigFileName", "/home/lamyfarai/Workbench/neotree-editor/_config/server.js");
+  reactHotLoader.register(serverConfigFileName, "serverConfigFileName", "/home/lamyfarai/Workbench/neotree-editor/_config/server.js");
   reactHotLoader.register(firebaseConfig, "firebaseConfig", "/home/lamyfarai/Workbench/neotree-editor/_config/server.js");
 })();
 
