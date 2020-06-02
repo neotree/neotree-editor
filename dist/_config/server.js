@@ -14,17 +14,17 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var serverType = process.env.NEOTREE_SERVER_TYPE;
-var firebaseConfigFileName = 'NEOTREE_FIREBASE_CONFIG_FILE';
-var serverConfigFileName = 'NEOTREE_CONFIG_FILE';
+var firebaseConfigFileName = process.env.NEOTREE_FIREBASE_CONFIG_FILE;
+var serverConfigFileName = process.env.NEOTREE_CONFIG_FILE;
 
 if (serverType === 'production') {
-  firebaseConfigFileName = 'NEOTREE_PRODUCTION_FIREBASE_CONFIG_FILE';
-  serverConfigFileName = 'NEOTREE_PRODUCTION_CONFIG_FILE';
+  firebaseConfigFileName = process.env.NEOTREE_PRODUCTION_FIREBASE_CONFIG_FILE;
+  serverConfigFileName = process.env.NEOTREE_PRODUCTION_CONFIG_FILE;
 }
 
 if (serverType === 'stage') {
-  firebaseConfigFileName = 'NEOTREE_STAGE_FIREBASE_CONFIG_FILE';
-  serverConfigFileName = 'NEOTREE_STAGE_CONFIG_FILE';
+  firebaseConfigFileName = process.env.NEOTREE_STAGE_FIREBASE_CONFIG_FILE;
+  serverConfigFileName = process.env.NEOTREE_STAGE_CONFIG_FILE;
 }
 
 var firebaseConfig = function () {
