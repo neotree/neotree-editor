@@ -37,5 +37,11 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/get-data-activity-info',
+    require('./getDataActivityInfo')(app),
+    responseMiddleware
+  );
+
   return router;
 };

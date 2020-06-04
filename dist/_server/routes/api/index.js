@@ -26,6 +26,7 @@ module.exports = function (app) {
   router.get('/get-script', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptMiddleware')(app), responseMiddleware);
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
+  router.get('/get-data-activity-info', (0, _apiKeyAuthenticator["default"])(app), require('../app/getDataActivityInfo')(app), responseMiddleware);
   return router;
 };
 

@@ -52,5 +52,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/get-data-activity-info',
+    apiKeyAuthenticator(app),
+    require('../app/getDataActivityInfo')(app),
+    responseMiddleware
+  );
+
   return router;
 };

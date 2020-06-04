@@ -1,7 +1,7 @@
 import { ConfigKey } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || {});
+  const payload = JSON.parse(req.query.payload || '{}');
 
   const done = (err, configKey) => {
     res.locals.setResponse(err, { configKey });
