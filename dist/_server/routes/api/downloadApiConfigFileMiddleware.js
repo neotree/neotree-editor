@@ -8,7 +8,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function () {
   return function (req, res) {
-    var api_endpoint = "".concat(req.protocol, "://").concat(req.headers.host, "/api");
+    var host = "".concat(req.protocol, "://").concat(req.headers.host);
+    var api_endpoint = "".concat(host, "/api");
 
     var done = function done(e, apiKey) {
       res.locals.setResponse(e);
@@ -21,11 +22,12 @@ module.exports = function () {
       //   api_key: apiKey.key
       // }, null, 4));
 
-      var filename = 'api.config.json';
+      var filename = 'neotree-webeditor-api.json';
       var mimetype = 'application/json';
       res.setHeader('Content-disposition', "attachment; filename=".concat(filename));
       res.setHeader('Content-type', mimetype);
       res.json({
+        host: host,
         api_endpoint: api_endpoint,
         api_key: apiKey.key
       });
