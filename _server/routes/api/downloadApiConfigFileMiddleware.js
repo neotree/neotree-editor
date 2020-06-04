@@ -1,7 +1,8 @@
 import { ApiKey } from '../../models';
 
 module.exports = () => (req, res) => {
-  const api_endpoint = `${req.protocol}://${req.headers.host}/api`;
+  const host = `${req.protocol}://${req.headers.host}`;
+  const api_endpoint = `${host}/api`;
 
   const done = (e, apiKey) => {
     res.locals.setResponse(e);
@@ -12,12 +13,13 @@ module.exports = () => (req, res) => {
     //   api_key: apiKey.key
     // }, null, 4));
 
-    const filename = 'api.config.json';
+    const filename = 'neotree-webeditor-api.json';
     const mimetype = 'application/json';
 
     res.setHeader('Content-disposition', `attachment; filename=${filename}`);
     res.setHeader('Content-type', mimetype);
     res.json({
+      host,
       api_endpoint,
       api_key: apiKey.key
     });
