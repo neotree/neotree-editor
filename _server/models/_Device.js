@@ -17,10 +17,10 @@ const Device = sqlz.define(
       type: Sequelize.JSON,
       defaultValue: JSON.stringify({}),
       get: function () {
-        return JSON.parse(this.getDataValue('data') || '{}');
+        return JSON.parse(this.getDataValue('details') || '{}');
       },
       set: function (value) {
-        this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
+        this.setDataValue('details', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
   }

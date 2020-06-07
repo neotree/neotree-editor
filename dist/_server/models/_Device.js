@@ -36,10 +36,10 @@ var Device = _sequelize2["default"].define('device', {
     type: _sequelize["default"].JSON,
     defaultValue: JSON.stringify({}),
     get: function get() {
-      return JSON.parse(this.getDataValue('data') || '{}');
+      return JSON.parse(this.getDataValue('details') || '{}');
     },
     set: function set(value) {
-      this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
+      this.setDataValue('details', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
     }
   }
 });
