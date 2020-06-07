@@ -1,12 +1,13 @@
 import sqlz from './sequelize';
-import User from './User';
-import File from './File';
-import UserProfile from './UserProfile';
-import Script from './Script';
-import Screen from './Screen';
-import Diagnosis from './Diagnosis';
-import ConfigKey from './ConfigKey';
-import ApiKey from './ApiKey';
+import User from './_User';
+import File from './_File';
+import UserProfile from './_UserProfile';
+import Script from './_Script';
+import Screen from './_Screen';
+import Diagnosis from './_Diagnosis';
+import ConfigKey from './_ConfigKey';
+import ApiKey from './_ApiKey';
+import Device from './_Device';
 
 export {
   User,
@@ -17,6 +18,7 @@ export {
   Diagnosis,
   ConfigKey,
   ApiKey,
+  Device,
 };
 
 export const sequelize = sqlz;
@@ -30,6 +32,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
   const initDiagnosesTable = (async () => await Diagnosis.sync())();
   const initConfigKeysTable = (async () => await ConfigKey.sync())();
   const initApiKeysTable = (async () => await ApiKey.sync())();
+  const initDeviceTable = (async () => await Device.sync())();
 
   sqlz.authenticate()
   .then(() => {
@@ -43,6 +46,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initDiagnosesTable,
       initConfigKeysTable,
       initApiKeysTable,
+      initDeviceTable,
     ]).then(rslts => {
       resolve(rslts);
       User.count({})

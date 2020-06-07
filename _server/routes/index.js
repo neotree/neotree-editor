@@ -7,5 +7,6 @@ module.exports = app => {
   app.use(require('./screens')(app));
   app.use(require('./diagnoses')(app));
   app.use(require('./config-keys')(app));
+  app.use(require('./devices')(app));
   return app;
 };

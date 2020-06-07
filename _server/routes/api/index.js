@@ -59,5 +59,26 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.get(
+    '/register-device',
+    apiKeyAuthenticator(app),
+    require('../devices/createDeviceMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
+    '/get-device',
+    apiKeyAuthenticator(app),
+    require('../devices/getDeviceMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
+    '/get-devices',
+    apiKeyAuthenticator(app),
+    require('../devices/getDevicesMiddleware')(app),
+    responseMiddleware
+  );
+
   return router;
 };

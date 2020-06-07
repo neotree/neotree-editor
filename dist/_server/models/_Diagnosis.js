@@ -98,8 +98,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Diagnosis, "Diagnosis", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Diagnosis.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Diagnosis.js");
+  reactHotLoader.register(Diagnosis, "Diagnosis", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Diagnosis.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Diagnosis.js");
 })();
 
 ;

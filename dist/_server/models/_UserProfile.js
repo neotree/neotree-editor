@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
+var _uuidv = _interopRequireDefault(require("uuidv4"));
+
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
 var _sequelize2 = _interopRequireDefault(require("./sequelize"));
@@ -20,17 +22,40 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var Session = _sequelize2["default"].define('session', {
-  sid: {
-    type: _sequelize["default"].STRING,
+var UserProfile = _sequelize2["default"].define('user_profile', {
+  id: {
+    type: _sequelize["default"].UUID,
+    defaultValue: function defaultValue() {
+      return (0, _uuidv["default"])();
+    },
+    allowNull: false,
     primaryKey: true
   },
-  userId: _sequelize["default"].STRING,
-  expires: _sequelize["default"].DATE,
-  data: _sequelize["default"].STRING(50000)
+  email: {
+    type: _sequelize["default"].STRING,
+    allowNull: false,
+    unique: true
+  },
+  profile_name: {
+    type: _sequelize["default"].STRING,
+    allowNull: false
+  },
+  user_id: {
+    type: _sequelize["default"].UUID // references: {
+    //   model: User,
+    //   key: 'id'
+    // }
+
+  },
+  firstname: {
+    type: _sequelize["default"].STRING
+  },
+  lastname: {
+    type: _sequelize["default"].STRING
+  }
 });
 
-var _default = Session;
+var _default = UserProfile;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -42,8 +67,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Session, "Session", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Session.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Session.js");
+  reactHotLoader.register(UserProfile, "UserProfile", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_UserProfile.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_UserProfile.js");
 })();
 
 ;

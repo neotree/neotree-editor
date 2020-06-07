@@ -28,15 +28,11 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var Screen = _sequelize2["default"].define('screen', {
+var ConfigKey = _sequelize2["default"].define('config_key', {
   id: {
-    type: _sequelize["default"].INTEGER,
-    autoIncrement: true,
-    primaryKey: true
-  },
-  screen_id: {
     type: _sequelize["default"].STRING,
-    allowNull: false
+    allowNull: false,
+    primaryKey: true
   },
   data: {
     type: _sequelize["default"].JSON,
@@ -47,49 +43,35 @@ var Screen = _sequelize2["default"].define('screen', {
     set: function set(value) {
       this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
     }
-  },
-  type: {
-    type: _sequelize["default"].STRING
-  },
-  position: {
-    type: _sequelize["default"].INTEGER
-  },
-  script_id: {
-    type: _sequelize["default"].STRING // references: {
-    //   model: Script,
-    //   key: 'id'
-    // }
-
   }
 });
 
-Screen.afterUpdate(function (script) {
-  var _JSON$parse = JSON.parse(JSON.stringify(script)),
+ConfigKey.afterUpdate(function (cKey) {
+  var _JSON$parse = JSON.parse(JSON.stringify(cKey)),
       id = _JSON$parse.id,
-      screen_id = _JSON$parse.screen_id,
       _JSON$parse$data = _JSON$parse.data,
       cAt = _JSON$parse$data.createdAt,
       data = (0, _objectWithoutProperties2["default"])(_JSON$parse$data, ["createdAt"]),
       createdAt = _JSON$parse.createdAt,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "screen_id", "data", "createdAt"]); // eslint-disable-line
+      c = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "data", "createdAt"]); // eslint-disable-line
 
 
-  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(screen_id)).update((0, _objectSpread2["default"])({}, data, {}, scr, {
+  _firebase["default"].database().ref("configkeys/".concat(id)).update((0, _objectSpread2["default"])({}, data, {}, c, {
     updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
 
   return new Promise(function (resolve) {
-    return resolve(script);
+    return resolve(cKey);
   });
 });
-Screen.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.screen_id)).remove();
+ConfigKey.afterDestroy(function (instance) {
+  _firebase["default"].database().ref("configkeys/".concat(instance.id)).remove();
 
   return new Promise(function (resolve) {
     return resolve(instance);
   });
 });
-var _default = Screen;
+var _default = ConfigKey;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -101,8 +83,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Screen, "Screen", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Screen.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/Screen.js");
+  reactHotLoader.register(ConfigKey, "ConfigKey", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_ConfigKey.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_ConfigKey.js");
 })();
 
 ;

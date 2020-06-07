@@ -20,19 +20,17 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var ApiKey = _sequelize2["default"].define('api_key', {
-  id: {
-    type: _sequelize["default"].INTEGER,
-    autoIncrement: true,
+var Session = _sequelize2["default"].define('session', {
+  sid: {
+    type: _sequelize["default"].STRING,
     primaryKey: true
   },
-  key: {
-    type: _sequelize["default"].STRING,
-    allowNull: false
-  }
+  userId: _sequelize["default"].STRING,
+  expires: _sequelize["default"].DATE,
+  data: _sequelize["default"].STRING(50000)
 });
 
-var _default = ApiKey;
+var _default = Session;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -44,8 +42,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(ApiKey, "ApiKey", "/home/lamyfarai/Workbench/neotree-editor/_server/models/ApiKey.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/ApiKey.js");
+  reactHotLoader.register(Session, "Session", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Session.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Session.js");
 })();
 
 ;

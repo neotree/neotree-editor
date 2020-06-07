@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
+var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
@@ -22,44 +22,29 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var File = _sequelize2["default"].define('file', {
+var User = _sequelize2["default"].define('user', {
   id: {
-    type: _sequelize["default"].STRING,
+    type: _sequelize["default"].UUID,
+    defaultValue: function defaultValue() {
+      return (0, _uuidv["default"])();
+    },
     allowNull: false,
     primaryKey: true
   },
-  metadata: {
-    type: _sequelize["default"].JSON,
-    defaultValue: JSON.stringify({}),
-    get: function get() {
-      return JSON.parse(this.getDataValue('metadata') || '{}');
-    },
-    set: function set(value) {
-      this.setDataValue('metadata', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
-    }
+  email: {
+    type: _sequelize["default"].STRING,
+    allowNull: false
   },
-  filename: {
+  password: {
     type: _sequelize["default"].STRING
   },
-  content_type: {
-    type: _sequelize["default"].STRING
-  },
-  size: {
-    type: _sequelize["default"].BIGINT
-  },
-  data: {
-    type: _sequelize["default"].BLOB('long')
-  },
-  uploaded_by: {
-    type: _sequelize["default"].UUID // references: {
-    //   model: User,
-    //   key: 'id'
-    // }
-
+  role: {
+    type: _sequelize["default"].INTEGER,
+    defaultValue: 0
   }
 });
 
-var _default = File;
+var _default = User;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -71,8 +56,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(File, "File", "/home/lamyfarai/Workbench/neotree-editor/_server/models/File.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/File.js");
+  reactHotLoader.register(User, "User", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_User.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_User.js");
 })();
 
 ;

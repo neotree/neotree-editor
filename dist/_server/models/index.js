@@ -53,6 +53,12 @@ Object.defineProperty(exports, "ApiKey", {
     return _ApiKey["default"];
   }
 });
+Object.defineProperty(exports, "Device", {
+  enumerable: true,
+  get: function get() {
+    return _Device["default"];
+  }
+});
 exports.dbInit = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -61,21 +67,23 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _sequelize = _interopRequireDefault(require("./sequelize"));
 
-var _User = _interopRequireDefault(require("./User"));
+var _User = _interopRequireDefault(require("./_User"));
 
-var _File = _interopRequireDefault(require("./File"));
+var _File = _interopRequireDefault(require("./_File"));
 
-var _UserProfile = _interopRequireDefault(require("./UserProfile"));
+var _UserProfile = _interopRequireDefault(require("./_UserProfile"));
 
-var _Script = _interopRequireDefault(require("./Script"));
+var _Script = _interopRequireDefault(require("./_Script"));
 
-var _Screen = _interopRequireDefault(require("./Screen"));
+var _Screen = _interopRequireDefault(require("./_Screen"));
 
-var _Diagnosis = _interopRequireDefault(require("./Diagnosis"));
+var _Diagnosis = _interopRequireDefault(require("./_Diagnosis"));
 
-var _ConfigKey = _interopRequireDefault(require("./ConfigKey"));
+var _ConfigKey = _interopRequireDefault(require("./_ConfigKey"));
 
-var _ApiKey = _interopRequireDefault(require("./ApiKey"));
+var _ApiKey = _interopRequireDefault(require("./_ApiKey"));
+
+var _Device = _interopRequireDefault(require("./_Device"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -251,11 +259,31 @@ var dbInit = function dbInit() {
         }
       }, _callee8);
     }))();
+    var initDeviceTable = (0, _asyncToGenerator2["default"])(
+    /*#__PURE__*/
+    _regenerator["default"].mark(function _callee9() {
+      return _regenerator["default"].wrap(function _callee9$(_context9) {
+        while (1) {
+          switch (_context9.prev = _context9.next) {
+            case 0:
+              _context9.next = 2;
+              return _Device["default"].sync();
+
+            case 2:
+              return _context9.abrupt("return", _context9.sent);
+
+            case 3:
+            case "end":
+              return _context9.stop();
+          }
+        }
+      }, _callee9);
+    }))();
 
     _sequelize["default"].authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
-      Promise.all([initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initApiKeysTable]).then(function (rslts) {
+      Promise.all([initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initApiKeysTable, initDeviceTable]).then(function (rslts) {
         resolve(rslts);
 
         _User["default"].count({}).then(function (count) {

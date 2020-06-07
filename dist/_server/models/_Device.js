@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
+var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
 
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
@@ -22,29 +22,29 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var User = _sequelize2["default"].define('user', {
+var Device = _sequelize2["default"].define('device', {
   id: {
-    type: _sequelize["default"].UUID,
-    defaultValue: function defaultValue() {
-      return (0, _uuidv["default"])();
-    },
-    allowNull: false,
+    type: _sequelize["default"].INTEGER,
+    autoIncrement: true,
     primaryKey: true
   },
-  email: {
+  unique_key: {
     type: _sequelize["default"].STRING,
     allowNull: false
   },
-  password: {
-    type: _sequelize["default"].STRING
-  },
-  role: {
-    type: _sequelize["default"].INTEGER,
-    defaultValue: 0
+  details: {
+    type: _sequelize["default"].JSON,
+    defaultValue: JSON.stringify({}),
+    get: function get() {
+      return JSON.parse(this.getDataValue('data') || '{}');
+    },
+    set: function set(value) {
+      this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
+    }
   }
 });
 
-var _default = User;
+var _default = Device;
 var _default2 = _default;
 exports["default"] = _default2;
 ;
@@ -56,8 +56,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(User, "User", "/home/lamyfarai/Workbench/neotree-editor/_server/models/User.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/User.js");
+  reactHotLoader.register(Device, "Device", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Device.js");
+  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Device.js");
 })();
 
 ;
