@@ -105,22 +105,24 @@ const ApiKey = () => {
                       </>
                     )}
 
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="primary"
-                      disabled={generatingKey}
-                      onClick={() => {
-                        setKeyGenError(null);
+                    {apiKey ? null : (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        disabled={generatingKey}
+                        onClick={() => {
+                          setKeyGenError(null);
 
-                        if (apiKey) {
-                          setOpenConfirmKeyGenModal(true);
-                          return;
-                        }
+                          if (apiKey) {
+                            setOpenConfirmKeyGenModal(true);
+                            return;
+                          }
 
-                        generateKey();
-                      }}
-                    >Genarate Api Key</Button>
+                          generateKey();
+                        }}
+                      >Genarate Api Key</Button>
+                    )}
                   </Grid>
 
                   {!keyGenError ? null : (
