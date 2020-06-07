@@ -59,7 +59,7 @@ module.exports = app => {
     responseMiddleware
   );
 
-  router.get(
+  router.post(
     '/register-device',
     apiKeyAuthenticator(app),
     require('../devices/createDeviceMiddleware')(app),

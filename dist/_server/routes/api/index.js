@@ -27,7 +27,7 @@ module.exports = function (app) {
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);
   router.get('/get-data-activity-info', (0, _apiKeyAuthenticator["default"])(app), require('../app/getDataActivityInfo')(app), responseMiddleware);
-  router.get('/register-device', (0, _apiKeyAuthenticator["default"])(app), require('../devices/createDeviceMiddleware')(app), responseMiddleware);
+  router.post('/register-device', (0, _apiKeyAuthenticator["default"])(app), require('../devices/createDeviceMiddleware')(app), responseMiddleware);
   router.get('/get-device', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDeviceMiddleware')(app), responseMiddleware);
   router.get('/get-devices', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDevicesMiddleware')(app), responseMiddleware);
   return router;
