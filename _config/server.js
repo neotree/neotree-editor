@@ -1,9 +1,9 @@
 let serverType = process.env.NEOTREE_SERVER_TYPE || '';
 
-if (serverType) serverType = `_${serverType.toUpperCase()}`;
+if (serverType) serverType = `${serverType.toUpperCase()}_`;
 
-const firebaseConfigFileName = `NEOTREE_FIREBASE_CONFIG_FILE${serverType}`;
-const serverConfigFileName = `NEOTREE_CONFIG_FILE${serverType}`;
+const firebaseConfigFileName = `${serverType}NEOTREE_FIREBASE_CONFIG_FILE`;
+const serverConfigFileName = `${serverType}NEOTREE_CONFIG_FILE`;
 
 const firebaseConfig = (function () {
   try {
