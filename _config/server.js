@@ -1,17 +1,9 @@
-const serverType = process.env.NEOTREE_SERVER_TYPE;
+let serverType = process.env.NEOTREE_SERVER_TYPE || '';
 
-let firebaseConfigFileName = process.env.NEOTREE_FIREBASE_CONFIG_FILE;
-let serverConfigFileName = process.env.NEOTREE_CONFIG_FILE;
+if (serverType) serverType = `_${serverType.toUpperCase()}`;
 
-if (serverType === 'production') {
-  firebaseConfigFileName = process.env.NEOTREE_PRODUCTION_FIREBASE_CONFIG_FILE;
-  serverConfigFileName = process.env.NEOTREE_PRODUCTION_CONFIG_FILE;
-}
-
-if (serverType === 'stage') {
-  firebaseConfigFileName = process.env.NEOTREE_STAGE_FIREBASE_CONFIG_FILE;
-  serverConfigFileName = process.env.NEOTREE_STAGE_CONFIG_FILE;
-}
+const firebaseConfigFileName = `NEOTREE_FIREBASE_CONFIG_FILE${serverType}`;
+const serverConfigFileName = `NEOTREE_CONFIG_FILE${serverType}`;
 
 const firebaseConfig = (function () {
   try {
