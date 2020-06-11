@@ -53,11 +53,16 @@ var copyDiagnosis = function copyDiagnosis(diagnosis) {
 
 exports.copyDiagnosis = copyDiagnosis;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var id = req.body.id;
 
     var done = function done(err, diagnosis) {
+      if (diagnosis) app.io.emit('create_diagnoses', {
+        diagnoses: [{
+          id: diagnosis.id
+        }]
+      });
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });

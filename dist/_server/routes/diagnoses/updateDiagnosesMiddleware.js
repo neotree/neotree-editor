@@ -74,13 +74,20 @@ var findAndUpdateDiagnoses = function findAndUpdateDiagnoses() {
 
 exports.findAndUpdateDiagnoses = findAndUpdateDiagnoses;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var _req$body = req.body,
         diagnoses = _req$body.diagnoses,
         returnUpdated = _req$body.returnUpdated;
 
     var done = function done(err, payload) {
+      app.io.emit('update_diagnoses', {
+        diagnoses: diagnoses.map(function (s) {
+          return {
+            id: s.id
+          };
+        })
+      });
       res.locals.setResponse(err, payload);
       next();
       return null;
