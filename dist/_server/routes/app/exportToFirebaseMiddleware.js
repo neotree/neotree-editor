@@ -46,28 +46,34 @@ module.exports = function () {
       diagnoses = JSON.parse(JSON.stringify(diagnoses));
       configKeys = JSON.parse(JSON.stringify(diagnoses));
       Promise.all([].concat((0, _toConsumableArray2["default"])(scripts.map(function (_ref3) {
-        var id = _ref3.id,
+        var scriptId = _ref3.id,
             s = (0, _objectWithoutProperties2["default"])(_ref3, ["id"]);
-        return _firebase["default"].database().ref("scripts/".concat(id)).set((0, _objectSpread2["default"])({}, s, {
-          data: JSON.stringify(s.data)
+        return _firebase["default"].database().ref("scripts/".concat(scriptId)).set((0, _objectSpread2["default"])({}, s.data, {
+          scriptId: scriptId,
+          createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
         }));
       })), (0, _toConsumableArray2["default"])(screens.map(function (_ref4) {
         var id = _ref4.id,
             s = (0, _objectWithoutProperties2["default"])(_ref4, ["id"]);
-        return _firebase["default"].database().ref("screens/".concat(s.screen_id)).set((0, _objectSpread2["default"])({}, s, {
-          data: JSON.stringify(s.data)
+        return _firebase["default"].database().ref("screens/".concat(s.screen_id)).set((0, _objectSpread2["default"])({}, s.data, {
+          screenId: s.screen_id,
+          scriptId: s.script_id,
+          createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
         }));
       })), (0, _toConsumableArray2["default"])(diagnoses.map(function (_ref5) {
         var id = _ref5.id,
             s = (0, _objectWithoutProperties2["default"])(_ref5, ["id"]);
-        return _firebase["default"].database().ref("diagnosis/".concat(id)).set((0, _objectSpread2["default"])({}, s, {
-          data: JSON.stringify(s.data)
+        return _firebase["default"].database().ref("diagnosis/".concat(s.diagnosis_id)).set((0, _objectSpread2["default"])({}, s.data, {
+          diagnosisId: s.diagnosis_id,
+          scriptId: s.script_id,
+          createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
         }));
       })), (0, _toConsumableArray2["default"])(configKeys.map(function (_ref6) {
-        var id = _ref6.id,
+        var configKeyId = _ref6.id,
             s = (0, _objectWithoutProperties2["default"])(_ref6, ["id"]);
-        return _firebase["default"].database().ref("configkeys/".concat(id)).set((0, _objectSpread2["default"])({}, s, {
-          data: JSON.stringify(s.data)
+        return _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set((0, _objectSpread2["default"])({}, s.data, {
+          configKeyId: configKeyId,
+          createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
         }));
       })))).then(function () {
         done(null, {

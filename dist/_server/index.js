@@ -2,10 +2,6 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
-
-var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
-
 var _path = _interopRequireDefault(require("path"));
 
 var _express = _interopRequireDefault(require("express"));
@@ -16,91 +12,32 @@ var _models = require("./models");
 
 var _server = _interopRequireDefault(require("../_config/server"));
 
-(function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
-  enterModule && enterModule(module);
-})();
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
 
-var app = (0, _express["default"])();
-app.sequelize = _models.sequelize;
-app.logger = require('../_utils/logger');
+Promise.all([(0, _models.dbInit)()])["catch"](function (e) {
+  console.log('DATABASE INIT ERROR:', e); // eslint-disable-line
 
-var initDatabase =
-/*#__PURE__*/
-function () {
-  var _ref = (0, _asyncToGenerator2["default"])(
-  /*#__PURE__*/
-  _regenerator["default"].mark(function _callee() {
-    return _regenerator["default"].wrap(function _callee$(_context) {
-      while (1) {
-        switch (_context.prev = _context.next) {
-          case 0:
-            _context.prev = 0;
-            _context.next = 3;
-            return (0, _models.dbInit)();
+  process.exit(1);
+}).then(function () {
+  var app = (0, _express["default"])();
+  app.sequelize = _models.sequelize;
+  app.logger = require('../_utils/logger');
 
-          case 3:
-            _context.next = 9;
-            break;
+  var httpServer = require('http').Server(app);
 
-          case 5:
-            _context.prev = 5;
-            _context.t0 = _context["catch"](0);
-            console.log('DATABASE INIT ERROR:', _context.t0); // eslint-disable-line
-
-            process.exit(1);
-
-          case 9:
-          case "end":
-            return _context.stop();
-        }
-      }
-    }, _callee, null, [[0, 5]]);
+  app.io = require('socket.io')(httpServer);
+  app = (0, _middlewares["default"])(app);
+  app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../src/assets'), {
+    index: false
   }));
-
-  return function initDatabase() {
-    return _ref.apply(this, arguments);
-  };
-}();
-
-initDatabase();
-
-var httpServer = require('http').Server(app);
-
-app.io = require('socket.io')(httpServer);
-app = (0, _middlewares["default"])(app);
-app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../src/assets'), {
-  index: false
-}));
-app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
-  index: false
-}));
-app.get('*', require('./routes/app/initialiseAppMiddleware')(app), require('./middlewares/sendHTML')(app));
-app.server = httpServer.listen(_server["default"].port, function (err) {
-  if (err) throw err;
-  console.log("Server started on port ".concat(_server["default"].port)); // eslint-disable-line
+  app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
+    index: false
+  }));
+  app.get('*', require('./routes/app/initialiseAppMiddleware')(app), require('./middlewares/sendHTML')(app));
+  app.server = httpServer.listen(_server["default"].port, function (err) {
+    if (err) throw err;
+    console.log("Server started on port ".concat(_server["default"].port)); // eslint-disable-line
+  });
 });
-;
-
-(function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
-
-  if (!reactHotLoader) {
-    return;
-  }
-
-  reactHotLoader.register(app, "app", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
-  reactHotLoader.register(initDatabase, "initDatabase", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
-  reactHotLoader.register(httpServer, "httpServer", "/home/lamyfarai/Workbench/neotree-editor/_server/index.js");
-})();
-
-;
-
-(function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
-  leaveModule && leaveModule(module);
-})();

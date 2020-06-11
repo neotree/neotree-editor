@@ -17,27 +17,45 @@ module.exports = () => (req, res, next) => {
     screens = JSON.parse(JSON.stringify(screens));
     diagnoses = JSON.parse(JSON.stringify(diagnoses));
     configKeys = JSON.parse(JSON.stringify(diagnoses));
-    
+
     Promise.all([
-      ...scripts.map(({ id, ...s }) => firebase
+      ...scripts.map(({ id: scriptId, ...s }) => firebase
         .database()
-        .ref(`scripts/${id}`)
-        .set({ ...s, data: JSON.stringify(s.data) })),
+        .ref(`scripts/${scriptId}`)
+        .set({
+          ...s.data,
+          scriptId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        })),
 
       ...screens.map(({ id, ...s }) => firebase
         .database()
         .ref(`screens/${s.screen_id}`)
-        .set({ ...s, data: JSON.stringify(s.data) })),
+        .set({
+          ...s.data,
+          screenId: s.screen_id,
+          scriptId: s.script_id,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        })),
 
       ...diagnoses.map(({ id, ...s }) => firebase
         .database()
-        .ref(`diagnosis/${id}`)
-        .set({ ...s, data: JSON.stringify(s.data) })),
+        .ref(`diagnosis/${s.diagnosis_id}`)
+        .set({
+          ...s.data,
+          diagnosisId: s.diagnosis_id,
+          scriptId: s.script_id,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        })),
 
-      ...configKeys.map(({ id, ...s }) => firebase
+      ...configKeys.map(({ id: configKeyId, ...s }) => firebase
         .database()
-        .ref(`configkeys/${id}`)
-        .set({ ...s, data: JSON.stringify(s.data) }))
+        .ref(`configkeys/${configKeyId}`)
+        .set({
+          ...s.data,
+          configKeyId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP
+        })),
     ]).then(() => {
       done(null, { success: true });
     }).catch(done);
