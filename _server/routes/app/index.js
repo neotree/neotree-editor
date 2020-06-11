@@ -37,6 +37,12 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/export-to-firebase',
+    require('./exportToFirebaseMiddleware')(app),
+    responseMiddleware
+  );
+
   router.get(
     '/get-data-activity-info',
     require('./getDataActivityInfo')(app),

@@ -10,7 +10,7 @@ import Display from './Display';
 const Scripts = props => {
   const [loading, setLoading] = useState(false);
   const [
-    loadingError, 
+    loadingError,
     setLoadingError
   ] = useState(null);
 
