@@ -16,7 +16,7 @@ module.exports = () => (req, res, next) => {
     scripts = JSON.parse(JSON.stringify(scripts));
     screens = JSON.parse(JSON.stringify(screens));
     diagnoses = JSON.parse(JSON.stringify(diagnoses));
-    configKeys = JSON.parse(JSON.stringify(diagnoses));
+    configKeys = JSON.parse(JSON.stringify(configKeys));
 
     Promise.all([
       ...scripts.map(({ id: scriptId, ...s }) => firebase
@@ -25,27 +25,30 @@ module.exports = () => (req, res, next) => {
         .set({
           ...s.data,
           scriptId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         })),
 
       ...screens.map(({ id, ...s }) => firebase
         .database()
-        .ref(`screens/${s.screen_id}`)
+        .ref(`screens/${s.script_id}/${s.screen_id}`)
         .set({
           ...s.data,
           screenId: s.screen_id,
           scriptId: s.script_id,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         })),
 
       ...diagnoses.map(({ id, ...s }) => firebase
         .database()
-        .ref(`diagnosis/${s.diagnosis_id}`)
+        .ref(`diagnosis/${s.script_id}/${s.diagnosis_id}`)
         .set({
           ...s.data,
           diagnosisId: s.diagnosis_id,
           scriptId: s.script_id,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         })),
 
       ...configKeys.map(({ id: configKeyId, ...s }) => firebase
@@ -54,7 +57,8 @@ module.exports = () => (req, res, next) => {
         .set({
           ...s.data,
           configKeyId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         })),
     ]).then(() => {
       done(null, { success: true });
