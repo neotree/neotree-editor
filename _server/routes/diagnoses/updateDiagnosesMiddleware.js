@@ -29,10 +29,11 @@ export const findAndUpdateDiagnoses = (
     }).catch(reject);
   });
 
-export default () => (req, res, next) => {
+export default app => (req, res, next) => {
   const { diagnoses, returnUpdated } = req.body;
 
   const done = (err, payload) => {
+    app.io.emit('update_diagnoses', { diagnoses: diagnoses.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };

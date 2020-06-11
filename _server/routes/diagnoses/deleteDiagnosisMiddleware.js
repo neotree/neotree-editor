@@ -5,7 +5,7 @@ module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
-    if (err) app.logger.log(err);
+    if (!err) app.io.emit('delete_diagnoses', { diagnoses: [{ id }] });
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

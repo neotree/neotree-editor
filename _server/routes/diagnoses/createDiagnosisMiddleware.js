@@ -6,6 +6,7 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, diagnosis) => {
     if (err) app.logger.log(err);
+    if (diagnosis) app.io.emit('create_diagnoses', { diagnoses: [{ id: diagnosis.id }] });
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

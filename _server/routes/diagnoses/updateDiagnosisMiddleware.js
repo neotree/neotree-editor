@@ -1,9 +1,10 @@
 import { Diagnosis } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const { id, ...payload } = req.body;
 
   const done = (err, diagnosis) => {
+    if (diagnosis) app.io.emit('update_diagnoses', { diagnoses: [{ id }] });
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };
