@@ -25,6 +25,20 @@ module.exports = app => {
   );
 
   router.get(
+    '/get-config-keys',
+    apiKeyAuthenticator(app),
+    require('./getConfigKeysMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
+    '/get-config-key',
+    apiKeyAuthenticator(app),
+    require('./getConfigKeyMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
     '/get-scripts',
     apiKeyAuthenticator(app),
     require('./getScriptsMiddleware')(app),

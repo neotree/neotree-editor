@@ -29,10 +29,11 @@ export const copyConfigKey = (configKey) => {
   });
 };
 
-export default () => (req, res, next) => {
+export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, configKey) => {
+    if (configKey) app.io.emit('create_config_keys', { config_keys: [{ id: configKey.id }] });
     res.locals.setResponse(err, { configKey });
     next(); return null;
   };

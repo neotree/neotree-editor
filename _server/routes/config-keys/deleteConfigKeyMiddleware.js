@@ -1,9 +1,16 @@
-import { ConfigKey } from '../../models';
+import { ConfigKey, Log } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, configKey) => {
+    if (!err) {
+      app.io.emit('delete_config_keys', { config_keys: [{ id }] });
+      Log.create({
+        name: 'delete_config_keys',
+        data: JSON.stringify({ config_keys: [{ id }] })
+      });
+    }
     res.locals.setResponse(err, { configKey });
     next(); return null;
   };

@@ -8,6 +8,7 @@ import Diagnosis from './_Diagnosis';
 import ConfigKey from './_ConfigKey';
 import ApiKey from './_ApiKey';
 import Device from './_Device';
+import Log from './_Log';
 
 export {
   User,
@@ -19,6 +20,7 @@ export {
   ConfigKey,
   ApiKey,
   Device,
+  Log,
 };
 
 export const sequelize = sqlz;
@@ -33,6 +35,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
   const initConfigKeysTable = (async () => await ConfigKey.sync())();
   const initApiKeysTable = (async () => await ApiKey.sync())();
   const initDeviceTable = (async () => await Device.sync())();
+  const initLogTable = (async () => await Log.sync())();
 
   sqlz.authenticate()
   .then(() => {
@@ -47,6 +50,7 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initConfigKeysTable,
       initApiKeysTable,
       initDeviceTable,
+      initLogTable,
     ]).then(rslts => {
       resolve(rslts);
       User.count({})

@@ -1,11 +1,17 @@
-import { Diagnosis } from '../../models';
+import { Diagnosis, Log } from '../../models';
 import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
 
 module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
-    if (!err) app.io.emit('delete_diagnoses', { diagnoses: [{ id }] });
+    if (!err) {
+      app.io.emit('delete_diagnoses', { diagnoses: [{ id }] });
+      Log.create({
+        name: 'delete_diagnoses',
+        data: JSON.stringify({ diagnoses: [{ id }] })
+      });
+    }
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

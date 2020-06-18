@@ -1,4 +1,4 @@
-import { Script, Screen, Diagnosis } from '../../models';
+import { Script, Screen, Diagnosis, Log } from '../../models';
 
 module.exports = (app) => (req, res, next) => {
   const {
@@ -8,7 +8,13 @@ module.exports = (app) => (req, res, next) => {
   } = req.body;
 
   const done = (err, script) => {
-    if (!err) app.io.emit('delete_scripts', { scripts: [{ id }] });
+    if (!err) {
+      app.io.emit('delete_scripts', { scripts: [{ id }] });
+      Log.create({
+        name: 'delete_scripts',
+        data: JSON.stringify({ scripts: [{ id }] })
+      });
+    }
     res.locals.setResponse(err, { script });
     next(); return null;
   };

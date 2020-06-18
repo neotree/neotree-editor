@@ -1,11 +1,17 @@
-import { Screen } from '../../models';
+import { Screen, Log } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, screen) => {
-    if (!err) app.io.emit('delete_screens', { screens: [{ id }] });
+    if (!err) {
+      app.io.emit('delete_screens', { screens: [{ id }] });
+      Log.create({
+        name: 'delete_screens',
+        data: JSON.stringify({ screens: [{ id }] })
+      });
+    }
     res.locals.setResponse(err, { screen });
     next(); return null;
   };

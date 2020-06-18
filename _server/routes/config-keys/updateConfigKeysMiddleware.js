@@ -1,9 +1,10 @@
 import { ConfigKey } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   const { configKeys, returnUpdated } = req.body;
 
   const done = (err, payload) => {
+    if (!err) app.io.emit('update_config_keys', { config_keys: configKeys.map(c => ({ id: c.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };
