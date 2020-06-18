@@ -60,9 +60,23 @@ module.exports = app => {
   );
 
   router.get(
-    '/get-screens',
+    '/get-screen',
     apiKeyAuthenticator(app),
-    require('./getScreensMiddleware')(app),
+    require('./getScreenMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
+    '/get-diagnoses',
+    apiKeyAuthenticator(app),
+    require('./getDiagnosesMiddleware')(app),
+    responseMiddleware
+  );
+
+  router.get(
+    '/get-diagnosis',
+    apiKeyAuthenticator(app),
+    require('./getDiagnosisMiddleware')(app),
     responseMiddleware
   );
 
