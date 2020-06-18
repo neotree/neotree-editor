@@ -17,11 +17,23 @@ module.exports = function (app) {
     var id = req.body.id;
 
     var done = function done(err, screen) {
-      if (!err) app.io.emit('delete_screens', {
-        screens: [{
-          id: id
-        }]
-      });
+      if (!err) {
+        app.io.emit('delete_screens', {
+          screens: [{
+            id: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'delete_screens',
+          data: JSON.stringify({
+            screens: [{
+              id: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         screen: screen
       });

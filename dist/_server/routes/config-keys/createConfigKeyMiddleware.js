@@ -14,11 +14,16 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var payload = req.body;
 
     var done = function done(err, configKey) {
+      if (configKey) app.io.emit('create_config_keys', {
+        config_keys: [{
+          id: configKey.id
+        }]
+      });
       res.locals.setResponse(err, {
         configKey: configKey
       });

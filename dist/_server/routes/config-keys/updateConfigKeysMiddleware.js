@@ -12,13 +12,20 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var _req$body = req.body,
         configKeys = _req$body.configKeys,
         returnUpdated = _req$body.returnUpdated;
 
     var done = function done(err, payload) {
+      if (!err) app.io.emit('update_config_keys', {
+        config_keys: configKeys.map(function (c) {
+          return {
+            id: c.id
+          };
+        })
+      });
       res.locals.setResponse(err, payload);
       next();
       return null;

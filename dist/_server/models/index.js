@@ -59,6 +59,12 @@ Object.defineProperty(exports, "Device", {
     return _Device["default"];
   }
 });
+Object.defineProperty(exports, "Log", {
+  enumerable: true,
+  get: function get() {
+    return _Log["default"];
+  }
+});
 exports.dbInit = exports.sequelize = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -84,6 +90,8 @@ var _ConfigKey = _interopRequireDefault(require("./_ConfigKey"));
 var _ApiKey = _interopRequireDefault(require("./_ApiKey"));
 
 var _Device = _interopRequireDefault(require("./_Device"));
+
+var _Log = _interopRequireDefault(require("./_Log"));
 
 (function () {
   var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
@@ -279,11 +287,31 @@ var dbInit = function dbInit() {
         }
       }, _callee9);
     }))();
+    var initLogTable = (0, _asyncToGenerator2["default"])(
+    /*#__PURE__*/
+    _regenerator["default"].mark(function _callee10() {
+      return _regenerator["default"].wrap(function _callee10$(_context10) {
+        while (1) {
+          switch (_context10.prev = _context10.next) {
+            case 0:
+              _context10.next = 2;
+              return _Log["default"].sync();
+
+            case 2:
+              return _context10.abrupt("return", _context10.sent);
+
+            case 3:
+            case "end":
+              return _context10.stop();
+          }
+        }
+      }, _callee10);
+    }))();
 
     _sequelize["default"].authenticate().then(function () {
       console.log('Connected to the database.'); // eslint-disable-line
 
-      Promise.all([initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initApiKeysTable, initDeviceTable]).then(function (rslts) {
+      Promise.all([initUsersTable, initFilesTable, initUserProfilesTable, initScriptsTable, initScreensTable, initDiagnosesTable, initConfigKeysTable, initApiKeysTable, initDeviceTable, initLogTable]).then(function (rslts) {
         resolve(rslts);
 
         _User["default"].count({}).then(function (count) {

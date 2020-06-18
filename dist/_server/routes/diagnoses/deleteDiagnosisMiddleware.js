@@ -17,11 +17,23 @@ module.exports = function (app) {
     var id = req.body.id;
 
     var done = function done(err, diagnosis) {
-      if (!err) app.io.emit('delete_diagnoses', {
-        diagnoses: [{
-          id: id
-        }]
-      });
+      if (!err) {
+        app.io.emit('delete_diagnoses', {
+          diagnoses: [{
+            id: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'delete_diagnoses',
+          data: JSON.stringify({
+            diagnoses: [{
+              id: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });

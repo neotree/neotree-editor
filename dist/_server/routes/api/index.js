@@ -22,6 +22,8 @@ module.exports = function (app) {
   router.get('/key', require('./getApiKeyMiddleware')(app), responseMiddleware);
   router.get('/download-api-config', require('./downloadApiConfigFileMiddleware')(app), responseMiddleware);
   router.post('/generate-key', require('./generateApiKeyMiddleware')(app), responseMiddleware);
+  router.get('/get-config-keys', (0, _apiKeyAuthenticator["default"])(app), require('./getConfigKeysMiddleware')(app), responseMiddleware);
+  router.get('/get-config-key', (0, _apiKeyAuthenticator["default"])(app), require('./getConfigKeyMiddleware')(app), responseMiddleware);
   router.get('/get-scripts', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptsMiddleware')(app), responseMiddleware);
   router.get('/get-script', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptMiddleware')(app), responseMiddleware);
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), responseMiddleware);

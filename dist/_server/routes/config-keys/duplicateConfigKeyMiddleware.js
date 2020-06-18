@@ -50,11 +50,16 @@ var copyConfigKey = function copyConfigKey(configKey) {
 
 exports.copyConfigKey = copyConfigKey;
 
-var _default = function _default() {
+var _default = function _default(app) {
   return function (req, res, next) {
     var id = req.body.id;
 
     var done = function done(err, configKey) {
+      if (configKey) app.io.emit('create_config_keys', {
+        config_keys: [{
+          id: configKey.id
+        }]
+      });
       res.locals.setResponse(err, {
         configKey: configKey
       });

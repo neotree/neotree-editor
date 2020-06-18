@@ -6,11 +6,28 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var id = req.body.id;
 
     var done = function done(err, configKey) {
+      if (!err) {
+        app.io.emit('delete_config_keys', {
+          config_keys: [{
+            id: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'delete_config_keys',
+          data: JSON.stringify({
+            config_keys: [{
+              id: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         configKey: configKey
       });

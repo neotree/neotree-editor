@@ -18,11 +18,23 @@ module.exports = function (app) {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id", "deleteAssociatedData"]);
 
     var done = function done(err, script) {
-      if (!err) app.io.emit('delete_scripts', {
-        scripts: [{
-          id: id
-        }]
-      });
+      if (!err) {
+        app.io.emit('delete_scripts', {
+          scripts: [{
+            id: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'delete_scripts',
+          data: JSON.stringify({
+            scripts: [{
+              id: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         script: script
       });
