@@ -30,7 +30,7 @@ module.exports = function (app) {
   router.get('/get-screen', (0, _apiKeyAuthenticator["default"])(app), require('./getScreenMiddleware')(app), responseMiddleware);
   router.get('/get-diagnoses', (0, _apiKeyAuthenticator["default"])(app), require('./getDiagnosesMiddleware')(app), responseMiddleware);
   router.get('/get-diagnosis', (0, _apiKeyAuthenticator["default"])(app), require('./getDiagnosisMiddleware')(app), responseMiddleware);
-  router.get('/get-data-activity-info', (0, _apiKeyAuthenticator["default"])(app), require('../app/getDataActivityInfo')(app), responseMiddleware);
+  router.get('/sync-data', (0, _apiKeyAuthenticator["default"])(app), require('../app/syncData')(app), responseMiddleware);
   router.post('/register-device', (0, _apiKeyAuthenticator["default"])(app), require('../devices/createDeviceMiddleware')(app), responseMiddleware);
   router.get('/get-device', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDeviceMiddleware')(app), responseMiddleware);
   router.get('/get-devices', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDevicesMiddleware')(app), responseMiddleware);

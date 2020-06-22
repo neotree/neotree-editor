@@ -81,9 +81,9 @@ module.exports = app => {
   );
 
   router.get(
-    '/get-data-activity-info',
+    '/sync-data',
     apiKeyAuthenticator(app),
-    require('../app/getDataActivityInfo')(app),
+    require('../app/syncData')(app),
     responseMiddleware
   );
 

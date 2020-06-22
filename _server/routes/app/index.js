@@ -44,8 +44,8 @@ module.exports = app => {
   );
 
   router.get(
-    '/get-data-activity-info',
-    require('./getDataActivityInfo')(app),
+    '/sync-data',
+    require('./syncData')(app),
     responseMiddleware
   );
 

@@ -6,12 +6,31 @@ import { Helmet } from 'react-helmet';
 import LazyComponent from 'LazyComponent';
 import reduxComponent from 'reduxComponent';
 import Spinner from 'AppComponents/Spinner';
+import io from 'socket.io-client';
+
+const socket = io();
 
 const HomePage = LazyComponent(() => import('./HomePage'));
 const LoginPage = LazyComponent(() => import('./LoginPage'));
 const Dashboard = LazyComponent(() => import('./Dashboard'));
 
 export class App extends React.Component {
+  componentDidMount() {
+    const onSocket = data => console.log('socket event', data); // eslint-disable-line
+    socket.on('update_scripts', onSocket);
+    socket.on('delete_scripts', onSocket);
+    socket.on('create_scripts', onSocket);
+    socket.on('update_screens', onSocket);
+    socket.on('delete_screens', onSocket);
+    socket.on('create_screens', onSocket);
+    socket.on('update_diagnoses', onSocket);
+    socket.on('delete_diagnoses', onSocket);
+    socket.on('create_diagnoses', onSocket);
+    socket.on('update_config_keys', onSocket);
+    socket.on('delete_config_keys', onSocket);
+    socket.on('create_config_keys', onSocket);
+  }
+
   render() {
     return (
       <div id="neotree-app" className="neotree-app">
