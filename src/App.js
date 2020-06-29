@@ -1,11 +1,16 @@
 import React from 'react';
 import { provideAppContext } from '@/contexts/app';
+import { LayoutRoot } from '@/components/Layout';
+import renderDocumentTitle from '@/components/renderDocumentTitle';
 import Containers from './containers';
 
 const App = () => {
   return (
     <>
-      <Containers />
+      {renderDocumentTitle()}
+      <LayoutRoot>
+        <Containers />
+      </LayoutRoot>
     </>
   );
 };
