@@ -12,6 +12,7 @@ const AuthenticationPage = LazyComponent(() => import('./Authentication'));
 const SignInPage = props => <AuthenticationPage {...props} authType="sign-in" />;
 const SignUpPage = props => <AuthenticationPage {...props} authType="sign-up" />;
 const ForgotPasswordPage = props => <AuthenticationPage {...props} authType="forgot-password" />;
+const ChangePasswordPage = props => <AuthenticationPage {...props} authType="change-password" />;
 
 const Containers = () => {
   const { authenticated } = useAppContext();
@@ -25,6 +26,7 @@ const Containers = () => {
               <Route exact path="/sign-in" component={SignInPage} />
               <Route exact path="/sign-up" component={SignUpPage} />
               <Route exact path="/forgot-password" component={ForgotPasswordPage} />
+              <Route exact path="/change-password" component={ChangePasswordPage} />
               <Route exact path="/" render={() => <Redirect to="/sign-in" />} />
             </Switch>
           </>
