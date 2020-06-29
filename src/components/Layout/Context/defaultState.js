@@ -1,3 +1,3 @@
 export default {
-  AUTH_FORM_WIDTH: 300,
+  AUTH_FORM_WIDTH: 350,
 };

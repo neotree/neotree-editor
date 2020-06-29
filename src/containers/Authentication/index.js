@@ -33,7 +33,7 @@ const useStyles = makeStyles(theme => ({
   },
   paper: {
     margin: '25px auto',
-    padding: theme.spacing(),
+    padding: theme.spacing(2),
   },
   paperWidth: ({ _layout }) => ({
     width: '90%',
@@ -59,13 +59,13 @@ const getPageItems = authType => {
 const Authentication = ({ authType }) => {
   const classes = useStyles();
 
-  const { copy, Form, noMatch } = getPageItems(authType);
+  const { copy: _copy, Form, noMatch } = getPageItems(authType);
 
   if (noMatch) return null;
 
   return (
     <>
-      {renderDocumentTitle(copy.PAGE_TITLE)}
+      {renderDocumentTitle(_copy.PAGE_TITLE)}
 
       <div className={cx(classes.root)}>
         <div className={cx(classes.rootInner)}>
@@ -73,10 +73,10 @@ const Authentication = ({ authType }) => {
             <div className={cx(classes.header)}>
               <Logo />
               <br />
-              <Typography variant="button">{copy.FORM_TITLE}</Typography>
+              <Typography variant="button">{_copy.FORM_TITLE}</Typography>
             </div>
-            
-            <Form authType={authType} />
+
+            <Form copy={{ ...copy, ..._copy }} authType={authType} />
           </Paper>
         </div>
       </div>
