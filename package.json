@@ -15,7 +15,6 @@
     "start": "babel-node _server/index.js",
     "clean-dist": "npm run remove-dist && mkdir dist && mkdir dist/src",
     "remove-dist": "rimraf ./dist",
-
     "build:html": "babel-node _tools/buildHtml.js",
     "build:server": "babel _server --out-dir dist/_server --copy-files --ignore .gitignore",
     "postbuild:server": "ncp _server/tmp_uploads dist/_server/tmp_uploads",
@@ -23,11 +22,9 @@
     "build:utils": "babel _utils --out-dir dist/_utils --copy-files",
     "prebuild": "npm-run-all clean-dist build:html build:server build:config build:utils",
     "build": "babel-node _tools/build.js",
-
     "start:prod-server": "cross-env NEOTREE_SERVER_TYPE=production node dist/_server/index.js",
     "start:stage-server": "cross-env NEOTREE_SERVER_TYPE=stage node dist/_server/index.js",
     "start:dev-server": "cross-env NEOTREE_SERVER_TYPE=development node dist/_server/index.js",
-
     "prod-server": "pm2 --name neotree_webeditor_production --watch --no-daemon start npm -- run start:prod-server",
     "stage-server": "pm2 --name neotree_webeditor_stage --watch --no-daemon start npm -- run start:stage-server",
     "dev-server": "pm2 --name neotree_webeditor_development --watch --no-daemon start npm -- run start:dev-server"
@@ -81,7 +78,7 @@
     "react-mdc-web": "^0.17.0",
     "react-mdl": "^1.11.0",
     "react-redux": "^7.1.0",
-    "react-router-dom": "^5.1.2",
+    "react-router-dom": "^5.2.0",
     "react-sortable-hoc": "^1.9.1",
     "redux": "^4.0.1",
     "redux-logger": "^3.0.6",
