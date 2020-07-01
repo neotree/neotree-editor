@@ -6,3 +6,11 @@ export const checkEmailRegistration = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const authenticate = (authType, reqPayload = {}, reqOpts) => {
+  return makeApiCall(`/${authType}`, {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

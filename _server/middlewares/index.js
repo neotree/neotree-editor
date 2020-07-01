@@ -21,7 +21,7 @@ module.exports = app => {
       let errors = res.locals._response_.errors;
       if (err) {
         console.log(err);
-        err = err.message || err.msg || err;
+        err = err.message || err.msg || JSON.stringify(err);
         errors = [...errors || [], ...(err.map ? err : [err])];
       }
       res.locals._response_ = { errors, ...res.locals._response_, ...payload };

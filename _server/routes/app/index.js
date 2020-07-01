@@ -19,7 +19,7 @@ module.exports = app => {
 
   router.get(
     '/initialise-app',
-    require('../auth/getAuthenticatedUser')(app),
+    require('../auth/getAuthenticatedUserMiddleware')(app),
     responseMiddleware,
   );
 

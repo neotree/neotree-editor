@@ -10,12 +10,12 @@ const SettingsPage = LazyPage(() => import('./SettingsPage'));
 const AuthenticationPage = LazyPage(() => import('./AuthenticationPage'));
 
 const Containers = () => {
-  const { authenticated } = useAppContext();
+  const { state: { authenticatedUser } } = useAppContext();
 
   return (
     <>
       <div>
-        {!authenticated ? (
+        {!authenticatedUser ? (
           <>
             <Switch>
               <Route exact path="/:authType" component={AuthenticationPage} />
@@ -31,6 +31,7 @@ const Containers = () => {
               <Route path="/config-keys" component={ConfigKeys} />
               <Route path="/settings" component={SettingsPage} />
               <Route exact path="/" component={HomePage} />
+              <Route render={() => <Redirect to="/" />} />
             </Switch>
           </>
         )}

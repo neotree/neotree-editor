@@ -3,7 +3,7 @@ import queryString from 'query-string';
 
 export default (url = '', opts = {}) => {
   const { body, method: m, ...reqOpts } = opts;
-
+  reqOpts.headers = { ...reqOpts.headers };
   const method = (m || 'GET').toUpperCase();
 
   if (method === 'GET') {

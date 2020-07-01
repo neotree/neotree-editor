@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator/check';
-import addUser from './addUser';
+import addUser from '../users/addUser';
 
 module.exports = app => (req, res, next) => { //eslint-disable-line
   const {
