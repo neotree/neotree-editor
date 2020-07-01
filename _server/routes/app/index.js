@@ -19,14 +19,8 @@ module.exports = app => {
 
   router.get(
     '/initialise-app',
-    require('./initialiseAppMiddleware')(app),
-    (req, res) => {
-      const { app, ...payload } = res.locals.getResponsePayload() || {};
-      res.json({
-        error: res.locals.getResponseError(),
-        payload: { ...payload, ...app }
-      });
-    }
+    require('../auth/getAuthenticatedUser')(app),
+    responseMiddleware,
   );
 
   router.get('/export-data', require('./exportDataMiddleware')(app));

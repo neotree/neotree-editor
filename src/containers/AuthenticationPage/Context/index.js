@@ -1,4 +1,5 @@
 import React from 'react';
+import _checkEmailRegistration from './_checkEmailRegistration';
 
 export const AuthPageContext = React.createContext(null);
 
@@ -6,8 +7,9 @@ export const useAuthPageContext = () => React.useContext(AuthPageContext);
 
 export const provideAuthPageContext = Component => function AuthPageContextProvider(props) {
   const [state, _setState] = React.useState({
+    emailRegistration: {},
     form: {
-      username: '',
+      email: '',
       password: '',
       password2: '',
     },
@@ -23,6 +25,15 @@ export const provideAuthPageContext = Component => function AuthPageContextProvi
     form: { ...prev.form, ...typeof s === 'function' ? s(prev.form) : s }
   }));
 
+  const { emailRegistration, form: { email } } = state;
+
+  React.useEffect(() => {
+    if (emailRegistration.email && (emailRegistration.email !== email)) {
+      setState({ emailRegistration: {} });
+      setForm({ password: '', password2: '' });
+    }
+  }, [email]);
+
   return (
     <AuthPageContext.Provider
       value={{
@@ -30,6 +41,7 @@ export const provideAuthPageContext = Component => function AuthPageContextProvi
         setState,
         _setState,
         setForm,
+        checkEmailRegistration: _checkEmailRegistration({ state, setState }),
       }}
     >
       <Component {...props} />

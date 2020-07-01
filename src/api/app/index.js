@@ -1,7 +1,7 @@
 import makeApiCall from '../makeApiCall';
 
 export const initialiseApp = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/app/init', {
+  return makeApiCall('/initialise-app', {
     body: reqPayload,
     ...reqOpts,
   });

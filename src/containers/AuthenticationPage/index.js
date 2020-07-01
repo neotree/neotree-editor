@@ -6,13 +6,33 @@ import { makeStyles } from '@/components/Layout';
 import cx from 'classnames';
 import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import Logo from '@/components/Logo';
 import { Switch, Route, Redirect, useParams } from 'react-router-dom';
 import { provideAuthPageContext } from './Context';
 
-const AuthForm = LazyComponent(() => import('./AuthForm'));
-const ForgotPasswordForm = LazyComponent(() => import('./ForgotPasswordForm'));
-const ChangePasswordForm = LazyComponent(() => import('./ChangePasswordForm'));
+const lazyComponentOpts = {
+  LoaderComponent: () => (
+    <div style={{ textAlign: 'center' }}>
+      <CircularProgress size={20} />
+    </div>
+  )
+};
+
+const AuthForm = LazyComponent(
+  () => import('./AuthForm'),
+  lazyComponentOpts
+);
+
+const ForgotPasswordForm = LazyComponent(
+  () => import('./ForgotPasswordForm'),
+  lazyComponentOpts
+);
+
+const ChangePasswordForm = LazyComponent(
+  () => import('./ChangePasswordForm'),
+  lazyComponentOpts
+);
 
 const useStyles = makeStyles(theme => ({
   root: {

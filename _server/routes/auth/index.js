@@ -4,8 +4,14 @@ const router = express.Router();
 
 module.exports = app => {
   router.get(
+    '/get-authenticated-user',
+    require('./getAuthenticatedUser')(app),
+    app.responseMiddleware
+  );
+
+  router.get(
     '/check-email-registration',
-    require('./checkEmailRegistrationMiddleware')(app),
+    require('./checkEmailRegistration')(app),
     app.responseMiddleware
   );
 

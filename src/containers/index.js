@@ -1,13 +1,13 @@
 import React from 'react';
-import LazyComponent from '@/components/LazyComponent';
+import LazyPage from '@/components/LazyPage';
 import { Switch, Route, Redirect } from 'react-router-dom';
 import { useAppContext } from '@/contexts/app';
 
-const HomePage = LazyComponent(() => import('./HomePage'));
-const Scripts = LazyComponent(() => import('./Scripts'));
-const ConfigKeys = LazyComponent(() => import('./ConfigKeys'));
-const SettingsPage = LazyComponent(() => import('./SettingsPage'));
-const AuthenticationPage = LazyComponent(() => import('./AuthenticationPage'));
+const HomePage = LazyPage(() => import('./HomePage'));
+const Scripts = LazyPage(() => import('./Scripts'));
+const ConfigKeys = LazyPage(() => import('./ConfigKeys'));
+const SettingsPage = LazyPage(() => import('./SettingsPage'));
+const AuthenticationPage = LazyPage(() => import('./AuthenticationPage'));
 
 const Containers = () => {
   const { authenticated } = useAppContext();

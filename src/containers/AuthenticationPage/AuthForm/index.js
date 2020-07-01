@@ -11,6 +11,7 @@ import cx from 'classnames';
 import useFormState from './useFormState';
 
 const useStyles = makeStyles(() => ({
+  actionsWrap: { textAlign: 'right', },
   actions: {
     display: 'flex',
     justifyContent: 'flex-end',
@@ -28,9 +29,9 @@ const AuthForm = ({ copy, authType }) => {
     checkEmailRegistration,
     state: {
       loading,
-      usernameVerified,
+      emailRegistration,
       form: {
-        username,
+        email,
         password,
         password2,
       },
@@ -38,15 +39,25 @@ const AuthForm = ({ copy, authType }) => {
   } = useFormState(authType);
 
   const renderActions = actions => (
-    <div className={cx(classes.actions)}>
-      {actions}
+    <div className={cx(classes.actionsWrap)}>
+      {!emailRegistration.errors ? null : emailRegistration.errors.map((e, i) => {
+        const key = i;
+        return (
+          <div key={key}>
+            <Typography color="error" variant="caption">{e}</Typography>
+          </div>
+        );
+      })}
+      <div className={cx(classes.actions)}>
+        {actions}
+      </div>
     </div>
   );
 
   const renderBtnText = text => (
     <>
       <Typography color="inherit" variant="caption">{text}</Typography>
-      {loading ? <>&nbsp;&nbsp;<CircularProgress size={15} /></> : null}
+      {loading ? <>&nbsp;&nbsp;<CircularProgress color="secondary" size={15} /></> : null}
     </>
   );
 
@@ -55,7 +66,7 @@ const AuthForm = ({ copy, authType }) => {
       <WindowEventListener
         events={{
           keyup: () => {
-            if (!usernameVerified) return checkEmailRegistration(authType);
+            if (!emailRegistration.activated) return checkEmailRegistration(authType);
             onAuthenticate(authType);
           },
         }}
@@ -65,16 +76,16 @@ const AuthForm = ({ copy, authType }) => {
             fullWidth
             variant="outlined"
             type="email"
-            name="username"
-            value={username || ''}
+            name="email"
+            value={email || ''}
             label={copy.EMAIL_ADDRESS_INPUT_LABEL}
-            onChange={e => setForm({ username: e.target.value })}
+            onChange={e => setForm({ email: e.target.value })}
           />
         </div>
 
         <br />
 
-        <Collapse in={!usernameVerified}>
+        <Collapse in={!emailRegistration.activated}>
           {renderActions(
             <>
               <Button
@@ -86,7 +97,7 @@ const AuthForm = ({ copy, authType }) => {
           )}
         </Collapse>
 
-        <Collapse in={usernameVerified}>
+        <Collapse in={emailRegistration.activated}>
           <div>
             <div>
               <TextField
@@ -126,6 +137,7 @@ const AuthForm = ({ copy, authType }) => {
               <>
                 <Button
                   variant="outlined"
+                  color="secondary"
                   onClick={() => onAuthenticate()}
                   disabled={disableAction()}
                 >

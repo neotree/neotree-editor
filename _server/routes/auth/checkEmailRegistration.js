@@ -12,6 +12,6 @@ module.exports = (app, payload, callback) => (req, res, next) => {
     .catch(done)
     .then(u => done(
       u ? null : { msg: 'Email address not registered.' },
-      !u ? null : { activated: u.password ? true : false, userId: u.id },
+      !u ? null : { activated: u.password ? true : false, userId: u.id, email: u.email },
     ));
 };
