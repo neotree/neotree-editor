@@ -4,8 +4,11 @@ import Collapse from '@material-ui/core/Collapse';
 import TextField from '@material-ui/core/TextField';
 import Button from '@material-ui/core/Button';
 import WindowEventListener from '@/components/WindowEventListener';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@/components/Layout';
 import cx from 'classnames';
+import useFormState from './useFormState';
 
 const useStyles = makeStyles(() => ({
   actions: {
@@ -18,33 +21,21 @@ const useStyles = makeStyles(() => ({
 const AuthForm = ({ copy, authType }) => {
   const classes = useStyles();
 
-  const [loading, setLoading] = React.useState(false);
-  const [username, setUsername] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [password2, setPassword2] = React.useState('');
-  const [usernameVerified, setUsernameVerified] = React.useState(false);
-
-  const canSubmit = () => {
-    let canSubmit = !loading && username;
-    if (usernameVerified) {
-      const passwordConfirmed = password && (authType === 'sign-up' ? password === password2 : true);
-      canSubmit = canSubmit && passwordConfirmed;
+  const {
+    setForm,
+    disableAction,
+    onAuthenticate,
+    onVerifyEmailAddress,
+    state: {
+      loading,
+      usernameVerified,
+      form: {
+        username,
+        password,
+        password2,
+      },
     }
-    return canSubmit;
-  };
-
-  const onVerifyEmailAddress = () => {
-    if (!canSubmit()) return;
-    setLoading(true);
-    setTimeout(() => {
-      setUsernameVerified(true);
-      setLoading(false);
-    }, 1000);
-  };
-
-  const onAuthenticate = () => {
-    if (!canSubmit()) return;
-  };
+  } = useFormState(authType);
 
   const renderActions = actions => (
     <div className={cx(classes.actions)}>
@@ -52,13 +43,20 @@ const AuthForm = ({ copy, authType }) => {
     </div>
   );
 
+  const renderBtnText = text => (
+    <>
+      <Typography color="inherit" variant="caption">{text}</Typography>
+      {loading ? <>&nbsp;&nbsp;<CircularProgress size={15} /></> : null}
+    </>
+  );
+
   return (
     <>
       <WindowEventListener
         events={{
           keyup: () => {
-            if (!usernameVerified) return onVerifyEmailAddress();
-            onAuthenticate();
+            if (!usernameVerified) return onVerifyEmailAddress(authType);
+            onAuthenticate(authType);
           },
         }}
       >
@@ -68,8 +66,9 @@ const AuthForm = ({ copy, authType }) => {
             variant="outlined"
             type="email"
             name="username"
+            value={username || ''}
             label={copy.EMAIL_ADDRESS_INPUT_LABEL}
-            onChange={e => setUsername(e.target.value)}
+            onChange={e => setForm({ username: e.target.value })}
           />
         </div>
 
@@ -80,8 +79,8 @@ const AuthForm = ({ copy, authType }) => {
             <>
               <Button
                 variant="outlined"
-                onClick={() => onVerifyEmailAddress()}
-                disabled={!canSubmit()}
+                onClick={() => onVerifyEmailAddress(authType)}
+                disabled={disableAction(authType)}
               >{copy.VERIFY_EMAIL_ADDRESS_BUTTON_TEXT}</Button>
             </>
           )}
@@ -95,8 +94,9 @@ const AuthForm = ({ copy, authType }) => {
                 variant="outlined"
                 type="password"
                 name="password"
+                value={password || ''}
                 label={copy.PASSWORD_INPUT_LABEL}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => setForm({ password: e.target.value })}
               />
             </div>
 
@@ -112,8 +112,9 @@ const AuthForm = ({ copy, authType }) => {
                     variant="outlined"
                     type="password"
                     name="password2"
+                    value={password2 || ''}
                     label={copy.PASSWORD_INPUT_LABEL}
-                    onChange={e => setPassword2(e.target.value)}
+                    onChange={e => setForm({ password2: e.target.value })}
                   />
                 </div>
 
@@ -126,8 +127,10 @@ const AuthForm = ({ copy, authType }) => {
                 <Button
                   variant="outlined"
                   onClick={() => onAuthenticate()}
-                  disabled={!canSubmit()}
-                >{copy.SUBMIT_BUTTON_LABEL}</Button>
+                  disabled={disableAction()}
+                >
+                  {renderBtnText(copy.SUBMIT_BUTTON_LABEL)}
+                </Button>
               </>
             )}
           </div>

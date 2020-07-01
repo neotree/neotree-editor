@@ -7,12 +7,7 @@ const HomePage = LazyComponent(() => import('./HomePage'));
 const Scripts = LazyComponent(() => import('./Scripts'));
 const ConfigKeys = LazyComponent(() => import('./ConfigKeys'));
 const SettingsPage = LazyComponent(() => import('./SettingsPage'));
-const AuthenticationPage = LazyComponent(() => import('./Authentication'));
-
-const SignInPage = props => <AuthenticationPage {...props} authType="sign-in" />;
-const SignUpPage = props => <AuthenticationPage {...props} authType="sign-up" />;
-const ForgotPasswordPage = props => <AuthenticationPage {...props} authType="forgot-password" />;
-const ChangePasswordPage = props => <AuthenticationPage {...props} authType="change-password" />;
+const AuthenticationPage = LazyComponent(() => import('./AuthenticationPage'));
 
 const Containers = () => {
   const { authenticated } = useAppContext();
@@ -23,11 +18,8 @@ const Containers = () => {
         {!authenticated ? (
           <>
             <Switch>
-              <Route exact path="/sign-in" component={SignInPage} />
-              <Route exact path="/sign-up" component={SignUpPage} />
-              <Route exact path="/forgot-password" component={ForgotPasswordPage} />
-              <Route exact path="/change-password" component={ChangePasswordPage} />
-              <Route exact path="/" render={() => <Redirect to="/sign-in" />} />
+              <Route exact path="/:authType" component={AuthenticationPage} />
+              <Route path="*" render={() => <Redirect to="/sign-in" />} />
             </Switch>
           </>
         )
