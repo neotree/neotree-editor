@@ -25,7 +25,7 @@ const AuthForm = ({ copy, authType }) => {
     setForm,
     disableAction,
     onAuthenticate,
-    onVerifyEmailAddress,
+    checkEmailRegistration,
     state: {
       loading,
       usernameVerified,
@@ -55,7 +55,7 @@ const AuthForm = ({ copy, authType }) => {
       <WindowEventListener
         events={{
           keyup: () => {
-            if (!usernameVerified) return onVerifyEmailAddress(authType);
+            if (!usernameVerified) return checkEmailRegistration(authType);
             onAuthenticate(authType);
           },
         }}
@@ -79,7 +79,7 @@ const AuthForm = ({ copy, authType }) => {
             <>
               <Button
                 variant="outlined"
-                onClick={() => onVerifyEmailAddress(authType)}
+                onClick={() => checkEmailRegistration(authType)}
                 disabled={disableAction(authType)}
               >{copy.VERIFY_EMAIL_ADDRESS_BUTTON_TEXT}</Button>
             </>

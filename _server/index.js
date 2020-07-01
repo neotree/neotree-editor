@@ -1,38 +1,75 @@
 import path from 'path';
 import express from 'express';
-import setMiddlewares from './middlewares';
-import { sequelize, dbInit } from './models';
+import { dbInit } from './models';
 import config from '../_config/server';
 
-Promise.all([
-  dbInit()
-])
-  .catch(e => {
-    console.log('DATABASE INIT ERROR:', e); // eslint-disable-line
-    process.exit(1);
-  })
-  .then(() => {
-    let app = express();
+(async () => {
+  const sequelize = await dbInit();
 
-    app.sequelize = sequelize;
-    app.logger = require('../_utils/logger');
-    
-    const httpServer = require('http').Server(app);
-    app.io = require('socket.io')(httpServer);
+  let app = express();
 
-    app = setMiddlewares(app);
+  app.sequelize = sequelize;
+  app.logger = require('../_utils/logger');
 
-    app.use('/assets', express.static(path.resolve(__dirname, '../src/assets'), { index: false }));
+  const httpServer = require('http').Server(app);
 
-    app.use(express.static(path.resolve(__dirname, '../src'), { index: false }));
+  // socket io
+  app.io = require('socket.io')(httpServer);
 
-    app.get('*',
-      require('./routes/app/initialiseAppMiddleware')(app),
-      require('./middlewares/sendHTML')(app)
-    );
+  //body-parser
+  app.use(require('body-parser').json());
+  app.use(require('body-parser').urlencoded({ extended: false }));
 
-    app.server = httpServer.listen(config.port, err => {
-      if (err) throw (err);
-      console.log(`Server started on port ${config.port}`); // eslint-disable-line
+  //express validator
+  app.use(require('express-validator')({
+    errorFormatter: (param, msg, value) => {
+      const namespace = param.split('.');
+      const root = namespace.shift();
+      let formParam = root;
+      while (namespace.length) {
+        formParam += `[${namespace.shift()}]`;
+      }
+      return { param: formParam, msg, value };
+    }
+  }));
+
+  //express session
+  const session = require('express-session');
+  const SequelizeStore = require('connect-session-sequelize')(session.Store);
+  const sessStore = new SequelizeStore({ db: app.sequelize });
+  app.use(session({
+    secret: 'neotree',
+    saveUninitialized: false, // don't create session until something stored
+    resave: false, //don't save session if unmodified
+    store: sessStore,
+    cookie: { maxAge: 365 * 24 * 60 * 60 } // = 365 days (exp date will be created from ttl opt)
+  }));
+  sessStore.sync();
+
+  // webpack
+  if (process.env.NODE_ENV !== 'production') {
+    const webpackConfig = require('../webpack.development.config');
+    const compiler = require('webpack')(webpackConfig);
+    app.wdm = require('webpack-dev-middleware')(compiler, {
+      noInfo: true,
+      publicPath: webpackConfig.output.publicPath
     });
+    app.use(app.wdm);
+    app.use(require('webpack-hot-middleware')(compiler));
+  }
+
+  app = require('./middlewares')(app);
+
+  app.use(require('./routes')(app));
+
+  app.use(express.static(path.resolve(__dirname, '../assets')));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../src/index.html'));
   });
+
+  app.server = httpServer.listen(config.port, err => {
+    if (err) throw (err);
+    app.logger.log(`Server started on port ${config.port}`);
+  });
+})();

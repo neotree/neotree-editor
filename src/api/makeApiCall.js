@@ -1,17 +1,16 @@
 /* global fetch */
+import queryString from 'query-string';
 
 export default (url = '', opts = {}) => {
-  const reqOpts = {
-    headers: { ...opts.headers },
-  };
+  const { body, method: m, ...reqOpts } = opts;
 
-  const method = (opts.method || 'GET').toUpperCase();
+  const method = (m || 'GET').toUpperCase();
 
   if (method === 'GET') {
-    url = `${url}?payload=${JSON.stringify(opts.payload || {})}`;
+    url = `${url}?${queryString.stringify(body || {})}`;
   } else {
     reqOpts.headers['Content-Type'] = 'application/json';
-    reqOpts.body = JSON.stringify({ ...opts.payload });
+    reqOpts.body = JSON.stringify({ ...body });
   }
 
   return new Promise((resolve, reject) => {

@@ -3,7 +3,7 @@ import path from 'path';
 import webpack from 'webpack';
 import base from './webpack.config.base';
 
-export default {
+module.exports = {
   mode: 'development',
   devtool: 'cheap-module-eval-source-map',
   context: path.resolve(__dirname, 'src'),

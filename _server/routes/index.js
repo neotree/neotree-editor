@@ -1,13 +1,16 @@
-module.exports = app => {
-  app.use(require('./app')(app));
-  app.use('/api', require('./api')(app));
-  app.use(require('./files')(app));
-  app.use(require('./users')(app));
-  app.use(require('./scripts')(app));
-  app.use(require('./screens')(app));
-  app.use(require('./diagnoses')(app));
-  app.use(require('./config-keys')(app));
-  app.use(require('./logs')(app));
-  app.use(require('./devices')(app));
-  return app;
-};
+import express from 'express';
+
+const router = express.Router();
+
+module.exports = app => router
+  .use(require('./auth')(app))
+  .use(require('./app')(app))
+  .use('/api', require('./api')(app))
+  .use(require('./files')(app))
+  .use(require('./users')(app))
+  .use(require('./scripts')(app))
+  .use(require('./screens')(app))
+  .use(require('./diagnoses')(app))
+  .use(require('./config-keys')(app))
+  .use(require('./logs')(app))
+  .use(require('./devices')(app));

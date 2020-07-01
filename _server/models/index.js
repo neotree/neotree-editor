@@ -51,8 +51,8 @@ export const dbInit = () => new Promise((resolve, reject) => {
       initApiKeysTable,
       initDeviceTable,
       initLogTable,
-    ]).then(rslts => {
-      resolve(rslts);
+    ]).then(() => {
+      resolve(sequelize);
       User.count({})
         .then(count => {
           if (!count) User.create({ email: 'ldt@bwsonline.co.za', role: 1 });
@@ -60,6 +60,8 @@ export const dbInit = () => new Promise((resolve, reject) => {
     })
       .catch(err => reject(err));
   }).catch(err => {
+    console.log('DATABASE INIT ERROR:', e); // eslint-disable-line
     reject(err);
+    process.exit(1);
   });
 });
