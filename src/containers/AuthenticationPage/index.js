@@ -1,38 +1,18 @@
 import React from 'react';
 import renderDocumentTitle from '@/components/renderDocumentTitle';
-import LazyComponent from '@/components/LazyComponent';
+import LazyPage from '@/components/LazyPage';
 import authCopy from '@/constants/copy/authentication';
 import { makeStyles } from '@/components/Layout';
 import cx from 'classnames';
 import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
-import CircularProgress from '@material-ui/core/CircularProgress';
 import Logo from '@/components/Logo';
 import { Switch, Route, Redirect, useParams } from 'react-router-dom';
 import { provideAuthPageContext } from './Context';
 
-const lazyComponentOpts = {
-  LoaderComponent: () => (
-    <div style={{ textAlign: 'center' }}>
-      <CircularProgress size={20} />
-    </div>
-  )
-};
-
-const AuthForm = LazyComponent(
-  () => import('./AuthForm'),
-  lazyComponentOpts
-);
-
-const ForgotPasswordForm = LazyComponent(
-  () => import('./ForgotPasswordForm'),
-  lazyComponentOpts
-);
-
-const ChangePasswordForm = LazyComponent(
-  () => import('./ChangePasswordForm'),
-  lazyComponentOpts
-);
+const AuthForm = LazyPage(() => import('./AuthForm'));
+const ForgotPasswordForm = LazyPage(() => import('./ForgotPasswordForm'));
+const ChangePasswordForm = LazyPage(() => import('./ChangePasswordForm'));
 
 const SignUp = props => <AuthForm {...props} authType="sign-up" />;
 const SignIn = props => <AuthForm {...props} authType="sign-in" />;

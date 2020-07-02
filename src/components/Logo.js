@@ -4,14 +4,15 @@ import { makeStyles } from '@/components/Layout';
 import cx from 'classnames';
 
 const useStyles = makeStyles(() => ({
-  root: {
-    width: 60,
+  root: ({ size }) => ({
+    width: size || 60,
     height: 'auto',
-  }
+    borderRadius: '50%',
+  })
 }));
 
-const Logo = ({ color, className, ...props }) => {
-  const classes = useStyles();
+const Logo = ({ color, className, size, ...props }) => {
+  const classes = useStyles({ size });
 
   return (
     <>
@@ -30,6 +31,7 @@ Logo.defaultProps = {
 };
 
 Logo.propTypes = {
+  size: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   className: PropTypes.string,
   color: PropTypes.oneOf(['dark', 'light']).isRequired
 };

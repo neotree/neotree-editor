@@ -1,3 +1,6 @@
 export default {
   AUTH_FORM_WIDTH: 350,
+  HEADER_HEIGHT: 60,
+  SIDEBAR_WIDTH: 300,
+  HEADER_ZINDEX: 100,
 };

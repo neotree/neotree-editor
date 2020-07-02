@@ -7,7 +7,10 @@ export const useLayoutContext = () => React.useContext(LayoutContext);
 
 export const provideLayoutContext = Component => function LayoutContextProvider(props) {
   const [state, _setState] = React.useState({ ...defaultState });
-  const setState = s => _setState(prev => typeof s === 'function' ? s(prev) : s);
+  const setState = s => _setState(prev => ({
+    ...prev,
+    ...typeof s === 'function' ? s(prev) : s
+  }));
 
   return (
     <LayoutContext.Provider

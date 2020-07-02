@@ -2,6 +2,7 @@ import React from 'react';
 import LazyPage from '@/components/LazyPage';
 import { Switch, Route, Redirect } from 'react-router-dom';
 import { useAppContext } from '@/contexts/app';
+import AuthenticatedUserLayout from './AuthenticatedUserLayout';
 
 const HomePage = LazyPage(() => import('./HomePage'));
 const Scripts = LazyPage(() => import('./Scripts'));
@@ -26,13 +27,15 @@ const Containers = () => {
         :
         (
           <>
-            <Switch>
-              <Route path="/scripts" component={Scripts} />
-              <Route path="/config-keys" component={ConfigKeys} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route exact path="/" component={HomePage} />
-              <Route render={() => <Redirect to="/" />} />
-            </Switch>
+            <AuthenticatedUserLayout>
+              <Switch>
+                <Route path="/scripts" component={Scripts} />
+                <Route path="/config-keys" component={ConfigKeys} />
+                <Route path="/settings" component={SettingsPage} />
+                <Route exact path="/" component={HomePage} />
+                <Route render={() => <Redirect to="/" />} />
+              </Switch>
+            </AuthenticatedUserLayout>
           </>
         )}
       </div>

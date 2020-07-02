@@ -1,8 +1,7 @@
-import React from 'react';
 import LazyComponent from '@/components/LazyComponent';
-import OverlayLoader from '@/components/OverlayLoader';
+import PageLoader from './PageLoader';
 
 export default (load, opts = {}) => LazyComponent(load, {
-  LoaderComponent: () => <OverlayLoader style={{ backgroundColor: 'white' }} />,
+  LoaderComponent: PageLoader,
   ...opts,
 });

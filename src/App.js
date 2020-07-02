@@ -1,7 +1,7 @@
 import React from 'react';
 import { provideAppContext, useAppContext } from '@/contexts/app';
 import { LayoutRoot } from '@/components/Layout';
-import OverlayLoader from '@/components/OverlayLoader';
+import PageLoader from '@/components/PageLoader';
 import renderDocumentTitle from '@/components/renderDocumentTitle';
 import Containers from './containers';
 
@@ -14,7 +14,7 @@ const App = () => {
     </LayoutRoot>
   );
 
-  if (!appInitialised) return wrapComponents(<OverlayLoader />);
+  if (!appInitialised) return wrapComponents(<PageLoader />);
 
   return (
     <>

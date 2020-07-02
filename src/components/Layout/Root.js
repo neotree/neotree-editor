@@ -5,7 +5,12 @@ import cx from 'classnames';
 import { provideLayoutContext } from './Context';
 import makeStyles from './makeStyles';
 
-const theme = createMuiTheme({});
+const theme = createMuiTheme({
+  palette: {
+    primary: { main: '#2980b9' },
+    secondary: { main: '#f39c12' },
+  }
+});
 
 const useStyles = makeStyles(theme => {
   return {
