@@ -65,8 +65,9 @@ const AuthForm = ({ copy, authType }) => {
     <>
       <WindowEventListener
         events={{
-          keyup: () => {
-            if (!emailRegistration.activated) return checkEmailRegistration(authType);
+          keyup: e => {
+            if (e.keyCode !== 13) return;
+            if (!emailRegistration.userId) return checkEmailRegistration(authType);
             onAuthenticate(authType);
           },
         }}
@@ -85,7 +86,7 @@ const AuthForm = ({ copy, authType }) => {
 
         <br />
 
-        <Collapse in={!emailRegistration.activated}>
+        <Collapse in={!emailRegistration.userId}>
           {renderActions(
             <>
               <Button
@@ -97,7 +98,7 @@ const AuthForm = ({ copy, authType }) => {
           )}
         </Collapse>
 
-        <Collapse in={emailRegistration.activated}>
+        <Collapse in={!!emailRegistration.userId}>
           <div>
             <div>
               <TextField

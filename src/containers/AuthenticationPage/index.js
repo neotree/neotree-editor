@@ -34,6 +34,9 @@ const ChangePasswordForm = LazyComponent(
   lazyComponentOpts
 );
 
+const SignUp = props => <AuthForm {...props} authType="sign-up" />;
+const SignIn = props => <AuthForm {...props} authType="sign-in" />;
+
 const useStyles = makeStyles(theme => ({
   root: {
     position: 'fixed',
@@ -88,13 +91,13 @@ const AuthenticationPage = () => {
               <Route
                 exact
                 path="/sign-in"
-                render={routeParams => <AuthForm {...routeParams} authType="/sign-in" {...formProps} />}
+                render={routeParams => <SignIn {...routeParams} {...formProps} />}
               />
 
               <Route
                 exact
                 path="/sign-up"
-                render={routeParams => <AuthForm {...routeParams} authType="/sign-up" {...formProps} />}
+                render={routeParams => <SignUp {...routeParams} {...formProps} />}
               />
 
               <Route

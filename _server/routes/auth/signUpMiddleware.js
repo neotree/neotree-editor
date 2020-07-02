@@ -1,22 +1,22 @@
 import { validationResult } from 'express-validator/check';
-import addUser from '../users/addUser';
+import addOrUpdateUser from '../users/addOrUpdateUser';
 
-module.exports = app => (req, res, next) => { //eslint-disable-line
+module.exports = (app, payload, callback) => (req, res, next) => {
   const {
     loginOnSignUp,
     password2, // eslint-disable-line
     ...params
-  } = res.locals.signUpPayload || req.body;
+  } = { ...(payload || req.body) };
 
-  const done = (err, user) => {
-    res.locals.setResponse(err, { user });
+  const done = callback || ((err, rslts) => {
+    res.locals.setResponse(err, rslts);
     next(); return null;
-  };
+  });
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) done(errors.array());
 
-  addUser(params)
+  addOrUpdateUser(params)
     .then(({ user, profile }) => {
       if (!user) return done({ msg: 'Something went wrong' });
 
@@ -25,7 +25,7 @@ module.exports = app => (req, res, next) => { //eslint-disable-line
       req.logIn(user, err => {
         if (err) done(err);
 
-        done(null, profile || user);
+        done(null, { user: profile || user });
       });
     }).catch(done);
 };
