@@ -1,5 +1,4 @@
 import React from 'react';
-import renderDocumentTitle from '@/components/renderDocumentTitle';
 import LazyPage from '@/components/LazyPage';
 import authCopy from '@/constants/copy/authentication';
 import { makeStyles } from '@/components/Layout';
@@ -8,6 +7,7 @@ import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
 import Logo from '@/components/Logo';
 import { Switch, Route, Redirect, useParams } from 'react-router-dom';
+import { setDocumentTitle } from '@/contexts/app';
 import { provideAuthPageContext } from './Context';
 
 const AuthForm = LazyPage(() => import('./AuthForm'));
@@ -50,12 +50,12 @@ const AuthenticationPage = () => {
   const classes = useStyles();
   const copy = { ...authCopy, ...authType ? authCopy[authType] : null };
 
+  setDocumentTitle(copy.PAGE_TITLE);
+
   const formProps = { authType, copy, };
 
   return (
     <>
-      {renderDocumentTitle(copy.PAGE_TITLE)}
-
       <div className={cx(classes.root)}>
         <div className={cx(classes.rootInner)}>
           <Paper className={cx(classes.paper, classes.paperWidth)}>

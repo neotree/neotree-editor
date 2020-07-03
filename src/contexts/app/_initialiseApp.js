@@ -4,7 +4,12 @@ export default ({ setState }) => function initialiseApp() {
   setState({ initialisingApp: true });
 
   const done = (initialiseAppError, app = {}) => {
-    setState({ initialiseAppError, ...app, appInitialised: true });
+    setState({
+      initialiseAppError,
+      ...app,
+      appInitialised: true,
+      initialisingApp: false, 
+    });
   };
 
   api.initialiseApp()

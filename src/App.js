@@ -2,7 +2,7 @@ import React from 'react';
 import { provideAppContext, useAppContext } from '@/contexts/app';
 import { LayoutRoot } from '@/components/Layout';
 import PageLoader from '@/components/PageLoader';
-import renderDocumentTitle from '@/components/renderDocumentTitle';
+import DocumentTitle from '@/components/DocumentTitle';
 import Containers from './containers';
 
 const App = () => {
@@ -18,7 +18,7 @@ const App = () => {
 
   return (
     <>
-      {renderDocumentTitle()}
+      <DocumentTitle />
       {wrapComponents(<Containers />)}
     </>
   );
