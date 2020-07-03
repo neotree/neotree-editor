@@ -1,5 +1,5 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
-import { useLayoutContext } from './Context';
+import { useLayoutContext } from '../Context';
 
 export default styles => {
   const useStyles = makeStyles(styles);

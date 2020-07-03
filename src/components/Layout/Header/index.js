@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import Paper from '@material-ui/core/Paper';
-import makeStyles from '../makeStyles';
+import makeStyles from '../utils/makeStyles';
 
 const useStyles = makeStyles(theme => ({
   header: {
@@ -11,7 +11,6 @@ const useStyles = makeStyles(theme => ({
   },
   headerHeight: ({ _layout }) => ({
     height: _layout.HEADER_HEIGHT,
-    boxSizing: 'border-box',
   }),
   contentBar: {
     position: 'fixed',
@@ -21,7 +20,7 @@ const useStyles = makeStyles(theme => ({
     width: '100%',
     boxSizing: 'border-box',
   },
-  contentBarZIndex: ({ HEADER_ZINDEX }) => ({ zIndex: HEADER_ZINDEX }),
+  contentBarZIndex: ({ _layout }) => ({ zIndex: _layout.HEADER_ZINDEX }),
   content: {
     padding: `${theme.spacing()}px ${theme.spacing(2)}px`,
     height: 'inherit',
@@ -40,6 +39,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 export default function LayoutHeader({
+  hasDrawer, // eslint-disable-line
   className,
   ...props
 }) {
@@ -67,4 +67,5 @@ export default function LayoutHeader({
 
 LayoutHeader.propTypes = {
   className: PropTypes.string,
+  hasDrawer: PropTypes.bool,
 };

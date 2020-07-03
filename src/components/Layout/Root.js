@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { MuiThemeProvider, createMuiTheme } from '@material-ui/core/styles';
 import cx from 'classnames';
 import { provideLayoutContext } from './Context';
-import makeStyles from './makeStyles';
+import makeStyles from './utils/makeStyles';
 
 const theme = createMuiTheme({
   palette: {

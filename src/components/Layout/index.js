@@ -1,8 +1,6 @@
 export * from './Context';
-
-export { default as makeStyles } from './makeStyles';
-export { default as setHeaderTitle } from './setHeaderTitle';
+export * from './utils';
 
 export { default as LayoutRoot } from './Root';
 export { default as LayoutItem } from './LayoutItem';
-export { default as LayoutHeader } from './Header';
+export { default as Layout } from './Layout';

@@ -1,5 +1,6 @@
+/* global window */
 import React from 'react';
-import defaultState from './defaultState';
+import defaultState, { getViewPort } from './defaultState';
 
 export const LayoutContext = React.createContext(null);
 
@@ -11,6 +12,11 @@ export const provideLayoutContext = Component => function LayoutContextProvider(
     ...prev,
     ...typeof s === 'function' ? s(prev) : s
   }));
+
+  React.useEffect(() => {
+    window.addEventListener('resize', () => setState({ viewport: getViewPort() }), true);
+    return () => window.removeEventListener('resize', () => setState({ viewport: getViewPort() }), true);
+  }, []);
 
   return (
     <LayoutContext.Provider

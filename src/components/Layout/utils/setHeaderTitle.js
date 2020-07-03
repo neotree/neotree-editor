@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLayoutContext } from './Context';
+import { useLayoutContext } from '../Context';
 
 export default function setHeaderTitle(t) {
   const { setState } = useLayoutContext();
