@@ -8,7 +8,7 @@ import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
 
 import DeleteScripts from '../Forms/DeleteScripts';
-import CopyScripts from '../Forms/CopyScripts';
+import DuplicateScripts from '../Forms/DuplicateScripts';
 
 function Action({ row, }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -35,8 +35,8 @@ function Action({ row, }) {
         <MenuItem
           onClick={handleClose}
           ids={[row.id]}
-          component={CopyScripts}
-        >Copy</MenuItem>
+          component={DuplicateScripts}
+        >Duplicate</MenuItem>
 
         <MenuItem
           onClick={handleClose}

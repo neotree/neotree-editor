@@ -5,18 +5,28 @@ import { setDocumentTitle } from '@/contexts/app';
 import { provideScriptsContext, useScriptsContext } from '@/contexts/scripts';
 import PageLoader from '@/components/PageLoader';
 import DataTable from '@/components/DataTable';
+import OverlayLoader from '@/components/OverlayLoader';
 
 const ScriptsList = () => {
   setDocumentTitle(copy.PAGE_TITLE);
   setHeaderTitle(copy.PAGE_TITLE);
 
-  const { state: { scripts, scriptsInitialised, loadingScripts } } = useScriptsContext();
+  const {
+    state: {
+      scripts,
+      scriptsInitialised,
+      loadingScripts,
+      duplicatingScripts,
+      deletingScripts,
+    }
+  } = useScriptsContext();
 
   return (
     <>
       {!scriptsInitialised ? null : (
         <>
           <DataTable
+            selectable={false}
             title={copy.PAGE_TITLE}
             displayFields={[
               { key: 'title', label: 'Title', },
@@ -30,6 +40,7 @@ const ScriptsList = () => {
       )}
 
       {loadingScripts && <PageLoader />}
+      {(deletingScripts || duplicatingScripts) ? <OverlayLoader /> : null}
     </>
   );
 };

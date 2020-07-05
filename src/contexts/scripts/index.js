@@ -2,7 +2,7 @@ import React from 'react';
 import _getScripts from './_getScripts';
 import _deleteScripts from './_deleteScripts';
 import _updateScripts from './_updateScripts';
-import _copyScripts from './_copyScripts';
+import _duplicateScripts from './_duplicateScripts';
 
 export const ScriptsContext = React.createContext(null);
 
@@ -20,7 +20,7 @@ export const provideScriptsContext = Component => function ScriptsContextProvide
   const getScripts = _getScripts({ setState });
   const deleteScripts = _deleteScripts({ setState });
   const updateScripts = _updateScripts({ setState });
-  const copyScripts = _copyScripts({ setState });
+  const duplicateScripts = _duplicateScripts({ setState });
 
   React.useEffect(() => { getScripts(); }, []);
 
@@ -33,7 +33,7 @@ export const provideScriptsContext = Component => function ScriptsContextProvide
         getScripts,
         deleteScripts,
         updateScripts,
-        copyScripts,
+        duplicateScripts,
       }}
     >
       <Component {...props} />

@@ -12,16 +12,19 @@ const useStyles = makeStyles(() => ({
     justifyContent: 'center',
     textAlign: 'center',
   },
+  bg: ({ transparent }) => ({
+    backgroundColor: transparent ? 'transparent' : 'rgba(0,0,0,.2)'
+  }),
 }));
 
-const OverlayLoader = ({ className, loaderProps, ...props }) => {
-  const classes = useStyles();
+const OverlayLoader = ({ className, loaderProps, transparent, ...props }) => {
+  const classes = useStyles({ transparent });
 
   return (
     <>
       <Overlay
         {...props}
-        className={cx(classes.root, className)}
+        className={cx(classes.root, classes.bg, className)}
       >
         <CircularProgress color="primary" {...loaderProps} />
       </Overlay>
@@ -32,6 +35,7 @@ const OverlayLoader = ({ className, loaderProps, ...props }) => {
 OverlayLoader.propTypes = {
   className: PropTypes.string,
   loaderProps: PropTypes.object,
+  transparent: PropTypes.bool,
 };
 
 export default OverlayLoader;

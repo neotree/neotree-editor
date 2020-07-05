@@ -6,16 +6,16 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import Button from '@material-ui/core/Button';
 
 import DeleteScripts from '../Forms/DeleteScripts';
-import CopyScripts from '../Forms/CopyScripts';
+import DuplicateScripts from '../Forms/DuplicateScripts';
 
 function Actions({ selected }) {
   return (
     <>
       {selected.length > 0 && (
         <>
-          <CopyScripts ids={selected}>
-            <Button>Copy</Button>
-          </CopyScripts>
+          <DuplicateScripts ids={selected}>
+            <Button>Duplicate</Button>
+          </DuplicateScripts>
 
           <DeleteScripts ids={selected}>
             <IconButton>

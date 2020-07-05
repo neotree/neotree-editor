@@ -15,6 +15,7 @@ const DragHandle = SortableHandle(() => (
 
 export default SortableElement(({
   row,
+  selectable,
   classes,
   selected,
   setSelected,
@@ -26,15 +27,17 @@ export default SortableElement(({
       selected: selected.indexOf(row.id) > -1,
     })}
   >
-    <TableCell padding="none">
-      <Checkbox
-        checked={selected.indexOf(row.id) > -1}
-        onChange={() => setSelected(selected => selected.indexOf(row.id) > -1 ?
-          selected.filter(id => id !== row.id)
-          :
-          [...selected, row.id])}
-      />
-    </TableCell>
+    {selectable && (
+      <TableCell padding="none">
+        <Checkbox
+          checked={selected.indexOf(row.id) > -1}
+          onChange={() => setSelected(selected => selected.indexOf(row.id) > -1 ?
+            selected.filter(id => id !== row.id)
+            :
+            [...selected, row.id])}
+        />
+      </TableCell>
+    )}
     <TableCell padding="none">
       <DragHandle />
     </TableCell>

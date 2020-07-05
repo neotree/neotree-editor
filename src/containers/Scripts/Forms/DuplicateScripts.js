@@ -3,14 +3,14 @@ import PropTypes from 'prop-types';
 import useConfirmModal from '@/utils/useConfirmModal';
 import { useScriptsContext } from '@/contexts/scripts';
 
-const CopyScripts = React.forwardRef(({
+const DuplicateScripts = React.forwardRef(({
   children,
   ids,
   onClick,
   ...props
 }, ref) => {
-  const copyMultiple = ids.length > 1;
-  const { copyScripts } = useScriptsContext();
+  const duplicateMultiple = ids.length > 1;
+  const { duplicateScripts } = useScriptsContext();
   const [renderConfirmModal, confirm] = useConfirmModal();
 
   return (
@@ -27,18 +27,18 @@ const CopyScripts = React.forwardRef(({
       </div>
 
       {renderConfirmModal({
-        title: `Copy script${copyMultiple ? 's' : ''}`,
-        message: `Are you sure you want to copy script${copyMultiple ? 's' : ''}?`,
-        onConfirm: () => copyScripts(ids),
+        title: `Duplicate script${duplicateMultiple ? 's' : ''}`,
+        message: `Are you sure you want to duplicate script${duplicateMultiple ? 's' : ''}?`,
+        onConfirm: () => duplicateScripts(ids),
       })}
     </>
   );
 });
 
-CopyScripts.propTypes = {
+DuplicateScripts.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
   ids: PropTypes.array.isRequired,
 };
 
-export default CopyScripts;
+export default DuplicateScripts;

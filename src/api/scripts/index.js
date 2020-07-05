@@ -7,14 +7,6 @@ export const getScripts = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const deleteScripts = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/delete-scripts', {
-    method: 'POST',
-    body: reqPayload,
-    ...reqOpts,
-  });
-};
-
 export const updateScripts = (reqPayload = {}, reqOpts) => {
   return makeApiCall('/update-scripts', {
     method: 'POST',
@@ -23,8 +15,16 @@ export const updateScripts = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const copyScripts = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/copy-scripts', {
+export const deleteScript = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/delete-script', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};
+
+export const duplicateScript = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/duplicate-script', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,

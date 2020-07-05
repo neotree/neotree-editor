@@ -5,15 +5,15 @@ export default ({ setState }) => function deleteScripts(ids = []) {
 
   setState({ deletingScripts: true });
 
-  const done = (deleteScriptsError, data) => {
-    setState({
-      deleteScriptsError,
-      ...data,
+  const done = (e) => {
+    setState(({ scripts }) => ({
+      deleteScriptsError: e,
       deletingScripts: false,
-    });
+      ...e ? null : { scripts: scripts.filter(s => ids.indexOf(s.id) < 0) },
+    }));
   };
 
-  api.deleteScripts({ ids })
+  api.deleteScript({ id: ids[0] })
     .then(data => done(data.errors, data))
     .catch(done);
 };

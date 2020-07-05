@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next(); return null;
   };
 
-  ConfigKey.findAll({ where: payload })
+  ConfigKey.findAll({ where: payload, order: [['position', 'ASC']] })
     .then(configKeys => done(null, configKeys))
     .catch(done);
 };
