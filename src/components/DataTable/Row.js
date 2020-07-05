@@ -43,7 +43,7 @@ export default SortableElement(({
     </TableCell>
     {displayFields.map((f, i) => (
       <TableCell key={`${row.id}${f.key}${i}`}>
-        {row[f.key]}
+        {row.data[f.key]}
       </TableCell>
     ))}
     {!action ? null : (

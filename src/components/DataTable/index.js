@@ -52,8 +52,9 @@ function DataTable({
 
   React.useEffect(() => {
     if (JSON.stringify(data) !== JSON.stringify(_data)) {
-      setData(data);
-      if (onSortData) onSortData(data);
+      const stateData = data.map((item, i) => ({ ...item, position: i + 1, }));
+      setData(stateData);
+      if (onSortData) onSortData(stateData);
     }
   }, [data]);
 

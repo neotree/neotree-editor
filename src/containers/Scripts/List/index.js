@@ -12,6 +12,8 @@ const ScriptsList = () => {
   setHeaderTitle(copy.PAGE_TITLE);
 
   const {
+    updateScripts,
+    setState,
     state: {
       scripts,
       scriptsInitialised,
@@ -28,13 +30,20 @@ const ScriptsList = () => {
           <DataTable
             selectable={false}
             title={copy.PAGE_TITLE}
+            data={scripts}
+            renderHeaderActions={require('./_renderHeaderActions').default}
+            renderRowAction={require('./_renderRowAction').default}
             displayFields={[
               { key: 'title', label: 'Title', },
               { key: 'description', label: 'Description', }
             ]}
-            data={scripts.map(s => ({ ...s, ...s.data }))}
-            renderHeaderActions={require('./_renderHeaderActions').default}
-            renderRowAction={require('./_renderRowAction').default}
+            onSortData={scripts => {
+              setState({ scripts });
+              updateScripts(scripts.map(s => ({
+                id: s.id,
+                position: s.position
+              })));
+            }}
           />
         </>
       )}
