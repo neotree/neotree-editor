@@ -44,7 +44,7 @@ export default SortableElement(({
       </TableCell>
     ))}
     {!action ? null : (
-      <TableCell align="right">
+      <TableCell align="right" padding="none">
         {action}
       </TableCell>
     )}
