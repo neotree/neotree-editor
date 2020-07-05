@@ -32,9 +32,12 @@ module.exports = app => (req, res, next) => {
     .catch(reject);
   });
 
-  saveToFirebase()
-    .then(id => {
-      ConfigKey.create({ ...payload, id })
+  Promise.all([
+    ConfigKey.count({ where: {} }),
+    saveToFirebase(),
+  ])
+    .then(([count, id]) => {
+      ConfigKey.create({ ...payload, position: count + 1, id })
         .then((configKey) => done(null, configKey))
         .catch(done);
     }).catch(done);

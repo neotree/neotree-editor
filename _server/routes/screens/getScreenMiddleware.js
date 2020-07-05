@@ -9,6 +9,6 @@ module.exports = () => (req, res, next) => {
   };
 
   Screen.findOne({ where: payload })
-    .then((screen) => done(null, screen))
+    .then(rslts => done(null, rslts ? rslts[1] : null))
     .catch(done);
 };

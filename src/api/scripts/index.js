@@ -45,3 +45,12 @@ export const updateScript = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+
+export const createScript = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/create-script', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

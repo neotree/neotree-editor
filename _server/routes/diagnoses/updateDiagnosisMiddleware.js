@@ -12,6 +12,6 @@ module.exports = app => (req, res, next) => {
   if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
 
   Diagnosis.update(payload, { where: { id }, individualHooks: true })
-    .then(diagnosis => done(null, diagnosis))
+    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
     .catch(done);
 };

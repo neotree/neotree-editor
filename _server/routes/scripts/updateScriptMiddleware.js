@@ -12,6 +12,6 @@ module.exports = (app) => (req, res, next) => {
   if (!id) return done({ msg: 'Required script "id" is not provided.' });
 
   Script.update(payload, { where: { id }, individualHooks: true })
-    .then(script => done(null, script))
+    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
     .catch(done);
 };

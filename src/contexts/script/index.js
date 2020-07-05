@@ -1,6 +1,7 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import useRouter from '@/utils/useRouter';
 import _getScript from './_getScript';
+import _saveScript from './_saveScript';
 
 export const ScriptContext = React.createContext(null);
 
@@ -15,7 +16,8 @@ export const setDocumentTitle = (t = '') => {
 };
 
 export const provideScriptContext = Component => function ScriptContextProvider(props) {
-  const { scriptId, scriptSection } = useParams();
+  const router = useRouter();
+  const { scriptId, scriptSection } = router.match.params;
 
   const [state, _setState] = React.useState({
     scriptSection: scriptSection || 'screens',
@@ -35,6 +37,7 @@ export const provideScriptContext = Component => function ScriptContextProvider(
   }));
 
   const getScript = _getScript({ setState });
+  const saveScript = _saveScript({ setState, state, router });
 
   React.useEffect(() => {
     const scriptInitialised = scriptId !== 'new' ? true : false;
@@ -50,6 +53,8 @@ export const provideScriptContext = Component => function ScriptContextProvider(
         _setState,
         getScript,
         setForm,
+        saveScript,
+        canSaveScript: () => state.form.title && !state.savingScript,
       }}
     >
       <Component {...props} />
