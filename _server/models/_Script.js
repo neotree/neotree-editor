@@ -11,6 +11,9 @@ const Script = sqlz.define(
       allowNull: false,
       primaryKey: true
     },
+    position: {
+      type: Sequelize.INTEGER
+    },
     data: {
       type: Sequelize.JSON,
       defaultValue: JSON.stringify({}),

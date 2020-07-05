@@ -7,6 +7,9 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
 
+import DeleteScripts from '../Forms/DeleteScripts';
+import CopyScripts from '../Forms/CopyScripts';
+
 function Action({ row, }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
@@ -31,10 +34,14 @@ function Action({ row, }) {
 
         <MenuItem
           onClick={handleClose}
+          ids={[row.id]}
+          component={CopyScripts}
         >Copy</MenuItem>
 
         <MenuItem
           onClick={handleClose}
+          ids={[row.id]}
+          component={DeleteScripts}
         >
           <Typography color="error">Delete</Typography>
         </MenuItem>

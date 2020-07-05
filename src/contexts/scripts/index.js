@@ -1,5 +1,8 @@
 import React from 'react';
 import _getScripts from './_getScripts';
+import _deleteScripts from './_deleteScripts';
+import _updateScripts from './_updateScripts';
+import _copyScripts from './_copyScripts';
 
 export const ScriptsContext = React.createContext(null);
 
@@ -15,6 +18,9 @@ export const provideScriptsContext = Component => function ScriptsContextProvide
   }));
 
   const getScripts = _getScripts({ setState });
+  const deleteScripts = _deleteScripts({ setState });
+  const updateScripts = _updateScripts({ setState });
+  const copyScripts = _copyScripts({ setState });
 
   React.useEffect(() => { getScripts(); }, []);
 
@@ -24,7 +30,10 @@ export const provideScriptsContext = Component => function ScriptsContextProvide
         state,
         setState,
         _setState,
-        getScripts
+        getScripts,
+        deleteScripts,
+        updateScripts,
+        copyScripts,
       }}
     >
       <Component {...props} />
