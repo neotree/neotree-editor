@@ -3,6 +3,7 @@ import LazyPage from '@/components/LazyPage';
 import { Switch, Route, Redirect } from 'react-router-dom';
 
 const List = LazyPage(() => import('./List'));
+const Script = LazyPage(() => import('./Script'));
 
 const Scripts = () => {
   return (
@@ -16,17 +17,17 @@ const Scripts = () => {
         <Route
           exact
           path="/scripts/:scriptId"
-          component={List}
+          component={Script}
         />
         <Route
           exact
           path="/scripts/:scriptId/screen/:screenId"
-          component={List}
+          component={Script}
         />
         <Route
           exact
           path="/scripts/:scriptId/diagnosis/:diagnosisId"
-          component={List}
+          component={Script}
         />
         <Route
           exact
