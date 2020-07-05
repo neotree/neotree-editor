@@ -28,6 +28,7 @@ const ScriptsList = () => {
       {!scriptsInitialised ? null : (
         <>
           <DataTable
+            noDataMsg="No scripts"
             selectable={false}
             title={copy.PAGE_TITLE}
             data={scripts}

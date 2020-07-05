@@ -1,16 +1,11 @@
 import React from 'react';
-import copy from '@/constants/copy/diagnoses';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle } from '@/contexts/app';
 import { provideDiagnosesContext, useDiagnosesContext } from '@/contexts/diagnoses';
 import DataTable from '@/components/DataTable';
 import OverlayLoader from '@/components/OverlayLoader';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import copy from '@/constants/copy/diagnoses';
 
 const DiagnosesList = () => {
-  setDocumentTitle(copy.PAGE_TITLE);
-  setHeaderTitle(copy.PAGE_TITLE);
-
   const {
     updateDiagnoses,
     setState,
@@ -29,6 +24,7 @@ const DiagnosesList = () => {
         <>
           <DataTable
             selectable
+            noDataMsg="No diagnoses"
             title={copy.PAGE_TITLE}
             data={diagnoses}
             renderHeaderActions={require('./_renderHeaderActions').default}

@@ -2,10 +2,12 @@ import React from 'react';
 import { useScriptContext } from '@/contexts/script';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
-import Divider from '@material-ui/core/Divider';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import { useHistory } from 'react-router-dom';
 import LazyComponent from '@/components/LazyComponent';
+import copy from '@/constants/copy/scripts';
+import { setHeaderTitle } from '@/components/Layout';
+import { setDocumentTitle } from '@/contexts/app';
 
 const LoaderComponent = () => (
   <div style={{ margin: 25, textAlign: 'center' }}>
@@ -19,6 +21,9 @@ const Diagnoses = LazyComponent(() => import('../Diagnoses/List'), { LoaderCompo
 function ScriptEditor() {
   const history = useHistory();
   const { setState, state: { scriptSection, script } } = useScriptContext();
+
+  setDocumentTitle(`${copy.PAGE_TITLE}${script ? `: ${script.data.title}` : ''}`);
+  setHeaderTitle(`${copy.PAGE_TITLE}${script ? ` / ${script.data.title}` : ''}`);
 
   return (
     <>
@@ -38,8 +43,6 @@ function ScriptEditor() {
             <Tab value="screens" label="Screens" />
             <Tab value="diagnoses" label="Diagnoses" />
           </Tabs>
-
-          <Divider />
 
           {scriptSection === 'screens' && <Screens />}
           {scriptSection === 'diagnoses' && <Diagnoses />}

@@ -28,6 +28,7 @@ const ConfigKeysList = () => {
       {!configKeysInitialised ? null : (
         <>
           <DataTable
+            noDataMsg="No config keys"
             selectable={false}
             title={copy.PAGE_TITLE}
             data={configKeys}

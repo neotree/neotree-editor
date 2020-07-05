@@ -35,6 +35,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 function DataTable({
+  noDataMsg,
   title,
   selectable,
   renderRowAction,
@@ -71,59 +72,66 @@ function DataTable({
 
         <Divider />
 
-        <Table className={cx(classes.table)}>
-          <TableHead>
-            <TableRow>
-              {selectable && (
-                <TableCell padding="none">
-                  <Checkbox
-                    checked={false}
-                    indeterminate={selected.length > 0 && selected.length < data.length}
-                    checked={data.length > 0 && selected.length === data.length}
-                    onChange={() => setSelected(selected =>
-                      selected.length < data.length ? data.map(r => r.id) : [])}
-                  />
-                </TableCell>
-              )}
-              <TableCell />
-              {displayFields.map((f, i) => (
-                <TableCell key={`${f.key}${i}`}>
-                  <b>{f.label}</b>
-                </TableCell>
-              ))}
-              {!renderRowAction ? null : (
-                <TableCell align="right">
-                  <b>Action</b>
-                </TableCell>
-              )}
-            </TableRow>
-          </TableHead>
+        {!data.length ? (
+          <div style={{ textAlign: 'center', padding: 25 }}>
+            <Typography color="textSecondary">{noDataMsg || 'No data'}</Typography>
+          </div>
+        ) : (
+          <Table className={cx(classes.table)}>
+            <TableHead>
+              <TableRow>
+                {selectable && (
+                  <TableCell padding="none">
+                    <Checkbox
+                      checked={false}
+                      indeterminate={selected.length > 0 && selected.length < data.length}
+                      checked={data.length > 0 && selected.length === data.length}
+                      onChange={() => setSelected(selected =>
+                        selected.length < data.length ? data.map(r => r.id) : [])}
+                    />
+                  </TableCell>
+                )}
+                <TableCell />
+                {displayFields.map((f, i) => (
+                  <TableCell key={`${f.key}${i}`}>
+                    <b>{f.label}</b>
+                  </TableCell>
+                ))}
+                {!renderRowAction ? null : (
+                  <TableCell align="right">
+                    <b>Action</b>
+                  </TableCell>
+                )}
+              </TableRow>
+            </TableHead>
 
-          <Body
-            rows={data}
-            selectable={selectable}
-            renderRowAction={renderRowAction}
-            classes={classes}
-            displayFields={displayFields}
-            selected={selected}
-            setSelected={setSelected}
-            useDragHandle
-            onSortEnd={({ oldIndex, newIndex }) => setData(data =>
-              update(data, {
-                $splice: [
-                  [oldIndex, 1],
-                  [newIndex, 0, data[oldIndex]],
-                ],
-              })
-            )}
-          />
-        </Table>
+            <Body
+              rows={data}
+              selectable={selectable}
+              renderRowAction={renderRowAction}
+              classes={classes}
+              displayFields={displayFields}
+              selected={selected}
+              setSelected={setSelected}
+              useDragHandle
+              onSortEnd={({ oldIndex, newIndex }) => setData(data =>
+                update(data, {
+                  $splice: [
+                    [oldIndex, 1],
+                    [newIndex, 0, data[oldIndex]],
+                  ],
+                })
+              )}
+            />
+          </Table>
+        )}
       </Paper>
     </>
   );
 }
 
 DataTable.propTypes = {
+  noDataMsg: PropTypes.string,
   selectable: PropTypes.bool,
   renderRowAction: PropTypes.func,
   title: PropTypes.string.isRequired,
