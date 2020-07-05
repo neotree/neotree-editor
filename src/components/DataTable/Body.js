@@ -12,6 +12,7 @@ export default SortableContainer(({
   selected,
   setSelected,
   displayFields,
+  action,
 }) => (
   <TableBody>
     <TableRow>
@@ -30,9 +31,11 @@ export default SortableContainer(({
           <b>{f.label}</b>
         </TableCell>
       ))}
-      <TableCell align="right">
-        <b>Action</b>
-      </TableCell>
+      {!action ? null : (
+        <TableCell align="right">
+          <b>Action</b>
+        </TableCell>
+      )}
     </TableRow>
 
     {rows.map((row, i) => (
@@ -41,6 +44,7 @@ export default SortableContainer(({
         row={row}
         index={i}
         classes={classes}
+        action={action}
         displayFields={displayFields}
         selected={selected}
         setSelected={setSelected}

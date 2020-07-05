@@ -18,7 +18,8 @@ export default SortableElement(({
   classes,
   selected,
   setSelected,
-  displayFields
+  displayFields,
+  action,
 }) => (
   <TableRow
     className={cx(classes.dataItemRow, {
@@ -42,8 +43,10 @@ export default SortableElement(({
         {row[f.key]}
       </TableCell>
     ))}
-    <TableCell align="right">
-      Action
-    </TableCell>
+    {!action ? null : (
+      <TableCell align="right">
+        {action}
+      </TableCell>
+    )}
   </TableRow>
 ));

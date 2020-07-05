@@ -35,6 +35,7 @@ const useStyles = makeStyles(theme => ({
 
 function DataTable({
   title,
+  action,
   data: _data,
   onSortData,
   displayFields,
@@ -70,12 +71,13 @@ function DataTable({
               {displayFields.map((f, i) => (
                 <TableCell key={`header${f.key}${i}`} />
               ))}
-              <TableCell />
+              {!action ? null : <TableCell />}
             </TableRow>
           </TableHead>
 
           <Body
             rows={data}
+            action={action}
             classes={classes}
             displayFields={displayFields}
             selected={selected}
@@ -97,6 +99,7 @@ function DataTable({
 }
 
 DataTable.propTypes = {
+  action: PropTypes.node,
   title: PropTypes.string.isRequired,
   displayFields: PropTypes.array.isRequired,
   renderHeaderActions: PropTypes.func,
