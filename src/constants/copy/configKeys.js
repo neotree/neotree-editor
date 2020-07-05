@@ -1,3 +1,3 @@
 export default {
-  PAGE_TITLE: 'Config keys',
+  PAGE_TITLE: 'Configuration',
 };

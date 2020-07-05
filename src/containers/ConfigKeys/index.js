@@ -1,15 +1,23 @@
 import React from 'react';
-import copy from '@/constants/copy/configKeys';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle } from '@/contexts/app';
+import LazyPage from '@/components/LazyPage';
+import { Switch, Route, Redirect } from 'react-router-dom';
+
+const List = LazyPage(() => import('./List'));
 
 const ConfigKeys = () => {
-  setDocumentTitle(copy.PAGE_TITLE);
-  setHeaderTitle(copy.PAGE_TITLE);
-
   return (
     <>
-      
+      <Switch>
+        <Route
+          exact
+          path="/config-keys"
+          component={List}
+        />
+        <Route
+          path="*"
+          render={() => <Redirect to="" />}
+        />
+      </Switch>
     </>
   );
 };

@@ -30,7 +30,6 @@ const Scripts = () => {
           component={Script}
         />
         <Route
-          exact
           path="*"
           render={() => <Redirect to="" />}
         />

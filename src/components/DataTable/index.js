@@ -131,8 +131,7 @@ DataTable.propTypes = {
   renderHeaderActions: PropTypes.func,
   onSortData: PropTypes.func,
   data: PropTypes.arrayOf(PropTypes.shape({
-    title: PropTypes.string.isRequired,
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.array]).isRequired
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired
   })).isRequired
 };
 
