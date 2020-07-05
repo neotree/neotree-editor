@@ -1,7 +1,7 @@
 import { Diagnosis } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  const payload = req.query;
 
   const done = (err, diagnoses) => {
     res.locals.setResponse(err, { diagnoses });

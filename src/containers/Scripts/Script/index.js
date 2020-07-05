@@ -1,9 +1,38 @@
 import React from 'react';
+import { provideScriptContext } from '@/contexts/script';
+import { Switch, Route, Redirect } from 'react-router-dom';
+import LazyPage from '@/components/LazyPage';
 
-export default function Script() {
+const ScriptEditor = LazyPage(() => import('./ScriptEditor'));
+
+function Script() {
   return (
     <>
+      <Switch>
+        <Route
+          exact
+          path="/scripts/:scriptId"
+          component={ScriptEditor}
+        />
 
+        <Route
+          exact
+          path="/scripts/:scriptId/:scriptSection"
+          component={ScriptEditor}
+        />
+
+        <Route
+          exact
+          path="/scripts/:scriptId/:scriptSection/:scriptItemId"
+          component={ScriptEditor}
+        />
+        <Route
+          path="*"
+          render={() => <Redirect to="" />}
+        />
+      </Switch>
     </>
   );
 }
+
+export default provideScriptContext(Script);

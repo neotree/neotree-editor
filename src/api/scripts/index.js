@@ -30,3 +30,18 @@ export const duplicateScript = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const getScript = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/get-script', {
+    body: reqPayload,
+    ...reqOpts,
+  });
+};
+
+export const updateScript = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/update-script', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

@@ -20,13 +20,7 @@ const Scripts = () => {
           component={Script}
         />
         <Route
-          exact
-          path="/scripts/:scriptId/screen/:screenId"
-          component={Script}
-        />
-        <Route
-          exact
-          path="/scripts/:scriptId/diagnosis/:diagnosisId"
+          path="/scripts/:scriptId/:scriptSection"
           component={Script}
         />
         <Route

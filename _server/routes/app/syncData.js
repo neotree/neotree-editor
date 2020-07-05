@@ -2,7 +2,7 @@ import { Op } from 'sequelize';
 import { Script, Screen, ConfigKey, Diagnosis, Log } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  const payload = req.query;
   const lastSyncDate = payload.lastSyncDate ?
     new Date(payload.lastSyncDate).getTime() : null;
 

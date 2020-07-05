@@ -4,7 +4,7 @@ module.exports = () => (req, res, next) => {
   const {
     filters,
     ...payload
-  } = JSON.parse(req.query.payload || {});
+  } = req.query;
 
   const done = (err, screens) => {
     res.locals.setResponse(err, { screens });
