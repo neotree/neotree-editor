@@ -8,6 +8,7 @@ import Typography from '@material-ui/core/Typography';
 
 import DeleteConfigKeys from '../Forms/DeleteConfigKeys';
 import DuplicateConfigKeys from '../Forms/DuplicateConfigKeys';
+import ConfigKeyForm from '../Forms/ConfigKeyForm';
 
 function Action({ row, }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -27,6 +28,8 @@ function Action({ row, }) {
       >
         <MenuItem
           onClick={handleClose}
+          configKey={row}
+          component={ConfigKeyForm}
         >Edit</MenuItem>
 
         <MenuItem

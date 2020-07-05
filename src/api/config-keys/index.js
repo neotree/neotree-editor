@@ -30,3 +30,20 @@ export const duplicateConfigKey = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const updateConfigKey = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/update-config-key', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};
+
+
+export const createConfigKey = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/create-config-key', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

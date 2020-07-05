@@ -3,6 +3,7 @@ import _getConfigKeys from './_getConfigKeys';
 import _deleteConfigKeys from './_deleteConfigKeys';
 import _updateConfigKeys from './_updateConfigKeys';
 import _duplicateConfigKeys from './_duplicateConfigKeys';
+import _saveConfigKey from './_saveConfigKey';
 
 export const ConfigKeysContext = React.createContext(null);
 
@@ -21,6 +22,7 @@ export const provideConfigKeysContext = Component => function ConfigKeysContextP
   const deleteConfigKeys = _deleteConfigKeys({ setState });
   const updateConfigKeys = _updateConfigKeys({ setState });
   const duplicateConfigKeys = _duplicateConfigKeys({ setState });
+  const saveConfigKey = _saveConfigKey({ state, setState });
 
   React.useEffect(() => { getConfigKeys(); }, []);
 
@@ -34,6 +36,7 @@ export const provideConfigKeysContext = Component => function ConfigKeysContextP
         deleteConfigKeys,
         updateConfigKeys,
         duplicateConfigKeys,
+        saveConfigKey,
       }}
     >
       <Component {...props} />

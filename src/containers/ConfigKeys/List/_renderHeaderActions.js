@@ -7,6 +7,7 @@ import Button from '@material-ui/core/Button';
 
 import DeleteConfigKeys from '../Forms/DeleteConfigKeys';
 import DuplicateConfigKeys from '../Forms/DuplicateConfigKeys';
+import ConfigKeyForm from '../Forms/ConfigKeyForm';
 
 function Actions({ selected }) {
   return (
@@ -25,9 +26,11 @@ function Actions({ selected }) {
         </>
       )}
 
-      <IconButton>
-        <AddIcon />
-      </IconButton>
+      <ConfigKeyForm>
+        <IconButton>
+          <AddIcon />
+        </IconButton>
+      </ConfigKeyForm>
     </>
   );
 }
