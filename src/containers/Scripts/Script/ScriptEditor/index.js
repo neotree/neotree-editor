@@ -20,10 +20,10 @@ const Diagnoses = LazyComponent(() => import('../Diagnoses/List'), { LoaderCompo
 
 function ScriptEditor() {
   const history = useHistory();
-  const { setState, state: { scriptSection, script } } = useScriptContext();
+  const { setState, state: { scriptSection, script, loadingScript } } = useScriptContext();
 
   setDocumentTitle(`${copy.PAGE_TITLE}${script ? `: ${script.data.title}` : ''}`);
-  setHeaderTitle(`${copy.PAGE_TITLE}${script ? ` / ${script.data.title}` : ''}`);
+  setHeaderTitle(`${copy.PAGE_TITLE}${script ? ` / ${script.data.title}` : ` / ${loadingScript ? '' : 'New script'}`}`);
 
   return (
     <>
