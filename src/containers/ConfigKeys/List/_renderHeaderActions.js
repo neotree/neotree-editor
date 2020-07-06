@@ -4,6 +4,8 @@ import IconButton from '@material-ui/core/IconButton';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import Button from '@material-ui/core/Button';
+import Fab from '@material-ui/core/Fab';
+import FabWrap from '@/components/FabWrap';
 
 import DeleteConfigKeys from '../Forms/DeleteConfigKeys';
 import DuplicateConfigKeys from '../Forms/DuplicateConfigKeys';
@@ -31,6 +33,14 @@ function Actions({ selected }) {
           <AddIcon />
         </IconButton>
       </ConfigKeyForm>
+
+      <FabWrap>
+        <ConfigKeyForm>
+          <Fab color="secondary">
+            <AddIcon />
+          </Fab>
+        </ConfigKeyForm>
+      </FabWrap>
     </>
   );
 }
