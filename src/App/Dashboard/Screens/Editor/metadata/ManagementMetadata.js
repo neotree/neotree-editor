@@ -2,8 +2,10 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Textfield } from 'react-mdl';
 
-import { DataType } from 'App/constants'; 
-import Base64ImageUploader from 'Dashboard/components/Base64ImageUploader';  
+import { DataType } from 'App/constants';
+import Base64ImageUploader, { _uploadFile as uploadFile } from 'Dashboard/components/Base64ImageUploader';
+
+export { uploadFile };
 
 export default class ManagementMetadata extends Component {
     componentWillMount() {

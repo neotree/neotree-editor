@@ -10,6 +10,7 @@ import {
     Textfield,
     Switch
 } from 'react-mdl';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
@@ -18,10 +19,11 @@ import FormSection from 'FormSection';
 import Toolbar from 'Toolbar';
 // import { DataType, ScreenType } from 'App/constants';
 import * as constants from 'App/constants';
+import DialogTitle from '@material-ui/core/DialogTitle';
 import SelectMetadata from '../metadata/SelectMetadata';
 import FieldList from '../metadata/FieldList';
 import ItemList from '../metadata/ItemList';
-import ManagementMetadata from '../metadata/ManagementMetadata';
+import ManagementMetadata, { uploadFile } from '../metadata/ManagementMetadata';
 import TimerMetadata from '../metadata/TimerMetadata';
 import YesNoMetadata from '../metadata/YesNoMetadata';
 
@@ -31,7 +33,7 @@ export class Editor extends React.Component {
     isModified: false,
     isModifiedConfirmed: false,
     skippable: false,
-    screen: this.props.screen ? this.props.screen.data : {
+    screen: {
       epicId: null,
       storyId: null,
       refId: null,
@@ -81,7 +83,7 @@ export class Editor extends React.Component {
 
   handleBackClick = () => this.props.history.goBack();
 
-  handleSubmitClick = () => {
+  handleSubmitClick = (shouldGoBack = true) => {
     const { actions, history, isEditMode, screenId } = this.props;
     const { screen } = this.state;
     const action = isEditMode ? 'update-screen' : 'create-screen';
@@ -92,26 +94,28 @@ export class Editor extends React.Component {
       onResponse: () => this.setState({ updatingScreen: false }),
       onFailure: updateScreenError => this.setState({ updateScreenError }),
       onSuccess: ({ payload }) => {
-      this.setState({ screen: payload.screen });
+      this.setState({ screen: payload.screen.data });
         actions.updateApiData({ screen: payload.screen });
-        if (action === 'update-screen') history.goBack();
+        if (shouldGoBack && (action === 'update-screen')) history.goBack();
       }
     });
   };
 
   handleItemsChanged = () => this.setState({ isModified: true });
 
-  handleUpdateMetadata = update => this.setState({
-    screen: {
-      ...this.props.screen,
-      ...this.state.screen,
-      metadata: {
-        ...this.props.screen.metadata,
-        ...this.state.screen.metadata,
-        ...update
+  handleUpdateMetadata = (update, shouldSaveAfter = false) => {
+    this.setState({
+      screen: {
+        // ...this.props.screen,
+        ...this.state.screen,
+        metadata: {
+          // ...this.props.screen.metadata,
+          ...this.state.screen.metadata,
+          ...update
+        }
       }
-    }
-  });
+    }, () => shouldSaveAfter && this.handleSubmitClick(false));
+  };
 
   openUnsavedChangesDialog = () => () => this.setState({
     openUnsavedChangesDialog: true
@@ -120,6 +124,18 @@ export class Editor extends React.Component {
   closeUnsavedChangesDialog = () => this.setState({
     openUnsavedChangesDialog: false
   });
+
+  getUploadableFiles = () => {
+    const { metadata: { image1, image2, image3 } } = this.state.screen || {};
+    const uploadable = [];
+    if (image1 || image2 || image3) {
+      const addUploadable = (name, img) => img && !img.fileId && uploadable.push({ name, img });
+      addUploadable('image1', image1);
+      addUploadable('image2', image2);
+      addUploadable('image3', image3);
+    }
+    return uploadable;
+  };
 
   render() {
     const { type, screen, skippable } = this.state;
@@ -342,6 +358,72 @@ export class Editor extends React.Component {
           {itemsEditor}
         </div>
         {confirmUnsavedChangesDialog}
+
+        <Dialog
+          fullWidth
+          maxWidth="sm"
+          open={this.getUploadableFiles().length > 0}
+          onClose={() => {}}
+        >
+          <DialogTitle>These images must be saved in the database</DialogTitle>
+
+          <DialogContent>
+            {this.getUploadableFiles().map((f, i) => {
+              return (
+                <div key={i}>
+                  <div
+                    style={{
+                      width: '90%',
+                      maxWidth: 200,
+                      margin: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      style={{ width: '100%', height: 'auto' }}
+                      role="presentation"
+                      src={f.img.data}
+                    />
+                  </div>
+                  <br />
+                </div>
+              );
+            })}
+          </DialogContent>
+
+          <DialogActions>
+            <Button
+              onClick={() => {
+                const files = this.getUploadableFiles();
+                this.setState({ uploadingFiles: true });
+                Promise.all(files.map(({ img: f }) => {
+                  const dataURI = f.data;
+                  const byteString = atob(dataURI.split(',')[1]);
+                  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+                  const ab = new ArrayBuffer(byteString.length);
+                  const ia = new Uint8Array(ab);
+                  for (let i = 0; i < byteString.length; i++) {
+                      ia[i] = byteString.charCodeAt(i);
+                  }
+                  const blob = new Blob([ab], { type: mimeString, });
+                  return uploadFile(new File([blob], f.filename));
+                }))
+                  .catch(e => {
+                    this.setState({ uploadingFiles: false });
+                    alert(e.msg || e.message || JSON.stringify(e));
+                  })
+                  .then(rslts => {
+                    const update = {};
+                    rslts.forEach((f, i) => { update[files[i].name] = f; });
+                    this.setState({ uploadingFiles: false });
+                    this.handleUpdateMetadata(update, true);
+                  });
+              }}
+            >{this.state.uploadingFiles ? <CircularProgress size={15} /> : 'Save'}</Button>
+          </DialogActions>
+        </Dialog>
       </div>
     );
   }

@@ -12,6 +12,6 @@ module.exports = (app) => (req, res, next) => {
   if (!id) return done({ msg: 'Required screen "id" is not provided.' });
 
   Screen.update(payload, { where: { id }, individualHooks: true })
-    .then(screen => done(null, screen))
+    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
     .catch(done);
 };

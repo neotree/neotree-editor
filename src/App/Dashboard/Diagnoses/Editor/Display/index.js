@@ -6,10 +6,15 @@ import {
     CardText,
     Textfield,
 } from 'react-mdl';
-import Base64ImageUploader from 'Dashboard/components/Base64ImageUploader'; 
-import FormButtonBar from 'FormButtonBar'; 
-import FormSection from 'FormSection'; 
-import Toolbar from 'Toolbar'; 
+import Base64ImageUploader, { _uploadFile as uploadFile } from 'Dashboard/components/Base64ImageUploader';
+import FormButtonBar from 'FormButtonBar';
+import FormSection from 'FormSection';
+import Toolbar from 'Toolbar';
+import Dialog from '@material-ui/core/Dialog';
+import DialogActions from '@material-ui/core/DialogActions';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogTitle from '@material-ui/core/DialogTitle';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import SymptomList from '../metadata/SymptomList';
 
 export class Display extends React.Component {
@@ -62,7 +67,7 @@ export class Display extends React.Component {
 
   handleBackClick = () => this.props.history.goBack();
 
-  handleSubmitClick = () => {
+  handleSubmitClick = (shouldGoBack = true) => {
     const { isEditMode, history, actions, diagnosisId, scriptId } = this.props;
     const { diagnosis } = this.state;
 
@@ -75,7 +80,7 @@ export class Display extends React.Component {
       onFailure: saveDiagnosisError => this.setState({ saveDiagnosisError }),
       onSuccess: ({ payload }) => {
         actions.updateApiData({ diagnosis: payload.diagnosis });
-        history.goBack();
+        if (shouldGoBack) history.goBack();
       }
     });
   };
@@ -86,6 +91,18 @@ export class Display extends React.Component {
       symptoms: update.symptoms
     }
   });
+
+  getUploadableFiles = () => {
+    const { diagnosis: { image1, image2, image3 } } = this.state || {};
+    const uploadable = [];
+    if (image1 || image2 || image3) {
+      const addUploadable = (name, img) => img && !img.fileId && uploadable.push({ name, img });
+      addUploadable('image1', image1);
+      addUploadable('image2', image2);
+      addUploadable('image3', image3);
+    }
+    return uploadable;
+  };
 
   render() {
     const { isEditMode } = this.props;
@@ -209,14 +226,82 @@ export class Display extends React.Component {
                 </div>}
 
               <FormButtonBar>
-                {(isEditMode) ? <Button style={{ ...styles.fieldLeft }} onClick={this.handleSubmitClick.bind(this, 'apply')} raised ripple>Apply</Button> : null }
-                <Button style={{ ...styles.fieldRight }} onClick={this.handleSubmitClick.bind(this, 'update')} raised accent ripple>{actionLabel}</Button>
+                {(isEditMode) ? <Button style={{ ...styles.fieldLeft }} onClick={this.handleSubmitClick.bind(this)} raised ripple>Apply</Button> : null }
+                <Button style={{ ...styles.fieldRight }} onClick={this.handleSubmitClick.bind(this)} raised accent ripple>{actionLabel}</Button>
               </FormButtonBar>
             </CardText>
           </Card>
 
           <SymptomList items={diagnosis.symptoms} onUpdateSymptoms={this.handleUpdateSymptoms} />
         </div>
+
+        <Dialog
+          fullWidth
+          maxWidth="sm"
+          open={this.getUploadableFiles().length > 0}
+          onClose={() => {}}
+        >
+          <DialogTitle>These images must be saved in the database</DialogTitle>
+
+          <DialogContent>
+            {this.getUploadableFiles().map((f, i) => {
+              return (
+                <div key={i}>
+                  <div
+                    style={{
+                      width: '90%',
+                      maxWidth: 200,
+                      margin: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      style={{ width: '100%', height: 'auto' }}
+                      role="presentation"
+                      src={f.img.data}
+                    />
+                  </div>
+                  <br />
+                </div>
+              );
+            })}
+          </DialogContent>
+
+          <DialogActions>
+            <Button
+              onClick={() => {
+                const files = this.getUploadableFiles();
+                this.setState({ uploadingFiles: true });
+                Promise.all(files.map(({ img: f }) => {
+                  const dataURI = f.data;
+                  const byteString = atob(dataURI.split(',')[1]);
+                  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+                  const ab = new ArrayBuffer(byteString.length);
+                  const ia = new Uint8Array(ab);
+                  for (let i = 0; i < byteString.length; i++) {
+                      ia[i] = byteString.charCodeAt(i);
+                  }
+                  const blob = new Blob([ab], { type: mimeString, });
+                  return uploadFile(new File([blob], f.filename));
+                }))
+                  .catch(e => {
+                    this.setState({ uploadingFiles: false });
+                    alert(e.msg || e.message || JSON.stringify(e));
+                  })
+                  .then(rslts => {
+                    const update = {};
+                    rslts.forEach((f, i) => { update[files[i].name] = f; });
+                    this.setState({
+                      uploadingFiles: false,
+                      ...update,
+                    }, () => this.handleSubmitClick());
+                  });
+              }}
+            >{this.state.uploadingFiles ? <CircularProgress size={15} /> : 'Save'}</Button>
+          </DialogActions>
+        </Dialog>
       </div>
     );
   }

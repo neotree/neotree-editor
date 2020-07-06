@@ -2,8 +2,37 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { FABButton } from 'react-mdl';
 import { MdDelete, MdAdd } from 'react-icons/md';
+import CircularProgress from '@material-ui/core/CircularProgress';
+
+export const _uploadFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', file, file.filename);
+
+      fetch('/upload-file', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(({ payload: { file: f, error: e, } }) => {
+        if (e) return reject(e);
+        resolve({
+          type: f.content_type,
+          size: f.size,
+          filename: f.filename,
+          fileId: f.id,
+          data: `${window.location.origin}/file/${f.id}`,
+        });
+      })
+      .catch(reject);
+    });
+};
 
 export default class Base64ImageUploader extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {};
+  }
     // componentWillMount() {
     //     const { name, fileInfo } = this.props;
     //
@@ -11,9 +40,31 @@ export default class Base64ImageUploader extends Component {
     //     this.setState({...this.state, fileInfo: fileInfo});
     // }
 
+    componentDidMount() {
+      this.parseFileInfo(this.props);
+    }
+
     componentWillReceiveProps(props) {
       const { fileInfo } = props;
       this.setState({ ...this.state, fileInfo });
+      // this.parseFileInfo(props);
+    }
+
+    parseFileInfo(props = this.props) {
+      if (props.fileInfo && props.fileInfo.data && !props.fileInfo.fileId) {
+        const dataURI = props.fileInfo.data;
+        const byteString = atob(dataURI.split(',')[1]);
+        const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        if (!this.state.uploading) {
+          const blob = new Blob([ab], { type: mimeString, });
+          // this.uploadFile(new File([blob], props.fileInfo.filename), false);
+        }
+      }
     }
 
     handleFormSubmit = (e) => {
@@ -58,9 +109,21 @@ export default class Base64ImageUploader extends Component {
         callbackFn(this.props.name);
     };
 
+    uploadFile = (f, uploaded = true) => {
+      this.setState({ uploading: true });
+      const done = (e, f) => {
+        this.setState({ uploading: false });
+        if (e) return alert(e.msg || e.message || JSON.stringify(e));
+        this.props.onFileUploaded(this.props.name, f, { uploaded });
+      };
+      _uploadFile(f)
+        .catch(done)
+        .then(f => done(null, f));
+    };
+
     render() {
         // const { children, className, label, style, topSpace, ...otherProps } = this.props;
-        const { fileInfo } = (this.state || {});
+        const { fileInfo, uploading, } = (this.state || {});
         const styles = {
             container: {
                 display: 'flex',
@@ -114,10 +177,16 @@ export default class Base64ImageUploader extends Component {
         return (
             <div style={styles.container}>
                 <form style={{display:'none'}} encType="multipart-formdata" onSubmit={this.handleFormSubmit}>
-                    <input ref={(ref) => this.uploadFileInput = ref} type="file" onChange={this.handleFileUploaded}/>
+                    <input
+                      value=""
+                      accept="image/*"
+                      ref={ref => (this.uploadFileInput = ref)}
+                      type="file"
+                      onChange={e => this.uploadFile(e.target.files[0])}
+                    />
                 </form>
                 <div>
-                    {imagePreview}
+                    {uploading ? <CircularProgress size={20} /> : imagePreview}
                 </div>
                 <div style={styles.flexContainer}>
                     <div style={styles.iconLeft}>

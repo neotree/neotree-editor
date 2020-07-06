@@ -12,6 +12,6 @@ module.exports = app => (req, res, next) => {
   if (!id) return done({ msg: 'Required configKey "id" is not provided.' });
 
   ConfigKey.update(payload, { where: { id }, individualHooks: true })
-    .then(configKey => done(null, configKey))
+    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
     .catch(done);
 };
