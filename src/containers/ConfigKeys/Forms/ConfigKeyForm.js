@@ -19,7 +19,8 @@ const ConfigKeyForm = React.forwardRef(({
   const { saveConfigKey } = useConfigKeysContext();
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [formError, setFormError] = React.useState(null);
+  const [saveError, setSaveError] = React.useState(null);
 
   const [form, _setForm] = React.useState(configKey ? configKey.data : {});
   const setForm = s => _setForm(prev => ({
@@ -28,6 +29,14 @@ const ConfigKeyForm = React.forwardRef(({
   }));
 
   React.useEffect(() => { if (configKey) setForm(configKey.data); }, [configKey]);
+
+  React.useEffect(() => {
+    let e = null;
+    if (!form.label) e = { ...e, label: 'Label is required' };
+    if (!form.configKey) e = { ...e, configKey: 'Key is required' };
+    setFormError(e ? e : null);
+    setSaveError(null);
+  }, [form]);
 
   return (
     <>
@@ -54,6 +63,8 @@ const ConfigKeyForm = React.forwardRef(({
           <div>
             <TextField
               fullWidth
+              required
+              error={formError ? !!formError.label : false}
               value={form.configKey || ''}
               label="Key"
               onChange={e => setForm({ configKey: e.target.value })}
@@ -65,6 +76,8 @@ const ConfigKeyForm = React.forwardRef(({
           <div>
             <TextField
               fullWidth
+              required
+              error={formError ? !!formError.configKey : false}
               value={form.label || ''}
               label="Label"
               onChange={e => setForm({ label: e.target.value })}
@@ -82,10 +95,12 @@ const ConfigKeyForm = React.forwardRef(({
             />
           </div>
 
-          {!error ? null : (
+          {!saveError ? null : (
             <div>
               <br />
-              <Typography variant="caption" color="error">{JSON.stringify(error)}</Typography>
+              <Typography variant="caption" color="error">
+                {JSON.stringify(saveError)}
+              </Typography>
             </div>
           )}
         </DialogContent>
@@ -104,12 +119,12 @@ const ConfigKeyForm = React.forwardRef(({
               <Button
                 variant="contained"
                 color="primary"
-                disabled={!(form.configKey && form.label)}
+                disabled={!!formError}
                 onClick={() => {
                   setSaving(true);
                   saveConfigKey(configKey, form, (e) => {
                     setSaving(false);
-                    setError(e);
+                    setSaveError(e);
                     setOpen(false);
                   });
                 }}

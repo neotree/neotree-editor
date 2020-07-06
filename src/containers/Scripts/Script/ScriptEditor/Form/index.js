@@ -21,6 +21,8 @@ function ScriptEditor() {
           <div>
             <TextField
               fullWidth
+              required
+              error={!form.title}
               value={form.title || ''}
               label="Title"
               onChange={e => setForm({ title: e.target.value })}
