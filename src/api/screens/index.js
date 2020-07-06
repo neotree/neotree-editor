@@ -45,3 +45,11 @@ export const updateScreen = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const createScreen = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/create-screen', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

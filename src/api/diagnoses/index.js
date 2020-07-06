@@ -45,3 +45,11 @@ export const updateDiagnosis = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const createDiagnosis = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/create-diagnosis', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

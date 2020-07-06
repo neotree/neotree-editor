@@ -4,6 +4,7 @@ import { Switch, Route, Redirect } from 'react-router-dom';
 import LazyPage from '@/components/LazyPage';
 
 const ScriptEditor = LazyPage(() => import('./ScriptEditor'));
+const Screen = LazyPage(() => import('./Screen'));
 
 function Script() {
   return (
@@ -24,7 +25,7 @@ function Script() {
         <Route
           exact
           path="/scripts/:scriptId/:scriptSection/:scriptItemId"
-          component={ScriptEditor}
+          component={Screen}
         />
         <Route
           path="*"

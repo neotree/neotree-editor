@@ -3,10 +3,14 @@ import PropTypes from 'prop-types';
 import IconButton from '@material-ui/core/IconButton';
 import AddIcon from '@material-ui/icons/Add';
 import Button from '@material-ui/core/Button';
+import { useScriptContext } from '@/contexts/script';
+import { Link } from 'react-router-dom';
 
 import CopyScreens from '../Forms/CopyScreens';
 
 function Actions({ selected }) {
+  const { state: { script } } = useScriptContext();
+
   return (
     <>
       {selected.length > 0 && (
@@ -17,9 +21,11 @@ function Actions({ selected }) {
         </>
       )}
 
-      <IconButton>
-        <AddIcon />
-      </IconButton>
+      <Link to={`/scripts/${script.id}/screens/new`}>
+        <IconButton>
+          <AddIcon />
+        </IconButton>
+      </Link>
     </>
   );
 }
