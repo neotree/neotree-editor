@@ -10,17 +10,19 @@ import Form from './Form';
 
 function Screen() {
   const { state: { script } } = useScriptContext();
-  const { state: { screen, loadingScreen, savingScreen } } = useScreenContext();
+  const { state: { screen, loadingScreen, savingScreen, } } = useScreenContext();
 
-  const titleChunks = [
+  const titleChunks = !script ? [] : [
     scritpsCopy.PAGE_TITLE,
     script.data.title,
     screensCopy.PAGE_TITLE,
     screen ? screen.data.title : loadingScreen ? '' : 'New screen',
   ].filter(c => c);
 
-  setDocumentTitle(titleChunks.join(' / '));
+  setDocumentTitle(titleChunks.join(' > '));
   setHeaderTitle(titleChunks.join(' / '));
+
+  if (!script || loadingScreen) return <OverlayLoader transparent />;
 
   return (
     <>
