@@ -9,6 +9,14 @@ import Title from './Title';
 function FlowControl() {
   const { setForm, state: { form }, } = useScreenContext();
 
+  React.useEffect(() => {
+    setForm({
+      skippable: null,
+      condition: null,
+      ...form,
+    });
+  }, []);
+
   return (
     <>
       <Title>FLOW CONTROL</Title>

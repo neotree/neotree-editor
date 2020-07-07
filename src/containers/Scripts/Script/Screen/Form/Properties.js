@@ -3,9 +3,28 @@ import { useScreenContext } from '@/contexts/screen';
 import Grid from '@material-ui/core/Grid';
 import TextField from '@material-ui/core/TextField';
 import Title from './Title';
+import MetadataManagement from './Metadata/Management';
+import MetadataTimer from './Metadata/Timer';
+import MetadataYesNo from './Metadata/YesNo';
 
 function Properties() {
   const { setForm, state: { form }, } = useScreenContext();
+
+  React.useEffect(() => {
+    setForm({
+      epicId: null,
+      storyId: null,
+      refId: null,
+      step: null,
+      title: null,
+      sectionTitle: null,
+      actionText: null,
+      contentText: null,
+      instructions: null,
+      notes: null,
+      ...form,
+    });
+  }, []);
 
   return (
     <>
@@ -68,10 +87,10 @@ function Properties() {
         <TextField
           fullWidth
           required
-          error={!form.printTitle}
-          value={form.printTitle || ''}
+          error={!form.sectionTitle}
+          value={form.sectionTitle || ''}
           label="Print section title"
-          onChange={e => setForm({ printTitle: e.target.value })}
+          onChange={e => setForm({ sectionTitle: e.target.value })}
         />
       </div>
 
@@ -100,6 +119,31 @@ function Properties() {
       </div>
 
       <br />
+
+      {(() => {
+        let Component = null;
+
+        switch (form.type) {
+          case 'yesno':
+            Component = MetadataYesNo;
+            break;
+          case 'timer':
+            Component = MetadataTimer;
+            break;
+          case 'management':
+            Component = MetadataManagement;
+            break;
+          default:
+            // do nothing
+        }
+
+        return !Component ? null : (
+          <>
+            <Component />
+            <br />
+          </>
+        );
+      })()}
 
       <div>
         <TextField

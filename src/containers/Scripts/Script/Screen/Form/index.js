@@ -8,7 +8,6 @@ import Collapse from '@material-ui/core/Collapse';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
-import MetadataTitleTextImage from './Metadata/TitleTextImage';
 
 function ScreenEditor() {
   const {
@@ -30,20 +29,6 @@ function ScreenEditor() {
 
               <Properties />
               <br />
-
-              {(() => {
-                switch (form.type) {
-                  case 'management':
-                    return (
-                      <>
-                        <MetadataTitleTextImage />
-                        <br />
-                      </>
-                    );
-                  default:
-                    return null;
-                }
-              })()}
             </div>
           </Collapse>
         </CardContent>

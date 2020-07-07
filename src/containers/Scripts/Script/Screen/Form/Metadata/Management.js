@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import TitleTextImageForm from '@/components/TitleTextImageForm';
 import wrapMetadataFormItem from './_wrapMetadataFormItem';
 
-function TitleTextImage({ form, setMetadata }) {
+function Management({ form, setMetadata }) {
   const fieldsCount = 3;
 
   React.useEffect(() => {
@@ -56,9 +56,9 @@ function TitleTextImage({ form, setMetadata }) {
   );
 }
 
-TitleTextImage.propTypes = {
+Management.propTypes = {
   setMetadata: PropTypes.func.isRequired,
   form: PropTypes.object.isRequired,
 };
 
-export default wrapMetadataFormItem(TitleTextImage);
+export default wrapMetadataFormItem(Management);
