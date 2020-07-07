@@ -54,12 +54,7 @@ const AuthForm = ({ copy, authType }) => {
     </div>
   );
 
-  const renderBtnText = text => (
-    <>
-      <Typography color="inherit" variant="caption">{text}</Typography>
-      {loading ? <>&nbsp;&nbsp;<CircularProgress color="secondary" size={15} /></> : null}
-    </>
-  );
+  const btnLoader = !loading ? null : <CircularProgress color="secondary" size={20} />;
 
   return (
     <>
@@ -90,7 +85,11 @@ const AuthForm = ({ copy, authType }) => {
           {renderActions(
             <>
               <Button
-                variant="outlined"
+                disableElevation
+                size="large"
+                color="primary"
+                variant="contained"
+                endIcon={btnLoader}
                 onClick={() => checkEmailRegistration(authType)}
                 disabled={disableAction(authType)}
               >{copy.VERIFY_EMAIL_ADDRESS_BUTTON_TEXT}</Button>
@@ -137,12 +136,15 @@ const AuthForm = ({ copy, authType }) => {
             {renderActions(
               <>
                 <Button
-                  variant="outlined"
-                  color="secondary"
+                  disableElevation
+                  size="large"
+                  color="primary"
+                  variant="contained"
+                  endIcon={btnLoader}
                   onClick={() => onAuthenticate()}
-                  disabled={disableAction()}
+                  disabled={disableAction(authType)}
                 >
-                  {renderBtnText(copy.SUBMIT_BUTTON_LABEL)}
+                  {copy.SUBMIT_BUTTON_LABEL}
                 </Button>
               </>
             )}
