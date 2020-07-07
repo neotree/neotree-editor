@@ -41,7 +41,7 @@ function ScriptEditor() {
           </div>
         </CardContent>
 
-        <CardActions>
+        <CardActions style={{ justifyContent: 'flex-end' }}>
           <Button
             color="primary"
             onClick={() => saveScript()}
