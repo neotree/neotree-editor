@@ -83,17 +83,16 @@ function DataTable({
                 {selectable && (
                   <TableCell padding="none">
                     <Checkbox
-                      checked={false}
                       indeterminate={selected.length > 0 && selected.length < data.length}
                       checked={data.length > 0 && selected.length === data.length}
                       onChange={() => setSelected(selected =>
-                        selected.length < data.length ? data.map(r => r.id) : [])}
+                        selected.length < data.length ? data.map((r, i) => ({ row: r, rowIndex: i })) : [])}
                     />
                   </TableCell>
                 )}
                 <TableCell />
                 {displayFields.map((f, i) => (
-                  <TableCell key={`${f.key}${i}`}>
+                  <TableCell {...f.cellProps} key={`${f.key}${i}`}>
                     <b>{f.label}</b>
                   </TableCell>
                 ))}
@@ -138,9 +137,7 @@ DataTable.propTypes = {
   displayFields: PropTypes.array.isRequired,
   renderHeaderActions: PropTypes.func,
   onSortData: PropTypes.func,
-  data: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired
-  })).isRequired
+  data: PropTypes.array.isRequired
 };
 
 export default DataTable;

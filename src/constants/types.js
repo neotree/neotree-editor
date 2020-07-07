@@ -52,10 +52,10 @@ export const FieldType = {
 export const ScreenTypes = [
   { name: 'checklist', label: 'Checklist' },
   { name: 'form', label: 'Form' },
-  { name: 'list', label: 'List' },
   { name: 'management', label: 'Management' },
-  { name: 'multi_select', label: 'Multi select' },
-  { name: 'single_select', label: 'Single select' },
+  { name: 'multi_select', label: 'Multiple choice list' },
+  { name: 'list', label: 'Simple list' },
+  { name: 'single_select', label: 'Single choice list' },
   { name: 'progress', label: 'Progress' },
   { name: 'timer', label: 'Timer' },
   { name: 'yesno', label: 'Yes/No' },

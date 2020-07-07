@@ -8,6 +8,7 @@ import Collapse from '@material-ui/core/Collapse';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
+import MetadataItems from './Metadata/Items';
 
 function ScreenEditor() {
   const {
@@ -43,6 +44,14 @@ function ScreenEditor() {
           </CardActions>
         )}
       </Card>
+
+      <br />
+
+      {['single_select', 'multi_select', 'list', 'progress'].includes(form.type) && (
+        <>
+          <MetadataItems />
+        </>
+      )}
     </>
   );
 }

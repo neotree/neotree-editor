@@ -6,6 +6,7 @@ import Title from './Title';
 import MetadataManagement from './Metadata/Management';
 import MetadataTimer from './Metadata/Timer';
 import MetadataYesNo from './Metadata/YesNo';
+import MetadataSelect from './Metadata/Select';
 
 function Properties() {
   const { setForm, state: { form }, } = useScreenContext();
@@ -67,8 +68,7 @@ function Properties() {
           />
         </Grid>
       </Grid>
-
-      <br />
+      <br /><br />
 
       <div>
         <TextField
@@ -80,8 +80,7 @@ function Properties() {
           onChange={e => setForm({ title: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
 
       <div>
         <TextField
@@ -93,8 +92,7 @@ function Properties() {
           onChange={e => setForm({ sectionTitle: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
 
       <div>
         <TextField
@@ -104,8 +102,7 @@ function Properties() {
           onChange={e => setForm({ actionText: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
 
       <div>
         <TextField
@@ -117,8 +114,7 @@ function Properties() {
           onChange={e => setForm({ contentText: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
 
       {(() => {
         let Component = null;
@@ -132,6 +128,12 @@ function Properties() {
             break;
           case 'management':
             Component = MetadataManagement;
+            break;
+          case 'multi_select':
+            Component = MetadataSelect;
+            break;
+          case 'single_select':
+            Component = MetadataSelect;
             break;
           default:
             // do nothing
@@ -155,8 +157,7 @@ function Properties() {
           onChange={e => setForm({ instructions: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
 
       <div>
         <TextField
@@ -168,8 +169,7 @@ function Properties() {
           onChange={e => setForm({ notes: e.target.value })}
         />
       </div>
-
-      <br />
+      <br /><br />
     </>
   );
 }

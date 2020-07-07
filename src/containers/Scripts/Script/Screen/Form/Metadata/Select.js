@@ -1,20 +1,24 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import Grid from '@material-ui/core/Grid';
 import TextField from '@material-ui/core/TextField';
 import Switch from '@material-ui/core/Switch';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import wrapMetadataFormItem from './_wrapMetadataFormItem';
 
-function YesNo({ form, setMetadata }) {
+function Select({ form, setMetadata }) {
   React.useEffect(() => {
     setMetadata({
-      dataType: 'boolean',
+      dataType: (() => {
+        switch (form.type) {
+          case 'multi_select':
+            return 'set<id>';
+          default:
+            return 'id';
+        }
+      }),
       confidential: false,
       key: null,
       label: null,
-      negativeLabel: null,
-      positiveLabel: null,
       ...form.metadata,
     });
   }, []);
@@ -31,7 +35,7 @@ function YesNo({ form, setMetadata }) {
           onChange={e => setMetadata({ key: e.target.value })}
         />
       </div>
-      <br /><br />
+      <br />
 
       <div>
         <TextField
@@ -43,7 +47,7 @@ function YesNo({ form, setMetadata }) {
           onChange={e => setMetadata({ label: e.target.value })}
         />
       </div>
-      <br /><br />
+      <br />
 
       <div>
         <FormControlLabel
@@ -57,39 +61,14 @@ function YesNo({ form, setMetadata }) {
           label="Confidential"
         />
       </div>
-      <br /><br />
-
-      <Grid container spacing={1}>
-        <Grid xs={6} sm={6} item>
-          <TextField
-            fullWidth
-            required
-            error={!form.metadata.negativeLabel}
-            value={form.metadata.negativeLabel || ''}
-            label="Negative label"
-            onChange={e => setMetadata({ negativeLabel: e.target.value })}
-          />
-        </Grid>
-
-        <Grid xs={6} sm={6} item>
-          <TextField
-            fullWidth
-            required
-            error={!form.metadata.positiveLabel}
-            value={form.metadata.positiveLabel || ''}
-            label="Positive label"
-            onChange={e => setMetadata({ positiveLabel: e.target.value })}
-          />
-        </Grid>
-      </Grid>
-      <br /><br />
+      <br />
     </>
   );
 }
 
-YesNo.propTypes = {
+Select.propTypes = {
   setMetadata: PropTypes.func.isRequired,
   form: PropTypes.object.isRequired,
 };
 
-export default wrapMetadataFormItem(YesNo);
+export default wrapMetadataFormItem(Select);

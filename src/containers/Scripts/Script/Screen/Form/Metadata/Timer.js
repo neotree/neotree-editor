@@ -7,7 +7,7 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import wrapMetadataFormItem from './_wrapMetadataFormItem';
 
 function Timer({ form, setMetadata }) {
-  React.useEffect(() => { 
+  React.useEffect(() => {
     setMetadata({
       dataType: 'number',
       confidential: false,
@@ -80,8 +80,7 @@ function Timer({ form, setMetadata }) {
           />
         </Grid>
       </Grid>
-
-      <br />
+      <br /><br />
 
       <div>
         <FormControlLabel
@@ -95,8 +94,7 @@ function Timer({ form, setMetadata }) {
           label="Confidential"
         />
       </div>
-
-      <br />
+      <br /><br />
     </>
   );
 }

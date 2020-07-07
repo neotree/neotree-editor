@@ -13,18 +13,22 @@ export default SortableContainer(({
   renderRowAction,
 }) => (
   <TableBody>
-    {rows.map((row, i) => (
-      <Row
-        key={`${row.id}${i}`}
-        row={row}
-        index={i}
-        classes={classes}
-        selectable={selectable}
-        action={renderRowAction ? renderRowAction(row, i) : null}
-        displayFields={displayFields}
-        selected={selected}
-        setSelected={setSelected}
-      />
-    ))}
+    {rows.map((row, i) => {
+      const key = i;
+      return (
+        <Row
+          key={`${key}${i}`}
+          row={row}
+          index={i}
+          rowIndex={i}
+          classes={classes}
+          selectable={selectable}
+          action={renderRowAction ? renderRowAction(row, i) || <></> : null}
+          displayFields={displayFields}
+          selected={selected}
+          setSelected={setSelected}
+        />
+      );
+    })}
   </TableBody>
 ));

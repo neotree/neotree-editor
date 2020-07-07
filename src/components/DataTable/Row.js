@@ -15,41 +15,50 @@ const DragHandle = SortableHandle(() => (
 
 export default SortableElement(({
   row,
+  rowIndex: i,
   selectable,
   classes,
   selected,
   setSelected,
   displayFields,
   action,
-}) => (
-  <TableRow
-    className={cx(classes.dataItemRow, {
-      selected: selected.indexOf(row.id) > -1,
-    })}
-  >
-    {selectable && (
+}) => {
+  return (
+    <TableRow
+      className={cx(classes.dataItemRow, {
+        selected: selected.map(({ rowIndex }) => rowIndex).includes(i),
+      })}
+    >
+      {selectable && (
+        <TableCell padding="none">
+          <Checkbox
+            checked={selected.map(({ rowIndex }) => rowIndex).includes(i)}
+            onChange={() => setSelected(selected => selected.map(({ rowIndex }) => rowIndex).includes(i) ?
+              selected.filter(({ rowIndex }) => rowIndex !== i)
+              :
+              [...selected, { row, rowIndex: i }])}
+          />
+        </TableCell>
+      )}
       <TableCell padding="none">
-        <Checkbox
-          checked={selected.indexOf(row.id) > -1}
-          onChange={() => setSelected(selected => selected.indexOf(row.id) > -1 ?
-            selected.filter(id => id !== row.id)
-            :
-            [...selected, row.id])}
-        />
+        <DragHandle />
       </TableCell>
-    )}
-    <TableCell padding="none">
-      <DragHandle />
-    </TableCell>
-    {displayFields.map((f, i) => (
-      <TableCell key={`${row.id}${f.key}${i}`}>
-        {row.data[f.key]}
-      </TableCell>
-    ))}
-    {!action ? null : (
-      <TableCell align="right" padding="none">
-        {action}
-      </TableCell>
-    )}
-  </TableRow>
-));
+      {displayFields.map((f, j) => {
+        const children = f.render ?
+          f.render({ row, rowIndex: i, column: f.key, columnIndex: j, })
+          :
+          (row.data || row)[f.key];
+        return (
+          <TableCell {...f.cellProps} key={`${i}${f.key}${j}`}>
+            {children}
+          </TableCell>
+        );
+      })}
+      {!action ? null : (
+        <TableCell align="right" padding="none">
+          {action}
+        </TableCell>
+      )}
+    </TableRow>
+  );
+});
