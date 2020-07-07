@@ -30,6 +30,7 @@ const ScreensList = () => {
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
+              { key: 'type', label: 'Type', },
               { key: 'epicId', label: 'Epic', },
               { key: 'storyId', label: 'Story', },
               { key: 'refId', label: 'Ref', },
