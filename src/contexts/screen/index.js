@@ -2,6 +2,7 @@ import React from 'react';
 import useRouter from '@/utils/useRouter';
 import _getScreen from './_getScreen';
 import _saveScreen from './_saveScreen';
+import defaultForm from './_defaultForm';
 
 export const ScreenContext = React.createContext(null);
 
@@ -21,7 +22,7 @@ export const provideScreenContext = Component => function ScreenContextProvider(
 
   const [state, _setState] = React.useState({
     screenSection: screenSection || 'screens',
-    form: {},
+    form: defaultForm,
   });
   const setState = s => _setState(prev => ({
     ...prev,
@@ -41,7 +42,7 @@ export const provideScreenContext = Component => function ScreenContextProvider(
 
   React.useEffect(() => {
     const screenInitialised = screenId !== 'new' ? true : false;
-    setState({ screenInitialised, screen: null, form: {} });
+    setState({ screenInitialised, screen: null, form: defaultForm });
     if (screenId !== 'new') getScreen({ id: screenId, });
   }, [screenId]);
 

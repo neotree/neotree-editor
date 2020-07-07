@@ -90,7 +90,7 @@ function Properties() {
 
       <div>
         <TextField
-          rows={4}
+          rows={5}
           multiline
           fullWidth
           value={form.contentText || ''}
@@ -103,7 +103,7 @@ function Properties() {
 
       <div>
         <TextField
-          rows={4}
+          rows={5}
           multiline
           fullWidth
           value={form.instructions || ''}
@@ -116,7 +116,7 @@ function Properties() {
 
       <div>
         <TextField
-          rows={4}
+          rows={5}
           multiline
           fullWidth
           value={form.notes || ''}
