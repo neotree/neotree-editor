@@ -39,15 +39,15 @@ export const DataType = {
     VOID: 'void'
 };
 
-export const FieldType = {
-    DATE: 'date',
-    DATETIME: 'datetime',
-    DROPDOWN: 'dropdown',
-    NUMBER: 'number',
-    PERIOD: 'period',
-    TEXT: 'text',
-    TIME: 'time'
-};
+export const FieldTypes = [
+    { name: 'date', label: 'Date' },
+    { name: 'datetime', label: 'Datetime' },
+    { name: 'dropdown', label: 'Dropdown' },
+    { name: 'number', label: 'Number' },
+    { name: 'period', label: 'Period' },
+    { name: 'text', label: 'Text' },
+    { name: 'time', label: 'Time' }
+];
 
 export const ScreenTypes = [
   { name: 'checklist', label: 'Checklist' },

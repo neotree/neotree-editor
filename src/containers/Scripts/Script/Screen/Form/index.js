@@ -9,6 +9,7 @@ import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
 import MetadataItems from './Metadata/Items';
+import MetadataFields from './Metadata/Fields';
 
 function ScreenEditor() {
   const {
@@ -52,6 +53,8 @@ function ScreenEditor() {
           <MetadataItems />
         </>
       )}
+
+      {form.type === 'form' && <MetadataFields />}
     </>
   );
 }

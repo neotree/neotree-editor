@@ -33,7 +33,6 @@ function FlowControl() {
           label="Allow user to skip this screen"
         />
       </div>
-
       <br />
 
       <div>
@@ -48,7 +47,6 @@ function FlowControl() {
           color="textSecondary"
         >Example: <b>($key = true and $key2 = false) or $key3 = 'HD'</b></Typography>
       </div>
-
       <br />
     </>
   );

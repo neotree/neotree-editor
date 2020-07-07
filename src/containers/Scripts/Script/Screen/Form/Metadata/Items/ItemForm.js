@@ -202,7 +202,7 @@ const ItemForm = React.forwardRef(({
 
 ItemForm.propTypes = {
   onClick: PropTypes.func,
-  form: PropTypes.object.isReqired,
+  form: PropTypes.object.isRequired,
   children: PropTypes.node,
   data: PropTypes.object,
   onSave: PropTypes.func.isRequired,
