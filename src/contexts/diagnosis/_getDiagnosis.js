@@ -4,13 +4,13 @@ export default ({ setState }) => function getDiagnosis(payload = {}) {
   setState({ loadingDiagnosis: true });
 
   const done = (e, rslts) => {
-    setState({
+    setState(({ form }) => ({
       initialiseDiagnosisError: e,
       diagnosisInitialised: true,
       loadingDiagnosis: false,
       ...rslts,
-      form: e ? {} : (rslts.diagnosis ? rslts.diagnosis.data : {}),
-    });
+      form: { ...form, ...e ? {} : (rslts.diagnosis ? rslts.diagnosis.data : {}), },
+    }));
   };
 
   api.getDiagnosis(payload)

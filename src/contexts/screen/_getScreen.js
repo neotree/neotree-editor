@@ -4,13 +4,13 @@ export default ({ setState }) => function getScreen(payload = {}) {
   setState({ loadingScreen: true });
 
   const done = (e, rslts) => {
-    setState({
+    setState(({ form }) => ({
       initialiseScreenError: e,
       screenInitialised: true,
       loadingScreen: false,
       ...rslts,
-      form: e ? {} : (rslts.screen ? rslts.screen.data : {}),
-    });
+      form: { ...form, ...e ? {} : (rslts.screen ? rslts.screen.data : {}), },
+    }));
   };
 
   api.getScreen(payload)

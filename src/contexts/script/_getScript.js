@@ -4,13 +4,13 @@ export default ({ setState }) => function getScript(payload = {}) {
   setState({ loadingScript: true });
 
   const done = (e, rslts) => {
-    setState({
+    setState(({ form }) => ({
       initialiseScriptError: e,
       scriptInitialised: true,
       loadingScript: false,
       ...rslts,
-      form: e ? {} : (rslts.script ? rslts.script.data : {}),
-    });
+      form: { ...form, ...e ? {} : (rslts.script ? rslts.script.data : {}), },
+    }));
   };
 
   api.getScript(payload)
