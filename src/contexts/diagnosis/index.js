@@ -49,6 +49,15 @@ export const provideDiagnosisContext = Component => function DiagnosisContextPro
     if (diagnosisId !== 'new') getDiagnosis({ id: diagnosisId, });
   }, [diagnosisId]);
 
+  const { shouldSaveForm } = state;
+
+  React.useEffect(() => {
+    if (shouldSaveForm) {
+      saveDiagnosis({ redirectOnSuccess: false });
+      setState({ shouldSaveForm: false });
+    }
+  }, [shouldSaveForm]);
+
   return (
     <DiagnosisContext.Provider
       value={{
@@ -60,6 +69,10 @@ export const provideDiagnosisContext = Component => function DiagnosisContextPro
         saveDiagnosis,
         canSaveDiagnosis: () => state.form.name && !state.savingDiagnosis,
         isFormReady: () => script && ((diagnosisId === 'new') || !!state.diagnosis),
+        setFormAndSave: f => {
+          setForm(f);
+          setState({ shouldSaveForm: true });
+        },
       }}
     >
       <Component {...props} />

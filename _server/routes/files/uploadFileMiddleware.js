@@ -31,7 +31,7 @@ module.exports = (router, app) => {
         File.findOne({
           where: { id: fileId },
           attributes: ['id', 'filename', 'content_type', 'size', 'createdAt', 'updatedAt']
-        }).then(({ file }) => done(null, file))
+        }).then(f => done(null, f))
           .catch(done);
       })
       .catch(done);

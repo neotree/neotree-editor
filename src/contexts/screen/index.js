@@ -49,6 +49,15 @@ export const provideScreenContext = Component => function ScreenContextProvider(
     if (screenId !== 'new') getScreen({ id: screenId, });
   }, [screenId]);
 
+  const { shouldSaveForm } = state;
+
+  React.useEffect(() => {
+    if (shouldSaveForm) {
+      saveScreen({ redirectOnSuccess: false });
+      setState({ shouldSaveForm: false });
+    }
+  }, [shouldSaveForm]);
+
   return (
     <ScreenContext.Provider
       value={{
@@ -60,6 +69,10 @@ export const provideScreenContext = Component => function ScreenContextProvider(
         saveScreen,
         canSaveScreen: () => state.form.title && !state.savingScreen,
         isFormReady: () => script && ((screenId === 'new') || !!state.screen),
+        setFormAndSave: f => {
+          setForm(f);
+          setState({ shouldSaveForm: true });
+        },
       }}
     >
       <Component {...props} />

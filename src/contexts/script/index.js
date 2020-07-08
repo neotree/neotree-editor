@@ -45,6 +45,15 @@ export const provideScriptContext = Component => function ScriptContextProvider(
     if (scriptId !== 'new') getScript({ id: scriptId, });
   }, [scriptId]);
 
+  const { shouldSaveForm } = state;
+
+  React.useEffect(() => {
+    if (shouldSaveForm) {
+      saveScript({ redirectOnSuccess: false });
+      setState({ shouldSaveForm: false });
+    }
+  }, [shouldSaveForm]);
+
   return (
     <ScriptContext.Provider
       value={{
@@ -56,6 +65,10 @@ export const provideScriptContext = Component => function ScriptContextProvider(
         saveScript,
         canSaveScript: () => state.form.title && !state.savingScript,
         isFormReady: () => (scriptId === 'new') || !!state.script,
+        setFormAndSave: f => {
+          setForm(f);
+          setState({ shouldSaveForm: true });
+        },
       }}
     >
       <Component {...props} />

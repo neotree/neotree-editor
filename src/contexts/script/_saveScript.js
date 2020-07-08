@@ -5,7 +5,10 @@ export default ({
   setState,
   router: { history, match: { params: { scriptId } } },
   state: { script, form, },
-}) => function saveScript(payload = {}) {
+}) => function saveScript(_payload = {}) {
+  const { redirectOnSuccess, ...payload } = _payload;
+  const shdRedirect = redirectOnSuccess !== false;
+
   setState({ savingScript: true });
 
   const done = (e, rslts) => {
@@ -22,7 +25,7 @@ export default ({
 
   save({ script_id: scriptId, type: form.type, ...script, data })
     .then(rslts => {
-      if (rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.id}`}`);
+      if (shdRedirect && rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.id}`}`);
       done(rslts.errors, rslts);
     })
     .catch(done);

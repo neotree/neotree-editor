@@ -6,6 +6,7 @@ import CardActions from '@material-ui/core/CardActions';
 import Button from '@material-ui/core/Button';
 import Collapse from '@material-ui/core/Collapse';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
+import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
@@ -16,11 +17,17 @@ function ScreenEditor() {
   const {
     canSaveScreen,
     saveScreen,
+    setFormAndSave,
     state: { screen, form },
   } = useScreenContext();
 
   return (
     <>
+      <UploadFilesPrompt 
+        data={form.metadata}
+        save={files => setFormAndSave(f => ({ metadata: { ...f.metadata, ...files } }))}
+      />
+
       <Card>
         <CardContent>
           <TitleWithBackArrow title={`${screen ? 'Edit' : 'Add'} screen`} />

@@ -7,6 +7,7 @@ import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import TitleTextImageForm from '@/components/TitleTextImageForm';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
+import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import Symptoms from './Symptoms';
 
 function DiagnosisEditor() {
@@ -14,11 +15,17 @@ function DiagnosisEditor() {
     canSaveDiagnosis,
     saveDiagnosis,
     setForm,
+    setFormAndSave,
     state: { diagnosis, form },
   } = useDiagnosisContext();
 
   return (
     <>
+        <UploadFilesPrompt 
+          data={form.metadata}
+          save={files => setFormAndSave({ ...files })}
+        />
+
       <Card>
         <CardContent>
           <TitleWithBackArrow title={`${diagnosis ? 'Edit' : 'Add'} diagnosis`} />

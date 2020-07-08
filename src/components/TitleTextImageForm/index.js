@@ -5,6 +5,7 @@ import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import Typography from '@material-ui/core/Typography';
 import Grid from '@material-ui/core/Grid';
+import FileIput from '@/components/FileInput';
 
 function TitleTextImageForm({ labels, value, onChange, noTitle }) {
   value = { text: '', title: '', image: null, ...value };
@@ -67,12 +68,17 @@ function TitleTextImageForm({ labels, value, onChange, noTitle }) {
               sm={6}
               style={{ textAlign: 'center' }}
             >
-              <Fab
-                size="small"
-                color="secondary"
-              >
-                <AddIcon fontSize="small" />
-              </Fab>
+                <FileIput
+                  accept="image/*"
+                  onUploadSuccess={files => onChange({ image: files[0] })}
+                >
+                  <Fab
+                    size="small"
+                    color="secondary"
+                  >
+                    <AddIcon fontSize="small" />
+                  </Fab>
+                </FileIput>              
             </Grid>
 
             <Grid

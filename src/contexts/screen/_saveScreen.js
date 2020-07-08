@@ -5,7 +5,10 @@ export default ({
   setState,
   router: { history, match: { params: { scriptId } } },
   state: { screen, form, },
-}) => function saveScreen(payload = {}) {
+}) => function saveScreen(_payload = {}) {
+  const { redirectOnSuccess, ...payload } = _payload;
+  const shdRedirect = redirectOnSuccess !== false;
+
   setState({ savingScreen: true });
 
   const done = (e, rslts) => {
@@ -22,7 +25,7 @@ export default ({
 
   save({ script_id: scriptId, type: form.type, ...screen, data })
     .then(rslts => {
-      if (rslts.screen) history.push(`/scripts/${scriptId}${screen ? '' : `/screens/${rslts.screen.id}`}`);
+      if (shdRedirect && rslts.screen) history.push(`/scripts/${scriptId}${screen ? '' : `/screens/${rslts.screen.id}`}`);
       done(rslts.errors, rslts);
     })
     .catch(done);

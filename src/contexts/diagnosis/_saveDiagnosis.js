@@ -5,7 +5,10 @@ export default ({
   setState,
   router: { history, match: { params: { scriptId } } },
   state: { diagnosis, form, },
-}) => function saveDiagnosis(payload = {}) {
+}) => function saveDiagnosis(_payload = {}) {
+  const { redirectOnSuccess, ...payload } = _payload;
+  const shdRedirect = redirectOnSuccess !== false;
+
   setState({ savingDiagnosis: true });
 
   const done = (e, rslts) => {
@@ -22,7 +25,7 @@ export default ({
 
   save({ script_id: scriptId, ...diagnosis, data })
     .then(rslts => {
-      if (rslts.diagnosis) history.push(`/scripts/${scriptId}${diagnosis ? '' : `/diagnoses/${rslts.diagnosis.id}`}`);
+      if (shdRedirect && rslts.diagnosis) history.push(`/scripts/${scriptId}${diagnosis ? '' : `/diagnoses/${rslts.diagnosis.id}`}`);
       done(rslts.errors, rslts);
     })
     .catch(done);
