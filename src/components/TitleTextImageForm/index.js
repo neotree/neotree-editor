@@ -6,7 +6,7 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import Typography from '@material-ui/core/Typography';
 import Grid from '@material-ui/core/Grid';
 
-function TitleTextImageForm({ labels, value, onChange }) {
+function TitleTextImageForm({ labels, value, onChange, noTitle }) {
   value = { text: '', title: '', image: null, ...value };
   labels = { text: 'Text', title: 'Title', image: 'Image', ...labels };
   const _onChange = v => onChange({ ...value, ...v });
@@ -14,14 +14,16 @@ function TitleTextImageForm({ labels, value, onChange }) {
   return (
     <>
       <Grid container spacing={1}>
-        <Grid item xs={12} sm={12}>
-          <TextField
-            fullWidth
-            value={value.title || ''}
-            label={labels.title}
-            onChange={e => _onChange({ title: e.target.value })}
-          />
-        </Grid>
+        {!noTitle && (
+          <Grid item xs={12} sm={12}>
+            <TextField
+              fullWidth
+              value={value.title || ''}
+              label={labels.title}
+              onChange={e => _onChange({ title: e.target.value })}
+            />
+          </Grid>
+        )}
 
         <Grid item xs={10} sm={10}>
           <TextField

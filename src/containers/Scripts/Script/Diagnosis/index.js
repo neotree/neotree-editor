@@ -1,22 +1,22 @@
 import React from 'react';
-import { provideScreenContext, useScreenContext } from '@/contexts/screen';
+import { provideDiagnosisContext, useDiagnosisContext } from '@/contexts/diagnosis';
 import { useScriptContext } from '@/contexts/script';
-import screensCopy from '@/constants/copy/screens';
+import diagnosesCopy from '@/constants/copy/diagnoses';
 import scritpsCopy from '@/constants/copy/scripts';
 import { setHeaderTitle } from '@/components/Layout';
 import { setDocumentTitle } from '@/contexts/app';
 import OverlayLoader from '@/components/OverlayLoader';
 import Form from './Form';
 
-function Screen() {
+function Diagnosis() {
   const { state: { script } } = useScriptContext();
-  const { isFormReady, state: { screen, loadingScreen, savingScreen, } } = useScreenContext();
+  const { isFormReady, state: { diagnosis, loadingDiagnosis, savingDiagnosis, } } = useDiagnosisContext();
 
   const titleChunks = !script ? [] : [
     scritpsCopy.PAGE_TITLE,
     script.data.title,
-    screensCopy.PAGE_TITLE,
-    screen ? screen.data.title : loadingScreen ? '' : 'New screen',
+    diagnosesCopy.PAGE_TITLE,
+    diagnosis ? diagnosis.data.title : loadingDiagnosis ? '' : 'New diagnosis',
   ].filter(c => c);
 
   setDocumentTitle(titleChunks.join(' > '));
@@ -27,9 +27,9 @@ function Screen() {
   return (
     <>
       <Form />
-      {(loadingScreen && savingScreen) ? <OverlayLoader /> : null}
+      {(loadingDiagnosis && savingDiagnosis) ? <OverlayLoader /> : null}
     </>
   );
 }
 
-export default provideScreenContext(Screen);
+export default provideDiagnosisContext(Diagnosis);

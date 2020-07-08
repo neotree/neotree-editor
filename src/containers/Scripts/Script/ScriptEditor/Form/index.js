@@ -5,19 +5,23 @@ import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
 import TextField from '@material-ui/core/TextField';
 import Button from '@material-ui/core/Button';
+import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 
 function ScriptEditor() {
   const {
     canSaveScript,
     setForm,
     saveScript,
-    state: { form },
+    state: { script, form },
   } = useScriptContext();
 
   return (
     <>
       <Card>
         <CardContent>
+          <TitleWithBackArrow title={`${script ? 'Edit' : 'Add'} script`} />
+          <br /><br />
+
           <div>
             <TextField
               fullWidth

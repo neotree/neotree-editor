@@ -21,7 +21,7 @@ function Actions({ selected }) {
         </>
       )}
 
-      <Link to={`/scripts/${script.id}/screens/new`}>
+      <Link to={`/scripts/${script.id}/diagnoses/new`}>
         <IconButton>
           <AddIcon />
         </IconButton>

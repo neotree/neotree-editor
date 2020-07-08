@@ -8,10 +8,12 @@ import Items from './Items';
 import Form from './Form';
 
 function ScriptEditor() {
-  const { state: { script, loadingScript, savingScript } } = useScriptContext();
+  const { isFormReady, state: { script, loadingScript, savingScript } } = useScriptContext();
 
   setDocumentTitle(`${copy.PAGE_TITLE}${script ? `: ${script.data.title}` : ''}`);
   setHeaderTitle(`${copy.PAGE_TITLE}${script ? ` / ${script.data.title}` : ` / ${loadingScript ? '' : 'New script'}`}`);
+
+  if (!isFormReady()) return <OverlayLoader />;
 
   return (
     <>

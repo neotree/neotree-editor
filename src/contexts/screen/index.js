@@ -1,4 +1,5 @@
 import React from 'react';
+import { useScriptContext } from '@/contexts/script';
 import useRouter from '@/utils/useRouter';
 import _getScreen from './_getScreen';
 import _saveScreen from './_saveScreen';
@@ -17,8 +18,10 @@ export const setDocumentTitle = (t = '') => {
 };
 
 export const provideScreenContext = Component => function ScreenContextProvider(props) {
+  const { state: { script } } = useScriptContext();
+
   const router = useRouter();
-  const { scriptItemId: screenId, screenSection } = router.match.params;
+  const { screenId, screenSection } = router.match.params;
 
   const [state, _setState] = React.useState({
     screenSection: screenSection || 'screens',
@@ -56,6 +59,7 @@ export const provideScreenContext = Component => function ScreenContextProvider(
         setForm,
         saveScreen,
         canSaveScreen: () => state.form.title && !state.savingScreen,
+        isFormReady: () => script && ((screenId === 'new') || !!state.screen),
       }}
     >
       <Component {...props} />

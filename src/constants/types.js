@@ -61,7 +61,7 @@ export const ScreenTypes = [
   { name: 'yesno', label: 'Yes/No' },
 ];
 
-export const SymptomType = {
-    SIGN: 'sign',
-    RISK: 'risk'
-};
+export const SymptomTypes = [
+  { name: 'risk', label: 'Risk factor', },
+  { name: 'sign', label: 'Sign/Symptom', },
+];

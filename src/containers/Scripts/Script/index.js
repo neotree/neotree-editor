@@ -5,6 +5,7 @@ import LazyPage from '@/components/LazyPage';
 
 const ScriptEditor = LazyPage(() => import('./ScriptEditor'));
 const Screen = LazyPage(() => import('./Screen'));
+const Diagnosis = LazyPage(() => import('./Diagnosis'));
 
 function Script() {
   return (
@@ -24,9 +25,16 @@ function Script() {
 
         <Route
           exact
-          path="/scripts/:scriptId/:scriptSection/:scriptItemId"
+          path="/scripts/:scriptId/screens/:screenId"
           component={Screen}
         />
+
+        <Route
+          exact
+          path="/scripts/:scriptId/diagnoses/:diagnosisId"
+          component={Diagnosis}
+        />
+
         <Route
           path="*"
           render={() => <Redirect to="" />}

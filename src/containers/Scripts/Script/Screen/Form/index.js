@@ -5,6 +5,7 @@ import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
 import Button from '@material-ui/core/Button';
 import Collapse from '@material-ui/core/Collapse';
+import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
@@ -15,13 +16,16 @@ function ScreenEditor() {
   const {
     canSaveScreen,
     saveScreen,
-    state: { form },
+    state: { screen, form },
   } = useScreenContext();
 
   return (
     <>
       <Card>
         <CardContent>
+          <TitleWithBackArrow title={`${screen ? 'Edit' : 'Add'} screen`} />
+          <br /><br />
+
           <ScreenType />
 
           <Collapse in={!!form.type}>

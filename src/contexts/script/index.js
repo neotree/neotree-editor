@@ -55,6 +55,7 @@ export const provideScriptContext = Component => function ScriptContextProvider(
         setForm,
         saveScript,
         canSaveScript: () => state.form.title && !state.savingScript,
+        isFormReady: () => (scriptId === 'new') || !!state.script,
       }}
     >
       <Component {...props} />
