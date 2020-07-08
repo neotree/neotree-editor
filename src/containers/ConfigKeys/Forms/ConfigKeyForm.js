@@ -22,13 +22,16 @@ const ConfigKeyForm = React.forwardRef(({
   const [formError, setFormError] = React.useState(null);
   const [saveError, setSaveError] = React.useState(null);
 
-  const [form, _setForm] = React.useState(configKey ? configKey.data : {});
+  const defaultForm = { ...configKey ? configKey.data : {} };
+  const [form, _setForm] = React.useState(defaultForm);
   const setForm = s => _setForm(prev => ({
     ...prev,
     ...typeof s === 'function' ? s(prev) : s
   }));
 
   React.useEffect(() => { if (configKey) setForm(configKey.data); }, [configKey]);
+
+  React.useEffect(() => { setForm(defaultForm); }, [open]);
 
   React.useEffect(() => {
     let e = null;

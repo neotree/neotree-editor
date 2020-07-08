@@ -26,7 +26,7 @@ const FieldForm = React.forwardRef(({
 }, ref) => {
   const [open, setOpen] = React.useState(false);
 
-  const [form, _setForm] = React.useState({
+  const defaultForm = {
     calculation: null,
     condition: null,
     confidential: false,
@@ -41,12 +41,14 @@ const FieldForm = React.forwardRef(({
     values: null,
     optional: false,
     ...data,
-  });
-
+  };
+  const [form, _setForm] = React.useState(defaultForm);
   const setForm = s => _setForm(prev => ({
     ...prev,
     ...typeof s === 'function' ? s(prev) : s
   }));
+
+  React.useEffect(() => { setForm(defaultForm); }, [open]);
 
   return (
     <>
