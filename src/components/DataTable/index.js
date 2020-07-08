@@ -64,7 +64,7 @@ function DataTable({
       <Paper>
         <div className={cx(classes.headerWrap)}>
           <div className={cx(classes.header)}>
-            <Typography variant="h5">{title}</Typography>
+            <Typography variant="h6">{title}</Typography>
             <div style={{ marginLeft: 'auto' }} />
             {renderHeaderActions && renderHeaderActions({ selected })}
           </div>
