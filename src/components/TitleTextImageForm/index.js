@@ -14,18 +14,21 @@ function TitleTextImageForm({ labels, value, onChange, noTitle }) {
 
   return (
     <>
-      <Grid container spacing={1}>
-        {!noTitle && (
-          <Grid item xs={12} sm={12}>
-            <TextField
-              fullWidth
-              value={value.title || ''}
-              label={labels.title}
-              onChange={e => _onChange({ title: e.target.value })}
-            />
-          </Grid>
+      {!noTitle && (
+          <>
+            <div>
+              <TextField
+                fullWidth
+                value={value.title || ''}
+                label={labels.title}
+                onChange={e => _onChange({ title: e.target.value })}
+              />
+            </div>
+            <br />
+          </>
         )}
-
+        
+      <Grid container spacing={1} alignItems="flex-end">      
         <Grid item xs={10} sm={10}>
           <TextField
             fullWidth
@@ -51,7 +54,7 @@ function TitleTextImageForm({ labels, value, onChange, noTitle }) {
               <img
                 role="presentation"
                 src={value.image.data}
-                style={{ width: 'auto', height: 100 }}
+                style={{ width: 100, height: 'auto' }}
               />
             ) : (
               <div stype={{ padding: 20 }}>
@@ -97,6 +100,7 @@ function TitleTextImageForm({ labels, value, onChange, noTitle }) {
           </Grid>
         </Grid>
       </Grid>
+      <br /><br />
     </>
   );
 }
