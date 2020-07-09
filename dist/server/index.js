@@ -14,10 +14,6 @@ var _models = require("./models");
 
 var _server = _interopRequireDefault(require("../config/server"));
 
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
-
 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
   var sequelize, app, httpServer, session, SequelizeStore, sessStore, webpackConfig, compiler;
   return _regenerator["default"].wrap(function _callee$(_context) {
@@ -91,7 +87,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
           app = require('./middlewares')(app);
           app.use(require('./routes')(app));
-          app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../assets')));
+          app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src')));
+          app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../assets')));
           app.get('*', function (req, res) {
             res.sendFile(_path["default"].resolve(__dirname, '../src/index.html'));
           });
@@ -100,7 +97,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
             app.logger.log("Server started on port ".concat(_server["default"].port));
           });
 
-        case 22:
+        case 23:
         case "end":
           return _context.stop();
       }

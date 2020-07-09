@@ -62,7 +62,8 @@ import config from '../config/server';
 
   app.use(require('./routes')(app));
 
-  app.use(express.static(path.resolve(__dirname, '../assets')));
+  app.use(express.static(path.resolve(__dirname, '../src')));
+  app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
 
   app.get('*', (req, res) => {
     res.sendFile(path.resolve(__dirname, '../src/index.html'));

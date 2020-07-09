@@ -17,15 +17,6 @@ var _sequelize = _interopRequireDefault(require("sequelize"));
 
 var _server = _interopRequireDefault(require("../../config/server"));
 
-(function () {
-  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
-  enterModule && enterModule(module);
-})();
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
-
 var dbConfig = _server["default"].database;
 var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.database, process.env.DATABASE_USERNAME || dbConfig.username, process.env.DATABASE_PASSWORD || dbConfig.password, {
   host: dbConfig.host || 'localhost',
@@ -33,25 +24,4 @@ var sequelize = new _sequelize["default"](process.env.DATABASE_NAME || dbConfig.
   logging: false
 });
 var _default = sequelize;
-var _default2 = _default;
-exports["default"] = _default2;
-;
-
-(function () {
-  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
-  if (!reactHotLoader) {
-    return;
-  }
-
-  reactHotLoader.register(dbConfig, "dbConfig", "/home/farai/WorkBench/neotree-editor/server/models/sequelize.js");
-  reactHotLoader.register(sequelize, "sequelize", "/home/farai/WorkBench/neotree-editor/server/models/sequelize.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/models/sequelize.js");
-})();
-
-;
-
-(function () {
-  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
-  leaveModule && leaveModule(module);
-})();
+exports["default"] = _default;

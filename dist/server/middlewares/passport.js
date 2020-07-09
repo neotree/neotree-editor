@@ -8,15 +8,6 @@ var _bcryptjs = _interopRequireDefault(require("bcryptjs"));
 
 var _models = require("../models");
 
-(function () {
-  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
-  enterModule && enterModule(module);
-})();
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
-
 var LocalStrategy = require('passport-local').Strategy;
 
 module.exports = function (app) {
@@ -89,22 +80,3 @@ module.exports = function (app) {
   app.passport = _passport["default"];
   return app;
 };
-
-;
-
-(function () {
-  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
-  if (!reactHotLoader) {
-    return;
-  }
-
-  reactHotLoader.register(LocalStrategy, "LocalStrategy", "/home/farai/WorkBench/neotree-editor/server/middlewares/passport.js");
-})();
-
-;
-
-(function () {
-  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
-  leaveModule && leaveModule(module);
-})();
