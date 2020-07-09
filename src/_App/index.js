@@ -26,9 +26,9 @@ export class App extends React.Component {
     socket.on('update_diagnoses', onSocket);
     socket.on('delete_diagnoses', onSocket);
     socket.on('create_diagnoses', onSocket);
-    socket.on('update_config_keys', onSocket);
-    socket.on('delete_config_keys', onSocket);
-    socket.on('create_config_keys', onSocket);
+    socket.on('updateconfig_keys', onSocket);
+    socket.on('deleteconfig_keys', onSocket);
+    socket.on('createconfig_keys', onSocket);
   }
 
   render() {

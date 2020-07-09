@@ -20,8 +20,8 @@ module.exports = {
         test: /\.js$/,
         include: [
           path.resolve(__dirname, 'src'),
-          path.resolve(__dirname, '_config'),
-          path.resolve(__dirname, '_utils')
+          path.resolve(__dirname, 'config'),
+          path.resolve(__dirname, 'utils')
         ],
         use: [{ loader: 'babel-loader' }]
       },

@@ -2,8 +2,8 @@ node_modules/
 *.log
 npm-debug.*
 
-_config/*
-!_config/server.js
+config/*
+!config/server.js
 
-dist/_config/*
-!dist/_config/server.js
+dist/config/*
+!dist/config/server.js
