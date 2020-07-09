@@ -2,17 +2,17 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import OverlayLoader from '@/components/OverlayLoader';
-import * as api from '@/api/scripts';
+import * as api from '@/api/screens';
 import getErrorMessage from '@/utils/getErrorMessage';
-import { useScriptsContext } from '@/contexts/scripts';
+import { useScreensContext } from '@/contexts/screens';
 
-const DuplicateScripts = React.forwardRef(({
+const DuplicateScreens = React.forwardRef(({
   children,
   onClick,
   ids,
   ...props
 }, ref) => {
-  const { setState: setScriptsState } = useScriptsContext();
+  const { setState: setScreensState } = useScreensContext();
   const [loading, setLoading] = React.useState(false);
 
   return (
@@ -22,19 +22,19 @@ const DuplicateScripts = React.forwardRef(({
         ref={ref}
         onClick={e => {
           setLoading(true);
-          api.duplicateScript({ id: ids[0] })
+          api.duplicateScreen({ id: ids[0] })
             .catch(e => {
               setLoading(false);
               alert(getErrorMessage(e));
             })
-            .then(({ script }) => {
+            .then(({ screen }) => {
               setLoading(false);
-              setScriptsState(({ scripts }) => ({
-                scripts: scripts.reduce((acc, s) => {
+              setScreensState(({ screens }) => ({
+                screens: screens.reduce((acc, s) => {
                   return [
                     ...acc,
                     s,
-                    ...ids.includes(s.id) ? [script] : [],
+                    ...ids.includes(s.id) ? [screen] : [],
                   ];
                 }, []),
               }));
@@ -50,10 +50,10 @@ const DuplicateScripts = React.forwardRef(({
   );
 });
 
-DuplicateScripts.propTypes = {
+DuplicateScreens.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
   ids: PropTypes.array.isRequired,
 };
 
-export default DuplicateScripts;
+export default DuplicateScreens;

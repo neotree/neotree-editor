@@ -53,5 +53,11 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/duplicate-diagnosis',
+    require('./duplicateDiagnosisMiddleware').default(app),
+    responseMiddleware
+  );
+
   return router;
 };

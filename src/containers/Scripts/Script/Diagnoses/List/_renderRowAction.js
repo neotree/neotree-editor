@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 
 import DeleteDiagnoses from '../Forms/DeleteDiagnoses';
 import CopyDiagnoses from '../Forms/CopyDiagnoses';
+// import DuplicateScreens from '../Forms/DuplicateDiagnoses';
 
 function Action({ row, }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -37,6 +38,12 @@ function Action({ row, }) {
           ids={[row.id]}
           component={CopyDiagnoses}
         >Copy</MenuItem>
+
+        {/* <MenuItem
+          onClick={handleClose}
+          ids={[row.id]}
+          component={DuplicateScreens}
+        >Duplicate</MenuItem> */}
 
         <MenuItem
           onClick={handleClose}

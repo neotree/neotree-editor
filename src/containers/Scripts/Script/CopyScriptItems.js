@@ -102,7 +102,7 @@ const CopyScriptItems = React.forwardRef(({
               <Button
                   disabled={copying}
                   onClick={() => setOpen(false)}
-                >Cancel</Button>
+              >Cancel</Button>
 
               <Button
                 color="primary"
@@ -179,7 +179,7 @@ CopyScriptItems.propTypes = {
   children: PropTypes.node,
   ids: PropTypes.array.isRequired,
   onSuccess: PropTypes.func,
-  type: PropTypes.oneOfType(['screen', 'diagnosis']).isRequired,
+  type: PropTypes.oneOf(['screen', 'diagnosis']).isRequired,
 };
 
 export default CopyScriptItems;

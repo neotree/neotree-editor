@@ -53,5 +53,11 @@ module.exports = app => {
     responseMiddleware
   );
 
+  router.post(
+    '/duplicate-screen',
+    require('./duplicateScreenMiddleware').default(app),
+    responseMiddleware
+  );
+
   return router;
 };
