@@ -1,44 +1,26 @@
 import React from 'react';
-import PropTypes from 'prop-types';
-import useConfirmModal from '@/utils/useConfirmModal';
 import { useScreensContext } from '@/contexts/screens';
+import { useScriptContext } from '@/contexts/script';
+import CopyScriptItems from '../../CopyScriptItems';
 
-const CopyScreens = React.forwardRef(({
-  children,
-  ids,
-  onClick,
-  ...props
-}, ref) => {
-  const copyMultiple = ids.length > 1;
-  const { copyScreens } = useScreensContext();
-  const [renderConfirmModal, confirm] = useConfirmModal();
-
+const CopyScreens = React.forwardRef((props, ref) => {
+  const { state: { script } } = useScriptContext();
+  const { setState: setScreensState } = useScreensContext();
+  
   return (
     <>
-      <div
+      <CopyScriptItems
         {...props}
         ref={ref}
-        onClick={e => {
-          confirm();
-          if (onClick) onClick(e);
+        type="screen"
+        onSuccess={(items, script_id) => {
+          if (script_id === script.id) {
+            setScreensState(s => ({ screens: [...s.screens, ...items] }));
+          }
         }}
-      >
-        {children}
-      </div>
-
-      {renderConfirmModal({
-        title: `Copy screen${copyMultiple ? 's' : ''}`,
-        message: `Are you sure you want to copy screen${copyMultiple ? 's' : ''}?`,
-        onConfirm: () => copyScreens(ids),
-      })}
+      />
     </>
   );
 });
-
-CopyScreens.propTypes = {
-  onClick: PropTypes.func,
-  children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
-};
 
 export default CopyScreens;

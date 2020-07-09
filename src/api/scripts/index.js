@@ -54,3 +54,20 @@ export const createScript = (reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const copyScreens = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/copy-screens', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};
+
+
+export const copyDiagnoses = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/copy-diagnoses', {
+    method: 'POST',
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

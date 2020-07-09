@@ -15,8 +15,10 @@ function Actions({ selected }) {
     <>
       {selected.length > 0 && (
         <>
-          <CopyScreens ids={selected}>
-            <Button>Duplicate</Button>
+          <CopyScreens 
+            ids={selected.map(({ row }) => row.id)}
+          >
+            <Button>Copy</Button>
           </CopyScreens>
         </>
       )}

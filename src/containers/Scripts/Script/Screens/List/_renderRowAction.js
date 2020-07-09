@@ -8,7 +8,7 @@ import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
 
 import DeleteScreens from '../Forms/DeleteScreens';
-import DuplicateScreens from '../Forms/DuplicateScreens';
+import CopyScreens from '../Forms/CopyScreens';
 
 function Action({ row, }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -35,8 +35,8 @@ function Action({ row, }) {
         <MenuItem
           onClick={handleClose}
           ids={[row.id]}
-          component={DuplicateScreens}
-        >Duplicate</MenuItem>
+          component={CopyScreens}
+        >Copy</MenuItem>
 
         <MenuItem
           onClick={handleClose}

@@ -1,44 +1,26 @@
 import React from 'react';
-import PropTypes from 'prop-types';
-import useConfirmModal from '@/utils/useConfirmModal';
 import { useDiagnosesContext } from '@/contexts/diagnoses';
+import { useScriptContext } from '@/contexts/script';
+import CopyScriptItems from '../../CopyScriptItems';
 
-const CopyDiagnoses = React.forwardRef(({
-  children,
-  ids,
-  onClick,
-  ...props
-}, ref) => {
-  const copyMultiple = ids.length > 1;
-  const { copyDiagnoses } = useDiagnosesContext();
-  const [renderConfirmModal, confirm] = useConfirmModal();
-
+const CopyDiagnoses = React.forwardRef((props, ref) => {
+  const { state: { script } } = useScriptContext();
+  const { setState: setDiagnosesState } = useDiagnosesContext();
+  
   return (
     <>
-      <div
+      <CopyScriptItems
         {...props}
         ref={ref}
-        onClick={e => {
-          confirm();
-          if (onClick) onClick(e);
+        type="diagnosis"
+        onSuccess={(items, script_id) => {
+          if (script_id === script.id) {
+            setDiagnosesState(s => ({ diagnoses: [...s.diagnoses, ...items] }));
+          }
         }}
-      >
-        {children}
-      </div>
-
-      {renderConfirmModal({
-        title: `Copy diagnosis${copyMultiple ? 's' : ''}`,
-        message: `Are you sure you want to copy diagnosis${copyMultiple ? 's' : ''}?`,
-        onConfirm: () => copyDiagnoses(ids),
-      })}
+      />
     </>
   );
 });
-
-CopyDiagnoses.propTypes = {
-  onClick: PropTypes.func,
-  children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
-};
 
 export default CopyDiagnoses;
