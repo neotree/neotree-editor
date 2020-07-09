@@ -25,6 +25,7 @@ module.exports = function (app) {
   router.post('/update-screen', require('./updateScreenMiddleware')(app), responseMiddleware);
   router.post('/update-screens', require('./updateScreensMiddleware')["default"](app), responseMiddleware);
   router.post('/delete-screen', require('./deleteScreenMiddleware')(app), responseMiddleware);
+  router.post('/duplicate-screen', require('./duplicateScreenMiddleware')["default"](app), responseMiddleware);
   return router;
 };
 
