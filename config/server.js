@@ -1,4 +1,4 @@
-let serverType = process.env.NEOTREEserver_TYPE || '';
+let serverType = process.env.NEOTREE_SERVER_TYPE || '';
 
 if (serverType) serverType = `${serverType.toUpperCase()}_`;
 

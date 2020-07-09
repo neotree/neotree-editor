@@ -17,7 +17,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var serverType = process.env.NEOTREEserver_TYPE || '';
+var serverType = process.env.NEOTREE_SERVER_TYPE || '';
 if (serverType) serverType = "".concat(serverType.toUpperCase(), "_");
 var firebaseConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITOR_FIREBASEconfig_FILE");
 var serverConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITORconfig_FILE");
