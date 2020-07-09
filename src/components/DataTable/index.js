@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import TableContainer from '@material-ui/core/TableContainer';
 import TableRow from '@material-ui/core/TableRow';
 import TableCell from '@material-ui/core/TableCell';
 import Paper from '@material-ui/core/Paper';
@@ -61,7 +62,7 @@ function DataTable({
 
   return (
     <>
-      <Paper>
+      <Paper square elevation={0}>
         <div className={cx(classes.headerWrap)}>
           <div className={cx(classes.header)}>
             <Typography variant="h6">{title}</Typography>
@@ -77,52 +78,54 @@ function DataTable({
             <Typography color="textSecondary">{noDataMsg || 'No data'}</Typography>
           </div>
         ) : (
-          <Table className={cx(classes.table)}>
-            <TableHead>
-              <TableRow>
-                {selectable && (
-                  <TableCell padding="none">
-                    <Checkbox
-                      indeterminate={selected.length > 0 && selected.length < data.length}
-                      checked={data.length > 0 && selected.length === data.length}
-                      onChange={() => setSelected(selected =>
-                        selected.length < data.length ? data.map((r, i) => ({ row: r, rowIndex: i })) : [])}
-                    />
-                  </TableCell>
-                )}
-                <TableCell />
-                {displayFields.map((f, i) => (
-                  <TableCell {...f.cellProps} key={`${f.key}${i}`}>
-                    <b>{f.label}</b>
-                  </TableCell>
-                ))}
-                {!renderRowAction ? null : (
-                  <TableCell align="right">
-                    <b>Action</b>
-                  </TableCell>
-                )}
-              </TableRow>
-            </TableHead>
+          <TableContainer component={Paper}>
+            <Table className={cx(classes.table)}>
+              <TableHead>
+                <TableRow>
+                  {selectable && (
+                    <TableCell padding="none">
+                      <Checkbox
+                        indeterminate={selected.length > 0 && selected.length < data.length}
+                        checked={data.length > 0 && selected.length === data.length}
+                        onChange={() => setSelected(selected =>
+                          selected.length < data.length ? data.map((r, i) => ({ row: r, rowIndex: i })) : [])}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell />
+                  {displayFields.map((f, i) => (
+                    <TableCell {...f.cellProps} key={`${f.key}${i}`}>
+                      <b>{f.label}</b>
+                    </TableCell>
+                  ))}
+                  {!renderRowAction ? null : (
+                    <TableCell align="right">
+                      <b>Action</b>
+                    </TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
 
-            <Body
-              rows={data}
-              selectable={selectable}
-              renderRowAction={renderRowAction}
-              classes={classes}
-              displayFields={displayFields}
-              selected={selected}
-              setSelected={setSelected}
-              useDragHandle
-              onSortEnd={({ oldIndex, newIndex }) => setData(data =>
-                update(data, {
-                  $splice: [
-                    [oldIndex, 1],
-                    [newIndex, 0, data[oldIndex]],
-                  ],
-                })
-              )}
-            />
-          </Table>
+              <Body
+                rows={data}
+                selectable={selectable}
+                renderRowAction={renderRowAction}
+                classes={classes}
+                displayFields={displayFields}
+                selected={selected}
+                setSelected={setSelected}
+                useDragHandle
+                onSortEnd={({ oldIndex, newIndex }) => setData(data =>
+                  update(data, {
+                    $splice: [
+                      [oldIndex, 1],
+                      [newIndex, 0, data[oldIndex]],
+                    ],
+                  })
+                )}
+              />
+            </Table>
+          </TableContainer>
         )}
       </Paper>
     </>
