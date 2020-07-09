@@ -1,7 +1,7 @@
 import React from 'react';
 import copy from '@/constants/copy/settings';
 import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle } from '@/contexts/app';
+import { setDocumentTitle, setNavSection } from '@/contexts/app';
 import LazyComponent from '@/components/LazyComponent';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
@@ -20,7 +20,8 @@ const sections = [
 const SettingsPage = () => {
   setDocumentTitle(copy.PAGE_TITLE);
   setHeaderTitle(copy.PAGE_TITLE);
-
+  setNavSection('settings');
+  
   const history = useHistory();
   const { section } = useParams();
 

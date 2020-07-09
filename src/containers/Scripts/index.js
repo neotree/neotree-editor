@@ -1,11 +1,14 @@
 import React from 'react';
 import LazyPage from '@/components/LazyPage';
 import { Switch, Route, Redirect } from 'react-router-dom';
+import { setNavSection } from '@/contexts/app';
 
 const List = LazyPage(() => import('./List'));
 const Script = LazyPage(() => import('./Script'));
 
 const Scripts = () => {
+  setNavSection('scripts');
+  
   return (
     <>
       <Switch>

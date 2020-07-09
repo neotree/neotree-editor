@@ -13,9 +13,18 @@ export const setDocumentTitle = (t = '') => {
   }, [t]);
 };
 
+export const setNavSection = navSection => {
+  const { setState } = useAppContext();
+  React.useEffect(() => {
+    setState({ navSection });
+    return () => setState({ navSection: null });
+  }, [navSection]);
+};
+
 export const provideAppContext = Component => function AppContextProvider(props) {
   const [state, _setState] = React.useState({
     documentTitle: '',
+    navSection: null,
   });
   const setState = s => _setState(prev => ({
     ...prev,

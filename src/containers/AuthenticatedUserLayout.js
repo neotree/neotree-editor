@@ -9,8 +9,11 @@ import UserMenu from '@/components/UserMenu';
 import List from '@material-ui/core/List';
 import ListItemText from '@material-ui/core/ListItemText';
 import ListItemLink from '@/components/ListItemLink';
+import { useAppContext } from '@/contexts/app';
 
 export default function AuthenticatedUserLayout(props) {
+  const { state: { navSection } } = useAppContext();
+
   return (
     <>
       <Layout
@@ -40,15 +43,15 @@ export default function AuthenticatedUserLayout(props) {
 
               return (
                 <List component="nav">
-                  <ListItemLink onClick={() => hideDrawer()} to="/scripts">
+                  <ListItemLink selected={navSection === 'scripts'} onClick={() => hideDrawer()} to="/scripts">
                     <ListItemText primary="Scripts" />
                   </ListItemLink>
 
-                  <ListItemLink onClick={() => hideDrawer()} to="/config-keys">
+                  <ListItemLink selected={navSection === 'configKeys'} onClick={() => hideDrawer()} to="/config-keys">
                     <ListItemText primary="Configuration" />
                   </ListItemLink>
 
-                  <ListItemLink onClick={() => hideDrawer()} to="/settings">
+                  <ListItemLink selected={navSection === 'settings'} onClick={() => hideDrawer()} to="/settings">
                     <ListItemText primary="Settings" />
                   </ListItemLink>
                 </List>
