@@ -19,8 +19,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 var serverType = process.env.NEOTREE_SERVER_TYPE || '';
 if (serverType) serverType = "".concat(serverType.toUpperCase(), "_");
-var firebaseConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITOR_FIREBASEconfig_FILE");
-var serverConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITORconfig_FILE");
+var firebaseConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITOR_FIREBASE_CONFIG_FILE");
+var serverConfigFileName = "".concat(serverType, "NEOTREE_WEBEDITOR_CONFIG_FILE");
 
 var firebaseConfig = function () {
   try {
