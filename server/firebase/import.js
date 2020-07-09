@@ -22,11 +22,11 @@ export default () => new Promise((resolve, reject) => {
       })
     ));
 
-    Object.keys(scripts).forEach(script_id => {
+    Object.keys(scripts).forEach((script_id, i) => {
       promises.push(
         Script.findOrCreate({
           where: { id: script_id },
-          defaults: { data: JSON.stringify(scripts[script_id]) }
+          defaults: { position: i + 1, data: JSON.stringify(scripts[script_id]) }
         })
       );
 

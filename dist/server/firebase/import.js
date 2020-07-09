@@ -44,12 +44,13 @@ var _default = function _default() {
           }
         }));
       });
-      Object.keys(scripts).forEach(function (script_id) {
+      Object.keys(scripts).forEach(function (script_id, i) {
         promises.push(_models.Script.findOrCreate({
           where: {
             id: script_id
           },
           defaults: {
+            position: i + 1,
             data: JSON.stringify(scripts[script_id])
           }
         }));
