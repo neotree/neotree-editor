@@ -34,12 +34,13 @@ var _default = function _default() {
           screens = _ref2[2],
           diagnosis = _ref2[3];
 
-      Object.keys(configKeys).forEach(function (id) {
+      Object.keys(configKeys).forEach(function (id, i) {
         return promises.push(_models.ConfigKey.findOrCreate({
           where: {
             id: id
           },
           defaults: {
+            position: i + 1,
             data: JSON.stringify(configKeys[id])
           }
         }));

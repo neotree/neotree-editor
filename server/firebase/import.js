@@ -15,10 +15,10 @@ export default () => new Promise((resolve, reject) => {
     getData('screens'),
     getData('diagnosis')
   ]).then(([configKeys, scripts, screens, diagnosis]) => {
-    Object.keys(configKeys).forEach(id => promises.push(
+    Object.keys(configKeys).forEach((id, i) => promises.push(
       ConfigKey.findOrCreate({
         where: { id },
-        defaults: { data: JSON.stringify(configKeys[id]) }
+        defaults: { position: i + 1, data: JSON.stringify(configKeys[id]) }
       })
     ));
 
