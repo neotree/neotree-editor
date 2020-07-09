@@ -22,9 +22,7 @@ module.exports = function (app) {
     req.logout();
     req.session.user = null;
     res.json({
-      payload: {
-        authenticatedUser: null
-      }
+      authenticatedUser: null
     });
   });
   return router;

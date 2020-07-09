@@ -14,3 +14,10 @@ export const authenticate = (authType, reqPayload = {}, reqOpts) => {
     ...reqOpts,
   });
 };
+
+export const signOut = (authType, reqPayload = {}, reqOpts) => {
+  return makeApiCall('/logout', {
+    body: reqPayload,
+    ...reqOpts,
+  });
+};

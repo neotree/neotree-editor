@@ -5,6 +5,7 @@ import AddIcon from '@material-ui/icons/Add';
 import Button from '@material-ui/core/Button';
 import { useScriptContext } from '@/contexts/script';
 import { Link } from 'react-router-dom';
+import Tooltip from '@material-ui/core/Tooltip';
 
 import CopyScreens from '../Forms/CopyScreens';
 
@@ -24,9 +25,11 @@ function Actions({ selected }) {
       )}
 
       <Link to={`/scripts/${script.id}/screens/new`}>
-        <IconButton>
-          <AddIcon />
-        </IconButton>
+        <Tooltip title="New screen">
+          <IconButton>
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Link>
     </>
   );

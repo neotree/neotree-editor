@@ -6,11 +6,16 @@ import IconButton from '@material-ui/core/IconButton';
 import cx from 'classnames';
 import { SortableElement, SortableHandle } from 'react-sortable-hoc';
 import DragHandleIcon from '@material-ui/icons/DragHandle';
+import Tooltip from '@material-ui/core/Tooltip';
 
 const DragHandle = SortableHandle(() => (
-  <IconButton style={{ cursor: 'move' }}>
-    <DragHandleIcon />
-  </IconButton>
+  <div>
+    <Tooltip title="Drag to reposition">
+      <IconButton style={{ cursor: 'move' }}>
+        <DragHandleIcon />
+      </IconButton>
+    </Tooltip>
+  </div>
 ));
 
 export default SortableElement(({

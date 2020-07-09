@@ -22,7 +22,7 @@ function DiagnosisEditor() {
   return (
     <>
         <UploadFilesPrompt 
-          data={form.metadata}
+          data={form}
           save={files => setFormAndSave({ ...files })}
         />
 

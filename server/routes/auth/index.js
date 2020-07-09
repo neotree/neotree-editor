@@ -40,7 +40,7 @@ module.exports = app => {
     (req, res) => {
       req.logout();
       req.session.user = null;
-      res.json({ payload: { authenticatedUser: null } });
+      res.json({ authenticatedUser: null });
     }
   );
 

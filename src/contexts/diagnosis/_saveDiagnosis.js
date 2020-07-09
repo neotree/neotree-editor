@@ -25,7 +25,7 @@ export default ({
 
   save({ script_id: scriptId, ...diagnosis, data })
     .then(rslts => {
-      if (shdRedirect && rslts.diagnosis) history.push(`/scripts/${scriptId}${diagnosis ? '' : `/diagnoses/${rslts.diagnosis.id}`}`);
+      if (shdRedirect && rslts.diagnosis) history.push(`/scripts/${scriptId}`);
       done(rslts.errors, rslts);
     })
     .catch(done);

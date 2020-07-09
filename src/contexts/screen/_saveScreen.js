@@ -25,7 +25,7 @@ export default ({
 
   save({ script_id: scriptId, type: form.type, ...screen, data })
     .then(rslts => {
-      if (shdRedirect && rslts.screen) history.push(`/scripts/${scriptId}${screen ? '' : `/screens/${rslts.screen.id}`}`);
+      if (shdRedirect && rslts.screen) history.push(`/scripts/${scriptId}`);
       done(rslts.errors, rslts);
     })
     .catch(done);

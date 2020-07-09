@@ -5,6 +5,7 @@ import AddIcon from '@material-ui/icons/Add';
 import Button from '@material-ui/core/Button';
 import { useScriptContext } from '@/contexts/script';
 import { Link } from 'react-router-dom';
+import Tooltip from '@material-ui/core/Tooltip';
 
 import CopyDiagnoses from '../Forms/CopyDiagnoses';
 
@@ -22,9 +23,11 @@ function Actions({ selected }) {
       )}
 
       <Link to={`/scripts/${script.id}/diagnoses/new`}>
-        <IconButton>
-          <AddIcon />
-        </IconButton>
+        <Tooltip title="New diagnosis">
+          <IconButton>
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Link>
     </>
   );

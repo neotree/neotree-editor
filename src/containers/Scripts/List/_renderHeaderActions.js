@@ -4,6 +4,7 @@ import IconButton from '@material-ui/core/IconButton';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import Button from '@material-ui/core/Button';
+import Tooltip from '@material-ui/core/Tooltip';
 import { Link } from 'react-router-dom';
 import Fab from '@material-ui/core/Fab';
 import FabWrap from '@/components/FabWrap';
@@ -29,9 +30,11 @@ function Actions({ selected }) {
       )}
 
       <Link to="/scripts/new">
-        <IconButton>
-          <AddIcon />
-        </IconButton>
+        <Tooltip title="New script">
+          <IconButton>
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Link>
 
       <FabWrap>
