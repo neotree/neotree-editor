@@ -31,7 +31,8 @@ const Containers = () => {
               <Switch>
                 <Route path="/scripts" component={Scripts} />
                 <Route path="/config-keys" component={ConfigKeys} />
-                <Route path="/settings" component={SettingsPage} />
+                <Route exact path="/settings" component={SettingsPage} />
+                <Route exact path="/settings/:section" component={SettingsPage} />
                 <Route exact path="/" component={HomePage} />
                 <Route render={() => <Redirect to="/" />} />
               </Switch>

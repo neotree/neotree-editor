@@ -32,7 +32,6 @@ function ScriptEditor() {
               setState({ scriptSection });
               history.push(`/scripts/${script.id}/${scriptSection}`);
             }}
-            aria-label="disabled tabs example"
           >
             <Tab value="screens" label="Screens" />
             <Tab value="diagnoses" label="Diagnoses" />
