@@ -30,20 +30,20 @@ https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk
 
 ### Configure development server
 
-If `export NEOTREE_CONFIG_FILE=/path/to/server.config.json` is set, then `/path/to/server.config.json` will be used as the server config file, otherwise add the config file to project folder: `_config/server.config.json`
+If `export NEOTREEconfig_FILE=/path/to/server.config.json` is set, then `/path/to/server.config.json` will be used as the server config file, otherwise add the config file to project folder: `config/server.config.json`
 
-If `export NEOTREE_CONFIG_FILE=/path/to/server.config.json` is set, then `/path/to/server.config.json` will be used as the server config file, otherwise add the config file to project folder: `_config/server.config.json`
+If `export NEOTREEconfig_FILE=/path/to/server.config.json` is set, then `/path/to/server.config.json` will be used as the server config file, otherwise add the config file to project folder: `config/server.config.json`
 
 ### Configure production server
 
-If `export NEOTREE_FIREBASE_CONFIG_FILE=/path/to/firebase.config.json` is set, then `/path/to/firebase.config.json` will be used as the server config file, otherwise add the config file to the project folder: `dist/_config/firebase.config.json`
+If `export NEOTREE_FIREBASEconfig_FILE=/path/to/firebase.config.json` is set, then `/path/to/firebase.config.json` will be used as the server config file, otherwise add the config file to the project folder: `dist/config/firebase.config.json`
 
-If `export NEOTREE_FIREBASE_CONFIG_FILE=/path/to/firebase.config.json` is set, then `/path/to/firebase.config.json` will be used as the firebase config file, otherwise add the firebase config file to the project folder: `dist/_config/firebase.config.json`
+If `export NEOTREE_FIREBASEconfig_FILE=/path/to/firebase.config.json` is set, then `/path/to/firebase.config.json` will be used as the firebase config file, otherwise add the firebase config file to the project folder: `dist/config/firebase.config.json`
 
 **enviroment variables for `npm run prod-server` config files must be prefixed `NEOTREE_PRODUCTION_`
 **enviroment variables for `npm run stage-server` config files must be prefixed `NEOTREE_STAGE_`
 
-**dist/_config is a public folder, for better security use enviroment variables**
+**dist/config is a public folder, for better security use enviroment variables**
 
 ## Scripts
 

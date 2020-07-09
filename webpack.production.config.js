@@ -7,7 +7,7 @@ const GLOBALS = {
   'process.env.NODE_ENV': JSON.stringify('production')
 };
 
-export default {
+module.exports = {
   mode: 'production',
   // devtool: 'source-map',
   context: path.resolve(__dirname, 'dist/src'),

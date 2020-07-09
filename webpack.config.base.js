@@ -6,29 +6,12 @@ module.exports = {
 
     modules: [
       path.resolve(__dirname, './node_modules'),
-      path.resolve(__dirname, './_utils'),
-      path.resolve(__dirname, './_config'),
+      path.resolve(__dirname, '.'),
       path.resolve(__dirname, './src'),
-      path.resolve(__dirname, './src/_redux'),
-      path.resolve(__dirname, './src/_utils'),
-      path.resolve(__dirname, './src/ui'),
-      path.resolve(__dirname, './src/App'),
-      path.resolve(__dirname, './src/App/.hooks'),
-      path.resolve(__dirname, './src/App/components'),
-      path.resolve(__dirname, './src/App/Dashboard'),
-      path.resolve(__dirname, './src/App/Dashboard/components')
     ],
     alias: {
-      config: path.resolve(__dirname, '_config'),
-      utils: path.resolve(__dirname, '_utils'),
-      root: path.resolve(__dirname, 'src'),
-      ui: path.resolve(__dirname, 'src/ui'),
-      App: path.resolve(__dirname, 'src/App'),
-      AppUtils: path.resolve(__dirname, 'src/_utils'),
-      AppHooks: path.resolve(__dirname, 'src/App/.hooks'),
-      AppComponents: path.resolve(__dirname, 'src/App/components'),
-      Dashboard: path.resolve(__dirname, 'src/App/Dashboard'),
-      DashboardComponents: path.resolve(__dirname, 'src/App/Dashboard/components')
+      '~': path.resolve(__dirname, '.'),
+      '@': path.resolve(__dirname, 'src'),
     },
   },
   module: {
@@ -37,8 +20,8 @@ module.exports = {
         test: /\.js$/,
         include: [
           path.resolve(__dirname, 'src'),
-          path.resolve(__dirname, '_config'),
-          path.resolve(__dirname, '_utils')
+          path.resolve(__dirname, 'config'),
+          path.resolve(__dirname, 'utils')
         ],
         use: [{ loader: 'babel-loader' }]
       },
