@@ -8,6 +8,15 @@ var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 var _models = require("../../models");
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var storage = _multer["default"].memoryStorage();
 
 var upload = (0, _multer["default"])({
@@ -48,3 +57,23 @@ module.exports = function (router, app) {
   }, responseMiddleware);
   return router;
 };
+
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(storage, "storage", "/home/farai/WorkBench/neotree-editor/server/routes/files/uploadFileMiddleware.js");
+  reactHotLoader.register(upload, "upload", "/home/farai/WorkBench/neotree-editor/server/routes/files/uploadFileMiddleware.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

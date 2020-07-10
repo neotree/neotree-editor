@@ -7,7 +7,7 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, items = []) => {
     if (err) app.logger.log(err);
-    if (items.length) app.io.emit('create_screens', { screens: items.map(s => ({ id: s.id })) });
+    if (items.length) app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, { items });
     next(); return null;
   };

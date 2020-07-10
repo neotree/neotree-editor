@@ -2,6 +2,10 @@
 
 var _models = require("../../models");
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function (app) {
   return function (req, res, next) {
     var id = req.body.id;
@@ -9,6 +13,7 @@ module.exports = function (app) {
     var done = function done(err, configKey) {
       if (!err) {
         app.io.emit('deleteconfig_keys', {
+          key: app.getRandomString(),
           config_keys: [{
             id: id
           }]

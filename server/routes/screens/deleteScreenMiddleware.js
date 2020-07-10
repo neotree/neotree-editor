@@ -6,7 +6,7 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, screen) => {
     if (!err) {
-      app.io.emit('delete_screens', { screens: [{ id }] });
+      app.io.emit('delete_screens', { key: app.getRandomString(), screens: [{ id }] });
       Log.create({
         name: 'delete_screens',
         data: JSON.stringify({ screens: [{ id }] })

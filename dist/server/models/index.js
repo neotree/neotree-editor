@@ -93,6 +93,15 @@ var _Device = _interopRequireDefault(require("./_Device"));
 
 var _Log = _interopRequireDefault(require("./_Log"));
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var sequelize = _sequelize["default"];
 exports.sequelize = sequelize;
 
@@ -304,3 +313,22 @@ var dbInit = function dbInit() {
 };
 
 exports.dbInit = dbInit;
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(sequelize, "sequelize", "/home/farai/WorkBench/neotree-editor/server/models/index.js");
+  reactHotLoader.register(dbInit, "dbInit", "/home/farai/WorkBench/neotree-editor/server/models/index.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

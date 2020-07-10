@@ -4,7 +4,7 @@ module.exports = (app) => (req, res, next) => {
   const { scripts, returnUpdated } = req.body;
 
   const done = (err, payload) => {
-    if (!err) app.io.emit('update_scripts', { scripts: scripts.map(s => ({ id: s.id })) });
+    if (!err) app.io.emit('update_scripts', { key: app.getRandomString(), scripts: scripts.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };

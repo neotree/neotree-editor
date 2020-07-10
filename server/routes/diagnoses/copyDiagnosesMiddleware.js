@@ -6,6 +6,7 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, items) => {
     if (err) app.logger.log(err);
+    if (items.length) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: items.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, { items });
     next(); return null;
   };

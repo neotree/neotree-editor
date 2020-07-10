@@ -4,7 +4,7 @@ module.exports = app => (req, res, next) => {
   const { configKeys, returnUpdated } = req.body;
 
   const done = (err, payload) => {
-    if (!err) app.io.emit('updateconfig_keys', { config_keys: configKeys.map(c => ({ id: c.id })) });
+    if (!err) app.io.emit('updateconfig_keys', { key: app.getRandomString(), config_keys: configKeys.map(c => ({ id: c.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };

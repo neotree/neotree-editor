@@ -3,6 +3,8 @@ import express from 'express';
 import { dbInit } from './models';
 import config from '../config/server';
 
+const getRandString = () => Math.random().toString(36).substring(2).toUpperCase();
+
 (async () => {
   const sequelize = await dbInit();
 
@@ -10,6 +12,8 @@ import config from '../config/server';
 
   app.sequelize = sequelize;
   app.logger = require('../utils/logger');
+  app.getRandomString = (separator = '') => 
+    `${getRandString()}${separator}${getRandString()}${separator}${getRandString()}`;
 
   const httpServer = require('http').Server(app);
 

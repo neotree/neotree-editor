@@ -5,7 +5,7 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, configKey) => {
     if (!err) {
-      app.io.emit('deleteconfig_keys', { config_keys: [{ id }] });
+      app.io.emit('deleteconfig_keys', { key: app.getRandomString(), config_keys: [{ id }] });
       Log.create({
         name: 'deleteconfig_keys',
         data: JSON.stringify({ config_keys: [{ id }] })

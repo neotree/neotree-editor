@@ -9,7 +9,7 @@ module.exports = (app) => (req, res, next) => {
 
   const done = (err, script) => {
     if (!err) {
-      app.io.emit('delete_scripts', { scripts: [{ id }] });
+      app.io.emit('delete_scripts', { key: app.getRandomString(), scripts: [{ id }] });
       Log.create({
         name: 'delete_scripts',
         data: JSON.stringify({ scripts: [{ id }] })

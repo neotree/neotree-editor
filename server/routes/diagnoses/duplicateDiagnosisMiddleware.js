@@ -34,7 +34,7 @@ export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
-    if (diagnosis) app.io.emit('create_diagnoses', { diagnoses: [{ id: diagnosis.id }] });
+    if (diagnosis) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id }] });
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

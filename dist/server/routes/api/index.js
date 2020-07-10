@@ -6,6 +6,15 @@ var _express = _interopRequireDefault(require("express"));
 
 var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator"));
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var router = _express["default"].Router();
 
 module.exports = function (app) {
@@ -27,3 +36,22 @@ module.exports = function (app) {
   router.get('/get-devices', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDevicesMiddleware')(app), responseMiddleware);
   return router;
 };
+
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(router, "router", "/home/farai/WorkBench/neotree-editor/server/routes/api/index.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

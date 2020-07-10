@@ -33,7 +33,7 @@ export default (app) => (req, res, next) => {
   const { screens, returnUpdated } = req.body;
 
   const done = (err, payload) => {
-    app.io.emit('update_screens', { screens: screens.map(s => ({ id: s.id })) });
+    app.io.emit('update_screens', { key: app.getRandomString(), screens: screens.map(s => ({ id: s.id })) });
     res.locals.setResponse(err, payload);
     next(); return null;
   };

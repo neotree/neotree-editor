@@ -58,7 +58,7 @@ export default (app) => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, script) => {
-    if (script) app.io.emit('create_scripts', { scripts: [{ id: script.id }] });
+    if (script) app.io.emit('create_scripts', { key: app.getRandomString(), scripts: [{ id: script.id }] });
     res.locals.setResponse(err, { script });
     next(); return null;
   };

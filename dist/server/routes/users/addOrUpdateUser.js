@@ -15,6 +15,15 @@ var _bcryptjs = _interopRequireDefault(require("bcryptjs"));
 
 var _models = require("../../models");
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var encryptPassword = function encryptPassword(password, callback) {
   return _bcryptjs["default"].genSalt(10, function (err, salt) {
     _bcryptjs["default"].hash(password, salt, function (err, hash) {
@@ -99,3 +108,23 @@ function addUser(_ref) {
     });
   });
 }
+
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(encryptPassword, "encryptPassword", "/home/farai/WorkBench/neotree-editor/server/routes/users/addOrUpdateUser.js");
+  reactHotLoader.register(addUser, "addUser", "/home/farai/WorkBench/neotree-editor/server/routes/users/addOrUpdateUser.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

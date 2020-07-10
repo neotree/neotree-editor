@@ -4,7 +4,7 @@ module.exports = app => (req, res, next) => {
   const { id, ...payload } = req.body;
 
   const done = (err, diagnosis) => {
-    if (diagnosis) app.io.emit('update_diagnoses', { diagnoses: [{ id }] });
+    if (diagnosis) app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: [{ id }] });
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

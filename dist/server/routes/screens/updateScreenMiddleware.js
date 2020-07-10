@@ -6,6 +6,10 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _models = require("../../models");
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function (app) {
   return function (req, res, next) {
     var _req$body = req.body,
@@ -14,6 +18,7 @@ module.exports = function (app) {
 
     var done = function done(err, screen) {
       if (screen) app.io.emit('update_screens', {
+        key: app.getRandomString(),
         screens: [{
           id: id
         }]
