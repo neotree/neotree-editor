@@ -20,7 +20,7 @@ const ItemForm = React.forwardRef(({
 }, ref) => {
   const [open, setOpen] = React.useState(false);
 
-  const [form, _setForm] = React.useState({
+  const defaultForm = {
     dataType: (() => {
       switch (type) {
         case 'list':
@@ -41,12 +41,16 @@ const ItemForm = React.forwardRef(({
     exclusive: null,
     summary: null,
     ...data,
-  });
+  };
+
+  const [form, _setForm] = React.useState(defaultForm);
 
   const setForm = s => _setForm(prev => ({
     ...prev,
     ...typeof s === 'function' ? s(prev) : s
   }));
+
+  React.useEffect(() => { setForm(defaultForm); }, [open]);
 
   return (
     <>
