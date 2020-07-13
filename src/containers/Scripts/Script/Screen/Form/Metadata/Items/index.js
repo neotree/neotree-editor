@@ -36,6 +36,17 @@ function Items({ form, setMetadata }) {
         )}
         displayFields={(() => {
           switch (form.type) {
+            case 'checklist':
+              return [
+                { key: 'key', label: 'Key', },
+                { key: 'label', label: 'Label', },
+                {
+                  key: 'exclusive',
+                  label: 'Exclusive',
+                  cellProps: { align: 'right' },
+                  render: ({ row, column }) => row[column] ? <CheckIcon fontSize="small" color="primary" /> : null
+                },
+             ];
             case 'single_select':
               return [
                 { key: 'id', label: 'ID', },

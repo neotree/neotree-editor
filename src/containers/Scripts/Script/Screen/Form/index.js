@@ -62,7 +62,7 @@ function ScreenEditor() {
 
       <br />
 
-      {['single_select', 'multi_select', 'list', 'progress'].includes(form.type) && (
+      {['single_select', 'multi_select', 'list', 'progress', 'checklist'].includes(form.type) && (
         <>
           <MetadataItems />
         </>

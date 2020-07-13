@@ -32,7 +32,7 @@ const ItemForm = React.forwardRef(({
         default:
           return null;
       }
-    }),
+    })(),
     confidential: false,
     checked: null,
     id: null,
@@ -72,6 +72,74 @@ const ItemForm = React.forwardRef(({
         <DialogContent>
           {(() => {
             switch (type) {
+              case 'checklist':
+                return (
+                  <>
+                    <div>
+                      <TextField
+                        fullWidth
+                        required
+                        error={!form.label}
+                        value={form.label || ''}
+                        label="Label"
+                        onChange={e => setForm({ label: e.target.value })}
+                      />
+                    </div>
+                    <br />
+
+                    <div>
+                      <TextField
+                        fullWidth
+                        // required
+                        // error={!form.summary}
+                        value={form.summary || ''}
+                        label="Summary"
+                        onChange={e => setForm({ summary: e.target.value })}
+                      />
+                    </div>
+                    <br />
+
+                    <div>
+                      <TextField
+                        fullWidth
+                        required
+                        error={!(form.key && /[a-zA-Z0-9]+/.test(form.key))}
+                        value={form.key || ''}
+                        label="Key"
+                        onChange={e => setForm({ key: e.target.value })}
+                      />
+                    </div>
+                    <br />
+
+                    <div>
+                      <FormControlLabel
+                        control={(
+                          <Switch
+                            checked={!!form.confidential}
+                            onChange={() => setForm({ confidential: !form.confidential })}
+                            name="confidential"
+                          />
+                        )}
+                        label="Confidential"
+                      />
+                    </div>
+                    <br />
+
+                    <div>
+                      <FormControlLabel
+                        control={(
+                          <Switch
+                            checked={!!form.exclusive}
+                            onChange={() => setForm({ exclusive: !form.exclusive })}
+                            name="exclusive"
+                          />
+                        )}
+                        label="Disable other items if selected"
+                      />
+                    </div>
+                  </>
+                );
+
               case 'progress':
                 return (
                   <>
