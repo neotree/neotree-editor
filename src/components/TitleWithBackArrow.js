@@ -6,14 +6,14 @@ import Typography from '@material-ui/core/Typography';
 import BackArrowIcon from '@material-ui/icons/ArrowBack';
 import { useHistory } from 'react-router-dom';
 
-export default function TitleWithBackArrow({ title }) {
+export default function TitleWithBackArrow({ backLink, title }) {
   const history = useHistory();
 
   return (
     <>
       <Grid container alignItems="center" spacing={1}>
         <Grid item xs={1} sm={1}>
-          <IconButton onClick={() => history.goBack()}>
+          <IconButton onClick={() => backLink ? history.push(backLink) : history.goBack()}>
             <BackArrowIcon />
           </IconButton>
         </Grid>
@@ -28,5 +28,6 @@ export default function TitleWithBackArrow({ title }) {
 }
 
 TitleWithBackArrow.propTypes = {
-  title: PropTypes.node
+  title: PropTypes.node,
+  backLink: PropTypes.string,
 };

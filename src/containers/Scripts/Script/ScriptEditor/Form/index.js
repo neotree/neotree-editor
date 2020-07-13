@@ -19,7 +19,7 @@ function ScriptEditor() {
     <>
       <Card>
         <CardContent>
-          <TitleWithBackArrow title={`${script ? 'Edit' : 'Add'} script`} />
+          <TitleWithBackArrow backLink="/scripts" title={`${script ? 'Edit' : 'Add'} script`} />
           <br /><br />
 
           <div>
