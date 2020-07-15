@@ -41,12 +41,12 @@ export const DataType = {
 
 export const FieldTypes = [
     { name: 'date', label: 'Date' },
-    { name: 'datetime', label: 'Datetime' },
+    { name: 'datetime', label: 'Date + Time' },
     { name: 'dropdown', label: 'Dropdown' },
-    { name: 'number', label: 'Number' },
-    { name: 'period', label: 'Period' },
+    { name: 'number', label: 'Number' },    
     { name: 'text', label: 'Text' },
-    { name: 'time', label: 'Time' }
+    { name: 'time', label: 'Time' },
+    { name: 'period', label: 'Time period' },
 ];
 
 export const ScreenTypes = [

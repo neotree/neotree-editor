@@ -110,8 +110,8 @@ const FieldForm = React.forwardRef(({
               <div>
                 <TextField
                   fullWidth
-                  // required
-                  // error={!form.key}
+                  required
+                  error={/[a-zA-Z0-9]+/.test(form.key)}
                   value={form.key || ''}
                   label="Key"
                   onChange={e => setForm({ key: e.target.value })}
@@ -181,7 +181,7 @@ const FieldForm = React.forwardRef(({
                   <>
                     <Title>Default</Title>
 
-                    <RadioGroup name="type" value={type} onChange={e => setForm({ defaultValue: e.target.value })}>
+                    <RadioGroup name="type" value={form.defaultValue} onChange={e => setForm({ defaultValue: e.target.value })}>
                       <FormControlLabel
                         value=""
                         control={<Radio />}
@@ -196,9 +196,78 @@ const FieldForm = React.forwardRef(({
                         />
                       ))}
                     </RadioGroup>
+                    <br />
                   </>
                 );
               })()}
+
+            {form.type === 'dropdown' && (
+              <>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={5}
+                  value={form.values || ''}
+                  label="Dropdown values"
+                  onChange={e => setForm({ values: e.target.value })}
+                />
+              </>
+            )}
+
+            {form.type === 'period' && (
+              <>
+                <TextField
+                  fullWidth
+                  required
+                  error={/(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?/.test(form.calculation)}
+                  value={form.calculation || ''}
+                  label="Reference expression"
+                  onChange={e => setForm({ calculation: e.target.value })}
+                />
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                >Example: <b>$key</b></Typography>
+              </>
+            )}
+
+            {form.type === 'period' && (
+              <>
+                <Grid container spacing={1}>
+                  <Grid item xs={4} sm={4}>
+                    <TextField
+                      fullWidth     
+                      error={form.format ? /#*/.test(form.format) : false}                 
+                      value={form.format || ''}
+                      label="Format"
+                      onChange={e => setForm({ format: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4} sm={4}>
+                    <TextField
+                      fullWidth
+                      error={form.minValue ? /-?[0-9]*(\.[0-9]+)?/.test(form.minValue) : false}
+                      value={form.minValue || ''}
+                      label="Min value"
+                      onChange={e => setForm({ minValue: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4} sm={4}>
+                    <TextField
+                      fullWidth
+                      error={form.maxValue ? /-?[0-9]*(\.[0-9]+)?/.test(form.maxValue) : false}
+                      value={form.maxValue || ''}
+                      label="Max value"
+                      onChange={e => setForm({ maxValue: e.target.value })}
+                    />
+                  </Grid>
+                </Grid>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                >Format: Add as many <b>#</b> as the number of decimal digits or leave empty</Typography>
+              </>
+            )}
             </div>
           </Collapse>
         </DialogContent>
