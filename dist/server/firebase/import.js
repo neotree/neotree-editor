@@ -7,6 +7,10 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
 var _firebase = _interopRequireDefault(require("../firebase"));
@@ -17,6 +21,10 @@ var _models = require("../models");
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -43,29 +51,61 @@ var _default = function _default() {
           screens = _ref2[2],
           diagnosis = _ref2[3];
 
-      Object.keys(configKeys).forEach(function (id, i) {
+      var sortData = function sortData() {
+        var arr = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+        return arr.sort(function (a, b) {
+          return a - b;
+        });
+      };
+
+      configKeys = sortData(Object.keys(configKeys).map(function (id) {
+        return _objectSpread({
+          id: id
+        }, configKeys[id]);
+      }));
+      scripts = sortData(Object.keys(scripts).map(function (script_id) {
+        return _objectSpread({
+          script_id: script_id
+        }, scripts[script_id]);
+      }));
+      configKeys.forEach(function (_ref3, i) {
+        var id = _ref3.id,
+            key = (0, _objectWithoutProperties2["default"])(_ref3, ["id"]);
         return promises.push(_models.ConfigKey.findOrCreate({
           where: {
             id: id
           },
           defaults: {
             position: i + 1,
-            data: JSON.stringify(configKeys[id])
+            data: JSON.stringify(key)
           }
         }));
       });
-      Object.keys(scripts).forEach(function (script_id, i) {
+      scripts.forEach(function (_ref4, i) {
+        var script_id = _ref4.script_id,
+            script = (0, _objectWithoutProperties2["default"])(_ref4, ["script_id"]);
+        screens = sortData(Object.keys(screens[script_id] || {}).map(function (screen_id) {
+          return _objectSpread({
+            screen_id: screen_id
+          }, screens[script_id][screen_id]);
+        }));
+        diagnosis = sortData(Object.keys(diagnosis[script_id] || {}).map(function (diagnosis_id) {
+          return _objectSpread({
+            diagnosis_id: diagnosis_id
+          }, diagnosis[script_id][diagnosis_id]);
+        }));
         promises.push(_models.Script.findOrCreate({
           where: {
             id: script_id
           },
           defaults: {
             position: i + 1,
-            data: JSON.stringify(scripts[script_id])
+            data: JSON.stringify(script)
           }
         }));
-        Object.keys(screens[script_id] || {}).forEach(function (screen_id, position) {
-          var s = screens[script_id][screen_id];
+        screens.forEach(function (_ref5, position) {
+          var screen_id = _ref5.screen_id,
+              s = (0, _objectWithoutProperties2["default"])(_ref5, ["screen_id"]);
           position = position + 1;
           promises.push(_models.Screen.findOrCreate({
             where: {
@@ -81,8 +121,9 @@ var _default = function _default() {
             }
           }));
         });
-        Object.keys(diagnosis[script_id] || {}).forEach(function (diagnosis_id, position) {
-          var d = diagnosis[script_id][diagnosis_id];
+        diagnosis.forEach(function (_ref6, position) {
+          var diagnosis_id = _ref6.diagnosis_id,
+              d = (0, _objectWithoutProperties2["default"])(_ref6, ["diagnosis_id"]);
           position = position + 1;
           promises.push(_models.Diagnosis.findOrCreate({
             where: {
