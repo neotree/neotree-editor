@@ -22,7 +22,7 @@ export default function ImportFromFirebase() {
           setMessage(null);
           api.importFirebase()
             .then(() => {
-              alert('Firebase impored'); // eslint-disable-line
+              alert('Firebase imported'); // eslint-disable-line
               // setMessage({ success: true, text: 'Firebase impored' });
               setLoading(false);
             })

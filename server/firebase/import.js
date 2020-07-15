@@ -15,23 +15,44 @@ export default () => new Promise((resolve, reject) => {
     getData('screens'),
     getData('diagnosis')
   ]).then(([configKeys, scripts, screens, diagnosis]) => {
-    Object.keys(configKeys).forEach((id, i) => promises.push(
+    const sortData = (arr = []) => arr.sort((a, b) => a - b);
+
+    configKeys = sortData(Object.keys(configKeys).map((id) => ({ 
+      id,
+      ...configKeys[id], 
+    })));
+
+    scripts = sortData(Object.keys(scripts).map((script_id) => ({ 
+      script_id,
+      ...scripts[script_id], 
+    })));    
+
+    configKeys.forEach(({ id, ...key }, i) => promises.push(
       ConfigKey.findOrCreate({
         where: { id },
-        defaults: { position: i + 1, data: JSON.stringify(configKeys[id]) }
+        defaults: { position: i + 1, data: JSON.stringify(key) }
       })
     ));
 
-    Object.keys(scripts).forEach((script_id, i) => {
+    scripts.forEach(({ script_id, ...script }, i) => {
+      screens = sortData(Object.keys(screens[script_id] || {}).map((screen_id) => ({ 
+        screen_id,
+        ...screens[script_id][screen_id], 
+      })));
+
+      diagnosis = sortData(Object.keys(diagnosis[script_id] || {}).map((diagnosis_id) => ({ 
+        diagnosis_id,
+        ...diagnosis[script_id][diagnosis_id], 
+      })));
+
       promises.push(
         Script.findOrCreate({
           where: { id: script_id },
-          defaults: { position: i + 1, data: JSON.stringify(scripts[script_id]) }
+          defaults: { position: i + 1, data: JSON.stringify(script) }
         })
       );
 
-      Object.keys(screens[script_id] || {}).forEach((screen_id, position) => {
-        const s = screens[script_id][screen_id];
+      screens.forEach(({ screen_id, ...s }, position) => {
         position = position + 1;
         promises.push(Screen.findOrCreate({
           where: { screen_id, script_id },
@@ -45,8 +66,7 @@ export default () => new Promise((resolve, reject) => {
         }));
       });
 
-      Object.keys(diagnosis[script_id] || {}).forEach((diagnosis_id, position) => {
-        const d = diagnosis[script_id][diagnosis_id];
+      diagnosis.forEach(({ diagnosis_id, ...d }, position) => {
         position = position + 1;
         promises.push(Diagnosis.findOrCreate({
           where: { diagnosis_id, script_id },
