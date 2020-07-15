@@ -46,27 +46,27 @@ var _default = function _default() {
 
     Promise.all([getData('configkeys'), getData('scripts'), getData('screens'), getData('diagnosis')]).then(function (_ref) {
       var _ref2 = (0, _slicedToArray2["default"])(_ref, 4),
-          configKeys = _ref2[0],
-          scripts = _ref2[1],
-          screens = _ref2[2],
-          diagnosis = _ref2[3];
+          _configKeys = _ref2[0],
+          _scripts = _ref2[1],
+          _screens = _ref2[2],
+          _diagnosis = _ref2[3];
 
       var sortData = function sortData() {
         var arr = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
         return arr.sort(function (a, b) {
-          return a - b;
+          return a.position - b.position;
         });
       };
 
-      configKeys = sortData(Object.keys(configKeys).map(function (id) {
+      var configKeys = sortData(Object.keys(_configKeys).map(function (id) {
         return _objectSpread({
           id: id
-        }, configKeys[id]);
+        }, _configKeys[id]);
       }));
-      scripts = sortData(Object.keys(scripts).map(function (script_id) {
+      var scripts = sortData(Object.keys(_scripts).map(function (script_id) {
         return _objectSpread({
           script_id: script_id
-        }, scripts[script_id]);
+        }, _scripts[script_id]);
       }));
       configKeys.forEach(function (_ref3, i) {
         var id = _ref3.id,
@@ -84,15 +84,15 @@ var _default = function _default() {
       scripts.forEach(function (_ref4, i) {
         var script_id = _ref4.script_id,
             script = (0, _objectWithoutProperties2["default"])(_ref4, ["script_id"]);
-        screens = sortData(Object.keys(screens[script_id] || {}).map(function (screen_id) {
+        var screens = sortData(Object.keys(_screens[script_id] || {}).map(function (screen_id) {
           return _objectSpread({
             screen_id: screen_id
-          }, screens[script_id][screen_id]);
+          }, _screens[script_id][screen_id]);
         }));
-        diagnosis = sortData(Object.keys(diagnosis[script_id] || {}).map(function (diagnosis_id) {
+        var diagnosis = sortData(Object.keys(_diagnosis[script_id] || {}).map(function (diagnosis_id) {
           return _objectSpread({
             diagnosis_id: diagnosis_id
-          }, diagnosis[script_id][diagnosis_id]);
+          }, _diagnosis[script_id][diagnosis_id]);
         }));
         promises.push(_models.Script.findOrCreate({
           where: {
