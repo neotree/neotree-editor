@@ -1,43 +1,19 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
-import _getDiagnoses from './_getDiagnoses';
-import _deleteDiagnoses from './_deleteDiagnoses';
-import _updateDiagnoses from './_updateDiagnoses';
-import _duplicateDiagnoses from './_duplicateDiagnoses';
+import useContextValue from './ContextValue';
 
 export const DiagnosesContext = React.createContext(null);
 
 export const useDiagnosesContext = () => React.useContext(DiagnosesContext);
 
 export const provideDiagnosesContext = Component => function DiagnosesContextProvider(props) {
-  const { scriptId, } = useParams();
+  const value = useContextValue();
+  const { scriptId } = value.router.match.params;
 
-  const [state, _setState] = React.useState({
-    diagnoses: [],
-  });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
-
-  const getDiagnoses = _getDiagnoses({ setState });
-  const deleteDiagnoses = _deleteDiagnoses({ setState });
-  const updateDiagnoses = _updateDiagnoses({ setState });
-  const duplicateDiagnoses = _duplicateDiagnoses({ setState });
-
-  React.useEffect(() => { getDiagnoses({ script_id: scriptId }); }, []);
+  React.useEffect(() => { value.getDiagnoses({ script_id: scriptId }); }, [scriptId]);
 
   return (
     <DiagnosesContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getDiagnoses,
-        deleteDiagnoses,
-        updateDiagnoses,
-        duplicateDiagnoses,
-      }}
+      value={value}
     >
       <Component {...props} />
     </DiagnosesContext.Provider>

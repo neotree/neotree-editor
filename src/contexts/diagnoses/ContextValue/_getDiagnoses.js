@@ -1,10 +1,10 @@
 import * as api from '@/api/diagnoses';
 
-export default ({ setState }) => function getDiagnoses(payload) {
-  setState({ loadingDiagnoses: true });
+export default function getDiagnoses(payload) {
+  this.setState({ loadingDiagnoses: true });
 
   const done = (getDiagnosesError, data) => {
-    setState({
+    this.setState({
       getDiagnosesError,
       ...data,
       diagnosesInitialised: true,
@@ -15,4 +15,4 @@ export default ({ setState }) => function getDiagnoses(payload) {
   api.getDiagnoses(payload)
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

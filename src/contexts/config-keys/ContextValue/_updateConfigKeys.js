@@ -1,12 +1,12 @@
 import * as api from '@/api/config-keys';
 
-export default ({ setState }) => function updateConfigKeys(configKeys = []) {
+export default function updateConfigKeys(configKeys = []) {
   if (!configKeys.length) return;
 
-  setState({ updatingConfigKeys: true });
+  this.setState({ updatingConfigKeys: true });
 
   const done = (updateConfigKeysError, data) => {
-    setState({
+    this.setState({
       updateConfigKeysError,
       ...data,
       updatingConfigKeys: false,
@@ -16,4 +16,4 @@ export default ({ setState }) => function updateConfigKeys(configKeys = []) {
   api.updateConfigKeys({ configKeys })
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

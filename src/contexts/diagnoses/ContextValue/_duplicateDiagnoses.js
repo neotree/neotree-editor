@@ -1,12 +1,12 @@
 import * as api from '@/api/diagnoses';
 
-export default ({ setState }) => function duplicateDiagnoses(ids = []) {
+export default function duplicateDiagnoses(ids = []) {
   if (!ids.length) return;
 
-  setState({ duplicatingDiagnoses: true });
+  this.setState({ duplicatingDiagnoses: true });
 
   const done = (e, rslts) => {
-    setState(({ diagnoses }) => {
+    this.setState(({ diagnoses }) => {
       return {
         duplicateDiagnosesError: e,
         duplicatingDiagnoses: false,
@@ -24,4 +24,4 @@ export default ({ setState }) => function duplicateDiagnoses(ids = []) {
   api.duplicateDiagnosis({ id: ids[0] })
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

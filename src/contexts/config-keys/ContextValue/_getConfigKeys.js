@@ -1,10 +1,10 @@
 import * as api from '@/api/config-keys';
 
-export default ({ setState }) => function getConfigKeys() {
-  setState({ loadingConfigKeys: true });
+export default function getConfigKeys() {
+  this.setState({ loadingConfigKeys: true });
 
   const done = (getConfigKeysError, data) => {
-    setState({
+    this.setState({
       getConfigKeysError,
       ...data,
       configKeysInitialised: true,
@@ -15,4 +15,4 @@ export default ({ setState }) => function getConfigKeys() {
   api.getConfigKeys()
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

@@ -1,12 +1,12 @@
 import * as api from '@/api/config-keys';
 
-export default ({ setState }) => function duplicateConfigKeys(ids = []) {
+export default function duplicateConfigKeys(ids = []) {
   if (!ids.length) return;
 
-  setState({ duplicatingConfigKeys: true });
+  this.setState({ duplicatingConfigKeys: true });
 
   const done = (e, rslts) => {
-    setState(({ configKeys }) => {
+    this.setState(({ configKeys }) => {
       return {
         duplicateConfigKeysError: e,
         duplicatingConfigKeys: false,
@@ -24,4 +24,4 @@ export default ({ setState }) => function duplicateConfigKeys(ids = []) {
   api.duplicateConfigKey({ id: ids[0] })
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

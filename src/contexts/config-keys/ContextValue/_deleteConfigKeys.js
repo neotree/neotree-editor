@@ -1,12 +1,12 @@
 import * as api from '@/api/config-keys';
 
-export default ({ setState }) => function deleteConfigKeys(ids = []) {
+export default function deleteConfigKeys(ids = []) {
   if (!ids.length) return;
 
-  setState({ deletingConfigKeys: true });
+  this.setState({ deletingConfigKeys: true });
 
   const done = (e) => {
-    setState(({ configKeys }) => ({
+    this.setState(({ configKeys }) => ({
       deleteConfigKeysError: e,
       deletingConfigKeys: false,
       ...e ? null : { configKeys: configKeys.filter(s => ids.indexOf(s.id) < 0) },
@@ -16,4 +16,4 @@ export default ({ setState }) => function deleteConfigKeys(ids = []) {
   api.deleteConfigKey({ id: ids[0] })
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

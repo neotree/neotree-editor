@@ -1,12 +1,10 @@
 import * as api from '@/api/config-keys';
 
-export default ({
-  setState,
-}) => function saveConfigKey(configKey, form = {}, cb) {
+export default function saveConfigKey(configKey, form = {}, cb) {
   const done = (e, rslts) => {
     if (cb) cb(e, rslts);
 
-    setState(({ configKeys }) => {
+    this.setState(({ configKeys }) => {
       let updatedConfigKeys = [...configKeys];
       if (rslts && rslts.configKey) {
         updatedConfigKeys = !configKey ?
@@ -26,4 +24,4 @@ export default ({
   save({ ...configKey, data })
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

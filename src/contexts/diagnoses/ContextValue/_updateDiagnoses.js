@@ -1,12 +1,12 @@
 import * as api from '@/api/diagnoses';
 
-export default ({ setState }) => function updateDiagnoses(diagnoses = []) {
+export default function updateDiagnoses(diagnoses = []) {
   if (!diagnoses.length) return;
 
-  setState({ updatingDiagnoses: true });
+  this.setState({ updatingDiagnoses: true });
 
   const done = (updateDiagnosesError, data) => {
-    setState({
+    this.setState({
       updateDiagnosesError,
       ...data,
       updatingDiagnoses: false,
@@ -16,4 +16,4 @@ export default ({ setState }) => function updateDiagnoses(diagnoses = []) {
   api.updateDiagnoses({ diagnoses })
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

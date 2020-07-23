@@ -1,5 +1,5 @@
 import React from 'react';
-import _initialiseApp from './_initialiseApp';
+import useContextValue from './ContextValue';
 
 export const AppContext = React.createContext(null);
 
@@ -22,27 +22,13 @@ export const setNavSection = navSection => {
 };
 
 export const provideAppContext = Component => function AppContextProvider(props) {
-  const [state, _setState] = React.useState({
-    documentTitle: '',
-    navSection: null,
-  });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
+  const value = useContextValue();
 
-  const initialiseApp = _initialiseApp({ setState });
-
-  React.useEffect(() => { initialiseApp(); }, []);
+  React.useEffect(() => { value.initialiseApp(); }, []);
 
   return (
     <AppContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        initialiseApp
-      }}
+      value={value}
     >
       <Component {...props} />
     </AppContext.Provider>
