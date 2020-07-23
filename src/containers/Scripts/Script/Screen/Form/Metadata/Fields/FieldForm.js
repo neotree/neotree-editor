@@ -111,7 +111,7 @@ const FieldForm = React.forwardRef(({
                 <TextField
                   fullWidth
                   required
-                  error={/[a-zA-Z0-9]+/.test(form.key)}
+                  error={/[a-zA-Z0-9]+/.test(form.key) ? false : true}
                   value={form.key || ''}
                   label="Key"
                   onChange={e => setForm({ key: e.target.value })}
@@ -219,7 +219,7 @@ const FieldForm = React.forwardRef(({
                 <TextField
                   fullWidth
                   required
-                  error={/(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?/.test(form.calculation)}
+                  error={/(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?/.test(form.calculation) ? false : true}
                   value={form.calculation || ''}
                   label="Reference expression"
                   onChange={e => setForm({ calculation: e.target.value })}
@@ -231,13 +231,13 @@ const FieldForm = React.forwardRef(({
               </>
             )}
 
-            {form.type === 'period' && (
+            {form.type === 'number' && (
               <>
                 <Grid container spacing={1}>
                   <Grid item xs={4} sm={4}>
                     <TextField
-                      fullWidth     
-                      error={form.format ? /#*/.test(form.format) : false}                 
+                      fullWidth
+                      error={/#*/.test(form.format) ? false : true}
                       value={form.format || ''}
                       label="Format"
                       onChange={e => setForm({ format: e.target.value })}
@@ -246,7 +246,7 @@ const FieldForm = React.forwardRef(({
                   <Grid item xs={4} sm={4}>
                     <TextField
                       fullWidth
-                      error={form.minValue ? /-?[0-9]*(\.[0-9]+)?/.test(form.minValue) : false}
+                      error={/-?[0-9]*(\.[0-9]+)?/.test(form.minValue) ? false : true}
                       value={form.minValue || ''}
                       label="Min value"
                       onChange={e => setForm({ minValue: e.target.value })}
@@ -255,7 +255,7 @@ const FieldForm = React.forwardRef(({
                   <Grid item xs={4} sm={4}>
                     <TextField
                       fullWidth
-                      error={form.maxValue ? /-?[0-9]*(\.[0-9]+)?/.test(form.maxValue) : false}
+                      error={/-?[0-9]*(\.[0-9]+)?/.test(form.maxValue) ? false : true}
                       value={form.maxValue || ''}
                       label="Max value"
                       onChange={e => setForm({ maxValue: e.target.value })}

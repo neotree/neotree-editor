@@ -107,7 +107,7 @@ const ItemForm = React.forwardRef(({
                       <TextField
                         fullWidth
                         required
-                        error={!(form.key && /[a-zA-Z0-9]+/.test(form.key))}
+                        error={form.key && /[a-zA-Z0-9]+/.test(form.key) ? false : true}
                         value={form.key || ''}
                         label="Key"
                         onChange={e => setForm({ key: e.target.value })}
