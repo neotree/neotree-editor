@@ -8,13 +8,15 @@ export default (authType, {
 }) => () => {
   if (disableAction(authType)) return;
 
-  setState({ loading: true });
+  setState({ loading: true, authenticateError: null, });
   authenticate(authType, {
     id: emailRegistration.userId,
     username: email,
     password,
     password2
   })
-    .catch(e => setState({ loading: false, authenticateError: e }))
-    .then(() => { window.location.href = '/'; });
+    .then(() => { window.location.href = '/'; })
+    .catch(e => {
+      setState({ loading: false, authenticateError: e });
+    });
 };

@@ -6,6 +6,6 @@ export default ({
 }) => () => {
   setState({ loading: true });
   checkEmailRegistration({ email })
-    .catch(e => setState({ loading: false, checkEmailRegistrationError: e, }))
-    .then(emailRegistration => setState({ loading: false, emailRegistration }));
+    .then(emailRegistration => setState({ loading: false, emailRegistration }))
+    .catch(e => setState({ loading: false, checkEmailRegistrationError: e, }));
 };

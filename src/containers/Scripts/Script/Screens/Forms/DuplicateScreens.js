@@ -23,10 +23,6 @@ const DuplicateScreens = React.forwardRef(({
         onClick={e => {
           setLoading(true);
           api.duplicateScreen({ id: ids[0] })
-            .catch(e => {
-              setLoading(false);
-              alert(getErrorMessage(e));
-            })
             .then(({ screen }) => {
               setLoading(false);
               setScreensState(({ screens }) => ({
@@ -38,6 +34,10 @@ const DuplicateScreens = React.forwardRef(({
                   ];
                 }, []),
               }));
+            })
+            .catch(e => {
+              setLoading(false);
+              alert(getErrorMessage(e));
             });
           if (onClick) onClick(e);
         }}

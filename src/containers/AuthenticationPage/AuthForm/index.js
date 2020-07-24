@@ -29,6 +29,7 @@ const AuthForm = ({ copy, authType }) => {
     checkEmailRegistration,
     state: {
       loading,
+      authenticateError,
       emailRegistration,
       form: {
         email,
@@ -38,9 +39,11 @@ const AuthForm = ({ copy, authType }) => {
     }
   } = useFormState(authType);
 
+  const errors = emailRegistration.errors || authenticateError;
+
   const renderActions = actions => (
     <div className={cx(classes.actionsWrap)}>
-      {!emailRegistration.errors ? null : emailRegistration.errors.map((e, i) => {
+      {!!errors && errors.map((e, i) => {
         const key = i;
         return (
           <div key={key}>

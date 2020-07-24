@@ -23,10 +23,6 @@ const DuplicateDiagnoses = React.forwardRef(({
         onClick={e => {
           setLoading(true);
           api.duplicateScreen({ id: ids[0] })
-            .catch(e => {
-              setLoading(false);
-              alert(getErrorMessage(e));
-            })
             .then(({ diagnosis }) => {
               setLoading(false);
               setDiagnosesState(({ diagnoses }) => ({
@@ -38,6 +34,10 @@ const DuplicateDiagnoses = React.forwardRef(({
                   ];
                 }, []),
               }));
+            })
+            .catch(e => {
+              setLoading(false);
+              alert(getErrorMessage(e));
             });
           if (onClick) onClick(e);
         }}

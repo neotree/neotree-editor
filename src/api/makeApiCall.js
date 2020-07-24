@@ -1,7 +1,7 @@
 /* global fetch */
 import queryString from 'query-string';
 
-export default (url = '', opts = {}) => {
+export default (url = '', opts = {}) => new Promise((resolve, reject) => {
   const { body, method: m, ...reqOpts } = opts;
   reqOpts.headers = { ...reqOpts.headers };
   const method = (m || 'GET').toUpperCase();
@@ -13,14 +13,12 @@ export default (url = '', opts = {}) => {
     reqOpts.body = JSON.stringify({ ...body });
   }
 
-  return new Promise((resolve, reject) => {
-    fetch(url, { method, ...reqOpts })
-      .then(res => {
-        return res.json();
-      })
-      .then(res => resolve(res))
-      .catch(e => {
-        reject(e);
-      });
-  });
-};
+  fetch(url, { method, ...reqOpts })
+    .then(res => res.json())
+    .then(res => {
+      const error = res.error || res.errors;
+      if (error) return reject(error.map ? error : [error]);
+      resolve(res);
+    })
+    .catch(reject);
+});

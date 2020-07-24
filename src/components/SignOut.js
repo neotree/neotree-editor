@@ -36,11 +36,11 @@ const SignOut = ({ Component, ...props }) => {
         onConfirm: () => {
           setSigningOut(true);
           api.signOut()
+            .then(() => window.location.reload())
             .catch(e => {
               setSigningOut(false);
               alert(getErrorMsg(e));
-            })
-            .then(() => window.location.reload())
+            });
         },
       })}
     </>

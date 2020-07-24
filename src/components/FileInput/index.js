@@ -21,11 +21,11 @@ const useStyles = makeStyles(() => ({
     },
 }));
 
-const FileInput = React.forwardRef(({ 
-    onUploadSuccess, 
-    children, 
-    className, 
-    ...props 
+const FileInput = React.forwardRef(({
+    onUploadSuccess,
+    children,
+    className,
+    ...props
 }, ref) => {
     const [uploading, setUploading] = React.useState(false);
     const inputRef = React.useRef(null);
@@ -39,9 +39,9 @@ const FileInput = React.forwardRef(({
 
     return (
         <>
-            <div className={cx(className, classes.root)}>                
+            <div className={cx(className, classes.root)}>
                 {uploading ? <CircularProgress size={15} /> : children}
-                <input 
+                <input
                     {...props}
                     type="file"
                     ref={inputRef}
@@ -56,11 +56,11 @@ const FileInput = React.forwardRef(({
                         };
                         Promise.all(files.map(f => new Promise((resolve) => {
                             uploadFile(f)
-                                .catch(e => resolve({ error: e }))
-                                .then(res => resolve(res));
+                                .then(res => resolve(res))
+                                .catch(e => resolve({ error: e }));
                         })))
-                            .catch(done)
-                            .then(rslts => done(null, rslts));
+                            .then(rslts => done(null, rslts))
+                            .catch(done);
                     }}
                 />
             </div>

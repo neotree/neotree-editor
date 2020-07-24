@@ -23,10 +23,6 @@ const DuplicateScripts = React.forwardRef(({
         onClick={e => {
           setLoading(true);
           api.duplicateScript({ id: ids[0] })
-            .catch(e => {
-              setLoading(false);
-              alert(getErrorMessage(e));
-            })
             .then(({ script }) => {
               setLoading(false);
               setScriptsState(({ scripts }) => ({
@@ -38,6 +34,10 @@ const DuplicateScripts = React.forwardRef(({
                   ];
                 }, []),
               }));
+            })
+            .catch(e => {
+              setLoading(false);
+              alert(getErrorMessage(e));
             });
           if (onClick) onClick(e);
         }}
