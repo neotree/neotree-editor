@@ -14,6 +14,8 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
 import { FieldTypes } from '@/constants/types';
+import { DateTimePicker, TimePicker, } from '@material-ui/pickers';
+import Checkbox from '@material-ui/core/Checkbox';
 import Title from '../../Title';
 
 const FieldForm = React.forwardRef(({
@@ -40,6 +42,10 @@ const FieldForm = React.forwardRef(({
     maxValue: null,
     values: null,
     optional: false,
+    minDate: null,
+    maxDate: null,
+    minTime: null,
+    maxTime: null,
     ...data,
   };
   const [form, _setForm] = React.useState(defaultForm);
@@ -49,6 +55,29 @@ const FieldForm = React.forwardRef(({
   }));
 
   React.useEffect(() => { setForm(defaultForm); }, [open]);
+
+  const renderDefaultsSection = opts => !opts ? null : (
+    <>
+      <Title>Default</Title>
+
+      <RadioGroup name="type" value={form.defaultValue} onChange={e => setForm({ defaultValue: e.target.value })}>
+        <FormControlLabel
+          value=""
+          control={<Radio />}
+          label="Empty"
+        />
+        {opts.map(o => (
+          <FormControlLabel
+            key={o.name}
+            value={o.name}
+            control={<Radio />}
+            label={o.label}
+          />
+        ))}
+      </RadioGroup>
+      <br />
+    </>
+  );
 
   return (
     <>
@@ -164,42 +193,117 @@ const FieldForm = React.forwardRef(({
               </Grid>
               <br />
 
-              {(() => {
-                let opts = null;
-                if (form.type === 'text') {
-                  opts = [
+              {form.type === 'text' && (
+                <>
+                  {renderDefaultsSection([
                     { label: 'Generated ID', name: 'uid' },
-                  ];
-                } else if ((form.type === 'date') || form.type === 'datetime') {
-                  opts = [
+                  ])}
+                </>
+              )}
+
+              {form.type === 'time' && (
+                <>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6} sm={6}>
+                      <TimePicker
+                        ampm={false}
+                        label="Min time"
+                        fullWidth
+                        disabled={form.minTime === 'time_now'}
+                        value={form.minTime === 'time_now' ? null : form.minTime}
+                        onChange={minTime => setForm({ minTime })}
+                      />
+                      <FormControlLabel
+                        label="Current time"
+                        control={(
+                          <Checkbox
+                            size="small"
+                            checked={form.minTime === 'time_now'}
+                            onChange={e => setForm({ minTime: e.target.checked ? 'time_now' : null })}
+                          />
+                        )}
+                      />
+                    </Grid>
+
+                    <Grid item xs={6} sm={6}>
+                      <TimePicker
+                        ampm={false}
+                        label="Max time"
+                        fullWidth
+                        disabled={form.maxTime === 'time_now'}
+                        value={form.maxTime === 'time_now' ? null : form.maxTime}
+                        onChange={maxTime => setForm({ maxTime })}
+                      />
+                      <FormControlLabel
+                        label="Current time"
+                        control={(
+                          <Checkbox
+                            size="small"
+                            checked={form.maxTime === 'time_now'}
+                            onChange={e => setForm({ maxTime: e.target.checked ? 'time_now' : null })}
+                          />
+                        )}
+                      />
+                    </Grid>
+                  </Grid>
+                  <br /><br />
+                </>
+              )}
+
+              {((form.type === 'date') || (form.type === 'datetime')) && (
+                <>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6} sm={6}>
+                      <DateTimePicker
+                        ampm={false}
+                        label="Min date"
+                        fullWidth
+                        disabled={form.minDate === 'date_now'}
+                        value={form.minDate === 'date_now' ? null : form.minDate}
+                        onChange={minDate => setForm({ minDate })}
+                      />
+                      <FormControlLabel
+                        label="Current date"
+                        control={(
+                          <Checkbox
+                            size="small"
+                            checked={form.minDate === 'date_now'}
+                            onChange={e => setForm({ minDate: e.target.checked ? 'date_now' : null })}
+                          />
+                        )}
+                      />
+                    </Grid>
+
+                    <Grid item xs={6} sm={6}>
+                      <DateTimePicker
+                        ampm={false}
+                        label="Max date"
+                        fullWidth
+                        disabled={form.maxDate === 'date_now'}
+                        value={form.maxDate === 'date_now' ? null : form.maxDate}
+                        onChange={maxDate => setForm({ maxDate })}
+                      />
+                      <FormControlLabel
+                        label="Current date"
+                        control={(
+                          <Checkbox
+                            size="small"
+                            checked={form.maxDate === 'date_now'}
+                            onChange={e => setForm({ maxDate: e.target.checked ? 'date_now' : null })}
+                          />
+                        )}
+                      />
+                    </Grid>
+                  </Grid>
+                  <br /><br />
+
+                  {renderDefaultsSection([
                     { label: 'Current time', name: 'date_now' },
                     { label: 'Today at noon', name: 'date_noon' },
                     { label: 'Today at midnight', name: 'date_midnight' },
-                  ];
-                }
-                return !opts ? null : (
-                  <>
-                    <Title>Default</Title>
-
-                    <RadioGroup name="type" value={form.defaultValue} onChange={e => setForm({ defaultValue: e.target.value })}>
-                      <FormControlLabel
-                        value=""
-                        control={<Radio />}
-                        label="Empty"
-                      />
-                      {opts.map(o => (
-                        <FormControlLabel
-                          key={o.name}
-                          value={o.name}
-                          control={<Radio />}
-                          label={o.label}
-                        />
-                      ))}
-                    </RadioGroup>
-                    <br />
-                  </>
-                );
-              })()}
+                  ])}
+                </>
+              )}
 
             {form.type === 'dropdown' && (
               <>
