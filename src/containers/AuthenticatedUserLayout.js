@@ -51,6 +51,10 @@ export default function AuthenticatedUserLayout(props) {
                     <ListItemText primary="Configuration" />
                   </ListItemLink>
 
+                  <ListItemLink selected={navSection === 'users'} onClick={() => hideDrawer()} to="/users">
+                    <ListItemText primary="Users" />
+                  </ListItemLink>
+
                   <ListItemLink selected={navSection === 'settings'} onClick={() => hideDrawer()} to="/settings">
                     <ListItemText primary="Settings" />
                   </ListItemLink>

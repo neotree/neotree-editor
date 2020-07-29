@@ -8,6 +8,7 @@ const HomePage = LazyPage(() => import('./HomePage'));
 const Scripts = LazyPage(() => import('./Scripts'));
 const ConfigKeys = LazyPage(() => import('./ConfigKeys'));
 const SettingsPage = LazyPage(() => import('./SettingsPage'));
+const UsersPage = LazyPage(() => import('./UsersPage'));
 const AuthenticationPage = LazyPage(() => import('./AuthenticationPage'));
 
 const Containers = () => {
@@ -31,6 +32,7 @@ const Containers = () => {
               <Switch>
                 <Route path="/scripts" component={Scripts} />
                 <Route path="/config-keys" component={ConfigKeys} />
+                <Route exact path="/users" component={UsersPage} />
                 <Route exact path="/settings" component={SettingsPage} />
                 <Route exact path="/settings/:section" component={SettingsPage} />
                 <Route exact path="/" component={HomePage} />
