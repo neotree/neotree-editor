@@ -24,6 +24,7 @@ module.exports = function () {
     };
 
     _models.Script.findAll({
+      order: [['position', 'ASC']],
       where: _objectSpread({}, payload)
     }).then(function (scripts) {
       return done(null, {

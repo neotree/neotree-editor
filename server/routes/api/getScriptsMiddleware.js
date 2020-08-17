@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next();
   };
 
-  Script.findAll({ where: { ...payload } })
+  Script.findAll({ order: [['position', 'ASC']], where: { ...payload } })
     .then(scripts => done(null, { scripts }))
     .catch(done);
 };
