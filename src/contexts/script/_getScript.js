@@ -1,10 +1,10 @@
 import * as api from '@/api/scripts';
 
-export default ({ setState }) => function getScript(payload = {}) {
-  setState({ loadingScript: true });
+export default function getScript(payload = {}) {
+  this.setState({ loadingScript: true });
 
   const done = (e, rslts) => {
-    setState(({ form }) => ({
+    this.setState(({ form }) => ({
       initialiseScriptError: e,
       scriptInitialised: true,
       loadingScript: false,
@@ -16,4 +16,4 @@ export default ({ setState }) => function getScript(payload = {}) {
   api.getScript(payload)
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

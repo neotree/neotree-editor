@@ -1,7 +1,6 @@
 import React from 'react';
 import useRouter from '@/utils/useRouter';
-import _getScript from './_getScript';
-import _saveScript from './_saveScript';
+import * as defaults from './_defaults';
 
 export const ScriptContext = React.createContext(null);
 
@@ -19,57 +18,64 @@ export const provideScriptContext = Component => function ScriptContextProvider(
   const router = useRouter();
   const { scriptId, scriptSection } = router.match.params;
 
-  const [state, _setState] = React.useState({
-    scriptSection: scriptSection || 'screens',
-    form: {},
+  const [_state, _setState] = React.useState({
+    ...defaults.defaultState,
+    scriptSection: scriptSection || defaults.defaultState.scriptSection,
   });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
 
-  const setForm = s => _setState(prev => ({
-    ...prev,
-    form: {
-      ...prev.form,
-      ...typeof s === 'function' ? s(prev.form) : s
-    },
-  }));
+  const contextValue = new (class ScriptContextValue {
+    constructor() {
+      this._setState = _setState;
+      this.state = _state;
+      this.router = router;
+      this.defaults = defaults;
+    }
 
-  const getScript = _getScript({ setState });
-  const saveScript = _saveScript({ setState, state, router });
+    setState = s => _setState(prev => ({
+      ...prev,
+      ...typeof s === 'function' ? s(prev) : s
+    }));
+  
+    setForm = s => _setState(prev => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        ...typeof s === 'function' ? s(prev.form) : s
+      },
+    }));
+
+    canSaveScript = () => this.state.form.title && !this.state.savingScript;
+
+    isFormReady = () => (scriptId === 'new') || !!this.state.script;
+
+    setFormAndSave = f => {
+      this.setForm(f);
+      this.setState({ shouldSaveForm: true });
+    };
+  
+    getScript = require('./_getScript').default.bind(this);
+
+    saveScript = require('./_saveScript').default.bind(this);
+  })();  
 
   React.useEffect(() => {
     const scriptInitialised = scriptId !== 'new' ? true : false;
-    setState({ scriptInitialised, script: null, form: {} });
-    if (scriptId !== 'new') getScript({ id: scriptId, });
+    contextValue.setState({ scriptInitialised, script: null, form: defaults.defaultState.form, });
+    if (scriptId !== 'new') contextValue.getScript({ id: scriptId, });
   }, [scriptId]);
 
-  const { shouldSaveForm } = state;
+  const { shouldSaveForm } = contextValue.state;
 
   React.useEffect(() => {
     if (shouldSaveForm) {
-      saveScript({ redirectOnSuccess: false });
-      setState({ shouldSaveForm: false });
+      contextValue.saveScript({ redirectOnSuccess: false });
+      contextValue.setState({ shouldSaveForm: false });
     }
   }, [shouldSaveForm]);
 
   return (
     <ScriptContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getScript,
-        setForm,
-        saveScript,
-        canSaveScript: () => state.form.title && !state.savingScript,
-        isFormReady: () => (scriptId === 'new') || !!state.script,
-        setFormAndSave: f => {
-          setForm(f);
-          setState({ shouldSaveForm: true });
-        },
-      }}
+      value={contextValue}
     >
       <Component {...props} />
     </ScriptContext.Provider>

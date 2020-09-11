@@ -1,11 +1,12 @@
 import * as api from '@/api/scripts';
 import getErrorMessage from '@/utils/getErrorMessage';
 
-export default ({
-  setState,
-  router: { history, match: { params: { scriptId } } },
-  state: { script, form, },
-}) => function saveScript(_payload = {}) {
+export default function saveScript(_payload = {}) {
+  const {
+    setState,
+    router: { history, match: { params: { scriptId } } },
+    state: { script, form, },
+  } = this;
   const { redirectOnSuccess, ...payload } = _payload;
   const shdRedirect = redirectOnSuccess !== false;
 
@@ -29,4 +30,4 @@ export default ({
       done(rslts.errors, rslts);
     })
     .catch(done);
-};
+}
