@@ -26,10 +26,11 @@ const DiagnosesList = () => {
             selectable
             noDataMsg="No diagnoses"
             title={copy.PAGE_TITLE}
-            data={diagnoses}
+            data={diagnoses.map(s => ({ ...s, data: { ...s.data, position: s.position, } }))}
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
+              { key: 'position', label: 'Position', },
               { key: 'name', label: 'Name', },
               { key: 'description', label: 'Description', }
             ]}

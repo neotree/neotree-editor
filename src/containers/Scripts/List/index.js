@@ -31,10 +31,11 @@ const ScriptsList = () => {
             noDataMsg="No scripts"
             selectable={false}
             title={copy.PAGE_TITLE}
-            data={scripts}
+            data={scripts.map(s => ({ ...s, data: { ...s.data, position: s.position, } }))}
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
+              { key: 'position', label: 'Position', },
               { key: 'title', label: 'Title', },
               { key: 'description', label: 'Description', }
             ]}
