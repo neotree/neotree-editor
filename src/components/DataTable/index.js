@@ -50,15 +50,9 @@ function DataTable({
   const [selected, setSelected] = React.useState([]);
   const [data, setData] = React.useState(_data);
 
-  React.useEffect(() => { setData(_data); }, [_data]);
-
-  React.useEffect(() => {
-    if (JSON.stringify(data) !== JSON.stringify(_data)) {
-      const stateData = data.map((item, i) => ({ ...item, position: i + 1, }));
-      setData(stateData);
-      if (onSortData) onSortData(stateData);
-    }
-  }, [data]);
+  React.useEffect(() => { 
+    if (JSON.stringify(data) !== JSON.stringify(_data)) setData(_data); 
+  }, [_data]);
 
   return (
     <>
@@ -115,14 +109,16 @@ function DataTable({
                 selected={selected}
                 setSelected={setSelected}
                 useDragHandle
-                onSortEnd={({ oldIndex, newIndex }) => setData(data =>
-                  update(data, {
+                onSortEnd={({ oldIndex, newIndex }) => {
+                  const _data = update(data, {
                     $splice: [
                       [oldIndex, 1],
                       [newIndex, 0, data[oldIndex]],
                     ],
-                  })
-                )}
+                  }).map((item, i) => ({ ...item, position: i + 1 }));
+                  setData(_data);
+                  onSortData(_data);
+                }}
               />
             </Table>
           </TableContainer>

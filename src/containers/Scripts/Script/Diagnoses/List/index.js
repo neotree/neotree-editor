@@ -30,7 +30,7 @@ const DiagnosesList = () => {
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
-              { key: 'position', label: 'Position', },
+              { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'name', label: 'Name', },
               { key: 'description', label: 'Description', }
             ]}

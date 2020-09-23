@@ -35,7 +35,7 @@ const ScriptsList = () => {
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
-              { key: 'position', label: 'Position', },
+              { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'title', label: 'Title', },
               { key: 'description', label: 'Description', }
             ]}
