@@ -2,11 +2,13 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
@@ -22,54 +24,95 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function (app, params) {
   return function (req, res, next) {
-    var payload = params || req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var payload, done, position, saveToFirebase, id;
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              payload = params || req.body;
 
-    var done = function done(err, script) {
-      if (script) app.io.emit('create_scripts', {
-        key: app.getRandomString(),
-        scripts: [{
-          id: script.id
-        }]
-      });
-      res.locals.setResponse(err, {
-        script: script
-      });
-      next();
-      return null;
-    };
+              done = function done(err, script) {
+                if (script) app.io.emit('create_scripts', {
+                  key: app.getRandomString(),
+                  scripts: [{
+                    id: script.id
+                  }]
+                });
+                res.locals.setResponse(err, {
+                  script: script
+                });
+                next();
+                return null;
+              };
 
-    var saveToFirebase = function saveToFirebase() {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref('scripts').push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-          var scriptId = snap.key;
+              position = 0;
+              _context.prev = 3;
+              _context.next = 6;
+              return _models.Script.count({
+                where: {}
+              });
 
-          var _data = data ? JSON.parse(data) : null;
+            case 6:
+              position = _context.sent;
+              position++;
+              _context.next = 13;
+              break;
 
-          _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-            scriptId: scriptId,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          })).then(function () {
-            resolve(scriptId);
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-    Promise.all([_models.Script.count({
-      where: {}
-    }), saveToFirebase()]).then(function (_ref) {
-      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          count = _ref2[0],
-          id = _ref2[1];
+            case 13:
+              saveToFirebase = function saveToFirebase() {
+                return new Promise(function (resolve, reject) {
+                  _firebase["default"].database().ref('scripts').push().then(function (snap) {
+                    var data = payload.data,
+                        rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
+                    var scriptId = snap.key;
 
-      _models.Script.create(_objectSpread(_objectSpread({}, payload), {}, {
-        position: count + 1,
-        id: id
-      })).then(function (script) {
-        return done(null, script);
-      })["catch"](done);
-    })["catch"](done);
+                    var _data = data ? JSON.parse(data) : null;
+
+                    _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
+                      position: position,
+                      scriptId: scriptId,
+                      createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                    })).then(function () {
+                      resolve(scriptId);
+                    })["catch"](reject);
+                  })["catch"](reject);
+                });
+              };
+
+              _context.prev = 14;
+              _context.next = 17;
+              return saveToFirebase();
+
+            case 17:
+              id = _context.sent;
+
+              _models.Script.create(_objectSpread(_objectSpread({}, payload), {}, {
+                position: position,
+                id: id
+              })).then(function (script) {
+                return done(null, script);
+              })["catch"](done);
+
+              _context.next = 24;
+              break;
+
+            case 21:
+              _context.prev = 21;
+              _context.t1 = _context["catch"](14);
+              done(_context.t1);
+
+            case 24:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 21]]);
+    }))();
   };
 };

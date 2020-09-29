@@ -2,11 +2,13 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _models = require("../../models");
 
@@ -22,58 +24,99 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function (app) {
   return function (req, res, next) {
-    var payload = req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var payload, done, position, saveToFirebase, diagnosis_id;
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              payload = req.body;
 
-    var done = function done(err, diagnosis) {
-      if (err) app.logger.log(err);
-      if (diagnosis) app.io.emit('create_diagnoses', {
-        key: app.getRandomString(),
-        diagnoses: [{
-          id: diagnosis.id
-        }]
-      });
-      res.locals.setResponse(err, {
-        diagnosis: diagnosis
-      });
-      next();
-      return null;
-    };
+              done = function done(err, diagnosis) {
+                if (err) app.logger.log(err);
+                if (diagnosis) app.io.emit('create_diagnoses', {
+                  key: app.getRandomString(),
+                  diagnoses: [{
+                    id: diagnosis.id
+                  }]
+                });
+                res.locals.setResponse(err, {
+                  diagnosis: diagnosis
+                });
+                next();
+                return null;
+              };
 
-    var saveToFirebase = function saveToFirebase() {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref("diagnosis/".concat(payload.script_id)).push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-          var diagnosisId = snap.key;
+              position = 0;
+              _context.prev = 3;
+              _context.next = 6;
+              return _models.Diagnosis.count({
+                where: {
+                  script_id: payload.script_id
+                }
+              });
 
-          var _data = data ? JSON.parse(data) : null;
+            case 6:
+              position = _context.sent;
+              position++;
+              _context.next = 13;
+              break;
 
-          _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-            diagnosisId: diagnosisId,
-            scriptId: payload.script_id,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          })).then(function () {
-            resolve(diagnosisId);
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-    Promise.all([_models.Diagnosis.count({
-      where: {
-        script_id: payload.script_id
-      }
-    }), saveToFirebase()]).then(function (_ref) {
-      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          count = _ref2[0],
-          diagnosis_id = _ref2[1];
+            case 13:
+              saveToFirebase = function saveToFirebase() {
+                return new Promise(function (resolve, reject) {
+                  _firebase["default"].database().ref("diagnosis/".concat(payload.script_id)).push().then(function (snap) {
+                    var data = payload.data,
+                        rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
+                    var diagnosisId = snap.key;
 
-      _models.Diagnosis.create(_objectSpread(_objectSpread({}, payload), {}, {
-        position: count + 1,
-        diagnosis_id: diagnosis_id
-      })).then(function (diagnosis) {
-        return done(null, diagnosis);
-      })["catch"](done);
-    })["catch"](done);
+                    var _data = data ? JSON.parse(data) : null;
+
+                    _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
+                      position: position,
+                      diagnosisId: diagnosisId,
+                      scriptId: payload.script_id,
+                      createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                    })).then(function () {
+                      resolve(diagnosisId);
+                    })["catch"](reject);
+                  })["catch"](reject);
+                });
+              };
+
+              _context.prev = 14;
+              _context.next = 17;
+              return saveToFirebase();
+
+            case 17:
+              diagnosis_id = _context.sent;
+
+              _models.Diagnosis.create(_objectSpread(_objectSpread({}, payload), {}, {
+                position: position,
+                diagnosis_id: diagnosis_id
+              })).then(function (diagnosis) {
+                return done(null, diagnosis);
+              })["catch"](done);
+
+              _context.next = 24;
+              break;
+
+            case 21:
+              _context.prev = 21;
+              _context.t1 = _context["catch"](14);
+              done(_context.t1);
+
+            case 24:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 21]]);
+    }))();
   };
 };

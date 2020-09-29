@@ -2,11 +2,13 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _models = require("../../models");
 
@@ -22,54 +24,95 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function (app) {
   return function (req, res, next) {
-    var payload = req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var payload, done, position, saveToFirebase, id;
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              payload = req.body;
 
-    var done = function done(err, configKey) {
-      if (configKey) app.io.emit('create_config_keys', {
-        key: app.getRandomString(),
-        config_keys: [{
-          id: configKey.id
-        }]
-      });
-      res.locals.setResponse(err, {
-        configKey: configKey
-      });
-      next();
-      return null;
-    };
+              done = function done(err, configKey) {
+                if (configKey) app.io.emit('create_config_keys', {
+                  key: app.getRandomString(),
+                  config_keys: [{
+                    id: configKey.id
+                  }]
+                });
+                res.locals.setResponse(err, {
+                  configKey: configKey
+                });
+                next();
+                return null;
+              };
 
-    var saveToFirebase = function saveToFirebase() {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref('configkeys').push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-          var configKeyId = snap.key;
+              position = 0;
+              _context.prev = 3;
+              _context.next = 6;
+              return _models.ConfigKey.count({
+                where: {}
+              });
 
-          var _data = data ? JSON.parse(data) : null;
+            case 6:
+              position = _context.sent;
+              position++;
+              _context.next = 13;
+              break;
 
-          _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-            configKeyId: configKeyId,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          })).then(function () {
-            resolve(configKeyId);
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-    Promise.all([_models.ConfigKey.count({
-      where: {}
-    }), saveToFirebase()]).then(function (_ref) {
-      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          count = _ref2[0],
-          id = _ref2[1];
+            case 13:
+              saveToFirebase = function saveToFirebase() {
+                return new Promise(function (resolve, reject) {
+                  _firebase["default"].database().ref('configkeys').push().then(function (snap) {
+                    var data = payload.data,
+                        rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
+                    var configKeyId = snap.key;
 
-      _models.ConfigKey.create(_objectSpread(_objectSpread({}, payload), {}, {
-        position: count + 1,
-        id: id
-      })).then(function (configKey) {
-        return done(null, configKey);
-      })["catch"](done);
-    })["catch"](done);
+                    var _data = data ? JSON.parse(data) : null;
+
+                    _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
+                      position: position,
+                      configKeyId: configKeyId,
+                      createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                    })).then(function () {
+                      resolve(configKeyId);
+                    })["catch"](reject);
+                  })["catch"](reject);
+                });
+              };
+
+              _context.prev = 14;
+              _context.next = 17;
+              return saveToFirebase();
+
+            case 17:
+              id = _context.sent;
+
+              _models.ConfigKey.create(_objectSpread(_objectSpread({}, payload), {}, {
+                position: position,
+                id: id
+              })).then(function (configKey) {
+                return done(null, configKey);
+              })["catch"](done);
+
+              _context.next = 24;
+              break;
+
+            case 21:
+              _context.prev = 21;
+              _context.t1 = _context["catch"](14);
+              done(_context.t1);
+
+            case 24:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 21]]);
+    }))();
   };
 };
