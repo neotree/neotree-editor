@@ -54,7 +54,7 @@ export const ScreenTypes = [
   { name: 'form', label: 'Form' },
   { name: 'management', label: 'Management' },
   { name: 'multi_select', label: 'Multiple choice list' },
-  { name: 'list', label: 'Simple list' },
+  // { name: 'list', label: 'Simple list' },
   { name: 'single_select', label: 'Single choice list' },
   { name: 'progress', label: 'Progress' },
   { name: 'timer', label: 'Timer' },
