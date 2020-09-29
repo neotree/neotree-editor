@@ -2,43 +2,49 @@ import { ConfigKey } from '../../models';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
-  const payload = req.body;
+  (async () => {
+    const payload = req.body;
 
-  const done = (err, configKey) => {
-    if (configKey) app.io.emit('create_config_keys', { key: app.getRandomString(), config_keys: [{ id: configKey.id }] });
-    res.locals.setResponse(err, { configKey });
-    next(); return null;
-  };
+    const done = (err, configKey) => {
+      if (configKey) app.io.emit('create_config_keys', { key: app.getRandomString(), config_keys: [{ id: configKey.id }] });
+      res.locals.setResponse(err, { configKey });
+      next(); return null;
+    };
 
-  const saveToFirebase = () => new Promise((resolve, reject) => {
-    firebase.database().ref('configkeys').push().then(snap => {
-      const { data, ...rest } = payload;
+    let position = 0;
+    try { 
+      position = await ConfigKey.count({ where: {} }); 
+      position++;
+    } catch (e) { return done(e); }
 
-      const configKeyId = snap.key;
+    const saveToFirebase = () => new Promise((resolve, reject) => {
+      firebase.database().ref('configkeys').push().then(snap => {
+        const { data, ...rest } = payload;
 
-      const _data = data ? JSON.parse(data) : null;
+        const configKeyId = snap.key;
 
-      firebase.database()
-        .ref(`configkeys/${configKeyId}`).set({
-          ...rest,
-          ..._data,
-          configKeyId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-          resolve(configKeyId);
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
+        const _data = data ? JSON.parse(data) : null;
 
-  Promise.all([
-    ConfigKey.count({ where: {} }),
-    saveToFirebase(),
-  ])
-    .then(([count, id]) => {
-      ConfigKey.create({ ...payload, position: count + 1, id })
-        .then((configKey) => done(null, configKey))
-        .catch(done);
-    }).catch(done);
+        firebase.database()
+          .ref(`configkeys/${configKeyId}`).set({
+            ...rest,
+            ..._data,
+            position,
+            configKeyId,
+            createdAt: firebase.database.ServerValue.TIMESTAMP
+          }).then(() => {
+            resolve(configKeyId);
+          })
+          .catch(reject);
+      })
+      .catch(reject);
+    });
+
+    try { 
+      const id = await saveToFirebase();
+      ConfigKey.create({ ...payload, position, id })
+          .then((configKey) => done(null, configKey))
+          .catch(done);
+    } catch (e) { done(e); }
+  })();
 };
