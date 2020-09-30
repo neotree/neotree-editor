@@ -57,14 +57,12 @@ var copyScript = function copyScript(_ref) {
           Promise.all([].concat((0, _toConsumableArray2["default"])(screens.map(function (screen) {
             screen = screen.toJSON();
             return (0, _duplicateScreenMiddleware.copyScreen)(_objectSpread(_objectSpread({}, screen), {}, {
-              script_id: script.id,
-              data: JSON.stringify(screen.data)
+              script_id: script.id
             }));
           })), (0, _toConsumableArray2["default"])(diagnoses.map(function (d) {
             d = d.toJSON();
             return (0, _duplicateDiagnosisMiddleware.copyDiagnosis)(_objectSpread(_objectSpread({}, d), {}, {
-              script_id: script.id,
-              data: JSON.stringify(d.data)
+              script_id: script.id
             }));
           })))).then(function (_ref2) {
             var _ref3 = (0, _slicedToArray2["default"])(_ref2, 2),
