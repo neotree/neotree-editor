@@ -29,7 +29,6 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
                   return copyScreen({
                     ...screen,
                     script_id: script.id,
-                    data: JSON.stringify(screen.data),
                   });
                 }),
                 ...diagnoses.map(d => {
@@ -37,7 +36,6 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
                   return copyDiagnosis({
                     ...d,
                     script_id: script.id,
-                    data: JSON.stringify(d.data),
                   });
                 })
               ])
