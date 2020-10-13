@@ -1,4 +1,4 @@
-import { Diagnosis, Log } from '../../models';
+import { Diagnosis, Log } from '../../database';
 import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
 
 module.exports = app => (req, res, next) => {

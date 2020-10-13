@@ -1,4 +1,4 @@
-import { User } from '../../models';
+import { User } from '../../database';
 
 module.exports = (app, payload, callback) => (req, res, next) => {
   const { email } = { ...(payload || req.query) };

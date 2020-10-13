@@ -1,5 +1,5 @@
-import firebase from '../../firebase';
-import { Script, Screen, Diagnosis } from '../../models';
+import firebase from '../../database/firebase';
+import { Script, Screen, Diagnosis } from '../../database';
 import { copyScreen } from '../screens/duplicateScreenMiddleware';
 import { copyDiagnosis } from '../diagnoses/duplicateDiagnosisMiddleware';
 

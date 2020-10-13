@@ -1,4 +1,4 @@
-import { Script, Screen, Diagnosis, Log } from '../../models';
+import { Script, Screen, Diagnosis, Log } from '../../database';
 
 module.exports = (app) => (req, res, next) => {
   const {

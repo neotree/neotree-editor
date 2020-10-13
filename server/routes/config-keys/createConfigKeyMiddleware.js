@@ -1,5 +1,5 @@
-import { ConfigKey } from '../../models';
-import firebase from '../../firebase';
+import { ConfigKey } from '../../database';
+import firebase from '../../database/firebase';
 
 module.exports = app => (req, res, next) => {
   (async () => {

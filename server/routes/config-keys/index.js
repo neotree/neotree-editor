@@ -1,56 +1,55 @@
 import express from 'express';
+import * as endpoints from '../../../constants/api-endpoints/configKeys';
 
 const router = express.Router();
 
 module.exports = app => {
-  const { responseMiddleware } = app;
-
   router.get(
-    '/get-config-keys',
+    endpoints.GET_CONFIG_KEYS,
     require('./getConfigKeysMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-config-key',
+    endpoints.GET_CONFIG_KEY,
     require('./getConfigKeyMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-full-config-key',
+    endpoints.GET_FULL_CONFIG_KEY,
     require('./getFullConfigKeyMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/create-config-key',
+    endpoints.CREATE_CONFIG_KEY,
     require('./createConfigKeyMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-config-key',
+    endpoints.UPDATE_CONFIG_KEY,
     require('./updateConfigKeyMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-config-keys',
+    endpoints.UPDATE_CONFIG_KEYS,
     require('./updateConfigKeysMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/delete-config-key',
+    endpoints.DELETE_CONFIG_KEY,
     require('./deleteConfigKeyMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/duplicate-config-key',
+    endpoints.DUPLICATE_CONFIG_KEY,
     require('./duplicateConfigKeyMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

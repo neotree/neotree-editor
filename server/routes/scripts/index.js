@@ -1,62 +1,61 @@
 import express from 'express';
+import * as endpoints from '../../../constants/api-endpoints/scripts';
 
 const router = express.Router();
 
 module.exports = app => {
-  const { responseMiddleware } = app;
-
   router.get(
-    '/get-scripts',
+    endpoints.GET_SCRIPTS,
     require('./getScriptsMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-script',
+    endpoints.GET_SCRIPT,
     require('./getScriptMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-full-script',
+    endpoints.GET_FULL_SCRIPT,
     require('./getFullScriptMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-script-items',
+    endpoints.GET_SCRIPT_ITEMS,
     require('./getScriptItemsMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/create-script',
+    endpoints.CREATE_SCRIPT,
     require('./createScriptMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-script',
+    endpoints.UPDATE_SCRIPT,
     require('./updateScriptMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-scripts',
+    endpoints.UPDATE_SCRIPTS,
     require('./updateScriptsMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/delete-script',
+    endpoints.DELETE_SCRIPT,
     require('./deleteScriptMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/duplicate-script',
+    endpoints.DUPLICATE_SCRIPT,
     require('./duplicateScriptMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

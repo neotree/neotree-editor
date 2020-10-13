@@ -1,4 +1,4 @@
-import { ConfigKey } from '../../models';
+import { ConfigKey } from '../../database';
 
 module.exports = app => (req, res, next) => {
   const { configKeys, returnUpdated } = req.body;

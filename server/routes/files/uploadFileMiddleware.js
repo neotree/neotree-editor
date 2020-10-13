@@ -1,15 +1,14 @@
 import multer from 'multer';
 import uuid from 'uuidv4';
-import { File } from '../../models';
+import { File } from '../../database';
+import * as endpoints from '../../../constants/api-endpoints/files';
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-module.exports = (router, app) => {
-  const { responseMiddleware } = app;
-
+module.exports = (router) => {
   router.post(
-    '/upload-file',
+    endpoints.UPLOAD_FILE,
     upload.single('file'),
     (req, res, next) => {
       const f = req.file;
@@ -36,7 +35,7 @@ module.exports = (router, app) => {
       })
       .catch(done);
     },
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

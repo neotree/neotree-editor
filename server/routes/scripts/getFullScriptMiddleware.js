@@ -1,4 +1,4 @@
-import { Script } from '../../models';
+import { Script } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const payload = req.query;

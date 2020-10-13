@@ -1,4 +1,4 @@
-import { ApiKey } from '../../models';
+import { ApiKey } from '../../database';
 
 module.exports = (app) => (req, res, next) => {
   const { apiKey } = req.body;

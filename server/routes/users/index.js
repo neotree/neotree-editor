@@ -1,11 +1,9 @@
 import express from 'express';
-import { User, UserProfile } from '../../models';
+import { User, UserProfile } from '../../database';
 
 let router = express.Router(); //eslint-disable-line
 
-module.exports = app => {
-  const { responseMiddleware } = app;
-
+module.exports = () => {
   router.get(
     '/get-users',
     (req, res, next) => {
@@ -18,7 +16,7 @@ module.exports = app => {
         .then(users => done(null, users))
         .catch(done);
     },
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
@@ -36,7 +34,7 @@ module.exports = app => {
         .then(rslt => done(null, rslt))
         .catch(done);
     },
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
@@ -51,7 +49,7 @@ module.exports = app => {
         .then(user => done(null, user))
         .catch(done);
     },
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

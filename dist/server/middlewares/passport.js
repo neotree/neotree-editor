@@ -21,7 +21,7 @@ var LocalStrategy = require('passport-local').Strategy;
 
 module.exports = function (app) {
   _passport["default"].serializeUser(function (user, done) {
-    // app.logger.log('passport.serializeUser');
+    // data.logger.log('passport.serializeUser');
     done(null, {
       id: user.id
     });
@@ -29,7 +29,7 @@ module.exports = function (app) {
   });
 
   _passport["default"].deserializeUser(function (user, done) {
-    // app.logger.log('passport.deserializeUser');
+    // data.logger.log('passport.deserializeUser');
     _models.User.findOne({
       where: {
         id: user.id
@@ -45,7 +45,7 @@ module.exports = function (app) {
 
 
   _passport["default"].use(new LocalStrategy(function (username, password, done) {
-    // app.logger.log('new passport.LocalStrategy()');
+    // data.logger.log('new passport.LocalStrategy()');
     _models.User.findOne({
       where: {
         email: username

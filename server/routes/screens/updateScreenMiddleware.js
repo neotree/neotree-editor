@@ -1,4 +1,4 @@
-import { Screen } from '../../models';
+import { Screen } from '../../database';
 
 module.exports = (app) => (req, res, next) => {
   const { id, ...payload } = req.body;

@@ -1,5 +1,5 @@
-import firebase from '../../firebase';
-import { Diagnosis } from '../../models';
+import firebase from '../../database/firebase';
+import { Diagnosis } from '../../database';
 
 export const copyDiagnosis = (diagnosis) => {
   return new Promise((resolve, reject) => {

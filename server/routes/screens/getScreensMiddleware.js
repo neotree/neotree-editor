@@ -1,4 +1,4 @@
-import { Screen } from '../../models';
+import { Screen } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const {

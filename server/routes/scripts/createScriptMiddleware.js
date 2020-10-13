@@ -1,5 +1,5 @@
-import firebase from '../../firebase';
-import { Script } from '../../models';
+import firebase from '../../database/firebase';
+import { Script } from '../../database';
 
 module.exports = (app, params) => (req, res, next) => {
   (async () => {

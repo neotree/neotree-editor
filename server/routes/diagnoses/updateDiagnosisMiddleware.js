@@ -1,4 +1,4 @@
-import { Diagnosis } from '../../models';
+import { Diagnosis } from '../../database';
 
 module.exports = app => (req, res, next) => {
   const { id, ...payload } = req.body;

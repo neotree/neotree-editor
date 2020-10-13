@@ -1,4 +1,4 @@
-import { Screen, Diagnosis } from '../../models';
+import { Screen, Diagnosis } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const payload = req.query;

@@ -1,4 +1,4 @@
-import { Screen, Log } from '../../models';
+import { Screen, Log } from '../../database';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 module.exports = app => (req, res, next) => {

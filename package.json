@@ -12,7 +12,7 @@
     "cross-env": "./node_modules/.bin/cross-env"
   },
   "scripts": {
-    "start": "babel-node server/index.js",
+    "start": "babel-node index.js",
     "clean-dist": "npm run remove-dist && mkdir dist && mkdir dist/src",
     "remove-dist": "rimraf ./dist",
     "build:html": "babel-node tools/buildHtml.js",
@@ -57,6 +57,7 @@
     "connect-session-sequelize": "^7.0.0",
     "cross-env": "^7.0.2",
     "date-fns": "^2.15.0",
+    "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "express-validator": "^5.3.1",
