@@ -1,6 +1,6 @@
-import { Screen } from '../../models';
+import { Screen } from '../../database';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
-import firebase from '../../firebase';
+import firebase from '../../database/firebase';
 
 module.exports = app => (req, res, next) => {
   const payload = req.body;

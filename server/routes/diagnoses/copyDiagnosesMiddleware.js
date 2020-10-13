@@ -1,5 +1,5 @@
-import { Diagnosis } from '../../models';
-import firebase from '../../firebase';
+import { Diagnosis } from '../../database';
+import firebase from '../../database/firebase';
 
 module.exports = app => (req, res, next) => {
   const payload = req.body;

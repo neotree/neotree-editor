@@ -1,4 +1,4 @@
-import { ApiKey } from '../../models';
+import { ApiKey } from '../../database';
 
 module.exports = () => (req, res) => {
   const host = `${req.protocol}://${req.headers.host}`;

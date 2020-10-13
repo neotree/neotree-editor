@@ -1,4 +1,4 @@
-import { User, UserProfile } from '../../models';
+import { User, UserProfile } from '../../database';
 
 module.exports = (app, payload, callback) => (req, res, next) => {
   const done = callback || ((err, payload) => {

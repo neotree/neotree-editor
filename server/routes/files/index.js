@@ -1,16 +1,15 @@
 import express from 'express';
 import stream from 'stream';
-import { File } from '../../models';
+import { File } from '../../database';
+import * as endpoints from '../../../constants/api-endpoints/files';
 
 let router = express.Router();
 
 module.exports = app => {
-  // const { responseMiddleware } = app;
-
   router = require('./uploadFileMiddleware')(router, app);
 
   router.get(
-    '/file/:fileId',
+    endpoints.GET_FILE,
     (req, res) => {
       File.findOne({ where: { id: req.params.fileId } })
         .catch(e => res.json({ error: e }))

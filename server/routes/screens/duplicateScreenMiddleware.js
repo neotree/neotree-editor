@@ -1,5 +1,5 @@
-import firebase from '../../firebase';
-import { Screen } from '../../models';
+import firebase from '../../database/firebase';
+import { Screen } from '../../database';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 export const copyScreen = (screen) => {

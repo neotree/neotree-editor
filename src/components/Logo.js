@@ -20,7 +20,7 @@ const Logo = ({ color, className, size, ...props }) => {
         {...props}
         className={cx(classes.root, className)}
         role="presentation"
-        src={color === 'light' ? require('~/assets/images/neotree-icon-light.png') : require('~/assets/images/neotree-icon-dark.png')}
+        src={color === 'light' ? require('*/assets/images/neotree-icon-light.png') : require('*/assets/images/neotree-icon-dark.png')}
       />
     </>
   );

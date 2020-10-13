@@ -1,0 +1,9 @@
+export const GET_CONFIG_KEY = '/get-config-key';
+export const GET_CONFIG_KEYS = '/get-config-keys';
+export const GET_FULL_CONFIG_KEY = '/get-full-config-key';
+export const GET_CONFIG_KEY_ITEMS = '/get-config-key-items';
+export const CREATE_CONFIG_KEY = '/create-config-key';
+export const UPDATE_CONFIG_KEY = '/update-config-key';
+export const UPDATE_CONFIG_KEYS = '/update-config-keys';
+export const DELETE_CONFIG_KEY = '/delete-config-key';
+export const DUPLICATE_CONFIG_KEY = '/duplicate-config-key';

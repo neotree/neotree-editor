@@ -1,4 +1,4 @@
-import { Screen } from '../../models';
+import { Screen } from '../../database';
 
 export const updateScreens = (screens, returnUpdated = false) => new Promise((resolve, reject) =>
   Promise.all(screens.map(({ id, ...scr }) =>

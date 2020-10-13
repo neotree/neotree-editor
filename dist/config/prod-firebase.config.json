@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "neotree-app",
+  "private_key_id": "9d35e87ff46c1c2aa2fafee93b3bd93801b59461",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC+Dfvwy5quzw72\n56NwnB5H4r+E7SiV0ILsahGpCbUFsJT4cJAFUSDTFIQAHaPpYvQkjW1ASNXwJ/6x\nxNxXH+8OLPQqkYhG6mTIvoRLyzqcnSb8iTz3+kiTiB1dP1rgADgobMCluo5eTFnJ\n9bP7Z9+PsJZW19+8Qt/2lp1nwtLKS4oilNYQ+0rifEoEyhTVqhaB/KC1DgwKNitR\nnh6CmJ8Wlo8V3dnACT/l2T0ONB/PJlamXATUDYmWWOTxAWSzqKsBveL9xp2e58G3\neWCRywRGQWN/pVa/QQdHMq7MLq5rD0G4mvuYUo9lJzOwpxMC39W6mTbR+dVJAqLv\nq6TwfzoxAgMBAAECggEAEF5q9xPKKEksHEbaFE5V61ITtbKpXrHdPNhr2fe8kBdj\n1Tv4o4SXw6ZOMiZbYjQEHAvUP4emaW9AZ/YxFg3pjHqBsxLivlzcvk9uXIrN6wQ8\nAd8eEauMSayc/tWAka9jJtQrCXsWXPfNefAABuSs5BbM9ADWw8Osv3O8bd3hQsv1\nvMTE2szc5bK88dcqiN270qdGT7ChZPc01LFJkrnNR6CAXRWkdakKZOZf55jkegHu\nXFg4L2hqDj/HMNMyZrflUZ3pqIPDXLEtCjw7qxr3t2kUuUz1eikW4nDeO7ZydIX1\niA8t0yhUIPuCKdku61ZDrM2Y6D+NSzS76VBP5cXr4wKBgQDldaLi04xQwl+LGWOg\nXmSOTxA9iaIzgVEVtAoa0LymYT6tSeiWvEv8U+Adu/cT2V5a9dk1paz0B1DNBBfh\njgXHCwVJHScVyEqdBe+TeJ2tOFms0dhIqya2jtWdFDOX0Fhv2PrUkDA95+k4JJ90\n2ty2a0wnWbnIRm+H1XhJdOvjHwKBgQDUCY610+KZCu0G6k6DhZ0rel+/IE/tPAP0\n/O3qnQwo5m0V2+we95ttbz4Xf7zT89uazRSNevPq/35+FJRINqc4WBXb3uFvdnBv\nwhpNkg/M0jqGEJ5rKXYh2HZv0wa2xd9LsXftx6gTnMeOlz02xW1c/O0PNGFFSFPg\nkiyXDRoIrwKBgAQE94F5qy+O+BV7sF8SyDgl8mbhjlHQphb3PGYT2fogIfTvIn/h\ndINLBNYAgOd8G0cEn3VtHYZ4ylWNCM4OqtM9wi3xsMmU5JmzjOrMZhausgNw+ZTs\nSpVQEzXZML4sDCCJcHtguzeaZF9zZMerPcqEPqVB0RtNAI8kkiLXRXqJAoGAHCas\nsM1Rz1nZAEsJY4LQzB3yKlDi669FIziVacmx/JgjMXzCS5Y6J3xWdQ47hrRgmpvR\nt7r0OWX0aE7ZJQFEkEF5nXho28CQyvWtQlE7EclzhasdLUMS8QlpKA2PXaLFs6n7\nLzGLyhbNk8vWj7gEfg0CeDtPEsC4ih8+FkviAfcCgYEAq/FUE3BHL4wtZaZ2zHyt\ngudtD4VtvXiQvD/sUAp46pTUBUW86m73AvrjZiOoHS6ECKoe9b+3hlOCsmlmTfbf\npnemqsUmcq1Z+yy83f5uvEgRUdgiXI7h0unRGcQPmgsY1dse+bjmnA7W7GunD0ew\n4MFuD1/fnchIADbO+gbt6PQ=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-1om80@neotree-app.iam.gserviceaccount.com",
+  "client_id": "114635009767698913681",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-1om80%40neotree-app.iam.gserviceaccount.com"
+}
+

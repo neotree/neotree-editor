@@ -1,5 +1,5 @@
-import { Screen } from '../../models';
-import firebase from '../../firebase';
+import { Screen } from '../../database';
+import firebase from '../../database/firebase';
 
 module.exports = app => (req, res, next) => {
   (async () => {

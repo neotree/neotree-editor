@@ -1,62 +1,61 @@
 import express from 'express';
+import * as endpoints from '../../../constants/api-endpoints/screens';
 
 const router = express.Router();
 
 module.exports = app => {
-  const { responseMiddleware } = app;
-
   router.post(
-    '/copy-screens',
+    endpoints.COPY_SCREENS,
     require('./copyScreensMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-screens',
+    endpoints.GET_SCREENS,
     require('./getScreensMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-screen',
+    endpoints.GET_SCREEN,
     require('./getScreenMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-full-screen',
+    endpoints.GET_FULL_SCREEN,
     require('./getFullScreenMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
     '/create-screen',
     require('./createScreenMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-screen',
+    endpoints.UPDATE_SCREEN,
     require('./updateScreenMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-screens',
+    endpoints.UPDATE_SCREENS,
     require('./updateScreensMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/delete-screen',
+    endpoints.DELETE_SCREEN,
     require('./deleteScreenMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/duplicate-screen',
+    endpoints.DUPLICATE_SCREEN,
     require('./duplicateScreenMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

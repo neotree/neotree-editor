@@ -238,7 +238,7 @@ module.exports = function () {
     return;
   }
 
-  reactHotLoader.register(callRemote, "callRemote", "/home/farai/WorkBench/neotree-editor/server/routes/app/copyDataMiddleware.js");
+  reactHotLoader.register(callRemote, "callRemote", "/home/farai/WorkBench/neotree-editor/server/routes/data/copyDataMiddleware.js");
 })();
 
 ;

@@ -4,26 +4,23 @@ module.exports = {
   resolve: {
     symlinks: false,
 
+    extensions: ['.ts', '.tsx', '.js'],
+
     modules: [
-      path.resolve(__dirname, './node_modules'),
+      path.resolve(__dirname, 'node_modules'),
       path.resolve(__dirname, '.'),
-      path.resolve(__dirname, './src'),
+      path.resolve(__dirname, 'src'),
     ],
-    alias: {
-      '~': path.resolve(__dirname, '.'),
-      '@': path.resolve(__dirname, 'src'),
-    },
+    alias: [
+      { name: '*', alias: path.resolve(__dirname, '.') },
+      { name: '@', alias: path.resolve(__dirname, 'src') },
+    ],
   },
   module: {
     rules: [
       {
-        test: /\.js$/,
-        include: [
-          path.resolve(__dirname, 'src'),
-          path.resolve(__dirname, 'config'),
-          path.resolve(__dirname, 'utils')
-        ],
-        use: [{ loader: 'babel-loader' }]
+        test: /\.(js|ts|tsx)$/,
+        use: ['babel-loader']
       },
       {
         test: /\.css$/,
@@ -43,7 +40,7 @@ module.exports = {
         ]
       },
       {
-        test: /\.(png|jpeg|jpg|gif|woff|woff2|eot|svg|otf|ttf)$/i,
+        test: /\.(png|jpeg|jpg|gif|ico|woff|woff2|eot|otf|ttf)$/i,
         use: [
           {
             loader: 'file-loader',
@@ -51,11 +48,15 @@ module.exports = {
               limit: 5000000,
               name: '[path][name].[ext]?[hash]',
               outputPath: 'assets',
-              publicPath: '/assets'
+              publicPath: '/assets/'
             }
           }
         ]
-      }
+      },
+      {
+        test: /\.svg/,
+        use: [{ loader: 'svg-inline-loader' }]
+      },
     ]
   }
 };

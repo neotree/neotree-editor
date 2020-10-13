@@ -1,4 +1,4 @@
-import { ConfigKey } from '../../models';
+import { ConfigKey } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const payload = req.query;

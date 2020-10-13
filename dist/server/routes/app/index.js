@@ -31,7 +31,7 @@ module.exports = function (app) {
       });
     })["catch"](done);
   }, responseMiddleware);
-  router.get('/initialise-app', require('../auth/getAuthenticatedUserMiddleware')(app), responseMiddleware);
+  router.get('/initialise-data', require('../auth/getAuthenticatedUserMiddleware')(app), responseMiddleware);
   router.get('/export-data', require('./exportDataMiddleware')(app));
   router.post('/copy-data', require('./copyDataMiddleware')(app), responseMiddleware);
   router.post('/export-to-firebase', require('./exportToFirebaseMiddleware')(app), responseMiddleware);
@@ -48,7 +48,7 @@ module.exports = function (app) {
     return;
   }
 
-  reactHotLoader.register(router, "router", "/home/farai/WorkBench/neotree-editor/server/routes/app/index.js");
+  reactHotLoader.register(router, "router", "/home/farai/WorkBench/neotree-editor/server/routes/data/index.js");
 })();
 
 ;

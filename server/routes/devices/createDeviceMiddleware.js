@@ -1,4 +1,4 @@
-import { Device } from '../../models';
+import { Device } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const payload = req.body;

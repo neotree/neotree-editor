@@ -1,6 +1,6 @@
 import uuid from 'uuidv4';
 import bcrypt from 'bcryptjs';
-import { User, UserProfile } from '../../models';
+import { User, UserProfile } from '../../database';
 
 const encryptPassword = (password, callback) => bcrypt.genSalt(10, (err, salt) => {
   bcrypt.hash(password, salt, (err, hash) => {

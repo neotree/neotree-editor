@@ -1,62 +1,61 @@
 import express from 'express';
+import * as endpoints from '../../../constants/api-endpoints/diagnoses';
 
 const router = express.Router();
 
 module.exports = app => {
-  const { responseMiddleware } = app;
-
   router.post(
-    '/copy-diagnoses',
+    endpoints.COPY_DIAGNOSES,
     require('./copyDiagnosesMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-diagnoses',
+    endpoints.GET_DIAGNOSES,
     require('./getDiagnosesMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-diagnosis',
+    endpoints.GET_DIAGNOSIS,
     require('./getDiagnosisMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.get(
-    '/get-full-diagnosis',
+    endpoints.GET_FULL_DIAGNOSIS,
     require('./getFullDiagnosisMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
     '/create-diagnosis',
     require('./createDiagnosisMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-diagnosis',
+    endpoints.UPDATE_DIAGNOSIS,
     require('./updateDiagnosisMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/update-diagnoses',
+    endpoints.UPDATE_DIAGNOSES,
     require('./updateDiagnosesMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/delete-diagnosis',
+    endpoints.DELETE_DIAGNOSIS,
     require('./deleteDiagnosisMiddleware')(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   router.post(
-    '/duplicate-diagnosis',
+    endpoints.DUPLICATE_DIAGNOSIS,
     require('./duplicateDiagnosisMiddleware').default(app),
-    responseMiddleware
+    require('../../utils/responseMiddleware')
   );
 
   return router;

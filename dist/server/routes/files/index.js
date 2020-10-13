@@ -20,7 +20,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  // const { responseMiddleware } = app;
+  // const { responseMiddleware } = data;
   router = require('./uploadFileMiddleware')(router, app);
   router.get('/file/:fileId', function (req, res) {
     _models.File.findOne({

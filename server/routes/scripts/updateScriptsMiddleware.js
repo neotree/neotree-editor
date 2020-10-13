@@ -1,4 +1,4 @@
-import { Script } from '../../models';
+import { Script } from '../../database';
 
 module.exports = (app) => (req, res, next) => {
   const { scripts, returnUpdated } = req.body;

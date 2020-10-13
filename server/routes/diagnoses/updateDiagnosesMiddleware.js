@@ -1,4 +1,4 @@
-import { Diagnosis } from '../../models';
+import { Diagnosis } from '../../database';
 
 export const updateDiagnoses = (diagnoses, returnUpdated = false) => new Promise((resolve, reject) =>
   Promise.all(diagnoses.map(({ id, ...d }) =>

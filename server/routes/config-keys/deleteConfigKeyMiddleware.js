@@ -1,4 +1,4 @@
-import { ConfigKey, Log } from '../../models';
+import { ConfigKey, Log } from '../../database';
 
 module.exports = app => (req, res, next) => {
   const { id } = req.body;
