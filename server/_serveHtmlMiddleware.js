@@ -8,6 +8,10 @@ module.exports = () => (req, res) => {
     let user = null;
     try {
       user = !req.isAuthenticated() ? null : await User.findOne({ where: { id: req.user.id, } });
+      if (user) {
+        user = JSON.parse(JSON.stringify(user));
+        delete user.password;
+      }
     } catch (e) { /* Do nothing */ }
     const html = fs.readFileSync(path.resolve(__dirname, '../src/index.html'), 'utf8');
     const $ = cheerio.load(html);
