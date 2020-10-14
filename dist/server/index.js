@@ -98,17 +98,14 @@ var isProd = process.env.NODE_ENV === 'production';
             });
             app.use(app.wdm);
             app.use(require('webpack-hot-middleware')(compiler));
-            app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
-              index: false
-            }));
             app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../assets')));
           } else {
-            app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../../src'), {
-              index: false
-            }));
             app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../../assets')));
           }
 
+          app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
+            index: false
+          }));
           app.use(require('./routes')(app));
           app.get('*', require('./_serveHtmlMiddleware')(app));
           app.server = httpServer.listen(process.env.SERVER_PORT, function (err) {
@@ -116,7 +113,7 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 33:
+        case 34:
         case "end":
           return _context.stop();
       }
