@@ -1,5 +1,5 @@
 import express from 'express';
-import { User, UserProfile } from '../../database';
+import { User } from '../../database';
 
 let router = express.Router(); //eslint-disable-line
 
@@ -29,7 +29,6 @@ module.exports = () => {
 
       Promise.all([
         User.destroy({ where: { id: req.body.id } }),
-        UserProfile.destroy({ where: { user_id: req.body.id } })
       ])
         .then(rslt => done(null, rslt))
         .catch(done);
