@@ -31,6 +31,17 @@ const isProd = process.env.NODE_ENV === 'production';
 
   app.sequelize = sequelize;
 
+  // seed admin user
+  if (process.env.DEFAULT_ADMIN_USER_EMAIL_ADDRESS) {
+    try {
+      await require('./utils/addOrUpdateUser')({
+        role: 1,
+        password: process.env.DEFAULT_ADMIN_USER_PASSWORD,
+        email: process.env.DEFAULT_ADMIN_USER_EMAIL_ADDRESS,
+      });
+    } catch (e) { /* Do nothing */ }
+  }
+
   //body-parser
   const bodyParser = require('body-parser');
   app.use(bodyParser.json());

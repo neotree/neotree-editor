@@ -5,7 +5,7 @@ import { File } from '../../models';
 let router = express.Router();
 
 module.exports = app => {
-  // const { responseMiddleware } = data;
+  // const { responseMiddleware } = app;
 
   router = require('./uploadFileMiddleware')(router, app);
 
