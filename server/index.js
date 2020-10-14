@@ -63,12 +63,12 @@ const isProd = process.env.NODE_ENV === 'production';
     app.use(app.wdm);
     app.use(require('webpack-hot-middleware')(compiler));
 
-    app.use(express.static(path.resolve(__dirname, '../src'), { index: false, }));
     app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
   } else {
-    app.use(express.static(path.resolve(__dirname, '../../src'), { index: false, }));
     app.use('/assets', express.static(path.resolve(__dirname, '../../assets')));
   }
+
+  app.use(express.static(path.resolve(__dirname, '../src'), { index: false, }));
 
   app.use(require('./routes')(app));
 
