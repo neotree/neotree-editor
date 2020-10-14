@@ -1,10 +1,6 @@
 "use strict";
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function (app) {
   return function (req, res, next) {
@@ -19,7 +15,7 @@ module.exports = function (app) {
           }]
         });
 
-        _models.Log.create({
+        _database.Log.create({
           name: 'deleteconfig_keys',
           data: JSON.stringify({
             config_keys: [{
@@ -40,7 +36,7 @@ module.exports = function (app) {
       msg: 'Required configKey "id" is not provided.'
     });
 
-    _models.ConfigKey.findOne({
+    _database.ConfigKey.findOne({
       where: {
         id: id
       }

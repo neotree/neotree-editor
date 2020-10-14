@@ -4,11 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function (app) {
   return function (req, res, next) {
@@ -26,7 +22,7 @@ module.exports = function (app) {
           }]
         });
 
-        _models.Log.create({
+        _database.Log.create({
           name: 'delete_scripts',
           data: JSON.stringify({
             scripts: [{
@@ -47,7 +43,7 @@ module.exports = function (app) {
       msg: 'Required script "id" is not provided.'
     });
 
-    _models.Script.findOne({
+    _database.Script.findOne({
       where: {
         id: id
       }
@@ -61,11 +57,11 @@ module.exports = function (app) {
         if (deleteAssociatedData === false) return done(null, {
           scripts: scripts
         });
-        Promise.all([_models.Screen.destroy({
+        Promise.all([_database.Screen.destroy({
           where: {
             script_id: id
           }
-        }), _models.Diagnosis.destroy({
+        }), _database.Diagnosis.destroy({
           where: {
             script_id: id
           }

@@ -4,11 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function () {
   return function (req, res, next) {
@@ -23,10 +19,10 @@ module.exports = function () {
       return null;
     };
 
-    Promise.all([_models.Screen.findAll({
+    Promise.all([_database.Screen.findAll({
       where: payload,
       order: [['position', 'ASC']]
-    }), _models.Diagnosis.findAll({
+    }), _database.Diagnosis.findAll({
       where: payload
     })])["catch"](done).then(function (_ref) {
       var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),

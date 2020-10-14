@@ -2,6 +2,8 @@ import path from 'path';
 import express from 'express';
 import * as database from './database';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 (async () => {
   let app = express();
   const httpServer = require('http').Server(app);
@@ -47,8 +49,11 @@ import * as database from './database';
   }));
   sessStore.sync();
 
+  // passport
+  app = require('./passport')(app);
+
   // webpack
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProd) {
     const webpackConfig = require('../webpack.config');
     const compiler = require('webpack')(webpackConfig);
     app.wdm = require('webpack-dev-middleware')(compiler, {
@@ -57,12 +62,13 @@ import * as database from './database';
     });
     app.use(app.wdm);
     app.use(require('webpack-hot-middleware')(compiler));
+
+    app.use(express.static(path.resolve(__dirname, '../src'), { index: false, }));
+    app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
+  } else {
+    app.use(express.static(path.resolve(__dirname, '../../src'), { index: false, }));
+    app.use('/assets', express.static(path.resolve(__dirname, '../../assets')));
   }
-
-  // passport
-  app = require('./passport')(app);
-
-  app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
 
   app.use(require('./routes')(app));
 

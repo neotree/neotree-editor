@@ -1,10 +1,6 @@
 "use strict";
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function () {
   return function (req, res, next) {
@@ -18,7 +14,7 @@ module.exports = function () {
       return null;
     };
 
-    _models.Screen.findOne({
+    _database.Screen.findOne({
       where: payload
     }).then(function (screen) {
       return done(null, screen);
