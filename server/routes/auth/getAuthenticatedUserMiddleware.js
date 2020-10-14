@@ -1,4 +1,4 @@
-import { User, UserProfile } from '../../database';
+import { User } from '../../database';
 
 module.exports = (app, payload, callback) => (req, res, next) => {
   const done = callback || ((err, payload) => {
@@ -7,16 +7,12 @@ module.exports = (app, payload, callback) => (req, res, next) => {
   });
 
   if (req.isAuthenticated()) {
-    return Promise.all([
-      User.findOne({ where: { id: req.user.id } }),
-      UserProfile.findOne({ where: { user_id: req.user.id } })
-    ])
-      .then(([user, profile]) => done(null, !profile ? null : {
-        authenticatedUser: {
-          role: user ? user.role : 0,
-          ...JSON.parse(JSON.stringify(profile)),
-        },
-      }))
+    return User.findOne({ where: { id: req.user.id } })
+      .then(u => {
+        const authenticatedUser = u ? JSON.parse(JSON.stringify(u)) : null;
+        if (authenticatedUser) delete authenticatedUser.password;
+        done(null, !u ? null : { authenticatedUser });
+      })
       .catch(done);
   }
 
