@@ -1,21 +1,11 @@
 import React from 'react';
 import { useScriptContext } from '@/contexts/script';
 import useRouter from '@/utils/useRouter';
-import _getDiagnosis from './_getDiagnosis';
-import _saveDiagnosis from './_saveDiagnosis';
-import defaultForm from './_defaultForm';
+import * as defaults from './_defaults';
 
 export const DiagnosisContext = React.createContext(null);
 
 export const useDiagnosisContext = () => React.useContext(DiagnosisContext);
-
-export const setDocumentTitle = (t = '') => {
-  const { setState } = useDiagnosisContext();
-  React.useEffect(() => {
-    setState({ documentTitle: t });
-    return () => setState({ documentTitle: '' });
-  }, [t]);
-};
 
 export const provideDiagnosisContext = Component => function DiagnosisContextProvider(props) {
   const { state: { script } } = useScriptContext();
@@ -24,56 +14,64 @@ export const provideDiagnosisContext = Component => function DiagnosisContextPro
   const { diagnosisId, diagnosisSection } = router.match.params;
 
   const [state, _setState] = React.useState({
+    ...defaults.defaultState,
     diagnosisSection: diagnosisSection || 'diagnoses',
-    form: defaultForm,
   });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
 
-  const setForm = s => _setState(prev => ({
-    ...prev,
-    form: {
-      ...prev.form,
-      ...typeof s === 'function' ? s(prev.form) : s
-    },
-  }));
+  const value = new (class DiagnosisContextValue {
+    state = state;
 
-  const getDiagnosis = _getDiagnosis({ setState });
-  const saveDiagnosis = _saveDiagnosis({ setState, state, router });
+    _setState = _setState;
+
+    router = router;
+
+    defaults = defaults;
+
+    setState = s => this._setState(prevState => ({
+      ...prevState,
+      ...(typeof s === 'function' ? s(prevState) : s)
+    }));
+
+    setForm = s => _setState(prev => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        ...typeof s === 'function' ? s(prev.form) : s
+      },
+    }));
+
+    canSaveDiagnosis = () => this.state.form.name && !this.state.savingDiagnosis;
+
+    isFormReady = () => script && ((diagnosisId === 'new') || !!this.state.diagnosis);
+
+    setFormAndSave = f => {
+      this.setForm(f);
+      this.setState({ shouldSaveForm: true });
+    };
+
+    getDiagnosis = require('./_getDiagnosis').default.bind(this);
+
+    saveDiagnosis = require('./_saveDiagnosis').default.bind(this);
+  })();
 
   React.useEffect(() => {
     const diagnosisInitialised = diagnosisId !== 'new' ? true : false;
-    setState({ diagnosisInitialised, diagnosis: null, form: defaultForm });
-    if (diagnosisId !== 'new') getDiagnosis({ id: diagnosisId, });
+    value.setState({ diagnosisInitialised, diagnosis: null, form: defaults.defaultState.form });
+    if (diagnosisId !== 'new') value.getDiagnosis({ id: diagnosisId, });
   }, [diagnosisId]);
 
   const { shouldSaveForm } = state;
 
   React.useEffect(() => {
     if (shouldSaveForm) {
-      saveDiagnosis({ redirectOnSuccess: false });
-      setState({ shouldSaveForm: false });
+      value.saveDiagnosis({ redirectOnSuccess: false });
+      value.setState({ shouldSaveForm: false });
     }
   }, [shouldSaveForm]);
 
   return (
     <DiagnosisContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getDiagnosis,
-        setForm,
-        saveDiagnosis,
-        canSaveDiagnosis: () => state.form.name && !state.savingDiagnosis,
-        isFormReady: () => script && ((diagnosisId === 'new') || !!state.diagnosis),
-        setFormAndSave: f => {
-          setForm(f);
-          setState({ shouldSaveForm: true });
-        },
-      }}
+      value={value}
     >
       <Component {...props} />
     </DiagnosisContext.Provider>

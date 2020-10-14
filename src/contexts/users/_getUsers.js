@@ -1,10 +1,10 @@
 import * as api from '@/api/users';
 
-export default ({ setState }) => function getUsers() {
-  setState({ loadingUsers: true });
+export default function getUsers() {
+  this.setState({ loadingUsers: true });
 
   const done = (e, rslts = {}) => {
-    setState({
+    this.setState({
       loadUsersError: e,
       ...rslts,
       usersInitialised: true,
@@ -15,4 +15,4 @@ export default ({ setState }) => function getUsers() {
   api.getUsers()
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

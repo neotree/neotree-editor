@@ -1,12 +1,12 @@
 import * as api from '@/api/screens';
 
-export default ({ setState }) => function updateScreens(screens = []) {
+export default function updateScreens(screens = []) {
   if (!screens.length) return;
 
-  setState({ updatingScreens: true });
+  this.setState({ updatingScreens: true });
 
   const done = (updateScreensError, data) => {
-    setState({
+    this.setState({
       updateScreensError,
       ...data,
       updatingScreens: false,
@@ -16,4 +16,4 @@ export default ({ setState }) => function updateScreens(screens = []) {
   api.updateScreens({ screens })
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

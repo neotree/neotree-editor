@@ -1,11 +1,13 @@
 import * as api from '@/api/diagnoses';
 import getErrorMessage from '@/utils/getErrorMessage';
 
-export default ({
-  setState,
-  router: { history, match: { params: { scriptId } } },
-  state: { diagnosis, form, },
-}) => function saveDiagnosis(_payload = {}) {
+export default function saveDiagnosis(_payload = {}) {
+  const {
+    setState,
+    router: { history, match: { params: { scriptId } } },
+    state: { diagnosis, form, },
+  } = this;
+
   const { redirectOnSuccess, ...payload } = _payload;
   const shdRedirect = redirectOnSuccess !== false;
 
