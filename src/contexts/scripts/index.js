@@ -1,40 +1,43 @@
 import React from 'react';
-import _getScripts from './_getScripts';
-import _deleteScripts from './_deleteScripts';
-import _updateScripts from './_updateScripts';
-import _duplicateScripts from './_duplicateScripts';
+import useRouter from '@/utils/useRouter';
+import * as defaults from './_defaults';
 
 export const ScriptsContext = React.createContext(null);
 
 export const useScriptsContext = () => React.useContext(ScriptsContext);
 
 export const provideScriptsContext = Component => function ScriptsContextProvider(props) {
-  const [state, _setState] = React.useState({
-    scripts: [],
-  });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
+  const router = useRouter();
+  const [state, _setState] = React.useState(defaults.defaultState);
 
-  const getScripts = _getScripts({ setState });
-  const deleteScripts = _deleteScripts({ setState });
-  const updateScripts = _updateScripts({ setState });
-  const duplicateScripts = _duplicateScripts({ setState });
+  const value = new (class ScriptsContextValue {
+    state = state;
 
-  React.useEffect(() => { getScripts(); }, []);
+    _setState = _setState;
+
+    router = router;
+
+    defaults = defaults;
+
+    setState = s => this._setState(prevState => ({
+      ...prevState,
+      ...(typeof s === 'function' ? s(prevState) : s)
+    }));
+
+    deleteScripts = require('./_deleteScripts').default.bind(this);
+
+    duplicateScripts = require('./_duplicateScripts').default.bind(this);
+
+    getScripts = require('./_getScripts').default.bind(this);
+
+    updateScripts = require('./_updateScripts').default.bind(this);
+  })();
+
+  React.useEffect(() => { value.getScripts(); }, []);
 
   return (
     <ScriptsContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getScripts,
-        deleteScripts,
-        updateScripts,
-        duplicateScripts,
-      }}
+      value={value}
     >
       <Component {...props} />
     </ScriptsContext.Provider>

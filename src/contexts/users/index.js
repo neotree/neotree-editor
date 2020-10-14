@@ -1,39 +1,37 @@
 import React from 'react';
-import _getUsers from './_getUsers';
+import useRouter from '@/utils/useRouter';
+import * as defaults from './_defaults';
 
 export const UsersContext = React.createContext(null);
 
 export const useUsersContext = () => React.useContext(UsersContext);
 
-export const setDocumentTitle = (t = '') => {
-  const { setState } = useUsersContext();
-  React.useEffect(() => {
-    setState({ documentTitle: t });
-    return () => setState({ documentTitle: '' });
-  }, [t]);
-};
-
 export const provideUsersContext = Component => function UsersContextProvider(props) {
-  const [state, _setState] = React.useState({
-    users: [],
-  });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
+  const router = useRouter();
+  const [state, _setState] = React.useState(defaults.defaultState);
 
-  const getUsers = _getUsers({ setState });
+  const value = new (class UsersContextValue {
+    state = state;
 
-  React.useEffect(() => { getUsers(); }, []);
+    _setState = _setState;
+
+    router = router;
+
+    defaults = defaults;
+
+    setState = s => this._setState(prevState => ({
+      ...prevState,
+      ...(typeof s === 'function' ? s(prevState) : s)
+    }));
+
+    getUsers = require('./_getUsers').default.bind(this);
+  })();
+
+  React.useEffect(() => { value.getUsers(); }, []);
 
   return (
     <UsersContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getUsers
-      }}
+      value={value}
     >
       <Component {...props} />
     </UsersContext.Provider>

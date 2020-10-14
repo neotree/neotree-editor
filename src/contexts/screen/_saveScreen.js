@@ -1,11 +1,13 @@
 import * as api from '@/api/screens';
 import getErrorMessage from '@/utils/getErrorMessage';
 
-export default ({
-  setState,
-  router: { history, match: { params: { scriptId } } },
-  state: { screen, form, },
-}) => function saveScreen(_payload = {}) {
+export default function saveScreen(_payload = {}) {
+  const {
+    setState,
+    router: { history, match: { params: { scriptId } } },
+    state: { screen, form, },
+  } = this;
+
   const { redirectOnSuccess, ...payload } = _payload;
   const shdRedirect = redirectOnSuccess !== false;
 
@@ -29,4 +31,4 @@ export default ({
       done(rslts.errors, rslts);
     })
     .catch(done);
-};
+}

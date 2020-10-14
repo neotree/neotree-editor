@@ -29,7 +29,7 @@ export const provideAppContext = Component => function AppContextProvider(props)
 
     _setState = _setState;
 
-    setState = s => _setState(prev => ({
+    setState = s => this._setState(prev => ({
       ...prev,
       ...(typeof s === 'function' ? s(prev) : s),
     }));

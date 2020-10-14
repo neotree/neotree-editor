@@ -8,6 +8,11 @@ import * as database from './database';
   app.logger = require('../utils/logger');
   app.io = require('socket.io')(httpServer); // socket io
 
+  app.getRandomString = (separator = '') => {
+    const getRandString = () => Math.random().toString(36).substring(2).toUpperCase();
+    return `${getRandString()}${separator}${getRandString()}${separator}${getRandString()}`;
+  };
+
   // custom middlewares
   app.use(require('./_requestQueryHandlerMiddleware')); // injects res.locals.reqQuery
   app.use(require('./_requestHandlerMiddleware')); // injects res.locals.setResponse & res.locals.getResponse

@@ -1,43 +1,45 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
-import _getScreens from './_getScreens';
-import _deleteScreens from './_deleteScreens';
-import _updateScreens from './_updateScreens';
-import _duplicateScreens from './_duplicateScreens';
+import useRouter from '@/utils/useRouter';
+import * as defaults from './_defaults';
 
 export const ScreensContext = React.createContext(null);
 
 export const useScreensContext = () => React.useContext(ScreensContext);
 
 export const provideScreensContext = Component => function ScreensContextProvider(props) {
-  const { scriptId, } = useParams();
+  const router = useRouter();
+  const [state, _setState] = React.useState(defaults.defaultState);
 
-  const [state, _setState] = React.useState({
-    screens: [],
-  });
-  const setState = s => _setState(prev => ({
-    ...prev,
-    ...typeof s === 'function' ? s(prev) : s
-  }));
+  const value = new (class ScreensContextValue {
+    state = state;
 
-  const getScreens = _getScreens({ setState });
-  const deleteScreens = _deleteScreens({ setState });
-  const updateScreens = _updateScreens({ setState });
-  const duplicateScreens = _duplicateScreens({ setState });
+    _setState = _setState;
 
-  React.useEffect(() => { getScreens({ script_id: scriptId }); }, []);
+    router = router;
+
+    defaults = defaults;
+
+    setState = s => this._setState(prevState => ({
+      ...prevState,
+      ...(typeof s === 'function' ? s(prevState) : s)
+    }));
+
+    deleteScreens = require('./_deleteScreens').default.bind(this);
+
+    duplicateScreens = require('./_duplicateScreens').default.bind(this);
+
+    getScreens = require('./_getScreens').default.bind(this);
+
+    updateScreens = require('./_updateScreens').default.bind(this);
+  })();
+
+  const { scriptId } = value.router.match.params;
+
+  React.useEffect(() => { value.getScreens({ script_id: scriptId }); }, [scriptId]);
 
   return (
     <ScreensContext.Provider
-      value={{
-        state,
-        setState,
-        _setState,
-        getScreens,
-        deleteScreens,
-        updateScreens,
-        duplicateScreens,
-      }}
+      value={value}
     >
       <Component {...props} />
     </ScreensContext.Provider>

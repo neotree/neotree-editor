@@ -1,12 +1,12 @@
 import * as api from '@/api/scripts';
 
-export default ({ setState }) => function duplicateScripts(ids = []) {
+export default function duplicateScripts(ids = []) {
   if (!ids.length) return;
 
-  setState({ duplicatingScripts: true });
+  this.setState({ duplicatingScripts: true });
 
   const done = (e, rslts) => {
-    setState(({ scripts }) => {
+    this.setState(({ scripts }) => {
       return {
         duplicateScriptsError: e,
         duplicatingScripts: false,
@@ -24,4 +24,4 @@ export default ({ setState }) => function duplicateScripts(ids = []) {
   api.duplicateScript({ id: ids[0] })
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

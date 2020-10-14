@@ -1,12 +1,12 @@
 import * as api from '@/api/screens';
 
-export default ({ setState }) => function duplicateScreens(ids = []) {
+export default function duplicateScreens(ids = []) {
   if (!ids.length) return;
 
-  setState({ duplicatingScreens: true });
+  this.setState({ duplicatingScreens: true });
 
   const done = (e, rslts) => {
-    setState(({ screens }) => {
+    this.setState(({ screens }) => {
       return {
         duplicateScreensError: e,
         duplicatingScreens: false,
@@ -24,4 +24,4 @@ export default ({ setState }) => function duplicateScreens(ids = []) {
   api.duplicateScreen({ id: ids[0] })
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

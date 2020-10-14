@@ -1,10 +1,10 @@
 import * as api from '@/api/screens';
 
-export default ({ setState }) => function getScreens(payload) {
-  setState({ loadingScreens: true });
+export default function getScreens(payload) {
+  this.setState({ loadingScreens: true });
 
   const done = (getScreensError, data) => {
-    setState({
+    this.setState({
       getScreensError,
       ...data,
       screensInitialised: true,
@@ -15,4 +15,4 @@ export default ({ setState }) => function getScreens(payload) {
   api.getScreens(payload)
     .then(data => done(data.errors, data))
     .catch(done);
-};
+}

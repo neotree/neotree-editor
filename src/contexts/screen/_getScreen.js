@@ -1,10 +1,10 @@
 import * as api from '@/api/screens';
 
-export default ({ setState }) => function getScreen(payload = {}) {
-  setState({ loadingScreen: true });
+export default function getScreen(payload = {}) {
+  this.setState({ loadingScreen: true });
 
   const done = (e, rslts) => {
-    setState(({ form }) => ({
+    this.setState(({ form }) => ({
       initialiseScreenError: e,
       screenInitialised: true,
       loadingScreen: false,
