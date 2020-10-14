@@ -14,7 +14,7 @@ var _express = _interopRequireDefault(require("express"));
 
 var database = _interopRequireWildcard(require("./database"));
 
-var isProd = process.env.NODE_ENV !== 'production';
+var isProd = process.env.NODE_ENV === 'production';
 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
   var app, httpServer, sequelize, bodyParser, session, SequelizeStore, sessStore, webpackConfig, compiler;
   return _regenerator["default"].wrap(function _callee$(_context) {
@@ -85,9 +85,11 @@ var isProd = process.env.NODE_ENV !== 'production';
             } // = 365 days (exp date will be created from ttl opt)
 
           }));
-          sessStore.sync(); // webpack
+          sessStore.sync(); // passport
 
-          if (isProd) {
+          app = require('./passport')(app); // webpack
+
+          if (!isProd) {
             webpackConfig = require('../webpack.config');
             compiler = require('webpack')(webpackConfig);
             app.wdm = require('webpack-dev-middleware')(compiler, {
@@ -96,21 +98,15 @@ var isProd = process.env.NODE_ENV !== 'production';
             });
             app.use(app.wdm);
             app.use(require('webpack-hot-middleware')(compiler));
-          } // passport
-
-
-          app = require('./passport')(app);
-
-          if (isProd) {
-            app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../../src'), {
-              index: false
-            }));
-            app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../../assets')));
-          } else {
             app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
               index: false
             }));
             app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../assets')));
+          } else {
+            app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../../src'), {
+              index: false
+            }));
+            app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../../assets')));
           }
 
           app.use(require('./routes')(app));
@@ -120,7 +116,7 @@ var isProd = process.env.NODE_ENV !== 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 34:
+        case 33:
         case "end":
           return _context.stop();
       }
