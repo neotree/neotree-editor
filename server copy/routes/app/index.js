@@ -18,7 +18,7 @@ module.exports = app => {
   }, responseMiddleware);
 
   router.get(
-    '/initialise-data',
+    '/initialise-app',
     require('../auth/getAuthenticatedUserMiddleware')(app),
     responseMiddleware,
   );

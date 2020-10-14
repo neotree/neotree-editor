@@ -40,14 +40,19 @@ module.exports = () => {
   router.post(
     '/add-user',
     (req, res, next) => {
-      const done = (err, user) => {
-        res.locals.setResponse(err, { user });
-        next(); return null;
-      };
+      (async () => {
+        const done = (err, user) => {
+          res.locals.setResponse(err, { user });
+          next(); return null;
+        };
 
-      User.create({ ...req.body })
-        .then(user => done(null, user))
-        .catch(done);
+        try {
+          const user = await require('../../utils/addOrUpdateUser')(req.body);
+          done(null, user);
+        } catch (e) {
+          done(e);
+        }
+      })();
     },
     require('../../utils/responseMiddleware')
   );

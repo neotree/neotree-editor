@@ -1,5 +1,4 @@
 import { validationResult } from 'express-validator/check';
-import addOrUpdateUser from '../users/addOrUpdateUser';
 
 module.exports = (app, payload, callback) => (req, res, next) => {
   const {
@@ -16,8 +15,8 @@ module.exports = (app, payload, callback) => (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) done(errors.array());
 
-  addOrUpdateUser(params)
-    .then(({ user, profile }) => {
+  require('../../utils/addOrUpdateUser')(params)
+    .then(user => {
       if (!user) return done({ msg: 'Something went wrong' });
 
       if (loginOnSignUp === false) return done(null, user);
@@ -25,7 +24,7 @@ module.exports = (app, payload, callback) => (req, res, next) => {
       req.logIn(user, err => {
         if (err) done(err);
 
-        done(null, { user: profile || user });
+        done(null, { user });
       });
     }).catch(done);
 };

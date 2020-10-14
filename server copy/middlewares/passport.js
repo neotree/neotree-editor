@@ -6,13 +6,13 @@ const LocalStrategy = require('passport-local').Strategy;
 
 module.exports = app => {
   passport.serializeUser((user, done) => {
-    // data.logger.log('passport.serializeUser');
+    // app.logger.log('passport.serializeUser');
     done(null, { id: user.id });
     return null;
   });
 
   passport.deserializeUser((user, done) => {
-    // data.logger.log('passport.deserializeUser');
+    // app.logger.log('passport.deserializeUser');
     User.findOne({ where: { id: user.id }, attributes: ['id'] })
       .then(user => { done(null, user); return null; })
       .catch(done);
@@ -21,7 +21,7 @@ module.exports = app => {
   /******************************************************************************
   *****************************LOCAL STRATEGY************************************/
   passport.use(new LocalStrategy((username, password, done) => {
-    // data.logger.log('new passport.LocalStrategy()');
+    // app.logger.log('new passport.LocalStrategy()');
     User.findOne({ where: { email: username } })
       .then(user => {
         if (!user) {

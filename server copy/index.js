@@ -52,7 +52,7 @@ const getRandString = () => Math.random().toString(36).substring(2).toUpperCase(
 
   // webpack
   if (process.env.NODE_ENV !== 'production') {
-    const webpackConfig = require('../webpack.config');
+    const webpackConfig = require('../webpack.development.config');
     const compiler = require('webpack')(webpackConfig);
     app.wdm = require('webpack-dev-middleware')(compiler, {
       noInfo: true,
