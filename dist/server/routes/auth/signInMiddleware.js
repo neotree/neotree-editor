@@ -1,9 +1,5 @@
 "use strict";
 
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
-
 module.exports = function (app) {
   return function (req, res, next) {
     app.passport.authenticate('local', function (error, user, info) {

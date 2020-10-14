@@ -10,17 +10,13 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _models = require("../../models");
+var _database = require("../../database");
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _firebase = _interopRequireDefault(require("../../database/firebase"));
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
 
 module.exports = function (app) {
   return function (req, res, next) {
@@ -50,7 +46,7 @@ module.exports = function (app) {
               position = 0;
               _context.prev = 3;
               _context.next = 6;
-              return _models.Diagnosis.count({
+              return _database.Diagnosis.count({
                 where: {
                   script_id: payload.script_id
                 }
@@ -96,7 +92,7 @@ module.exports = function (app) {
             case 17:
               diagnosis_id = _context.sent;
 
-              _models.Diagnosis.create(_objectSpread(_objectSpread({}, payload), {}, {
+              _database.Diagnosis.create(_objectSpread(_objectSpread({}, payload), {}, {
                 position: position,
                 diagnosis_id: diagnosis_id
               })).then(function (diagnosis) {

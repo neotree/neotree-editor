@@ -13,16 +13,7 @@ var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 var _bcryptjs = _interopRequireDefault(require("bcryptjs"));
 
-var _models = require("../../models");
-
-(function () {
-  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
-  enterModule && enterModule(module);
-})();
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 var encryptPassword = function encryptPassword(password, callback) {
   return _bcryptjs["default"].genSalt(10, function (err, salt) {
@@ -41,11 +32,11 @@ function addUser(_ref) {
   var emailSplit = username.split('@');
   var profile_name = "".concat(emailSplit[0]).toLowerCase();
   return new Promise(function (resolve, reject) {
-    Promise.all([_models.User.count({
+    Promise.all([_database.User.count({
       where: {
         email: username
       }
-    }), _models.UserProfile.count({
+    }), _database.UserProfile.count({
       where: {
         profile_name: profile_name
       }
@@ -64,7 +55,7 @@ function addUser(_ref) {
         var profileId = (0, _uuidv["default"])();
         profile_name = countProfilesWithProfileName ? "".concat(profile_name, "-").concat(profileId) : profile_name;
         var promise = id ? new Promise(function (resolve, reject) {
-          _models.User.update({
+          _database.User.update({
             password: encryptedPassword
           }, {
             where: {
@@ -72,13 +63,13 @@ function addUser(_ref) {
             },
             individualHooks: true
           }).then(function () {
-            return _models.User.findOne({
+            return _database.User.findOne({
               where: {
                 id: id
               }
             }).then(resolve)["catch"](reject);
           })["catch"](reject);
-        }) : _models.User.create({
+        }) : _database.User.create({
           id: userId,
           role: role || 0,
           email: username,
@@ -86,7 +77,7 @@ function addUser(_ref) {
         });
         promise.then(function (user) {
           // resolve user if no Profile model is supplied
-          return _models.UserProfile.create({
+          return _database.UserProfile.create({
             id: profileId,
             email: username,
             user_id: userId,
@@ -108,23 +99,3 @@ function addUser(_ref) {
     });
   });
 }
-
-;
-
-(function () {
-  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
-  if (!reactHotLoader) {
-    return;
-  }
-
-  reactHotLoader.register(encryptPassword, "encryptPassword", "/home/farai/WorkBench/neotree-editor/server/routes/users/addOrUpdateUser.js");
-  reactHotLoader.register(addUser, "addUser", "/home/farai/WorkBench/neotree-editor/server/routes/users/addOrUpdateUser.js");
-})();
-
-;
-
-(function () {
-  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
-  leaveModule && leaveModule(module);
-})();

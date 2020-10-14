@@ -1,48 +1,23 @@
 "use strict";
 
+var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
+
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
 var _express = _interopRequireDefault(require("express"));
 
-(function () {
-  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
-  enterModule && enterModule(module);
-})();
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var endpoints = _interopRequireWildcard(require("../../../constants/api-endpoints/configKeys"));
 
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  var responseMiddleware = app.responseMiddleware;
-  router.get('/get-config-keys', require('./getConfigKeysMiddleware')(app), responseMiddleware);
-  router.get('/get-config-key', require('./getConfigKeyMiddleware')(app), responseMiddleware);
-  router.get('/get-full-config-key', require('./getFullConfigKeyMiddleware')(app), responseMiddleware);
-  router.post('/create-config-key', require('./createConfigKeyMiddleware')(app), responseMiddleware);
-  router.post('/update-config-key', require('./updateConfigKeyMiddleware')(app), responseMiddleware);
-  router.post('/update-config-keys', require('./updateConfigKeysMiddleware')(app), responseMiddleware);
-  router.post('/delete-config-key', require('./deleteConfigKeyMiddleware')(app), responseMiddleware);
-  router.post('/duplicate-config-key', require('./duplicateConfigKeyMiddleware')["default"](app), responseMiddleware);
+  router.get(endpoints.GET_CONFIG_KEYS, require('./getConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.get(endpoints.GET_CONFIG_KEY, require('./getConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.get(endpoints.GET_FULL_CONFIG_KEY, require('./getFullConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.CREATE_CONFIG_KEY, require('./createConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_CONFIG_KEY, require('./updateConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_CONFIG_KEYS, require('./updateConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.DELETE_CONFIG_KEY, require('./deleteConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.DUPLICATE_CONFIG_KEY, require('./duplicateConfigKeyMiddleware')["default"](app), require('../../utils/responseMiddleware'));
   return router;
 };
-
-;
-
-(function () {
-  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
-  if (!reactHotLoader) {
-    return;
-  }
-
-  reactHotLoader.register(router, "router", "/home/farai/WorkBench/neotree-editor/server/routes/config-keys/index.js");
-})();
-
-;
-
-(function () {
-  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
-  leaveModule && leaveModule(module);
-})();

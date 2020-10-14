@@ -1,10 +1,6 @@
 "use strict";
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function () {
   return function (req, res) {
@@ -33,7 +29,7 @@ module.exports = function () {
       });
     };
 
-    _models.ApiKey.findOne({
+    _database.ApiKey.findOne({
       where: {}
     }).then(function (apiKey) {
       return done(null, apiKey);

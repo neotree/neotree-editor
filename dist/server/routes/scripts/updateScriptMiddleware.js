@@ -4,11 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function (app) {
   return function (req, res, next) {
@@ -34,7 +30,7 @@ module.exports = function (app) {
       msg: 'Required script "id" is not provided.'
     });
 
-    _models.Script.update(payload, {
+    _database.Script.update(payload, {
       where: {
         id: id
       },

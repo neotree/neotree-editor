@@ -1,12 +1,8 @@
 "use strict";
 
-var _models = require("../../models");
+var _database = require("../../database");
 
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
-
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     var key = req.headers['x-api-key'];
 
@@ -19,7 +15,7 @@ module.exports = function (app) {
         e = e || {
           msg: 'Invalid api key'
         };
-        return app.responseMiddleware(req, res, next);
+        return require('../../utils/responseMiddleware')(req, res, next);
       }
 
       next();
@@ -29,7 +25,7 @@ module.exports = function (app) {
       msg: 'Api key not provided'
     });
 
-    _models.ApiKey.findOne({
+    _database.ApiKey.findOne({
       where: {
         key: key
       }

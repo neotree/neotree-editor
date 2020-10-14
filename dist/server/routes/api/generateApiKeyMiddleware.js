@@ -1,10 +1,6 @@
 "use strict";
 
-var _models = require("../../models");
-
-var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
-  return a;
-};
+var _database = require("../../database");
 
 module.exports = function (app) {
   return function (req, res, next) {
@@ -16,14 +12,14 @@ module.exports = function (app) {
       next();
     };
 
-    (apiKey ? _models.ApiKey.update({
+    (apiKey ? _database.ApiKey.update({
       key: key
     }, {
       where: {
         id: apiKey.id
       },
       individualHooks: true
-    }) : _models.ApiKey.create({
+    }) : _database.ApiKey.create({
       key: key
     })).then(function (apiKey) {
       return done(null, {
