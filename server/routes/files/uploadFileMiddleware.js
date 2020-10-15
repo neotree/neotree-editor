@@ -32,11 +32,6 @@ module.exports = (router) => {
           createdAt: rslts.createdAt,
           updatedAt: rslts.updatedAt,
         });
-        // File.findOne({
-        //   where: { id: fileId },
-        //   attributes: ['id', 'filename', 'content_type', 'size', 'createdAt', 'updatedAt']
-        // }).then(f => done(null, f))
-        //   .catch(done);
       })
       .catch(done);
     },
