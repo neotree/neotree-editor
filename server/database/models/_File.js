@@ -5,8 +5,8 @@ const File = sqlz.define(
   'file',
   {
     id: {
-      type: Sequelize.STRING,
-      allowNull: false,
+      type: Sequelize.INTEGER,
+      autoIncrement: true,
       primaryKey: true
     },
     metadata: {
@@ -24,7 +24,7 @@ const File = sqlz.define(
     size: { type: Sequelize.BIGINT },
     data: { type: Sequelize.BLOB('long') },
     uploaded_by: {
-      type: Sequelize.UUID,
+      type: Sequelize.INTEGER,
       // references: {
       //   model: User,
       //   key: 'id'

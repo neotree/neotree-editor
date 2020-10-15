@@ -22,7 +22,7 @@ function Actions({ selected }) {
         </>
       )}
 
-      <Link to={`/scripts/${script.id}/diagnoses/new`}>
+      <Link to={`/scripts/${script.script_id}/diagnoses/new`}>
         <Tooltip title="New diagnosis">
           <IconButton>
             <AddIcon />

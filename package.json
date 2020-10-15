@@ -95,8 +95,7 @@
     "roboto-fontface": "^0.10.0",
     "sequelize": "^6.2.3",
     "socket.io": "^2.3.0",
-    "socket.io-client": "^2.3.0",
-    "uuidv4": "^4.0.0"
+    "socket.io-client": "^2.3.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.10.4",

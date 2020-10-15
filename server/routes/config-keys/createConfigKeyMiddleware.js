@@ -41,8 +41,8 @@ module.exports = app => (req, res, next) => {
     });
 
     try { 
-      const id = await saveToFirebase();
-      ConfigKey.create({ ...payload, position, id })
+      const config_key_id = await saveToFirebase();
+      ConfigKey.create({ ...payload, position, config_key_id })
           .then((configKey) => done(null, configKey))
           .catch(done);
     } catch (e) { done(e); }

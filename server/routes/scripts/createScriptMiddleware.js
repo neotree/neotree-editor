@@ -41,8 +41,8 @@ module.exports = (app, params) => (req, res, next) => {
     });
 
     try { 
-      const id = await saveToFirebase();
-      Script.create({ ...payload, position, id })
+      const script_id = await saveToFirebase();
+      Script.create({ ...payload, position, script_id })
           .then((script) => done(null, script))
           .catch(done);
     } catch (e) { done(e); }

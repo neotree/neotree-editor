@@ -1,4 +1,3 @@
-import uuid from 'uuidv4';
 import bcrypt from 'bcryptjs';
 import { User } from '../database';
 
@@ -47,7 +46,6 @@ module.exports = function addOrUpdateUser({ id, username, password, ...userParam
       try {
         const newUser = await User.create({
           ...userParams,
-          id: uuid(),
           role: userParams.role || 0,
         });
         resolve(newUser);

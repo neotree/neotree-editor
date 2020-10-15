@@ -91,7 +91,7 @@ const CopyScriptItems = React.forwardRef(({
               >
                 <option value="">Select script</option>
                 {scripts.map((scr, i) => (
-                  <option key={i} value={scr.id}>
+                  <option key={i} value={scr.script_id}>
                     {scr.data.title}
                   </option>
                 ))}

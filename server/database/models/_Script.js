@@ -7,9 +7,13 @@ const Script = sqlz.define(
   'script',
   {
     id: {
+      type: Sequelize.INTEGER,
+      autoIncrement: true,
+      primaryKey: true
+    },
+    script_id: {
       type: Sequelize.STRING,
       allowNull: false,
-      primaryKey: true
     },
     position: {
       type: Sequelize.INTEGER
@@ -28,8 +32,8 @@ const Script = sqlz.define(
 );
 
 Script.afterUpdate(script => {
-  const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
-  firebase.database().ref(`scripts/${id}`).update({
+  const { id, script_id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+  firebase.database().ref(`scripts/${script_id}`).update({
     ...data,
     ...scr,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
@@ -37,9 +41,9 @@ Script.afterUpdate(script => {
   return new Promise(resolve => resolve(script));
 });
 Script.afterDestroy(instance => {
-  firebase.database().ref(`screens/${instance.id}`).remove();
-  firebase.database().ref(`diagnosis/${instance.id}`).remove();
-  firebase.database().ref(`scripts/${instance.id}`).remove();
+  firebase.database().ref(`screens/${instance.script_id}`).remove();
+  firebase.database().ref(`diagnosis/${instance.script_id}`).remove();
+  firebase.database().ref(`scripts/${instance.script_id}`).remove();
   return new Promise(resolve => resolve(instance));
 });
 

@@ -26,7 +26,7 @@ export default function saveScript(_payload = {}) {
 
   save({ script_id: scriptId, type: form.type, ...script, data })
     .then(rslts => {
-      if (shdRedirect && rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.id}`}`);
+      if (shdRedirect && rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.script_id}`}`);
       done(rslts.errors, rslts);
     })
     .catch(done);
