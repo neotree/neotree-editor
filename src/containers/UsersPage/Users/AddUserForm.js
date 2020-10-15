@@ -13,7 +13,7 @@ import Checkbox from '@material-ui/core/Checkbox';
 import Typography from '@material-ui/core/Typography';
 import * as api from '@/api/users';
 
-const Form = ({ updateState }) => {
+const AddUserForm = ({ updateState }) => {
   const defaultForm = { email: '' };
   const [form, _setForm] = useState(defaultForm);
   const setForm = v => _setForm({ ...form, ...v });
@@ -69,6 +69,9 @@ const Form = ({ updateState }) => {
             <Typography>{error.msg || error.message || JSON.stringify(error)}</Typography>}
           <Button
             color="primary"
+            variant="contained"
+            disableElevation
+            disabled={!form.email}
             onClick={() => {
               setLoading(true);
               api.addUser(form)
@@ -82,15 +85,15 @@ const Form = ({ updateState }) => {
                   setError(err);
                 });
             }}
-          >Add user</Button>
+          >Save</Button>
         </DialogActions>
       </Dialog>
     </>
   );
 };
 
-Form.propTypes = {
+AddUserForm.propTypes = {
   updateState: PropTypes.func.isRequired
 };
 
-export default Form;
+export default AddUserForm;
