@@ -17,37 +17,37 @@ export default () => new Promise((resolve, reject) => {
   ]).then(([_configKeys, _scripts, _screens, _diagnosis]) => {
     const sortData = (arr = []) => arr.sort((a, b) => a.position - b.position);
 
-    const configKeys = sortData(Object.keys(_configKeys).map((id) => ({ 
-      id,
-      ..._configKeys[id], 
+    const configKeys = sortData(Object.keys(_configKeys).map((config_key_id) => ({
+      ..._configKeys[config_key_id],
+      config_key_id,
     })));
 
-    const scripts = sortData(Object.keys(_scripts).map((script_id) => ({ 
+    const scripts = sortData(Object.keys(_scripts).map((script_id) => ({
+      ..._scripts[script_id],
       script_id,
-      ..._scripts[script_id], 
-    })));    
+    })));
 
-    configKeys.forEach(({ id, ...key }, i) => promises.push(
+    configKeys.forEach(({ config_key_id, ...key }, i) => promises.push(
       ConfigKey.findOrCreate({
-        where: { id },
+        where: { config_key_id },
         defaults: { position: i + 1, data: JSON.stringify(key) }
       })
     ));
 
     scripts.forEach(({ script_id, ...script }, i) => {
-      const screens = sortData(Object.keys(_screens[script_id] || {}).map((screen_id) => ({ 
+      const screens = sortData(Object.keys(_screens[script_id] || {}).map((screen_id) => ({
+        ..._screens[script_id][screen_id],
         screen_id,
-        ..._screens[script_id][screen_id], 
       })));
 
-      const diagnosis = sortData(Object.keys(_diagnosis[script_id] || {}).map((diagnosis_id) => ({ 
+      const diagnosis = sortData(Object.keys(_diagnosis[script_id] || {}).map((diagnosis_id) => ({
+        ..._diagnosis[script_id][diagnosis_id],
         diagnosis_id,
-        ..._diagnosis[script_id][diagnosis_id], 
       })));
 
       promises.push(
         Script.findOrCreate({
-          where: { id: script_id },
+          where: { script_id },
           defaults: { position: i + 1, data: JSON.stringify(script) }
         })
       );

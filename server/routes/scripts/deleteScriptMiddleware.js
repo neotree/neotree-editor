@@ -30,8 +30,8 @@ module.exports = (app) => (req, res, next) => {
           if (deleteAssociatedData === false) return done(null, { scripts });
 
           Promise.all([
-            Screen.destroy({ where: { script_id: id } }),
-            Diagnosis.destroy({ where: { script_id: id } })
+            Screen.destroy({ where: { script_id: s.script_id } }),
+            Diagnosis.destroy({ where: { script_id: s.script_id } })
           ]).then(associated => done(null, { scripts, associated }))
             .catch(err => done(null, { scripts, associatedErrors: err }));
 

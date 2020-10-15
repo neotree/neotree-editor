@@ -1,35 +1,32 @@
 /* eslint-disable object-shorthand */
 import Sequelize from 'sequelize';
 import sqlz from './sequelize';
-import Country from './_Country';
+import User from './_User';
+import Hospital from './_Hospital';
 
-const User = sqlz.define(
-  'user',
+const UserHospital = sqlz.define(
+  'user_hospital',
   {
     id: {
       type: Sequelize.INTEGER,
       autoIncrement: true,
       primaryKey: true
     },
-    email: {
-      type: Sequelize.STRING,
-      allowNull: false
-    },
-    password: {
-      type: Sequelize.STRING,
-    },
-    role: {
-      type: Sequelize.INTEGER,
-      defaultValue: 0,
-    },
-    country: {
+    hospital: {
       type: Sequelize.INTEGER,
       references: {
-        model: Country,
+        model: Hospital,
+        key: 'id'
+      }
+    },
+    user: {
+      type: Sequelize.INTEGER,
+      references: {
+        model: User,
         key: 'id'
       }
     },
   }
 );
 
-export default User;
+export default UserHospital;

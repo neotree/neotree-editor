@@ -24,7 +24,7 @@ function Actions({ selected }) {
         </>
       )}
 
-      <Link to={`/scripts/${script.id}/screens/new`}>
+      <Link to={`/scripts/${script.script_id}/screens/new`}>
         <Tooltip title="New screen">
           <IconButton>
             <AddIcon />

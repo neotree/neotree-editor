@@ -19,7 +19,7 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
         }).then(() => {
           Script.create({
             ...script,
-            id: scriptId,
+            script_id: scriptId,
             data: JSON.stringify(script.data),
           })
             .then(script => {
@@ -28,14 +28,14 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
                   screen = screen.toJSON();
                   return copyScreen({
                     ...screen,
-                    script_id: script.id,
+                    script_id: script.script_id,
                   });
                 }),
                 ...diagnoses.map(d => {
                   d = d.toJSON();
                   return copyDiagnosis({
                     ...d,
-                    script_id: script.id,
+                    script_id: script.script_id,
                   });
                 })
               ])

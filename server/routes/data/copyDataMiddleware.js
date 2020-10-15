@@ -1,5 +1,4 @@
 import http from 'http';
-import uuidv4 from 'uuidv4';
 import { ConfigKey, Script, Screen, Diagnosis } from '../../database';
 import { findAndUpdateScreens } from '../../routes/screens/updateScreensMiddleware';
 import splitCamelCase from '../../../utils/splitCamelCase';
@@ -46,7 +45,6 @@ module.exports = () => (req, res, next) => {
         const dataToImport = data.payload[source.dataType];
 
         const author = req.user ? req.user.id : null;
-        const id = uuidv4();
 
         const persitScriptItems = (Model, { data, ...params }) => {
           return new Promise((resolve, reject) => {
@@ -58,7 +56,6 @@ module.exports = () => (req, res, next) => {
             Model.create({
               ...data,
               data: JSON.stringify(data.data || {}),
-              id,
               author,
               ...params,
             }).then(s => done(null, s)).catch(done);
@@ -72,7 +69,6 @@ module.exports = () => (req, res, next) => {
             return ConfigKey.create({
               ...dataToImport,
               data: JSON.stringify(dataToImport.data || {}),
-              id,
               author
             }).then(s => done(null, s)).catch(done);
           case 'screen':
@@ -97,16 +93,15 @@ module.exports = () => (req, res, next) => {
             return Script.create({
               ...dataToImport,
               data: JSON.stringify(dataToImport.data || {}),
-              id,
               author
             }).then(s => {
               callRemote(req, `${source.host}/get-script-items?payload=${JSON.stringify({ script_id: source.dataId })}`)
                 .then(({ payload }) => {
                   const promises = [
                     ...payload.screens.map((screen, position) =>
-                      persitScriptItems(Screen, { position, id: uuidv4(), data: { ...screen, script_id: s.id } })),
+                      persitScriptItems(Screen, { position, data: { ...screen, script_id: s.id } })),
                     ...payload.diagnoses.map((d, position) =>
-                      persitScriptItems(Diagnosis, { position, id: uuidv4(), data: { ...d, script_id: s.id } }))
+                      persitScriptItems(Diagnosis, { position, data: { ...d, script_id: s.id } }))
                   ];
                   Promise.all(promises).then(() => done(null, s))
                     .catch(() => done(null, s));
