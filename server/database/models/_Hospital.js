@@ -1,5 +1,6 @@
 import Sequelize from 'sequelize';
 import sqlz from './sequelize';
+import Country from './_Country';
 
 const Hospital = sqlz.define(
   'hospital',
@@ -9,9 +10,20 @@ const Hospital = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
+    firebase_id: {
+      type: Sequelize.STRING,
+      allowNull: false
+    },
     name: {
       type: Sequelize.STRING,
       allowNull: false
+    },
+    country: {
+      type: Sequelize.INTEGER,
+      references: {
+        model: Country,
+        key: 'id'
+      }
     },
   }
 );

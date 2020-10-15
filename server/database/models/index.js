@@ -19,8 +19,8 @@ const init = () => new Promise((resolve, reject) => {
    (async () => {
       try { await sequelize.authenticate(); } catch (e) { return reject(e); }
 
-     try { await Country.sync(); } catch (e) { errors.push(e); }
-     try { await Hospital.sync(); } catch (e) { errors.push(e); }
+      try { await Country.sync(); } catch (e) { errors.push(e); }
+      try { await Hospital.sync(); } catch (e) { errors.push(e); }
       try { await User.sync(); } catch (e) { errors.push(e); }
       try { await File.sync(); } catch (e) { errors.push(e); }
       try { await Script.sync(); } catch (e) { errors.push(e); }

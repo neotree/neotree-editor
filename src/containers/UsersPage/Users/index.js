@@ -9,7 +9,8 @@ import CardContent from '@material-ui/core/CardContent';
 import CardHeader from '@material-ui/core/CardHeader';
 import { useAppContext } from '@/contexts/app';
 import { provideUsersContext, useUsersContext } from '@/contexts/users';
-import Form from './Form';
+import AddUserForm from './AddUserForm';
+import UserManagerForm from './UserManagerForm';
 import Delete from './Delete';
 
 const Users = () => {
@@ -22,7 +23,7 @@ const Users = () => {
         <CardHeader
           action={(
             <>
-              <Form updateState={setState} />
+              <AddUserForm updateState={setState} />
             </>
           )}
           title="Users"
@@ -33,7 +34,7 @@ const Users = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Email</TableCell>
-                <TableCell>Action</TableCell>
+                <TableCell align="right">Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -41,10 +42,10 @@ const Users = () => {
                 return (
                   <TableRow key={`user-${i}`}>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell>
-                      <Delete
+                    <TableCell align="right">
+                      <UserManagerForm
                         user={u}
-                        disabled={authenticatedUser.email === u.email}
+                        authenticatedUser={authenticatedUser}
                         updateState={setState}
                       />
                     </TableCell>
