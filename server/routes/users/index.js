@@ -1,9 +1,10 @@
 import express from 'express';
 import { User } from '../../database';
+import * as endpoints from '../../../constants/api-endpoints/users';
 
 let router = express.Router(); //eslint-disable-line
 
-module.exports = () => {
+module.exports = app => {
   router.get(
     '/get-users',
     (req, res, next) => {
@@ -20,7 +21,7 @@ module.exports = () => {
   );
 
   router.post(
-    '/delete-user',
+    endpoints.DELETE_USER,
     (req, res, next) => {
       const done = (err, rslt) => {
         res.locals.setResponse(err, { rslt });
@@ -37,7 +38,7 @@ module.exports = () => {
   );
 
   router.post(
-    '/add-user',
+    endpoints.ADD_USER,
     (req, res, next) => {
       (async () => {
         const done = (err, user) => {
@@ -53,6 +54,48 @@ module.exports = () => {
         }
       })();
     },
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.UPDATE_USER,
+    require('./_updateUserMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.ADD_USER_HOSPITAL,
+    require('./_addUserHospitalMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.UPDATE_USER_HOSPITAL,
+    require('./_updateUserHospitalMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.GET_USER_HOSPITALS,
+    require('./_getUserHospitalsMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.ADD_USER_COUNTRY,
+    require('./_addUserCountryMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.UPDATE_USER_COUNTRY,
+    require('./_updateUserCountryMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    endpoints.GET_USER_COUNTRIES,
+    require('./_getUserCountriesMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 

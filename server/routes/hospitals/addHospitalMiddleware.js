@@ -6,34 +6,28 @@ module.exports = app => (req, res, next) => {
     const payload = req.body;
 
     const done = (err, hospital) => {
-      if (hospital) app.io.emit('add_hospital', { key: app.getRandomString(), hospitals: [{ id: hospital.id }] });
+      if (hospital) app.io.emit('add_hospitals', { key: app.getRandomString(), hospitals: [{ id: hospital.id }] });
       res.locals.setResponse(err, { hospital });
       next();
       return null;
     };
 
-    const saveToFirebase = () => new Promise((resolve, reject) => {
-      firebase.database().ref('hospitals').push().then(snap => {
-        const hospitalId = snap.key;
+    let hospital_id = null;
+    try {
+      const snap = firebase.database().ref('hospitals').push();
+      hospital_id = snap.key;
+    } catch (e) { return done(e); }
 
-        firebase.database()
-          .ref(`hospitals/${hospitalId}`).set({
-            ...payload,
-            hospitalId,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-          }).then(() => {
-            resolve(hospitalId);
-          })
-          .catch(reject);
-      })
-      .catch(reject);
-    });
+    let hospital = null;
+    try {
+      const rslts = await Hospital.create({ ...payload, hospital_id });
+      hospital = JSON.parse(JSON.stringify(rslts));
+    } catch (e) { return done(e); }
 
-    try { 
-      const firebase_id = await saveToFirebase();
-      Hospital.create({ ...payload, firebase_id })
-          .then((c) => done(null, c))
-          .catch(done);
-    } catch (e) { done(e); }
+    try {
+      const { id, ...h } = hospital; // eslint-disable-line
+      await firebase.database().ref(`hospitals/${hospital_id}`).set(h);
+      done(null, hospital);
+    } catch (e) { return done(e); }
   })();
 };
