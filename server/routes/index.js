@@ -13,5 +13,4 @@ module.exports = app => router
   .use(require('./diagnoses')(app))
   .use(require('./config-keys')(app))
   .use(require('./devices')(app))
-  .use(require('./countries')(app))
   .use(require('./hospitals')(app));

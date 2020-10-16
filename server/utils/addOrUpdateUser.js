@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
+import crypoJS from 'crypto-js';
 import { User } from '../database';
+import firebase from '../database/firebase';
 
 const encryptPassword = (password) => new Promise((resolve, reject) => {
   bcrypt.genSalt(10, (err, salt) => {
@@ -43,12 +45,20 @@ module.exports = function addOrUpdateUser({ id, username, password, ...userParam
         return reject({ msg: 'Username is required.' });
       }
 
+      let user = null;
       try {
         const newUser = await User.create({
           ...userParams,
+          email_hash: crypoJS.MD5(userParams.email).toString(),
           role: userParams.role || 0,
         });
-        resolve(newUser);
+        user = JSON.parse(JSON.stringify(newUser));
+      } catch (e) { return reject(e); }
+
+      try {
+        const { id, ...u } = user; // eslint-disable-line
+        await firebase.database().ref(`users/${user.email_hash}`).set(u);
+        resolve(user);
       } catch (e) { reject(e); }
     })();
   });

@@ -1,6 +1,6 @@
 import Sequelize from 'sequelize';
 import sqlz from './sequelize';
-import Country from './_Country';
+import firebase from '../firebase';
 
 const Hospital = sqlz.define(
   'hospital',
@@ -10,22 +10,30 @@ const Hospital = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
-    firebase_id: {
+    hospital_id: {
       type: Sequelize.STRING,
-      allowNull: false
+      allowNull: false,
+      unique: true,
     },
     name: {
       type: Sequelize.STRING,
-      allowNull: false
+      allowNull: false,
     },
     country: {
-      type: Sequelize.INTEGER,
-      references: {
-        model: Country,
-        key: 'id'
-      }
+      type: Sequelize.STRING,
     },
   }
 );
+
+Hospital.afterUpdate(h => {
+  const hospital = JSON.parse(JSON.stringify(h));
+  firebase.database().ref(`hospitals/${hospital.hospital_id}`).update(hospital);
+  return new Promise(resolve => resolve(hospital));
+});
+
+Hospital.afterDestroy(instance => {
+  firebase.database().ref(`hospitals/${instance.hospital_id}`).remove();
+  return new Promise(resolve => resolve(instance));
+});
 
 export default Hospital;
