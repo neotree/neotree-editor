@@ -16,13 +16,13 @@ function Actions({ selected }) {
     <>
       {selected.length > 0 && (
         <>
-          <CopyDiagnoses ids={selected.map(({ row }) => row.id)}>
+          <CopyDiagnoses diagnoses={selected.map(({ row }) => ({ diagnosisId: row.diagnosisId, scriptId: row.scriptId }))}>
             <Button>Copy</Button>
           </CopyDiagnoses>
         </>
       )}
 
-      <Link to={`/scripts/${script.script_id}/diagnoses/new`}>
+      <Link to={`/scripts/${script.scriptId}/diagnoses/new`}>
         <Tooltip title="New diagnosis">
           <IconButton>
             <AddIcon />

@@ -30,7 +30,7 @@ function ScriptEditor() {
             textColor="primary"
             onChange={(e, scriptSection) => {
               setState({ scriptSection });
-              history.push(`/scripts/${script.script_id}/${scriptSection}`);
+              history.push(`/scripts/${script.scriptId}/${scriptSection}`);
             }}
           >
             <Tab value="screens" label="Screens" />

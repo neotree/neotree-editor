@@ -1,5 +1,4 @@
-import { Hospital } from '../../database';
-import firebase from '../../database/firebase';
+import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   (async () => {
@@ -18,11 +17,7 @@ module.exports = app => (req, res, next) => {
       hospital_id = snap.key;
     } catch (e) { return done(e); }
 
-    let hospital = null;
-    try {
-      const rslts = await Hospital.create({ ...payload, hospital_id });
-      hospital = JSON.parse(JSON.stringify(rslts));
-    } catch (e) { return done(e); }
+    const hospital = { ...payload, hospital_id };
 
     try {
       const { id, ...h } = hospital; // eslint-disable-line

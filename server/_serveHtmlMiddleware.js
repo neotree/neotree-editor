@@ -1,18 +1,22 @@
 import path from 'path';
 import fs from 'fs';
 import cheerio from 'cheerio';
-import { User } from './database';
+import { firebase, firebaseAdmin } from './firebase';
 
 module.exports = () => (req, res) => {
   (async () => {
+    const authenticated = firebase.auth().currentUser;
     let user = null;
-    try {
-      user = !req.isAuthenticated() ? null : await User.findOne({ where: { id: req.user.id, } });
-      if (user) {
-        user = JSON.parse(JSON.stringify(user));
-        delete user.password;
-      }
-    } catch (e) { /* Do nothing */ }
+
+    if (authenticated) {
+      try {
+        user = await new Promise((resolve) => {
+          firebaseAdmin.database().ref(`users/${authenticated.uid}`)
+            .on('value', snap => resolve(snap.val()));
+        });
+      } catch (e) { /* Do nothing */ }
+    }
+
     const html = fs.readFileSync(path.resolve(__dirname, '../src/index.html'), 'utf8');
     const $ = cheerio.load(html);
     const $APP = JSON.stringify({

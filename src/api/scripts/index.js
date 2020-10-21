@@ -15,16 +15,16 @@ export const updateScripts = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const deleteScript = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/delete-script', {
+export const deleteScripts = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/delete-scripts', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,
   });
 };
 
-export const duplicateScript = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/duplicate-script', {
+export const duplicateScripts = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/duplicate-scripts', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,

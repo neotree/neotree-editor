@@ -1,5 +1,5 @@
 import { ConfigKey } from '../../database';
-import firebase from '../../database/firebase';
+import firebase from '../../firebase';
 
 export const copyConfigKey = (configKey) => {
   return new Promise((resolve, reject) => {

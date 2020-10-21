@@ -1,27 +1,26 @@
 import * as api from '@/api/scripts';
 
-export default function duplicateScripts(ids = []) {
-  if (!ids.length) return;
+export default function duplicateScripts(scripts = []) {
+  return new Promise((resolve, reject) => {
+    if (!scripts.length) return;
 
-  this.setState({ duplicatingScripts: true });
+    this.setState({ duplicatingScripts: true });
 
-  const done = (e, rslts) => {
-    this.setState(({ scripts }) => {
-      return {
-        duplicateScriptsError: e,
-        duplicatingScripts: false,
-        ...e ? null : {
-          scripts: scripts.reduce((acc, s) => [
-            ...acc,
-            s,
-            ...ids.indexOf(s.id) < 0 ? [] : [rslts.script],
-          ], []),
-        },
-      };
-    });
-  };
+    const done = (e, rslts) => {
+      this.setState(({ scripts: _scripts }) => {
+        return {
+          duplicateScriptsError: e,
+          duplicatingScripts: false,
+          ...e ? null : {
+            scripts: [..._scripts, ...(rslts && rslts.scripts ? rslts.scripts : [])],
+          },
+        };
+      });
+      if (e) { reject(e); } else { resolve(rslts); }
+    };
 
-  api.duplicateScript({ id: ids[0] })
-    .then(rslts => done(rslts.errors, rslts))
-    .catch(done);
+    api.duplicateScripts({ scripts })
+      .then(rslts => done(rslts.errors, rslts))
+      .catch(done);
+  });
 }

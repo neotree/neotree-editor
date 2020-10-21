@@ -8,13 +8,11 @@ import Typography from '@material-ui/core/Typography';
 import Logo from '@/components/Logo';
 import { Switch, Route, Redirect, useParams } from 'react-router-dom';
 import { setDocumentTitle } from '@/contexts/app';
-import { provideAuthPageContext } from './Context';
 
 const AuthForm = LazyPage(() => import('./AuthForm'));
 const ForgotPasswordForm = LazyPage(() => import('./ForgotPasswordForm'));
 const ChangePasswordForm = LazyPage(() => import('./ChangePasswordForm'));
 
-const SignUp = props => <AuthForm {...props} authType="sign-up" />;
 const SignIn = props => <AuthForm {...props} authType="sign-in" />;
 
 const useStyles = makeStyles(theme => ({
@@ -76,12 +74,6 @@ const AuthenticationPage = () => {
 
               <Route
                 exact
-                path="/sign-up"
-                render={routeParams => <SignUp {...routeParams} {...formProps} />}
-              />
-
-              <Route
-                exact
                 path="/forgot-password"
                 render={routeParams => <ForgotPasswordForm {...routeParams} {...formProps} />}
               />
@@ -101,4 +93,4 @@ const AuthenticationPage = () => {
   );
 };
 
-export default provideAuthPageContext(AuthenticationPage);
+export default AuthenticationPage;

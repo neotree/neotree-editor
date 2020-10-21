@@ -17,11 +17,11 @@ function Actions({ selected }) {
     <>
       {selected.length > 0 && (
         <>
-          <DuplicateScripts ids={selected}>
+          <DuplicateScripts scripts={selected.map(({ row }) => ({ scriptId: row.scriptId }))}>
             <Button>Duplicate</Button>
           </DuplicateScripts>
 
-          <DeleteScripts ids={selected}>
+          <DeleteScripts scripts={selected.map(({ row }) => ({ scriptId: row.scriptId }))}>
             <IconButton>
               <DeleteIcon />
             </IconButton>

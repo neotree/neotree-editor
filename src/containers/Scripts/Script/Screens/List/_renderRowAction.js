@@ -29,25 +29,25 @@ function Action({ row, }) {
       >
         <MenuItem
           component={Link}
-          to={`/scripts/${row.script_id}/screens/${row.id}`}
+          to={`/scripts/${row.scriptId}/screens/${row.screenId}`}
           onClick={handleClose}
         >Edit</MenuItem>
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          items={[row]}
           component={CopyScreens}
         >Copy</MenuItem>
 
         {/* <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          screens={[{ screenId: row.screenId, scriptId: row.scriptId, }]}
           component={DuplicateScreens}
         >Duplicate</MenuItem> */}
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          screens={[{ screenId: row.screenId, scriptId: row.scriptId, }]}
           component={DeleteScreens}
         >
           <Typography color="error">Delete</Typography>

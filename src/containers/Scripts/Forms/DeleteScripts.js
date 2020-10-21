@@ -5,11 +5,11 @@ import { useScriptsContext } from '@/contexts/scripts';
 
 const DeleteScripts = React.forwardRef(({
   children,
-  ids,
+  scripts,
   onClick,
   ...props
 }, ref) => {
-  const deleteMultiple = ids.length > 1;
+  const deleteMultiple = scripts.length > 1;
   const [renderConfirmModal, confirm] = useConfirmModal();
   const { deleteScripts } = useScriptsContext();
 
@@ -29,7 +29,7 @@ const DeleteScripts = React.forwardRef(({
       {renderConfirmModal({
         title: `Delete script${deleteMultiple ? 's' : ''}`,
         message: `Are you sure you want to delete script${deleteMultiple ? 's' : ''}?`,
-        onConfirm: () => deleteScripts(ids),
+        onConfirm: () => deleteScripts(scripts),
       })}
     </>
   );
@@ -38,7 +38,7 @@ const DeleteScripts = React.forwardRef(({
 DeleteScripts.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  scripts: PropTypes.array.isRequired,
 };
 
 export default DeleteScripts;

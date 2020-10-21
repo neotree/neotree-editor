@@ -28,19 +28,19 @@ function Action({ row, }) {
       >
         <MenuItem
           component={Link}
-          to={`/scripts/${row.script_id}`}
+          to={`/scripts/${row.scriptId}`}
           onClick={handleClose}
         >Edit</MenuItem>
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          scripts={[{ scriptId: row.scriptId }]}
           component={DuplicateScripts}
         >Duplicate</MenuItem>
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          scripts={[{ scriptId: row.scriptId }]}
           component={DeleteScripts}
         >
           <Typography color="error">Delete</Typography>

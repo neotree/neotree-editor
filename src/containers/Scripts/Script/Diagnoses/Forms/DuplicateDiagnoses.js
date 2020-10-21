@@ -2,17 +2,16 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import OverlayLoader from '@/components/OverlayLoader';
-import * as api from '@/api/diagnoses';
 import getErrorMessage from '@/utils/getErrorMessage';
 import { useDiagnosesContext } from '@/contexts/diagnoses';
 
 const DuplicateDiagnoses = React.forwardRef(({
   children,
   onClick,
-  ids,
+  diagnoses,
   ...props
 }, ref) => {
-  const { setState: setDiagnosesState } = useDiagnosesContext();
+  const { duplicateDiagnoses, } = useDiagnosesContext();
   const [loading, setLoading] = React.useState(false);
 
   return (
@@ -22,19 +21,8 @@ const DuplicateDiagnoses = React.forwardRef(({
         ref={ref}
         onClick={e => {
           setLoading(true);
-          api.duplicateScreen({ id: ids[0] })
-            .then(({ diagnosis }) => {
-              setLoading(false);
-              setDiagnosesState(({ diagnoses }) => ({
-                diagnoses: diagnoses.reduce((acc, s) => {
-                  return [
-                    ...acc,
-                    s,
-                    ...ids.includes(s.id) ? [diagnosis] : [],
-                  ];
-                }, []),
-              }));
-            })
+          duplicateDiagnoses(diagnoses)
+            .then(() => setLoading(false))
             .catch(e => {
               setLoading(false);
               alert(getErrorMessage(e));
@@ -53,7 +41,10 @@ const DuplicateDiagnoses = React.forwardRef(({
 DuplicateDiagnoses.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  diagnoses: PropTypes.arrayOf(PropTypes.shape({
+    diagnosisId: PropTypes.string.isRequired,
+    scriptId: PropTypes.string.isRequired,
+  })).isRequired,
 };
 
 export default DuplicateDiagnoses;

@@ -1,8 +1,6 @@
 import Sequelize from 'sequelize';
 import sqlz from './sequelize';
 
-import firebase from '../firebase';
-
 const ConfigKey = sqlz.define(
   'config_key',
   {
@@ -30,19 +28,5 @@ const ConfigKey = sqlz.define(
     },
   }
 );
-
-ConfigKey.afterUpdate(cKey => {
-  const { id, config_key_id, data: { createdAt: cAt, ...data }, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
-  firebase.database().ref(`configkeys/${config_key_id}`).update({
-    ...data,
-    ...c,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return new Promise(resolve => resolve(cKey));
-});
-ConfigKey.afterDestroy(instance => {
-  firebase.database().ref(`configkeys/${instance.config_key_id}`).remove();
-  return new Promise(resolve => resolve(instance));
-});
 
 export default ConfigKey;

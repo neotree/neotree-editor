@@ -1,4 +1,4 @@
-import firebase from '../../database/firebase';
+import firebase from '../../firebase';
 import { Script, Screen, Diagnosis, ConfigKey } from '../../database';
 
 module.exports = () => (req, res, next) => {

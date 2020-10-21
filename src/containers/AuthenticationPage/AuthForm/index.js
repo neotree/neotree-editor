@@ -1,3 +1,4 @@
+/* global window */
 import React from 'react';
 import PropTypes from 'prop-types';
 import Collapse from '@material-ui/core/Collapse';
@@ -8,7 +9,7 @@ import CircularProgress from '@material-ui/core/CircularProgress';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@/components/Layout';
 import cx from 'classnames';
-import useFormState from './useFormState';
+import { checkEmailRegistration, authenticate } from '@/api/auth';
 
 const useStyles = makeStyles(() => ({
   actionsWrap: { textAlign: 'right', },
@@ -19,25 +20,80 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const AuthForm = ({ copy, authType }) => {
-  const classes = useStyles();
+const AuthForm = ({ copy }) => {
+  const [state, _setState] = React.useState({
+    authType: 'sign-in',
+    emailRegistration: {},
+    form: {
+      email: '',
+      password: '',
+      password2: '',
+    },
+  });
+
+  const setState = s => _setState(prev => ({
+    ...prev,
+    ...(typeof s === 'function' ? s(prev) : s),
+  }));
+
+  const setForm = s => setState(prev => ({
+    form: {
+      ...prev.form,
+      ...(typeof s === 'function' ? s(prev.form) : s),
+    },
+  }));
 
   const {
-    setForm,
-    disableAction,
-    onAuthenticate,
-    checkEmailRegistration,
-    state: {
-      loading,
-      authenticateError,
-      emailRegistration,
-      form: {
-        email,
-        password,
-        password2,
-      },
+    loading,
+    authType,
+    authenticateError,
+    emailRegistration,
+    form: {
+      email,
+      password,
+      password2,
+    },
+  } = state;
+
+  const disableAction = () => {
+    let canSubmit = !loading && email;
+    if (emailRegistration.userId) {
+      const passwordConfirmed = password && (!emailRegistration.activated ? password === password2 : true);
+      canSubmit = canSubmit && passwordConfirmed;
     }
-  } = useFormState(authType);
+    return canSubmit ? false : true;
+  };
+
+  const onAuthenticate = () => {
+    if (disableAction(authType)) return;
+
+    setState({ loading: true, authenticateError: null, });
+    authenticate(authType, {
+      id: emailRegistration.userId,
+      username: email,
+      password,
+      password2
+    })
+      .then(() => { window.location.href = '/'; })
+      .catch(e => {
+        setState({ loading: false, authenticateError: e });
+      });
+  };
+
+  const _checkEmailRegistration = () => {
+    setState({ loading: true, authenticateError: null, });
+    checkEmailRegistration({ email })
+      .then(emailRegistration => {
+        setState({
+          loading: false,
+          emailRegistration,
+          authType: emailRegistration.userId && !emailRegistration.activated ? 'sign-up' : 'sign-in',
+        });
+      })
+      .catch(e => setState({ loading: false, authenticateError: e, }));
+  };
+
+  const classes = useStyles();
 
   const errors = emailRegistration.errors || authenticateError;
 
@@ -65,7 +121,7 @@ const AuthForm = ({ copy, authType }) => {
         events={{
           keyup: e => {
             if (e.keyCode !== 13) return;
-            if (!emailRegistration.userId) return checkEmailRegistration(authType);
+            if (!emailRegistration.userId) return _checkEmailRegistration();
             onAuthenticate(authType);
           },
         }}
@@ -93,7 +149,7 @@ const AuthForm = ({ copy, authType }) => {
                 color="primary"
                 variant="contained"
                 endIcon={btnLoader}
-                onClick={() => checkEmailRegistration(authType)}
+                onClick={() => _checkEmailRegistration()}
                 disabled={disableAction(authType)}
               >{copy.VERIFY_EMAIL_ADDRESS_BUTTON_TEXT}</Button>
             </>
@@ -160,7 +216,6 @@ const AuthForm = ({ copy, authType }) => {
 
 AuthForm.propTypes = {
   copy: PropTypes.object.isRequired,
-  authType: PropTypes.oneOf(['sign-in', 'sign-up']).isRequired,
 };
 
 export default AuthForm;

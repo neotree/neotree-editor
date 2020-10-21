@@ -35,7 +35,7 @@ export const provideScreensContext = Component => function ScreensContextProvide
 
   const { scriptId } = value.router.match.params;
 
-  React.useEffect(() => { value.getScreens({ script_id: scriptId }); }, [scriptId]);
+  React.useEffect(() => { value.getScreens({ scriptId }); }, [scriptId]);
 
   return (
     <ScreensContext.Provider

@@ -17,14 +17,14 @@ function Actions({ selected }) {
       {selected.length > 0 && (
         <>
           <CopyScreens 
-            ids={selected.map(({ row }) => row.id)}
+            items={selected.map(({ row }) => ({ screenId: row.screenId, scriptId: row.scriptId, }))}
           >
             <Button>Copy</Button>
           </CopyScreens>
         </>
       )}
 
-      <Link to={`/scripts/${script.script_id}/screens/new`}>
+      <Link to={`/scripts/${script.scriptId}/screens/new`}>
         <Tooltip title="New screen">
           <IconButton>
             <AddIcon />

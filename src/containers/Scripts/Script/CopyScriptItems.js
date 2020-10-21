@@ -11,20 +11,20 @@ import * as api from '@/api/scripts';
 
 const CopyScriptItems = React.forwardRef(({
   children,
-  ids,
+  items,
   type,
   onClick,
   onSuccess,
   ...props
 }, ref) => {
-  const copyMultiple = ids.length > 1;
+  const copyMultiple = items.length > 1;
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [scriptsLoaded, setScriptsLoaded] = React.useState(false);
   const [scripts, setScripts] = React.useState([]);
   const [error, setError] = React.useState(null);
   const [copying, setCopying] = React.useState(false);
-  const [script_id, setScriptId] = React.useState('');
+  const [scriptId, setScriptId] = React.useState('');
   const [displaySuccessModal, setDisplaySuccessModal] = React.useState(false);
 
   React.useEffect(() => {
@@ -79,7 +79,7 @@ const CopyScriptItems = React.forwardRef(({
             <DialogContent>
               <Typography>Copy to</Typography>
               <select
-                value={script_id || ''}
+                value={scriptId || ''}
                 style={{
                   maxWidth: 200,
                   background: 'transparent',
@@ -91,8 +91,8 @@ const CopyScriptItems = React.forwardRef(({
               >
                 <option value="">Select script</option>
                 {scripts.map((scr, i) => (
-                  <option key={i} value={scr.script_id}>
-                    {scr.data.title}
+                  <option key={i} value={scr.scriptId}>
+                    {scr.title}
                   </option>
                 ))}
               </select>
@@ -107,7 +107,7 @@ const CopyScriptItems = React.forwardRef(({
               <Button
                 color="primary"
                 variant="contained"
-                disabled={copying || !script_id}
+                disabled={copying || !scriptId}
                 onClick={() => {                  
                   let copy = null;
                   switch (type) {
@@ -125,12 +125,12 @@ const CopyScriptItems = React.forwardRef(({
                   setCopying(true);
                   setError(null);
 
-                  copy({ ids, script_id, })
+                  copy({ items, targetScriptId: scriptId, })
                     .then(({ error, items, }) => {
                       setError(error);
                       setCopying(false);
                       setScriptId('');
-                      if (onSuccess) onSuccess(items, script_id);
+                      if (onSuccess) onSuccess(items, scriptId);
                       setDisplaySuccessModal(true);
                     })
                     .catch(err => {
@@ -177,7 +177,11 @@ const CopyScriptItems = React.forwardRef(({
 CopyScriptItems.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  items: PropTypes.arrayOf(PropTypes.shape({
+    diagnosisId: PropTypes.string,
+    screenId: PropTypes.string,
+    scriptId: PropTypes.string.isRequired,
+  })).isRequired,
   onSuccess: PropTypes.func,
   type: PropTypes.oneOf(['screen', 'diagnosis']).isRequired,
 };

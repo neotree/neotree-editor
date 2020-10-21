@@ -40,7 +40,8 @@ const ScreensList = () => {
             onSortData={screens => {
               setState({ screens });
               updateScreens(screens.map(s => ({
-                id: s.id,
+                screenId: s.screenId,
+                scriptId: s.scriptId,
                 position: s.position
               })));
             }}

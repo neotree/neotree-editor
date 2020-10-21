@@ -1,27 +1,26 @@
 import * as api from '@/api/screens';
 
-export default function duplicateScreens(ids = []) {
-  if (!ids.length) return;
+export default function duplicateScreens(screens = []) {
+  return new Promise((resolve, reject) => {
+    if (!screens.length) return;
 
-  this.setState({ duplicatingScreens: true });
+    this.setState({ duplicatingScreens: true });
 
-  const done = (e, rslts) => {
-    this.setState(({ screens }) => {
-      return {
-        duplicateScreensError: e,
-        duplicatingScreens: false,
-        ...e ? null : {
-          screens: screens.reduce((acc, s) => [
-            ...acc,
-            s,
-            ...ids.indexOf(s.id) < 0 ? [] : [rslts.screen],
-          ], []),
-        },
-      };
-    });
-  };
+    const done = (e, rslts) => {
+      this.setState(({ screens: _screens }) => {
+        return {
+          duplicateScreensError: e,
+          duplicatingScreens: false,
+          ...e ? null : {
+            screens: [..._screens, ...(rslts && rslts.screens ? rslts.screens : [])],
+          },
+        };
+      });
+      if (e) { reject(e); } else { resolve(rslts); }
+    };
 
-  api.duplicateScreen({ id: ids[0] })
-    .then(rslts => done(rslts.errors, rslts))
-    .catch(done);
+    api.duplicateScreens({ screens })
+      .then(rslts => done(rslts.errors, rslts))
+      .catch(done);
+  });
 }
