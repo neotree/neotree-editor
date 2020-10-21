@@ -1,52 +1,37 @@
-import { Screen } from '../../database';
-import firebase from '../../database/firebase';
+import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   (async () => {
-    const payload = req.body;
+    const { scriptId, ...payload } = req.body;
 
     const done = (err, screen) => {
-      if (err) app.logger.log(err);
-      if (screen) app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ id: screen.id }] });
+      if (screen) app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ id: screen.id, scriptId }] });
       res.locals.setResponse(err, { screen });
-      next(); return null;
+      next();
     };
 
-    let position = 0;
-    try { 
-      position = await Screen.count({ where: { script_id: payload.script_id } }); 
-      position++;
+    if (!scriptId) return done(new Error('Required script "id" is not provided.'));
+
+    let screenId = null;
+    try {
+      const snap = await firebase.database().ref(`screens/${scriptId}`).push();
+      screenId = snap.key;
     } catch (e) { return done(e); }
 
-    const saveToFirebase = () => new Promise((resolve, reject) => {
-      firebase.database().ref(`screens/${payload.script_id}`).push().then(snap => {
-        const { data, ...rest } = payload;
-
-        const screenId = snap.key;
-
-        const _data = data ? JSON.parse(data) : null;
-
+    let screens = {};
+    try {
+      screens = await new Promise((resolve) => {
         firebase.database()
-          .ref(`screens/${payload.script_id}/${screenId}`).set({
-            ...rest,
-            ..._data,
-            position,
-            screenId,
-            scriptId: payload.script_id,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-          }).then(() => {
-            resolve(screenId);
-          })
-          .catch(reject);
-      })
-      .catch(reject);
-    });
+          .ref(`screens/${scriptId}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+      screens = screens || {};
+    } catch (e) { /* Do nothing */ }
 
-    try { 
-      const screen_id = await saveToFirebase();
-      Screen.create({ ...payload, position, screen_id })
-          .then((screen) => done(null, screen))
-          .catch(done);
-    } catch (e) { done(e); }
+    const screen = { ...payload, scriptId, screenId, id: screenId, position: Object.keys(screens).length + 1, };
+
+    try { await firebase.database().ref(`screens/${scriptId}`).set(screen); } catch (e) { return done(e); }
+
+    done(null, screen);
   })();
 };

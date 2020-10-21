@@ -15,16 +15,16 @@ export const updateConfigKeys = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const deleteConfigKey = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/delete-config-key', {
+export const deleteConfigKeys = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/delete-config-keys', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,
   });
 };
 
-export const duplicateConfigKey = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/duplicate-config-key', {
+export const duplicateConfigKeys = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/duplicate-config-keys', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,

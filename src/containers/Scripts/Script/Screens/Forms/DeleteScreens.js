@@ -5,11 +5,11 @@ import { useScreensContext } from '@/contexts/screens';
 
 const DeleteScreens = React.forwardRef(({
   children,
-  ids,
+  screens,
   onClick,
   ...props
 }, ref) => {
-  const deleteMultiple = ids.length > 1;
+  const deleteMultiple = screens.length > 1;
   const [renderConfirmModal, confirm] = useConfirmModal();
   const { deleteScreens } = useScreensContext();
 
@@ -29,7 +29,7 @@ const DeleteScreens = React.forwardRef(({
       {renderConfirmModal({
         title: `Delete screen${deleteMultiple ? 's' : ''}`,
         message: `Are you sure you want to delete screen${deleteMultiple ? 's' : ''}?`,
-        onConfirm: () => deleteScreens(ids),
+        onConfirm: () => deleteScreens(screens),
       })}
     </>
   );
@@ -38,7 +38,10 @@ const DeleteScreens = React.forwardRef(({
 DeleteScreens.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  screens: PropTypes.arrayOf(PropTypes.shape({
+    screenId: PropTypes.string.isRequired,
+    scriptId: PropTypes.string.isRequired,
+  })).isRequired,
 };
 
 export default DeleteScreens;

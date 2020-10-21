@@ -9,7 +9,7 @@ export default function getScreen(payload = {}) {
       screenInitialised: true,
       loadingScreen: false,
       ...rslts,
-      form: { ...form, ...e ? {} : (rslts.screen ? rslts.screen.data : {}), },
+      form: { ...form, ...(rslts ? rslts.screen : null) },
     }));
   };
 

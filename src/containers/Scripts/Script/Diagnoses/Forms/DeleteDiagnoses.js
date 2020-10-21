@@ -5,11 +5,11 @@ import { useDiagnosesContext } from '@/contexts/diagnoses';
 
 const DeleteDiagnoses = React.forwardRef(({
   children,
-  ids,
+  diagnoses,
   onClick,
   ...props
 }, ref) => {
-  const deleteMultiple = ids.length > 1;
+  const deleteMultiple = diagnoses.length > 1;
   const [renderConfirmModal, confirm] = useConfirmModal();
   const { deleteDiagnoses } = useDiagnosesContext();
 
@@ -29,7 +29,7 @@ const DeleteDiagnoses = React.forwardRef(({
       {renderConfirmModal({
         title: `Delete diagnosis${deleteMultiple ? 's' : ''}`,
         message: `Are you sure you want to delete diagnosis${deleteMultiple ? 's' : ''}?`,
-        onConfirm: () => deleteDiagnoses(ids),
+        onConfirm: () => deleteDiagnoses(diagnoses),
       })}
     </>
   );
@@ -38,7 +38,10 @@ const DeleteDiagnoses = React.forwardRef(({
 DeleteDiagnoses.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  diagnoses: PropTypes.arrayOf(PropTypes.shape({
+    diagnosisId: PropTypes.string.isRequired,
+    scriptId: PropTypes.string.isRequired,
+  })).isRequired,
 };
 
 export default DeleteDiagnoses;

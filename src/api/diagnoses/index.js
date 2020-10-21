@@ -15,16 +15,16 @@ export const updateDiagnoses = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const deleteDiagnosis = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/delete-diagnosis', {
+export const deleteDiagnoses = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/delete-diagnoses', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,
   });
 };
 
-export const duplicateDiagnosis = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/duplicate-diagnosis', {
+export const duplicateDiagnoses = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/duplicate-diagnoses', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,

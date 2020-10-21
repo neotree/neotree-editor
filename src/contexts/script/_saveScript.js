@@ -17,16 +17,15 @@ export default function saveScript(_payload = {}) {
     setState(({ form }) => ({
       saveScriptError: e,
       savingScript: false,
-      form: { ...form, ...e ? {} : (rslts.script ? rslts.script.data : {}), },
+      form: { ...form, ...rslts.script },
     }));
   };
 
   const save = script ? api.updateScript : api.createScript;
-  const data = JSON.stringify({ ...form, ...payload });
 
-  save({ script_id: scriptId, type: form.type, ...script, data })
+  save({ type: form.type, ...script, ...form, ...payload })
     .then(rslts => {
-      if (shdRedirect && rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.script_id}`}`);
+      if (shdRedirect && rslts.script) history.push(`/scripts${script ? '' : `/${rslts.script.id}`}`);
       done(rslts.errors, rslts);
     })
     .catch(done);

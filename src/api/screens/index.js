@@ -15,16 +15,16 @@ export const updateScreens = (reqPayload = {}, reqOpts) => {
   });
 };
 
-export const deleteScreen = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/delete-screen', {
+export const deleteScreens = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/delete-screens', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,
   });
 };
 
-export const duplicateScreen = (reqPayload = {}, reqOpts) => {
-  return makeApiCall('/duplicate-screen', {
+export const duplicateScreens = (reqPayload = {}, reqOpts) => {
+  return makeApiCall('/duplicate-screens', {
     method: 'POST',
     body: reqPayload,
     ...reqOpts,

@@ -31,7 +31,7 @@ const ScriptsList = () => {
             noDataMsg="No scripts"
             selectable={false}
             title={copy.PAGE_TITLE}
-            data={scripts.map(s => ({ ...s, data: { ...s.data, position: s.position, } }))}
+            data={scripts}
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
@@ -42,7 +42,7 @@ const ScriptsList = () => {
             onSortData={scripts => {
               setState({ scripts });
               updateScripts(scripts.map(s => ({
-                id: s.id,
+                id: s.scriptId,
                 position: s.position
               })));
             }}

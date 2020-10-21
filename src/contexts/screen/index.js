@@ -11,7 +11,7 @@ export const provideScreenContext = Component => function ScreenContextProvider(
   const { state: { script } } = useScriptContext();
 
   const router = useRouter();
-  const { screenId, screenSection } = router.match.params;
+  const { screenId, screenSection, scriptId, } = router.match.params;
 
   const [state, _setState] = React.useState({
     ...defaults.defaultState,
@@ -57,8 +57,8 @@ export const provideScreenContext = Component => function ScreenContextProvider(
   React.useEffect(() => {
     const screenInitialised = screenId !== 'new' ? true : false;
     value.setState({ screenInitialised, screen: null, form: defaults.defaultState.form });
-    if (screenId !== 'new') value.getScreen({ id: screenId, });
-  }, [screenId]);
+    if (screenId !== 'new') value.getScreen({ screenId, scriptId });
+  }, [screenId, scriptId]);
 
   const { shouldSaveForm } = state;
 

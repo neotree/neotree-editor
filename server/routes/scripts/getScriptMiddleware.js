@@ -1,14 +1,23 @@
-import { Script } from '../../database';
+import firebase from '../../firebase';
 
 module.exports = () => (req, res, next) => {
-  const payload = req.query;
+  (async () => {
+    const { id } = req.query;
 
-  const done = (err, script) => {
-    res.locals.setResponse(err, { script });
-    next(); return null;
-  };
+    const done = (err, script) => {
+      res.locals.setResponse(err, { script });
+      next();
+    };
 
-  Script.findOne({ where: payload })
-    .then((script) => done(null, script))
-    .catch(done);
+    let script = null;
+    try {
+      script = await new Promise((resolve) => {
+        firebase.database()
+          .ref(`scripts/${id}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+    } catch (e) { return done(e); }
+
+    done(null, script);
+  })();
 };

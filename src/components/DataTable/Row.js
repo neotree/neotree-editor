@@ -52,7 +52,7 @@ export default SortableElement(({
         const children = f.render ?
           f.render({ row, rowIndex: i, column: f.key, columnIndex: j, })
           :
-          (row.data || row)[f.key];
+          row[f.key];
         return (
           <TableCell {...f.cellProps} key={`${i}${f.key}${j}`}>
             {children}

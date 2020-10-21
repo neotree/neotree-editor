@@ -1,50 +1,34 @@
-import firebase from '../../database/firebase';
-import { Script } from '../../database';
+import firebase from '../../firebase';
 
-module.exports = (app, params) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
-    const payload = params || req.body;
+    const payload = req.body;
 
     const done = (err, script) => {
-      if (script) app.io.emit('create_scripts', { key: app.getRandomString(), scripts: [{ id: script.id }] });
       res.locals.setResponse(err, { script });
-      next(); return null;
+      next();
     };
 
-    let position = 0;
-    try { 
-      position = await Script.count({ where: {} }); 
-      position++;
+    let scriptId = null;
+    try {
+      const snap = await firebase.database().ref('scripts').push();
+      scriptId = snap.key;
     } catch (e) { return done(e); }
 
-    const saveToFirebase = () => new Promise((resolve, reject) => {
-      firebase.database().ref('scripts').push().then(snap => {
-        const { data, ...rest } = payload;
-
-        const scriptId = snap.key;
-
-        const _data = data ? JSON.parse(data) : null;
-
+    let scripts = {};
+    try {
+      scripts = await new Promise((resolve) => {
         firebase.database()
-          .ref(`scripts/${scriptId}`).set({
-            ...rest,
-            ..._data,
-            position,
-            scriptId,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-          }).then(() => {
-            resolve(scriptId);
-          })
-          .catch(reject);
-      })
-      .catch(reject);
-    });
+          .ref('scripts')
+          .on('value', snap => resolve(snap.val()));
+      });
+      scripts = scripts || {};
+    } catch (e) { /* Do nothing */ }
 
-    try { 
-      const script_id = await saveToFirebase();
-      Script.create({ ...payload, position, script_id })
-          .then((script) => done(null, script))
-          .catch(done);
-    } catch (e) { done(e); }
+    const script = { ...payload, scriptId, id: scriptId, position: Object.keys(scripts).length + 1, };
+
+    try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return done(e); }
+
+    done(null, script);
   })();
 };

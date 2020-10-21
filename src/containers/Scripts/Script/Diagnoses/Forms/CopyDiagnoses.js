@@ -14,7 +14,7 @@ const CopyDiagnoses = React.forwardRef((props, ref) => {
         ref={ref}
         type="diagnosis"
         onSuccess={(items, script_id) => {
-          if (script_id === script.id) {
+          if (script_id === script.scriptId) {
             setDiagnosesState(s => ({ diagnoses: [...s.diagnoses, ...items] }));
           }
         }}

@@ -14,9 +14,9 @@ function Screen() {
 
   const titleChunks = !script ? [] : [
     scritpsCopy.PAGE_TITLE,
-    script.data.title,
+    script.title,
     screensCopy.PAGE_TITLE,
-    screen ? screen.data.title : loadingScreen ? '' : 'New screen',
+    screen ? screen.title : loadingScreen ? '' : 'New screen',
   ].filter(c => c);
 
   setDocumentTitle(titleChunks.join(' > '));

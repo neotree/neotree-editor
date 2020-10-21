@@ -47,14 +47,14 @@ module.exports = app => {
   );
 
   router.post(
-    endpoints.DELETE_DIAGNOSIS,
-    require('./deleteDiagnosisMiddleware')(app),
+    endpoints.DELETE_DIAGNOSES,
+    require('./deleteDiagnosesMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 
   router.post(
-    endpoints.DUPLICATE_DIAGNOSIS,
-    require('./duplicateDiagnosisMiddleware').default(app),
+    endpoints.DUPLICATE_DIAGNOSES,
+    require('./duplicateDiagnosesMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 

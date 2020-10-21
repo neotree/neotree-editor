@@ -17,12 +17,6 @@ module.exports = app => {
   );
 
   router.get(
-    endpoints.GET_FULL_SCRIPT,
-    require('./getFullScriptMiddleware')(app),
-    require('../../utils/responseMiddleware')
-  );
-
-  router.get(
     endpoints.GET_SCRIPT_ITEMS,
     require('./getScriptItemsMiddleware')(app),
     require('../../utils/responseMiddleware')
@@ -36,7 +30,7 @@ module.exports = app => {
 
   router.post(
     endpoints.UPDATE_SCRIPT,
-    require('./updateScriptMiddleware')(app),
+    require('./updateScriptMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 
@@ -47,14 +41,14 @@ module.exports = app => {
   );
 
   router.post(
-    endpoints.DELETE_SCRIPT,
-    require('./deleteScriptMiddleware')(app),
+    endpoints.DELETE_SCRIPTS,
+    require('./deleteScriptsMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 
   router.post(
-    endpoints.DUPLICATE_SCRIPT,
-    require('./duplicateScriptMiddleware').default(app),
+    endpoints.DUPLICATE_SCRIPTS,
+    require('./duplicateScriptsMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 

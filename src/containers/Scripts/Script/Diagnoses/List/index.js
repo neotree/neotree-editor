@@ -26,7 +26,7 @@ const DiagnosesList = () => {
             selectable
             noDataMsg="No diagnoses"
             title={copy.PAGE_TITLE}
-            data={diagnoses.map(s => ({ ...s, data: { ...s.data, position: s.position, } }))}
+            data={diagnoses}
             renderHeaderActions={require('./_renderHeaderActions').default}
             renderRowAction={require('./_renderRowAction').default}
             displayFields={[
@@ -37,8 +37,9 @@ const DiagnosesList = () => {
             onSortData={diagnoses => {
               setState({ diagnoses });
               updateDiagnoses(diagnoses.map(s => ({
-                id: s.id,
-                position: s.position
+                diagnosisId: s.diagnosisId,
+                scriptId: s.scriptId,
+                position: s.position,
               })));
             }}
           />
