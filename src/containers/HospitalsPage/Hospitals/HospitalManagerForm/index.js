@@ -6,18 +6,13 @@ import Dialog from '@material-ui/core/Dialog';
 import DialogContent from '@material-ui/core/DialogContent';
 import DialogActions from '@material-ui/core/DialogActions';
 import Button from '@material-ui/core/Button';
-import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
-import Grid from '@material-ui/core/Grid';
 import * as api from '@/api/hospitals';
+import HospitalForm, { defaultForm } from '../HospitalForm';
 import Delete from './Delete';
 
-const defaultForm = { country: '', name: '' };
-
 const HospitalManagerForm = ({ updateState, hospital, authenticatedUser, }) => {
-  const [form, _setForm] = useState(defaultForm);
-  const setForm = v => _setForm({ ...form, ...v });
-
+  const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -43,23 +38,7 @@ const HospitalManagerForm = ({ updateState, hospital, authenticatedUser, }) => {
         maxWidth="sm"
       >
         <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={4} sm={4}>
-              <TextField
-                label="Country"
-                value={form.country}
-                onChange={e => setForm({ country: e.target.value })}
-              />
-            </Grid>
-
-            <Grid item xs={8} sm={8}>
-              <TextField
-                label="Name"
-                value={form.name}
-                onChange={e => setForm({ name: e.target.value })}
-              />
-            </Grid>
-          </Grid>
+          <HospitalForm hospital={hospital} onChange={form => setForm(form)} />
         </DialogContent>
 
         <DialogActions>
@@ -76,14 +55,16 @@ const HospitalManagerForm = ({ updateState, hospital, authenticatedUser, }) => {
             color="primary"
             variant="contained"
             disableElevation
-            disabled
+            disabled={!(form.name && form.country)}
             onClick={() => {
               setLoading(true);
-              api.addHospital(form)
+              api.updateHospital(form)
                 .then(({ hospital }) => {
                   setLoading(false);
                   setOpen(false);
-                  updateState(({ hospitals }) => ({ hospitals: [...hospitals, hospital] }));
+                  updateState(({ hospitals }) => ({
+                    hospitals: hospitals.map(h => h.hospitalId === hospital.hospitalId ? hospital : h)
+                  }));
                 })
                 .catch(err => {
                   setLoading(false);

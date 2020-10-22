@@ -40,7 +40,7 @@ module.exports = app => (req, res, next) => {
         return firebase.database().ref(`screens/${scriptId}/${s.screenId}`).set({
           ...s,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         });
       }));
     } catch (e) { return done(e); }

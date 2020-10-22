@@ -1,15 +1,25 @@
-import { Hospital } from '../../database';
+import firebase from '../../firebase';
 
 module.exports = () => (req, res, next) => {
-  const payload = req.query;
+  (async () => {
+    const done = (err, hospitals) => {
+      res.locals.setResponse(err, { hospitals });
+      next();
+    };
 
-  const done = (err, hospitals) => {
-    res.locals.setResponse(err, { hospitals });
-    next();
-    return null;
-  };
+    let hospitals = {};
+    try {
+      hospitals = await new Promise((resolve) => {
+        firebase.database()
+          .ref('hospitals')
+          .on('value', snap => resolve(snap.val()));
+      });
+      hospitals = hospitals || {};
+    } catch (e) { return done(e); }
 
-  Hospital.findAll({ where: payload, })
-    .then(hospitals => done(null, hospitals))
-    .catch(done);
+    done(
+      null,
+      Object.keys(hospitals).map(key => hospitals[key]).sort((a, b) => a.position - b.position)
+    );
+  })();
 };

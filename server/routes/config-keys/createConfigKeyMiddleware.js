@@ -31,7 +31,7 @@ module.exports = () => (req, res, next) => {
       id: configKeyId,
       position: Object.keys(configKeys).length + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
-      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
     try { await firebase.database().ref(`configkeys/${configKeyId}`).set(configKey); } catch (e) { return done(e); }

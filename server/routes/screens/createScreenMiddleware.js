@@ -35,7 +35,7 @@ module.exports = app => (req, res, next) => {
       id: screenId,
       position: Object.keys(screens).length + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
-      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
     try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return done(e); }

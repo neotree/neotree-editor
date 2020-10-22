@@ -8,14 +8,47 @@ import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardHeader from '@material-ui/core/CardHeader';
 import { useAppContext } from '@/contexts/app';
-import { provideUsersContext, useUsersContext } from '@/contexts/users';
+import { getUsers } from '@/api/users';
+import { getHospitals } from '@/api/hospitals';
 import AddUserForm from './AddUserForm';
 import UserManagerForm from './UserManagerForm';
-import Delete from './Delete';
 
 const Users = () => {
   const { state: { authenticatedUser } } = useAppContext();
-  const { state: { users }, setState } = useUsersContext();
+  const [state, _setState] = React.useState({
+    users: [],
+    loading: false,
+    form: {
+      name: '',
+      code: '',
+    },
+  });
+
+  const setState = s => _setState(prev => ({
+    ...prev,
+    ...(typeof s === 'function' ? s(prev) : s),
+  }));
+
+  const { users, hospitals } = state;
+
+  React.useEffect(() => {
+    (async () => {
+      setState({ loading: true, });
+      let users = [];
+      let hospitals = [];
+
+      try {
+        const rslts = await getUsers();
+        users = rslts.users;
+      } catch (e) { setState({ getUsersErrors: e, loading: false, }); }
+      try {
+        const rslts = await getHospitals();
+        hospitals = rslts.hospitals;
+      } catch (e) { setState({ getHospitalsErrors: e, loading: false, }); }
+
+      setState({ users: users || [], hospitals: hospitals || [], loading: false, });
+    })();
+  }, []);
 
   return (
     <>
@@ -23,7 +56,7 @@ const Users = () => {
         <CardHeader
           action={(
             <>
-              <AddUserForm updateState={setState} />
+              <AddUserForm updateState={setState} hospitals={hospitals} />
             </>
           )}
           title="Users"
@@ -45,6 +78,7 @@ const Users = () => {
                     <TableCell align="right">
                       <UserManagerForm
                         user={u}
+                        hospitals={hospitals}
                         authenticatedUser={authenticatedUser}
                         updateState={setState}
                       />
@@ -60,4 +94,4 @@ const Users = () => {
   );
 };
 
-export default provideUsersContext(Users);
+export default Users;

@@ -1,24 +1,22 @@
-import { Hospital } from '../../database';
+import { updateHospital } from './updateHospitalMiddleware';
 
-module.exports = app => (req, res, next) => {
-  const { hospitals, returnUpdated } = req.body;
+module.exports = (app) => (req, res, next) => {
+  (async () => {
+    const { hospitals } = req.body;
 
-  const done = (err, payload) => {
-    if (!err) app.io.emit('update_hospitals', { key: app.getRandomString(), hospitals: hospitals.map(c => ({ id: c.id })) });
-    res.locals.setResponse(err, payload);
-    next();
-    return null;
-  };
+    const done = (err, updatedHospitals) => {
+      if (err) {
+        res.locals.setResponse(err);
+        return next();
+      }
+      app.io.emit('update_config_keys', { key: app.getRandomString(), hospitals: hospitals.map(s => ({ hospitalId: s.hospitalId })) });
+      res.locals.setResponse(null, { updatedHospitals });
+      next();
+    };
 
-  Promise.all(hospitals.map(({ id, ...scr }) =>
-    Hospital.update({ ...scr }, { where: { id }, individualHooks: true }))
-  ).then(rslts => {
-    if (!returnUpdated) return done(null, { rslts });
+    let updatedHospitals = [];
+    try { updatedHospitals = await Promise.all(hospitals.map(s => updateHospital(s))); } catch (e) { return done(e); }
 
-    Hospital.findAll({ where: { id: hospitals.map(scr => scr.id) } })
-      .then(hospitals => done(null, { hospitals }))
-      .catch(done);
-
-    return null;
-  }).catch(done);
+    done(null, updatedHospitals);
+  })();
 };

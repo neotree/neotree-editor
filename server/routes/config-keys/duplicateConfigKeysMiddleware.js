@@ -37,7 +37,7 @@ export const copyConfigKey = ({ configKeyId: id }) => {
         await firebase.database().ref(`configkeys/${configKeyId}`).set({
           ...configKey,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         });
       } catch (e) { return reject(e); }
 

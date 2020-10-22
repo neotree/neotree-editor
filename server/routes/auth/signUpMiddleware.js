@@ -62,6 +62,7 @@ module.exports = (app, payload, callback) => (req, res, next) => {
     userDetails = {
       email: username,
       id: user.uid,
+      userId: user.uid,
       hospitals: [],
       countries: [],
       ...userDetails,
