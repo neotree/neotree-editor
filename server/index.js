@@ -1,6 +1,7 @@
 import path from 'path';
 import express from 'express';
 import * as database from './database';
+import syncFirebase from './firebase/sync';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -31,16 +32,8 @@ const isProd = process.env.NODE_ENV === 'production';
 
   app.sequelize = sequelize;
 
-  // seed admin user
-  if (process.env.DEFAULT_ADMIN_USER_EMAIL_ADDRESS) {
-    try {
-      await require('./utils/addOrUpdateUser')({
-        role: 1,
-        password: process.env.DEFAULT_ADMIN_USER_PASSWORD,
-        email: process.env.DEFAULT_ADMIN_USER_EMAIL_ADDRESS,
-      });
-    } catch (e) { /* Do nothing */ }
-  }
+  // firebase
+  try { await syncFirebase(); } catch (e) { console.log(e); }
 
   //body-parser
   const bodyParser = require('body-parser');
