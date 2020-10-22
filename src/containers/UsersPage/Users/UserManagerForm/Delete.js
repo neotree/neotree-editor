@@ -51,16 +51,17 @@ const Delete = ({ user, updateState, disabled }) => {
             disabled={loading}
             onClick={() => setOpenConfirmDialog(false)}
           >Cancel</Button>
+
           <Button
-            disabled={loading}
+            disabled={disabled} //{loading}
             color="secondary"
             onClick={() => {
               setLoading(true);
-              api.deleteUser({ id: user.id })
+              api.deleteUsers({ users: [{ userId: user.userId }] })
                 .then(() => {
                   setLoading(false);
                   setOpenConfirmDialog(false);
-                  updateState(({ users }) => ({ users: users.filter(u => u.id !== user.id) }));
+                  updateState(({ users }) => ({ users: users.filter(u => u.userId !== user.userId) }));
                 })
                 .catch(err => {
                   setLoading(false);

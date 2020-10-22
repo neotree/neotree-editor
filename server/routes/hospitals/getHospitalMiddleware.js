@@ -1,15 +1,23 @@
-import { Hospital } from '../../database';
+import firebase from '../../firebase';
 
 module.exports = () => (req, res, next) => {
-  const payload = req.query;
+  (async () => {
+    const { hospitalId } = req.query;
 
-  const done = (err, hospital) => {
-    res.locals.setResponse(err, { hospital });
-    next();
-    return null;
-  };
+    const done = (err, hospital) => {
+      res.locals.setResponse(err, { hospital });
+      next();
+    };
 
-  Hospital.findOne({ where: payload })
-    .then((hospital) => done(null, hospital))
-    .catch(done);
+    let hospital = null;
+    try {
+      hospital = await new Promise((resolve) => {
+        firebase.database()
+          .ref(`hospitals/${hospitalId}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+    } catch (e) { return done(e); }
+
+    done(null, hospital);
+  })();
 };

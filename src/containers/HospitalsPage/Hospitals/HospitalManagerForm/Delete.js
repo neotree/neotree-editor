@@ -51,16 +51,17 @@ const Delete = ({ hospital, updateState, disabled }) => {
             disabled={loading}
             onClick={() => setOpenConfirmDialog(false)}
           >Cancel</Button>
+
           <Button
             disabled={loading}
             color="secondary"
             onClick={() => {
               setLoading(true);
-              api.deleteHospital({ id: hospital.id })
+              api.deleteHospitals({ hospitals: [{ hospitalId: hospital.hospitalId }] })
                 .then(() => {
                   setLoading(false);
                   setOpenConfirmDialog(false);
-                  updateState(({ hospitals }) => ({ hospitals: hospitals.filter(u => u.id !== hospital.id) }));
+                  updateState(({ hospitals }) => ({ hospitals: hospitals.filter(u => u.hospitalId !== hospital.hospitalId) }));
                 })
                 .catch(err => {
                   setLoading(false);

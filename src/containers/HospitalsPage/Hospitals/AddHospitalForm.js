@@ -6,17 +6,12 @@ import Dialog from '@material-ui/core/Dialog';
 import DialogContent from '@material-ui/core/DialogContent';
 import DialogActions from '@material-ui/core/DialogActions';
 import Button from '@material-ui/core/Button';
-import TextField from '@material-ui/core/TextField';
-import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
-import CountryInput from '@/components/CountryInput';
 import * as api from '@/api/hospitals';
-
-const defaultForm = { name: '', country: '', };
+import HospitalForm, { defaultForm } from './HospitalForm';
 
 const AddHospitalForm = ({ updateState }) => {
-  const [form, _setForm] = useState(defaultForm);
-  const setForm = v => _setForm({ ...form, ...v });
+  const [form, setForm] = useState(defaultForm);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -43,25 +38,7 @@ const AddHospitalForm = ({ updateState }) => {
         maxWidth="sm"
       >
         <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={4} sm={4}>
-              <CountryInput
-                fullWidth
-                label="Country"
-                value={form.country}
-                onChange={(e, country) => setForm({ country: country.code })}
-              />
-            </Grid>
-
-            <Grid item xs={8} sm={8}>
-              <TextField
-                fullWidth
-                label="Hospital Name"
-                value={form.name}
-                onChange={e => setForm({ name: e.target.value })}
-              />
-            </Grid>
-          </Grid>
+          <HospitalForm onChange={form => setForm(form)} />
         </DialogContent>
 
         <DialogActions>

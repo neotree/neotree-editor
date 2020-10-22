@@ -1,28 +1,41 @@
 import firebase from '../../firebase';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const payload = req.body;
 
     const done = (err, hospital) => {
-      if (hospital) app.io.emit('add_hospitals', { key: app.getRandomString(), hospitals: [{ id: hospital.id }] });
       res.locals.setResponse(err, { hospital });
       next();
-      return null;
     };
 
-    let hospital_id = null;
+    let hospitalId = null;
     try {
-      const snap = firebase.database().ref('hospitals').push();
-      hospital_id = snap.key;
+      const snap = await firebase.database().ref('hospitals').push();
+      hospitalId = snap.key;
     } catch (e) { return done(e); }
 
-    const hospital = { ...payload, hospital_id };
-
+    let hospitals = {};
     try {
-      const { id, ...h } = hospital; // eslint-disable-line
-      await firebase.database().ref(`hospitals/${hospital_id}`).set(h);
-      done(null, hospital);
-    } catch (e) { return done(e); }
+      hospitals = await new Promise((resolve) => {
+        firebase.database()
+          .ref('hospitals')
+          .on('value', snap => resolve(snap.val()));
+      });
+      hospitals = hospitals || {};
+    } catch (e) { /* Do nothing */ }
+
+    const hospital = {
+      ...payload,
+      hospitalId,
+      id: hospitalId,
+      position: Object.keys(hospitals).length + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try { await firebase.database().ref(`hospitals/${hospitalId}`).set(hospital); } catch (e) { return done(e); }
+
+    done(null, hospital);
   })();
 };

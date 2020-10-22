@@ -11,18 +11,18 @@ module.exports = app => {
   );
 
   router.post(
-    endpoints.DELETE_USER,
-    require('./_deleteUserMiddleware')(app),
+    endpoints.DELETE_USERS,
+    require('./_deleteUsersMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.ADD_USER,
-    require('./_addUserMiddleware')(app),
+    require('./_addUserMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 
-  router.get(
+  router.post(
     endpoints.UPDATE_USER,
     require('./_updateUserMiddleware')(app),
     require('../../utils/responseMiddleware')

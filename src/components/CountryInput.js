@@ -2,14 +2,18 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import TextField from '@material-ui/core/TextField';
 import Autocomplete from '@material-ui/lab/Autocomplete';
+import countries from '*/constants/countries.json';
 
-function CountryInput({ onChange, onInputChange, ...props }) {
+export { countries };
+
+function CountryInput({ onChange, onInputChange, value, ...props }) {
   return (
     <Autocomplete
-      options={require('*/constants/countries.json')}
-      getOptionLabel={o => o.name}
+      options={countries}
+      getOptionLabel={o => o.name || ''}
       onChange={onChange}
       onInputChange={onInputChange}
+      value={{ ...countries.filter(c => c.code === value)[0] }}
       renderInput={params => (
         <TextField
           {...params}

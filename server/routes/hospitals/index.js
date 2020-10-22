@@ -24,7 +24,7 @@ module.exports = app => {
 
   router.post(
     endpoints.UPDATE_HOSPITAL,
-    require('./updateHospitalMiddleware')(app),
+    require('./updateHospitalMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 
@@ -35,8 +35,8 @@ module.exports = app => {
   );
 
   router.post(
-    endpoints.DELETE_HOSPITAL,
-    require('./deleteHospitalMiddleware')(app),
+    endpoints.DELETE_HOSPITALS,
+    require('./deleteHospitalsMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 

@@ -83,7 +83,7 @@ export const copyScript = ({ scriptId: id }) => {
         await firebase.database().ref(`diagnosis/${scriptId}`).set({
           ...diagnosis,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         });
       } catch (e) { /* do nothing */ }
 

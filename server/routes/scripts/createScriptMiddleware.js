@@ -31,7 +31,7 @@ module.exports = () => (req, res, next) => {
       id: scriptId,
       position: Object.keys(scripts).length + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
-      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
     try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return done(e); }

@@ -1,17 +1,39 @@
-import { Hospital } from '../../database';
+import firebase from '../../firebase';
 
-module.exports = app => (req, res, next) => {
-  const { id, ...payload } = req.body;
+export const updateHospital = ({ hospitalId: id, ...payload }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!id) return reject(new Error('Required hospital "id" is not provided.'));
 
-  const done = (err, hospital) => {
-    if (!err) app.io.emit('update_hospitals', { key: app.getRandomString(), hospitals: [{ id }] });
-    res.locals.setResponse(err, { hospital });
-    next(); return null;
-  };
+    let hospital = null;
+    try {
+      hospital = await new Promise((resolve) => {
+        firebase.database()
+          .ref(`hospitals/${id}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+    } catch (e) { return reject(e); }
 
-  if (!id) return done({ msg: 'Required hospital "id" is not provided.' });
+    if (!hospital) return reject(new Error(`Hospital with id "${id}" not found`));
 
-  Hospital.update(payload, { where: { id }, individualHooks: true })
-    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
-    .catch(done);
+    hospital = { ...hospital, ...payload, id, updatedAt: firebase.database.ServerValue.TIMESTAMP, };
+
+    try { await firebase.database().ref(`hospitals/${id}`).set(hospital); } catch (e) { return reject(e); }
+
+    resolve(hospital);
+  })();
+});
+
+export default (app) => (req, res, next) => {
+  (async () => {
+    const done = (err, hospital) => {
+      if (hospital) app.io.emit('update_config_keys', { key: app.getRandomString(), hospitals: [{ hospitalId: hospital.hospitalId }] });
+      res.locals.setResponse(err, { hospital });
+      next();
+    };
+
+    let hospital = null;
+    try { hospital = await updateHospital(req.body); } catch (e) { return done(e); }
+
+    done(null, hospital);
+  })();
 };
