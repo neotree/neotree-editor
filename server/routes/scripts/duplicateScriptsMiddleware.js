@@ -63,11 +63,29 @@ export const copyScript = ({ scriptId: id }) => {
         [key]: { ...diagnosis[key], scriptId, }
       }), {});
 
-      try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return reject(e); }
+      try {
+        await firebase.database().ref(`scripts/${scriptId}`).set({
+          ...script,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        });
+      } catch (e) { return reject(e); }
 
-      try { await firebase.database().ref(`screens/${scriptId}`).set(screens); } catch (e) { /* do nothing */ }
+      try {
+        await firebase.database().ref(`screens/${scriptId}`).set({
+          ...screens,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        });
+      } catch (e) { /* do nothing */ }
 
-      try { await firebase.database().ref(`diagnosis/${scriptId}`).set(diagnosis); } catch (e) { /* do nothing */ }
+      try {
+        await firebase.database().ref(`diagnosis/${scriptId}`).set({
+          ...diagnosis,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        });
+      } catch (e) { /* do nothing */ }
 
       resolve(script);
     })();

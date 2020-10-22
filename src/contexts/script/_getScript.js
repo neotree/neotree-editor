@@ -9,7 +9,7 @@ export default function getScript(payload = {}) {
       scriptInitialised: true,
       loadingScript: false,
       ...rslts,
-      form: { ...form, ...rslts.script, },
+      form: { ...form, ...(rslts ? rslts.script : null), },
     }));
   };
 

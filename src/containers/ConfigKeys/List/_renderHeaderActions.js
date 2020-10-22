@@ -16,11 +16,11 @@ function Actions({ selected }) {
     <>
       {selected.length > 0 && (
         <>
-          <DuplicateConfigKeys ids={selected}>
+          <DuplicateConfigKeys configKeys={selected.map(({ row }) => ({ configKeyId: row.configKeyId }))}>
             <Button>Duplicate</Button>
           </DuplicateConfigKeys>
 
-          <DeleteConfigKeys ids={selected}>
+          <DeleteConfigKeys configKeys={selected.map(({ row }) => ({ configKeyId: row.configKeyId }))}>
             <IconButton>
               <DeleteIcon />
             </IconButton>

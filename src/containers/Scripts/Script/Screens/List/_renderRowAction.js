@@ -35,7 +35,7 @@ function Action({ row, }) {
 
         <MenuItem
           onClick={handleClose}
-          items={[row]}
+          items={[row]} // {[{ screenId: row.screenId, scriptId: row.scriptId, }]}
           component={CopyScreens}
         >Copy</MenuItem>
 

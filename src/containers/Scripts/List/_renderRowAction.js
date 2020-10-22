@@ -34,7 +34,7 @@ function Action({ row, }) {
 
         <MenuItem
           onClick={handleClose}
-          scripts={[{ scriptId: row.scriptId }]}
+          scripts={[row]} // {[{ scriptId: row.scriptId }]}
           component={DuplicateScripts}
         >Duplicate</MenuItem>
 

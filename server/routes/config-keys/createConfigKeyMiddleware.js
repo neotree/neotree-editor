@@ -1,50 +1,41 @@
-import { ConfigKey } from '../../database';
 import firebase from '../../firebase';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const payload = req.body;
 
     const done = (err, configKey) => {
-      if (configKey) app.io.emit('create_config_keys', { key: app.getRandomString(), config_keys: [{ id: configKey.id }] });
       res.locals.setResponse(err, { configKey });
-      next(); return null;
+      next();
     };
 
-    let position = 0;
-    try { 
-      position = await ConfigKey.count({ where: {} }); 
-      position++;
+    let configKeyId = null;
+    try {
+      const snap = await firebase.database().ref('configkeys').push();
+      configKeyId = snap.key;
     } catch (e) { return done(e); }
 
-    const saveToFirebase = () => new Promise((resolve, reject) => {
-      firebase.database().ref('configkeys').push().then(snap => {
-        const { data, ...rest } = payload;
-
-        const configKeyId = snap.key;
-
-        const _data = data ? JSON.parse(data) : null;
-
+    let configKeys = {};
+    try {
+      configKeys = await new Promise((resolve) => {
         firebase.database()
-          .ref(`configkeys/${configKeyId}`).set({
-            ...rest,
-            ..._data,
-            position,
-            configKeyId,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-          }).then(() => {
-            resolve(configKeyId);
-          })
-          .catch(reject);
-      })
-      .catch(reject);
-    });
+          .ref('configkeys')
+          .on('value', snap => resolve(snap.val()));
+      });
+      configKeys = configKeys || {};
+    } catch (e) { /* Do nothing */ }
 
-    try { 
-      const config_key_id = await saveToFirebase();
-      ConfigKey.create({ ...payload, position, config_key_id })
-          .then((configKey) => done(null, configKey))
-          .catch(done);
-    } catch (e) { done(e); }
+    const configKey = {
+      ...payload,
+      configKeyId,
+      id: configKeyId,
+      position: Object.keys(configKeys).length + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try { await firebase.database().ref(`configkeys/${configKeyId}`).set(configKey); } catch (e) { return done(e); }
+
+    done(null, configKey);
   })();
 };

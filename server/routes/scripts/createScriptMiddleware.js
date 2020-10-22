@@ -25,7 +25,14 @@ module.exports = () => (req, res, next) => {
       scripts = scripts || {};
     } catch (e) { /* Do nothing */ }
 
-    const script = { ...payload, scriptId, id: scriptId, position: Object.keys(scripts).length + 1, };
+    const script = {
+      ...payload,
+      scriptId,
+      id: scriptId,
+      position: Object.keys(scripts).length + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
 
     try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return done(e); }
 

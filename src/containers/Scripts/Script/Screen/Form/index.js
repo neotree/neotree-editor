@@ -31,7 +31,7 @@ function ScreenEditor() {
       <Card>
         <CardContent>
           <TitleWithBackArrow 
-            backLink={screen ? `/scripts/${screen.script_id}/screens` : null}
+            backLink={screen ? `/scripts/${screen.scriptId}/screens` : null}
             title={`${screen ? 'Edit' : 'Add'} screen`} 
           />
           <br /><br />

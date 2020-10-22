@@ -34,14 +34,18 @@ export const copyScreen = ({ scriptId, screenId: id, }) => {
         screens = screens || {};
       } catch (e) { /* Do nothing */ }
 
-      screen = { ...screen, screenId, id: screenId, position: Object.keys(screens).length + 1, };
+      screen = {
+        ...screen,
+        screenId,
+        id: screenId,
+        position: Object.keys(screens).length + 1,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      };
 
       try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return reject(e); }
 
-      resolve({
-        screen,
-        screens: Object.keys()
-      });
+      resolve(screen);
     })();
   });
 };

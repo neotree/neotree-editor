@@ -18,13 +18,13 @@ export default function saveScreen(_payload = {}) {
     setState(({ form }) => ({
       saveScreenError: e,
       savingScreen: false,
-      form: { ...form, ...rslts.screen },
+      form: { ...form, ...(rslts ? rslts.screen : null) },
     }));
   };
 
   const save = screen ? api.updateScreen : api.createScreen;
 
-  save({ ...screen, ...form, ...payload })
+  save({ scriptId, ...screen, ...form, ...payload })
     .then(rslts => {
       if (shdRedirect && rslts.screen) history.push(`/scripts/${scriptId}`);
       done(rslts.errors, rslts);

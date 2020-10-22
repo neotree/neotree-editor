@@ -1,18 +1,21 @@
 import * as api from '@/api/diagnoses';
 
 export default function getDiagnoses(payload) {
-  this.setState({ loadingDiagnoses: true });
+  return new Promise((resolve, reject) => {
+    this.setState({ loadingDiagnoses: true });
 
-  const done = (getDiagnosesError, data) => {
-    this.setState({
-      getDiagnosesError,
-      ...data,
-      diagnosesInitialised: true,
-      loadingDiagnoses: false,
-    });
-  };
+    const done = (e, data) => {
+      this.setState({
+        getDiagnosesError: e,
+        ...data,
+        diagnosesInitialised: true,
+        loadingDiagnoses: false,
+      });
+      if (e) { reject(e); } else { resolve(data); }
+    };
 
-  api.getDiagnoses(payload)
-    .then(data => done(data.errors, data))
-    .catch(done);
+    api.getDiagnoses(payload)
+      .then(data => done(data.errors, data))
+      .catch(done);
+  });
 }

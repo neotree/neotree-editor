@@ -1,44 +1,39 @@
-import { Diagnosis, Log } from '../../database';
-import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
+import firebase from '../../firebase';
 
-module.exports = app => (req, res, next) => {
-  const { id } = req.body;
+export const deleteDiagnosis = ({ scriptId, diagnosisId: id, }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
 
-  const done = (err, diagnosis) => {
-    if (!err) {
-      app.io.emit('delete_diagnoses', { key: app.getRandomString(), diagnoses: [{ id }] });
-      Log.create({
-        name: 'delete_diagnoses',
-        data: JSON.stringify({ diagnoses: [{ id }] })
+    if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
+
+    let diagnosis = null;
+    try {
+      diagnosis = await new Promise((resolve) => {
+        firebase.database()
+          .ref(`diagnosis/${scriptId}/${id}`)
+          .on('value', snap => resolve(snap.val()));
       });
-    }
-    res.locals.setResponse(err, { diagnosis });
-    next(); return null;
-  };
+    } catch (e) { /* Do nothing */ }
 
-  if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
+    try { await firebase.database().ref(`diagnosis/${scriptId}/${id}`).remove(); } catch (e) { return reject(e); }
 
-  Diagnosis.findOne({ where: { id } })
-    .then(d => {
-      if (!d) return done({ msg: `Could not find script with "id" ${id}.` });
+    resolve(diagnosis);
+  })();
+});
 
-      d.destroy({ where: { id } })
-        .then(deleted => {
-          // update diagnoses positions
-          findAndUpdateDiagnoses(
-            {
-              attributes: ['id'],
-              where: { script_id: d.script_id },
-              order: [['position', 'ASC']]
-            },
-            diagnoses => diagnoses.map((d, i) => ({ ...d, position: i + 1 }))
-          ).then(() => null).catch(err => { app.logger.log(err); return null; });
+export default (app) => (req, res, next) => {
+  (async () => {
+    const { diagnoses } = req.body;
 
-          return done(null, { deleted });
-        })
-        .catch(done);
+    const done = (err, rslts = []) => {
+      if (rslts.length) app.io.emit('delete_diagnoses', { key: app.getRandomString(), diagnoses });
+      res.locals.setResponse(err, { diagnoses: rslts });
+      next();
+    };
 
-      return null;
-    })
-    .catch(done);
+    let rslts = null;
+    try { rslts = await Promise.all(diagnoses.map(s => deleteDiagnosis(s))); } catch (e) { return done(e); }
+
+    done(null, rslts);
+  })();
 };

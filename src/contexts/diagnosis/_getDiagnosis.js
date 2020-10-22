@@ -9,7 +9,7 @@ export default function getDiagnosis(payload = {}) {
       diagnosisInitialised: true,
       loadingDiagnosis: false,
       ...rslts,
-      form: { ...form, ...e ? {} : (rslts.diagnosis ? rslts.diagnosis.data : {}), },
+      form: { ...form, ...(rslts ? rslts.diagnosis : {}), },
     }));
   };
 

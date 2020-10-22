@@ -16,4 +16,4 @@ export default function getScreen(payload = {}) {
   api.getScreen(payload)
     .then(rslts => done(rslts.errors, rslts))
     .catch(done);
-};
+}

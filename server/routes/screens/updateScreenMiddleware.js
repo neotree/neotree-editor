@@ -17,7 +17,7 @@ export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Prom
 
     if (!screen) return reject(new Error(`Screen with id "${id}" not found`));
 
-    screen = { ...screen, ...payload, id, };
+    screen = { ...screen, ...payload, id, updatedAt: firebase.database.ServerValue.TIMESTAMP, };
 
     try { await firebase.database().ref(`screens/${scriptId}/${id}`).set(screen); } catch (e) { return reject(e); }
 

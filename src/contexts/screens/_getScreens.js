@@ -1,18 +1,21 @@
 import * as api from '@/api/screens';
 
 export default function getScreens(payload) {
-  this.setState({ loadingScreens: true });
+  return new Promise((resolve, reject) => {
+    this.setState({ loadingScreens: true });
 
-  const done = (getScreensError, data) => {
-    this.setState({
-      getScreensError,
-      ...data,
-      screensInitialised: true,
-      loadingScreens: false,
-    });
-  };
+    const done = (e, data) => {
+      this.setState({
+        getScreensError: e,
+        ...data,
+        screensInitialised: true,
+        loadingScreens: false,
+      });
+      if (e) { reject(e); } else { resolve(data); }
+    };
 
-  api.getScreens(payload)
-    .then(data => done(data.errors, data))
-    .catch(done);
+    api.getScreens(payload)
+      .then(data => done(data.errors, data))
+      .catch(done);
+  });
 }

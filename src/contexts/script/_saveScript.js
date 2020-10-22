@@ -17,7 +17,7 @@ export default function saveScript(_payload = {}) {
     setState(({ form }) => ({
       saveScriptError: e,
       savingScript: false,
-      form: { ...form, ...rslts.script },
+      form: { ...form, ...(rslts ? rslts.script : null) },
     }));
   };
 

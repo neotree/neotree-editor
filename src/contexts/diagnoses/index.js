@@ -35,7 +35,7 @@ export const provideDiagnosesContext = Component => function DiagnosesContextPro
 
   const { scriptId } = value.router.match.params;
 
-  React.useEffect(() => { value.getDiagnoses({ script_id: scriptId }); }, [scriptId]);
+  React.useEffect(() => { value.getDiagnoses({ scriptId }); }, [scriptId]);
 
   return (
     <DiagnosesContext.Provider

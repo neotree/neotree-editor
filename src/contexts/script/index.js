@@ -61,7 +61,7 @@ export const provideScriptContext = Component => function ScriptContextProvider(
   React.useEffect(() => {
     const scriptInitialised = scriptId !== 'new' ? true : false;
     contextValue.setState({ scriptInitialised, script: null, form: defaults.defaultState.form, });
-    if (scriptId !== 'new') contextValue.getScript({ id: scriptId, });
+    if (scriptId !== 'new') contextValue.getScript({ scriptId, });
   }, [scriptId]);
 
   const { shouldSaveForm } = contextValue.state;

@@ -1,52 +1,45 @@
-import { Diagnosis } from '../../database';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   (async () => {
-    const payload = req.body;
+    const { scriptId, ...payload } = req.body;
 
     const done = (err, diagnosis) => {
-      if (err) app.logger.log(err);
-      if (diagnosis) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id }] });
+      if (diagnosis) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id, scriptId }] });
       res.locals.setResponse(err, { diagnosis });
-      next(); return null;
+      next();
     };
 
-    let position = 0;
-    try { 
-      position = await Diagnosis.count({ where: { script_id: payload.script_id } }); 
-      position++;
+    if (!scriptId) return done(new Error('Required script "id" is not provided.'));
+
+    let diagnosisId = null;
+    try {
+      const snap = await firebase.database().ref(`diagnosis/${scriptId}`).push();
+      diagnosisId = snap.key;
     } catch (e) { return done(e); }
 
-    const saveToFirebase = () => new Promise((resolve, reject) => {
-      firebase.database().ref(`diagnosis/${payload.script_id}`).push().then(snap => {
-        const { data, ...rest } = payload;
-
-        const diagnosisId = snap.key;
-
-        const _data = data ? JSON.parse(data) : null;
-
+    let diagnoses = {};
+    try {
+      diagnoses = await new Promise((resolve) => {
         firebase.database()
-          .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set({
-            ...rest,
-            ..._data,
-            position,
-            diagnosisId,
-            scriptId: payload.script_id,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-          }).then(() => {
-            resolve(diagnosisId);
-          })
-          .catch(reject);
-      })
-      .catch(reject);
-    });
+          .ref(`diagnosis/${scriptId}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+      diagnoses = diagnoses || {};
+    } catch (e) { /* Do nothing */ }
 
-    try { 
-      const diagnosis_id = await saveToFirebase();
-      Diagnosis.create({ ...payload, position, diagnosis_id })
-          .then((diagnosis) => done(null, diagnosis))
-          .catch(done);
-    } catch (e) { done(e); }
+    const diagnosis = {
+      ...payload,
+      scriptId,
+      diagnosisId,
+      id: diagnosisId,
+      position: Object.keys(diagnoses).length + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try { await firebase.database().ref(`diagnosis/${scriptId}/${diagnosisId}`).set(diagnosis); } catch (e) { return done(e); }
+
+    done(null, diagnosis);
   })();
 };

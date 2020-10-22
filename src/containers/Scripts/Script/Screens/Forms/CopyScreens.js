@@ -13,8 +13,8 @@ const CopyScreens = React.forwardRef((props, ref) => {
         {...props}
         ref={ref}
         type="screen"
-        onSuccess={(items, script_id) => {
-          if (script_id === script.scriptId) {
+        onSuccess={(items, scriptId) => {
+          if (scriptId === script.scriptId) {
             setScreensState(s => ({ screens: [...s.screens, ...items] }));
           }
         }}

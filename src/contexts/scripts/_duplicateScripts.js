@@ -11,9 +11,9 @@ export default function duplicateScripts(scripts = []) {
         return {
           duplicateScriptsError: e,
           duplicatingScripts: false,
-          ...e ? null : {
+          ...(e ? null : {
             scripts: [..._scripts, ...(rslts && rslts.scripts ? rslts.scripts : [])],
-          },
+          }),
         };
       });
       if (e) { reject(e); } else { resolve(rslts); }

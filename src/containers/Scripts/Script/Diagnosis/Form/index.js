@@ -29,7 +29,7 @@ function DiagnosisEditor() {
       <Card>
         <CardContent>
           <TitleWithBackArrow 
-            backLink={diagnosis ? `/scripts/${diagnosis.script_id}/diagnoses` : null}
+            backLink={diagnosis ? `/scripts/${diagnosis.scriptId}/diagnoses` : null}
             title={`${diagnosis ? 'Edit' : 'Add'} diagnosis`} 
           />
           <br /><br />
