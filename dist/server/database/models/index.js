@@ -23,12 +23,6 @@ Object.defineProperty(exports, "File", {
     return _File["default"];
   }
 });
-Object.defineProperty(exports, "UserProfile", {
-  enumerable: true,
-  get: function get() {
-    return _UserProfile["default"];
-  }
-});
 Object.defineProperty(exports, "Script", {
   enumerable: true,
   get: function get() {
@@ -71,6 +65,24 @@ Object.defineProperty(exports, "Log", {
     return _Log["default"];
   }
 });
+Object.defineProperty(exports, "Hospital", {
+  enumerable: true,
+  get: function get() {
+    return _Hospital["default"];
+  }
+});
+Object.defineProperty(exports, "UserHospital", {
+  enumerable: true,
+  get: function get() {
+    return _UserHospital["default"];
+  }
+});
+Object.defineProperty(exports, "UserCountry", {
+  enumerable: true,
+  get: function get() {
+    return _UserCountry["default"];
+  }
+});
 exports.init = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -82,8 +94,6 @@ var _sequelize = _interopRequireDefault(require("./sequelize"));
 var _User = _interopRequireDefault(require("./_User"));
 
 var _File = _interopRequireDefault(require("./_File"));
-
-var _UserProfile = _interopRequireDefault(require("./_UserProfile"));
 
 var _Script = _interopRequireDefault(require("./_Script"));
 
@@ -98,6 +108,21 @@ var _ApiKey = _interopRequireDefault(require("./_ApiKey"));
 var _Device = _interopRequireDefault(require("./_Device"));
 
 var _Log = _interopRequireDefault(require("./_Log"));
+
+var _Hospital = _interopRequireDefault(require("./_Hospital"));
+
+var _UserHospital = _interopRequireDefault(require("./_UserHospital"));
+
+var _UserCountry = _interopRequireDefault(require("./_UserCountry"));
+
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
 
 var init = function init() {
   return new Promise(function (resolve, reject) {
@@ -123,7 +148,7 @@ var init = function init() {
             case 8:
               _context.prev = 8;
               _context.next = 11;
-              return _User["default"].sync();
+              return _Hospital["default"].sync();
 
             case 11:
               _context.next = 16;
@@ -137,7 +162,7 @@ var init = function init() {
             case 16:
               _context.prev = 16;
               _context.next = 19;
-              return _File["default"].sync();
+              return _User["default"].sync();
 
             case 19:
               _context.next = 24;
@@ -151,7 +176,7 @@ var init = function init() {
             case 24:
               _context.prev = 24;
               _context.next = 27;
-              return _UserProfile["default"].sync();
+              return _File["default"].sync();
 
             case 27:
               _context.next = 32;
@@ -261,6 +286,34 @@ var init = function init() {
               errors.push(_context.t10);
 
             case 88:
+              _context.prev = 88;
+              _context.next = 91;
+              return _UserCountry["default"].sync();
+
+            case 91:
+              _context.next = 96;
+              break;
+
+            case 93:
+              _context.prev = 93;
+              _context.t11 = _context["catch"](88);
+              errors.push(_context.t11);
+
+            case 96:
+              _context.prev = 96;
+              _context.next = 99;
+              return _UserHospital["default"].sync();
+
+            case 99:
+              _context.next = 104;
+              break;
+
+            case 101:
+              _context.prev = 101;
+              _context.t12 = _context["catch"](96);
+              errors.push(_context.t12);
+
+            case 104:
               if (!errors.length) {
                 resolve(_sequelize["default"]);
               } else {
@@ -269,14 +322,32 @@ var init = function init() {
                 }).join('\n')));
               }
 
-            case 89:
+            case 105:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85]]);
+      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85], [88, 93], [96, 101]]);
     }))();
   });
 };
 
 exports.init = init;
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(init, "init", "/home/farai/WorkBench/neotree-editor/server/database/models/index.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

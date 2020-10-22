@@ -2,100 +2,130 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _database = require("../../database");
-
-var _firebase = _interopRequireDefault(require("../../database/firebase"));
+var _firebase = _interopRequireDefault(require("../../firebase"));
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function (app) {
   return function (req, res, next) {
-    var payload = req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var _req$body, items, scriptId, done, ids, snaps, diagnoses, _diagnoses;
 
-    var done = function done(err, items) {
-      if (err) app.logger.log(err);
-      if (items.length) app.io.emit('create_diagnoses', {
-        key: app.getRandomString(),
-        diagnoses: items.map(function (s) {
-          return {
-            id: s.id
-          };
-        })
-      });
-      res.locals.setResponse(err, {
-        items: items
-      });
-      next();
-      return null;
-    };
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _req$body = req.body, items = _req$body.items, scriptId = _req$body.targetScriptId;
 
-    var saveToFirebase = function saveToFirebase(payload) {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref("diagnosis/".concat(payload.script_id)).push().then(function (snap) {
-          var _payload$data = payload.data,
-              position = _payload$data.position,
-              data = (0, _objectWithoutProperties2["default"])(_payload$data, ["position"]),
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]); // eslint-disable-line
+              done = function done(err) {
+                var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+                if (items.length) app.io.emit('create_diagnoses', {
+                  key: app.getRandomString(),
+                  diagnoses: items.map(function (s) {
+                    return {
+                      id: s.id,
+                      scriptId: s.scriptId
+                    };
+                  })
+                });
+                res.locals.setResponse(err, {
+                  items: items
+                });
+                next();
+              };
 
-          var diagnosisId = snap.key;
+              ids = [];
+              _context.prev = 3;
+              _context.next = 6;
+              return Promise.all(items.map(function () {
+                return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).push();
+              }));
 
-          var diagnosis = _objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
-            diagnosisId: diagnosisId,
-            scriptId: payload.script_id,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          });
+            case 6:
+              snaps = _context.sent;
+              snaps.forEach(function (snap) {
+                return ids.push(snap.key);
+              });
+              _context.next = 13;
+              break;
 
-          _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(diagnosis).then(function () {
-            resolve(_objectSpread(_objectSpread({}, rest), {}, {
-              diagnosis_id: diagnosisId,
-              data: JSON.stringify(diagnosis)
-            }));
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-    Promise.all([_database.Diagnosis.count({
-      where: {
-        script_id: payload.script_id
-      }
-    }), _database.Diagnosis.findAll({
-      where: {
-        id: payload.ids
-      }
-    })]).then(function (_ref) {
-      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          count = _ref2[0],
-          diagnoses = _ref2[1];
+            case 13:
+              diagnoses = [];
+              _context.prev = 14;
+              _context.next = 17;
+              return new Promise(function (resolve) {
+                _firebase["default"].database().ref("diagnosis/".concat(scriptId)).on('value', function (snap) {
+                  return resolve(snap.val());
+                });
+              });
 
-      Promise.all(diagnoses.map(function (diagnosis, i) {
-        diagnosis = JSON.parse(JSON.stringify(diagnosis));
-        var _diagnosis = diagnosis,
-            createdAt = _diagnosis.createdAt,
-            updateAt = _diagnosis.updateAt,
-            id = _diagnosis.id,
-            diagnosis_id = _diagnosis.diagnosis_id,
-            d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id", "diagnosis_id"]); // eslint-disable-line
+            case 17:
+              _diagnoses = _context.sent;
+              _diagnoses = _diagnoses || {};
+              diagnoses = Object.keys(_diagnoses).map(function (key) {
+                return _diagnoses[key];
+              });
+              diagnoses = items.map(function (s, i) {
+                return _objectSpread(_objectSpread(_objectSpread({}, s), _diagnoses[s.diagnosisId]), {}, {
+                  scriptId: scriptId,
+                  position: i + diagnoses.length + 1,
+                  id: ids[i] || s.id,
+                  diagnosisId: ids[i] || s.id
+                });
+              });
+              _context.next = 26;
+              break;
 
-        return saveToFirebase(_objectSpread(_objectSpread({}, d), {}, {
-          position: count + (i + 1),
-          script_id: payload.script_id
-        }));
-      })).then(function (items) {
-        return Promise.all(items.map(function (item) {
-          return _database.Diagnosis.create(_objectSpread({}, item));
-        })).then(function (items) {
-          return done(null, items);
-        })["catch"](done);
-      })["catch"](done);
-    })["catch"](done);
+            case 23:
+              _context.prev = 23;
+              _context.t1 = _context["catch"](14);
+              return _context.abrupt("return", done(_context.t1));
+
+            case 26:
+              _context.prev = 26;
+              _context.next = 29;
+              return Promise.all(diagnoses.map(function (s) {
+                return _firebase["default"].database().ref("diagnosis/".concat(scriptId, "/").concat(s.diagnosisId)).set(_objectSpread(_objectSpread({}, s), {}, {
+                  createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                  updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                }));
+              }));
+
+            case 29:
+              _context.next = 34;
+              break;
+
+            case 31:
+              _context.prev = 31;
+              _context.t2 = _context["catch"](26);
+              return _context.abrupt("return", done(_context.t2));
+
+            case 34:
+              done(null, diagnoses);
+
+            case 35:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 23], [26, 31]]);
+    }))();
   };
 };

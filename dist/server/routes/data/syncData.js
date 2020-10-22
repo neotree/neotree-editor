@@ -10,6 +10,10 @@ var _sequelize = require("sequelize");
 
 var _database = require("../../database");
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function () {
   return function (req, res, next) {
     var payload = req.query;

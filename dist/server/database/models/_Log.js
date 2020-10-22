@@ -13,6 +13,15 @@ var _sequelize = _interopRequireDefault(require("sequelize"));
 
 var _sequelize2 = _interopRequireDefault(require("./sequelize"));
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var Script = _sequelize2["default"].define('log', {
   id: {
     type: _sequelize["default"].INTEGER,
@@ -36,4 +45,24 @@ var Script = _sequelize2["default"].define('log', {
 });
 
 var _default = Script;
-exports["default"] = _default;
+var _default2 = _default;
+exports["default"] = _default2;
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(Script, "Script", "/home/farai/WorkBench/neotree-editor/server/database/models/_Log.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_Log.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

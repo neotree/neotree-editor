@@ -14,9 +14,20 @@ var _express = _interopRequireDefault(require("express"));
 
 var database = _interopRequireWildcard(require("./database"));
 
+var _sync = _interopRequireDefault(require("./firebase/sync"));
+
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var isProd = process.env.NODE_ENV === 'production';
 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-  var app, httpServer, sequelize, bodyParser, session, SequelizeStore, sessStore, webpackConfig, compiler;
+  var app, httpServer, sequelize, bodyParser, webpackConfig, compiler;
   return _regenerator["default"].wrap(function _callee$(_context) {
     while (1) {
       switch (_context.prev = _context.next) {
@@ -60,34 +71,28 @@ var isProd = process.env.NODE_ENV === 'production';
           process.exit(1);
 
         case 19:
-          app.sequelize = sequelize; //body-parser
+          app.sequelize = sequelize; // firebase
 
+          _context.prev = 20;
+          _context.next = 23;
+          return (0, _sync["default"])();
+
+        case 23:
+          _context.next = 28;
+          break;
+
+        case 25:
+          _context.prev = 25;
+          _context.t1 = _context["catch"](20);
+          console.log(_context.t1);
+
+        case 28:
+          //body-parser
           bodyParser = require('body-parser');
           app.use(bodyParser.json());
           app.use(bodyParser.urlencoded({
             extended: false
-          })); //express session
-
-          session = require('express-session');
-          SequelizeStore = require('connect-session-sequelize')(session.Store);
-          sessStore = new SequelizeStore({
-            db: app.sequelize
-          });
-          app.use(session({
-            secret: 'neotree',
-            saveUninitialized: false,
-            // don't create session until something stored
-            resave: false,
-            //don't save session if unmodified
-            store: sessStore,
-            cookie: {
-              maxAge: 365 * 24 * 60 * 60
-            } // = 365 days (exp date will be created from ttl opt)
-
-          }));
-          sessStore.sync(); // passport
-
-          app = require('./passport')(app); // webpack
+          })); // webpack
 
           if (!isProd) {
             webpackConfig = require('../webpack.config');
@@ -113,10 +118,28 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 34:
+        case 36:
         case "end":
           return _context.stop();
       }
     }
-  }, _callee, null, [[8, 15]]);
+  }, _callee, null, [[8, 15], [20, 25]]);
 }))();
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(isProd, "isProd", "/home/farai/WorkBench/neotree-editor/server/index.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();
