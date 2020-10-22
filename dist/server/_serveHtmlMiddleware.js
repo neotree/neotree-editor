@@ -14,70 +14,68 @@ var _fs = _interopRequireDefault(require("fs"));
 
 var _cheerio = _interopRequireDefault(require("cheerio"));
 
-var _database = require("./database");
+var _firebase = require("./firebase");
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function () {
   return function (req, res) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var user, html, $, $APP;
+      var authenticated, user, html, $, $APP;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
+              authenticated = _firebase.firebase.auth().currentUser;
               user = null;
-              _context.prev = 1;
 
-              if (req.isAuthenticated()) {
-                _context.next = 6;
+              if (!authenticated) {
+                _context.next = 11;
                 break;
               }
 
-              _context.t0 = null;
-              _context.next = 9;
-              break;
-
-            case 6:
-              _context.next = 8;
-              return _database.User.findOne({
-                where: {
-                  id: req.user.id
-                }
+              _context.prev = 3;
+              _context.next = 6;
+              return new Promise(function (resolve) {
+                _firebase.firebaseAdmin.database().ref("users/".concat(authenticated.uid)).on('value', function (snap) {
+                  return resolve(snap.val());
+                });
               });
 
-            case 8:
-              _context.t0 = _context.sent;
-
-            case 9:
-              user = _context.t0;
-              _context.next = 14;
+            case 6:
+              user = _context.sent;
+              _context.next = 11;
               break;
 
-            case 12:
-              _context.prev = 12;
-              _context.t1 = _context["catch"](1);
+            case 9:
+              _context.prev = 9;
+              _context.t0 = _context["catch"](3);
 
-            case 14:
+            case 11:
               html = _fs["default"].readFileSync(_path["default"].resolve(__dirname, '../src/index.html'), 'utf8');
               $ = _cheerio["default"].load(html);
               $APP = JSON.stringify({
                 authenticatedUser: !user ? null : _objectSpread({}, user),
+                firebaseConfig: _firebase.firebaseOptions,
                 app_name: process.env.APP_NAME,
                 app_slug: process.env.APP_SLUG,
                 app_url: process.env.APP_URL
-              });
-              $('head').append("<script type=\"text/javascript\">const $APP = ".concat($APP, ";</script>"));
+              }, null, 4);
+              $('head').append("<script type=\"text/javascript\">\n    const $APP = ".concat($APP, ";\n</script>\n"));
               res.send($.html());
 
-            case 19:
+            case 16:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 12]]);
+      }, _callee, null, [[3, 9]]);
     }))();
   };
 };

@@ -10,17 +10,24 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _http = _interopRequireDefault(require("http"));
 
-var _uuidv = _interopRequireDefault(require("uuidv4"));
-
 var _database = require("../../database");
 
 var _updateScreensMiddleware = require("../../routes/screens/updateScreensMiddleware");
 
 var _splitCamelCase = _interopRequireDefault(require("../../../utils/splitCamelCase"));
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
 
 var callRemote = function callRemote(req, url) {
   return new Promise(function (resolve, reject) {
@@ -73,7 +80,6 @@ module.exports = function () {
           if (data.error) return done(data.error);
           var dataToImport = data.payload[source.dataType];
           var author = req.user ? req.user.id : null;
-          var id = (0, _uuidv["default"])();
 
           var persitScriptItems = function persitScriptItems(Model, _ref) {
             var data = _ref.data,
@@ -91,7 +97,6 @@ module.exports = function () {
 
               Model.create(_objectSpread(_objectSpread({}, data), {}, {
                 data: JSON.stringify(data.data || {}),
-                id: id,
                 author: author
               }, params)).then(function (s) {
                 return done(null, s);
@@ -104,7 +109,6 @@ module.exports = function () {
             case 'configKey':
               return _database.ConfigKey.create(_objectSpread(_objectSpread({}, dataToImport), {}, {
                 data: JSON.stringify(dataToImport.data || {}),
-                id: id,
                 author: author
               })).then(function (s) {
                 return done(null, s);
@@ -150,7 +154,6 @@ module.exports = function () {
             case 'script':
               return _database.Script.create(_objectSpread(_objectSpread({}, dataToImport), {}, {
                 data: JSON.stringify(dataToImport.data || {}),
-                id: id,
                 author: author
               })).then(function (s) {
                 callRemote(req, "".concat(source.host, "/get-script-items?payload=").concat(JSON.stringify({
@@ -160,7 +163,6 @@ module.exports = function () {
                   var promises = [].concat((0, _toConsumableArray2["default"])(payload.screens.map(function (screen, position) {
                     return persitScriptItems(_database.Screen, {
                       position: position,
-                      id: (0, _uuidv["default"])(),
                       data: _objectSpread(_objectSpread({}, screen), {}, {
                         script_id: s.id
                       })
@@ -168,7 +170,6 @@ module.exports = function () {
                   })), (0, _toConsumableArray2["default"])(payload.diagnoses.map(function (d, position) {
                     return persitScriptItems(_database.Diagnosis, {
                       position: position,
-                      id: (0, _uuidv["default"])(),
                       data: _objectSpread(_objectSpread({}, d), {}, {
                         script_id: s.id
                       })
@@ -219,3 +220,22 @@ module.exports = function () {
     });
   };
 };
+
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(callRemote, "callRemote", "/home/farai/WorkBench/neotree-editor/server/routes/data/copyDataMiddleware.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

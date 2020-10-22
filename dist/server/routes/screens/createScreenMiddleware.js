@@ -10,109 +10,116 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _database = require("../../database");
-
-var _firebase = _interopRequireDefault(require("../../database/firebase"));
+var _firebase = _interopRequireDefault(require("../../firebase"));
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function (app) {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var payload, done, position, saveToFirebase, screen_id;
+      var _req$body, scriptId, payload, done, screenId, snap, screens, screen;
+
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              payload = req.body;
+              _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, ["scriptId"]);
 
               done = function done(err, screen) {
-                if (err) app.logger.log(err);
                 if (screen) app.io.emit('create_screens', {
                   key: app.getRandomString(),
                   screens: [{
-                    id: screen.id
+                    id: screen.id,
+                    scriptId: scriptId
                   }]
                 });
                 res.locals.setResponse(err, {
                   screen: screen
                 });
                 next();
-                return null;
               };
 
-              position = 0;
-              _context.prev = 3;
-              _context.next = 6;
-              return _database.Screen.count({
-                where: {
-                  script_id: payload.script_id
-                }
-              });
+              if (scriptId) {
+                _context.next = 4;
+                break;
+              }
 
-            case 6:
-              position = _context.sent;
-              position++;
-              _context.next = 13;
+              return _context.abrupt("return", done(new Error('Required script "id" is not provided.')));
+
+            case 4:
+              screenId = null;
+              _context.prev = 5;
+              _context.next = 8;
+              return _firebase["default"].database().ref("screens/".concat(scriptId)).push();
+
+            case 8:
+              snap = _context.sent;
+              screenId = snap.key;
+              _context.next = 15;
               break;
 
-            case 10:
-              _context.prev = 10;
-              _context.t0 = _context["catch"](3);
+            case 12:
+              _context.prev = 12;
+              _context.t0 = _context["catch"](5);
               return _context.abrupt("return", done(_context.t0));
 
-            case 13:
-              saveToFirebase = function saveToFirebase() {
-                return new Promise(function (resolve, reject) {
-                  _firebase["default"].database().ref("screens/".concat(payload.script_id)).push().then(function (snap) {
-                    var data = payload.data,
-                        rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-                    var screenId = snap.key;
-
-                    var _data = data ? JSON.parse(data) : null;
-
-                    _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-                      position: position,
-                      screenId: screenId,
-                      scriptId: payload.script_id,
-                      createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-                    })).then(function () {
-                      resolve(screenId);
-                    })["catch"](reject);
-                  })["catch"](reject);
+            case 15:
+              screens = {};
+              _context.prev = 16;
+              _context.next = 19;
+              return new Promise(function (resolve) {
+                _firebase["default"].database().ref("screens/".concat(scriptId)).on('value', function (snap) {
+                  return resolve(snap.val());
                 });
-              };
+              });
 
-              _context.prev = 14;
-              _context.next = 17;
-              return saveToFirebase();
-
-            case 17:
-              screen_id = _context.sent;
-
-              _database.Screen.create(_objectSpread(_objectSpread({}, payload), {}, {
-                position: position,
-                screen_id: screen_id
-              })).then(function (screen) {
-                return done(null, screen);
-              })["catch"](done);
-
-              _context.next = 24;
+            case 19:
+              screens = _context.sent;
+              screens = screens || {};
+              _context.next = 25;
               break;
 
-            case 21:
-              _context.prev = 21;
-              _context.t1 = _context["catch"](14);
-              done(_context.t1);
+            case 23:
+              _context.prev = 23;
+              _context.t1 = _context["catch"](16);
 
-            case 24:
+            case 25:
+              screen = _objectSpread(_objectSpread({}, payload), {}, {
+                scriptId: scriptId,
+                screenId: screenId,
+                id: screenId,
+                position: Object.keys(screens).length + 1,
+                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+              });
+              _context.prev = 26;
+              _context.next = 29;
+              return _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(screenId)).set(screen);
+
+            case 29:
+              _context.next = 34;
+              break;
+
+            case 31:
+              _context.prev = 31;
+              _context.t2 = _context["catch"](26);
+              return _context.abrupt("return", done(_context.t2));
+
+            case 34:
+              done(null, screen);
+
+            case 35:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 21]]);
+      }, _callee, null, [[5, 12], [16, 23], [26, 31]]);
     }))();
   };
 };

@@ -1,5 +1,14 @@
 "use strict";
 
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 /*eslint-disable no-console*/
 var clc = require('cli-color');
 
@@ -57,3 +66,22 @@ module.exports = {
     }
   }
 };
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(isProd, "isProd", "/home/farai/WorkBench/neotree-editor/utils/logger.js");
+  reactHotLoader.register(logger, "logger", "/home/farai/WorkBench/neotree-editor/utils/logger.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

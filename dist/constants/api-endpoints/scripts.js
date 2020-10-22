@@ -3,7 +3,17 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DUPLICATE_SCRIPT = exports.DELETE_SCRIPT = exports.UPDATE_SCRIPTS = exports.UPDATE_SCRIPT = exports.CREATE_SCRIPT = exports.GET_SCRIPT_ITEMS = exports.GET_FULL_SCRIPT = exports.GET_SCRIPTS = exports.GET_SCRIPT = void 0;
+exports.DUPLICATE_SCRIPTS = exports.DELETE_SCRIPTS = exports.UPDATE_SCRIPTS = exports.UPDATE_SCRIPT = exports.CREATE_SCRIPT = exports.GET_SCRIPT_ITEMS = exports.GET_FULL_SCRIPT = exports.GET_SCRIPTS = exports.GET_SCRIPT = void 0;
+
+(function () {
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
+  enterModule && enterModule(module);
+})();
+
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 var GET_SCRIPT = '/get-script';
 exports.GET_SCRIPT = GET_SCRIPT;
 var GET_SCRIPTS = '/get-scripts';
@@ -18,7 +28,33 @@ var UPDATE_SCRIPT = '/update-script';
 exports.UPDATE_SCRIPT = UPDATE_SCRIPT;
 var UPDATE_SCRIPTS = '/update-scripts';
 exports.UPDATE_SCRIPTS = UPDATE_SCRIPTS;
-var DELETE_SCRIPT = '/delete-script';
-exports.DELETE_SCRIPT = DELETE_SCRIPT;
-var DUPLICATE_SCRIPT = '/duplicate-script';
-exports.DUPLICATE_SCRIPT = DUPLICATE_SCRIPT;
+var DELETE_SCRIPTS = '/delete-scripts';
+exports.DELETE_SCRIPTS = DELETE_SCRIPTS;
+var DUPLICATE_SCRIPTS = '/duplicate-scripts';
+exports.DUPLICATE_SCRIPTS = DUPLICATE_SCRIPTS;
+;
+
+(function () {
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
+
+  if (!reactHotLoader) {
+    return;
+  }
+
+  reactHotLoader.register(GET_SCRIPT, "GET_SCRIPT", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPTS, "GET_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_FULL_SCRIPT, "GET_FULL_SCRIPT", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPT_ITEMS, "GET_SCRIPT_ITEMS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(CREATE_SCRIPT, "CREATE_SCRIPT", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(UPDATE_SCRIPT, "UPDATE_SCRIPT", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(UPDATE_SCRIPTS, "UPDATE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(DELETE_SCRIPTS, "DELETE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(DUPLICATE_SCRIPTS, "DUPLICATE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+})();
+
+;
+
+(function () {
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
+  leaveModule && leaveModule(module);
+})();

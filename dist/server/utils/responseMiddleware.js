@@ -1,5 +1,9 @@
 "use strict";
 
+var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
+  return a;
+};
+
 module.exports = function (req, res) {
   var json = res.locals.getResponse();
 
