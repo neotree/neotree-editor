@@ -42,7 +42,7 @@ const ConfigKeysList = () => {
             onSortData={configKeys => {
               setState({ configKeys });
               updateConfigKeys(configKeys.map(s => ({
-                id: s.id,
+                configKeyId: s.configKeyId,
                 position: s.position
               })));
             }}

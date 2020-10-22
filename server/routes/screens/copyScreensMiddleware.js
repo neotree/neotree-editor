@@ -18,15 +18,16 @@ module.exports = app => (req, res, next) => {
 
     let screens = [];
     try {
-      screens = await new Promise((resolve) => {
+      let _screens = await new Promise((resolve) => {
         firebase.database()
           .ref(`screens/${scriptId}`)
           .on('value', snap => resolve(snap.val()));
       });
-      screens = screens || {};
-      screens = Object.keys(screens).map(key => screens[key]);
+      _screens = _screens || {};
+      screens = Object.keys(_screens).map(key => _screens[key]);
       screens = items.map((s, i) => ({
         ...s,
+        ..._screens[s.screenId],
         scriptId,
         position: i + screens.length + 1,
         id: ids[i] || s.id,
@@ -36,7 +37,11 @@ module.exports = app => (req, res, next) => {
 
     try {
       await Promise.all(screens.map(s => {
-        return firebase.database().ref(`screens/${scriptId}/${s.screenId}`).set(s);
+        return firebase.database().ref(`screens/${scriptId}/${s.screenId}`).set({
+          ...s,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        });
       }));
     } catch (e) { return done(e); }
 

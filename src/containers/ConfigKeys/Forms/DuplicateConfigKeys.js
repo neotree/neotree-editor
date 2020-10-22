@@ -5,11 +5,11 @@ import { useConfigKeysContext } from '@/contexts/config-keys';
 
 const DuplicateConfigKeys = React.forwardRef(({
   children,
-  ids,
+  configKeys,
   onClick,
   ...props
 }, ref) => {
-  const duplicateMultiple = ids.length > 1;
+  const duplicateMultiple = configKeys.length > 1;
   const { duplicateConfigKeys } = useConfigKeysContext();
   const [renderConfirmModal, confirm] = useConfirmModal();
 
@@ -29,7 +29,7 @@ const DuplicateConfigKeys = React.forwardRef(({
       {renderConfirmModal({
         title: `Duplicate config key${duplicateMultiple ? 's' : ''}`,
         message: `Are you sure you want to duplicate config key${duplicateMultiple ? 's' : ''}?`,
-        onConfirm: () => duplicateConfigKeys(ids),
+        onConfirm: () => duplicateConfigKeys(configKeys),
       })}
     </>
   );
@@ -38,7 +38,7 @@ const DuplicateConfigKeys = React.forwardRef(({
 DuplicateConfigKeys.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  configKeys: PropTypes.array.isRequired,
 };
 
 export default DuplicateConfigKeys;

@@ -17,7 +17,7 @@ const SymptomForm = React.forwardRef(({
   onClick,
   data,
   onSave,
-  form: { type },
+  // form: { type },
   ...props
 }, ref) => {
   const [open, setOpen] = React.useState(false);
@@ -25,7 +25,7 @@ const SymptomForm = React.forwardRef(({
   const defaultForm = {
     name: null,
     expression: null,
-    type: false,
+    type: SymptomTypes[0].name || '',
     weight: null,
     ...data,
   };
@@ -59,7 +59,7 @@ const SymptomForm = React.forwardRef(({
         <DialogTitle>{data ? 'Edit' : 'Add'} symptom</DialogTitle>
 
         <DialogContent>
-          <RadioGroup name="type" value={type} onChange={e => setForm({ type: e.target.value })}>
+          <RadioGroup name="type" value={form.type} onChange={e => setForm({ type: e.target.value })}>
             {SymptomTypes.map(t => (
               <FormControlLabel
                 key={t.name}

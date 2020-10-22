@@ -11,9 +11,9 @@ export default function duplicateScreens(screens = []) {
         return {
           duplicateScreensError: e,
           duplicatingScreens: false,
-          ...e ? null : {
+          ...(e ? null : {
             screens: [..._screens, ...(rslts && rslts.screens ? rslts.screens : [])],
-          },
+          }),
         };
       });
       if (e) { reject(e); } else { resolve(rslts); }

@@ -28,9 +28,17 @@ module.exports = app => (req, res, next) => {
       screens = screens || {};
     } catch (e) { /* Do nothing */ }
 
-    const screen = { ...payload, scriptId, screenId, id: screenId, position: Object.keys(screens).length + 1, };
+    const screen = {
+      ...payload,
+      scriptId,
+      screenId,
+      id: screenId,
+      position: Object.keys(screens).length + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      // updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
 
-    try { await firebase.database().ref(`screens/${scriptId}`).set(screen); } catch (e) { return done(e); }
+    try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return done(e); }
 
     done(null, screen);
   })();

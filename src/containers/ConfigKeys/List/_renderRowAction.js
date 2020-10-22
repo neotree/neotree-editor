@@ -34,13 +34,13 @@ function Action({ row, }) {
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          configKeys={[{ configKeyId: row.configKeyId }]}
           component={DuplicateConfigKeys}
         >Duplicate</MenuItem>
 
         <MenuItem
           onClick={handleClose}
-          ids={[row.id]}
+          configKeys={[{ configKeyId: row.configKeyId }]}
           component={DeleteConfigKeys}
         >
           <Typography color="error">Delete</Typography>

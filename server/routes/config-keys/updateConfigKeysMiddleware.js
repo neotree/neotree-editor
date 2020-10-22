@@ -1,23 +1,22 @@
-import { ConfigKey } from '../../database';
+import { updateConfigKey } from './updateConfigKeyMiddleware';
 
-module.exports = app => (req, res, next) => {
-  const { configKeys, returnUpdated } = req.body;
+module.exports = (app) => (req, res, next) => {
+  (async () => {
+    const { configKeys } = req.body;
 
-  const done = (err, payload) => {
-    if (!err) app.io.emit('updateconfig_keys', { key: app.getRandomString(), config_keys: configKeys.map(c => ({ id: c.id })) });
-    res.locals.setResponse(err, payload);
-    next(); return null;
-  };
+    const done = (err, updatedConfigKeys) => {
+      if (err) {
+        res.locals.setResponse(err);
+        return next();
+      }
+      app.io.emit('update_config_keys', { key: app.getRandomString(), configKeys: configKeys.map(s => ({ configKeyId: s.configKeyId })) });
+      res.locals.setResponse(null, { updatedConfigKeys });
+      next();
+    };
 
-  Promise.all(configKeys.map(({ id, ...scr }) =>
-    ConfigKey.update({ ...scr }, { where: { id }, individualHooks: true }))
-  ).then(rslts => {
-    if (!returnUpdated) return done(null, { rslts });
+    let updatedConfigKeys = [];
+    try { updatedConfigKeys = await Promise.all(configKeys.map(s => updateConfigKey(s))); } catch (e) { return done(e); }
 
-    ConfigKey.findAll({ where: { id: configKeys.map(scr => scr.id) } })
-      .then(configKeys => done(null, { configKeys }))
-      .catch(done);
-
-    return null;
-  }).catch(done);
+    done(null, updatedConfigKeys);
+  })();
 };

@@ -14,9 +14,9 @@ function Diagnosis() {
 
   const titleChunks = !script ? [] : [
     scritpsCopy.PAGE_TITLE,
-    script.data.title,
+    script.title,
     diagnosesCopy.PAGE_TITLE,
-    diagnosis ? diagnosis.data.title : loadingDiagnosis ? '' : 'New diagnosis',
+    diagnosis ? diagnosis.title : loadingDiagnosis ? '' : 'New diagnosis',
   ].filter(c => c);
 
   setDocumentTitle(titleChunks.join(' > '));

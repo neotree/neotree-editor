@@ -18,17 +18,16 @@ export default function saveDiagnosis(_payload = {}) {
     setState(({ form }) => ({
       saveDiagnosisError: e,
       savingDiagnosis: false,
-      form: { ...form, ...e ? {} : (rslts.diagnosis ? rslts.diagnosis.data : {}), },
+      form: { ...form, ...(rslts ? rslts.diagnosis : {}), },
     }));
   };
 
   const save = diagnosis ? api.updateDiagnosis : api.createDiagnosis;
-  const data = JSON.stringify({ ...form, ...payload });
 
-  save({ script_id: scriptId, ...diagnosis, data })
+  save({ scriptId, ...diagnosis, ...form, ...payload })
     .then(rslts => {
       if (shdRedirect && rslts.diagnosis) history.push(`/scripts/${scriptId}`);
       done(rslts.errors, rslts);
     })
     .catch(done);
-};
+}

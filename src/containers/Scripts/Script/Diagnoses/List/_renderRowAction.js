@@ -29,19 +29,19 @@ function Action({ row, }) {
       >
         <MenuItem
           component={Link}
-          to={`/scripts/${row.script_id}/diagnoses/${row.diagnosisId}`}
+          to={`/scripts/${row.scriptId}/diagnoses/${row.diagnosisId}`}
           onClick={handleClose}
         >Edit</MenuItem>
 
         <MenuItem
           onClick={handleClose}
-          diagnoses={[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
+          items={[row]} // {[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
           component={CopyDiagnoses}
         >Copy</MenuItem>
 
         {/* <MenuItem
           onClick={handleClose}
-          diagnoses={[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
+          items={[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
           component={DuplicateScreens}
         >Duplicate</MenuItem> */}
 

@@ -1,19 +1,27 @@
 import * as api from '@/api/diagnoses';
 
 export default function deleteDiagnoses(diagnoses = []) {
-  if (!diagnoses.length) return;
+  return new Promise((resolve, reject) => {
+    const { diagnoses: _diagnoses } = this.state;
 
-  this.setState({ deletingDiagnoses: true });
+    if (!diagnoses.length) return;
 
-  const done = (e) => {
-    this.setState(({ diagnoses: _diagnoses }) => ({
-      deleteDiagnosesError: e,
-      deletingDiagnoses: false,
-      ...e ? null : { diagnoses: _diagnoses.map(d => d.diagnosisId).filter(s => diagnoses.indexOf(s.id) < 0) },
-    }));
-  };
+    this.setState({ deletingDiagnoses: true });
 
-  api.deleteDiagnoses({ diagnoses })
-    .then(data => done(data.errors, data))
-    .catch(done);
+    const done = (e, rslts) => {
+      const updatedDiagnoses = _diagnoses.filter(s => diagnoses.map(s => s.diagnosisId).indexOf(s.diagnosisId) < 0)
+        .map((s, i) => ({ ...s, position: i + 1, }));
+      this.setState({
+        deleteDiagnosesError: e,
+        deletingDiagnoses: false,
+        ...(e ? null : { diagnoses: updatedDiagnoses }),
+      });
+      this.updateDiagnoses(updatedDiagnoses.map(s => ({ diagnosisId: s.diagnosisId, scriptId: s.scriptId, position: s.position, })));
+      if (e) { reject(e); } else { resolve(rslts); }
+    };
+
+    api.deleteDiagnoses({ diagnoses })
+      .then(data => done(data.errors, data))
+      .catch(done);
+  });
 }

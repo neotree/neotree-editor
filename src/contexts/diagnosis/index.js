@@ -11,7 +11,7 @@ export const provideDiagnosisContext = Component => function DiagnosisContextPro
   const { state: { script } } = useScriptContext();
 
   const router = useRouter();
-  const { diagnosisId, diagnosisSection } = router.match.params;
+  const { diagnosisId, diagnosisSection, scriptId, } = router.match.params;
 
   const [state, _setState] = React.useState({
     ...defaults.defaultState,
@@ -57,8 +57,8 @@ export const provideDiagnosisContext = Component => function DiagnosisContextPro
   React.useEffect(() => {
     const diagnosisInitialised = diagnosisId !== 'new' ? true : false;
     value.setState({ diagnosisInitialised, diagnosis: null, form: defaults.defaultState.form });
-    if (diagnosisId !== 'new') value.getDiagnosis({ id: diagnosisId, });
-  }, [diagnosisId]);
+    if (diagnosisId !== 'new') value.getDiagnosis({ scriptId, diagnosisId, });
+  }, [diagnosisId, scriptId]);
 
   const { shouldSaveForm } = state;
 

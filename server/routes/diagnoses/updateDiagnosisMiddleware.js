@@ -1,17 +1,41 @@
-import { Diagnosis } from '../../database';
+import firebase from '../../firebase';
 
-module.exports = app => (req, res, next) => {
-  const { id, ...payload } = req.body;
+export const updateDiagnosis = ({ diagnosisId: id, scriptId, ...payload }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
 
-  const done = (err, diagnosis) => {
-    if (diagnosis) app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: [{ id }] });
-    res.locals.setResponse(err, { diagnosis });
-    next(); return null;
-  };
+    if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
 
-  if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
+    let diagnosis = null;
+    try {
+      diagnosis = await new Promise((resolve) => {
+        firebase.database()
+          .ref(`diagnosis/${scriptId}/${id}`)
+          .on('value', snap => resolve(snap.val()));
+      });
+    } catch (e) { return reject(e); }
 
-  Diagnosis.update(payload, { where: { id }, individualHooks: true })
-    .then(rslts => done(null, rslts && rslts[1] ? rslts[1][0] : null))
-    .catch(done);
+    if (!diagnosis) return reject(new Error(`Diagnosis with id "${id}" not found`));
+
+    diagnosis = { ...diagnosis, ...payload, id, updatedAt: firebase.database.ServerValue.TIMESTAMP, };
+
+    try { await firebase.database().ref(`diagnosis/${scriptId}/${id}`).set(diagnosis); } catch (e) { return reject(e); }
+
+    resolve(diagnosis);
+  })();
+});
+
+export default (app) => (req, res, next) => {
+  (async () => {
+    const done = (err, diagnosis) => {
+      if (diagnosis) app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: [{ diagnosisId: diagnosis.diagnosisId }] });
+      res.locals.setResponse(err, { diagnosis });
+      next();
+    };
+
+    let diagnosis = null;
+    try { diagnosis = await updateDiagnosis(req.body); } catch (e) { return done(e); }
+
+    done(null, diagnosis);
+  })();
 };

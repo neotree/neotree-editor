@@ -42,7 +42,7 @@ const ScriptsList = () => {
             onSortData={scripts => {
               setState({ scripts });
               updateScripts(scripts.map(s => ({
-                id: s.scriptId,
+                scriptId: s.scriptId,
                 position: s.position
               })));
             }}

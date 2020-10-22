@@ -16,12 +16,6 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
-  router.get(
-    endpoints.GET_FULL_CONFIG_KEY,
-    require('./getFullConfigKeyMiddleware')(app),
-    require('../../utils/responseMiddleware')
-  );
-
   router.post(
     endpoints.CREATE_CONFIG_KEY,
     require('./createConfigKeyMiddleware')(app),
@@ -30,7 +24,7 @@ module.exports = app => {
 
   router.post(
     endpoints.UPDATE_CONFIG_KEY,
-    require('./updateConfigKeyMiddleware')(app),
+    require('./updateConfigKeyMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 
@@ -41,14 +35,14 @@ module.exports = app => {
   );
 
   router.post(
-    endpoints.DELETE_CONFIG_KEY,
-    require('./deleteConfigKeyMiddleware')(app),
+    endpoints.DELETE_CONFIG_KEYS,
+    require('./deleteConfigKeysMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 
   router.post(
-    endpoints.DUPLICATE_CONFIG_KEY,
-    require('./duplicateConfigKeyMiddleware').default(app),
+    endpoints.DUPLICATE_CONFIG_KEYS,
+    require('./duplicateConfigKeysMiddleware').default(app),
     require('../../utils/responseMiddleware')
   );
 

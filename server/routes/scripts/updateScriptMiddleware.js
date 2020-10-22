@@ -1,6 +1,6 @@
 import firebase from '../../firebase';
 
-export const updateScript = ({ id, ...payload }) => new Promise((resolve, reject) => {
+export const updateScript = ({ scriptId: id, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
     if (!id) return reject(new Error('Required script "id" is not provided.'));
 
@@ -15,7 +15,7 @@ export const updateScript = ({ id, ...payload }) => new Promise((resolve, reject
 
     if (!script) return reject(new Error(`Script with id "${id}" not found`));
 
-    script = { ...script, ...payload, id, };
+    script = { ...script, ...payload, id, updatedAt: firebase.database.ServerValue.TIMESTAMP, };
 
     try { await firebase.database().ref(`scripts/${id}`).set(script); } catch (e) { return reject(e); }
 
@@ -25,15 +25,11 @@ export const updateScript = ({ id, ...payload }) => new Promise((resolve, reject
 
 export default (app) => (req, res, next) => {
   (async () => {
-    const { id } = req.body;
-
     const done = (err, script) => {
-      if (script) app.io.emit('update_scripts', { key: app.getRandomString(), scripts: [{ id: script.id }] });
+      if (script) app.io.emit('update_scripts', { key: app.getRandomString(), scripts: [{ scriptId: script.scriptId }] });
       res.locals.setResponse(err, { script });
       next();
     };
-
-    if (!id) return done({ msg: 'Required script "id" is not provided.' });
 
     let script = null;
     try { script = await updateScript(req.body); } catch (e) { return done(e); }

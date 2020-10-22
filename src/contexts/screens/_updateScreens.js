@@ -1,19 +1,21 @@
 import * as api from '@/api/screens';
 
 export default function updateScreens(screens = []) {
-  if (!screens.length) return;
+  return new Promise((resolve, reject) => {
+    if (!screens.length) return;
 
-  this.setState({ updatingScreens: true });
+    this.setState({ updatingScreens: true });
 
-  const done = (updateScreensError, data) => {
-    this.setState({
-      updateScreensError,
-      ...data,
-      updatingScreens: false,
-    });
-  };
+    const done = (e, data) => {
+      this.setState({
+        updateScreensError: e,
+        updatingScreens: false,
+      });
+      if (e) { reject(e); } else { resolve(data); }
+    };
 
-  api.updateScreens({ screens })
-    .then(data => done(data.errors, data))
-    .catch(done);
+    api.updateScreens({ screens })
+      .then(data => done(data.errors, data))
+      .catch(done);
+  });
 }

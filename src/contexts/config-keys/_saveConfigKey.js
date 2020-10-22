@@ -1,27 +1,30 @@
 import * as api from '@/api/config-keys';
 
 export default function saveConfigKey(configKey, form = {}, cb) {
-  const done = (e, rslts) => {
-    if (cb) cb(e, rslts);
+  return new Promise((resolve, reject) => {
+    const done = (e, rslts) => {
+      if (cb) cb(e, rslts);
 
-    this.setState(({ configKeys }) => {
-      let updatedConfigKeys = [...configKeys];
-      if (rslts && rslts.configKey) {
-        updatedConfigKeys = !configKey ?
-          [...configKeys, rslts.configKey]
-          :
-          configKeys.map(key => key.id === rslts.configKey.id ? rslts.configKey : key);
-      }
-      return {
-        configKeys: updatedConfigKeys,
-      };
-    });
-  };
+      this.setState(({ configKeys }) => {
+        let updatedConfigKeys = [...configKeys];
+        if (rslts && rslts.configKey) {
+          updatedConfigKeys = !configKey ?
+            [...configKeys, rslts.configKey]
+            :
+            configKeys.map(ck => ck.configKeyId === rslts.configKey.configKeyId ? rslts.configKey : ck);
+        }
+        return {
+          configKeys: updatedConfigKeys,
+        };
+      });
 
-  const save = configKey ? api.updateConfigKey : api.createConfigKey;
-  const data = JSON.stringify({ ...form });
+      if (e) { reject(e); } else { resolve(rslts); }
+    };
 
-  save({ ...configKey, data })
-    .then(rslts => done(rslts.errors, rslts))
-    .catch(done);
+    const save = configKey ? api.updateConfigKey : api.createConfigKey;
+
+    save({ ...configKey, ...form })
+      .then(rslts => done(rslts.errors, rslts))
+      .catch(done);
+  });
 }

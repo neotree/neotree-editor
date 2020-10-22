@@ -5,11 +5,11 @@ import { useConfigKeysContext } from '@/contexts/config-keys';
 
 const DeleteConfigKeys = React.forwardRef(({
   children,
-  ids,
+  configKeys,
   onClick,
   ...props
 }, ref) => {
-  const deleteMultiple = ids.length > 1;
+  const deleteMultiple = configKeys.length > 1;
   const [renderConfirmModal, confirm] = useConfirmModal();
   const { deleteConfigKeys } = useConfigKeysContext();
 
@@ -29,7 +29,7 @@ const DeleteConfigKeys = React.forwardRef(({
       {renderConfirmModal({
         title: `Delete config key${deleteMultiple ? 's' : ''}`,
         message: `Are you sure you want to delete config key${deleteMultiple ? 's' : ''}?`,
-        onConfirm: () => deleteConfigKeys(ids),
+        onConfirm: () => deleteConfigKeys(configKeys),
       })}
     </>
   );
@@ -38,7 +38,7 @@ const DeleteConfigKeys = React.forwardRef(({
 DeleteConfigKeys.propTypes = {
   onClick: PropTypes.func,
   children: PropTypes.node,
-  ids: PropTypes.array.isRequired,
+  configKeys: PropTypes.array.isRequired,
 };
 
 export default DeleteConfigKeys;
