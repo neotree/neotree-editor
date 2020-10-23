@@ -1,11 +1,18 @@
 import firebase from '../../firebase';
+import { Diagnosis, Log } from '../../database/models';
 
 module.exports = app => (req, res, next) => {
   (async () => {
     const { items, targetScriptId: scriptId } = req.body;
 
     const done = (err, items = []) => {
-      if (items.length) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+      if (items.length) {
+        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+        Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({ diagnoses: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) })
+        });
+      }
       res.locals.setResponse(err, { items });
       next();
     };
@@ -44,6 +51,20 @@ module.exports = app => (req, res, next) => {
         });
       }));
     } catch (e) { return done(e); }
+
+    try {
+      await Promise.all(diagnoses.map(diagnosis => {
+        return Diagnosis.findOrCreate({
+          where: { diagnosis_id: diagnosis.diagnosisId },
+          defaults: {
+            diagnosis_id: diagnosis.diagnosisId,
+            script_id: diagnosis.scriptId,
+            position: diagnosis.position,
+            data: JSON.stringify(diagnosis),
+          }
+        });
+      }));
+    } catch (e) { /* Do nothing */ }
 
     done(null, diagnoses);
   })();

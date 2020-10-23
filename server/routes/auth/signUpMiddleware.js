@@ -1,4 +1,5 @@
 import { firebase, firebaseAdmin } from '../../firebase';
+import { User } from '../../database/models';
 
 // module.exports = (app, payload, callback) => (req, res, next) => {
 //   const {
@@ -72,6 +73,17 @@ module.exports = (app, payload, callback) => (req, res, next) => {
     try {
       await firebaseAdmin.database().ref(`users/${user.uid}`).set(userDetails);
     } catch (e) { return done(e); }
+
+    try {
+      await User.findOrCreate({
+        where: { email: userDetails.email },
+        defaults: {
+          user_id: userDetails.userId,
+          email: userDetails.email,
+          data: JSON.stringify(userDetails),
+        },
+      });
+    } catch (e) { /* Do nothing*/ }
 
     if (loginOnSignUp === false) return done(null, { user: userDetails, });
 

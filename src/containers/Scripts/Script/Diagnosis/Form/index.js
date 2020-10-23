@@ -56,6 +56,16 @@ function DiagnosisEditor() {
           </div>
           <br /><br />
 
+          <div>
+            <TextField
+              fullWidth
+              value={form.expression || ''}
+              label="Diagnosis expression"
+              onChange={e => setForm({ expression: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
           {!diagnosis ? null : (
             <>
               <TitleTextImageForm

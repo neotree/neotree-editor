@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Diagnosis, Log } from '../../database/models';
 
 export const updateDiagnosis = ({ diagnosisId: id, scriptId, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
@@ -21,6 +22,16 @@ export const updateDiagnosis = ({ diagnosisId: id, scriptId, ...payload }) => ne
 
     try { await firebase.database().ref(`diagnosis/${scriptId}/${id}`).set(diagnosis); } catch (e) { return reject(e); }
 
+    try {
+      await Diagnosis.update(
+        {
+          position: diagnosis.position,
+          data: JSON.stringify(diagnosis),
+        },
+        { where: { diagnosis_id: diagnosis.diagnosisId } }
+      );
+    } catch (e) { /* Do nothing */ }
+
     resolve(diagnosis);
   })();
 });
@@ -28,7 +39,13 @@ export const updateDiagnosis = ({ diagnosisId: id, scriptId, ...payload }) => ne
 export default (app) => (req, res, next) => {
   (async () => {
     const done = (err, diagnosis) => {
-      if (diagnosis) app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: [{ diagnosisId: diagnosis.diagnosisId }] });
+      if (diagnosis) {
+        app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: [{ diagnosisId: diagnosis.diagnosisId }] });
+        Log.create({
+          name: 'update_diagnoses',
+          data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.diagnosisId }] })
+        });
+      }
       res.locals.setResponse(err, { diagnosis });
       next();
     };
