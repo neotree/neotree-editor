@@ -10,6 +10,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
@@ -31,15 +33,31 @@ module.exports = function (app) {
 
               done = function done(err) {
                 var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (items.length) app.io.emit('create_diagnoses', {
-                  key: app.getRandomString(),
-                  diagnoses: items.map(function (s) {
-                    return {
-                      id: s.id,
-                      scriptId: s.scriptId
-                    };
-                  })
-                });
+
+                if (items.length) {
+                  app.io.emit('create_diagnoses', {
+                    key: app.getRandomString(),
+                    diagnoses: items.map(function (s) {
+                      return {
+                        id: s.id,
+                        scriptId: s.scriptId
+                      };
+                    })
+                  });
+
+                  _models.Log.create({
+                    name: 'create_diagnoses',
+                    data: JSON.stringify({
+                      diagnoses: items.map(function (s) {
+                        return {
+                          id: s.id,
+                          scriptId: s.scriptId
+                        };
+                      })
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   items: items
                 });
@@ -118,14 +136,39 @@ module.exports = function (app) {
               return _context.abrupt("return", done(_context.t2));
 
             case 34:
+              _context.prev = 34;
+              _context.next = 37;
+              return Promise.all(diagnoses.map(function (diagnosis) {
+                return _models.Diagnosis.findOrCreate({
+                  where: {
+                    diagnosis_id: diagnosis.diagnosisId
+                  },
+                  defaults: {
+                    diagnosis_id: diagnosis.diagnosisId,
+                    script_id: diagnosis.scriptId,
+                    position: diagnosis.position,
+                    data: JSON.stringify(diagnosis)
+                  }
+                });
+              }));
+
+            case 37:
+              _context.next = 41;
+              break;
+
+            case 39:
+              _context.prev = 39;
+              _context.t3 = _context["catch"](34);
+
+            case 41:
               done(null, diagnoses);
 
-            case 35:
+            case 42:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 23], [26, 31]]);
+      }, _callee, null, [[3, 10], [14, 23], [26, 31], [34, 39]]);
     }))();
   };
 };

@@ -17,6 +17,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -103,14 +105,34 @@ var updateScreen = function updateScreen(_ref) {
               return _context.abrupt("return", reject(_context.t1));
 
             case 25:
+              _context.prev = 25;
+              _context.next = 28;
+              return _models.Screen.update({
+                position: screen.position,
+                data: JSON.stringify(screen)
+              }, {
+                where: {
+                  screen_id: screen.screenId
+                }
+              });
+
+            case 28:
+              _context.next = 32;
+              break;
+
+            case 30:
+              _context.prev = 30;
+              _context.t2 = _context["catch"](25);
+
+            case 32:
               resolve(screen);
 
-            case 26:
+            case 33:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 11], [17, 22]]);
+      }, _callee, null, [[5, 11], [17, 22], [25, 30]]);
     }))();
   });
 };
@@ -126,12 +148,24 @@ var _default = function _default(app) {
           switch (_context2.prev = _context2.next) {
             case 0:
               done = function done(err, screen) {
-                if (screen) app.io.emit('update_screens', {
-                  key: app.getRandomString(),
-                  screens: [{
-                    screenId: screen.screenId
-                  }]
-                });
+                if (screen) {
+                  app.io.emit('update_screens', {
+                    key: app.getRandomString(),
+                    screens: [{
+                      screenId: screen.screenId
+                    }]
+                  });
+
+                  _models.Log.create({
+                    name: 'update_screens',
+                    data: JSON.stringify({
+                      screens: [{
+                        screenId: screen.screenId
+                      }]
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   screen: screen
                 });

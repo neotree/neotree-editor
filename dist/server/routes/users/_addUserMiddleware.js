@@ -17,6 +17,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -165,7 +167,8 @@ var _default = function _default() {
       msg: 'Required user "email" is not provided.'
     });
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var user;
+      var user, _user;
+
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
@@ -189,58 +192,81 @@ var _default = function _default() {
 
             case 10:
               if (!user) {
-                _context2.next = 28;
+                _context2.next = 36;
                 break;
               }
 
-              _context2.prev = 11;
-              _context2.next = 14;
-              return _firebase["default"].database().ref("users/".concat(user.uid)).set(_objectSpread({
+              _user = _objectSpread({
                 email: email,
                 id: user.uid,
                 userId: user.uid,
                 hospitals: [],
                 countries: [],
                 activated: false
-              }, params));
+              }, params);
+              _context2.prev = 12;
+              _context2.next = 15;
+              return _firebase["default"].database().ref("users/".concat(user.uid)).set(_user);
 
-            case 14:
-              _context2.next = 19;
+            case 15:
+              _context2.next = 20;
               break;
 
-            case 16:
-              _context2.prev = 16;
-              _context2.t1 = _context2["catch"](11);
+            case 17:
+              _context2.prev = 17;
+              _context2.t1 = _context2["catch"](12);
               return _context2.abrupt("return", done(_context2.t1));
 
-            case 19:
-              _context2.prev = 19;
-              _context2.next = 22;
+            case 20:
+              _context2.prev = 20;
+              _context2.next = 23;
               return new Promise(function (resolve) {
                 _firebase["default"].database().ref("users/".concat(user.uid)).on('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 22:
+            case 23:
               user = _context2.sent;
-              _context2.next = 28;
+              _context2.next = 29;
               break;
 
-            case 25:
-              _context2.prev = 25;
-              _context2.t2 = _context2["catch"](19);
+            case 26:
+              _context2.prev = 26;
+              _context2.t2 = _context2["catch"](20);
               return _context2.abrupt("return", done(_context2.t2));
 
-            case 28:
+            case 29:
+              _context2.prev = 29;
+              _context2.next = 32;
+              return _models.User.findOrCreate({
+                where: {
+                  email: _user.email
+                },
+                defaults: {
+                  user_id: _user.userId,
+                  email: _user.email,
+                  data: JSON.stringify(_user)
+                }
+              });
+
+            case 32:
+              _context2.next = 36;
+              break;
+
+            case 34:
+              _context2.prev = 34;
+              _context2.t3 = _context2["catch"](29);
+
+            case 36:
               done(null, user);
 
-            case 29:
+            case 37:
             case "end":
               return _context2.stop();
           }
         }
-      }, _callee2, null, [[1, 7], [11, 16], [19, 25]]);
+      }, _callee2, null, [[1, 7], [12, 17], [20, 26], [29, 34]]);
     }))();
   };
 };

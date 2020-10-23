@@ -15,6 +15,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -139,14 +141,38 @@ var copyScreen = function copyScreen(_ref) {
               return _context.abrupt("return", reject(_context.t3));
 
             case 45:
+              _context.prev = 45;
+              _context.next = 48;
+              return _models.Screen.findOrCreate({
+                where: {
+                  screen_id: screen.screenId
+                },
+                defaults: {
+                  screen_id: screen.screenId,
+                  script_id: screen.scriptId,
+                  type: screen.type,
+                  position: screen.position,
+                  data: JSON.stringify(screen)
+                }
+              });
+
+            case 48:
+              _context.next = 52;
+              break;
+
+            case 50:
+              _context.prev = 50;
+              _context.t4 = _context["catch"](45);
+
+            case 52:
               resolve(screen);
 
-            case 46:
+            case 53:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 12], [16, 22], [27, 34], [37, 42]]);
+      }, _callee, null, [[5, 12], [16, 22], [27, 34], [37, 42], [45, 50]]);
     }))();
   });
 };
@@ -167,10 +193,20 @@ var _default = function _default(app) {
               done = function done(err) {
                 var _screens = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
 
-                if (_screens.length) app.io.emit('create_screens', {
-                  key: app.getRandomString(),
-                  screens: screens
-                });
+                if (_screens.length) {
+                  app.io.emit('create_screens', {
+                    key: app.getRandomString(),
+                    screens: screens
+                  });
+
+                  _models.Log.create({
+                    name: 'create_screens',
+                    data: JSON.stringify({
+                      screens: screens
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   screens: _screens
                 });

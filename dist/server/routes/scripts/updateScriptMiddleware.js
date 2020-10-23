@@ -17,6 +17,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -94,14 +96,34 @@ var updateScript = function updateScript(_ref) {
               return _context.abrupt("return", reject(_context.t1));
 
             case 23:
+              _context.prev = 23;
+              _context.next = 26;
+              return _models.Script.update({
+                position: script.position,
+                data: JSON.stringify(script)
+              }, {
+                where: {
+                  script_id: script.scriptId
+                }
+              });
+
+            case 26:
+              _context.next = 30;
+              break;
+
+            case 28:
+              _context.prev = 28;
+              _context.t2 = _context["catch"](23);
+
+            case 30:
               resolve(script);
 
-            case 24:
+            case 31:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [15, 20]]);
+      }, _callee, null, [[3, 9], [15, 20], [23, 28]]);
     }))();
   });
 };
@@ -117,12 +139,24 @@ var _default = function _default(app) {
           switch (_context2.prev = _context2.next) {
             case 0:
               done = function done(err, script) {
-                if (script) app.io.emit('update_scripts', {
-                  key: app.getRandomString(),
-                  scripts: [{
-                    scriptId: script.scriptId
-                  }]
-                });
+                if (script) {
+                  app.io.emit('update_scripts', {
+                    key: app.getRandomString(),
+                    scripts: [{
+                      scriptId: script.scriptId
+                    }]
+                  });
+
+                  _models.Log.create({
+                    name: 'update_scripts',
+                    data: JSON.stringify({
+                      scripts: [{
+                        scriptId: script.scriptId
+                      }]
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   script: script
                 });

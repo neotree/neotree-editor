@@ -15,6 +15,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -205,14 +207,89 @@ var copyScript = function copyScript(_ref) {
               _context.t7 = _context["catch"](69);
 
             case 76:
+              _context.prev = 76;
+              _context.next = 79;
+              return _models.Script.findOrCreate({
+                where: {
+                  script_id: script.scriptId
+                },
+                defaults: {
+                  script_id: script.scriptId,
+                  position: script.position,
+                  data: JSON.stringify(script)
+                }
+              });
+
+            case 79:
+              _context.next = 83;
+              break;
+
+            case 81:
+              _context.prev = 81;
+              _context.t8 = _context["catch"](76);
+
+            case 83:
+              _context.prev = 83;
+              _context.next = 86;
+              return Promise.all(Object.keys(screens).map(function (key) {
+                var screen = screens[key];
+                return _models.Screen.findOrCreate({
+                  where: {
+                    screen_id: screen.screenId
+                  },
+                  defaults: {
+                    screen_id: screen.screenId,
+                    script_id: screen.scriptId,
+                    type: screen.type,
+                    position: screen.position,
+                    data: JSON.stringify(screen)
+                  }
+                });
+              }));
+
+            case 86:
+              _context.next = 90;
+              break;
+
+            case 88:
+              _context.prev = 88;
+              _context.t9 = _context["catch"](83);
+
+            case 90:
+              _context.prev = 90;
+              _context.next = 93;
+              return Promise.all(Object.keys(diagnosis).map(function (key) {
+                var d = diagnosis[key];
+                return _models.Diagnosis.findOrCreate({
+                  where: {
+                    diagnosis_id: d.diagnosisId
+                  },
+                  defaults: {
+                    diagnosis_id: d.diagnosisId,
+                    script_id: d.scriptId,
+                    position: d.position,
+                    data: JSON.stringify(d)
+                  }
+                });
+              }));
+
+            case 93:
+              _context.next = 97;
+              break;
+
+            case 95:
+              _context.prev = 95;
+              _context.t10 = _context["catch"](90);
+
+            case 97:
               resolve(script);
 
-            case 77:
+            case 98:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [54, 59], [62, 67], [69, 74]]);
+      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [54, 59], [62, 67], [69, 74], [76, 81], [83, 88], [90, 95]]);
     }))();
   });
 };
@@ -231,10 +308,21 @@ var _default = function _default(app) {
 
               done = function done(err) {
                 var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (rslts.length) app.io.emit('create_scripts', {
-                  key: app.getRandomString(),
-                  scripts: scripts
-                });
+
+                if (rslts.length) {
+                  app.io.emit('create_scripts', {
+                    key: app.getRandomString(),
+                    scripts: scripts
+                  });
+
+                  _models.Log.create({
+                    name: 'create_scripts',
+                    data: JSON.stringify({
+                      scripts: scripts
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   scripts: rslts
                 });

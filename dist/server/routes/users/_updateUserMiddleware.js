@@ -12,6 +12,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _database = require("../../database");
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
@@ -84,14 +86,33 @@ module.exports = function () {
               return _context.abrupt("return", done(_context.t1));
 
             case 20:
+              _context.prev = 20;
+              _context.next = 23;
+              return _database.User.update({
+                data: JSON.stringify(user)
+              }, {
+                where: {
+                  email: user.email
+                }
+              });
+
+            case 23:
+              _context.next = 27;
+              break;
+
+            case 25:
+              _context.prev = 25;
+              _context.t2 = _context["catch"](20);
+
+            case 27:
               done(null, user);
 
-            case 21:
+            case 28:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 7], [12, 17]]);
+      }, _callee, null, [[1, 7], [12, 17], [20, 25]]);
     }))();
   };
 };

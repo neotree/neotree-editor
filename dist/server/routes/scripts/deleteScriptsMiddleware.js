@@ -13,6 +13,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -106,14 +108,65 @@ var deleteScript = function deleteScript(_ref, deleteAssociatedData) {
               _context.t3 = _context["catch"](28);
 
             case 35:
+              _context.prev = 35;
+              _context.next = 38;
+              return _models.Script.destroy({
+                where: {
+                  script_id: id
+                }
+              });
+
+            case 38:
+              _context.next = 42;
+              break;
+
+            case 40:
+              _context.prev = 40;
+              _context.t4 = _context["catch"](35);
+
+            case 42:
+              _context.prev = 42;
+              _context.next = 45;
+              return _models.Screen.destroy({
+                where: {
+                  script_id: id
+                }
+              });
+
+            case 45:
+              _context.next = 49;
+              break;
+
+            case 47:
+              _context.prev = 47;
+              _context.t5 = _context["catch"](42);
+
+            case 49:
+              _context.prev = 49;
+              _context.next = 52;
+              return _models.Diagnosis.destroy({
+                where: {
+                  script_id: id
+                }
+              });
+
+            case 52:
+              _context.next = 56;
+              break;
+
+            case 54:
+              _context.prev = 54;
+              _context.t6 = _context["catch"](49);
+
+            case 56:
               resolve(script);
 
-            case 36:
+            case 57:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [11, 16], [21, 26], [28, 33]]);
+      }, _callee, null, [[3, 9], [11, 16], [21, 26], [28, 33], [35, 40], [42, 47], [49, 54]]);
     }))();
   });
 };
@@ -133,10 +186,21 @@ module.exports = function (app) {
 
               done = function done(err) {
                 var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (rslts.length) app.io.emit('delete_scripts', {
-                  key: app.getRandomString(),
-                  scripts: scripts
-                });
+
+                if (rslts.length) {
+                  app.io.emit('delete_scripts', {
+                    key: app.getRandomString(),
+                    scripts: scripts
+                  });
+
+                  _models.Log.create({
+                    name: 'delete_scripts',
+                    data: JSON.stringify({
+                      scripts: scripts
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   scripts: rslts
                 });

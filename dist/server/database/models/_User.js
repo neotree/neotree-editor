@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
+var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
+
 var _sequelize = _interopRequireDefault(require("sequelize"));
 
 var _sequelize2 = _interopRequireDefault(require("./sequelize"));
@@ -26,12 +28,11 @@ var User = _sequelize2["default"].define('user', {
     autoIncrement: true,
     primaryKey: true
   },
-  email: {
+  user_id: {
     type: _sequelize["default"].STRING,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
-  email_hash: {
+  email: {
     type: _sequelize["default"].STRING,
     allowNull: false,
     unique: true
@@ -39,9 +40,15 @@ var User = _sequelize2["default"].define('user', {
   password: {
     type: _sequelize["default"].STRING
   },
-  role: {
-    type: _sequelize["default"].INTEGER,
-    defaultValue: 0
+  data: {
+    type: _sequelize["default"].JSON,
+    defaultValue: JSON.stringify({}),
+    get: function get() {
+      return JSON.parse(this.getDataValue('data') || '{}');
+    },
+    set: function set(value) {
+      this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
+    }
   }
 });
 

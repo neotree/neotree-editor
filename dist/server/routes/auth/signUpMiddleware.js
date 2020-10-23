@@ -10,6 +10,8 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 
 var _firebase = require("../../firebase");
 
+var _models = require("../../database/models");
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
@@ -147,8 +149,30 @@ module.exports = function (app, payload, callback) {
               return _context.abrupt("return", done(_context.t3));
 
             case 39:
+              _context.prev = 39;
+              _context.next = 42;
+              return _models.User.findOrCreate({
+                where: {
+                  email: userDetails.email
+                },
+                defaults: {
+                  user_id: userDetails.userId,
+                  email: userDetails.email,
+                  data: JSON.stringify(userDetails)
+                }
+              });
+
+            case 42:
+              _context.next = 46;
+              break;
+
+            case 44:
+              _context.prev = 44;
+              _context.t4 = _context["catch"](39);
+
+            case 46:
               if (!(loginOnSignUp === false)) {
-                _context.next = 41;
+                _context.next = 48;
                 break;
               }
 
@@ -156,33 +180,33 @@ module.exports = function (app, payload, callback) {
                 user: userDetails
               }));
 
-            case 41:
+            case 48:
               authenticated = null;
-              _context.prev = 42;
-              _context.next = 45;
+              _context.prev = 49;
+              _context.next = 52;
               return _firebase.firebase.auth().signInWithEmailAndPassword(username, password);
 
-            case 45:
+            case 52:
               authenticated = _firebase.firebase.auth().currentUser;
-              _context.next = 51;
+              _context.next = 58;
               break;
 
-            case 48:
-              _context.prev = 48;
-              _context.t4 = _context["catch"](42);
-              return _context.abrupt("return", done(_context.t4));
+            case 55:
+              _context.prev = 55;
+              _context.t5 = _context["catch"](49);
+              return _context.abrupt("return", done(_context.t5));
 
-            case 51:
+            case 58:
               done(null, {
                 user: authenticated
               });
 
-            case 52:
+            case 59:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 7], [12, 17], [21, 27], [31, 36], [42, 48]]);
+      }, _callee, null, [[1, 7], [12, 17], [21, 27], [31, 36], [39, 44], [49, 55]]);
     }))();
   };
 };

@@ -71,18 +71,6 @@ Object.defineProperty(exports, "Hospital", {
     return _Hospital["default"];
   }
 });
-Object.defineProperty(exports, "UserHospital", {
-  enumerable: true,
-  get: function get() {
-    return _UserHospital["default"];
-  }
-});
-Object.defineProperty(exports, "UserCountry", {
-  enumerable: true,
-  get: function get() {
-    return _UserCountry["default"];
-  }
-});
 exports.init = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -110,10 +98,6 @@ var _Device = _interopRequireDefault(require("./_Device"));
 var _Log = _interopRequireDefault(require("./_Log"));
 
 var _Hospital = _interopRequireDefault(require("./_Hospital"));
-
-var _UserHospital = _interopRequireDefault(require("./_UserHospital"));
-
-var _UserCountry = _interopRequireDefault(require("./_UserCountry"));
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -286,34 +270,6 @@ var init = function init() {
               errors.push(_context.t10);
 
             case 88:
-              _context.prev = 88;
-              _context.next = 91;
-              return _UserCountry["default"].sync();
-
-            case 91:
-              _context.next = 96;
-              break;
-
-            case 93:
-              _context.prev = 93;
-              _context.t11 = _context["catch"](88);
-              errors.push(_context.t11);
-
-            case 96:
-              _context.prev = 96;
-              _context.next = 99;
-              return _UserHospital["default"].sync();
-
-            case 99:
-              _context.next = 104;
-              break;
-
-            case 101:
-              _context.prev = 101;
-              _context.t12 = _context["catch"](96);
-              errors.push(_context.t12);
-
-            case 104:
               if (!errors.length) {
                 resolve(_sequelize["default"]);
               } else {
@@ -322,12 +278,12 @@ var init = function init() {
                 }).join('\n')));
               }
 
-            case 105:
+            case 89:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85], [88, 93], [96, 101]]);
+      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85]]);
     }))();
   });
 };
