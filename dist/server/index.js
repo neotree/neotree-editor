@@ -27,7 +27,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 var isProd = process.env.NODE_ENV === 'production';
 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-  var app, httpServer, sequelize, bodyParser, webpackConfig, compiler;
+  var app, httpServer, sequelize, bodyParser, session, SequelizeStore, sessStore, webpackConfig, compiler;
   return _regenerator["default"].wrap(function _callee$(_context) {
     while (1) {
       switch (_context.prev = _context.next) {
@@ -92,7 +92,26 @@ var isProd = process.env.NODE_ENV === 'production';
           app.use(bodyParser.json());
           app.use(bodyParser.urlencoded({
             extended: false
-          })); // webpack
+          })); //express session
+
+          session = require('express-session');
+          SequelizeStore = require('connect-session-sequelize')(session.Store);
+          sessStore = new SequelizeStore({
+            db: app.sequelize
+          });
+          app.use(session({
+            secret: 'neotree',
+            saveUninitialized: false,
+            // don't create session until something stored
+            resave: false,
+            //don't save session if unmodified
+            store: sessStore,
+            cookie: {
+              maxAge: 365 * 24 * 60 * 60
+            } // = 365 days (exp date will be created from ttl opt)
+
+          }));
+          sessStore.sync(); // webpack
 
           if (!isProd) {
             webpackConfig = require('../webpack.config');
@@ -108,6 +127,7 @@ var isProd = process.env.NODE_ENV === 'production';
             app.use('/assets', _express["default"]["static"](_path["default"].resolve(__dirname, '../../assets')));
           }
 
+          app = require('./_passport')(app);
           app.use(_express["default"]["static"](_path["default"].resolve(__dirname, '../src'), {
             index: false
           }));
@@ -118,7 +138,7 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 36:
+        case 42:
         case "end":
           return _context.stop();
       }

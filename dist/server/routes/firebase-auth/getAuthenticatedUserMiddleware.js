@@ -16,12 +16,13 @@ module.exports = function (app, payload, callback) {
     if (req.isAuthenticated()) {
       return _database.User.findOne({
         where: {
-          email: req.user.email
+          id: req.user.id
         }
       }).then(function (u) {
-        delete u.password;
+        var authenticatedUser = u ? JSON.parse(JSON.stringify(u)) : null;
+        if (authenticatedUser) delete authenticatedUser.password;
         done(null, !u ? null : {
-          authenticatedUser: u
+          authenticatedUser: authenticatedUser
         });
       })["catch"](done);
     }
