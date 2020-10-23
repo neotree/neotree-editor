@@ -10,8 +10,6 @@ import ApiKey from './_ApiKey';
 import Device from './_Device';
 import Log from './_Log';
 import Hospital from './_Hospital';
-import UserHospital from './_UserHospital';
-import UserCountry from './_UserCountry';
 
 const init = () => new Promise((resolve, reject) => {
   const errors = [];
@@ -28,8 +26,6 @@ const init = () => new Promise((resolve, reject) => {
       try { await ApiKey.sync(); } catch (e) { errors.push(e); }
       try { await Device.sync(); } catch (e) { errors.push(e); }
       try { await Log.sync(); } catch (e) { errors.push(e); }
-      try { await UserCountry.sync(); } catch (e) { errors.push(e); }
-      try { await UserHospital.sync(); } catch (e) { errors.push(e); }
 
       if (!errors.length) { 
         resolve(sequelize); 
@@ -52,7 +48,5 @@ export {
   Device,
   Log,
   Hospital,
-  UserCountry,
-  UserHospital,
 };
 

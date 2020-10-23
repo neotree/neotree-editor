@@ -1,10 +1,18 @@
 import firebase from '../../firebase';
+import { Script, Log, } from '../../database';
 
-module.exports = () => (req, res, next) => {
+module.exports = app => (req, res, next) => {
   (async () => {
     const payload = req.body;
 
     const done = (err, script) => {
+      if (script) {
+        app.io.emit('create_scripts', { key: app.getRandomString(), scripts: [{ scriptId: script.scriptId }] });
+        Log.create({
+          name: 'create_scripts',
+          data: JSON.stringify({ scripts: [{ scriptId: script.scriptId }] })
+        });
+      }
       res.locals.setResponse(err, { script });
       next();
     };
@@ -35,6 +43,16 @@ module.exports = () => (req, res, next) => {
     };
 
     try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return done(e); }
+
+    try {
+      await Script.findOrCreate({
+        where: { script_id: script.scriptId },
+        defaults: {
+          position: script.position,
+          data: JSON.stringify(script),
+        }
+      });
+    } catch (e) { /* Do nothing */ }
 
     done(null, script);
   })();

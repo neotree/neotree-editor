@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { User } from '../../database/models';
 
 const deleteUser = userId => new Promise((resolve, reject) => {
   (async () => {
@@ -17,6 +18,8 @@ const deleteUser = userId => new Promise((resolve, reject) => {
     try { await firebase.auth().deleteUser(userId); } catch (e) { return reject(e); }
 
     try { await firebase.database().ref(`users/${userId}`).remove(); } catch (e) { return reject(e); }
+
+    try { await User.destroy({ where: { user_id: userId }, }); } catch (e) { /* Do nothing*/ }
 
     resolve(user);
   })();

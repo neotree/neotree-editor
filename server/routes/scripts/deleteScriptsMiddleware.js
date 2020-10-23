@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Script, Screen, Diagnosis, Log } from '../../database/models';
 
 export const deleteScript = ({ scriptId: id }, deleteAssociatedData) => new Promise((resolve, reject) => {
   (async () => {
@@ -21,6 +22,12 @@ export const deleteScript = ({ scriptId: id }, deleteAssociatedData) => new Prom
 
     try { await firebase.database().ref(`diagnosis/${id}`).remove(); } catch (e) { /* do nothing */ }
 
+    try { await Script.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
+
+    try { await Screen.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
+
+    try { await Diagnosis.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
+
     resolve(script);
   })();
 });
@@ -30,7 +37,13 @@ module.exports = (app) => (req, res, next) => {
     const { scripts, deleteAssociatedData, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('delete_scripts', { key: app.getRandomString(), scripts });
+      if (rslts.length) {
+        app.io.emit('delete_scripts', { key: app.getRandomString(), scripts });
+        Log.create({
+          name: 'delete_scripts',
+          data: JSON.stringify({ scripts })
+        });
+      }
       res.locals.setResponse(err, { scripts: rslts });
       next();
     };

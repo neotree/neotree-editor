@@ -10,12 +10,11 @@ const User = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
-    email: {
+    user_id: {
       type: Sequelize.STRING,
       allowNull: false,
-      unique: true,
     },
-    email_hash: {
+    email: {
       type: Sequelize.STRING,
       allowNull: false,
       unique: true,
@@ -23,9 +22,15 @@ const User = sqlz.define(
     password: {
       type: Sequelize.STRING,
     },
-    role: {
-      type: Sequelize.INTEGER,
-      defaultValue: 0,
+    data: {
+      type: Sequelize.JSON,
+      defaultValue: JSON.stringify({}),
+      get: function () {
+        return JSON.parse(this.getDataValue('data') || '{}');
+      },
+      set: function (value) {
+        this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
+      }
     },
   }
 );

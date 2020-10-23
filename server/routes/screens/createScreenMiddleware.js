@@ -1,11 +1,18 @@
 import firebase from '../../firebase';
+import { Log, Screen } from '../../database/models';
 
 module.exports = app => (req, res, next) => {
   (async () => {
     const { scriptId, ...payload } = req.body;
 
     const done = (err, screen) => {
-      if (screen) app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ id: screen.id, scriptId }] });
+      if (screen) {
+        app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ id: screen.id, scriptId }] });
+        Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({ screens: [{ id: screen.id, scriptId }] })
+        });
+      }
       res.locals.setResponse(err, { screen });
       next();
     };
@@ -39,6 +46,19 @@ module.exports = app => (req, res, next) => {
     };
 
     try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return done(e); }
+
+    try {
+      await Screen.findOrCreate({
+        where: { screen_id: screen.screenId },
+        defaults: {
+          screen_id: screen.screenId,
+          script_id: screen.scriptId,
+          type: screen.type,
+          position: screen.position,
+          data: JSON.stringify(screen),
+        }
+      });
+    } catch (e) { /* Do nothing */ }
 
     done(null, screen);
   })();

@@ -1,11 +1,18 @@
 import firebase from '../../firebase';
+import { Log, Screen } from '../../database/models';
 
 module.exports = app => (req, res, next) => {
   (async () => {
     const { items, targetScriptId: scriptId } = req.body;
 
     const done = (err, items = []) => {
-      if (items.length) app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+      if (items.length) {
+        app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+        Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({ screens: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) })
+        });
+      }
       res.locals.setResponse(err, { items });
       next();
     };
@@ -44,6 +51,21 @@ module.exports = app => (req, res, next) => {
         });
       }));
     } catch (e) { return done(e); }
+
+    try {
+      await Promise.all(screens.map(screen => {
+        return Screen.findOrCreate({
+          where: { screen_id: screen.screenId },
+          defaults: {
+            screen_id: screen.screenId,
+            script_id: screen.scriptId,
+            type: screen.type,
+            position: screen.position,
+            data: JSON.stringify(screen),
+          }
+        });
+      }));
+    } catch (e) { /* Do nothing */ }
 
     done(null, screens);
   })();

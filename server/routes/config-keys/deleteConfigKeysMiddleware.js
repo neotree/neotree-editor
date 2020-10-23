@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { ConfigKey, Log } from '../../database/models';
 
 export const deleteConfigKey = ({ configKeyId: id }, deleteAssociatedData) => new Promise((resolve, reject) => {
   (async () => {
@@ -21,6 +22,8 @@ export const deleteConfigKey = ({ configKeyId: id }, deleteAssociatedData) => ne
 
     try { await firebase.database().ref(`diagnosis/${id}`).remove(); } catch (e) { /* do nothing */ }
 
+    try { await ConfigKey.destroy({ where: { config_key_id: configKey.configKeyId }, }); } catch (e) { /* Do nothing */ }
+
     resolve(configKey);
   })();
 });
@@ -30,7 +33,13 @@ module.exports = (app) => (req, res, next) => {
     const { configKeys, deleteAssociatedData, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('delete_config_keys', { key: app.getRandomString(), configKeys });
+      if (rslts.length) {
+        app.io.emit('delete_config_keys', { key: app.getRandomString(), configKeys });
+        Log.create({
+          name: 'delete_config_keys',
+          data: JSON.stringify({ configKeys })
+        });
+      }
       res.locals.setResponse(err, { configKeys: rslts });
       next();
     };

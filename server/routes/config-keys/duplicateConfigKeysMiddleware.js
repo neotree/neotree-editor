@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { ConfigKey, Log } from '../../database/models';
 
 export const copyConfigKey = ({ configKeyId: id }) => {
   return new Promise((resolve, reject) => {
@@ -41,6 +42,16 @@ export const copyConfigKey = ({ configKeyId: id }) => {
         });
       } catch (e) { return reject(e); }
 
+      try {
+        await ConfigKey.findOrCreate({
+          where: { config_key_id: configKey.configKeyId },
+          defaults: {
+            position: configKey.position,
+            data: JSON.stringify(configKey),
+          }
+        });
+      } catch (e) { /* Do nothing */ }
+
       resolve(configKey);
     })();
   });
@@ -51,7 +62,13 @@ export default (app) => (req, res, next) => {
     const { configKeys } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('create_config_keys', { key: app.getRandomString(), configKeys });
+      if (rslts.length) {
+        app.io.emit('create_config_keys', { key: app.getRandomString(), configKeys });
+        Log.create({
+          name: 'create_config_keys',
+          data: JSON.stringify({ configKeys })
+        });
+      }
       res.locals.setResponse(err, { configKeys: rslts });
       next();
     };

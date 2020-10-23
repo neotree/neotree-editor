@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Log, Screen } from '../../database/models';
 
 export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
@@ -21,6 +22,16 @@ export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Prom
 
     try { await firebase.database().ref(`screens/${scriptId}/${id}`).set(screen); } catch (e) { return reject(e); }
 
+    try {
+      await Screen.update(
+        {
+          position: screen.position,
+          data: JSON.stringify(screen),
+        },
+        { where: { screen_id: screen.screenId } }
+      );
+    } catch (e) { /* Do nothing */ }
+
     resolve(screen);
   })();
 });
@@ -28,7 +39,13 @@ export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Prom
 export default (app) => (req, res, next) => {
   (async () => {
     const done = (err, screen) => {
-      if (screen) app.io.emit('update_screens', { key: app.getRandomString(), screens: [{ screenId: screen.screenId }] });
+      if (screen) {
+        app.io.emit('update_screens', { key: app.getRandomString(), screens: [{ screenId: screen.screenId }] });
+        Log.create({
+          name: 'update_screens',
+          data: JSON.stringify({ screens: [{ screenId: screen.screenId }] })
+        });
+      }
       res.locals.setResponse(err, { screen });
       next();
     };

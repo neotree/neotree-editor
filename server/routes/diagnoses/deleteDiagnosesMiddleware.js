@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Diagnosis, Log } from '../../database/models';
 
 export const deleteDiagnosis = ({ scriptId, diagnosisId: id, }) => new Promise((resolve, reject) => {
   (async () => {
@@ -17,6 +18,8 @@ export const deleteDiagnosis = ({ scriptId, diagnosisId: id, }) => new Promise((
 
     try { await firebase.database().ref(`diagnosis/${scriptId}/${id}`).remove(); } catch (e) { return reject(e); }
 
+    try { await Diagnosis.destroy({ where: { diagnosis_id: id }, }); } catch (e) { /* Do nothing */ }
+
     resolve(diagnosis);
   })();
 });
@@ -26,7 +29,13 @@ export default (app) => (req, res, next) => {
     const { diagnoses } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('delete_diagnoses', { key: app.getRandomString(), diagnoses });
+      if (rslts.length) {
+        app.io.emit('delete_diagnoses', { key: app.getRandomString(), diagnoses });
+        Log.create({
+          name: 'delete_diagnoses',
+          data: JSON.stringify({ diagnoses })
+        });
+      }
       res.locals.setResponse(err, { diagnoses: rslts });
       next();
     };

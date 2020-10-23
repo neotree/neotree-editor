@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Log, Script } from '../../database/models';
 
 export const updateScript = ({ scriptId: id, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
@@ -19,6 +20,16 @@ export const updateScript = ({ scriptId: id, ...payload }) => new Promise((resol
 
     try { await firebase.database().ref(`scripts/${id}`).set(script); } catch (e) { return reject(e); }
 
+    try {
+      await Script.update(
+        {
+          position: script.position,
+          data: JSON.stringify(script),
+        },
+        { where: { script_id: script.scriptId } }
+      );
+    } catch (e) { /* Do nothing */ }
+
     resolve(script);
   })();
 });
@@ -26,7 +37,13 @@ export const updateScript = ({ scriptId: id, ...payload }) => new Promise((resol
 export default (app) => (req, res, next) => {
   (async () => {
     const done = (err, script) => {
-      if (script) app.io.emit('update_scripts', { key: app.getRandomString(), scripts: [{ scriptId: script.scriptId }] });
+      if (script) {
+        app.io.emit('update_scripts', { key: app.getRandomString(), scripts: [{ scriptId: script.scriptId }] });
+        Log.create({
+          name: 'update_scripts',
+          data: JSON.stringify({ scripts: [{ scriptId: script.scriptId }] })
+        });
+      }
       res.locals.setResponse(err, { script });
       next();
     };

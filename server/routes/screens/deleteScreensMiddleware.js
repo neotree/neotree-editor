@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Log, Screen } from '../../database/models';
 
 export const deleteScreen = ({ scriptId, screenId: id, }) => new Promise((resolve, reject) => {
   (async () => {
@@ -17,6 +18,8 @@ export const deleteScreen = ({ scriptId, screenId: id, }) => new Promise((resolv
 
     try { await firebase.database().ref(`screens/${scriptId}/${id}`).remove(); } catch (e) { return reject(e); }
 
+    try { await Screen.destroy({ where: { screen_id: id }, }); } catch (e) { /* Do nothing */ }
+
     resolve(screen);
   })();
 });
@@ -26,7 +29,13 @@ export default (app) => (req, res, next) => {
     const { screens } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('delete_screens', { key: app.getRandomString(), screens });
+      if (rslts.length) {
+        app.io.emit('delete_screens', { key: app.getRandomString(), screens });
+        Log.create({
+          name: 'delete_screens',
+          data: JSON.stringify({ screens })
+        });
+      }
       res.locals.setResponse(err, { screens: rslts });
       next();
     };

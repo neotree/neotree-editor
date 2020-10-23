@@ -1,11 +1,18 @@
 import firebase from '../../firebase';
+import { Diagnosis, Log } from '../../database/models';
 
 module.exports = app => (req, res, next) => {
   (async () => {
     const { scriptId, ...payload } = req.body;
 
     const done = (err, diagnosis) => {
-      if (diagnosis) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id, scriptId }] });
+      if (diagnosis) {
+        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id, scriptId }] });
+        Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({ diagnoses: [{ id: diagnosis.id, scriptId }] })
+        });
+      }
       res.locals.setResponse(err, { diagnosis });
       next();
     };
@@ -39,6 +46,18 @@ module.exports = app => (req, res, next) => {
     };
 
     try { await firebase.database().ref(`diagnosis/${scriptId}/${diagnosisId}`).set(diagnosis); } catch (e) { return done(e); }
+
+    try {
+      await Diagnosis.findOrCreate({
+        where: { diagnosis_id: diagnosis.diagnosisId },
+        defaults: {
+          diagnosis_id: diagnosis.diagnosisId,
+          script_id: diagnosis.scriptId,
+          position: diagnosis.position,
+          data: JSON.stringify(diagnosis),
+        }
+      });
+    } catch (e) { /* Do nothing */ }
 
     done(null, diagnosis);
   })();

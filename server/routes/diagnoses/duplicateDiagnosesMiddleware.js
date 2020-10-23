@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Diagnosis, Log } from '../../database/models';
 
 export const copyDiagnosis = ({ scriptId, diagnosisId: id, }) => {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,18 @@ export const copyDiagnosis = ({ scriptId, diagnosisId: id, }) => {
         });
       } catch (e) { return reject(e); }
 
+      try {
+        await Diagnosis.findOrCreate({
+          where: { diagnosis_id: diagnosis.diagnosisId },
+          defaults: {
+            diagnosis_id: diagnosis.diagnosisId,
+            script_id: diagnosis.scriptId,
+            position: diagnosis.position,
+            data: JSON.stringify(diagnosis),
+          }
+        });
+      } catch (e) { /* Do nothing */ }
+
       resolve(diagnosis);
     })();
   });
@@ -54,7 +67,13 @@ export default (app) => (req, res, next) => {
     const { diagnoses } = req.body;
 
     const done = (err, _diagnoses = []) => {
-      if (_diagnoses.length) app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses });
+      if (_diagnoses.length) {
+        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses });
+        Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({ diagnoses })
+        });
+      }
       res.locals.setResponse(err, { diagnoses: _diagnoses });
       next();
     };
