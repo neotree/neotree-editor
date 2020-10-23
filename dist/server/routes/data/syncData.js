@@ -2,9 +2,13 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
+
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _sequelize = require("sequelize");
 
@@ -16,107 +20,123 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function () {
   return function (req, res, next) {
-    var payload = req.query;
-    var lastSyncDate = payload.lastSyncDate ? new Date(payload.lastSyncDate).getTime() : null;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var _lastSyncDate, lastSyncDate, done;
 
-    var done = function done(e, payload) {
-      res.locals.setResponse(e, payload);
-      next();
-    };
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _lastSyncDate = req.query.lastSyncDate;
+              lastSyncDate = _lastSyncDate ? new Date(_lastSyncDate).getTime() : null;
 
-    Promise.all([!lastSyncDate ? null : _database.Log.findAll({
-      where: {
-        createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate),
-        name: (0, _defineProperty2["default"])({}, _sequelize.Op.or, ['delete_scripts', 'delete_screens', 'delete_daignoses', 'deleteconfig_keys'])
-      }
-    }), _database.Script.findAll({
-      where: !lastSyncDate ? {} : {
-        updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.Script.findAll({
-      where: !lastSyncDate ? {} : {
-        createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.Screen.findAll({
-      where: !lastSyncDate ? {} : {
-        updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.Screen.findAll({
-      where: !lastSyncDate ? {} : {
-        createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.Diagnosis.findAll({
-      where: !lastSyncDate ? {} : {
-        updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.Diagnosis.findAll({
-      where: !lastSyncDate ? {} : {
-        createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.ConfigKey.findAll({
-      where: !lastSyncDate ? {} : {
-        updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    }), _database.ConfigKey.findAll({
-      where: !lastSyncDate ? {} : {
-        createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-      }
-    })]).then(function () {
-      var rslts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-      done(null, {
-        scripts: {
-          lastCreated: rslts[1] || [],
-          lastUpdated: rslts[2] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-            return log.name === 'delete_scripts';
-          }).reduce(function (acc, log) {
-            return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.scripts || []).map(function (s) {
-              return {
-                id: s.id
+              done = function done(e, payload) {
+                res.locals.setResponse(e, payload);
+                next();
               };
-            })));
-          }, [])
-        },
-        screens: {
-          lastCreated: rslts[3] || [],
-          lastUpdated: rslts[4] || [],
-          lastDeleted: (rslts[0] || []).filter(function (log) {
-            return log.name === 'delete_screens';
-          }).reduce(function (acc, log) {
-            return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.screens || []).map(function (s) {
-              return {
-                id: s.id
-              };
-            })));
-          }, [])
-        },
-        diagnoses: {
-          lastCreated: rslts[5] || [],
-          lastUpdated: rslts[6] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-            return log.name === 'delete_diagnoses';
-          }).reduce(function (acc, log) {
-            return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.diagnoses || []).map(function (s) {
-              return {
-                id: s.id
-              };
-            })));
-          }, [])
-        },
-        config_keys: {
-          lastCreated: rslts[7] || [],
-          lastUpdated: rslts[8] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-            return log.name === 'deleteconfig_keys';
-          }).reduce(function (acc, log) {
-            return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.config_keys || []).map(function (s) {
-              return {
-                id: s.id
-              };
-            })));
-          }, [])
+
+              Promise.all([!lastSyncDate ? null : _database.Log.findAll({
+                where: {
+                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate),
+                  name: (0, _defineProperty2["default"])({}, _sequelize.Op.or, ['delete_scripts', 'delete_screens', 'delete_diagnoses', 'delete_config_keys'])
+                }
+              }), _database.Script.findAll({
+                where: !lastSyncDate ? {} : {
+                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.Script.findAll({
+                where: !lastSyncDate ? {} : {
+                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.Screen.findAll({
+                where: !lastSyncDate ? {} : {
+                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.Screen.findAll({
+                where: !lastSyncDate ? {} : {
+                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.Diagnosis.findAll({
+                where: !lastSyncDate ? {} : {
+                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.Diagnosis.findAll({
+                where: !lastSyncDate ? {} : {
+                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.ConfigKey.findAll({
+                where: !lastSyncDate ? {} : {
+                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              }), _database.ConfigKey.findAll({
+                where: !lastSyncDate ? {} : {
+                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+                }
+              })]).then(function () {
+                var rslts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+                done(null, {
+                  device: device,
+                  scripts: {
+                    lastCreated: rslts[1] || [],
+                    lastUpdated: rslts[2] || [],
+                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
+                      return log.name === 'delete_scripts';
+                    }).reduce(function (acc, log) {
+                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.scripts || []).map(function (s) {
+                        return {
+                          scriptId: s.scriptId
+                        };
+                      })));
+                    }, [])
+                  },
+                  screens: {
+                    lastCreated: rslts[3] || [],
+                    lastUpdated: rslts[4] || [],
+                    lastDeleted: (rslts[0] || []).filter(function (log) {
+                      return log.name === 'delete_screens';
+                    }).reduce(function (acc, log) {
+                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.screens || []).map(function (s) {
+                        return {
+                          screenId: s.screenId
+                        };
+                      })));
+                    }, [])
+                  },
+                  diagnoses: {
+                    lastCreated: rslts[5] || [],
+                    lastUpdated: rslts[6] || [],
+                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
+                      return log.name === 'delete_diagnoses';
+                    }).reduce(function (acc, log) {
+                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.diagnoses || []).map(function (s) {
+                        return {
+                          diagnosisId: s.diagnosisId
+                        };
+                      })));
+                    }, [])
+                  },
+                  config_keys: {
+                    lastCreated: rslts[7] || [],
+                    lastUpdated: rslts[8] || [],
+                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
+                      return log.name === 'delete_config_keys';
+                    }).reduce(function (acc, log) {
+                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.config_keys || []).map(function (s) {
+                        return {
+                          configKeyId: s.configKeyId
+                        };
+                      })));
+                    }, [])
+                  }
+                });
+              })["catch"](done);
+
+            case 4:
+            case "end":
+              return _context.stop();
+          }
         }
-      });
-    })["catch"](done);
+      }, _callee);
+    }))();
   };
 };

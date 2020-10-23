@@ -36,11 +36,6 @@ var Device = _sequelize2["default"].define('device', {
     type: _sequelize["default"].STRING,
     allowNull: false
   },
-  scripts_count: {
-    type: _sequelize["default"].INTEGER,
-    allowNull: false,
-    defaultValue: 0
-  },
   details: {
     type: _sequelize["default"].JSON,
     defaultValue: JSON.stringify({}),
