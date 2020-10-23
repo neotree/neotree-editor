@@ -8,6 +8,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -88,14 +90,31 @@ var deleteUser = function deleteUser(userId) {
               return _context.abrupt("return", reject(_context.t2));
 
             case 29:
+              _context.prev = 29;
+              _context.next = 32;
+              return _models.User.destroy({
+                where: {
+                  user_id: userId
+                }
+              });
+
+            case 32:
+              _context.next = 36;
+              break;
+
+            case 34:
+              _context.prev = 34;
+              _context.t3 = _context["catch"](29);
+
+            case 36:
               resolve(user);
 
-            case 30:
+            case 37:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [13, 18], [21, 26]]);
+      }, _callee, null, [[3, 9], [13, 18], [21, 26], [29, 34]]);
     }))();
   });
 };

@@ -15,6 +15,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -140,14 +142,37 @@ var copyDiagnosis = function copyDiagnosis(_ref) {
               return _context.abrupt("return", reject(_context.t3));
 
             case 45:
+              _context.prev = 45;
+              _context.next = 48;
+              return _models.Diagnosis.findOrCreate({
+                where: {
+                  diagnosis_id: diagnosis.diagnosisId
+                },
+                defaults: {
+                  diagnosis_id: diagnosis.diagnosisId,
+                  script_id: diagnosis.scriptId,
+                  position: diagnosis.position,
+                  data: JSON.stringify(diagnosis)
+                }
+              });
+
+            case 48:
+              _context.next = 52;
+              break;
+
+            case 50:
+              _context.prev = 50;
+              _context.t4 = _context["catch"](45);
+
+            case 52:
               resolve(diagnosis);
 
-            case 46:
+            case 53:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 12], [16, 22], [27, 34], [37, 42]]);
+      }, _callee, null, [[5, 12], [16, 22], [27, 34], [37, 42], [45, 50]]);
     }))();
   });
 };
@@ -168,10 +193,20 @@ var _default = function _default(app) {
               done = function done(err) {
                 var _diagnoses = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
 
-                if (_diagnoses.length) app.io.emit('create_diagnoses', {
-                  key: app.getRandomString(),
-                  diagnoses: diagnoses
-                });
+                if (_diagnoses.length) {
+                  app.io.emit('create_diagnoses', {
+                    key: app.getRandomString(),
+                    diagnoses: diagnoses
+                  });
+
+                  _models.Log.create({
+                    name: 'create_diagnoses',
+                    data: JSON.stringify({
+                      diagnoses: diagnoses
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   diagnoses: _diagnoses
                 });

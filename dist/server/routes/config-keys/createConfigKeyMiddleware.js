@@ -10,6 +10,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
@@ -18,7 +20,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var payload, done, configKeyId, snap, configKeys, configKey;
@@ -29,6 +31,22 @@ module.exports = function () {
               payload = req.body;
 
               done = function done(err, configKey) {
+                if (configKey) {
+                  app.io.emit('create_config_keys', {
+                    key: app.getRandomString(),
+                    configKeys: configKeys
+                  });
+
+                  _models.Log.create({
+                    name: 'create_config_keys',
+                    data: JSON.stringify({
+                      configKeys: [{
+                        configKeyId: configKey.configKeyId
+                      }]
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   configKey: configKey
                 });
@@ -93,14 +111,35 @@ module.exports = function () {
               return _context.abrupt("return", done(_context.t2));
 
             case 32:
+              _context.prev = 32;
+              _context.next = 35;
+              return _models.ConfigKey.findOrCreate({
+                where: {
+                  config_key_id: configKey.configKeyId
+                },
+                defaults: {
+                  position: configKey.position,
+                  data: JSON.stringify(configKey)
+                }
+              });
+
+            case 35:
+              _context.next = 39;
+              break;
+
+            case 37:
+              _context.prev = 37;
+              _context.t3 = _context["catch"](32);
+
+            case 39:
               done(null, configKey);
 
-            case 33:
+            case 40:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 21], [24, 29]]);
+      }, _callee, null, [[3, 10], [14, 21], [24, 29], [32, 37]]);
     }))();
   };
 };

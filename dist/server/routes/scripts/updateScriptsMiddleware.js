@@ -8,6 +8,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _updateScriptMiddleware = require("./updateScriptMiddleware");
 
+var _models = require("../../database/models");
+
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
@@ -36,6 +38,18 @@ module.exports = function (app) {
                     };
                   })
                 });
+
+                _models.Log.create({
+                  name: 'update_scripts',
+                  data: JSON.stringify({
+                    scripts: scripts.map(function (s) {
+                      return {
+                        scriptId: s.scriptId
+                      };
+                    })
+                  })
+                });
+
                 res.locals.setResponse(null, {
                   updatedScripts: updatedScripts
                 });

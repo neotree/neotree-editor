@@ -15,6 +15,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -123,14 +125,35 @@ var copyConfigKey = function copyConfigKey(_ref) {
               return _context.abrupt("return", reject(_context.t3));
 
             case 40:
+              _context.prev = 40;
+              _context.next = 43;
+              return _models.ConfigKey.findOrCreate({
+                where: {
+                  config_key_id: configKey.configKeyId
+                },
+                defaults: {
+                  position: configKey.position,
+                  data: JSON.stringify(configKey)
+                }
+              });
+
+            case 43:
+              _context.next = 47;
+              break;
+
+            case 45:
+              _context.prev = 45;
+              _context.t4 = _context["catch"](40);
+
+            case 47:
               resolve(configKey);
 
-            case 41:
+            case 48:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 37]]);
+      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 37], [40, 45]]);
     }))();
   });
 };
@@ -149,10 +172,21 @@ var _default = function _default(app) {
 
               done = function done(err) {
                 var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (rslts.length) app.io.emit('create_config_keys', {
-                  key: app.getRandomString(),
-                  configKeys: configKeys
-                });
+
+                if (rslts.length) {
+                  app.io.emit('create_config_keys', {
+                    key: app.getRandomString(),
+                    configKeys: configKeys
+                  });
+
+                  _models.Log.create({
+                    name: 'create_config_keys',
+                    data: JSON.stringify({
+                      configKeys: configKeys
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   configKeys: rslts
                 });

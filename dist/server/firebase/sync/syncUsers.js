@@ -1,7 +1,5 @@
 "use strict";
 
-var _interopRequireWildcard = require("@babel/runtime/helpers/interopRequireWildcard");
-
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
 Object.defineProperty(exports, "__esModule", {
@@ -13,7 +11,9 @@ var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"))
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _index = _interopRequireWildcard(require("../index"));
+var _index = require("../index");
+
+var _models = require("../../database/models");
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -65,7 +65,7 @@ var _default = function _default() {
 
               _context.prev = 14;
               _context.next = 17;
-              return _index["default"].auth().createUser({
+              return _index.firebaseAdmin.auth().createUser({
                 email: process.env.DEFAULT_ADMIN_USER_EMAIL_ADDRESS,
                 password: process.env.DEFAULT_ADMIN_USER_PASSWORD
               });
@@ -85,7 +85,11 @@ var _default = function _default() {
               users = {};
               _context.prev = 25;
               _context.next = 28;
-              return _index.firebaseAdmin.database().ref('users');
+              return new Promise(function (resolve) {
+                _index.firebaseAdmin.database().ref('users').once('value', function (snap) {
+                  return resolve(snap.val());
+                });
+              });
 
             case 28:
               users = _context.sent;
@@ -99,40 +103,68 @@ var _default = function _default() {
               return _context.abrupt("return", reject(_context.t2));
 
             case 35:
-              _context.prev = 35;
+              seedUsers = [];
+              _context.prev = 36;
               seedUsers = authUsers.filter(function (u) {
                 return !users[u.uid];
-              });
-              _context.next = 39;
-              return Promise.all(seedUsers.map(function (u) {
-                return _index.firebaseAdmin.database().ref("users/".concat(u.uid)).set({
+              }).map(function (u) {
+                return {
                   email: u.email,
                   id: u.uid,
                   userId: u.uid,
                   hospitals: [],
                   countries: [],
                   activated: false
+                };
+              });
+              _context.next = 40;
+              return Promise.all(seedUsers.map(function (u) {
+                return _index.firebaseAdmin.database().ref("users/".concat(u.userId)).set(u);
+              }));
+
+            case 40:
+              _context.next = 45;
+              break;
+
+            case 42:
+              _context.prev = 42;
+              _context.t3 = _context["catch"](36);
+              return _context.abrupt("return", reject(_context.t3));
+
+            case 45:
+              _context.prev = 45;
+              _context.next = 48;
+              return Promise.all(seedUsers.map(function (u) {
+                return _models.User.findOrCreate({
+                  where: {
+                    email: u.email
+                  },
+                  defaults: {
+                    user_id: u.userId,
+                    email: u.email,
+                    data: JSON.stringify(u)
+                  }
                 });
               }));
 
-            case 39:
-              _context.next = 44;
+            case 48:
+              _context.next = 53;
               break;
 
-            case 41:
-              _context.prev = 41;
-              _context.t3 = _context["catch"](35);
-              return _context.abrupt("return", reject(_context.t3));
+            case 50:
+              _context.prev = 50;
+              _context.t4 = _context["catch"](45);
+              return _context.abrupt("return", reject(_context.t4));
 
-            case 44:
+            case 53:
               resolve();
 
-            case 45:
+            case 54:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [14, 21], [25, 32], [35, 41]]);
+      }, _callee, null, [[1, 8], [14, 21], [25, 32], [36, 42], [45, 50]]);
     }))();
   });
 };
