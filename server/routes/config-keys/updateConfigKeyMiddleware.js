@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { ConfigKey, Log } from '../../database/models';
 
 export const updateConfigKey = ({ configKeyId: id, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
@@ -19,6 +20,16 @@ export const updateConfigKey = ({ configKeyId: id, ...payload }) => new Promise(
 
     try { await firebase.database().ref(`configkeys/${id}`).set(configKey); } catch (e) { return reject(e); }
 
+    try {
+      await ConfigKey.update(
+        {
+          position: configKey.position,
+          data: JSON.stringify(configKey),
+        },
+        { where: { config_key_id: configKey.configKeyId } },
+      );
+    } catch (e) { /* Do nothing */ }
+
     resolve(configKey);
   })();
 });
@@ -26,7 +37,13 @@ export const updateConfigKey = ({ configKeyId: id, ...payload }) => new Promise(
 export default (app) => (req, res, next) => {
   (async () => {
     const done = (err, configKey) => {
-      if (configKey) app.io.emit('update_config_keys', { key: app.getRandomString(), configKeys: [{ configKeyId: configKey.configKeyId }] });
+      if (configKey) {
+        app.io.emit('update_config_keys', { key: app.getRandomString(), configKeys: [{ configKeyId: configKey.configKeyId }] });
+        Log.create({
+          name: 'update_config_keys',
+          data: JSON.stringify({ configKeys: [{ configKeyId: configKey.configKeyId }] })
+        });
+      }
       res.locals.setResponse(err, { configKey });
       next();
     };

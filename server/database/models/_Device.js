@@ -9,9 +9,18 @@ const Device = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
-    unique_key: {
+    device_id: {
       type: Sequelize.STRING,
       allowNull: false,
+    },
+    device_hash: {
+      type: Sequelize.STRING,
+      allowNull: false,
+    },
+    scripts_count: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
     },
     details: {
       type: Sequelize.JSON,

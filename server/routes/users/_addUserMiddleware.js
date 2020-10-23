@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { User } from '../../database/models';
 
 export const addUser = params => new Promise((resolve, reject) => {
   (async () => {
@@ -55,16 +56,18 @@ export default () => (req, res, next) => {
     } catch (e) { return done(e); }
 
     if (user) {
+      const _user = {
+        email,
+        id: user.uid,
+        userId: user.uid,
+        hospitals: [],
+        countries: [],
+        activated: false,
+        ...params
+      };
+
       try {
-        await firebase.database().ref(`users/${user.uid}`).set({
-          email,
-          id: user.uid,
-          userId: user.uid,
-          hospitals: [],
-          countries: [],
-          activated: false,
-          ...params
-        });
+        await firebase.database().ref(`users/${user.uid}`).set(_user);
       } catch (e) { return done(e); }
 
       try {
@@ -73,6 +76,17 @@ export default () => (req, res, next) => {
             .on('value', snap => resolve(snap.val()));
         });
       } catch (e) { return done(e); }
+
+      try {
+        await User.findOrCreate({
+          where: { email: _user.email },
+          defaults: {
+            user_id: _user.userId,
+            email: _user.email,
+            data: JSON.stringify(_user),
+          },
+        });
+      } catch (e) { /* Do nothing*/ }
     }
 
     done(null, user);

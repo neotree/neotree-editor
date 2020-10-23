@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { User } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const { userId, ...payload } = req.body;
@@ -24,6 +25,10 @@ module.exports = () => (req, res, next) => {
     user = { ...user, ...payload };
 
     try { await firebase.database().ref(`users/${userId}`).set(user); } catch (e) { return done(e); }
+
+    try {
+      await User.update({ data: JSON.stringify(user), }, { where: { email: user.email }, });
+    } catch (e) { /* Do nothing*/ }
 
     done(null, user);
   })();

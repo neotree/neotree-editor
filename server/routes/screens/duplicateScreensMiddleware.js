@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Log, Screen } from '../../database/models';
 
 export const copyScreen = ({ scriptId, screenId: id, }) => {
   return new Promise((resolve, reject) => {
@@ -45,6 +46,19 @@ export const copyScreen = ({ scriptId, screenId: id, }) => {
 
       try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return reject(e); }
 
+      try {
+        await Screen.findOrCreate({
+          where: { screen_id: screen.screenId },
+          defaults: {
+            screen_id: screen.screenId,
+            script_id: screen.scriptId,
+            type: screen.type,
+            position: screen.position,
+            data: JSON.stringify(screen),
+          }
+        });
+      } catch (e) { /* Do nothing */ }
+
       resolve(screen);
     })();
   });
@@ -55,7 +69,13 @@ export default (app) => (req, res, next) => {
     const { screens } = req.body;
 
     const done = (err, _screens = []) => {
-      if (_screens.length) app.io.emit('create_screens', { key: app.getRandomString(), screens });
+      if (_screens.length) {
+        app.io.emit('create_screens', { key: app.getRandomString(), screens });
+        Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({ screens })
+        });
+      }
       res.locals.setResponse(err, { screens: _screens });
       next();
     };

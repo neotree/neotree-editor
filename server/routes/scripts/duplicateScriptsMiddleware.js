@@ -1,4 +1,5 @@
 import firebase from '../../firebase';
+import { Script, Diagnosis, Screen, Log } from '../../database/models';
 
 export const copyScript = ({ scriptId: id }) => {
   return new Promise((resolve, reject) => {
@@ -87,6 +88,48 @@ export const copyScript = ({ scriptId: id }) => {
         });
       } catch (e) { /* do nothing */ }
 
+      try {
+        await Script.findOrCreate({
+          where: { script_id: script.scriptId },
+          defaults: {
+            script_id: script.scriptId,
+            position: script.position,
+            data: JSON.stringify(script),
+          }
+        });
+      } catch (e) { /* Do nothing */ }
+
+      try {
+        await Promise.all(Object.keys(screens).map(key => {
+          const screen = screens[key];
+          return Screen.findOrCreate({
+            where: { screen_id: screen.screenId },
+            defaults: {
+              screen_id: screen.screenId,
+              script_id: screen.scriptId,
+              type: screen.type,
+              position: screen.position,
+              data: JSON.stringify(screen),
+            }
+          });
+        }));
+      } catch (e) { /* Do nothing */ }
+
+      try {
+        await Promise.all(Object.keys(diagnosis).map(key => {
+          const d = diagnosis[key];
+          return Diagnosis.findOrCreate({
+            where: { diagnosis_id: d.diagnosisId },
+            defaults: {
+              diagnosis_id: d.diagnosisId,
+              script_id: d.scriptId,
+              position: d.position,
+              data: JSON.stringify(d),
+            }
+          });
+        }));
+      } catch (e) { /* Do nothing */ }
+
       resolve(script);
     })();
   });
@@ -97,7 +140,13 @@ export default (app) => (req, res, next) => {
     const { scripts } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('create_scripts', { key: app.getRandomString(), scripts });
+      if (rslts.length) {
+        app.io.emit('create_scripts', { key: app.getRandomString(), scripts });
+        Log.create({
+          name: 'create_scripts',
+          data: JSON.stringify({ scripts })
+        });
+      }
       res.locals.setResponse(err, { scripts: rslts });
       next();
     };
