@@ -85,24 +85,10 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
-  router.post(
-    '/register-device',
-    apiKeyAuthenticator(app),
-    require('../devices/createDeviceMiddleware')(app),
-    require('../../utils/responseMiddleware')
-  );
-
   router.get(
-    '/get-device',
+    '/get-device-registration',
     apiKeyAuthenticator(app),
     require('../devices/getDeviceMiddleware')(app),
-    require('../../utils/responseMiddleware')
-  );
-
-  router.get(
-    '/get-devices',
-    apiKeyAuthenticator(app),
-    require('../devices/getDevicesMiddleware')(app),
     require('../../utils/responseMiddleware')
   );
 

@@ -17,11 +17,6 @@ const Device = sqlz.define(
       type: Sequelize.STRING,
       allowNull: false,
     },
-    scripts_count: {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      defaultValue: 0,
-    },
     details: {
       type: Sequelize.JSON,
       defaultValue: JSON.stringify({}),
