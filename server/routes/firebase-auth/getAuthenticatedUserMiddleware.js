@@ -7,10 +7,11 @@ module.exports = (app, payload, callback) => (req, res, next) => {
   });
 
   if (req.isAuthenticated()) {
-    return User.findOne({ where: { email: req.user.email } })
+    return User.findOne({ where: { id: req.user.id } })
       .then(u => {
-        delete u.password;
-        done(null, !u ? null : { authenticatedUser: u, });
+        const authenticatedUser = u ? JSON.parse(JSON.stringify(u)) : null;
+        if (authenticatedUser) delete authenticatedUser.password;
+        done(null, !u ? null : { authenticatedUser });
       })
       .catch(done);
   }
