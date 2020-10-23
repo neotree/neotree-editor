@@ -13,6 +13,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -81,14 +83,31 @@ var deleteScreen = function deleteScreen(_ref) {
               return _context.abrupt("return", reject(_context.t1));
 
             case 21:
+              _context.prev = 21;
+              _context.next = 24;
+              return _models.Screen.destroy({
+                where: {
+                  screen_id: id
+                }
+              });
+
+            case 24:
+              _context.next = 28;
+              break;
+
+            case 26:
+              _context.prev = 26;
+              _context.t2 = _context["catch"](21);
+
+            case 28:
               resolve(screen);
 
-            case 22:
+            case 29:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 11], [13, 18]]);
+      }, _callee, null, [[5, 11], [13, 18], [21, 26]]);
     }))();
   });
 };
@@ -107,10 +126,21 @@ var _default = function _default(app) {
 
               done = function done(err) {
                 var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (rslts.length) app.io.emit('delete_screens', {
-                  key: app.getRandomString(),
-                  screens: screens
-                });
+
+                if (rslts.length) {
+                  app.io.emit('delete_screens', {
+                    key: app.getRandomString(),
+                    screens: screens
+                  });
+
+                  _models.Log.create({
+                    name: 'delete_screens',
+                    data: JSON.stringify({
+                      screens: screens
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   screens: rslts
                 });

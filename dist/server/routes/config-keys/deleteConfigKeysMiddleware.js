@@ -13,6 +13,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -106,14 +108,31 @@ var deleteConfigKey = function deleteConfigKey(_ref, deleteAssociatedData) {
               _context.t3 = _context["catch"](28);
 
             case 35:
+              _context.prev = 35;
+              _context.next = 38;
+              return _models.ConfigKey.destroy({
+                where: {
+                  config_key_id: configKey.configKeyId
+                }
+              });
+
+            case 38:
+              _context.next = 42;
+              break;
+
+            case 40:
+              _context.prev = 40;
+              _context.t4 = _context["catch"](35);
+
+            case 42:
               resolve(configKey);
 
-            case 36:
+            case 43:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [11, 16], [21, 26], [28, 33]]);
+      }, _callee, null, [[3, 9], [11, 16], [21, 26], [28, 33], [35, 40]]);
     }))();
   });
 };
@@ -133,10 +152,21 @@ module.exports = function (app) {
 
               done = function done(err) {
                 var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-                if (rslts.length) app.io.emit('delete_config_keys', {
-                  key: app.getRandomString(),
-                  configKeys: configKeys
-                });
+
+                if (rslts.length) {
+                  app.io.emit('delete_config_keys', {
+                    key: app.getRandomString(),
+                    configKeys: configKeys
+                  });
+
+                  _models.Log.create({
+                    name: 'delete_config_keys',
+                    data: JSON.stringify({
+                      configKeys: configKeys
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   configKeys: rslts
                 });

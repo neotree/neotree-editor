@@ -12,6 +12,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
+var _models = require("../../database/models");
+
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
@@ -32,13 +34,26 @@ module.exports = function (app) {
               _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, ["scriptId"]);
 
               done = function done(err, screen) {
-                if (screen) app.io.emit('create_screens', {
-                  key: app.getRandomString(),
-                  screens: [{
-                    id: screen.id,
-                    scriptId: scriptId
-                  }]
-                });
+                if (screen) {
+                  app.io.emit('create_screens', {
+                    key: app.getRandomString(),
+                    screens: [{
+                      id: screen.id,
+                      scriptId: scriptId
+                    }]
+                  });
+
+                  _models.Log.create({
+                    name: 'create_screens',
+                    data: JSON.stringify({
+                      screens: [{
+                        id: screen.id,
+                        scriptId: scriptId
+                      }]
+                    })
+                  });
+                }
+
                 res.locals.setResponse(err, {
                   screen: screen
                 });
@@ -112,14 +127,38 @@ module.exports = function (app) {
               return _context.abrupt("return", done(_context.t2));
 
             case 34:
+              _context.prev = 34;
+              _context.next = 37;
+              return _models.Screen.findOrCreate({
+                where: {
+                  screen_id: screen.screenId
+                },
+                defaults: {
+                  screen_id: screen.screenId,
+                  script_id: screen.scriptId,
+                  type: screen.type,
+                  position: screen.position,
+                  data: JSON.stringify(screen)
+                }
+              });
+
+            case 37:
+              _context.next = 41;
+              break;
+
+            case 39:
+              _context.prev = 39;
+              _context.t3 = _context["catch"](34);
+
+            case 41:
               done(null, screen);
 
-            case 35:
+            case 42:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 12], [16, 23], [26, 31]]);
+      }, _callee, null, [[5, 12], [16, 23], [26, 31], [34, 39]]);
     }))();
   };
 };

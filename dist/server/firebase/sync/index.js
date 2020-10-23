@@ -13,6 +13,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _syncUsers = _interopRequireDefault(require("./syncUsers"));
 
+var _syncData = _interopRequireDefault(require("./syncData"));
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -45,15 +47,29 @@ var _default = function _default() {
               errors.push(_context.t0);
 
             case 9:
+              _context.prev = 9;
+              _context.next = 12;
+              return (0, _syncData["default"])();
+
+            case 12:
+              _context.next = 17;
+              break;
+
+            case 14:
+              _context.prev = 14;
+              _context.t1 = _context["catch"](9);
+              errors.push(_context.t1);
+
+            case 17:
               if (errors.length) reject(errors);
               resolve();
 
-            case 11:
+            case 19:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 6]]);
+      }, _callee, null, [[1, 6], [9, 14]]);
     }))();
   });
 };

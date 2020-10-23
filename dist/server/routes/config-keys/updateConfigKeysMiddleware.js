@@ -8,6 +8,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _updateConfigKeyMiddleware = require("./updateConfigKeyMiddleware");
 
+var _models = require("../../database/models");
+
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
@@ -36,6 +38,18 @@ module.exports = function (app) {
                     };
                   })
                 });
+
+                _models.Log.create({
+                  name: 'create_diagnoses',
+                  data: JSON.stringify({
+                    configKeys: configKeys.map(function (s) {
+                      return {
+                        configKeyId: s.configKeyId
+                      };
+                    })
+                  })
+                });
+
                 res.locals.setResponse(null, {
                   updatedConfigKeys: updatedConfigKeys
                 });
