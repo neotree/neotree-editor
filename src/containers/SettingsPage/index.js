@@ -5,8 +5,8 @@ import { setDocumentTitle, setNavSection } from '@/contexts/app';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import ApiKey from './ApiKey';
-import ExportToFirebase from './ExportToFirebase';
-import ImportFromFirebase from './ImportFromFirebase';
+// import ExportToFirebase from './ExportToFirebase';
+// import ImportFromFirebase from './ImportFromFirebase';
 
 const SettingsPage = () => {
   setDocumentTitle(copy.PAGE_TITLE);
@@ -18,13 +18,13 @@ const SettingsPage = () => {
       <div>
         <Card>
           <CardContent>
-            <ExportToFirebase />
+            {/*<ExportToFirebase />*/}
 
-            <br />
+            {/*<br />*/}
 
-            <ImportFromFirebase />
+            {/*<ImportFromFirebase />*/}
 
-            <br /> <br />
+            {/*<br /> <br />*/}
 
             <ApiKey />
           </CardContent>
