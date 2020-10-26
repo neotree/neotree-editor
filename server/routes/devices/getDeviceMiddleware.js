@@ -28,6 +28,7 @@ module.exports = () => (req, res, next) => {
           details: JSON.stringify({ scripts_count: 0, }),
         },
       });
+      device = device ? device[0] : null;
     } catch (e) { /* Do nothing */ }
 
     try { await firebaseAdmin.database().ref(`devices/${deviceId}`).set(device); } catch (e) { /* Do nothing */ }
