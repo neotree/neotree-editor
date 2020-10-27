@@ -7,3 +7,5 @@ _config/*
 
 dist/_config/*
 !dist/_config/server.js
+
+.env
