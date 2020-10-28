@@ -1,10 +1,16 @@
-import { Script } from '../../models';
+import { Log, Script } from '../../models';
 
 module.exports = (app) => (req, res, next) => {
   const { scripts, returnUpdated } = req.body;
 
   const done = (err, payload) => {
-    if (!err) app.io.emit('update_scripts', { scripts: scripts.map(s => ({ id: s.id })) });
+    if (!err) {
+      app.io.emit('update_scripts', { scripts: scripts.map(s => ({ scriptId: s.id })) });
+      Log.create({
+        name: 'update_scripts',
+        data: JSON.stringify({ scripts: scripts.map(s => ({ scriptId: s.id })) })
+      });
+    }
     res.locals.setResponse(err, payload);
     next(); return null;
   };

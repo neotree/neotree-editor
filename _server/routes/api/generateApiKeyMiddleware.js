@@ -1,10 +1,9 @@
 import { ApiKey } from '../../models';
 
-module.exports = () => (req, res, next) => {
+module.exports = (app) => (req, res, next) => {
   const { apiKey } = req.body;
-  const getRandString = () => Math.random().toString(36).substring(2).toUpperCase();
 
-  const key = `${getRandString()}${getRandString()}${getRandString()}`;
+  const key = app.getRandomString();
 
   const done = (e, payload) => {
     res.locals.setResponse(e, payload);

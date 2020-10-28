@@ -107,9 +107,9 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={`menu_${id}`} align="right">
-              <MenuItem onClick={() => this.handleDuplicateDiagnosis(id)}>
-                Duplicate
-              </MenuItem>
+              {/*<MenuItem onClick={() => this.handleDuplicateDiagnosis(id)}>*/}
+              {/*  Duplicate*/}
+              {/*</MenuItem>*/}
                 <MenuItem onClick={this.handleDeleteDiagnosisClick(id)}>
                   Delete
                 </MenuItem>
@@ -126,7 +126,7 @@ class Display extends Component {
             {selected.length > 0 && (
               <Copy
                 itemsType="diagnoses"
-                data={{ ids: diagnoses.map(d => selected.includes(`${d.id}`) ? d.id : null).filter(id => id !== null) }}
+                data={{ ids: diagnoses.map(d => selected.map(s => `${s}`).includes(`${d.id}`) ? d.id : null).filter(id => id !== null) }}
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ diagnoses }) => ({

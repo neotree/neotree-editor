@@ -1,5 +1,5 @@
 import firebase from '../../firebase';
-import { Screen } from '../../models';
+import { Log, Screen } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 
 export const copyScreen = (screen) => {
@@ -35,7 +35,13 @@ export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, screen) => {
-    if (screen) app.io.emit('create_screens', { screens: [{ id: screen.id }] });
+    if (screen) {
+      app.io.emit('create_screens', { screens: [{ screenId: screen.screen_id }] });
+      Log.create({
+        name: 'create_screens',
+        data: JSON.stringify({ screens: [{ screenId: screen.screen_id }] })
+      });
+    }
     res.locals.setResponse(err, { screen });
     next(); return null;
   };

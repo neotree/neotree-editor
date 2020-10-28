@@ -18,7 +18,7 @@ export default () => new Promise((resolve, reject) => {
     Object.keys(configKeys).forEach(id => promises.push(
       ConfigKey.findOrCreate({
         where: { id },
-        defaults: { data: JSON.stringify(configKeys[id]) }
+        defaults: { config_key_id: id, data: JSON.stringify(configKeys[id]) }
       })
     ));
 
@@ -26,7 +26,7 @@ export default () => new Promise((resolve, reject) => {
       promises.push(
         Script.findOrCreate({
           where: { id: script_id },
-          defaults: { data: JSON.stringify(scripts[script_id]) }
+          defaults: { script_id, data: JSON.stringify(scripts[script_id]) }
         })
       );
 

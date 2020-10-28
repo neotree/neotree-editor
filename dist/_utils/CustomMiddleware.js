@@ -14,7 +14,7 @@ var _createClass2 = _interopRequireDefault(require("@babel/runtime/helpers/creat
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
@@ -22,9 +22,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var CustomMiddleware =
-/*#__PURE__*/
-function () {
+var CustomMiddleware = /*#__PURE__*/function () {
   function CustomMiddleware() {
     (0, _classCallCheck2["default"])(this, CustomMiddleware);
     (0, _defineProperty2["default"])(this, "go", function (next) {
@@ -58,18 +56,18 @@ exports["default"] = CustomMiddleware;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/home/lamyfarai/Workbench/neotree-editor/_utils/CustomMiddleware.js");
+  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/home/farai/WorkBench/neotree-editor/_utils/CustomMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

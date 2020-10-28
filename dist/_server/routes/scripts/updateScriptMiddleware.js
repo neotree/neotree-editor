@@ -17,11 +17,23 @@ module.exports = function (app) {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id"]);
 
     var done = function done(err, script) {
-      if (!err) app.io.emit('update_scripts', {
-        scripts: [{
-          id: id
-        }]
-      });
+      if (!err) {
+        app.io.emit('update_scripts', {
+          scripts: [{
+            scriptId: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'update_scripts',
+          data: JSON.stringify({
+            scripts: [{
+              scriptId: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         script: script
       });

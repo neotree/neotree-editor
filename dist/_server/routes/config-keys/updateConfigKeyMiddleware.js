@@ -17,11 +17,23 @@ module.exports = function (app) {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id"]);
 
     var done = function done(err, configKey) {
-      if (!err) app.io.emit('update_config_keys', {
-        config_keys: [{
-          id: id
-        }]
-      });
+      if (!err) {
+        app.io.emit('update_config_keys', {
+          configKeys: [{
+            configKeyId: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'update_config_keys',
+          data: JSON.stringify({
+            configKeys: [{
+              configKeyId: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         configKey: configKey
       });

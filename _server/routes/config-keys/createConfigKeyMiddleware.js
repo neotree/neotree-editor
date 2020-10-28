@@ -1,11 +1,17 @@
-import { ConfigKey } from '../../models';
+import { ConfigKey, Log } from '../../models';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
   const payload = req.body;
 
   const done = (err, configKey) => {
-    if (configKey) app.io.emit('create_config_keys', { config_keys: [{ id: configKey.id }] });
+    if (configKey) {
+      app.io.emit('create_config_keys', { configKeys: [{ configKeyId: configKey.id }] });
+      Log.create({
+        name: 'create_config_keys',
+        data: JSON.stringify({ configKeys: [{ configKeyId: configKey.id }] })
+      });
+    }
     res.locals.setResponse(err, { configKey });
     next(); return null;
   };

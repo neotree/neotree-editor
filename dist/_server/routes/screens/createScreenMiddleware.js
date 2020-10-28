@@ -4,13 +4,17 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _models = require("../../models");
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -22,11 +26,24 @@ module.exports = function (app) {
 
     var done = function done(err, screen) {
       if (err) app.logger.log(err);
-      if (screen) app.io.emit('create_screens', {
-        screens: [{
-          id: screen.id
-        }]
-      });
+
+      if (screen) {
+        app.io.emit('create_screens', {
+          screens: [{
+            screenId: screen.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({
+            screens: [{
+              screenId: screen.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         screen: screen
       });
@@ -43,7 +60,7 @@ module.exports = function (app) {
 
           var _data = data ? JSON.parse(data) : null;
 
-          _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set((0, _objectSpread2["default"])({}, rest, {}, _data, {
+          _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
             screenId: screenId,
             scriptId: payload.script_id,
             createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
@@ -63,7 +80,7 @@ module.exports = function (app) {
           count = _ref2[0],
           screen_id = _ref2[1];
 
-      _models.Screen.create((0, _objectSpread2["default"])({}, payload, {
+      _models.Screen.create(_objectSpread(_objectSpread({}, payload), {}, {
         position: count + 1,
         screen_id: screen_id
       })).then(function (screen) {

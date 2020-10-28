@@ -1,4 +1,4 @@
-import { Screen } from '../../models';
+import { Log, Screen } from '../../models';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
@@ -6,7 +6,13 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, screen) => {
     if (err) app.logger.log(err);
-    if (screen) app.io.emit('create_screens', { screens: [{ id: screen.id }] });
+    if (screen) {
+      app.io.emit('create_screens', { screens: [{ screenId: screen.screen_id }] });
+      Log.create({
+        name: 'create_screens',
+        data: JSON.stringify({ screens: [{ screenId: screen.screen_id }] })
+      });
+    }
     res.locals.setResponse(err, { screen });
     next(); return null;
   };

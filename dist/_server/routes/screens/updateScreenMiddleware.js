@@ -17,11 +17,23 @@ module.exports = function (app) {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id"]);
 
     var done = function done(err, screen) {
-      if (screen) app.io.emit('update_screens', {
-        screens: [{
-          id: id
-        }]
-      });
+      if (screen) {
+        app.io.emit('update_screens', {
+          screens: [{
+            screenId: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'update_screens',
+          data: JSON.stringify({
+            screens: [{
+              screenId: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         screen: screen
       });

@@ -1,11 +1,17 @@
 import firebase from '../../firebase';
-import { Script } from '../../models';
+import { Log, Script } from '../../models';
 
 module.exports = (app, params) => (req, res, next) => {
   const payload = params || req.body;
 
   const done = (err, script) => {
-    if (script) app.io.emit('create_scripts', { scripts: [{ id: script.id }] });
+    if (script) {
+      app.io.emit('create_scripts', { scripts: [{ scriptId: script.id }] });
+      Log.create({
+        name: 'create_scripts',
+        data: JSON.stringify({ scripts: [{ scriptId: script.id }] })
+      });
+    }
     res.locals.setResponse(err, { script });
     next(); return null;
   };

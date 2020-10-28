@@ -11,7 +11,7 @@ var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/sli
 
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -24,9 +24,13 @@ var _duplicateScreenMiddleware = require("../screens/duplicateScreenMiddleware")
 var _duplicateDiagnosisMiddleware = require("../diagnoses/duplicateDiagnosisMiddleware");
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -42,23 +46,23 @@ var copyScript = function copyScript(_ref) {
           rest = (0, _objectWithoutProperties2["default"])(script, ["data"]);
       var scriptId = snap.key;
 
-      _firebase["default"].database().ref("scripts/".concat(scriptId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+      _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
         scriptId: scriptId,
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
-        _models.Script.create((0, _objectSpread2["default"])({}, script, {
+        _models.Script.create(_objectSpread(_objectSpread({}, script), {}, {
           id: scriptId,
           data: JSON.stringify(script.data)
         })).then(function (script) {
           Promise.all([].concat((0, _toConsumableArray2["default"])(screens.map(function (screen) {
             screen = screen.toJSON();
-            return (0, _duplicateScreenMiddleware.copyScreen)((0, _objectSpread2["default"])({}, screen, {
+            return (0, _duplicateScreenMiddleware.copyScreen)(_objectSpread(_objectSpread({}, screen), {}, {
               script_id: script.id,
               data: JSON.stringify(screen.data)
             }));
           })), (0, _toConsumableArray2["default"])(diagnoses.map(function (d) {
             d = d.toJSON();
-            return (0, _duplicateDiagnosisMiddleware.copyDiagnosis)((0, _objectSpread2["default"])({}, d, {
+            return (0, _duplicateDiagnosisMiddleware.copyDiagnosis)(_objectSpread(_objectSpread({}, d), {}, {
               script_id: script.id,
               data: JSON.stringify(d.data)
             }));
@@ -96,11 +100,23 @@ var _default = function _default(app) {
     var id = req.body.id;
 
     var done = function done(err, script) {
-      if (script) app.io.emit('create_scripts', {
-        scripts: [{
-          id: script.id
-        }]
-      });
+      if (script) {
+        app.io.emit('create_scripts', {
+          scripts: [{
+            scriptId: script.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_scripts',
+          data: JSON.stringify({
+            scripts: [{
+              scriptId: script.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         script: script
       });
@@ -133,7 +149,7 @@ var _default = function _default(app) {
         msg: "Could not find script with \"id\" ".concat(id, ".")
       });
       s = s.toJSON();
-      copyScript((0, _objectSpread2["default"])({
+      copyScript(_objectSpread({
         screens: screens,
         diagnoses: diagnoses
       }, s)).then(function (_ref6) {
@@ -150,19 +166,19 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(copyScript, "copyScript", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
+  reactHotLoader.register(copyScript, "copyScript", "/home/farai/WorkBench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_server/routes/scripts/duplicateScriptMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

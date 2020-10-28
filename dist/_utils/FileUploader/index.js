@@ -18,7 +18,7 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 var _uuidv = _interopRequireDefault(require("uuidv4"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
@@ -26,9 +26,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var Upload =
-/*#__PURE__*/
-function () {
+var Upload = /*#__PURE__*/function () {
   function Upload(file) {
     var _this = this;
 
@@ -150,18 +148,18 @@ exports["default"] = Upload;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(Upload, "Upload", "/home/lamyfarai/Workbench/neotree-editor/_utils/FileUploader/index.js");
+  reactHotLoader.register(Upload, "Upload", "/home/farai/WorkBench/neotree-editor/_utils/FileUploader/index.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

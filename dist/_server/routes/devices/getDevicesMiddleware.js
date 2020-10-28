@@ -8,7 +8,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function () {
   return function (req, res, next) {
-    var payload = JSON.parse(req.query.payload || '{}');
+    var payload = req.query;
 
     var done = function done(e, payload) {
       res.locals.setResponse(e, payload);

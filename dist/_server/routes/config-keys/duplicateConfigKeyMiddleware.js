@@ -9,7 +9,7 @@ exports["default"] = exports.copyConfigKey = void 0;
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -18,9 +18,13 @@ var _models = require("../../models");
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -33,11 +37,11 @@ var copyConfigKey = function copyConfigKey(configKey) {
           rest = (0, _objectWithoutProperties2["default"])(configKey, ["data"]);
       var configKeyId = snap.key;
 
-      _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+      _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
         configKeyId: configKeyId,
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
-        _models.ConfigKey.create((0, _objectSpread2["default"])({}, configKey, {
+        _models.ConfigKey.create(_objectSpread(_objectSpread({}, configKey), {}, {
           id: configKeyId,
           data: JSON.stringify(configKey.data)
         })).then(function (configKey) {
@@ -55,11 +59,23 @@ var _default = function _default(app) {
     var id = req.body.id;
 
     var done = function done(err, configKey) {
-      if (configKey) app.io.emit('create_config_keys', {
-        config_keys: [{
-          id: configKey.id
-        }]
-      });
+      if (configKey) {
+        app.io.emit('create_config_keys', {
+          configKeys: [{
+            configKeyId: configKey.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_config_keys',
+          data: JSON.stringify({
+            configKeys: [{
+              configKeyId: configKey.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         configKey: configKey
       });
@@ -95,19 +111,19 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(copyConfigKey, "copyConfigKey", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/config-keys/duplicateConfigKeyMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/config-keys/duplicateConfigKeyMiddleware.js");
+  reactHotLoader.register(copyConfigKey, "copyConfigKey", "/home/farai/WorkBench/neotree-editor/_server/routes/config-keys/duplicateConfigKeyMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_server/routes/config-keys/duplicateConfigKeyMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

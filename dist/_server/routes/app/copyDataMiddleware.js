@@ -2,11 +2,9 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
-
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -21,9 +19,13 @@ var _updateScreensMiddleware = require("../../routes/screens/updateScreensMiddle
 var _splitCamelCase = _interopRequireDefault(require("../../../_utils/splitCamelCase"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -96,7 +98,7 @@ module.exports = function () {
                 return null;
               };
 
-              Model.create((0, _objectSpread2["default"])({}, data, {
+              Model.create(_objectSpread(_objectSpread({}, data), {}, {
                 data: JSON.stringify(data.data || {}),
                 id: id,
                 author: author
@@ -109,7 +111,7 @@ module.exports = function () {
 
           switch (source.dataType) {
             case 'configKey':
-              return _models.ConfigKey.create((0, _objectSpread2["default"])({}, dataToImport, {
+              return _models.ConfigKey.create(_objectSpread(_objectSpread({}, dataToImport), {}, {
                 data: JSON.stringify(dataToImport.data || {}),
                 id: id,
                 author: author
@@ -119,7 +121,7 @@ module.exports = function () {
 
             case 'screen':
               return persitScriptItems(_models.Screen, {
-                data: (0, _objectSpread2["default"])({}, dataToImport, {
+                data: _objectSpread(_objectSpread({}, dataToImport), {}, {
                   position: 1,
                   script_id: destination.dataId
                 })
@@ -132,7 +134,7 @@ module.exports = function () {
                   order: [['position', 'ASC']]
                 }, function (screens) {
                   return screens.map(function (scr, i) {
-                    return (0, _objectSpread2["default"])({}, scr, {
+                    return _objectSpread(_objectSpread({}, scr), {}, {
                       position: i + 1
                     });
                   });
@@ -146,7 +148,7 @@ module.exports = function () {
 
             case 'diagnosis':
               return persitScriptItems(_models.Diagnosis, {
-                data: (0, _objectSpread2["default"])({}, dataToImport, {
+                data: _objectSpread(_objectSpread({}, dataToImport), {}, {
                   position: 1,
                   script_id: destination.dataId
                 })
@@ -155,7 +157,7 @@ module.exports = function () {
               })["catch"](done);
 
             case 'script':
-              return _models.Script.create((0, _objectSpread2["default"])({}, dataToImport, {
+              return _models.Script.create(_objectSpread(_objectSpread({}, dataToImport), {}, {
                 data: JSON.stringify(dataToImport.data || {}),
                 id: id,
                 author: author
@@ -168,7 +170,7 @@ module.exports = function () {
                     return persitScriptItems(_models.Screen, {
                       position: position,
                       id: (0, _uuidv["default"])(),
-                      data: (0, _objectSpread2["default"])({}, screen, {
+                      data: _objectSpread(_objectSpread({}, screen), {}, {
                         script_id: s.id
                       })
                     });
@@ -176,7 +178,7 @@ module.exports = function () {
                     return persitScriptItems(_models.Diagnosis, {
                       position: position,
                       id: (0, _uuidv["default"])(),
-                      data: (0, _objectSpread2["default"])({}, d, {
+                      data: _objectSpread(_objectSpread({}, d), {}, {
                         script_id: s.id
                       })
                     });
@@ -205,7 +207,7 @@ module.exports = function () {
     var ids = source.ids,
         s = (0, _objectWithoutProperties2["default"])(source, ["ids"]);
     Promise.all(ids.map(function (dataId) {
-      return copy((0, _objectSpread2["default"])({}, s, {
+      return copy(_objectSpread(_objectSpread({}, s), {}, {
         dataId: dataId
       }), destination);
     })).then(function (rslts) {
@@ -230,18 +232,18 @@ module.exports = function () {
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(callRemote, "callRemote", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/app/copyDataMiddleware.js");
+  reactHotLoader.register(callRemote, "callRemote", "/home/farai/WorkBench/neotree-editor/_server/routes/app/copyDataMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

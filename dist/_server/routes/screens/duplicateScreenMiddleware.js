@@ -9,7 +9,7 @@ exports["default"] = exports.copyScreen = void 0;
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -20,9 +20,13 @@ var _models = require("../../models");
 var _updateScreensMiddleware = require("./updateScreensMiddleware");
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -35,12 +39,12 @@ var copyScreen = function copyScreen(screen) {
           rest = (0, _objectWithoutProperties2["default"])(screen, ["data"]);
       var screenId = snap.key;
 
-      _firebase["default"].database().ref("screens/".concat(screen.script_id, "/").concat(screenId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+      _firebase["default"].database().ref("screens/".concat(screen.script_id, "/").concat(screenId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
         screenId: screenId,
         scriptId: screen.script_id,
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
-        _models.Screen.create((0, _objectSpread2["default"])({}, screen, {
+        _models.Screen.create(_objectSpread(_objectSpread({}, screen), {}, {
           screen_id: screenId,
           data: JSON.stringify(screen.data)
         })).then(function (screen) {
@@ -60,11 +64,23 @@ var _default = function _default(app) {
     var id = req.body.id;
 
     var done = function done(err, screen) {
-      if (screen) app.io.emit('create_screens', {
-        screens: [{
-          id: screen.id
-        }]
-      });
+      if (screen) {
+        app.io.emit('create_screens', {
+          screens: [{
+            screenId: screen.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({
+            screens: [{
+              screenId: screen.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         screen: screen
       });
@@ -97,7 +113,7 @@ var _default = function _default(app) {
           order: [['position', 'ASC']]
         }, function (screens) {
           return screens.map(function (scr, i) {
-            return (0, _objectSpread2["default"])({}, scr, {
+            return _objectSpread(_objectSpread({}, scr), {}, {
               position: i + 1
             });
           });
@@ -119,19 +135,19 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(copyScreen, "copyScreen", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
+  reactHotLoader.register(copyScreen, "copyScreen", "/home/farai/WorkBench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_server/routes/screens/duplicateScreenMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

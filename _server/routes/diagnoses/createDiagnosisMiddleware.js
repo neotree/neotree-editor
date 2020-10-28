@@ -1,4 +1,4 @@
-import { Diagnosis } from '../../models';
+import { Diagnosis, Log } from '../../models';
 import firebase from '../../firebase';
 
 module.exports = app => (req, res, next) => {
@@ -6,7 +6,13 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, diagnosis) => {
     if (err) app.logger.log(err);
-    if (diagnosis) app.io.emit('create_diagnoses', { diagnoses: [{ id: diagnosis.id }] });
+    if (diagnosis) {
+      app.io.emit('create_diagnoses', { diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] });
+      Log.create({
+        name: 'create_diagnoses',
+        data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] })
+      });
+    }
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

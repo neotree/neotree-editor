@@ -4,13 +4,17 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _models = require("../../models");
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -22,6 +26,28 @@ module.exports = function (app) {
 
     var done = function done(err, items) {
       if (err) app.logger.log(err);
+
+      if (items.length) {
+        app.io.emit('create_diagnoses', {
+          diagnoses: items.map(function (s) {
+            return {
+              diagnosisId: s.id
+            };
+          })
+        });
+
+        _models.Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({
+            diagnoses: items.map(function (s) {
+              return {
+                diagnosisId: s.id
+              };
+            })
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         items: items
       });
@@ -38,14 +64,15 @@ module.exports = function (app) {
               rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]); // eslint-disable-line
 
           var diagnosisId = snap.key;
-          var diagnosis = (0, _objectSpread2["default"])({}, rest, {}, data, {
+
+          var diagnosis = _objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
             diagnosisId: diagnosisId,
             scriptId: payload.script_id,
             createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
           });
 
           _firebase["default"].database().ref("diagnosis/".concat(payload.script_id, "/").concat(diagnosisId)).set(diagnosis).then(function () {
-            resolve((0, _objectSpread2["default"])({}, rest, {
+            resolve(_objectSpread(_objectSpread({}, rest), {}, {
               diagnosis_id: diagnosisId,
               data: JSON.stringify(diagnosis)
             }));
@@ -76,13 +103,13 @@ module.exports = function (app) {
             diagnosis_id = _diagnosis.diagnosis_id,
             d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id", "diagnosis_id"]); // eslint-disable-line
 
-        return saveToFirebase((0, _objectSpread2["default"])({}, d, {
+        return saveToFirebase(_objectSpread(_objectSpread({}, d), {}, {
           position: count + (i + 1),
           script_id: payload.script_id
         }));
       })).then(function (items) {
         return Promise.all(items.map(function (item) {
-          return _models.Diagnosis.create((0, _objectSpread2["default"])({}, item));
+          return _models.Diagnosis.create(_objectSpread({}, item));
         })).then(function (items) {
           return done(null, items);
         })["catch"](done);

@@ -11,6 +11,12 @@ const ConfigKey = sqlz.define(
       allowNull: false,
       primaryKey: true
     },
+    config_key_id: {
+      type: Sequelize.STRING,
+    },
+    position: {
+      type: Sequelize.INTEGER
+    },
     data: {
       type: Sequelize.JSON,
       defaultValue: JSON.stringify({}),

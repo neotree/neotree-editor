@@ -4,15 +4,15 @@ import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
 module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
-  const done = (err, diagnosis) => {
-    if (!err) {
-      app.io.emit('delete_diagnoses', { diagnoses: [{ id }] });
+  const done = (err, deleted) => {
+    if (deleted) {
+      app.io.emit('delete_diagnoses', { diagnoses: [{ diagnosisId: deleted.diagnosis_id }] });
       Log.create({
         name: 'delete_diagnoses',
-        data: JSON.stringify({ diagnoses: [{ id }] })
+        data: JSON.stringify({ diagnoses: [{ diagnosisId: deleted.diagnosis_id }] })
       });
     }
-    res.locals.setResponse(err, { diagnosis });
+    res.locals.setResponse(err, { deleted });
     next(); return null;
   };
 
@@ -23,7 +23,7 @@ module.exports = app => (req, res, next) => {
       if (!d) return done({ msg: `Could not find script with "id" ${id}.` });
 
       d.destroy({ where: { id } })
-        .then(deleted => {
+        .then(() => {
           // update diagnoses positions
           findAndUpdateDiagnoses(
             {
@@ -34,7 +34,7 @@ module.exports = app => (req, res, next) => {
             diagnoses => diagnoses.map((d, i) => ({ ...d, position: i + 1 }))
           ).then(() => null).catch(err => { app.logger.log(err); return null; });
 
-          return done(null, { deleted });
+          return done(null, d);
         })
         .catch(done);
 

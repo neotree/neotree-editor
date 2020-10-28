@@ -94,7 +94,7 @@ var _Device = _interopRequireDefault(require("./_Device"));
 var _Log = _interopRequireDefault(require("./_Log"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
@@ -107,9 +107,7 @@ exports.sequelize = sequelize;
 
 var dbInit = function dbInit() {
   return new Promise(function (resolve, reject) {
-    var initUsersTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee() {
+    var initUsersTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -127,9 +125,7 @@ var dbInit = function dbInit() {
         }
       }, _callee);
     }))();
-    var initFilesTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee2() {
+    var initFilesTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
@@ -147,9 +143,7 @@ var dbInit = function dbInit() {
         }
       }, _callee2);
     }))();
-    var initUserProfilesTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee3() {
+    var initUserProfilesTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
       return _regenerator["default"].wrap(function _callee3$(_context3) {
         while (1) {
           switch (_context3.prev = _context3.next) {
@@ -167,9 +161,7 @@ var dbInit = function dbInit() {
         }
       }, _callee3);
     }))();
-    var initScriptsTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee4() {
+    var initScriptsTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee4() {
       return _regenerator["default"].wrap(function _callee4$(_context4) {
         while (1) {
           switch (_context4.prev = _context4.next) {
@@ -187,9 +179,7 @@ var dbInit = function dbInit() {
         }
       }, _callee4);
     }))();
-    var initScreensTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee5() {
+    var initScreensTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee5() {
       return _regenerator["default"].wrap(function _callee5$(_context5) {
         while (1) {
           switch (_context5.prev = _context5.next) {
@@ -207,9 +197,7 @@ var dbInit = function dbInit() {
         }
       }, _callee5);
     }))();
-    var initDiagnosesTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee6() {
+    var initDiagnosesTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee6() {
       return _regenerator["default"].wrap(function _callee6$(_context6) {
         while (1) {
           switch (_context6.prev = _context6.next) {
@@ -227,9 +215,7 @@ var dbInit = function dbInit() {
         }
       }, _callee6);
     }))();
-    var initConfigKeysTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee7() {
+    var initConfigKeysTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee7() {
       return _regenerator["default"].wrap(function _callee7$(_context7) {
         while (1) {
           switch (_context7.prev = _context7.next) {
@@ -247,9 +233,7 @@ var dbInit = function dbInit() {
         }
       }, _callee7);
     }))();
-    var initApiKeysTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee8() {
+    var initApiKeysTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee8() {
       return _regenerator["default"].wrap(function _callee8$(_context8) {
         while (1) {
           switch (_context8.prev = _context8.next) {
@@ -267,9 +251,7 @@ var dbInit = function dbInit() {
         }
       }, _callee8);
     }))();
-    var initDeviceTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee9() {
+    var initDeviceTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee9() {
       return _regenerator["default"].wrap(function _callee9$(_context9) {
         while (1) {
           switch (_context9.prev = _context9.next) {
@@ -287,9 +269,7 @@ var dbInit = function dbInit() {
         }
       }, _callee9);
     }))();
-    var initLogTable = (0, _asyncToGenerator2["default"])(
-    /*#__PURE__*/
-    _regenerator["default"].mark(function _callee10() {
+    var initLogTable = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee10() {
       return _regenerator["default"].wrap(function _callee10$(_context10) {
         while (1) {
           switch (_context10.prev = _context10.next) {
@@ -333,19 +313,19 @@ exports.dbInit = dbInit;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(sequelize, "sequelize", "/home/lamyfarai/Workbench/neotree-editor/_server/models/index.js");
-  reactHotLoader.register(dbInit, "dbInit", "/home/lamyfarai/Workbench/neotree-editor/_server/models/index.js");
+  reactHotLoader.register(sequelize, "sequelize", "/home/farai/WorkBench/neotree-editor/_server/models/index.js");
+  reactHotLoader.register(dbInit, "dbInit", "/home/farai/WorkBench/neotree-editor/_server/models/index.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

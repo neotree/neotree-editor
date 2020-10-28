@@ -13,16 +13,16 @@ module.exports = function (app) {
     var done = function done(err, configKey) {
       if (!err) {
         app.io.emit('delete_config_keys', {
-          config_keys: [{
-            id: id
+          configKeys: [{
+            configKeyId: id
           }]
         });
 
         _models.Log.create({
           name: 'delete_config_keys',
           data: JSON.stringify({
-            config_keys: [{
-              id: id
+            configKeys: [{
+              configKeyId: id
             }]
           })
         });

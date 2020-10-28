@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -20,9 +20,13 @@ var _sequelize2 = _interopRequireDefault(require("./sequelize"));
 var _firebase = _interopRequireDefault(require("../firebase"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -71,7 +75,7 @@ Diagnosis.afterUpdate(function (diagnosis) {
       d = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "diagnosis_id", "data", "createdAt"]); // eslint-disable-line
 
 
-  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosis_id)).update((0, _objectSpread2["default"])({}, data, {}, d, {
+  _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosis_id)).update(_objectSpread(_objectSpread(_objectSpread({}, data), d), {}, {
     updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
   }));
 
@@ -92,19 +96,19 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(Diagnosis, "Diagnosis", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Diagnosis.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/models/_Diagnosis.js");
+  reactHotLoader.register(Diagnosis, "Diagnosis", "/home/farai/WorkBench/neotree-editor/_server/models/_Diagnosis.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_server/models/_Diagnosis.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

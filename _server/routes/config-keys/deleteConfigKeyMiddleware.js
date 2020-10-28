@@ -5,10 +5,10 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, configKey) => {
     if (!err) {
-      app.io.emit('delete_config_keys', { config_keys: [{ id }] });
+      app.io.emit('delete_config_keys', { configKeys: [{ configKeyId: id }] });
       Log.create({
         name: 'delete_config_keys',
-        data: JSON.stringify({ config_keys: [{ id }] })
+        data: JSON.stringify({ configKeys: [{ configKeyId: id }] })
       });
     }
     res.locals.setResponse(err, { configKey });

@@ -1,5 +1,5 @@
 import firebase from '../../firebase';
-import { Script, Screen, Diagnosis } from '../../models';
+import { Script, Screen, Diagnosis, Log } from '../../models';
 import { copyScreen } from '../screens/duplicateScreenMiddleware';
 import { copyDiagnosis } from '../diagnoses/duplicateDiagnosisMiddleware';
 
@@ -58,7 +58,13 @@ export default (app) => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, script) => {
-    if (script) app.io.emit('create_scripts', { scripts: [{ id: script.id }] });
+    if (script) {
+      app.io.emit('create_scripts', { scripts: [{ scriptId: script.id }] });
+      Log.create({
+        name: 'create_scripts',
+        data: JSON.stringify({ scripts: [{ scriptId: script.id }] })
+      });
+    }
     res.locals.setResponse(err, { script });
     next(); return null;
   };

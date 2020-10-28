@@ -4,7 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -13,6 +13,10 @@ var _models = require("../../models");
 var _updateScreensMiddleware = require("./updateScreensMiddleware");
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -25,13 +29,28 @@ module.exports = function (app) {
     var done = function done(err) {
       var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
       if (err) app.logger.log(err);
-      if (items.length) app.io.emit('create_screens', {
-        screens: items.map(function (s) {
-          return {
-            id: s.id
-          };
-        })
-      });
+
+      if (items.length) {
+        app.io.emit('create_screens', {
+          screens: items.map(function (s) {
+            return {
+              screenId: s.id
+            };
+          })
+        });
+
+        _models.Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({
+            screens: items.map(function (s) {
+              return {
+                screenId: s.id
+              };
+            })
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         items: items
       });
@@ -48,14 +67,15 @@ module.exports = function (app) {
               rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]); // eslint-disable-line
 
           var screenId = snap.key;
-          var screen = (0, _objectSpread2["default"])({}, rest, {}, data, {
+
+          var screen = _objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
             screenId: screenId,
             scriptId: payload.script_id,
             createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
           });
 
           _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set(screen).then(function () {
-            resolve((0, _objectSpread2["default"])({}, rest, {
+            resolve(_objectSpread(_objectSpread({}, rest), {}, {
               screen_id: screenId,
               data: JSON.stringify(screen)
             }));
@@ -93,13 +113,13 @@ module.exports = function (app) {
             screen_id = _screen.screen_id,
             scr = (0, _objectWithoutProperties2["default"])(_screen, ["createdAt", "updateAt", "id", "screen_id"]); // eslint-disable-line
 
-        return saveToFirebase((0, _objectSpread2["default"])({}, scr, {
+        return saveToFirebase(_objectSpread(_objectSpread({}, scr), {}, {
           position: count + (i + 1),
           script_id: payload.script_id
         }));
       })).then(function (items) {
         return Promise.all(items.map(function (item) {
-          return _models.Screen.create((0, _objectSpread2["default"])({}, item));
+          return _models.Screen.create(_objectSpread({}, item));
         })).then(function (items) {
           Promise.all(items.map(function (item) {
             // update screens positions
@@ -111,7 +131,7 @@ module.exports = function (app) {
               order: [['position', 'ASC']]
             }, function (screens) {
               return screens.map(function (scr, i) {
-                return (0, _objectSpread2["default"])({}, scr, {
+                return _objectSpread(_objectSpread({}, scr), {}, {
                   position: i + 1
                 });
               });

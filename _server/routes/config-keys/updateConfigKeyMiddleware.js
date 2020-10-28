@@ -1,10 +1,16 @@
-import { ConfigKey } from '../../models';
+import { ConfigKey, Log } from '../../models';
 
 module.exports = app => (req, res, next) => {
   const { id, ...payload } = req.body;
 
   const done = (err, configKey) => {
-    if (!err) app.io.emit('update_config_keys', { config_keys: [{ id }] });
+    if (!err) {
+      app.io.emit('update_config_keys', { configKeys: [{ configKeyId: id }] });
+      Log.create({
+        name: 'update_config_keys',
+        data: JSON.stringify({ configKeys: [{ configKeyId: id }] })
+      });
+    }
     res.locals.setResponse(err, { configKey });
     next(); return null;
   };

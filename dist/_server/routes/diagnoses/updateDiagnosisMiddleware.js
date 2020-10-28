@@ -17,11 +17,23 @@ module.exports = function (app) {
         payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id"]);
 
     var done = function done(err, diagnosis) {
-      if (diagnosis) app.io.emit('update_diagnoses', {
-        diagnoses: [{
-          id: id
-        }]
-      });
+      if (diagnosis) {
+        app.io.emit('update_diagnoses', {
+          diagnoses: [{
+            diagnosisId: id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'update_diagnoses',
+          data: JSON.stringify({
+            diagnoses: [{
+              diagnosisId: id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });

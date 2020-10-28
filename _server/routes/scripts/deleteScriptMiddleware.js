@@ -9,10 +9,10 @@ module.exports = (app) => (req, res, next) => {
 
   const done = (err, script) => {
     if (!err) {
-      app.io.emit('delete_scripts', { scripts: [{ id }] });
+      app.io.emit('delete_scripts', { scripts: [{ scriptId: id }] });
       Log.create({
         name: 'delete_scripts',
-        data: JSON.stringify({ scripts: [{ id }] })
+        data: JSON.stringify({ scripts: [{ scriptId: id }] })
       });
     }
     res.locals.setResponse(err, { script });

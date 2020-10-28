@@ -4,15 +4,15 @@ import { findAndUpdateScreens } from './updateScreensMiddleware';
 module.exports = app => (req, res, next) => {
   const { id } = req.body;
 
-  const done = (err, screen) => {
-    if (!err) {
-      app.io.emit('delete_screens', { screens: [{ id }] });
+  const done = (err, deleted) => {
+    if (deleted) {
+      app.io.emit('delete_screens', { screens: [{ screenId: deleted.screen_id }] });
       Log.create({
         name: 'delete_screens',
-        data: JSON.stringify({ screens: [{ id }] })
+        data: JSON.stringify({ screens: [{ screenId: deleted.screen_id }] })
       });
     }
-    res.locals.setResponse(err, { screen });
+    res.locals.setResponse(err, { deleted });
     next(); return null;
   };
 
@@ -23,7 +23,7 @@ module.exports = app => (req, res, next) => {
       if (!s) return done({ msg: `Could not find script with "id" ${id}.` });
 
       s.destroy({ where: { id } })
-        .then(deleted => {
+        .then(() => {
           // update screens positions
           findAndUpdateScreens(
             {
@@ -34,7 +34,7 @@ module.exports = app => (req, res, next) => {
             screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
           ).then(() => null).catch(err => { app.logger.log(err); return null; });
 
-          return done(null, { deleted });
+          return done(null, s);
         })
         .catch(done);
 

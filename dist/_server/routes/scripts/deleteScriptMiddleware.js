@@ -21,7 +21,7 @@ module.exports = function (app) {
       if (!err) {
         app.io.emit('delete_scripts', {
           scripts: [{
-            id: id
+            scriptId: id
           }]
         });
 
@@ -29,7 +29,7 @@ module.exports = function (app) {
           name: 'delete_scripts',
           data: JSON.stringify({
             scripts: [{
-              id: id
+              scriptId: id
             }]
           })
         });

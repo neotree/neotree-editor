@@ -2,13 +2,17 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _models = require("../../models");
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -19,11 +23,23 @@ module.exports = function (app, params) {
     var payload = params || req.body;
 
     var done = function done(err, script) {
-      if (script) app.io.emit('create_scripts', {
-        scripts: [{
-          id: script.id
-        }]
-      });
+      if (script) {
+        app.io.emit('create_scripts', {
+          scripts: [{
+            scriptId: script.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_scripts',
+          data: JSON.stringify({
+            scripts: [{
+              scriptId: script.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         script: script
       });
@@ -40,7 +56,7 @@ module.exports = function (app, params) {
 
           var _data = data ? JSON.parse(data) : null;
 
-          _firebase["default"].database().ref("scripts/".concat(scriptId)).set((0, _objectSpread2["default"])({}, rest, {}, _data, {
+          _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
             scriptId: scriptId,
             createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
           })).then(function () {
@@ -51,7 +67,7 @@ module.exports = function (app, params) {
     };
 
     saveToFirebase().then(function (id) {
-      _models.Script.create((0, _objectSpread2["default"])({}, payload, {
+      _models.Script.create(_objectSpread(_objectSpread({}, payload), {}, {
         id: id
       })).then(function (script) {
         return done(null, script);

@@ -1,4 +1,4 @@
-import { Screen } from '../../models';
+import { Log, Screen } from '../../models';
 import { findAndUpdateScreens } from './updateScreensMiddleware';
 import firebase from '../../firebase';
 
@@ -7,7 +7,13 @@ module.exports = app => (req, res, next) => {
 
   const done = (err, items = []) => {
     if (err) app.logger.log(err);
-    if (items.length) app.io.emit('create_screens', { screens: items.map(s => ({ id: s.id })) });
+    if (items.length) {
+      app.io.emit('create_screens', { screens: items.map(s => ({ screenId: s.screen_id })) });
+      Log.create({
+        name: 'create_screens',
+        data: JSON.stringify({ screens: items.map(s => ({ screenId: s.screen_id })) })
+      });
+    }
     res.locals.setResponse(err, { items });
     next(); return null;
   };

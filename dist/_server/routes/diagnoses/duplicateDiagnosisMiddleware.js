@@ -9,7 +9,7 @@ exports["default"] = exports.copyDiagnosis = void 0;
 
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
@@ -18,9 +18,13 @@ var _firebase = _interopRequireDefault(require("../../firebase"));
 var _models = require("../../models");
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -33,12 +37,12 @@ var copyDiagnosis = function copyDiagnosis(diagnosis) {
           rest = (0, _objectWithoutProperties2["default"])(diagnosis, ["data"]);
       var diagnosisId = snap.key;
 
-      _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosisId)).set((0, _objectSpread2["default"])({}, rest, {}, data, {
+      _firebase["default"].database().ref("diagnosis/".concat(diagnosis.script_id, "/").concat(diagnosisId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), data), {}, {
         diagnosisId: diagnosisId,
         scriptId: diagnosis.script_id,
         createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
       })).then(function () {
-        _models.Diagnosis.create((0, _objectSpread2["default"])({}, diagnosis, {
+        _models.Diagnosis.create(_objectSpread(_objectSpread({}, diagnosis), {}, {
           diagnosis_id: diagnosisId,
           data: JSON.stringify(diagnosis.data)
         })).then(function (diagnosis) {
@@ -58,11 +62,23 @@ var _default = function _default(app) {
     var id = req.body.id;
 
     var done = function done(err, diagnosis) {
-      if (diagnosis) app.io.emit('create_diagnoses', {
-        diagnoses: [{
-          id: diagnosis.id
-        }]
-      });
+      if (diagnosis) {
+        app.io.emit('create_diagnoses', {
+          diagnoses: [{
+            diagnosisId: diagnosis.id
+          }]
+        });
+
+        _models.Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({
+            diagnoses: [{
+              diagnosisId: diagnosis.id
+            }]
+          })
+        });
+      }
+
       res.locals.setResponse(err, {
         diagnosis: diagnosis
       });
@@ -98,19 +114,19 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(copyDiagnosis, "copyDiagnosis", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/diagnoses/duplicateDiagnosisMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/diagnoses/duplicateDiagnosisMiddleware.js");
+  reactHotLoader.register(copyDiagnosis, "copyDiagnosis", "/home/farai/WorkBench/neotree-editor/_server/routes/diagnoses/duplicateDiagnosisMiddleware.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_server/routes/diagnoses/duplicateDiagnosisMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

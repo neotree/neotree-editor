@@ -1,5 +1,5 @@
 import firebase from '../../firebase';
-import { Diagnosis } from '../../models';
+import { Diagnosis, Log } from '../../models';
 
 export const copyDiagnosis = (diagnosis) => {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,13 @@ export default app => (req, res, next) => {
   const { id } = req.body;
 
   const done = (err, diagnosis) => {
-    if (diagnosis) app.io.emit('create_diagnoses', { diagnoses: [{ id: diagnosis.id }] });
+    if (diagnosis) {
+      app.io.emit('create_diagnoses', { diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] });
+      Log.create({
+        name: 'create_diagnoses',
+        data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] })
+      });
+    }
     res.locals.setResponse(err, { diagnosis });
     next(); return null;
   };

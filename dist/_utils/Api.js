@@ -9,8 +9,6 @@ exports["default"] = void 0;
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _objectSpread2 = _interopRequireDefault(require("@babel/runtime/helpers/objectSpread2"));
-
 var _classCallCheck2 = _interopRequireDefault(require("@babel/runtime/helpers/classCallCheck"));
 
 var _createClass2 = _interopRequireDefault(require("@babel/runtime/helpers/createClass"));
@@ -18,18 +16,20 @@ var _createClass2 = _interopRequireDefault(require("@babel/runtime/helpers/creat
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
 
 /* global XMLHttpRequest */
-var ApiFetch =
-/*#__PURE__*/
-function () {
+var ApiFetch = /*#__PURE__*/function () {
   function ApiFetch(url, options) {
     var _this = this;
 
@@ -50,7 +50,7 @@ function () {
       var reqQuery = '';
 
       if (_this.method === 'GET') {
-        reqQuery = "?payload=".concat(JSON.stringify((0, _objectSpread2["default"])({}, _this.options.payload || {})));
+        reqQuery = "?payload=".concat(JSON.stringify(_objectSpread({}, _this.options.payload || {})));
       }
 
       xhr.open(_this.method, "".concat(_this.url).concat(reqQuery), true);
@@ -126,7 +126,7 @@ var makeApiCall = function makeApiCall(method) {
       });
     }
 
-    new ApiFetch(_url, (0, _objectSpread2["default"])({}, _options, {
+    new ApiFetch(_url, _objectSpread(_objectSpread({}, _options), {}, {
       method: method
     })).request(method).then(resolve)["catch"](reject);
   });
@@ -153,20 +153,20 @@ exports["default"] = _default2;
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(ApiFetch, "ApiFetch", "/home/lamyfarai/Workbench/neotree-editor/_utils/Api.js");
-  reactHotLoader.register(makeApiCall, "makeApiCall", "/home/lamyfarai/Workbench/neotree-editor/_utils/Api.js");
-  reactHotLoader.register(_default, "default", "/home/lamyfarai/Workbench/neotree-editor/_utils/Api.js");
+  reactHotLoader.register(ApiFetch, "ApiFetch", "/home/farai/WorkBench/neotree-editor/_utils/Api.js");
+  reactHotLoader.register(makeApiCall, "makeApiCall", "/home/farai/WorkBench/neotree-editor/_utils/Api.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/_utils/Api.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

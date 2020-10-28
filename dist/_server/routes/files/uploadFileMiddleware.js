@@ -9,7 +9,7 @@ var _uuidv = _interopRequireDefault(require("uuidv4"));
 var _models = require("../../models");
 
 (function () {
-  var enterModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).enterModule;
+  var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
@@ -62,19 +62,19 @@ module.exports = function (router, app) {
 ;
 
 (function () {
-  var reactHotLoader = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).default;
+  var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
 
   if (!reactHotLoader) {
     return;
   }
 
-  reactHotLoader.register(storage, "storage", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/files/uploadFileMiddleware.js");
-  reactHotLoader.register(upload, "upload", "/home/lamyfarai/Workbench/neotree-editor/_server/routes/files/uploadFileMiddleware.js");
+  reactHotLoader.register(storage, "storage", "/home/farai/WorkBench/neotree-editor/_server/routes/files/uploadFileMiddleware.js");
+  reactHotLoader.register(upload, "upload", "/home/farai/WorkBench/neotree-editor/_server/routes/files/uploadFileMiddleware.js");
 })();
 
 ;
 
 (function () {
-  var leaveModule = (typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal : require('react-hot-loader')).leaveModule;
+  var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
 })();

@@ -6,15 +6,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function () {
+module.exports = function (app) {
   return function (req, res, next) {
     var apiKey = req.body.apiKey;
-
-    var getRandString = function getRandString() {
-      return Math.random().toString(36).substring(2).toUpperCase();
-    };
-
-    var key = "".concat(getRandString()).concat(getRandString()).concat(getRandString());
+    var key = app.getRandomString();
 
     var done = function done(e, payload) {
       res.locals.setResponse(e, payload);
