@@ -6,7 +6,7 @@ var _express = _interopRequireDefault(require("express"));
 
 var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator"));
 
-var _responseMiddleware = _interopRequireDefault(require("../../responseMiddleware"));
+var _responseMiddleware = _interopRequireDefault(require("./responseMiddleware"));
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;

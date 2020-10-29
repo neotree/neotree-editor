@@ -1,6 +1,6 @@
 import express from 'express';
 import apiKeyAuthenticator from './apiKeyAuthenticator';
-import responseMiddleware from '../../responseMiddleware';
+import responseMiddleware from './responseMiddleware';
 
 const router = express.Router();
 
