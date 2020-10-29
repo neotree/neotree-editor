@@ -20,11 +20,11 @@ module.exports = function (app) {
   return function (req, res, next) {
     var id = req.body.id;
 
-    var done = function done(err, screen) {
-      if (!err) {
+    var done = function done(err, deleted) {
+      if (deleted) {
         app.io.emit('delete_screens', {
           screens: [{
-            screenId: id
+            screenId: deleted.screen_id
           }]
         });
 
@@ -32,14 +32,14 @@ module.exports = function (app) {
           name: 'delete_screens',
           data: JSON.stringify({
             screens: [{
-              screenId: id
+              screenId: deleted.screen_id
             }]
           })
         });
       }
 
       res.locals.setResponse(err, {
-        screen: screen
+        deleted: deleted
       });
       next();
       return null;
@@ -61,7 +61,7 @@ module.exports = function (app) {
         where: {
           id: id
         }
-      }).then(function (deleted) {
+      }).then(function () {
         // update screens positions
         (0, _updateScreensMiddleware.findAndUpdateScreens)({
           attributes: ['id'],
@@ -81,9 +81,7 @@ module.exports = function (app) {
           app.logger.log(err);
           return null;
         });
-        return done(null, {
-          deleted: deleted
-        });
+        return done(null, s);
       })["catch"](done);
       return null;
     })["catch"](done);

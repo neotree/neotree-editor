@@ -49,6 +49,7 @@ var _default = function _default() {
             id: id
           },
           defaults: {
+            config_key_id: id,
             data: JSON.stringify(configKeys[id])
           }
         }));
@@ -59,6 +60,7 @@ var _default = function _default() {
             id: script_id
           },
           defaults: {
+            script_id: script_id,
             data: JSON.stringify(scripts[script_id])
           }
         }));

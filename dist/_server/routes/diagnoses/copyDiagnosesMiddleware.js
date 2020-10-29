@@ -10,6 +10,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _models = require("../../models");
 
+var _updateDiagnosesMiddleware = require("./updateDiagnosesMiddleware");
+
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
@@ -24,14 +26,15 @@ module.exports = function (app) {
   return function (req, res, next) {
     var payload = req.body;
 
-    var done = function done(err, items) {
+    var done = function done(err) {
+      var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
       if (err) app.logger.log(err);
 
       if (items.length) {
         app.io.emit('create_diagnoses', {
           diagnoses: items.map(function (s) {
             return {
-              diagnosisId: s.id
+              diagnosisId: s.diagnosis_id
             };
           })
         });
@@ -41,7 +44,7 @@ module.exports = function (app) {
           data: JSON.stringify({
             diagnoses: items.map(function (s) {
               return {
-                diagnosisId: s.id
+                diagnosisId: s.diagnosis_id
               };
             })
           })
@@ -94,6 +97,13 @@ module.exports = function (app) {
           count = _ref2[0],
           diagnoses = _ref2[1];
 
+      diagnoses = payload.ids.map(function (id) {
+        return diagnoses.filter(function (scr) {
+          return scr.id === id;
+        })[0];
+      }).filter(function (scr) {
+        return scr;
+      });
       Promise.all(diagnoses.map(function (diagnosis, i) {
         diagnosis = JSON.parse(JSON.stringify(diagnosis));
         var _diagnosis = diagnosis,
@@ -101,9 +111,9 @@ module.exports = function (app) {
             updateAt = _diagnosis.updateAt,
             id = _diagnosis.id,
             diagnosis_id = _diagnosis.diagnosis_id,
-            d = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id", "diagnosis_id"]); // eslint-disable-line
+            scr = (0, _objectWithoutProperties2["default"])(_diagnosis, ["createdAt", "updateAt", "id", "diagnosis_id"]); // eslint-disable-line
 
-        return saveToFirebase(_objectSpread(_objectSpread({}, d), {}, {
+        return saveToFirebase(_objectSpread(_objectSpread({}, scr), {}, {
           position: count + (i + 1),
           script_id: payload.script_id
         }));
@@ -111,8 +121,27 @@ module.exports = function (app) {
         return Promise.all(items.map(function (item) {
           return _models.Diagnosis.create(_objectSpread({}, item));
         })).then(function (items) {
-          return done(null, items);
-        })["catch"](done);
+          Promise.all(items.map(function (item) {
+            // update diagnoses positions
+            return (0, _updateDiagnosesMiddleware.findAndUpdateDiagnoses)({
+              attributes: ['id'],
+              where: {
+                script_id: item.script_id
+              },
+              order: [['position', 'ASC']]
+            }, function (diagnoses) {
+              return diagnoses.map(function (scr, i) {
+                return _objectSpread(_objectSpread({}, scr), {}, {
+                  position: i + 1
+                });
+              });
+            });
+          })).then(function () {
+            return done(null, items);
+          })["catch"](function () {
+            return done(null, items);
+          });
+        });
       })["catch"](done);
     })["catch"](done);
   };

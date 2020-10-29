@@ -20,11 +20,11 @@ module.exports = function (app) {
   return function (req, res, next) {
     var id = req.body.id;
 
-    var done = function done(err, diagnosis) {
-      if (!err) {
+    var done = function done(err, deleted) {
+      if (deleted) {
         app.io.emit('delete_diagnoses', {
           diagnoses: [{
-            diagnosisId: id
+            diagnosisId: deleted.diagnosis_id
           }]
         });
 
@@ -32,14 +32,14 @@ module.exports = function (app) {
           name: 'delete_diagnoses',
           data: JSON.stringify({
             diagnoses: [{
-              diagnosisId: id
+              diagnosisId: deleted.diagnosis_id
             }]
           })
         });
       }
 
       res.locals.setResponse(err, {
-        diagnosis: diagnosis
+        deleted: deleted
       });
       next();
       return null;
@@ -61,7 +61,7 @@ module.exports = function (app) {
         where: {
           id: id
         }
-      }).then(function (deleted) {
+      }).then(function () {
         // update diagnoses positions
         (0, _updateDiagnosesMiddleware.findAndUpdateDiagnoses)({
           attributes: ['id'],
@@ -81,9 +81,7 @@ module.exports = function (app) {
           app.logger.log(err);
           return null;
         });
-        return done(null, {
-          deleted: deleted
-        });
+        return done(null, d);
       })["catch"](done);
       return null;
     })["catch"](done);

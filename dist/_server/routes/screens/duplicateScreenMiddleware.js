@@ -67,7 +67,7 @@ var _default = function _default(app) {
       if (screen) {
         app.io.emit('create_screens', {
           screens: [{
-            screenId: screen.id
+            screenId: screen.screen_id
           }]
         });
 
@@ -75,7 +75,7 @@ var _default = function _default(app) {
           name: 'create_screens',
           data: JSON.stringify({
             screens: [{
-              screenId: screen.id
+              screenId: screen.screen_id
             }]
           })
         });

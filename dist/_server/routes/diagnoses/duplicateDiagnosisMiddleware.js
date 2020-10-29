@@ -65,7 +65,7 @@ var _default = function _default(app) {
       if (diagnosis) {
         app.io.emit('create_diagnoses', {
           diagnoses: [{
-            diagnosisId: diagnosis.id
+            diagnosisId: diagnosis.diagnosis_id
           }]
         });
 
@@ -73,7 +73,7 @@ var _default = function _default(app) {
           name: 'create_diagnoses',
           data: JSON.stringify({
             diagnoses: [{
-              diagnosisId: diagnosis.id
+              diagnosisId: diagnosis.diagnosis_id
             }]
           })
         });

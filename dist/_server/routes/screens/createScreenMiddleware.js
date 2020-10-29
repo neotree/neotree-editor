@@ -30,7 +30,7 @@ module.exports = function (app) {
       if (screen) {
         app.io.emit('create_screens', {
           screens: [{
-            screenId: screen.id
+            screenId: screen.screen_id
           }]
         });
 
@@ -38,7 +38,7 @@ module.exports = function (app) {
           name: 'create_screens',
           data: JSON.stringify({
             screens: [{
-              screenId: screen.id
+              screenId: screen.screen_id
             }]
           })
         });

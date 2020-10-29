@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = exports.findAndUpdateDiagnoses = exports.updateDiagnoses = void 0;
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
@@ -27,7 +29,6 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var updateDiagnoses = function updateDiagnoses(diagnoses) {
-  var returnUpdated = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
   return new Promise(function (resolve, reject) {
     return Promise.all(diagnoses.map(function (_ref) {
       var id = _ref.id,
@@ -39,23 +40,12 @@ var updateDiagnoses = function updateDiagnoses(diagnoses) {
         individualHooks: true
       });
     })).then(function (rslts) {
-      if (!returnUpdated) return resolve({
-        rslts: rslts
-      });
+      resolve(rslts.map(function (_ref2) {
+        var _ref3 = (0, _slicedToArray2["default"])(_ref2, 2),
+            d = _ref3[1];
 
-      _models.Diagnosis.findAll({
-        where: {
-          id: diagnoses.map(function (d) {
-            return d.id;
-          })
-        },
-        order: [['position', 'ASC']]
-      }).then(function (diagnoses) {
-        return resolve({
-          diagnoses: diagnoses
-        });
-      })["catch"](reject);
-
+        return d[0];
+      }));
       return null;
     })["catch"](reject);
   });
@@ -66,11 +56,10 @@ exports.updateDiagnoses = updateDiagnoses;
 var findAndUpdateDiagnoses = function findAndUpdateDiagnoses() {
   var finder = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var updater = arguments.length > 1 ? arguments[1] : undefined;
-  var returnUpdated = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
   return new Promise(function (resolve, reject) {
     _models.Diagnosis.findAll(finder).then(function (diagnoses) {
       diagnoses = updater(JSON.parse(JSON.stringify(diagnoses)));
-      updateDiagnoses(diagnoses, returnUpdated).then(resolve)["catch"](reject);
+      updateDiagnoses(diagnoses).then(resolve)["catch"](reject);
       return null;
     })["catch"](reject);
   });
@@ -80,37 +69,38 @@ exports.findAndUpdateDiagnoses = findAndUpdateDiagnoses;
 
 var _default = function _default(app) {
   return function (req, res, next) {
-    var _req$body = req.body,
-        diagnoses = _req$body.diagnoses,
-        returnUpdated = _req$body.returnUpdated;
+    var diagnoses = req.body.diagnoses;
 
-    var done = function done(err, payload) {
-      app.io.emit('update_diagnoses', {
-        diagnoses: diagnoses.map(function (s) {
+    var done = function done(err) {
+      var diagnoses = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+
+      if (diagnoses.length) {
+        var ds = diagnoses.map(function (d) {
           return {
-            diagnosisId: s.id
+            diagnosisId: d.diagnosis_id
           };
-        })
-      });
+        });
+        app.io.emit('update_diagnoses', {
+          diagnoses: ds
+        });
 
-      _models.Log.create({
-        name: 'update_diagnoses',
-        data: JSON.stringify({
-          diagnoses: diagnoses.map(function (s) {
-            return {
-              diagnosisId: s.id
-            };
+        _models.Log.create({
+          name: 'update_diagnoses',
+          data: JSON.stringify({
+            diagnoses: ds
           })
-        })
-      });
+        });
+      }
 
-      res.locals.setResponse(err, payload);
+      res.locals.setResponse(err, {
+        diagnoses: diagnoses
+      });
       next();
       return null;
     };
 
-    updateDiagnoses(diagnoses, returnUpdated).then(function (payload) {
-      return done(null, payload);
+    updateDiagnoses(diagnoses).then(function (rslts) {
+      return done(null, rslts);
     })["catch"](done);
   };
 };

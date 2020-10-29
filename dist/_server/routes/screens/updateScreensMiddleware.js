@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = exports.findAndUpdateScreens = exports.updateScreens = void 0;
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
@@ -27,7 +29,6 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var updateScreens = function updateScreens(screens) {
-  var returnUpdated = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
   return new Promise(function (resolve, reject) {
     return Promise.all(screens.map(function (_ref) {
       var id = _ref.id,
@@ -39,23 +40,12 @@ var updateScreens = function updateScreens(screens) {
         individualHooks: true
       });
     })).then(function (rslts) {
-      if (!returnUpdated) return resolve({
-        rslts: rslts
-      });
+      resolve(rslts.map(function (_ref2) {
+        var _ref3 = (0, _slicedToArray2["default"])(_ref2, 2),
+            s = _ref3[1];
 
-      _models.Screen.findAll({
-        where: {
-          id: screens.map(function (scr) {
-            return scr.id;
-          })
-        },
-        order: [['position', 'ASC']]
-      }).then(function (screens) {
-        return resolve({
-          screens: screens
-        });
-      })["catch"](reject);
-
+        return s[0];
+      }));
       return null;
     })["catch"](reject);
   });
@@ -66,11 +56,10 @@ exports.updateScreens = updateScreens;
 var findAndUpdateScreens = function findAndUpdateScreens() {
   var finder = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var updater = arguments.length > 1 ? arguments[1] : undefined;
-  var returnUpdated = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
   return new Promise(function (resolve, reject) {
     _models.Screen.findAll(finder).then(function (screens) {
       screens = updater(JSON.parse(JSON.stringify(screens)));
-      updateScreens(screens, returnUpdated).then(resolve)["catch"](reject);
+      updateScreens(screens).then(resolve)["catch"](reject);
       return null;
     })["catch"](reject);
   });
@@ -80,37 +69,38 @@ exports.findAndUpdateScreens = findAndUpdateScreens;
 
 var _default = function _default(app) {
   return function (req, res, next) {
-    var _req$body = req.body,
-        screens = _req$body.screens,
-        returnUpdated = _req$body.returnUpdated;
+    var screens = req.body.screens;
 
-    var done = function done(err, payload) {
-      app.io.emit('update_screens', {
-        screens: screens.map(function (s) {
+    var done = function done(err) {
+      var screens = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+
+      if (screens.length) {
+        var scrns = screens.map(function (s) {
           return {
-            screenId: s.id
+            screenId: s.screen_id
           };
-        })
-      });
+        });
+        app.io.emit('update_screens', {
+          screens: screens
+        });
 
-      _models.Log.create({
-        name: 'update_screens',
-        data: JSON.stringify({
-          screens: screens.map(function (s) {
-            return {
-              screenId: s.id
-            };
+        _models.Log.create({
+          name: 'update_screens',
+          data: JSON.stringify({
+            screens: scrns
           })
-        })
-      });
+        });
+      }
 
-      res.locals.setResponse(err, payload);
+      res.locals.setResponse(err, {
+        screens: screens
+      });
       next();
       return null;
     };
 
-    updateScreens(screens, returnUpdated).then(function (payload) {
-      return done(null, payload);
+    updateScreens(screens).then(function (rslts) {
+      return done(null, rslts);
     })["catch"](done);
   };
 };

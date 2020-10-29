@@ -30,7 +30,7 @@ module.exports = function (app) {
       if (diagnosis) {
         app.io.emit('create_diagnoses', {
           diagnoses: [{
-            diagnosisId: diagnosis.id
+            diagnosisId: diagnosis.diagnosis_id
           }]
         });
 
@@ -38,7 +38,7 @@ module.exports = function (app) {
           name: 'create_diagnoses',
           data: JSON.stringify({
             diagnoses: [{
-              diagnosisId: diagnosis.id
+              diagnosisId: diagnosis.diagnosis_id
             }]
           })
         });

@@ -34,7 +34,7 @@ module.exports = function (app) {
         app.io.emit('create_screens', {
           screens: items.map(function (s) {
             return {
-              screenId: s.id
+              screenId: s.screen_id
             };
           })
         });
@@ -44,7 +44,7 @@ module.exports = function (app) {
           data: JSON.stringify({
             screens: items.map(function (s) {
               return {
-                screenId: s.id
+                screenId: s.screen_id
               };
             })
           })

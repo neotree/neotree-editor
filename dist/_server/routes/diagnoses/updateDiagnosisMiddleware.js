@@ -2,6 +2,8 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _models = require("../../models");
@@ -20,7 +22,7 @@ module.exports = function (app) {
       if (diagnosis) {
         app.io.emit('update_diagnoses', {
           diagnoses: [{
-            diagnosisId: id
+            diagnosisId: diagnosis.diagnosis_id
           }]
         });
 
@@ -28,7 +30,7 @@ module.exports = function (app) {
           name: 'update_diagnoses',
           data: JSON.stringify({
             diagnoses: [{
-              diagnosisId: id
+              diagnosisId: diagnosis.diagnosis_id
             }]
           })
         });
@@ -50,7 +52,11 @@ module.exports = function (app) {
         id: id
       },
       individualHooks: true
-    }).then(function (diagnosis) {
+    }).then(function (_ref) {
+      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+          _ref2$ = (0, _slicedToArray2["default"])(_ref2[1], 1),
+          diagnosis = _ref2$[0];
+
       return done(null, diagnosis);
     })["catch"](done);
   };
