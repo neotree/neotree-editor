@@ -43,23 +43,29 @@ var _default = function _default() {
           screens = _ref2[2],
           diagnosis = _ref2[3];
 
-      Object.keys(configKeys).forEach(function (id) {
-        return promises.push(_models.ConfigKey.findOrCreate({
+      Object.keys(configKeys).forEach(function (config_key_id, i) {
+        var position = configKeys[config_key_id].position || i + 1;
+        promises.push(_models.ConfigKey.findOrCreate({
           where: {
-            id: id
+            config_key_id: config_key_id
           },
           defaults: {
-            config_key_id: id,
-            data: JSON.stringify(configKeys[id])
+            id: config_key_id,
+            position: position,
+            config_key_id: config_key_id,
+            data: JSON.stringify(configKeys[config_key_id])
           }
         }));
       });
-      Object.keys(scripts).forEach(function (script_id) {
+      Object.keys(scripts).forEach(function (script_id, i) {
+        var position = scripts[script_id].position || i + 1;
         promises.push(_models.Script.findOrCreate({
           where: {
-            id: script_id
+            script_id: script_id
           },
           defaults: {
+            id: script_id,
+            position: position,
             script_id: script_id,
             data: JSON.stringify(scripts[script_id])
           }

@@ -9,7 +9,11 @@ const Device = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
-    unique_key: {
+    device_id: {
+      type: Sequelize.STRING,
+      allowNull: false,
+    },
+    device_hash: {
       type: Sequelize.STRING,
       allowNull: false,
     },

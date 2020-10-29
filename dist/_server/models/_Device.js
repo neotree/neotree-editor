@@ -28,7 +28,11 @@ var Device = _sequelize2["default"].define('device', {
     autoIncrement: true,
     primaryKey: true
   },
-  unique_key: {
+  device_id: {
+    type: _sequelize["default"].STRING,
+    allowNull: false
+  },
+  device_hash: {
     type: _sequelize["default"].STRING,
     allowNull: false
   },

@@ -15,18 +15,22 @@ export default () => new Promise((resolve, reject) => {
     getData('screens'),
     getData('diagnosis')
   ]).then(([configKeys, scripts, screens, diagnosis]) => {
-    Object.keys(configKeys).forEach(id => promises.push(
-      ConfigKey.findOrCreate({
-        where: { id },
-        defaults: { config_key_id: id, data: JSON.stringify(configKeys[id]) }
-      })
-    ));
+    Object.keys(configKeys).forEach((config_key_id, i) => {
+      const position = configKeys[config_key_id].position || (i + 1);
+      promises.push(
+        ConfigKey.findOrCreate({
+          where: { config_key_id },
+          defaults: { id: config_key_id, position, config_key_id, data: JSON.stringify(configKeys[config_key_id]) }
+        })
+      );
+    });
 
-    Object.keys(scripts).forEach(script_id => {
+    Object.keys(scripts).forEach((script_id, i) => {
+      const position = scripts[script_id].position || (i + 1);
       promises.push(
         Script.findOrCreate({
-          where: { id: script_id },
-          defaults: { script_id, data: JSON.stringify(scripts[script_id]) }
+          where: { script_id },
+          defaults: { id: script_id, position, script_id, data: JSON.stringify(scripts[script_id]) }
         })
       );
 
