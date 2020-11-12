@@ -99,8 +99,11 @@ export const copyScript = ({ scriptId: id }) => {
         });
       } catch (e) { /* Do nothing */ }
 
+      let _screens = [];
+      let _diagnoses = [];
+
       try {
-        await Promise.all(Object.keys(screens).map(key => {
+        const savedScreens = await Promise.all(Object.keys(screens).map(key => {
           const screen = screens[key];
           return Screen.findOrCreate({
             where: { screen_id: screen.screenId },
@@ -113,10 +116,11 @@ export const copyScript = ({ scriptId: id }) => {
             }
           });
         }));
+        _screens = savedScreens.map(rslt => rslt[0]);
       } catch (e) { /* Do nothing */ }
 
       try {
-        await Promise.all(Object.keys(diagnosis).map(key => {
+        const savedDiagnoses = await Promise.all(Object.keys(diagnosis).map(key => {
           const d = diagnosis[key];
           return Diagnosis.findOrCreate({
             where: { diagnosis_id: d.diagnosisId },
@@ -128,9 +132,10 @@ export const copyScript = ({ scriptId: id }) => {
             }
           });
         }));
+        _diagnoses = savedDiagnoses.map(rslt => rslt[0]);
       } catch (e) { /* Do nothing */ }
 
-      resolve(script);
+      resolve({ script, diagnoses: _diagnoses, screens: _screens, });
     })();
   });
 };
@@ -139,15 +144,34 @@ export default (app) => (req, res, next) => {
   (async () => {
     const { scripts } = req.body;
 
-    const done = (err, rslts = []) => {
+    const done = async (err, rslts = []) => {
       if (rslts.length) {
+        const diagnoses = rslts.reduce((acc, { diagnoses }) => [...acc, ...diagnoses.map(d => ({ diagnosisId: d.diagnosis_id, scriptId: d.script_id, }))], []);
+        const screens = rslts.reduce((acc, { screens }) => [...acc, ...screens.map(s => ({ screenId: s.screen_id, scriptId: s.script_id, }))], []);
+
+        if (diagnoses.length) {
+          Log.create({
+            name: 'create_diagnoses',
+            data: JSON.stringify({ diagnoses })
+          });
+          app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses });
+        }
+
+        if (screens.length) {
+          Log.create({
+            name: 'create_screens',
+            data: JSON.stringify({ screens })
+          });
+          app.io.emit('create_screens', { key: app.getRandomString(), screens });
+        }
+
         app.io.emit('create_scripts', { key: app.getRandomString(), scripts });
         Log.create({
           name: 'create_scripts',
           data: JSON.stringify({ scripts })
         });
       }
-      res.locals.setResponse(err, { scripts: rslts });
+      res.locals.setResponse(err, { scripts: rslts.map(({ script }) => script) });
       next();
     };
 
