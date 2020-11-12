@@ -7,7 +7,7 @@ module.exports = app => (req, res, next) => {
 
     const done = (err, configKey) => {
       if (configKey) {
-        app.io.emit('create_config_keys', { key: app.getRandomString(), configKeys });
+        app.io.emit('create_config_keys', { key: app.getRandomString(), configKeys: [{ configKeyId: configKey.configKeyId }], });
         Log.create({
           name: 'create_config_keys',
           data: JSON.stringify({ configKeys: [{ configKeyId: configKey.configKeyId }] })

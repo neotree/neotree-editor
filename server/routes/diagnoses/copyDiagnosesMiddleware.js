@@ -7,10 +7,10 @@ module.exports = app => (req, res, next) => {
 
     const done = (err, items = []) => {
       if (items.length) {
-        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: items.map(s => ({ diagnosisId: s.id, scriptId: s.scriptId, })) });
         Log.create({
           name: 'create_diagnoses',
-          data: JSON.stringify({ diagnoses: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) })
+          data: JSON.stringify({ diagnoses: items.map(s => ({ diagnosisId: s.id, scriptId: s.scriptId, })) })
         });
       }
       res.locals.setResponse(err, { items });

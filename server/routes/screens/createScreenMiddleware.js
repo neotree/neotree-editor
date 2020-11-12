@@ -7,10 +7,10 @@ module.exports = app => (req, res, next) => {
 
     const done = (err, screen) => {
       if (screen) {
-        app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ id: screen.id, scriptId }] });
+        app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ screenId: screen.id, scriptId }] });
         Log.create({
           name: 'create_screens',
-          data: JSON.stringify({ screens: [{ id: screen.id, scriptId }] })
+          data: JSON.stringify({ screens: [{ screenId: screen.id, scriptId }] })
         });
       }
       res.locals.setResponse(err, { screen });

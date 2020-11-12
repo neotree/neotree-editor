@@ -38,7 +38,7 @@ module.exports = function (app) {
                   app.io.emit('create_screens', {
                     key: app.getRandomString(),
                     screens: [{
-                      id: screen.id,
+                      screenId: screen.id,
                       scriptId: scriptId
                     }]
                   });
@@ -47,7 +47,7 @@ module.exports = function (app) {
                     name: 'create_screens',
                     data: JSON.stringify({
                       screens: [{
-                        id: screen.id,
+                        screenId: screen.id,
                         scriptId: scriptId
                       }]
                     })

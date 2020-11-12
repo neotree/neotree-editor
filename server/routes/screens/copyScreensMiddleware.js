@@ -7,10 +7,10 @@ module.exports = app => (req, res, next) => {
 
     const done = (err, items = []) => {
       if (items.length) {
-        app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) });
+        app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ screenId: s.id, scriptId: s.scriptId, })) });
         Log.create({
           name: 'create_screens',
-          data: JSON.stringify({ screens: items.map(s => ({ id: s.id, scriptId: s.scriptId, })) })
+          data: JSON.stringify({ screens: items.map(s => ({ screenId: s.id, scriptId: s.scriptId, })) })
         });
       }
       res.locals.setResponse(err, { items });
