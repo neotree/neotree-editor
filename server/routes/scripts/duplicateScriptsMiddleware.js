@@ -74,6 +74,18 @@ export const copyScript = ({ scriptId: id }) => {
         }
       }), {});
 
+      const screenIds = [];
+      try {
+        const snaps = await Promise.all(Object.keys(screens).map(() => firebase.database().ref(`screens/${scriptId}`).push()));
+        snaps.forEach(snap => screenIds.push(snap.key));
+      } catch (e) { return reject(e); }
+
+      const diagnosesIds = [];
+      try {
+        const snaps = await Promise.all(Object.keys(diagnosis).map(() => firebase.database().ref(`diagnosis/${scriptId}`).push()));
+        snaps.forEach(snap => diagnosesIds.push(snap.key));
+      } catch (e) { return reject(e); }
+
       try {
         await firebase.database().ref(`scripts/${scriptId}`).set({
           ...script,
@@ -105,12 +117,13 @@ export const copyScript = ({ scriptId: id }) => {
       let _diagnoses = [];
 
       try {
-        const savedScreens = await Promise.all(Object.keys(screens).map(key => {
+        const savedScreens = await Promise.all(Object.keys(screens).map((key, i) => {
           const screen = screens[key];
+          const screen_id = screenIds[i];
           return Screen.findOrCreate({
-            where: { screen_id: screen.screenId },
+            where: { screen_id },
             defaults: {
-              screen_id: screen.screenId,
+              screen_id,
               script_id: screen.scriptId,
               type: screen.type,
               position: screen.position,
@@ -122,12 +135,13 @@ export const copyScript = ({ scriptId: id }) => {
       } catch (e) { /* Do nothing */ }
 
       try {
-        const savedDiagnoses = await Promise.all(Object.keys(diagnosis).map(key => {
+        const savedDiagnoses = await Promise.all(Object.keys(diagnosis).map((key, i) => {
           const d = diagnosis[key];
+          const diagnosis_id = diagnosesIds[i];
           return Diagnosis.findOrCreate({
-            where: { diagnosis_id: d.diagnosisId },
+            where: { diagnosis_id },
             defaults: {
-              diagnosis_id: d.diagnosisId,
+              diagnosis_id,
               script_id: d.scriptId,
               position: d.position,
               data: JSON.stringify(d),

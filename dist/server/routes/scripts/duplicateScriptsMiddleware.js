@@ -37,7 +37,7 @@ var copyScript = function copyScript(_ref) {
   return new Promise(function (resolve, reject) {
     if (!id) return reject(new Error('Required script "id" is not provided.'));
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var scriptId, snap, script, scripts, screens, diagnosis, _screens, _diagnoses, savedScreens, savedDiagnoses;
+      var scriptId, snap, script, scripts, screens, diagnosis, screenIds, snaps, diagnosesIds, _snaps, _screens, _diagnoses, savedScreens, savedDiagnoses;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -165,51 +165,95 @@ var copyScript = function copyScript(_ref) {
                   updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
                 })));
               }, {});
-              _context.prev = 54;
-              _context.next = 57;
+              screenIds = [];
+              _context.prev = 55;
+              _context.next = 58;
+              return Promise.all(Object.keys(screens).map(function () {
+                return _firebase["default"].database().ref("screens/".concat(scriptId)).push();
+              }));
+
+            case 58:
+              snaps = _context.sent;
+              snaps.forEach(function (snap) {
+                return screenIds.push(snap.key);
+              });
+              _context.next = 65;
+              break;
+
+            case 62:
+              _context.prev = 62;
+              _context.t5 = _context["catch"](55);
+              return _context.abrupt("return", reject(_context.t5));
+
+            case 65:
+              diagnosesIds = [];
+              _context.prev = 66;
+              _context.next = 69;
+              return Promise.all(Object.keys(diagnosis).map(function () {
+                return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).push();
+              }));
+
+            case 69:
+              _snaps = _context.sent;
+
+              _snaps.forEach(function (snap) {
+                return diagnosesIds.push(snap.key);
+              });
+
+              _context.next = 76;
+              break;
+
+            case 73:
+              _context.prev = 73;
+              _context.t6 = _context["catch"](66);
+              return _context.abrupt("return", reject(_context.t6));
+
+            case 76:
+              _context.prev = 76;
+              _context.next = 79;
               return _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread({}, script), {}, {
                 createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
                 updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
               }));
 
-            case 57:
-              _context.next = 62;
+            case 79:
+              _context.next = 84;
               break;
 
-            case 59:
-              _context.prev = 59;
-              _context.t5 = _context["catch"](54);
-              return _context.abrupt("return", reject(_context.t5));
+            case 81:
+              _context.prev = 81;
+              _context.t7 = _context["catch"](76);
+              return _context.abrupt("return", reject(_context.t7));
 
-            case 62:
-              _context.prev = 62;
-              _context.next = 65;
+            case 84:
+              _context.prev = 84;
+              _context.next = 87;
               return _firebase["default"].database().ref("screens/".concat(scriptId)).set(_objectSpread({}, screens));
 
-            case 65:
-              _context.next = 69;
+            case 87:
+              _context.next = 91;
               break;
 
-            case 67:
-              _context.prev = 67;
-              _context.t6 = _context["catch"](62);
+            case 89:
+              _context.prev = 89;
+              _context.t8 = _context["catch"](84);
 
-            case 69:
-              _context.prev = 69;
-              _context.next = 72;
+            case 91:
+              _context.prev = 91;
+              _context.next = 94;
               return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).set(_objectSpread({}, diagnosis));
 
-            case 72:
-              _context.next = 76;
+            case 94:
+              _context.next = 98;
               break;
 
-            case 74:
-              _context.prev = 74;
-              _context.t7 = _context["catch"](69);
+            case 96:
+              _context.prev = 96;
+              _context.t9 = _context["catch"](91);
 
-            case 76:
-              _context.prev = 76;
-              _context.next = 79;
+            case 98:
+              _context.prev = 98;
+              _context.next = 101;
               return _models.Script.findOrCreate({
                 where: {
                   script_id: script.scriptId
@@ -221,27 +265,28 @@ var copyScript = function copyScript(_ref) {
                 }
               });
 
-            case 79:
-              _context.next = 83;
+            case 101:
+              _context.next = 105;
               break;
 
-            case 81:
-              _context.prev = 81;
-              _context.t8 = _context["catch"](76);
+            case 103:
+              _context.prev = 103;
+              _context.t10 = _context["catch"](98);
 
-            case 83:
+            case 105:
               _screens = [];
               _diagnoses = [];
-              _context.prev = 85;
-              _context.next = 88;
-              return Promise.all(Object.keys(screens).map(function (key) {
+              _context.prev = 107;
+              _context.next = 110;
+              return Promise.all(Object.keys(screens).map(function (key, i) {
                 var screen = screens[key];
+                var screen_id = screenIds[i];
                 return _models.Screen.findOrCreate({
                   where: {
-                    screen_id: screen.screenId
+                    screen_id: screen_id
                   },
                   defaults: {
-                    screen_id: screen.screenId,
+                    screen_id: screen_id,
                     script_id: screen.scriptId,
                     type: screen.type,
                     position: screen.position,
@@ -250,29 +295,30 @@ var copyScript = function copyScript(_ref) {
                 });
               }));
 
-            case 88:
+            case 110:
               savedScreens = _context.sent;
               _screens = savedScreens.map(function (rslt) {
                 return rslt[0];
               });
-              _context.next = 94;
+              _context.next = 116;
               break;
 
-            case 92:
-              _context.prev = 92;
-              _context.t9 = _context["catch"](85);
+            case 114:
+              _context.prev = 114;
+              _context.t11 = _context["catch"](107);
 
-            case 94:
-              _context.prev = 94;
-              _context.next = 97;
-              return Promise.all(Object.keys(diagnosis).map(function (key) {
+            case 116:
+              _context.prev = 116;
+              _context.next = 119;
+              return Promise.all(Object.keys(diagnosis).map(function (key, i) {
                 var d = diagnosis[key];
+                var diagnosis_id = diagnosesIds[i];
                 return _models.Diagnosis.findOrCreate({
                   where: {
-                    diagnosis_id: d.diagnosisId
+                    diagnosis_id: diagnosis_id
                   },
                   defaults: {
-                    diagnosis_id: d.diagnosisId,
+                    diagnosis_id: diagnosis_id,
                     script_id: d.scriptId,
                     position: d.position,
                     data: JSON.stringify(d)
@@ -280,31 +326,31 @@ var copyScript = function copyScript(_ref) {
                 });
               }));
 
-            case 97:
+            case 119:
               savedDiagnoses = _context.sent;
               _diagnoses = savedDiagnoses.map(function (rslt) {
                 return rslt[0];
               });
-              _context.next = 103;
+              _context.next = 125;
               break;
 
-            case 101:
-              _context.prev = 101;
-              _context.t10 = _context["catch"](94);
+            case 123:
+              _context.prev = 123;
+              _context.t12 = _context["catch"](116);
 
-            case 103:
+            case 125:
               resolve({
                 script: script,
                 diagnoses: _diagnoses,
                 screens: _screens
               });
 
-            case 104:
+            case 126:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [54, 59], [62, 67], [69, 74], [76, 81], [85, 92], [94, 101]]);
+      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [55, 62], [66, 73], [76, 81], [84, 89], [91, 96], [98, 103], [107, 114], [116, 123]]);
     }))();
   });
 };
