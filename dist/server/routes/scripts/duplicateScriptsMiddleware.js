@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = exports.copyScript = void 0;
 
+var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
+
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
@@ -35,7 +37,8 @@ var copyScript = function copyScript(_ref) {
   return new Promise(function (resolve, reject) {
     if (!id) return reject(new Error('Required script "id" is not provided.'));
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var scriptId, snap, script, scripts, screens, diagnosis;
+      var scriptId, snap, script, scripts, screens, diagnosis, _screens, _diagnoses, savedScreens, savedDiagnoses;
+
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -229,8 +232,10 @@ var copyScript = function copyScript(_ref) {
               _context.t8 = _context["catch"](76);
 
             case 83:
-              _context.prev = 83;
-              _context.next = 86;
+              _screens = [];
+              _diagnoses = [];
+              _context.prev = 85;
+              _context.next = 88;
               return Promise.all(Object.keys(screens).map(function (key) {
                 var screen = screens[key];
                 return _models.Screen.findOrCreate({
@@ -247,17 +252,21 @@ var copyScript = function copyScript(_ref) {
                 });
               }));
 
-            case 86:
-              _context.next = 90;
+            case 88:
+              savedScreens = _context.sent;
+              _screens = savedScreens.map(function (rslt) {
+                return rslt[0];
+              });
+              _context.next = 94;
               break;
 
-            case 88:
-              _context.prev = 88;
-              _context.t9 = _context["catch"](83);
+            case 92:
+              _context.prev = 92;
+              _context.t9 = _context["catch"](85);
 
-            case 90:
-              _context.prev = 90;
-              _context.next = 93;
+            case 94:
+              _context.prev = 94;
+              _context.next = 97;
               return Promise.all(Object.keys(diagnosis).map(function (key) {
                 var d = diagnosis[key];
                 return _models.Diagnosis.findOrCreate({
@@ -273,23 +282,31 @@ var copyScript = function copyScript(_ref) {
                 });
               }));
 
-            case 93:
-              _context.next = 97;
+            case 97:
+              savedDiagnoses = _context.sent;
+              _diagnoses = savedDiagnoses.map(function (rslt) {
+                return rslt[0];
+              });
+              _context.next = 103;
               break;
 
-            case 95:
-              _context.prev = 95;
-              _context.t10 = _context["catch"](90);
+            case 101:
+              _context.prev = 101;
+              _context.t10 = _context["catch"](94);
 
-            case 97:
-              resolve(script);
+            case 103:
+              resolve({
+                script: script,
+                diagnoses: _diagnoses,
+                screens: _screens
+              });
 
-            case 98:
+            case 104:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [54, 59], [62, 67], [69, 74], [76, 81], [83, 88], [90, 95]]);
+      }, _callee, null, [[1, 8], [12, 18], [23, 29], [32, 39], [42, 49], [54, 59], [62, 67], [69, 74], [76, 81], [85, 92], [94, 101]]);
     }))();
   });
 };
@@ -298,63 +315,134 @@ exports.copyScript = copyScript;
 
 var _default = function _default(app) {
   return function (req, res, next) {
-    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
       var scripts, done, rslts;
-      return _regenerator["default"].wrap(function _callee2$(_context2) {
+      return _regenerator["default"].wrap(function _callee3$(_context3) {
         while (1) {
-          switch (_context2.prev = _context2.next) {
+          switch (_context3.prev = _context3.next) {
             case 0:
               scripts = req.body.scripts;
 
-              done = function done(err) {
-                var rslts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+              done = /*#__PURE__*/function () {
+                var _ref4 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2(err) {
+                  var rslts,
+                      diagnoses,
+                      screens,
+                      _args2 = arguments;
+                  return _regenerator["default"].wrap(function _callee2$(_context2) {
+                    while (1) {
+                      switch (_context2.prev = _context2.next) {
+                        case 0:
+                          rslts = _args2.length > 1 && _args2[1] !== undefined ? _args2[1] : [];
 
-                if (rslts.length) {
-                  app.io.emit('create_scripts', {
-                    key: app.getRandomString(),
-                    scripts: scripts
-                  });
+                          if (rslts.length) {
+                            diagnoses = rslts.reduce(function (acc, _ref5) {
+                              var diagnoses = _ref5.diagnoses;
+                              return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])(diagnoses.map(function (d) {
+                                return {
+                                  diagnosisId: d.diagnosis_id,
+                                  scriptId: d.script_id
+                                };
+                              })));
+                            }, []);
+                            screens = rslts.reduce(function (acc, _ref6) {
+                              var screens = _ref6.screens;
+                              return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])(screens.map(function (s) {
+                                return {
+                                  screenId: s.screen_id,
+                                  scriptId: s.script_id
+                                };
+                              })));
+                            }, []);
 
-                  _models.Log.create({
-                    name: 'create_scripts',
-                    data: JSON.stringify({
-                      scripts: scripts
-                    })
-                  });
-                }
+                            if (diagnoses.length) {
+                              _models.Log.create({
+                                name: 'create_diagnoses',
+                                data: JSON.stringify({
+                                  diagnoses: diagnoses
+                                })
+                              });
 
-                res.locals.setResponse(err, {
-                  scripts: rslts
-                });
-                next();
-              };
+                              app.io.emit('create_diagnoses', {
+                                key: app.getRandomString(),
+                                diagnoses: diagnoses
+                              });
+                            }
+
+                            if (screens.length) {
+                              _models.Log.create({
+                                name: 'create_screens',
+                                data: JSON.stringify({
+                                  screens: screens
+                                })
+                              });
+
+                              app.io.emit('create_screens', {
+                                key: app.getRandomString(),
+                                screens: screens
+                              });
+                            }
+
+                            app.io.emit('create_scripts', {
+                              key: app.getRandomString(),
+                              scripts: scripts
+                            });
+
+                            _models.Log.create({
+                              name: 'create_scripts',
+                              data: JSON.stringify({
+                                scripts: scripts
+                              })
+                            });
+                          }
+
+                          res.locals.setResponse(err, {
+                            scripts: rslts.map(function (_ref7) {
+                              var script = _ref7.script;
+                              return script;
+                            })
+                          });
+                          next();
+
+                        case 4:
+                        case "end":
+                          return _context2.stop();
+                      }
+                    }
+                  }, _callee2);
+                }));
+
+                return function done(_x) {
+                  return _ref4.apply(this, arguments);
+                };
+              }();
 
               rslts = [];
-              _context2.prev = 3;
-              _context2.next = 6;
+              _context3.prev = 3;
+              _context3.next = 6;
               return Promise.all(scripts.map(function (s) {
                 return copyScript(s);
               }));
 
             case 6:
-              rslts = _context2.sent;
-              _context2.next = 12;
+              rslts = _context3.sent;
+              _context3.next = 12;
               break;
 
             case 9:
-              _context2.prev = 9;
-              _context2.t0 = _context2["catch"](3);
-              return _context2.abrupt("return", done(_context2.t0));
+              _context3.prev = 9;
+              _context3.t0 = _context3["catch"](3);
+              return _context3.abrupt("return", done(_context3.t0));
 
             case 12:
               done(null, rslts);
 
             case 13:
             case "end":
-              return _context2.stop();
+              return _context3.stop();
           }
         }
-      }, _callee2, null, [[3, 9]]);
+      }, _callee3, null, [[3, 9]]);
     }))();
   };
 };
