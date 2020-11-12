@@ -9,6 +9,8 @@ exports["default"] = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _index = require("../index");
@@ -20,6 +22,10 @@ var _models = require("../../database/models");
   enterModule && enterModule(module);
 })();
 
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
@@ -27,7 +33,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var _default = function _default() {
   return new Promise(function (resolve, reject) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var authUsers, rslts, adminUser, users, seedUsers;
+      var authUsers, rslts, adminUser, countUsers, users, seedUsers;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -82,32 +88,52 @@ var _default = function _default() {
               return _context.abrupt("return", reject(_context.t1));
 
             case 24:
-              users = {};
+              countUsers = 0;
               _context.prev = 25;
               _context.next = 28;
+              return _models.User.count({
+                where: {}
+              });
+
+            case 28:
+              countUsers = _context.sent;
+              _context.next = 33;
+              break;
+
+            case 31:
+              _context.prev = 31;
+              _context.t2 = _context["catch"](25);
+
+            case 33:
+              if (countUsers) {
+                _context.next = 63;
+                break;
+              }
+
+              users = {};
+              _context.prev = 35;
+              _context.next = 38;
               return new Promise(function (resolve) {
                 _index.firebaseAdmin.database().ref('users').once('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 28:
+            case 38:
               users = _context.sent;
               users = users || {};
-              _context.next = 35;
+              _context.next = 45;
               break;
 
-            case 32:
-              _context.prev = 32;
-              _context.t2 = _context["catch"](25);
-              return _context.abrupt("return", reject(_context.t2));
+            case 42:
+              _context.prev = 42;
+              _context.t3 = _context["catch"](35);
+              return _context.abrupt("return", reject(_context.t3));
 
-            case 35:
+            case 45:
               seedUsers = [];
-              _context.prev = 36;
-              seedUsers = authUsers.filter(function (u) {
-                return !users[u.uid];
-              }).map(function (u) {
+              _context.prev = 46;
+              seedUsers = authUsers.map(function (u) {
                 return {
                   email: u.email,
                   id: u.uid,
@@ -117,23 +143,23 @@ var _default = function _default() {
                   activated: false
                 };
               });
-              _context.next = 40;
+              _context.next = 50;
               return Promise.all(seedUsers.map(function (u) {
-                return _index.firebaseAdmin.database().ref("users/".concat(u.userId)).set(u);
+                return _index.firebaseAdmin.database().ref("users/".concat(u.userId)).set(_objectSpread(_objectSpread({}, u), users[u.id]));
               }));
 
-            case 40:
-              _context.next = 45;
+            case 50:
+              _context.next = 55;
               break;
 
-            case 42:
-              _context.prev = 42;
-              _context.t3 = _context["catch"](36);
-              return _context.abrupt("return", reject(_context.t3));
+            case 52:
+              _context.prev = 52;
+              _context.t4 = _context["catch"](46);
+              return _context.abrupt("return", reject(_context.t4));
 
-            case 45:
-              _context.prev = 45;
-              _context.next = 48;
+            case 55:
+              _context.prev = 55;
+              _context.next = 58;
               return Promise.all(seedUsers.map(function (u) {
                 return _models.User.findOrCreate({
                   where: {
@@ -147,24 +173,24 @@ var _default = function _default() {
                 });
               }));
 
-            case 48:
-              _context.next = 53;
+            case 58:
+              _context.next = 63;
               break;
 
-            case 50:
-              _context.prev = 50;
-              _context.t4 = _context["catch"](45);
-              return _context.abrupt("return", reject(_context.t4));
+            case 60:
+              _context.prev = 60;
+              _context.t5 = _context["catch"](55);
+              return _context.abrupt("return", reject(_context.t5));
 
-            case 53:
+            case 63:
               resolve();
 
-            case 54:
+            case 64:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [14, 21], [25, 32], [36, 42], [45, 50]]);
+      }, _callee, null, [[1, 8], [14, 21], [25, 31], [35, 42], [46, 52], [55, 60]]);
     }))();
   });
 };
