@@ -383,7 +383,12 @@ var _default = function _default(app) {
 
                             app.io.emit('create_scripts', {
                               key: app.getRandomString(),
-                              scripts: scripts
+                              scripts: rslts.map(function (_ref7) {
+                                var script = _ref7.script;
+                                return {
+                                  scriptId: script.scriptId
+                                };
+                              })
                             });
 
                             _models.Log.create({
@@ -395,8 +400,8 @@ var _default = function _default(app) {
                           }
 
                           res.locals.setResponse(err, {
-                            scripts: rslts.map(function (_ref7) {
-                              var script = _ref7.script;
+                            scripts: rslts.map(function (_ref8) {
+                              var script = _ref8.script;
                               return script;
                             })
                           });

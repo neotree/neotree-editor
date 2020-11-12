@@ -167,7 +167,7 @@ export default (app) => (req, res, next) => {
           app.io.emit('create_screens', { key: app.getRandomString(), screens });
         }
 
-        app.io.emit('create_scripts', { key: app.getRandomString(), scripts });
+        app.io.emit('create_scripts', { key: app.getRandomString(), scripts: rslts.map(({ script }) => ({ scriptId: script.scriptId })) });
         Log.create({
           name: 'create_scripts',
           data: JSON.stringify({ scripts })
