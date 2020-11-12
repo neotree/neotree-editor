@@ -56,12 +56,22 @@ export const copyScript = ({ scriptId: id }) => {
 
       screens = Object.keys(screens).reduce((acc, key) => ({
         ...acc,
-        [key]: { ...screens[key], scriptId, }
+        [key]: {
+          ...screens[key],
+          scriptId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        }
       }), {});
 
       diagnosis = Object.keys(diagnosis).reduce((acc, key) => ({
         ...acc,
-        [key]: { ...diagnosis[key], scriptId, }
+        [key]: {
+          ...diagnosis[key],
+          scriptId,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        }
       }), {});
 
       try {
@@ -73,19 +83,11 @@ export const copyScript = ({ scriptId: id }) => {
       } catch (e) { return reject(e); }
 
       try {
-        await firebase.database().ref(`screens/${scriptId}`).set({
-          ...screens,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        });
+        await firebase.database().ref(`screens/${scriptId}`).set({ ...screens, });
       } catch (e) { /* do nothing */ }
 
       try {
-        await firebase.database().ref(`diagnosis/${scriptId}`).set({
-          ...diagnosis,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        });
+        await firebase.database().ref(`diagnosis/${scriptId}`).set({ ...diagnosis, });
       } catch (e) { /* do nothing */ }
 
       try {

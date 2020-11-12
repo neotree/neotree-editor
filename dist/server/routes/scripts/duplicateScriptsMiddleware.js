@@ -153,12 +153,16 @@ var copyScript = function copyScript(_ref) {
               });
               screens = Object.keys(screens).reduce(function (acc, key) {
                 return _objectSpread(_objectSpread({}, acc), {}, (0, _defineProperty2["default"])({}, key, _objectSpread(_objectSpread({}, screens[key]), {}, {
-                  scriptId: scriptId
+                  scriptId: scriptId,
+                  createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                  updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
                 })));
               }, {});
               diagnosis = Object.keys(diagnosis).reduce(function (acc, key) {
                 return _objectSpread(_objectSpread({}, acc), {}, (0, _defineProperty2["default"])({}, key, _objectSpread(_objectSpread({}, diagnosis[key]), {}, {
-                  scriptId: scriptId
+                  scriptId: scriptId,
+                  createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                  updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
                 })));
               }, {});
               _context.prev = 54;
@@ -180,10 +184,7 @@ var copyScript = function copyScript(_ref) {
             case 62:
               _context.prev = 62;
               _context.next = 65;
-              return _firebase["default"].database().ref("screens/".concat(scriptId)).set(_objectSpread(_objectSpread({}, screens), {}, {
-                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-              }));
+              return _firebase["default"].database().ref("screens/".concat(scriptId)).set(_objectSpread({}, screens));
 
             case 65:
               _context.next = 69;
@@ -196,10 +197,7 @@ var copyScript = function copyScript(_ref) {
             case 69:
               _context.prev = 69;
               _context.next = 72;
-              return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).set(_objectSpread(_objectSpread({}, diagnosis), {}, {
-                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-              }));
+              return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).set(_objectSpread({}, diagnosis));
 
             case 72:
               _context.next = 76;
