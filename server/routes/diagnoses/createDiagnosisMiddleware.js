@@ -7,10 +7,10 @@ module.exports = app => (req, res, next) => {
 
     const done = (err, diagnosis) => {
       if (diagnosis) {
-        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ id: diagnosis.id, scriptId }] });
+        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses: [{ diagnosisId: diagnosis.id, scriptId }] });
         Log.create({
           name: 'create_diagnoses',
-          data: JSON.stringify({ diagnoses: [{ id: diagnosis.id, scriptId }] })
+          data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.id, scriptId }] })
         });
       }
       res.locals.setResponse(err, { diagnosis });

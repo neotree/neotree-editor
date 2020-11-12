@@ -34,7 +34,9 @@ module.exports = function (app) {
                 if (configKey) {
                   app.io.emit('create_config_keys', {
                     key: app.getRandomString(),
-                    configKeys: configKeys
+                    configKeys: [{
+                      configKeyId: configKey.configKeyId
+                    }]
                   });
 
                   _models.Log.create({

@@ -40,7 +40,7 @@ module.exports = function (app) {
                 });
 
                 _models.Log.create({
-                  name: 'create_diagnoses',
+                  name: 'update_config_keys',
                   data: JSON.stringify({
                     configKeys: configKeys.map(function (s) {
                       return {

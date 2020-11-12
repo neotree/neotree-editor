@@ -38,7 +38,7 @@ module.exports = function (app) {
                   app.io.emit('create_diagnoses', {
                     key: app.getRandomString(),
                     diagnoses: [{
-                      id: diagnosis.id,
+                      diagnosisId: diagnosis.id,
                       scriptId: scriptId
                     }]
                   });
@@ -47,7 +47,7 @@ module.exports = function (app) {
                     name: 'create_diagnoses',
                     data: JSON.stringify({
                       diagnoses: [{
-                        id: diagnosis.id,
+                        diagnosisId: diagnosis.id,
                         scriptId: scriptId
                       }]
                     })

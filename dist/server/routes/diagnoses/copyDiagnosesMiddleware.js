@@ -39,7 +39,7 @@ module.exports = function (app) {
                     key: app.getRandomString(),
                     diagnoses: items.map(function (s) {
                       return {
-                        id: s.id,
+                        diagnosisId: s.id,
                         scriptId: s.scriptId
                       };
                     })
@@ -50,7 +50,7 @@ module.exports = function (app) {
                     data: JSON.stringify({
                       diagnoses: items.map(function (s) {
                         return {
-                          id: s.id,
+                          diagnosisId: s.id,
                           scriptId: s.scriptId
                         };
                       })
