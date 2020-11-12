@@ -1,7 +1,7 @@
 import { ConfigKey } from '../../database';
 
 module.exports = () => (req, res, next) => {
-  const payload = req.query;
+  const payload = res.locals.reqQuery;
 
   const done = (e, payload) => {
     res.locals.setResponse(e, payload);

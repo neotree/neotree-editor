@@ -4,7 +4,7 @@ module.exports = () => (req, res, next) => {
   const {
     filters,
     ...payload
-  } = req.query;
+  } = res.locals.reqQuery;
 
   const done = (e, payload) => {
     res.locals.setResponse(e, payload);
