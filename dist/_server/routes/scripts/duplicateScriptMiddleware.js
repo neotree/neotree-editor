@@ -7,6 +7,10 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = exports.copyScript = void 0;
 
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
+
 var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
@@ -99,30 +103,93 @@ var _default = function _default(app) {
   return function (req, res, next) {
     var id = req.body.id;
 
-    var done = function done(err, script) {
-      if (script) {
-        app.io.emit('create_scripts', {
-          scripts: [{
-            scriptId: script.id
-          }]
-        });
+    var done = /*#__PURE__*/function () {
+      var _ref4 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee(err) {
+        var rslts,
+            script,
+            diagnoses,
+            screens,
+            _args = arguments;
+        return _regenerator["default"].wrap(function _callee$(_context) {
+          while (1) {
+            switch (_context.prev = _context.next) {
+              case 0:
+                rslts = _args.length > 1 && _args[1] !== undefined ? _args[1] : {};
+                script = rslts.script;
+                diagnoses = rslts.diagnoses.map(function (d) {
+                  return {
+                    diagnosisId: d.diagnosis_id,
+                    scriptId: d.script_id
+                  };
+                });
+                screens = rslts.screens.map(function (s) {
+                  return {
+                    screenId: s.screen_id,
+                    scriptId: s.script_id
+                  };
+                });
 
-        _models.Log.create({
-          name: 'create_scripts',
-          data: JSON.stringify({
-            scripts: [{
-              scriptId: script.id
-            }]
-          })
-        });
-      }
+                if (script) {
+                  if (diagnoses.length) {
+                    _models.Log.create({
+                      name: 'create_diagnoses',
+                      data: JSON.stringify({
+                        diagnoses: diagnoses
+                      })
+                    });
 
-      res.locals.setResponse(err, {
-        script: script
-      });
-      next();
-      return null;
-    };
+                    app.io.emit('create_diagnoses', {
+                      diagnoses: diagnoses
+                    });
+                  }
+
+                  if (screens.length) {
+                    _models.Log.create({
+                      name: 'create_screens',
+                      data: JSON.stringify({
+                        screens: screens
+                      })
+                    });
+
+                    app.io.emit('create_screens', {
+                      screens: screens
+                    });
+                  }
+
+                  app.io.emit('create_scripts', {
+                    scripts: [{
+                      scriptId: script.id
+                    }]
+                  });
+
+                  _models.Log.create({
+                    name: 'create_scripts',
+                    data: JSON.stringify({
+                      scripts: [{
+                        scriptId: script.id
+                      }]
+                    })
+                  });
+                }
+
+                res.locals.setResponse(err, {
+                  script: script
+                });
+                next();
+                return _context.abrupt("return", null);
+
+              case 8:
+              case "end":
+                return _context.stop();
+            }
+          }
+        }, _callee);
+      }));
+
+      return function done(_x) {
+        return _ref4.apply(this, arguments);
+      };
+    }();
 
     if (!id) return done({
       msg: 'Required script "id" is not provided.'
@@ -139,11 +206,11 @@ var _default = function _default(app) {
       where: {
         script_id: id
       }
-    })]).then(function (_ref4) {
-      var _ref5 = (0, _slicedToArray2["default"])(_ref4, 3),
-          s = _ref5[0],
-          screens = _ref5[1],
-          diagnoses = _ref5[2];
+    })]).then(function (_ref5) {
+      var _ref6 = (0, _slicedToArray2["default"])(_ref5, 3),
+          s = _ref6[0],
+          screens = _ref6[1],
+          diagnoses = _ref6[2];
 
       if (!s) return done({
         msg: "Could not find script with \"id\" ".concat(id, ".")
@@ -152,9 +219,8 @@ var _default = function _default(app) {
       copyScript(_objectSpread({
         screens: screens,
         diagnoses: diagnoses
-      }, s)).then(function (_ref6) {
-        var script = _ref6.script;
-        return done(null, script);
+      }, s)).then(function (rslts) {
+        return done(null, rslts);
       })["catch"](done);
       return null;
     })["catch"](done);

@@ -57,8 +57,27 @@ export const copyScript = ({ screens, diagnoses, ...script }) => {
 export default (app) => (req, res, next) => {
   const { id } = req.body;
 
-  const done = (err, script) => {
+  const done = async (err, rslts = {}) => {
+    const { script } = rslts;
+    const diagnoses = rslts.diagnoses.map(d => ({ diagnosisId: d.diagnosis_id, scriptId: d.script_id, }));
+    const screens = rslts.screens.map(s => ({ screenId: s.screen_id, scriptId: s.script_id, }));
     if (script) {
+      if (diagnoses.length) {
+        Log.create({
+          name: 'create_diagnoses',
+          data: JSON.stringify({ diagnoses })
+        });
+        app.io.emit('create_diagnoses', { diagnoses });
+      }
+
+      if (screens.length) {
+        Log.create({
+          name: 'create_screens',
+          data: JSON.stringify({ screens })
+        });
+        app.io.emit('create_screens', { screens });
+      }
+
       app.io.emit('create_scripts', { scripts: [{ scriptId: script.id }] });
       Log.create({
         name: 'create_scripts',
@@ -82,7 +101,7 @@ export default (app) => (req, res, next) => {
       s = s.toJSON();
 
       copyScript({ screens, diagnoses, ...s })
-        .then(({ script }) => done(null, script))
+        .then(rslts => done(null, rslts))
         .catch(done);
 
       return null;

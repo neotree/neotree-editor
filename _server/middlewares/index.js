@@ -2,6 +2,18 @@ export default app => {
   app = (process.env.NODE_ENV === 'production' ?
     require('./middlewares.production') : require('./middlewares.development'))(app);
 
+  app.use((req, res, next) => {
+    res.locals.reqQuery = {};
+    if (req.query) {
+      res.locals.reqQuery = Object.keys(req.query).reduce((acc, key) => {
+        let value = req.query[key];
+        try { value = JSON.parse(req.query[key]); } catch (e) { /* DO NOTHING*/ }
+        return { ...acc, [key]: value, };
+      }, {});
+    }
+    next();
+  });
+
   //body-parser
   app.use(require('body-parser').json());
   app.use(require('body-parser').urlencoded({ extended: false }));

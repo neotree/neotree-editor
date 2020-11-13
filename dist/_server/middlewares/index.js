@@ -23,7 +23,26 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var _default = function _default(app) {
-  app = (process.env.NODE_ENV === 'production' ? require('./middlewares.production') : require('./middlewares.development'))(app); //body-parser
+  app = (process.env.NODE_ENV === 'production' ? require('./middlewares.production') : require('./middlewares.development'))(app);
+  app.use(function (req, res, next) {
+    res.locals.reqQuery = {};
+
+    if (req.query) {
+      res.locals.reqQuery = Object.keys(req.query).reduce(function (acc, key) {
+        var value = req.query[key];
+
+        try {
+          value = JSON.parse(req.query[key]);
+        } catch (e) {
+          /* DO NOTHING*/
+        }
+
+        return _objectSpread(_objectSpread({}, acc), {}, (0, _defineProperty2["default"])({}, key, value));
+      }, {});
+    }
+
+    next();
+  }); //body-parser
 
   app.use(require('body-parser').json());
   app.use(require('body-parser').urlencoded({
