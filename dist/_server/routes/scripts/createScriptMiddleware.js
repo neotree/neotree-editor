@@ -2,6 +2,8 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
@@ -66,9 +68,17 @@ module.exports = function (app, params) {
       });
     };
 
-    saveToFirebase().then(function (id) {
+    Promise.all([_models.Script.count({
+      where: {}
+    }), saveToFirebase()]).then(function (_ref) {
+      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
+          count = _ref2[0],
+          id = _ref2[1];
+
       _models.Script.create(_objectSpread(_objectSpread({}, payload), {}, {
-        id: id
+        position: count + 1,
+        id: id,
+        script_id: id
       })).then(function (script) {
         return done(null, script);
       })["catch"](done);
