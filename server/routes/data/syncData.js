@@ -28,16 +28,16 @@ module.exports = () => (req, res, next) => {
 
     Promise.all([
       Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Script.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
+      Script.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
       Screen.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Screen.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
+      Screen.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
       Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Diagnosis.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
+      Diagnosis.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
       ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      ConfigKey.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
+      ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
     ])
       .then(([
         scripts,

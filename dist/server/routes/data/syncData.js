@@ -120,25 +120,41 @@ module.exports = function () {
                   deletedAt: null
                 }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Script.findAll({
-                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
+                where: _objectSpread({
+                  deletedAt: {
+                    $not: null
+                  }
+                }, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.Screen.findAll({
                 where: _objectSpread({
                   deletedAt: null
                 }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Screen.findAll({
-                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
+                where: _objectSpread({
+                  deletedAt: {
+                    $not: null
+                  }
+                }, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.Diagnosis.findAll({
                 where: _objectSpread({
                   deletedAt: null
                 }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Diagnosis.findAll({
-                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
+                where: _objectSpread({
+                  deletedAt: {
+                    $not: null
+                  }
+                }, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.ConfigKey.findAll({
                 where: _objectSpread({
                   deletedAt: null
                 }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.ConfigKey.findAll({
-                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
+                where: _objectSpread({
+                  deletedAt: {
+                    $not: null
+                  }
+                }, whereLastSyncDateGreaterThanLastDeleted)
               })]).then(function (_ref2) {
                 var _ref3 = (0, _slicedToArray2["default"])(_ref2, 8),
                     scripts = _ref3[0],
