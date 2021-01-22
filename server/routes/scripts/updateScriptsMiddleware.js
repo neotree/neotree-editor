@@ -1,7 +1,6 @@
 import { updateScript } from './updateScriptMiddleware';
-import { Log } from '../../database/models';
 
-module.exports = (app) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { scripts } = req.body;
 
@@ -10,11 +9,6 @@ module.exports = (app) => (req, res, next) => {
         res.locals.setResponse(err);
         return next();
       }
-      app.io.emit('update_scripts', { key: app.getRandomString(), scripts: scripts.map(s => ({ scriptId: s.scriptId })) });
-      Log.create({
-        name: 'update_scripts',
-        data: JSON.stringify({ scripts: scripts.map(s => ({ scriptId: s.scriptId })) })
-      });
       res.locals.setResponse(null, { updatedScripts });
       next();
     };

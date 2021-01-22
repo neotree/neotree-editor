@@ -1,29 +1,23 @@
-import firebase from '../../firebase';
+import { Diagnosis } from '../../database';
 
 module.exports = () => (req, res, next) => {
-  (async () => {
-    const { scriptId } = req.query;
+  const { scriptId } = req.query;
 
+  (async () => {
     const done = (err, diagnoses) => {
       res.locals.setResponse(err, { diagnoses });
       next();
     };
 
-    if (!scriptId) return done(new Error('Required script "id" is not provided.'));
-
-    let diagnoses = {};
+    let diagnoses = [];
     try {
-      diagnoses = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`diagnosis/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
+      diagnoses = await Diagnosis.findAll({ where: { script_id: scriptId, deletedAt: null }, order: [['position', 'ASC']], });
+      diagnoses = diagnoses.map(diagnosis => {
+        const { data, ...s } = JSON.parse(JSON.stringify(diagnosis));
+        return { ...data, ...s };
       });
-      diagnoses = diagnoses || {};
     } catch (e) { return done(e); }
 
-    done(
-      null,
-      Object.keys(diagnoses).map(key => diagnoses[key]).sort((a, b) => a.position - b.position)
-    );
+    done(null, diagnoses);
   })();
 };

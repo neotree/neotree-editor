@@ -1,57 +1,41 @@
-import firebase from '../../firebase';
-import { Script, Screen, Diagnosis, Log } from '../../database/models';
+import { Script, Screen, Diagnosis } from '../../database/models';
 
-export const deleteScript = ({ scriptId: id }, deleteAssociatedData) => new Promise((resolve, reject) => {
+module.exports = () => (req, res, next) => {
   (async () => {
-    if (!id) return reject(new Error('Required script "id" is not provided.'));
-
-    let script = null;
-    try {
-      script = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`scripts/${id}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-    } catch (e) { /* Do nothing */ }
-
-    try { await firebase.database().ref(`scripts/${id}`).remove(); } catch (e) { return reject(e); }
-
-    if (deleteAssociatedData === false) return resolve(script);
-
-    try { await firebase.database().ref(`screens/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    try { await firebase.database().ref(`diagnosis/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    try { await Script.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
-
-    try { await Screen.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
-
-    try { await Diagnosis.destroy({ where: { script_id: id }, }); } catch (e) { /* Do nothing */ }
-
-    resolve(script);
-  })();
-});
-
-module.exports = (app) => (req, res, next) => {
-  (async () => {
-    const { scripts, deleteAssociatedData, } = req.body;
+    const { scripts: _scripts, deleteAssociatedData, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) {
-        app.io.emit('delete_scripts', { key: app.getRandomString(), scripts });
-        Log.create({
-          name: 'delete_scripts',
-          data: JSON.stringify({ scripts })
-        });
-      }
       res.locals.setResponse(err, { scripts: rslts });
       next();
     };
 
-    let rslts = [];
+    let scripts = [];
     try {
-      rslts = await Promise.all(scripts.map(s => deleteScript(s, deleteAssociatedData)));
+      scripts = await Script.findAll({ where: { id: _scripts.map(s => s.id) } });
     } catch (e) { return done(e); }
+
+    const rslts = {};
+    const deletedAt = new Date();
+
+    try {
+      rslts.scripts = await Script.update({ deletedAt }, { where: { id: scripts.map(s => s.id) } });
+
+      const activeScripts = await Script.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']] });
+      await Promise.all(activeScripts.map((s, i) => Script.update({ position: i + 1, }, { where: { id: s.id } })));
+
+      const deletedScripts = await Script.findAll({ where: { deletedAt: { $not: null } }, order: [['position', 'ASC']] });
+      await Promise.all(deletedScripts.map((s, i) => Script.update({ position: activeScripts.length + i + 1, }, { where: { id: s.id } })));
+    } catch (e) { return done(e); }
+
+    if (deleteAssociatedData !== false) {
+      try {
+        rslts.screens = await Screen.update({ deletedAt }, { where: { script_id: scripts.map(s => s.script_id) } });
+      } catch (e) { /* Do nothing */ }
+
+      try {
+        rslts.diagnoses = await Diagnosis.update({ deletedAt }, { where: { script_id: scripts.map(s => s.script_id) } });
+      } catch (e) { /* Do nothing */ }
+    }
 
     done(null, rslts);
   })();

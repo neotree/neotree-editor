@@ -25,30 +25,50 @@ module.exports = app => {
   router.post(
     endpoints.CREATE_SCRIPT,
     require('./createScriptMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_SCRIPT,
     require('./updateScriptMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_SCRIPTS,
     require('./updateScriptsMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DELETE_SCRIPTS,
     require('./deleteScriptsMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DUPLICATE_SCRIPTS,
     require('./duplicateScriptsMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 

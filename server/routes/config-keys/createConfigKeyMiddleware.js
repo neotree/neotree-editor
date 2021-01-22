@@ -1,58 +1,47 @@
 import firebase from '../../firebase';
-import { ConfigKey, Log } from '../../database/models';
+import { ConfigKey, } from '../../database';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const payload = req.body;
 
     const done = (err, configKey) => {
-      if (configKey) {
-        app.io.emit('create_config_keys', { key: app.getRandomString(), configKeys: [{ configKeyId: configKey.configKeyId }], });
-        Log.create({
-          name: 'create_config_keys',
-          data: JSON.stringify({ configKeys: [{ configKeyId: configKey.configKeyId }] })
-        });
-      }
       res.locals.setResponse(err, { configKey });
       next();
     };
 
     let configKeyId = null;
     try {
-      const snap = await firebase.database().ref('configkeys').push();
+      const snap = await firebase.database().ref('configKeys').push();
       configKeyId = snap.key;
     } catch (e) { return done(e); }
 
-    let configKeys = {};
+    let configKeysCount = 0;
     try {
-      configKeys = await new Promise((resolve) => {
-        firebase.database()
-          .ref('configkeys')
-          .on('value', snap => resolve(snap.val()));
-      });
-      configKeys = configKeys || {};
+      configKeysCount = await ConfigKey.count({ where: {} });
     } catch (e) { /* Do nothing */ }
 
-    const configKey = {
+    let configKey = {
       ...payload,
       configKeyId,
-      id: configKeyId,
-      position: Object.keys(configKeys).length + 1,
+      position: configKeysCount + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
-    try { await firebase.database().ref(`configkeys/${configKeyId}`).set(configKey); } catch (e) { return done(e); }
-
     try {
-      await ConfigKey.findOrCreate({
+      const rslts = await ConfigKey.findOrCreate({
         where: { config_key_id: configKey.configKeyId },
         defaults: {
           position: configKey.position,
           data: JSON.stringify(configKey),
         }
       });
-    } catch (e) { /* Do nothing */ }
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        configKey = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
     done(null, configKey);
   })();

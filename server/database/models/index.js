@@ -10,12 +10,14 @@ import ApiKey from './_ApiKey';
 import Device from './_Device';
 import Log from './_Log';
 import Hospital from './_Hospital';
+import App from './_App';
 
 const init = () => new Promise((resolve, reject) => {
   const errors = [];
    (async () => {
       try { await sequelize.authenticate(); } catch (e) { return reject(e); }
 
+     try { await App.sync(); } catch (e) { errors.push(e); }
       try { await Hospital.sync(); } catch (e) { errors.push(e); }
       try { await User.sync(); } catch (e) { errors.push(e); }
       try { await File.sync(); } catch (e) { errors.push(e); }
@@ -38,6 +40,7 @@ const init = () => new Promise((resolve, reject) => {
 export {
   sequelize,
   init,
+  App,
   User,
   File,
   Script,

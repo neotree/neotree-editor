@@ -1,38 +1,24 @@
-import firebase from '../../firebase';
+import { Screen, Diagnosis } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
     const { scriptId } = req.query;
 
-    const done = (err, screens, diagnoses) => {
-      res.locals.setResponse(err, { screens, diagnoses });
+    const done = (err, data) => {
+      res.locals.setResponse(err, { ...data });
       next();
     };
 
-    let screens = {};
+    let screens = [];
     try {
-      screens = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-      screens = screens || {};
+      screens = await Screen.findAll({ where: { script_id: scriptId } });
     } catch (e) { /* Do nothing */ }
 
-    let diagnosis = {};
+    let diagnoses = [];
     try {
-      diagnosis = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`diagnosis/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-      diagnosis = diagnosis || {};
+      diagnoses = await Diagnosis.findAll({ where: { script_id: scriptId } });
     } catch (e) { /* Do nothing */ }
 
-    done(
-      null,
-      Object.keys(screens).map(key => screens[key]).sort((a, b) => a.position - b.position),
-      Object.keys(diagnosis).map(key => diagnosis[key]).sort((a, b) => a.position - b.position)
-    );
+    done(null, { screens, diagnoses });
   })();
 };

@@ -1,70 +1,56 @@
 import firebase from '../../firebase';
-import { Log, Screen } from '../../database/models';
+import { Screen } from '../../database/models';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { items, targetScriptId: scriptId } = req.body;
 
     const done = (err, items = []) => {
-      if (items.length) {
-        app.io.emit('create_screens', { key: app.getRandomString(), screens: items.map(s => ({ screenId: s.id, scriptId: s.scriptId, })) });
-        Log.create({
-          name: 'create_screens',
-          data: JSON.stringify({ screens: items.map(s => ({ screenId: s.id, scriptId: s.scriptId, })) })
-        });
-      }
       res.locals.setResponse(err, { items });
       next();
     };
 
-    const ids = [];
+    let snaps = [];
     try {
-      const snaps = await Promise.all(items.map(() => firebase.database().ref(`screens/${scriptId}`).push()));
-      snaps.forEach(snap => ids.push(snap.key));
+      snaps = await Promise.all(items.map(() => firebase.database().ref(`screens/${scriptId}`).push()));
     } catch (e) { return done(e); }
+
+    let screensCount = 0;
+    try {
+      screensCount = await Screen.count({ where: { script_id: scriptId, deletedAt: null } });
+    } catch (e) { /* Do nothing */ }
 
     let screens = [];
     try {
-      let _screens = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-      _screens = _screens || {};
-      screens = Object.keys(_screens).map(key => _screens[key]);
-      screens = items.map((s, i) => ({
-        ...s,
-        ..._screens[s.screenId],
-        scriptId,
-        position: i + screens.length + 1,
-        id: ids[i] || s.id,
-        screenId: ids[i] || s.id,
-      }));
-    } catch (e) { return done(e); }
-
-    try {
-      await Promise.all(screens.map(s => {
-        return firebase.database().ref(`screens/${scriptId}/${s.screenId}`).set({
+      screens = await Screen.findAll({ where: { id: items.map(s => s.id) } });
+      screens = screens.map((s, i) => {
+        s = JSON.parse(JSON.stringify(s));
+        delete s.id;
+        return {
           ...s,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        });
-      }));
+          screen_id: snaps[i].key,
+          script_id: scriptId,
+          position: screensCount + 1,
+          data: JSON.stringify({
+            ...s.data,
+            scriptId,
+            screenId: snaps[i].key,
+            position: screensCount + 1,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          }),
+        };
+      });
     } catch (e) { return done(e); }
 
     try {
-      await Promise.all(screens.map(screen => {
-        return Screen.findOrCreate({
-          where: { screen_id: screen.screenId },
-          defaults: {
-            screen_id: screen.screenId,
-            script_id: screen.scriptId,
-            type: screen.type,
-            position: screen.position,
-            data: JSON.stringify(screen),
-          }
-        });
+      const rslts = await Promise.all(screens.map(screen => {
+        return Screen.findOrCreate({ where: { screen_id: screen.screen_id }, defaults: { ...screen } });
       }));
+      screens = rslts.map(rslt => {
+        const { data, ...screen } = JSON.parse(JSON.stringify(rslt[0]));
+        return { ...data, ...screen };
+      });
     } catch (e) { /* Do nothing */ }
 
     done(null, screens);

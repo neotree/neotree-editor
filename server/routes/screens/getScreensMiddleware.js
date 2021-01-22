@@ -1,29 +1,23 @@
-import firebase from '../../firebase';
+import { Screen } from '../../database';
 
 module.exports = () => (req, res, next) => {
-  (async () => {
-    const { scriptId } = req.query;
+  const { scriptId } = req.query;
 
+  (async () => {
     const done = (err, screens) => {
       res.locals.setResponse(err, { screens });
       next();
     };
 
-    if (!scriptId) return done(new Error('Required script "id" is not provided.'));
-
-    let screens = {};
+    let screens = [];
     try {
-      screens = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
+      screens = await Screen.findAll({ where: { script_id: scriptId, deletedAt: null }, order: [['position', 'ASC']], });
+      screens = screens.map(screen => {
+        const { data, ...s } = JSON.parse(JSON.stringify(screen));
+        return { ...data, ...s };
       });
-      screens = screens || {};
     } catch (e) { return done(e); }
 
-    done(
-      null,
-      Object.keys(screens).map(key => screens[key]).sort((a, b) => a.position - b.position)
-    );
+    done(null, screens);
   })();
 };

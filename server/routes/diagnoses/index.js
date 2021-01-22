@@ -19,36 +19,60 @@ module.exports = app => {
   router.post(
     endpoints.CREATE_DIAGNOSIS,
     require('./createDiagnosisMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_DIAGNOSIS,
     require('./updateDiagnosisMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_DIAGNOSES,
     require('./updateDiagnosesMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DELETE_DIAGNOSES,
-    require('./deleteDiagnosesMiddleware').default(app),
+    require('./deleteDiagnosesMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DUPLICATE_DIAGNOSES,
     require('./duplicateDiagnosesMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.COPY_DIAGNOSES,
     require('./copyDiagnosesMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 

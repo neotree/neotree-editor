@@ -21,6 +21,10 @@ const Hospital = sqlz.define(
     country: {
       type: Sequelize.STRING,
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+      defaultValue: null,
+    },
   }
 );
 

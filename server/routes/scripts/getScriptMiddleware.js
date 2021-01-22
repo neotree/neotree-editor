@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { Script } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -11,11 +11,11 @@ module.exports = () => (req, res, next) => {
 
     let script = null;
     try {
-      script = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`scripts/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
+      script = await Script.findOne({ where: { script_id: scriptId } });
+      if (script) {
+        const { data, ...s } = JSON.parse(JSON.stringify(script));
+        script = { ...data, ...s };
+      }
     } catch (e) { return done(e); }
 
     done(null, script);

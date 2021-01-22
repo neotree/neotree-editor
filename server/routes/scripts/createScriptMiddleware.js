@@ -1,18 +1,11 @@
 import firebase from '../../firebase';
-import { Script, Log, } from '../../database';
+import { Script, } from '../../database';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const payload = req.body;
 
     const done = (err, script) => {
-      if (script) {
-        app.io.emit('create_scripts', { key: app.getRandomString(), scripts: [{ scriptId: script.scriptId }] });
-        Log.create({
-          name: 'create_scripts',
-          data: JSON.stringify({ scripts: [{ scriptId: script.scriptId }] })
-        });
-      }
       res.locals.setResponse(err, { script });
       next();
     };
@@ -23,36 +16,32 @@ module.exports = app => (req, res, next) => {
       scriptId = snap.key;
     } catch (e) { return done(e); }
 
-    let scripts = {};
+    let scriptsCount = 0;
     try {
-      scripts = await new Promise((resolve) => {
-        firebase.database()
-          .ref('scripts')
-          .on('value', snap => resolve(snap.val()));
-      });
-      scripts = scripts || {};
+      scriptsCount = await Script.count({ where: {} });
     } catch (e) { /* Do nothing */ }
 
-    const script = {
+    let script = {
       ...payload,
       scriptId,
-      id: scriptId,
-      position: Object.keys(scripts).length + 1,
+      position: scriptsCount + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
-    try { await firebase.database().ref(`scripts/${scriptId}`).set(script); } catch (e) { return done(e); }
-
     try {
-      await Script.findOrCreate({
+      const rslts = await Script.findOrCreate({
         where: { script_id: script.scriptId },
         defaults: {
           position: script.position,
           data: JSON.stringify(script),
         }
       });
-    } catch (e) { /* Do nothing */ }
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        script = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
     done(null, script);
   })();

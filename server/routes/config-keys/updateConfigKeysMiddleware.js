@@ -1,7 +1,6 @@
 import { updateConfigKey } from './updateConfigKeyMiddleware';
-import { Log } from '../../database/models';
 
-module.exports = (app) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { configKeys } = req.body;
 
@@ -10,12 +9,6 @@ module.exports = (app) => (req, res, next) => {
         res.locals.setResponse(err);
         return next();
       }
-      app.io.emit('update_config_keys', { key: app.getRandomString(), configKeys: configKeys.map(s => ({ configKeyId: s.configKeyId })) });
-      Log.create({
-        name: 'update_config_keys',
-        data: JSON.stringify({ configKeys: configKeys.map(s => ({ configKeyId: s.configKeyId })) })
-      });
-
       res.locals.setResponse(null, { updatedConfigKeys });
       next();
     };

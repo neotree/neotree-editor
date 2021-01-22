@@ -1,7 +1,8 @@
+/* global alert, fetch, window */
 import React from 'react';
 import PropTypes from 'prop-types';
 import useConfirmModal from '@/utils/useConfirmModal';
-import { useConfigKeysContext } from '@/contexts/config-keys';
+import OverlayLoader from '@/components/OverlayLoader';
 
 const DeleteConfigKeys = React.forwardRef(({
   children,
@@ -9,9 +10,10 @@ const DeleteConfigKeys = React.forwardRef(({
   onClick,
   ...props
 }, ref) => {
+  const [deletingConfigKeys, setDeletingConfigKeys] = React.useState(false);
+  
   const deleteMultiple = configKeys.length > 1;
   const [renderConfirmModal, confirm] = useConfirmModal();
-  const { deleteConfigKeys } = useConfigKeysContext();
 
   return (
     <>
@@ -29,8 +31,28 @@ const DeleteConfigKeys = React.forwardRef(({
       {renderConfirmModal({
         title: `Delete config key${deleteMultiple ? 's' : ''}`,
         message: `Are you sure you want to delete config key${deleteMultiple ? 's' : ''}?`,
-        onConfirm: () => deleteConfigKeys(configKeys),
+        onConfirm: () => {
+          (async () => {
+            setDeletingConfigKeys(true);
+            try {
+              const res = await fetch('/delete-config-keys', {
+                headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                body: JSON.stringify({ configKeys }),
+              });
+              const { errors } = await res.json();
+              if (errors && errors.length) {
+                alert(JSON.stringify(errors));
+              } else {
+                window.location.reload();
+              }
+            } catch (e) { alert(e.message); }
+            setDeletingConfigKeys(false);
+          })();
+        },
       })}
+
+      {deletingConfigKeys ? <OverlayLoader /> : null}
     </>
   );
 });

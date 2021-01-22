@@ -27,6 +27,10 @@ const Device = sqlz.define(
         this.setDataValue('details', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+      defaultValue: null,
+    },
   }
 );
 

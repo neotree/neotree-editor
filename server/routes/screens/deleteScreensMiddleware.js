@@ -1,47 +1,43 @@
-import firebase from '../../firebase';
-import { Log, Screen } from '../../database/models';
+import { Screen } from '../../database/models';
 
-export const deleteScreen = ({ scriptId, screenId: id, }) => new Promise((resolve, reject) => {
+module.exports = () => (req, res, next) => {
   (async () => {
-    if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
-
-    if (!id) return reject(new Error('Required screen "id" is not provided.'));
-
-    let screen = null;
-    try {
-      screen = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}/${id}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-    } catch (e) { /* Do nothing */ }
-
-    try { await firebase.database().ref(`screens/${scriptId}/${id}`).remove(); } catch (e) { return reject(e); }
-
-    try { await Screen.destroy({ where: { screen_id: id }, }); } catch (e) { /* Do nothing */ }
-
-    resolve(screen);
-  })();
-});
-
-export default (app) => (req, res, next) => {
-  (async () => {
-    const { screens } = req.body;
+    const { screens: _screens, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) {
-        app.io.emit('delete_screens', { key: app.getRandomString(), screens });
-        Log.create({
-          name: 'delete_screens',
-          data: JSON.stringify({ screens })
-        });
-      }
       res.locals.setResponse(err, { screens: rslts });
       next();
     };
 
     let rslts = null;
-    try { rslts = await Promise.all(screens.map(s => deleteScreen(s))); } catch (e) { return done(e); }
+    const deletedAt = new Date();
+
+    let screens = [];
+    try {
+      screens = await Screen.findAll({ where: { id: _screens.map(s => s.id) } });
+    } catch (e) { return done(e); }
+
+    try {
+      rslts = await Screen.update({ deletedAt }, { where: { id: _screens.map(s => s.id) } });
+      const scriptIds = screens.map(s => s.script_id).reduce((acc, scriptId) => {
+        if (acc.includes(scriptId)) return acc;
+        return [...acc, scriptId];
+      }, []);
+
+      await Promise.all(scriptIds.map(script_id => new Promise(resolve => {
+        (async () => {
+          try {
+            const activeScreens = await Screen.findAll({ where: { script_id, deletedAt: null }, order: [['position', 'ASC']] });
+            await Promise.all(activeScreens.map((s, i) => Screen.update({ position: i + 1, }, { where: { id: s.id } })));
+
+            const deletedScreens = await Screen.findAll({ where: { script_id, deletedAt: { $not: null } }, order: [['position', 'ASC']] });
+            await Promise.all(deletedScreens.map((s, i) => Screen.update({ position: activeScreens.length + i + 1, }, { where: { id: s.id } })));
+          } catch (e) { /* Do nothing */ }
+
+          resolve();
+        })();
+      })));
+    } catch (e) { return done(e); }
 
     done(null, rslts);
   })();
