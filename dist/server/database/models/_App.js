@@ -22,18 +22,22 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-var Script = _sequelize2["default"].define('script', {
+var Script = _sequelize2["default"].define('app', {
   id: {
     type: _sequelize["default"].INTEGER,
     autoIncrement: true,
     primaryKey: true
   },
-  script_id: {
-    type: _sequelize["default"].STRING,
+  version: {
+    type: _sequelize["default"].INTEGER,
+    defaultValue: 1,
     allowNull: false
   },
-  position: {
-    type: _sequelize["default"].INTEGER
+  version_hash: {
+    type: _sequelize["default"].STRING
+  },
+  last_backup_date: {
+    type: _sequelize["default"].DATE
   },
   data: {
     type: _sequelize["default"].JSON,
@@ -63,8 +67,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Script, "Script", "/home/farai/WorkBench/neotree-editor/server/database/models/_Script.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_Script.js");
+  reactHotLoader.register(Script, "Script", "/home/farai/WorkBench/neotree-editor/server/database/models/_App.js");
+  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_App.js");
 })();
 
 ;

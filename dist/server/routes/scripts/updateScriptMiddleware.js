@@ -15,8 +15,6 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
-
 var _models = require("../../database/models");
 
 (function () {
@@ -33,8 +31,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var updateScript = function updateScript(_ref) {
-  var id = _ref.scriptId,
-      payload = (0, _objectWithoutProperties2["default"])(_ref, ["scriptId"]);
+  var id = _ref.id,
+      payload = (0, _objectWithoutProperties2["default"])(_ref, ["id"]);
   return new Promise(function (resolve, reject) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var script;
@@ -53,10 +51,10 @@ var updateScript = function updateScript(_ref) {
               script = null;
               _context.prev = 3;
               _context.next = 6;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("scripts/".concat(id)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              return _models.Script.findOne({
+                where: {
+                  id: id
+                }
               });
 
             case 6:
@@ -78,59 +76,42 @@ var updateScript = function updateScript(_ref) {
               return _context.abrupt("return", reject(new Error("Script with id \"".concat(id, "\" not found"))));
 
             case 14:
-              script = _objectSpread(_objectSpread(_objectSpread({}, script), payload), {}, {
-                id: id,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-              });
-              _context.prev = 15;
-              _context.next = 18;
-              return _firebase["default"].database().ref("scripts/".concat(id)).set(script);
-
-            case 18:
-              _context.next = 23;
-              break;
-
-            case 20:
-              _context.prev = 20;
-              _context.t1 = _context["catch"](15);
-              return _context.abrupt("return", reject(_context.t1));
-
-            case 23:
-              _context.prev = 23;
-              _context.next = 26;
+              _context.prev = 14;
+              _context.next = 17;
               return _models.Script.update({
-                position: script.position,
-                data: JSON.stringify(script)
+                position: payload.position || script.position,
+                data: JSON.stringify(_objectSpread(_objectSpread({}, script.data), payload))
               }, {
                 where: {
-                  script_id: script.scriptId
+                  id: id,
+                  deletedAt: null
                 }
               });
 
-            case 26:
-              _context.next = 30;
+            case 17:
+              _context.next = 21;
               break;
 
-            case 28:
-              _context.prev = 28;
-              _context.t2 = _context["catch"](23);
+            case 19:
+              _context.prev = 19;
+              _context.t1 = _context["catch"](14);
 
-            case 30:
+            case 21:
               resolve(script);
 
-            case 31:
+            case 22:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [15, 20], [23, 28]]);
+      }, _callee, null, [[3, 9], [14, 19]]);
     }))();
   });
 };
 
 exports.updateScript = updateScript;
 
-var _default = function _default(app) {
+var _default = function _default() {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
       var done, script;
@@ -139,24 +120,6 @@ var _default = function _default(app) {
           switch (_context2.prev = _context2.next) {
             case 0:
               done = function done(err, script) {
-                if (script) {
-                  app.io.emit('update_scripts', {
-                    key: app.getRandomString(),
-                    scripts: [{
-                      scriptId: script.scriptId
-                    }]
-                  });
-
-                  _models.Log.create({
-                    name: 'update_scripts',
-                    data: JSON.stringify({
-                      scripts: [{
-                        scriptId: script.scriptId
-                      }]
-                    })
-                  });
-                }
-
                 res.locals.setResponse(err, {
                   script: script
                 });

@@ -22,12 +22,30 @@ var router = _express["default"].Router();
 module.exports = function (app) {
   router.get(endpoints.GET_SCREENS, require('./getScreensMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get(endpoints.GET_SCREEN, require('./getScreenMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.CREATE_SCREEN, require('./createScreenMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.UPDATE_SCREEN, require('./updateScreenMiddleware')["default"](app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.UPDATE_SCREENS, require('./updateScreensMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.DELETE_SCREENS, require('./deleteScreensMiddleware')["default"](app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.DUPLICATE_SCREENS, require('./duplicateScreensMiddleware')["default"](app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.COPY_SCREENS, require('./copyScreensMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.CREATE_SCREEN, require('./createScreenMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_SCREEN, require('./updateScreenMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_SCREENS, require('./updateScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.DELETE_SCREENS, require('./deleteScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.DUPLICATE_SCREENS, require('./duplicateScreensMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.COPY_SCREENS, require('./copyScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
   return router;
 };
 

@@ -15,8 +15,6 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
-
 var _models = require("../../database/models");
 
 (function () {
@@ -33,9 +31,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var updateScreen = function updateScreen(_ref) {
-  var id = _ref.screenId,
-      scriptId = _ref.scriptId,
-      payload = (0, _objectWithoutProperties2["default"])(_ref, ["screenId", "scriptId"]);
+  var id = _ref.id,
+      payload = (0, _objectWithoutProperties2["default"])(_ref, ["id"]);
   return new Promise(function (resolve, reject) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var screen;
@@ -43,103 +40,77 @@ var updateScreen = function updateScreen(_ref) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              if (scriptId) {
-                _context.next = 2;
-                break;
-              }
-
-              return _context.abrupt("return", reject(new Error('Required script "id" is not provided.')));
-
-            case 2:
               if (id) {
-                _context.next = 4;
+                _context.next = 2;
                 break;
               }
 
               return _context.abrupt("return", reject(new Error('Required screen "id" is not provided.')));
 
-            case 4:
+            case 2:
               screen = null;
-              _context.prev = 5;
-              _context.next = 8;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(id)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              _context.prev = 3;
+              _context.next = 6;
+              return _models.Screen.findOne({
+                where: {
+                  id: id
+                }
               });
 
-            case 8:
+            case 6:
               screen = _context.sent;
-              _context.next = 14;
+              _context.next = 12;
               break;
 
-            case 11:
-              _context.prev = 11;
-              _context.t0 = _context["catch"](5);
+            case 9:
+              _context.prev = 9;
+              _context.t0 = _context["catch"](3);
               return _context.abrupt("return", reject(_context.t0));
 
-            case 14:
+            case 12:
               if (screen) {
-                _context.next = 16;
+                _context.next = 14;
                 break;
               }
 
               return _context.abrupt("return", reject(new Error("Screen with id \"".concat(id, "\" not found"))));
 
-            case 16:
-              screen = _objectSpread(_objectSpread(_objectSpread({}, screen), payload), {}, {
-                id: id,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-              });
-              _context.prev = 17;
-              _context.next = 20;
-              return _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(id)).set(screen);
-
-            case 20:
-              _context.next = 25;
-              break;
-
-            case 22:
-              _context.prev = 22;
-              _context.t1 = _context["catch"](17);
-              return _context.abrupt("return", reject(_context.t1));
-
-            case 25:
-              _context.prev = 25;
-              _context.next = 28;
+            case 14:
+              _context.prev = 14;
+              _context.next = 17;
               return _models.Screen.update({
-                position: screen.position,
-                data: JSON.stringify(screen)
+                position: payload.position || screen.position,
+                data: JSON.stringify(_objectSpread(_objectSpread({}, screen.data), payload))
               }, {
                 where: {
-                  screen_id: screen.screenId
+                  id: id
                 }
               });
 
-            case 28:
-              _context.next = 32;
+            case 17:
+              _context.next = 21;
               break;
 
-            case 30:
-              _context.prev = 30;
-              _context.t2 = _context["catch"](25);
+            case 19:
+              _context.prev = 19;
+              _context.t1 = _context["catch"](14);
 
-            case 32:
+            case 21:
               resolve(screen);
 
-            case 33:
+            case 22:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 11], [17, 22], [25, 30]]);
+      }, _callee, null, [[3, 9], [14, 19]]);
     }))();
   });
 };
 
 exports.updateScreen = updateScreen;
 
-var _default = function _default(app) {
+var _default = function _default() {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
       var done, screen;
@@ -148,24 +119,6 @@ var _default = function _default(app) {
           switch (_context2.prev = _context2.next) {
             case 0:
               done = function done(err, screen) {
-                if (screen) {
-                  app.io.emit('update_screens', {
-                    key: app.getRandomString(),
-                    screens: [{
-                      screenId: screen.screenId
-                    }]
-                  });
-
-                  _models.Log.create({
-                    name: 'update_screens',
-                    data: JSON.stringify({
-                      screens: [{
-                        screenId: screen.screenId
-                      }]
-                    })
-                  });
-                }
-
                 res.locals.setResponse(err, {
                   screen: screen
                 });

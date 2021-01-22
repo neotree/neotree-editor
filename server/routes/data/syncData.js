@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Script, Screen, ConfigKey, Diagnosis, Log, Device, } from '../../database';
+import { Script, Screen, ConfigKey, Diagnosis, Device, } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -23,64 +23,42 @@ module.exports = () => (req, res, next) => {
       }
     }
 
+    const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
+    const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
+
     Promise.all([
-      !lastSyncDate ? null : Log.findAll({
-        where: {
-          createdAt: { [Op.gte]: lastSyncDate },
-          name: { [Op.or]: ['delete_scripts', 'delete_screens', 'delete_diagnoses', 'delete_config_keys'] },
-        }
-      }),
+      Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Script.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-      Script.findAll({ where: !lastSyncDate ?
-          {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-      Script.findAll({ where: !lastSyncDate ?
-          {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+      Screen.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Screen.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-      Screen.findAll({ where: !lastSyncDate ?
-          {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-      Screen.findAll({ where: !lastSyncDate ?
-          {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+      Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Diagnosis.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-      Diagnosis.findAll({ where: !lastSyncDate ?
-          {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-      Diagnosis.findAll({ where: !lastSyncDate ?
-          {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
-
-      ConfigKey.findAll({ where: !lastSyncDate ?
-          {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-      ConfigKey.findAll({ where: !lastSyncDate ?
-          {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+      ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      ConfigKey.findAll({ where: { ...whereLastSyncDateGreaterThanLastDeleted } }),
     ])
-      .then((rslts = []) => {
+      .then(([
+        scripts,
+        deletedScripts,
+        screens,
+        deletedScreens,
+        diagnoses,
+        deletedDiagnoses,
+        configKeys,
+        deletedConfigKeys,
+      ]) => {
         done(null, {
           device,
-
-          scripts: {
-            lastCreated: rslts[1] || [],
-            lastUpdated: rslts[2] || [],
-            lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_scripts')
-              .reduce((acc, log) => [...acc, ...(log.data.scripts || []).map(s => ({ scriptId: s.scriptId }))], []),
-          },
-          screens: {
-            lastCreated: rslts[3] || [],
-            lastUpdated: rslts[4] || [],
-            lastDeleted: (rslts[0] || []).filter(log => log.name === 'delete_screens')
-              .reduce((acc, log) => [...acc, ...(log.data.screens || []).map(s => ({ screenId: s.screenId }))], []),
-          },
-
-          diagnoses: {
-            lastCreated: rslts[5] || [],
-            lastUpdated: rslts[6] || [],
-            lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_diagnoses')
-              .reduce((acc, log) => [...acc, ...(log.data.diagnoses || []).map(s => ({ diagnosisId: s.diagnosisId }))], []),
-          },
-
-          config_keys: {
-            lastCreated: rslts[7] || [],
-            lastUpdated: rslts[8] || [],
-            lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_config_keys')
-              .reduce((acc, log) => [...acc, ...(log.data.config_keys || []).map(s => ({ configKeyId: s.configKeyId }))], []),
-          }
+          scripts,
+          deletedScripts,
+          screens,
+          deletedScreens,
+          diagnoses,
+          deletedDiagnoses,
+          configKeys,
+          deletedConfigKeys,
         });
       })
       .catch(done);

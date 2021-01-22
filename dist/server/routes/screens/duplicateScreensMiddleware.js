@@ -31,214 +31,186 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 };
 
 var copyScreen = function copyScreen(_ref) {
-  var scriptId = _ref.scriptId,
-      id = _ref.screenId;
+  var id = _ref.id;
   return new Promise(function (resolve, reject) {
+    if (!id) return reject(new Error('Required screen "id" is not provided.'));
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var screenId, snap, screen, screens;
+      var screenId, snap, screen, screensCount, savedScreen;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              if (scriptId) {
-                _context.next = 2;
-                break;
-              }
-
-              return _context.abrupt("return", reject(new Error('Required script "id" is not provided.')));
-
-            case 2:
-              if (id) {
-                _context.next = 4;
-                break;
-              }
-
-              return _context.abrupt("return", reject(new Error('Required screen "id" is not provided.')));
-
-            case 4:
               screenId = null;
-              _context.prev = 5;
-              _context.next = 8;
+              _context.prev = 1;
+              _context.next = 4;
               return _firebase["default"].database().ref('screens').push();
 
-            case 8:
+            case 4:
               snap = _context.sent;
               screenId = snap.key;
-              _context.next = 15;
+              _context.next = 11;
               break;
 
-            case 12:
-              _context.prev = 12;
-              _context.t0 = _context["catch"](5);
+            case 8:
+              _context.prev = 8;
+              _context.t0 = _context["catch"](1);
               return _context.abrupt("return", reject(_context.t0));
 
-            case 15:
+            case 11:
               screen = null;
-              _context.prev = 16;
-              _context.next = 19;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(id)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              _context.prev = 12;
+              _context.next = 15;
+              return _models.Screen.findOne({
+                where: {
+                  id: id
+                }
               });
 
-            case 19:
+            case 15:
               screen = _context.sent;
-              _context.next = 24;
+              _context.next = 20;
               break;
 
-            case 22:
-              _context.prev = 22;
-              _context.t1 = _context["catch"](16);
+            case 18:
+              _context.prev = 18;
+              _context.t1 = _context["catch"](12);
 
-            case 24:
+            case 20:
               if (screen) {
-                _context.next = 26;
+                _context.next = 22;
                 break;
               }
 
               return _context.abrupt("return", reject(new Error("Screen with id \"".concat(id, "\" not found"))));
 
-            case 26:
-              screens = {};
-              _context.prev = 27;
-              _context.next = 30;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("screens/".concat(scriptId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+            case 22:
+              screen = JSON.parse(JSON.stringify(screen));
+              screensCount = 0;
+              _context.prev = 24;
+              _context.next = 27;
+              return _models.Screen.count({
+                where: {}
               });
+
+            case 27:
+              screensCount = _context.sent;
+              _context.next = 32;
+              break;
 
             case 30:
-              screens = _context.sent;
-              screens = screens || {};
-              _context.next = 36;
-              break;
+              _context.prev = 30;
+              _context.t2 = _context["catch"](24);
 
-            case 34:
-              _context.prev = 34;
-              _context.t2 = _context["catch"](27);
-
-            case 36:
+            case 32:
+              delete screen.id;
               screen = _objectSpread(_objectSpread({}, screen), {}, {
-                screenId: screenId,
-                id: screenId,
-                position: Object.keys(screens).length + 1,
-                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                screen_id: screenId,
+                position: screensCount + 1,
+                data: JSON.stringify(_objectSpread(_objectSpread({}, screen.data), {}, {
+                  screenId: screenId,
+                  position: screensCount + 1,
+                  createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                  updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                }))
               });
-              _context.prev = 37;
-              _context.next = 40;
-              return _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(screenId)).set(screen);
-
-            case 40:
-              _context.next = 45;
-              break;
-
-            case 42:
-              _context.prev = 42;
-              _context.t3 = _context["catch"](37);
-              return _context.abrupt("return", reject(_context.t3));
-
-            case 45:
-              _context.prev = 45;
-              _context.next = 48;
+              savedScreen = null;
+              _context.prev = 35;
+              _context.next = 38;
               return _models.Screen.findOrCreate({
                 where: {
-                  screen_id: screen.screenId
+                  screen_id: screen.screen_id
                 },
-                defaults: {
-                  screen_id: screen.screenId,
-                  script_id: screen.scriptId,
-                  type: screen.type,
-                  position: screen.position,
-                  data: JSON.stringify(screen)
-                }
+                defaults: _objectSpread({}, screen)
               });
 
-            case 48:
-              _context.next = 52;
+            case 38:
+              savedScreen = _context.sent;
+              _context.next = 44;
               break;
 
-            case 50:
-              _context.prev = 50;
-              _context.t4 = _context["catch"](45);
+            case 41:
+              _context.prev = 41;
+              _context.t3 = _context["catch"](35);
+              return _context.abrupt("return", reject(_context.t3));
 
-            case 52:
-              resolve(screen);
+            case 44:
+              resolve(savedScreen);
 
-            case 53:
+            case 45:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 12], [16, 22], [27, 34], [37, 42], [45, 50]]);
+      }, _callee, null, [[1, 8], [12, 18], [24, 30], [35, 41]]);
     }))();
   });
 };
 
 exports.copyScreen = copyScreen;
 
-var _default = function _default(app) {
+var _default = function _default() {
   return function (req, res, next) {
-    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var screens, done, _screens;
-
-      return _regenerator["default"].wrap(function _callee2$(_context2) {
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
+      var screens, done, rslts;
+      return _regenerator["default"].wrap(function _callee3$(_context3) {
         while (1) {
-          switch (_context2.prev = _context2.next) {
+          switch (_context3.prev = _context3.next) {
             case 0:
               screens = req.body.screens;
 
-              done = function done(err) {
-                var _screens = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+              done = /*#__PURE__*/function () {
+                var _ref4 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2(err) {
+                  var rslts,
+                      _args2 = arguments;
+                  return _regenerator["default"].wrap(function _callee2$(_context2) {
+                    while (1) {
+                      switch (_context2.prev = _context2.next) {
+                        case 0:
+                          rslts = _args2.length > 1 && _args2[1] !== undefined ? _args2[1] : [];
+                          res.locals.setResponse(err, {
+                            screens: rslts
+                          });
+                          next();
 
-                if (_screens.length) {
-                  app.io.emit('create_screens', {
-                    key: app.getRandomString(),
-                    screens: screens
-                  });
+                        case 3:
+                        case "end":
+                          return _context2.stop();
+                      }
+                    }
+                  }, _callee2);
+                }));
 
-                  _models.Log.create({
-                    name: 'create_screens',
-                    data: JSON.stringify({
-                      screens: screens
-                    })
-                  });
-                }
+                return function done(_x) {
+                  return _ref4.apply(this, arguments);
+                };
+              }();
 
-                res.locals.setResponse(err, {
-                  screens: _screens
-                });
-                next();
-              };
-
-              _screens = [];
-              _context2.prev = 3;
-              _context2.next = 6;
+              rslts = [];
+              _context3.prev = 3;
+              _context3.next = 6;
               return Promise.all(screens.map(function (s) {
                 return copyScreen(s);
               }));
 
             case 6:
-              _screens = _context2.sent;
-              _context2.next = 12;
+              rslts = _context3.sent;
+              _context3.next = 12;
               break;
 
             case 9:
-              _context2.prev = 9;
-              _context2.t0 = _context2["catch"](3);
-              return _context2.abrupt("return", done(_context2.t0));
+              _context3.prev = 9;
+              _context3.t0 = _context3["catch"](3);
+              return _context3.abrupt("return", done(_context3.t0));
 
             case 12:
-              done(null, _screens);
+              done(null, rslts);
 
             case 13:
             case "end":
-              return _context2.stop();
+              return _context3.stop();
           }
         }
-      }, _callee2, null, [[3, 9]]);
+      }, _callee3, null, [[3, 9]]);
     }))();
   };
 };

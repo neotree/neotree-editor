@@ -4,7 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
-var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
+var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
@@ -25,7 +25,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$query, _lastSyncDate, deviceId, scriptsCount, lastSyncDate, done, device, details;
+      var _req$query, _lastSyncDate, deviceId, scriptsCount, lastSyncDate, done, device, details, whereLastSyncDateGreaterThanLastUpdated, whereLastSyncDateGreaterThanLastDeleted;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -109,103 +109,61 @@ module.exports = function () {
               _context.t2 = _context["catch"](22);
 
             case 30:
-              Promise.all([!lastSyncDate ? null : _database.Log.findAll({
-                where: {
-                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate),
-                  name: (0, _defineProperty2["default"])({}, _sequelize.Op.or, ['delete_scripts', 'delete_screens', 'delete_diagnoses', 'delete_config_keys'])
-                }
+              whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : {
+                updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+              };
+              whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : {
+                deletedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+              };
+              Promise.all([_database.Script.findAll({
+                where: _objectSpread({
+                  deletedAt: null
+                }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Script.findAll({
-                where: !lastSyncDate ? {} : {
-                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
-              }), _database.Script.findAll({
-                where: !lastSyncDate ? {} : {
-                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.Screen.findAll({
-                where: !lastSyncDate ? {} : {
-                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({
+                  deletedAt: null
+                }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Screen.findAll({
-                where: !lastSyncDate ? {} : {
-                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.Diagnosis.findAll({
-                where: !lastSyncDate ? {} : {
-                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({
+                  deletedAt: null
+                }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.Diagnosis.findAll({
-                where: !lastSyncDate ? {} : {
-                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
               }), _database.ConfigKey.findAll({
-                where: !lastSyncDate ? {} : {
-                  updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
+                where: _objectSpread({
+                  deletedAt: null
+                }, whereLastSyncDateGreaterThanLastUpdated)
               }), _database.ConfigKey.findAll({
-                where: !lastSyncDate ? {} : {
-                  createdAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-                }
-              })]).then(function () {
-                var rslts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+                where: _objectSpread({}, whereLastSyncDateGreaterThanLastDeleted)
+              })]).then(function (_ref2) {
+                var _ref3 = (0, _slicedToArray2["default"])(_ref2, 8),
+                    scripts = _ref3[0],
+                    deletedScripts = _ref3[1],
+                    screens = _ref3[2],
+                    deletedScreens = _ref3[3],
+                    diagnoses = _ref3[4],
+                    deletedDiagnoses = _ref3[5],
+                    configKeys = _ref3[6],
+                    deletedConfigKeys = _ref3[7];
+
                 done(null, {
                   device: device,
-                  scripts: {
-                    lastCreated: rslts[1] || [],
-                    lastUpdated: rslts[2] || [],
-                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-                      return log.name === 'delete_scripts';
-                    }).reduce(function (acc, log) {
-                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.scripts || []).map(function (s) {
-                        return {
-                          scriptId: s.scriptId
-                        };
-                      })));
-                    }, [])
-                  },
-                  screens: {
-                    lastCreated: rslts[3] || [],
-                    lastUpdated: rslts[4] || [],
-                    lastDeleted: (rslts[0] || []).filter(function (log) {
-                      return log.name === 'delete_screens';
-                    }).reduce(function (acc, log) {
-                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.screens || []).map(function (s) {
-                        return {
-                          screenId: s.screenId
-                        };
-                      })));
-                    }, [])
-                  },
-                  diagnoses: {
-                    lastCreated: rslts[5] || [],
-                    lastUpdated: rslts[6] || [],
-                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-                      return log.name === 'delete_diagnoses';
-                    }).reduce(function (acc, log) {
-                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.diagnoses || []).map(function (s) {
-                        return {
-                          diagnosisId: s.diagnosisId
-                        };
-                      })));
-                    }, [])
-                  },
-                  config_keys: {
-                    lastCreated: rslts[7] || [],
-                    lastUpdated: rslts[8] || [],
-                    lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(function (log) {
-                      return log.name === 'delete_config_keys';
-                    }).reduce(function (acc, log) {
-                      return [].concat((0, _toConsumableArray2["default"])(acc), (0, _toConsumableArray2["default"])((log.data.config_keys || []).map(function (s) {
-                        return {
-                          configKeyId: s.configKeyId
-                        };
-                      })));
-                    }, [])
-                  }
+                  scripts: scripts,
+                  deletedScripts: deletedScripts,
+                  screens: screens,
+                  deletedScreens: deletedScreens,
+                  diagnoses: diagnoses,
+                  deletedDiagnoses: deletedDiagnoses,
+                  configKeys: configKeys,
+                  deletedConfigKeys: deletedConfigKeys
                 });
               })["catch"](done);
 
-            case 31:
+            case 33:
             case "end":
               return _context.stop();
           }

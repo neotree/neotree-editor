@@ -4,6 +4,8 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
@@ -20,10 +22,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, items, scriptId, done, ids, snaps, screens, _screens;
+      var _req$body, items, scriptId, done, snaps, screensCount, screens, rslts;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -33,38 +35,13 @@ module.exports = function (app) {
 
               done = function done(err) {
                 var items = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-
-                if (items.length) {
-                  app.io.emit('create_screens', {
-                    key: app.getRandomString(),
-                    screens: items.map(function (s) {
-                      return {
-                        screenId: s.id,
-                        scriptId: s.scriptId
-                      };
-                    })
-                  });
-
-                  _models.Log.create({
-                    name: 'create_screens',
-                    data: JSON.stringify({
-                      screens: items.map(function (s) {
-                        return {
-                          screenId: s.id,
-                          scriptId: s.scriptId
-                        };
-                      })
-                    })
-                  });
-                }
-
                 res.locals.setResponse(err, {
                   items: items
                 });
                 next();
               };
 
-              ids = [];
+              snaps = [];
               _context.prev = 3;
               _context.next = 6;
               return Promise.all(items.map(function () {
@@ -73,93 +50,99 @@ module.exports = function (app) {
 
             case 6:
               snaps = _context.sent;
-              snaps.forEach(function (snap) {
-                return ids.push(snap.key);
-              });
-              _context.next = 13;
+              _context.next = 12;
               break;
 
-            case 10:
-              _context.prev = 10;
+            case 9:
+              _context.prev = 9;
               _context.t0 = _context["catch"](3);
               return _context.abrupt("return", done(_context.t0));
 
-            case 13:
-              screens = [];
-              _context.prev = 14;
-              _context.next = 17;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("screens/".concat(scriptId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+            case 12:
+              screensCount = 0;
+              _context.prev = 13;
+              _context.next = 16;
+              return _models.Screen.count({
+                where: {
+                  script_id: scriptId,
+                  deletedAt: null
+                }
               });
 
-            case 17:
-              _screens = _context.sent;
-              _screens = _screens || {};
-              screens = Object.keys(_screens).map(function (key) {
-                return _screens[key];
-              });
-              screens = items.map(function (s, i) {
-                return _objectSpread(_objectSpread(_objectSpread({}, s), _screens[s.screenId]), {}, {
-                  scriptId: scriptId,
-                  position: i + screens.length + 1,
-                  id: ids[i] || s.id,
-                  screenId: ids[i] || s.id
-                });
-              });
-              _context.next = 26;
+            case 16:
+              screensCount = _context.sent;
+              _context.next = 21;
               break;
 
-            case 23:
-              _context.prev = 23;
-              _context.t1 = _context["catch"](14);
-              return _context.abrupt("return", done(_context.t1));
+            case 19:
+              _context.prev = 19;
+              _context.t1 = _context["catch"](13);
 
-            case 26:
-              _context.prev = 26;
-              _context.next = 29;
-              return Promise.all(screens.map(function (s) {
-                return _firebase["default"].database().ref("screens/".concat(scriptId, "/").concat(s.screenId)).set(_objectSpread(_objectSpread({}, s), {}, {
-                  createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
-                  updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-                }));
-              }));
+            case 21:
+              screens = [];
+              _context.prev = 22;
+              _context.next = 25;
+              return _models.Screen.findAll({
+                where: {
+                  id: items.map(function (s) {
+                    return s.id;
+                  })
+                }
+              });
+
+            case 25:
+              screens = _context.sent;
+              screens = screens.map(function (s, i) {
+                s = JSON.parse(JSON.stringify(s));
+                delete s.id;
+                return _objectSpread(_objectSpread({}, s), {}, {
+                  screen_id: snaps[i].key,
+                  script_id: scriptId,
+                  position: screensCount + 1,
+                  data: JSON.stringify(_objectSpread(_objectSpread({}, s.data), {}, {
+                    scriptId: scriptId,
+                    screenId: snaps[i].key,
+                    position: screensCount + 1,
+                    createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+                  }))
+                });
+              });
+              _context.next = 32;
+              break;
 
             case 29:
-              _context.next = 34;
-              break;
-
-            case 31:
-              _context.prev = 31;
-              _context.t2 = _context["catch"](26);
+              _context.prev = 29;
+              _context.t2 = _context["catch"](22);
               return _context.abrupt("return", done(_context.t2));
 
-            case 34:
-              _context.prev = 34;
-              _context.next = 37;
+            case 32:
+              _context.prev = 32;
+              _context.next = 35;
               return Promise.all(screens.map(function (screen) {
                 return _models.Screen.findOrCreate({
                   where: {
-                    screen_id: screen.screenId
+                    screen_id: screen.screen_id
                   },
-                  defaults: {
-                    screen_id: screen.screenId,
-                    script_id: screen.scriptId,
-                    type: screen.type,
-                    position: screen.position,
-                    data: JSON.stringify(screen)
-                  }
+                  defaults: _objectSpread({}, screen)
                 });
               }));
 
-            case 37:
+            case 35:
+              rslts = _context.sent;
+              screens = rslts.map(function (rslt) {
+                var _JSON$parse = JSON.parse(JSON.stringify(rslt[0])),
+                    data = _JSON$parse.data,
+                    screen = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+
+                return _objectSpread(_objectSpread({}, data), screen);
+              });
               _context.next = 41;
               break;
 
             case 39:
               _context.prev = 39;
-              _context.t3 = _context["catch"](34);
+              _context.t3 = _context["catch"](32);
 
             case 41:
               done(null, screens);
@@ -169,7 +152,7 @@ module.exports = function (app) {
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 23], [26, 31], [34, 39]]);
+      }, _callee, null, [[3, 9], [13, 19], [22, 29], [32, 39]]);
     }))();
   };
 };

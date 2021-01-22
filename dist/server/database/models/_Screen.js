@@ -50,10 +50,14 @@ var Screen = _sequelize2["default"].define('screen', {
   },
   script_id: {
     type: _sequelize["default"].STRING // references: {
-    //   model: Script,
+    //   model: ScriptPage,
     //   key: 'id'
     // }
 
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE,
+    defaultValue: null
   }
 });
 

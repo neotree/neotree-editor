@@ -12,7 +12,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var diagnoses, done, updatedDiagnoses;
@@ -23,16 +23,12 @@ module.exports = function (app) {
               diagnoses = req.body.diagnoses;
 
               done = function done(err, updatedDiagnoses) {
-                if (!err) app.io.emit('update_diagnoses', {
-                  key: app.getRandomString(),
-                  diagnoses: diagnoses.map(function (s) {
-                    return {
-                      diagnosisId: s.diagnosisId,
-                      scriptId: s.scriptId
-                    };
-                  })
-                });
-                res.locals.setResponse(err, {
+                if (err) {
+                  res.locals.setResponse(err);
+                  return next();
+                }
+
+                res.locals.setResponse(null, {
                   updatedDiagnoses: updatedDiagnoses
                 });
                 next();

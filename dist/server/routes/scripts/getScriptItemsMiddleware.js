@@ -4,9 +4,15 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _database = require("../../database");
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -15,77 +21,67 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var scriptId, done, screens, diagnosis;
+      var scriptId, done, screens, diagnoses;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
               scriptId = req.query.scriptId;
 
-              done = function done(err, screens, diagnoses) {
-                res.locals.setResponse(err, {
-                  screens: screens,
-                  diagnoses: diagnoses
-                });
+              done = function done(err, data) {
+                res.locals.setResponse(err, _objectSpread({}, data));
                 next();
               };
 
-              screens = {};
+              screens = [];
               _context.prev = 3;
               _context.next = 6;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("screens/".concat(scriptId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              return _database.Screen.findAll({
+                where: {
+                  script_id: scriptId
+                }
               });
 
             case 6:
               screens = _context.sent;
-              screens = screens || {};
-              _context.next = 12;
+              _context.next = 11;
               break;
 
-            case 10:
-              _context.prev = 10;
+            case 9:
+              _context.prev = 9;
               _context.t0 = _context["catch"](3);
 
-            case 12:
-              diagnosis = {};
-              _context.prev = 13;
-              _context.next = 16;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("diagnosis/".concat(scriptId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+            case 11:
+              diagnoses = [];
+              _context.prev = 12;
+              _context.next = 15;
+              return _database.Diagnosis.findAll({
+                where: {
+                  script_id: scriptId
+                }
               });
 
-            case 16:
-              diagnosis = _context.sent;
-              diagnosis = diagnosis || {};
-              _context.next = 22;
+            case 15:
+              diagnoses = _context.sent;
+              _context.next = 20;
               break;
 
+            case 18:
+              _context.prev = 18;
+              _context.t1 = _context["catch"](12);
+
             case 20:
-              _context.prev = 20;
-              _context.t1 = _context["catch"](13);
+              done(null, {
+                screens: screens,
+                diagnoses: diagnoses
+              });
 
-            case 22:
-              done(null, Object.keys(screens).map(function (key) {
-                return screens[key];
-              }).sort(function (a, b) {
-                return a.position - b.position;
-              }), Object.keys(diagnosis).map(function (key) {
-                return diagnosis[key];
-              }).sort(function (a, b) {
-                return a.position - b.position;
-              }));
-
-            case 23:
+            case 21:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [13, 20]]);
+      }, _callee, null, [[3, 9], [12, 18]]);
     }))();
   };
 };

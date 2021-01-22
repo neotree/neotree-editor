@@ -12,7 +12,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var screens, done, updatedScreens;
@@ -23,16 +23,12 @@ module.exports = function (app) {
               screens = req.body.screens;
 
               done = function done(err, updatedScreens) {
-                if (!err) app.io.emit('update_screens', {
-                  key: app.getRandomString(),
-                  screens: screens.map(function (s) {
-                    return {
-                      screenId: s.screenId,
-                      scriptId: s.scriptId
-                    };
-                  })
-                });
-                res.locals.setResponse(err, {
+                if (err) {
+                  res.locals.setResponse(err);
+                  return next();
+                }
+
+                res.locals.setResponse(null, {
                   updatedScreens: updatedScreens
                 });
                 next();

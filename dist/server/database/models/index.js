@@ -71,6 +71,12 @@ Object.defineProperty(exports, "Hospital", {
     return _Hospital["default"];
   }
 });
+Object.defineProperty(exports, "App", {
+  enumerable: true,
+  get: function get() {
+    return _App["default"];
+  }
+});
 exports.init = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -98,6 +104,8 @@ var _Device = _interopRequireDefault(require("./_Device"));
 var _Log = _interopRequireDefault(require("./_Log"));
 
 var _Hospital = _interopRequireDefault(require("./_Hospital"));
+
+var _App = _interopRequireDefault(require("./_App"));
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -132,7 +140,7 @@ var init = function init() {
             case 8:
               _context.prev = 8;
               _context.next = 11;
-              return _Hospital["default"].sync();
+              return _App["default"].sync();
 
             case 11:
               _context.next = 16;
@@ -146,7 +154,7 @@ var init = function init() {
             case 16:
               _context.prev = 16;
               _context.next = 19;
-              return _User["default"].sync();
+              return _Hospital["default"].sync();
 
             case 19:
               _context.next = 24;
@@ -160,7 +168,7 @@ var init = function init() {
             case 24:
               _context.prev = 24;
               _context.next = 27;
-              return _File["default"].sync();
+              return _User["default"].sync();
 
             case 27:
               _context.next = 32;
@@ -174,7 +182,7 @@ var init = function init() {
             case 32:
               _context.prev = 32;
               _context.next = 35;
-              return _Script["default"].sync();
+              return _File["default"].sync();
 
             case 35:
               _context.next = 40;
@@ -188,7 +196,7 @@ var init = function init() {
             case 40:
               _context.prev = 40;
               _context.next = 43;
-              return _Screen["default"].sync();
+              return _Script["default"].sync();
 
             case 43:
               _context.next = 48;
@@ -202,7 +210,7 @@ var init = function init() {
             case 48:
               _context.prev = 48;
               _context.next = 51;
-              return _Diagnosis["default"].sync();
+              return _Screen["default"].sync();
 
             case 51:
               _context.next = 56;
@@ -216,7 +224,7 @@ var init = function init() {
             case 56:
               _context.prev = 56;
               _context.next = 59;
-              return _ConfigKey["default"].sync();
+              return _Diagnosis["default"].sync();
 
             case 59:
               _context.next = 64;
@@ -230,7 +238,7 @@ var init = function init() {
             case 64:
               _context.prev = 64;
               _context.next = 67;
-              return _ApiKey["default"].sync();
+              return _ConfigKey["default"].sync();
 
             case 67:
               _context.next = 72;
@@ -244,7 +252,7 @@ var init = function init() {
             case 72:
               _context.prev = 72;
               _context.next = 75;
-              return _Device["default"].sync();
+              return _ApiKey["default"].sync();
 
             case 75:
               _context.next = 80;
@@ -258,7 +266,7 @@ var init = function init() {
             case 80:
               _context.prev = 80;
               _context.next = 83;
-              return _Log["default"].sync();
+              return _Device["default"].sync();
 
             case 83:
               _context.next = 88;
@@ -270,6 +278,20 @@ var init = function init() {
               errors.push(_context.t10);
 
             case 88:
+              _context.prev = 88;
+              _context.next = 91;
+              return _Log["default"].sync();
+
+            case 91:
+              _context.next = 96;
+              break;
+
+            case 93:
+              _context.prev = 93;
+              _context.t11 = _context["catch"](88);
+              errors.push(_context.t11);
+
+            case 96:
               if (!errors.length) {
                 resolve(_sequelize["default"]);
               } else {
@@ -278,12 +300,12 @@ var init = function init() {
                 }).join('\n')));
               }
 
-            case 89:
+            case 97:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85]]);
+      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85], [88, 93]]);
     }))();
   });
 };

@@ -8,13 +8,11 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _updateConfigKeyMiddleware = require("./updateConfigKeyMiddleware");
 
-var _models = require("../../database/models");
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var configKeys, done, updatedConfigKeys;
@@ -29,26 +27,6 @@ module.exports = function (app) {
                   res.locals.setResponse(err);
                   return next();
                 }
-
-                app.io.emit('update_config_keys', {
-                  key: app.getRandomString(),
-                  configKeys: configKeys.map(function (s) {
-                    return {
-                      configKeyId: s.configKeyId
-                    };
-                  })
-                });
-
-                _models.Log.create({
-                  name: 'update_config_keys',
-                  data: JSON.stringify({
-                    configKeys: configKeys.map(function (s) {
-                      return {
-                        configKeyId: s.configKeyId
-                      };
-                    })
-                  })
-                });
 
                 res.locals.setResponse(null, {
                   updatedConfigKeys: updatedConfigKeys

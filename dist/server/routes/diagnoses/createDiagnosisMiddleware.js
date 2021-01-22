@@ -12,7 +12,7 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
-var _models = require("../../database/models");
+var _database = require("../../database");
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
@@ -22,10 +22,10 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, scriptId, payload, done, diagnosisId, snap, diagnoses, diagnosis;
+      var _req$body, scriptId, payload, done, diagnosisId, snap, diagnosesCount, diagnosis, rslts, _rslts$, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -34,130 +34,96 @@ module.exports = function (app) {
               _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, ["scriptId"]);
 
               done = function done(err, diagnosis) {
-                if (diagnosis) {
-                  app.io.emit('create_diagnoses', {
-                    key: app.getRandomString(),
-                    diagnoses: [{
-                      diagnosisId: diagnosis.id,
-                      scriptId: scriptId
-                    }]
-                  });
-
-                  _models.Log.create({
-                    name: 'create_diagnoses',
-                    data: JSON.stringify({
-                      diagnoses: [{
-                        diagnosisId: diagnosis.id,
-                        scriptId: scriptId
-                      }]
-                    })
-                  });
-                }
-
                 res.locals.setResponse(err, {
                   diagnosis: diagnosis
                 });
                 next();
               };
 
-              if (scriptId) {
-                _context.next = 4;
-                break;
-              }
-
-              return _context.abrupt("return", done(new Error('Required script "id" is not provided.')));
-
-            case 4:
               diagnosisId = null;
-              _context.prev = 5;
-              _context.next = 8;
+              _context.prev = 3;
+              _context.next = 6;
               return _firebase["default"].database().ref("diagnosis/".concat(scriptId)).push();
 
-            case 8:
+            case 6:
               snap = _context.sent;
               diagnosisId = snap.key;
-              _context.next = 15;
+              _context.next = 13;
               break;
 
-            case 12:
-              _context.prev = 12;
-              _context.t0 = _context["catch"](5);
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
               return _context.abrupt("return", done(_context.t0));
 
-            case 15:
-              diagnoses = {};
-              _context.prev = 16;
-              _context.next = 19;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("diagnosis/".concat(scriptId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+            case 13:
+              diagnosesCount = 0;
+              _context.prev = 14;
+              _context.next = 17;
+              return _database.Diagnosis.count({
+                where: {
+                  script_id: scriptId,
+                  deletedAt: null
+                }
               });
 
-            case 19:
-              diagnoses = _context.sent;
-              diagnoses = diagnoses || {};
-              _context.next = 25;
+            case 17:
+              diagnosesCount = _context.sent;
+              _context.next = 22;
               break;
 
-            case 23:
-              _context.prev = 23;
-              _context.t1 = _context["catch"](16);
+            case 20:
+              _context.prev = 20;
+              _context.t1 = _context["catch"](14);
 
-            case 25:
+            case 22:
               diagnosis = _objectSpread(_objectSpread({}, payload), {}, {
-                scriptId: scriptId,
                 diagnosisId: diagnosisId,
-                id: diagnosisId,
-                position: Object.keys(diagnoses).length + 1,
+                scriptId: scriptId,
+                position: diagnosesCount + 1,
                 createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
                 updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
               });
-              _context.prev = 26;
-              _context.next = 29;
-              return _firebase["default"].database().ref("diagnosis/".concat(scriptId, "/").concat(diagnosisId)).set(diagnosis);
-
-            case 29:
-              _context.next = 34;
-              break;
-
-            case 31:
-              _context.prev = 31;
-              _context.t2 = _context["catch"](26);
-              return _context.abrupt("return", done(_context.t2));
-
-            case 34:
-              _context.prev = 34;
-              _context.next = 37;
-              return _models.Diagnosis.findOrCreate({
+              _context.prev = 23;
+              _context.next = 26;
+              return _database.Diagnosis.findOrCreate({
                 where: {
                   diagnosis_id: diagnosis.diagnosisId
                 },
                 defaults: {
+                  script_id: scriptId,
                   diagnosis_id: diagnosis.diagnosisId,
-                  script_id: diagnosis.scriptId,
                   position: diagnosis.position,
+                  type: diagnosis.type,
                   data: JSON.stringify(diagnosis)
                 }
               });
 
-            case 37:
-              _context.next = 41;
+            case 26:
+              rslts = _context.sent;
+
+              if (rslts && rslts[0]) {
+                _rslts$ = rslts[0], data = _rslts$.data, s = (0, _objectWithoutProperties2["default"])(_rslts$, ["data"]);
+                diagnosis = _objectSpread(_objectSpread({}, data), s);
+              }
+
+              _context.next = 33;
               break;
 
-            case 39:
-              _context.prev = 39;
-              _context.t3 = _context["catch"](34);
+            case 30:
+              _context.prev = 30;
+              _context.t2 = _context["catch"](23);
+              return _context.abrupt("return", done(_context.t2));
 
-            case 41:
+            case 33:
               done(null, diagnosis);
 
-            case 42:
+            case 34:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[5, 12], [16, 23], [26, 31], [34, 39]]);
+      }, _callee, null, [[3, 10], [14, 20], [23, 30]]);
     }))();
   };
 };
