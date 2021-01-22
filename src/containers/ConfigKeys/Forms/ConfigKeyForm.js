@@ -1,6 +1,6 @@
+/* global alert, fetch, window */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useConfigKeysContext } from '@/contexts/config-keys';
 import Dialog from '@material-ui/core/Dialog';
 import DialogTitle from '@material-ui/core/DialogTitle';
 import DialogContent from '@material-ui/core/DialogContent';
@@ -9,6 +9,7 @@ import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Typography from '@material-ui/core/Typography';
+import OverlayLoader from '@/components/OverlayLoader';
 
 const ConfigKeyForm = React.forwardRef(({
   children,
@@ -16,7 +17,6 @@ const ConfigKeyForm = React.forwardRef(({
   configKey,
   ...props
 }, ref) => {
-  const { saveConfigKey } = useConfigKeysContext();
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [formError, setFormError] = React.useState(null);
@@ -28,6 +28,29 @@ const ConfigKeyForm = React.forwardRef(({
     ...prev,
     ...typeof s === 'function' ? s(prev) : s
   }));
+
+  const [savingConfigKey, setSavingConfigKey] = React.useState(false);
+  const [saveConfigKeyError, setSaveConfigKeyError] = React.useState(null);
+
+  const saveConfigKey = React.useCallback(() => {
+    (async () => {
+      setSavingConfigKey(true);
+      try {
+        let res = await fetch(configKey ? '/update-config-key' : '/create-config-key', {
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          body: JSON.stringify(form),
+        });
+        res = await res.json();
+        if (res.errors && res.errors.length) {
+          alert(JSON.stringify(res.errors));
+        } else {
+          window.location.reload();
+        }
+      } catch (e) { setSaveConfigKeyError(e); }
+      setSavingConfigKey(false);
+    })();
+  });
 
   React.useEffect(() => { if (configKey) setForm(configKey); }, [configKey]);
 
@@ -136,6 +159,8 @@ const ConfigKeyForm = React.forwardRef(({
           )}
         </DialogActions>
       </Dialog>
+
+      {savingConfigKey ? <OverlayLoader /> : null}
     </>
   );
 });

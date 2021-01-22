@@ -1,13 +1,11 @@
 import firebase from '../../firebase';
-import { Log, Screen } from '../../database/models';
+import { Screen } from '../../database/models';
 
-export const copyScreen = ({ scriptId, screenId: id, }) => {
+export const copyScreen = ({ id }) => {
   return new Promise((resolve, reject) => {
+    if (!id) return reject(new Error('Required screen "id" is not provided.'));
+
     (async () => {
-      if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
-
-      if (!id) return reject(new Error('Required screen "id" is not provided.'));
-
       let screenId = null;
       try {
         const snap = await firebase.database().ref('screens').push();
@@ -16,75 +14,56 @@ export const copyScreen = ({ scriptId, screenId: id, }) => {
 
       let screen = null;
       try {
-        screen = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`screens/${scriptId}/${id}`)
-            .on('value', snap => resolve(snap.val()));
-        });
+        screen = await Screen.findOne({ where: { id } });
       } catch (e) { /* Do nothing */ }
 
       if (!screen) return reject(new Error(`Screen with id "${id}" not found`));
 
-      let screens = {};
+      screen = JSON.parse(JSON.stringify(screen));
+
+      let screensCount = 0;
       try {
-        screens = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`screens/${scriptId}`)
-            .on('value', snap => resolve(snap.val()));
-        });
-        screens = screens || {};
+        screensCount = await Screen.count({ where: {} });
       } catch (e) { /* Do nothing */ }
 
+      delete screen.id;
       screen = {
         ...screen,
-        screenId,
-        id: screenId,
-        position: Object.keys(screens).length + 1,
-        createdAt: firebase.database.ServerValue.TIMESTAMP,
-        updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        screen_id: screenId,
+        position: screensCount + 1,
+        data: JSON.stringify({
+          ...screen.data,
+          screenId,
+          position: screensCount + 1,
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        }),
       };
 
-      try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return reject(e); }
-
+      let savedScreen = null;
       try {
-        await Screen.findOrCreate({
-          where: { screen_id: screen.screenId },
-          defaults: {
-            screen_id: screen.screenId,
-            script_id: screen.scriptId,
-            type: screen.type,
-            position: screen.position,
-            data: JSON.stringify(screen),
-          }
-        });
-      } catch (e) { /* Do nothing */ }
+        savedScreen = await Screen.findOrCreate({ where: { screen_id: screen.screen_id }, defaults: { ...screen } });
+      } catch (e) { return reject(e); }
 
-      resolve(screen);
+      resolve(savedScreen);
     })();
   });
 };
 
-export default (app) => (req, res, next) => {
+export default () => (req, res, next) => {
   (async () => {
     const { screens } = req.body;
 
-    const done = (err, _screens = []) => {
-      if (_screens.length) {
-        app.io.emit('create_screens', { key: app.getRandomString(), screens });
-        Log.create({
-          name: 'create_screens',
-          data: JSON.stringify({ screens })
-        });
-      }
-      res.locals.setResponse(err, { screens: _screens });
+    const done = async (err, rslts = []) => {
+      res.locals.setResponse(err, { screens: rslts });
       next();
     };
 
-    let _screens = [];
+    let rslts = [];
     try {
-      _screens = await Promise.all(screens.map(s => copyScreen(s)));
+      rslts = await Promise.all(screens.map(s => copyScreen(s)));
     } catch (e) { return done(e); }
 
-    done(null, _screens);
+    done(null, rslts);
   })();
 };

@@ -1,12 +1,15 @@
 import { updateScreen } from './updateScreenMiddleware';
 
-module.exports = (app) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { screens } = req.body;
 
     const done = (err, updatedScreens) => {
-      if (!err) app.io.emit('update_screens', { key: app.getRandomString(), screens: screens.map(s => ({ screenId: s.screenId, scriptId: s.scriptId, })) });
-      res.locals.setResponse(err, { updatedScreens });
+      if (err) {
+        res.locals.setResponse(err);
+        return next();
+      }
+      res.locals.setResponse(null, { updatedScreens });
       next();
     };
 

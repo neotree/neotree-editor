@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { ConfigKey } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -11,11 +11,11 @@ module.exports = () => (req, res, next) => {
 
     let configKey = null;
     try {
-      configKey = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`configkeys/${configKeyId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
+      configKey = await ConfigKey.findOne({ where: { config_key_id: configKeyId } });
+      if (configKey) {
+        const { data, ...s } = JSON.parse(JSON.stringify(configKey));
+        configKey = { ...data, ...s };
+      }
     } catch (e) { return done(e); }
 
     done(null, configKey);

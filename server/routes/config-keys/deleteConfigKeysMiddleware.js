@@ -1,53 +1,41 @@
-import firebase from '../../firebase';
-import { ConfigKey, Log } from '../../database/models';
+import { ConfigKey, Screen, Diagnosis } from '../../database/models';
 
-export const deleteConfigKey = ({ configKeyId: id }, deleteAssociatedData) => new Promise((resolve, reject) => {
+module.exports = () => (req, res, next) => {
   (async () => {
-    if (!id) return reject(new Error('Required configKey "id" is not provided.'));
-
-    let configKey = null;
-    try {
-      configKey = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`configkeys/${id}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-    } catch (e) { /* Do nothing */ }
-
-    try { await firebase.database().ref(`configkeys/${id}`).remove(); } catch (e) { return reject(e); }
-
-    if (deleteAssociatedData === false) return resolve(configKey);
-
-    try { await firebase.database().ref(`screens/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    try { await firebase.database().ref(`diagnosis/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    try { await ConfigKey.destroy({ where: { config_key_id: configKey.configKeyId }, }); } catch (e) { /* Do nothing */ }
-
-    resolve(configKey);
-  })();
-});
-
-module.exports = (app) => (req, res, next) => {
-  (async () => {
-    const { configKeys, deleteAssociatedData, } = req.body;
+    const { configKeys: _configKeys, deleteAssociatedData, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) {
-        app.io.emit('delete_config_keys', { key: app.getRandomString(), configKeys });
-        Log.create({
-          name: 'delete_config_keys',
-          data: JSON.stringify({ configKeys })
-        });
-      }
       res.locals.setResponse(err, { configKeys: rslts });
       next();
     };
 
-    let rslts = [];
+    let configKeys = [];
     try {
-      rslts = await Promise.all(configKeys.map(s => deleteConfigKey(s, deleteAssociatedData)));
+      configKeys = await ConfigKey.findAll({ where: { id: _configKeys.map(s => s.id) } });
     } catch (e) { return done(e); }
+
+    const rslts = {};
+    const deletedAt = new Date();
+
+    try {
+      rslts.configKeys = await ConfigKey.update({ deletedAt }, { where: { id: configKeys.map(s => s.id) } });
+
+      const activeConfigKeys = await ConfigKey.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']] });
+      await Promise.all(activeConfigKeys.map((s, i) => ConfigKey.update({ position: i + 1, }, { where: { id: s.id } })));
+
+      const deletedConfigKeys = await ConfigKey.findAll({ where: { deletedAt: { $not: null } }, order: [['position', 'ASC']] });
+      await Promise.all(deletedConfigKeys.map((s, i) => ConfigKey.update({ position: activeConfigKeys.length + i + 1, }, { where: { id: s.id } })));
+    } catch (e) { return done(e); }
+
+    if (deleteAssociatedData !== false) {
+      try {
+        rslts.screens = await Screen.update({ deletedAt }, { where: { config_key_id: configKeys.map(s => s.config_key_id) } });
+      } catch (e) { /* Do nothing */ }
+
+      try {
+        rslts.diagnoses = await Diagnosis.update({ deletedAt }, { where: { config_key_id: configKeys.map(s => s.config_key_id) } });
+      } catch (e) { /* Do nothing */ }
+    }
 
     done(null, rslts);
   })();

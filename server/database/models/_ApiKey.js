@@ -12,7 +12,10 @@ const ApiKey = sqlz.define(
     key: {
       type: Sequelize.STRING,
       allowNull: false,
-    }
+    },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 

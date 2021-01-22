@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { ConfigKey } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -7,19 +7,15 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let configKeys = {};
+    let configKeys = [];
     try {
-      configKeys = await new Promise((resolve) => {
-        firebase.database()
-          .ref('configkeys')
-          .on('value', snap => resolve(snap.val()));
+      configKeys = await ConfigKey.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
+      configKeys = configKeys.map(configKey => {
+        const { data, ...s } = JSON.parse(JSON.stringify(configKey));
+        return { ...data, ...s };
       });
-      configKeys = configKeys || {};
     } catch (e) { return done(e); }
 
-    done(
-      null,
-      Object.keys(configKeys).map(key => configKeys[key]).sort((a, b) => a.position - b.position)
-    );
+    done(null, configKeys);
   })();
 };

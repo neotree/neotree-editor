@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { Script } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -7,19 +7,15 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let scripts = {};
+    let scripts = [];
     try {
-      scripts = await new Promise((resolve) => {
-        firebase.database()
-          .ref('scripts')
-          .on('value', snap => resolve(snap.val()));
+      scripts = await Script.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
+      scripts = scripts.map(script => {
+        const { data, ...s } = JSON.parse(JSON.stringify(script));
+        return { ...data, ...s };
       });
-      scripts = scripts || {};
     } catch (e) { return done(e); }
 
-    done(
-      null,
-      Object.keys(scripts).map(key => scripts[key]).sort((a, b) => a.position - b.position)
-    );
+    done(null, scripts);
   })();
 };

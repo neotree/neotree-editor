@@ -1,12 +1,15 @@
 import { updateDiagnosis } from './updateDiagnosisMiddleware';
 
-module.exports = (app) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { diagnoses } = req.body;
 
     const done = (err, updatedDiagnoses) => {
-      if (!err) app.io.emit('update_diagnoses', { key: app.getRandomString(), diagnoses: diagnoses.map(s => ({ diagnosisId: s.diagnosisId, scriptId: s.scriptId, })) });
-      res.locals.setResponse(err, { updatedDiagnoses });
+      if (err) {
+        res.locals.setResponse(err);
+        return next();
+      }
+      res.locals.setResponse(null, { updatedDiagnoses });
       next();
     };
 

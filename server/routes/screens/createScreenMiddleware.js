@@ -1,23 +1,14 @@
 import firebase from '../../firebase';
-import { Log, Screen } from '../../database/models';
+import { Screen } from '../../database';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { scriptId, ...payload } = req.body;
 
     const done = (err, screen) => {
-      if (screen) {
-        app.io.emit('create_screens', { key: app.getRandomString(), screens: [{ screenId: screen.id, scriptId }] });
-        Log.create({
-          name: 'create_screens',
-          data: JSON.stringify({ screens: [{ screenId: screen.id, scriptId }] })
-        });
-      }
       res.locals.setResponse(err, { screen });
       next();
     };
-
-    if (!scriptId) return done(new Error('Required script "id" is not provided.'));
 
     let screenId = null;
     try {
@@ -25,40 +16,36 @@ module.exports = app => (req, res, next) => {
       screenId = snap.key;
     } catch (e) { return done(e); }
 
-    let screens = {};
+    let screensCount = 0;
     try {
-      screens = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-      screens = screens || {};
+      screensCount = await Screen.count({ where: { script_id: scriptId, deletedAt: null } });
     } catch (e) { /* Do nothing */ }
 
-    const screen = {
+    let screen = {
       ...payload,
-      scriptId,
       screenId,
-      id: screenId,
-      position: Object.keys(screens).length + 1,
+      scriptId,
+      position: screensCount + 1,
       createdAt: firebase.database.ServerValue.TIMESTAMP,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
-    try { await firebase.database().ref(`screens/${scriptId}/${screenId}`).set(screen); } catch (e) { return done(e); }
-
     try {
-      await Screen.findOrCreate({
+      const rslts = await Screen.findOrCreate({
         where: { screen_id: screen.screenId },
         defaults: {
+          script_id: scriptId,
           screen_id: screen.screenId,
-          script_id: screen.scriptId,
-          type: screen.type,
           position: screen.position,
+          type: screen.type,
           data: JSON.stringify(screen),
         }
       });
-    } catch (e) { /* Do nothing */ }
+      if (rslts && rslts[0]) {
+        const { data, ...s } = rslts[0];
+        screen = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
     done(null, screen);
   })();

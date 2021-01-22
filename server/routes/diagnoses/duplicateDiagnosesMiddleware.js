@@ -1,13 +1,11 @@
 import firebase from '../../firebase';
-import { Diagnosis, Log } from '../../database/models';
+import { Diagnosis } from '../../database/models';
 
-export const copyDiagnosis = ({ scriptId, diagnosisId: id, }) => {
+export const copyDiagnosis = ({ id }) => {
   return new Promise((resolve, reject) => {
+    if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
+
     (async () => {
-      if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
-
-      if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
-
       let diagnosisId = null;
       try {
         const snap = await firebase.database().ref('diagnoses').push();
@@ -16,73 +14,56 @@ export const copyDiagnosis = ({ scriptId, diagnosisId: id, }) => {
 
       let diagnosis = null;
       try {
-        diagnosis = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`diagnosis/${scriptId}/${id}`)
-            .on('value', snap => resolve(snap.val()));
-        });
+        diagnosis = await Diagnosis.findOne({ where: { id } });
       } catch (e) { /* Do nothing */ }
 
       if (!diagnosis) return reject(new Error(`Diagnosis with id "${id}" not found`));
 
-      let diagnoses = {};
+      diagnosis = JSON.parse(JSON.stringify(diagnosis));
+
+      let diagnosesCount = 0;
       try {
-        diagnoses = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`diagnosis/${scriptId}`)
-            .on('value', snap => resolve(snap.val()));
-        });
-        diagnoses = diagnoses || {};
+        diagnosesCount = await Diagnosis.count({ where: {} });
       } catch (e) { /* Do nothing */ }
 
-      diagnosis = { ...diagnosis, diagnosisId, id: diagnosisId, position: Object.keys(diagnoses).length + 1, };
-
-      try {
-        await firebase.database().ref(`diagnosis/${scriptId}/${diagnosisId}`).set({
-          ...diagnosis,
+      delete diagnosis.id;
+      diagnosis = {
+        ...diagnosis,
+        diagnosis_id: diagnosisId,
+        position: diagnosesCount + 1,
+        data: JSON.stringify({
+          ...diagnosis.data,
+          diagnosisId,
+          position: diagnosesCount + 1,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
           updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        });
+        }),
+      };
+
+      let savedDiagnosis = null;
+      try {
+        savedDiagnosis = await Diagnosis.findOrCreate({ where: { diagnosis_id: diagnosis.diagnosis_id }, defaults: { ...diagnosis } });
       } catch (e) { return reject(e); }
 
-      try {
-        await Diagnosis.findOrCreate({
-          where: { diagnosis_id: diagnosis.diagnosisId },
-          defaults: {
-            diagnosis_id: diagnosis.diagnosisId,
-            script_id: diagnosis.scriptId,
-            position: diagnosis.position,
-            data: JSON.stringify(diagnosis),
-          }
-        });
-      } catch (e) { /* Do nothing */ }
-
-      resolve(diagnosis);
+      resolve(savedDiagnosis);
     })();
   });
 };
 
-export default (app) => (req, res, next) => {
+export default () => (req, res, next) => {
   (async () => {
     const { diagnoses } = req.body;
 
-    const done = (err, _diagnoses = []) => {
-      if (_diagnoses.length) {
-        app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses });
-        Log.create({
-          name: 'create_diagnoses',
-          data: JSON.stringify({ diagnoses })
-        });
-      }
-      res.locals.setResponse(err, { diagnoses: _diagnoses });
+    const done = async (err, rslts = []) => {
+      res.locals.setResponse(err, { diagnoses: rslts });
       next();
     };
 
-    let _diagnoses = [];
+    let rslts = [];
     try {
-      _diagnoses = await Promise.all(diagnoses.map(s => copyDiagnosis(s)));
+      rslts = await Promise.all(diagnoses.map(s => copyDiagnosis(s)));
     } catch (e) { return done(e); }
 
-    done(null, _diagnoses);
+    done(null, rslts);
   })();
 };

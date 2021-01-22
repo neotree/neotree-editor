@@ -19,30 +19,50 @@ module.exports = app => {
   router.post(
     endpoints.CREATE_CONFIG_KEY,
     require('./createConfigKeyMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_CONFIG_KEY,
     require('./updateConfigKeyMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_CONFIG_KEYS,
     require('./updateConfigKeysMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DELETE_CONFIG_KEYS,
     require('./deleteConfigKeysMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DUPLICATE_CONFIG_KEYS,
     require('./duplicateConfigKeysMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 

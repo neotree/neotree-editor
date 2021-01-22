@@ -1,7 +1,7 @@
 import firebase from '../../firebase';
-import { Script, Diagnosis, Screen, Log } from '../../database/models';
+import { Script, Diagnosis, Screen } from '../../database/models';
 
-export const copyScript = ({ scriptId: id }) => {
+export const copyScript = ({ id }) => {
   return new Promise((resolve, reject) => {
     if (!id) return reject(new Error('Required script "id" is not provided.'));
 
@@ -14,179 +14,105 @@ export const copyScript = ({ scriptId: id }) => {
 
       let script = null;
       try {
-        script = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`scripts/${id}`)
-            .on('value', snap => resolve(snap.val()));
-        });
+        script = await Script.findOne({ where: { id } });
       } catch (e) { /* Do nothing */ }
 
       if (!script) return reject(new Error(`Script with id "${id}" not found`));
 
-      let scripts = {};
+      script = JSON.parse(JSON.stringify(script));
+
+      let scriptsCount = 0;
       try {
-        scripts = await new Promise((resolve) => {
-          firebase.database()
-            .ref('scripts')
-            .on('value', snap => resolve(snap.val()));
+        scriptsCount = await Script.count({ where: {} });
+      } catch (e) { /* Do nothing */ }
+
+      let screens = [];
+      try {
+        screens = await Screen.findAll({ where: { script_id: script.script_id, deletedAt: null }, order: [['position', 'ASC']] });
+        const snaps = await Promise.all(screens.map(() => firebase.database().ref(`screens/${scriptId}`).push()));
+        screens = screens.map((s, i) => {
+          s = JSON.parse(JSON.stringify(s));
+          delete s.id;
+          return {
+            ...s,
+            script_id: scriptId,
+            screen_id: snaps[i].key,
+            data: JSON.stringify({
+              ...s.data,
+              scriptId,
+              screenId: snaps[i].key,
+              createdAt: firebase.database.ServerValue.TIMESTAMP,
+              updatedAt: firebase.database.ServerValue.TIMESTAMP,
+            }),
+          };
         });
       } catch (e) { /* Do nothing */ }
 
-      let screens = {};
+      let diagnoses = [];
       try {
-        screens = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`screens/${id}`)
-            .on('value', snap => resolve(snap.val()));
+        diagnoses = await Diagnosis.findAll({ where: { script_id: script.script_id, deletedAt: null }, order: [['position', 'ASC']] });
+        const snaps = await Promise.all(diagnoses.map(() => firebase.database().ref(`diagnosis/${scriptId}`).push()));
+        diagnoses = diagnoses.map((d, i) => {
+          d = JSON.parse(JSON.stringify(d));
+          delete d.id;
+          return {
+            ...d,
+            script_id: scriptId,
+            diagnosis_id: snaps[i].key,
+            data: JSON.stringify({
+              ...d.data,
+              scriptId,
+              diagnosisId: snaps[i].key,
+              createdAt: firebase.database.ServerValue.TIMESTAMP,
+              updatedAt: firebase.database.ServerValue.TIMESTAMP,
+            }),
+          };
         });
-        screens = screens || {};
       } catch (e) { /* Do nothing */ }
 
-      let diagnosis = {};
-      try {
-        diagnosis = await new Promise((resolve) => {
-          firebase.database()
-            .ref(`diagnosis/${id}`)
-            .on('value', snap => resolve(snap.val()));
-        });
-        diagnosis = diagnosis || {};
-      } catch (e) { /* Do nothing */ }
-
-      script = { ...script, scriptId, id: scriptId, position: Object.keys(scripts).length + 1, };
-
-      screens = Object.keys(screens).reduce((acc, key) => ({
-        ...acc,
-        [key]: {
-          ...screens[key],
+      delete script.id;
+      script = {
+        ...script,
+        script_id: scriptId,
+        position: scriptsCount + 1,
+        data: JSON.stringify({
+          ...script.data,
           scriptId,
+          position: scriptsCount + 1,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
           updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        }
-      }), {});
+        }),
+      };
 
-      diagnosis = Object.keys(diagnosis).reduce((acc, key) => ({
-        ...acc,
-        [key]: {
-          ...diagnosis[key],
-          scriptId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        }
-      }), {});
-
-      const screenIds = [];
+      let savedScript = null;
       try {
-        const snaps = await Promise.all(Object.keys(screens).map(() => firebase.database().ref(`screens/${scriptId}`).push()));
-        snaps.forEach(snap => screenIds.push(snap.key));
+        savedScript = await Script.findOrCreate({ where: { script_id: script.script_id }, defaults: { ...script } });
       } catch (e) { return reject(e); }
 
-      const diagnosesIds = [];
+      let savedScreens = [];
       try {
-        const snaps = await Promise.all(Object.keys(diagnosis).map(() => firebase.database().ref(`diagnosis/${scriptId}`).push()));
-        snaps.forEach(snap => diagnosesIds.push(snap.key));
-      } catch (e) { return reject(e); }
-
-      try {
-        await firebase.database().ref(`scripts/${scriptId}`).set({
-          ...script,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
-        });
-      } catch (e) { return reject(e); }
-
-      try {
-        await firebase.database().ref(`screens/${scriptId}`).set({ ...screens, });
-      } catch (e) { /* do nothing */ }
-
-      try {
-        await firebase.database().ref(`diagnosis/${scriptId}`).set({ ...diagnosis, });
-      } catch (e) { /* do nothing */ }
-
-      try {
-        await Script.findOrCreate({
-          where: { script_id: script.scriptId },
-          defaults: {
-            script_id: script.scriptId,
-            position: script.position,
-            data: JSON.stringify(script),
-          }
-        });
+        savedScreens = await Promise.all(screens.map(s => Screen.findOrCreate({ where: { screen_id: s.screen_id }, defaults: { ...s } })));
       } catch (e) { /* Do nothing */ }
 
-      let _screens = [];
-      let _diagnoses = [];
-
+      let savedDiagnoses = [];
       try {
-        const savedScreens = await Promise.all(Object.keys(screens).map((key, i) => {
-          const screen = screens[key];
-          const screen_id = screenIds[i];
-          return Screen.findOrCreate({
-            where: { screen_id },
-            defaults: {
-              screen_id,
-              script_id: screen.scriptId,
-              type: screen.type,
-              position: screen.position,
-              data: JSON.stringify(screen),
-            }
-          });
-        }));
-        _screens = savedScreens.map(rslt => rslt[0]);
+        savedDiagnoses = await Promise.all(diagnoses.map(d => Diagnosis.findOrCreate({ where: { diagnosis_id: d.diagnosis_id }, defaults: { ...d } })));
       } catch (e) { /* Do nothing */ }
 
-      try {
-        const savedDiagnoses = await Promise.all(Object.keys(diagnosis).map((key, i) => {
-          const d = diagnosis[key];
-          const diagnosis_id = diagnosesIds[i];
-          return Diagnosis.findOrCreate({
-            where: { diagnosis_id },
-            defaults: {
-              diagnosis_id,
-              script_id: d.scriptId,
-              position: d.position,
-              data: JSON.stringify(d),
-            }
-          });
-        }));
-        _diagnoses = savedDiagnoses.map(rslt => rslt[0]);
-      } catch (e) { /* Do nothing */ }
-
-      resolve({ script, diagnoses: _diagnoses, screens: _screens, });
+      resolve({
+        script: savedScript,
+        diagnoses: savedScreens,
+        screens: savedDiagnoses,
+      });
     })();
   });
 };
 
-export default (app) => (req, res, next) => {
+export default () => (req, res, next) => {
   (async () => {
     const { scripts } = req.body;
 
     const done = async (err, rslts = []) => {
-      if (rslts.length) {
-        const diagnoses = rslts.reduce((acc, { diagnoses }) => [...acc, ...diagnoses.map(d => ({ diagnosisId: d.diagnosis_id, scriptId: d.script_id, }))], []);
-        const screens = rslts.reduce((acc, { screens }) => [...acc, ...screens.map(s => ({ screenId: s.screen_id, scriptId: s.script_id, }))], []);
-
-        if (diagnoses.length) {
-          Log.create({
-            name: 'create_diagnoses',
-            data: JSON.stringify({ diagnoses })
-          });
-          app.io.emit('create_diagnoses', { key: app.getRandomString(), diagnoses });
-        }
-
-        if (screens.length) {
-          Log.create({
-            name: 'create_screens',
-            data: JSON.stringify({ screens })
-          });
-          app.io.emit('create_screens', { key: app.getRandomString(), screens });
-        }
-
-        app.io.emit('create_scripts', { key: app.getRandomString(), scripts: rslts.map(({ script }) => ({ scriptId: script.scriptId })) });
-        Log.create({
-          name: 'create_scripts',
-          data: JSON.stringify({ scripts })
-        });
-      }
       res.locals.setResponse(err, { scripts: rslts.map(({ script }) => script) });
       next();
     };

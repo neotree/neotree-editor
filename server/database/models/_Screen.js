@@ -32,9 +32,13 @@ const Screen = sqlz.define(
     script_id: {
       type: Sequelize.STRING,
       // references: {
-      //   model: Script,
+      //   model: ScriptPage,
       //   key: 'id'
       // }
+    },
+    deletedAt: {
+      type: Sequelize.DATE,
+      defaultValue: null,
     },
   }
 );

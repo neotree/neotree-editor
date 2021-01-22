@@ -4,70 +4,79 @@ import { ConfigKey, Hospital, Diagnosis, Script, Screen, } from '../../database/
 export default () => new Promise((resolve, reject) => {
   (async () => {
     const errors = [];
-
-    let countScripts = 0;
-    try { countScripts = await Script.count({ where: {} }); } catch (e) { return reject(e); }
-
-    if (countScripts) return resolve();
     
     let scripts = [];
     try {
-      console.log('Importing firebase scripts...');
-      let rslts = await new Promise(resolve => {
-        firebaseAdmin.database().ref('scripts').once('value', snap => resolve(snap.val()));
-      });
-      rslts = rslts || {};
-      scripts = Object.keys(rslts).map(key => rslts[key]);
+      const countScripts = await Script.count({ where: {} });
+      if (!countScripts) {
+        console.log('Importing firebase scripts...');
+        let rslts = await new Promise(resolve => {
+          firebaseAdmin.database().ref('scripts').once('value', snap => resolve(snap.val()));
+        });
+        rslts = rslts || {};
+        scripts = Object.keys(rslts).map(key => rslts[key]);
+      }
     } catch (e) { errors.push(e); }
 
     let screens = [];
     try {
-      console.log('Importing firebase screens...');
-      let rslts = await new Promise(resolve => {
-        firebaseAdmin.database().ref('screens').once('value', snap => resolve(snap.val()));
-      });
-      rslts = rslts || {};
-      screens = Object.keys(rslts).reduce((acc, scriptId) => {
-        const _screens = rslts[scriptId];
-        return [...acc, ...Object.keys(_screens).map(key => _screens[key])];
-      }, []);
+      const countScreens = await Screen.count({ where: {} });
+      if (!countScreens) {
+        console.log('Importing firebase screens...');
+        let rslts = await new Promise(resolve => {
+          firebaseAdmin.database().ref('screens').once('value', snap => resolve(snap.val()));
+        });
+        rslts = rslts || {};
+        screens = Object.keys(rslts).reduce((acc, scriptId) => {
+          const _screens = rslts[scriptId];
+          return [...acc, ...Object.keys(_screens).map(key => _screens[key])];
+        }, []);
+      }
     } catch (e) { errors.push(e); }
 
     let diagnoses = [];
     try {
-      console.log('Importing firebase diagnoses...');
-      let rslts = await new Promise(resolve => {
-        firebaseAdmin.database().ref('diagnosis').once('value', snap => resolve(snap.val()));
-      });
-      rslts = rslts || {};
-      diagnoses = Object.keys(rslts).reduce((acc, scriptId) => {
-        const _diagnoses = rslts[scriptId];
-        return [...acc, ...Object.keys(_diagnoses).map(key => _diagnoses[key])];
-      }, []);
+      const countDiagnoses = await Diagnosis.count({ where: {} });
+      if (!countDiagnoses) {
+        console.log('Importing firebase diagnoses...');
+        let rslts = await new Promise(resolve => {
+          firebaseAdmin.database().ref('diagnosis').once('value', snap => resolve(snap.val()));
+        });
+        rslts = rslts || {};
+        diagnoses = Object.keys(rslts).reduce((acc, scriptId) => {
+          const _diagnoses = rslts[scriptId];
+          return [...acc, ...Object.keys(_diagnoses).map(key => _diagnoses[key])];
+        }, []);
+      }
     } catch (e) { errors.push(e); }
 
     let hospitals = [];
     try {
-      console.log('Importing firebase hospitals...');
-      let rslts = await new Promise(resolve => {
-        firebaseAdmin.database().ref('hospitals').once('value', snap => resolve(snap.val()));
-      });
-      rslts = rslts || {};
-      hospitals = Object.keys(rslts).map(key => rslts[key]);
+      const countHospitals = await Hospital.count({ where: {} });
+      if (!countHospitals) {
+        console.log('Importing firebase hospitals...');
+        let rslts = await new Promise(resolve => {
+          firebaseAdmin.database().ref('hospitals').once('value', snap => resolve(snap.val()));
+        });
+        rslts = rslts || {};
+        hospitals = Object.keys(rslts).map(key => rslts[key]);
+      }
     } catch (e) { errors.push(e); }
 
     let configKeys = [];
     try {
-      console.log('Importing firebase configKeys...');
-      let rslts = await new Promise(resolve => {
-        firebaseAdmin.database().ref('configkeys').once('value', snap => resolve(snap.val()));
-      });
-      rslts = rslts || {};
-      configKeys = Object.keys(rslts).map(key => rslts[key]);
+      const countConfigKeys = await ConfigKey.count({ where: {} });
+      if (!countConfigKeys) {
+        console.log('Importing firebase configKeys...');
+        let rslts = await new Promise(resolve => {
+          firebaseAdmin.database().ref('configkeys').once('value', snap => resolve(snap.val()));
+        });
+        rslts = rslts || {};
+        configKeys = Object.keys(rslts).map(key => rslts[key]);
+      }
     } catch (e) { errors.push(e); }
 
     try {
-      console.log('Saving imported data...');
       await Promise.all([
         ...scripts.map(s => Script.findOrCreate({
           where: { script_id: s.scriptId },

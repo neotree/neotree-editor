@@ -26,6 +26,10 @@ const Script = sqlz.define(
         this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+      defaultValue: null,
+    },
   }
 );
 

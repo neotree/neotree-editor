@@ -1,34 +1,23 @@
-import firebase from '../../firebase';
-import { Log, Screen } from '../../database/models';
+import { Screen } from '../../database/models';
 
-export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Promise((resolve, reject) => {
+export const updateScreen = ({ id, ...payload }) => new Promise((resolve, reject) => {
   (async () => {
-    if (!scriptId) return reject(new Error('Required script "id" is not provided.'));
-
     if (!id) return reject(new Error('Required screen "id" is not provided.'));
 
     let screen = null;
     try {
-      screen = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`screens/${scriptId}/${id}`)
-          .on('value', snap => resolve(snap.val()));
-      });
+      screen = await Screen.findOne({ where: { id } });
     } catch (e) { return reject(e); }
 
     if (!screen) return reject(new Error(`Screen with id "${id}" not found`));
 
-    screen = { ...screen, ...payload, id, updatedAt: firebase.database.ServerValue.TIMESTAMP, };
-
-    try { await firebase.database().ref(`screens/${scriptId}/${id}`).set(screen); } catch (e) { return reject(e); }
-
     try {
       await Screen.update(
         {
-          position: screen.position,
-          data: JSON.stringify(screen),
+          position: payload.position || screen.position,
+          data: JSON.stringify({ ...screen.data, ...payload }),
         },
-        { where: { screen_id: screen.screenId } }
+        { where: { id } }
       );
     } catch (e) { /* Do nothing */ }
 
@@ -36,16 +25,9 @@ export const updateScreen = ({ screenId: id, scriptId, ...payload }) => new Prom
   })();
 });
 
-export default (app) => (req, res, next) => {
+export default () => (req, res, next) => {
   (async () => {
     const done = (err, screen) => {
-      if (screen) {
-        app.io.emit('update_screens', { key: app.getRandomString(), screens: [{ screenId: screen.screenId }] });
-        Log.create({
-          name: 'update_screens',
-          data: JSON.stringify({ screens: [{ screenId: screen.screenId }] })
-        });
-      }
       res.locals.setResponse(err, { screen });
       next();
     };
