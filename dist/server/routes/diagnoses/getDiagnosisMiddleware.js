@@ -4,9 +4,17 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _database = require("../../database");
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -15,13 +23,13 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$query, scriptId, diagnosisId, done, diagnosis;
+      var diagnosisId, done, diagnosis, _JSON$parse, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              _req$query = req.query, scriptId = _req$query.scriptId, diagnosisId = _req$query.diagnosisId;
+              diagnosisId = req.query.diagnosisId;
 
               done = function done(err, diagnosis) {
                 res.locals.setResponse(err, {
@@ -30,50 +38,40 @@ module.exports = function () {
                 next();
               };
 
-              if (scriptId) {
-                _context.next = 4;
-                break;
-              }
-
-              return _context.abrupt("return", done(new Error('Required script "id" is not provided.')));
-
-            case 4:
-              if (diagnosisId) {
-                _context.next = 6;
-                break;
-              }
-
-              return _context.abrupt("return", done(new Error('Required diagnosis "id" is not provided.')));
-
-            case 6:
               diagnosis = null;
-              _context.prev = 7;
-              _context.next = 10;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref("diagnosis/".concat(scriptId, "/").concat(diagnosisId)).on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              _context.prev = 3;
+              _context.next = 6;
+              return _database.Diagnosis.findOne({
+                where: {
+                  diagnosis_id: diagnosisId
+                }
               });
 
-            case 10:
+            case 6:
               diagnosis = _context.sent;
-              _context.next = 16;
+
+              if (diagnosis) {
+                _JSON$parse = JSON.parse(JSON.stringify(diagnosis)), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                diagnosis = _objectSpread(_objectSpread({}, data), s);
+              }
+
+              _context.next = 13;
               break;
 
-            case 13:
-              _context.prev = 13;
-              _context.t0 = _context["catch"](7);
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
               return _context.abrupt("return", done(_context.t0));
 
-            case 16:
+            case 13:
               done(null, diagnosis);
 
-            case 17:
+            case 14:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[7, 13]]);
+      }, _callee, null, [[3, 10]]);
     }))();
   };
 };

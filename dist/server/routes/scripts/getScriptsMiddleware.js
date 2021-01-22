@@ -4,9 +4,17 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _database = require("../../database");
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -27,18 +35,25 @@ module.exports = function () {
                 next();
               };
 
-              scripts = {};
+              scripts = [];
               _context.prev = 2;
               _context.next = 5;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref('scripts').on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              return _database.Script.findAll({
+                where: {
+                  deletedAt: null
+                },
+                order: [['position', 'ASC']]
               });
 
             case 5:
               scripts = _context.sent;
-              scripts = scripts || {};
+              scripts = scripts.map(function (script) {
+                var _JSON$parse = JSON.parse(JSON.stringify(script)),
+                    data = _JSON$parse.data,
+                    s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+
+                return _objectSpread(_objectSpread({}, data), s);
+              });
               _context.next = 12;
               break;
 
@@ -48,11 +63,7 @@ module.exports = function () {
               return _context.abrupt("return", done(_context.t0));
 
             case 12:
-              done(null, Object.keys(scripts).map(function (key) {
-                return scripts[key];
-              }).sort(function (a, b) {
-                return a.position - b.position;
-              }));
+              done(null, scripts);
 
             case 13:
             case "end":

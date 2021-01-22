@@ -56,6 +56,10 @@ var File = _sequelize2["default"].define('file', {
     //   key: 'id'
     // }
 
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE,
+    defaultValue: null
   }
 });
 

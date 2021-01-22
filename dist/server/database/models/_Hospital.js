@@ -37,6 +37,10 @@ var Hospital = _sequelize2["default"].define('hospital', {
   },
   country: {
     type: _sequelize["default"].STRING
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE,
+    defaultValue: null
   }
 });
 

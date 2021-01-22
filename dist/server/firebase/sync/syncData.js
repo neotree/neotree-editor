@@ -29,14 +29,14 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var _default = function _default() {
   return new Promise(function (resolve, reject) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var errors, countScripts, scripts, rslts, screens, _rslts, diagnoses, _rslts2, hospitals, _rslts3, configKeys, _rslts4;
+      var errors, scripts, countScripts, rslts, screens, countScreens, _rslts, diagnoses, countDiagnoses, _rslts2, hospitals, countHospitals, _rslts3, configKeys, countConfigKeys, _rslts4;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
               errors = [];
-              countScripts = 0;
+              scripts = [];
               _context.prev = 2;
               _context.next = 5;
               return _models.Script.count({
@@ -45,59 +45,61 @@ var _default = function _default() {
 
             case 5:
               countScripts = _context.sent;
-              _context.next = 11;
-              break;
 
-            case 8:
-              _context.prev = 8;
-              _context.t0 = _context["catch"](2);
-              return _context.abrupt("return", reject(_context.t0));
-
-            case 11:
-              if (!countScripts) {
+              if (countScripts) {
                 _context.next = 13;
                 break;
               }
 
-              return _context.abrupt("return", resolve());
-
-            case 13:
-              scripts = [];
-              _context.prev = 14;
               console.log('Importing firebase scripts...');
-              _context.next = 18;
+              _context.next = 10;
               return new Promise(function (resolve) {
                 _index.firebaseAdmin.database().ref('scripts').once('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 18:
+            case 10:
               rslts = _context.sent;
               rslts = rslts || {};
               scripts = Object.keys(rslts).map(function (key) {
                 return rslts[key];
               });
-              _context.next = 26;
+
+            case 13:
+              _context.next = 18;
               break;
 
-            case 23:
-              _context.prev = 23;
-              _context.t1 = _context["catch"](14);
-              errors.push(_context.t1);
+            case 15:
+              _context.prev = 15;
+              _context.t0 = _context["catch"](2);
+              errors.push(_context.t0);
 
-            case 26:
+            case 18:
               screens = [];
-              _context.prev = 27;
+              _context.prev = 19;
+              _context.next = 22;
+              return _models.Screen.count({
+                where: {}
+              });
+
+            case 22:
+              countScreens = _context.sent;
+
+              if (countScreens) {
+                _context.next = 30;
+                break;
+              }
+
               console.log('Importing firebase screens...');
-              _context.next = 31;
+              _context.next = 27;
               return new Promise(function (resolve) {
                 _index.firebaseAdmin.database().ref('screens').once('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 31:
+            case 27:
               _rslts = _context.sent;
               _rslts = _rslts || {};
               screens = Object.keys(_rslts).reduce(function (acc, scriptId) {
@@ -106,17 +108,32 @@ var _default = function _default() {
                   return _screens[key];
                 })));
               }, []);
-              _context.next = 39;
+
+            case 30:
+              _context.next = 35;
               break;
 
-            case 36:
+            case 32:
+              _context.prev = 32;
+              _context.t1 = _context["catch"](19);
+              errors.push(_context.t1);
+
+            case 35:
+              diagnoses = [];
               _context.prev = 36;
-              _context.t2 = _context["catch"](27);
-              errors.push(_context.t2);
+              _context.next = 39;
+              return _models.Diagnosis.count({
+                where: {}
+              });
 
             case 39:
-              diagnoses = [];
-              _context.prev = 40;
+              countDiagnoses = _context.sent;
+
+              if (countDiagnoses) {
+                _context.next = 47;
+                break;
+              }
+
               console.log('Importing firebase diagnoses...');
               _context.next = 44;
               return new Promise(function (resolve) {
@@ -134,68 +151,99 @@ var _default = function _default() {
                   return _diagnoses[key];
                 })));
               }, []);
+
+            case 47:
               _context.next = 52;
               break;
 
             case 49:
               _context.prev = 49;
-              _context.t3 = _context["catch"](40);
-              errors.push(_context.t3);
+              _context.t2 = _context["catch"](36);
+              errors.push(_context.t2);
 
             case 52:
               hospitals = [];
               _context.prev = 53;
+              _context.next = 56;
+              return _models.Hospital.count({
+                where: {}
+              });
+
+            case 56:
+              countHospitals = _context.sent;
+
+              if (countHospitals) {
+                _context.next = 64;
+                break;
+              }
+
               console.log('Importing firebase hospitals...');
-              _context.next = 57;
+              _context.next = 61;
               return new Promise(function (resolve) {
                 _index.firebaseAdmin.database().ref('hospitals').once('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 57:
+            case 61:
               _rslts3 = _context.sent;
               _rslts3 = _rslts3 || {};
               hospitals = Object.keys(_rslts3).map(function (key) {
                 return _rslts3[key];
               });
-              _context.next = 65;
+
+            case 64:
+              _context.next = 69;
               break;
 
-            case 62:
-              _context.prev = 62;
-              _context.t4 = _context["catch"](53);
-              errors.push(_context.t4);
-
-            case 65:
-              configKeys = [];
+            case 66:
               _context.prev = 66;
+              _context.t3 = _context["catch"](53);
+              errors.push(_context.t3);
+
+            case 69:
+              configKeys = [];
+              _context.prev = 70;
+              _context.next = 73;
+              return _models.ConfigKey.count({
+                where: {}
+              });
+
+            case 73:
+              countConfigKeys = _context.sent;
+
+              if (countConfigKeys) {
+                _context.next = 81;
+                break;
+              }
+
               console.log('Importing firebase configKeys...');
-              _context.next = 70;
+              _context.next = 78;
               return new Promise(function (resolve) {
                 _index.firebaseAdmin.database().ref('configkeys').once('value', function (snap) {
                   return resolve(snap.val());
                 });
               });
 
-            case 70:
+            case 78:
               _rslts4 = _context.sent;
               _rslts4 = _rslts4 || {};
               configKeys = Object.keys(_rslts4).map(function (key) {
                 return _rslts4[key];
               });
-              _context.next = 78;
+
+            case 81:
+              _context.next = 86;
               break;
 
-            case 75:
-              _context.prev = 75;
-              _context.t5 = _context["catch"](66);
-              errors.push(_context.t5);
+            case 83:
+              _context.prev = 83;
+              _context.t4 = _context["catch"](70);
+              errors.push(_context.t4);
 
-            case 78:
-              _context.prev = 78;
-              console.log('Saving imported data...');
-              _context.next = 82;
+            case 86:
+              _context.prev = 86;
+              _context.next = 89;
               return Promise.all([].concat((0, _toConsumableArray2["default"])(scripts.map(function (s) {
                 return _models.Script.findOrCreate({
                   where: {
@@ -256,32 +304,32 @@ var _default = function _default() {
                 });
               }))));
 
-            case 82:
-              _context.next = 87;
+            case 89:
+              _context.next = 94;
               break;
 
-            case 84:
-              _context.prev = 84;
-              _context.t6 = _context["catch"](78);
-              errors.push(_context.t6);
+            case 91:
+              _context.prev = 91;
+              _context.t5 = _context["catch"](86);
+              errors.push(_context.t5);
 
-            case 87:
+            case 94:
               if (!errors.length) {
-                _context.next = 89;
+                _context.next = 96;
                 break;
               }
 
               return _context.abrupt("return", reject(errors));
 
-            case 89:
+            case 96:
               resolve();
 
-            case 90:
+            case 97:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[2, 8], [14, 23], [27, 36], [40, 49], [53, 62], [66, 75], [78, 84]]);
+      }, _callee, null, [[2, 15], [19, 32], [36, 49], [53, 66], [70, 83], [86, 91]]);
     }))();
   });
 };

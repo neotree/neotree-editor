@@ -47,10 +47,14 @@ var Diagnosis = _sequelize2["default"].define('diagnosis', {
   },
   script_id: {
     type: _sequelize["default"].STRING // references: {
-    //   model: Script,
+    //   model: ScriptPage,
     //   key: 'id'
     // }
 
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE,
+    defaultValue: null
   }
 });
 

@@ -44,6 +44,10 @@ var ConfigKey = _sequelize2["default"].define('config_key', {
     set: function set(value) {
       this.setDataValue('data', (typeof data === "undefined" ? "undefined" : (0, _typeof2["default"])(data)) === 'object' ? JSON.stringify(value) : value);
     }
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE,
+    defaultValue: null
   }
 });
 

@@ -22,11 +22,26 @@ var router = _express["default"].Router();
 module.exports = function (app) {
   router.get(endpoints.GET_CONFIG_KEYS, require('./getConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get(endpoints.GET_CONFIG_KEY, require('./getConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.CREATE_CONFIG_KEY, require('./createConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.UPDATE_CONFIG_KEY, require('./updateConfigKeyMiddleware')["default"](app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.UPDATE_CONFIG_KEYS, require('./updateConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.DELETE_CONFIG_KEYS, require('./deleteConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
-  router.post(endpoints.DUPLICATE_CONFIG_KEYS, require('./duplicateConfigKeysMiddleware')["default"](app), require('../../utils/responseMiddleware'));
+  router.post(endpoints.CREATE_CONFIG_KEY, require('./createConfigKeyMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_CONFIG_KEY, require('./updateConfigKeyMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.UPDATE_CONFIG_KEYS, require('./updateConfigKeysMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.DELETE_CONFIG_KEYS, require('./deleteConfigKeysMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
+  router.post(endpoints.DUPLICATE_CONFIG_KEYS, require('./duplicateConfigKeysMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, require('../../utils/responseMiddleware'));
   return router;
 };
 

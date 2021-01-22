@@ -4,6 +4,8 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
@@ -20,10 +22,11 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var payload, done, scriptId, snap, scripts, script;
+      var payload, done, scriptId, snap, scriptsCount, script, rslts, _JSON$parse, data, s;
+
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -31,24 +34,6 @@ module.exports = function (app) {
               payload = req.body;
 
               done = function done(err, script) {
-                if (script) {
-                  app.io.emit('create_scripts', {
-                    key: app.getRandomString(),
-                    scripts: [{
-                      scriptId: script.scriptId
-                    }]
-                  });
-
-                  _database.Log.create({
-                    name: 'create_scripts',
-                    data: JSON.stringify({
-                      scripts: [{
-                        scriptId: script.scriptId
-                      }]
-                    })
-                  });
-                }
-
                 res.locals.setResponse(err, {
                   script: script
                 });
@@ -72,49 +57,31 @@ module.exports = function (app) {
               return _context.abrupt("return", done(_context.t0));
 
             case 13:
-              scripts = {};
+              scriptsCount = 0;
               _context.prev = 14;
               _context.next = 17;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref('scripts').on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              return _database.Script.count({
+                where: {}
               });
 
             case 17:
-              scripts = _context.sent;
-              scripts = scripts || {};
-              _context.next = 23;
+              scriptsCount = _context.sent;
+              _context.next = 22;
               break;
 
-            case 21:
-              _context.prev = 21;
+            case 20:
+              _context.prev = 20;
               _context.t1 = _context["catch"](14);
 
-            case 23:
+            case 22:
               script = _objectSpread(_objectSpread({}, payload), {}, {
                 scriptId: scriptId,
-                id: scriptId,
-                position: Object.keys(scripts).length + 1,
+                position: scriptsCount + 1,
                 createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
                 updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
               });
-              _context.prev = 24;
-              _context.next = 27;
-              return _firebase["default"].database().ref("scripts/".concat(scriptId)).set(script);
-
-            case 27:
-              _context.next = 32;
-              break;
-
-            case 29:
-              _context.prev = 29;
-              _context.t2 = _context["catch"](24);
-              return _context.abrupt("return", done(_context.t2));
-
-            case 32:
-              _context.prev = 32;
-              _context.next = 35;
+              _context.prev = 23;
+              _context.next = 26;
               return _database.Script.findOrCreate({
                 where: {
                   script_id: script.scriptId
@@ -125,23 +92,31 @@ module.exports = function (app) {
                 }
               });
 
-            case 35:
-              _context.next = 39;
+            case 26:
+              rslts = _context.sent;
+
+              if (rslts && rslts[0]) {
+                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                script = _objectSpread(_objectSpread({}, data), s);
+              }
+
+              _context.next = 33;
               break;
 
-            case 37:
-              _context.prev = 37;
-              _context.t3 = _context["catch"](32);
+            case 30:
+              _context.prev = 30;
+              _context.t2 = _context["catch"](23);
+              return _context.abrupt("return", done(_context.t2));
 
-            case 39:
+            case 33:
               done(null, script);
 
-            case 40:
+            case 34:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 21], [24, 29], [32, 37]]);
+      }, _callee, null, [[3, 10], [14, 20], [23, 30]]);
     }))();
   };
 };
