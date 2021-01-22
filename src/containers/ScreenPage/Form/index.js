@@ -1,7 +1,7 @@
-/* global fetch, alert */
+/* global fetch, alert, window */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
@@ -18,9 +18,11 @@ import MetadataFields from './Metadata/Fields';
 
 function ScreenEditor({ screen, script }) {
   const history = useHistory();
+  const { scriptId } = useParams();
 
   const [form, _setForm] = React.useState({
     metadata: { items: [], fields: [], },
+    scriptId,
     ...screen,
   });
   const setForm = s => _setForm(prev => ({
@@ -45,7 +47,8 @@ function ScreenEditor({ screen, script }) {
         if (res.errors && res.errors.length) {
           alert(JSON.stringify(res.errors));
         } else {
-          history.push(`/scripts/${script.script_id}${screen ? '' : `/screens/${res.screen.id}`}`);
+          // history.push(`/scripts/${script.script_id}${screen ? '' : `/screens/${res.screen.id}`}`);
+          history.push(`/scripts/${scriptId}/screens`);
         }
       } catch (e) { alert(e.message); }
       setSavingScreen(false);

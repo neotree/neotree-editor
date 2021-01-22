@@ -42,6 +42,7 @@ function ScriptEditorForm({ script }) {
           alert(JSON.stringify(res.errors));
         } else {
           history.push(`/scripts${script ? '' : `/${res.script.script_id}`}`);
+          window.location.reload();
         }
       } catch (e) { alert(e.message); }
       setSavingScript(false);

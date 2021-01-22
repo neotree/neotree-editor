@@ -42,7 +42,7 @@ module.exports = () => (req, res, next) => {
         }
       });
       if (rslts && rslts[0]) {
-        const { data, ...s } = rslts[0];
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
         diagnosis = { ...data, ...s };
       }
     } catch (e) { return done(e); }
