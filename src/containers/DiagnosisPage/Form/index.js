@@ -1,6 +1,6 @@
-/* global fetch, alert */
+/* global fetch, alert, window */
 import React from 'react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
@@ -15,6 +15,7 @@ import Symptoms from './Symptoms';
 
 function DiagnosisEditor({ diagnosis, script }) {
   const history = useHistory();
+  const { scriptId } = useParams();
 
   const [form, _setForm] = React.useState({
     description: null,
@@ -27,6 +28,7 @@ function DiagnosisEditor({ diagnosis, script }) {
     text2: null,
     text3: null,
     symptoms: [],
+    scriptId,
     ...diagnosis,
   });
   const setForm = s => _setForm(prev => ({
@@ -51,7 +53,8 @@ function DiagnosisEditor({ diagnosis, script }) {
         if (res.errors && res.errors.length) {
           alert(JSON.stringify(res.errors));
         } else {
-          history.push(`/scripts/${script.script_id}${diagnosis ? '/diagnoses' : `/diagnoses/${res.diagnosis.id}`}`);
+          // history.push(`/scripts/${script.script_id}${diagnosis ? '/diagnoses' : `/diagnoses/${res.diagnosis.id}`}`);
+          history.push(`/scripts/${scriptId}/diagnoses`);
         }
       } catch (e) { alert(e.message); }
       setSavingDiagnosis(false);

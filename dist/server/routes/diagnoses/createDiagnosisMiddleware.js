@@ -25,7 +25,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, scriptId, payload, done, diagnosisId, snap, diagnosesCount, diagnosis, rslts, _rslts$, data, s;
+      var _req$body, scriptId, payload, done, diagnosisId, snap, diagnosesCount, diagnosis, rslts, _JSON$parse, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -103,7 +103,7 @@ module.exports = function () {
               rslts = _context.sent;
 
               if (rslts && rslts[0]) {
-                _rslts$ = rslts[0], data = _rslts$.data, s = (0, _objectWithoutProperties2["default"])(_rslts$, ["data"]);
+                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
                 diagnosis = _objectSpread(_objectSpread({}, data), s);
               }
 
