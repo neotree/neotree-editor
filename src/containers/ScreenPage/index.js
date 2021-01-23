@@ -25,7 +25,7 @@ function Screen() {
 
       if (screenId !== 'new') {
         try {
-          const res = await fetch(`/get-screen?screenId=${screenId}`);
+          const res = await fetch(`/get-screen?id=${screenId}`);
           const { screen } = await res.json();
           setScreen(screen);
         } catch (e) { alert(e.message); }

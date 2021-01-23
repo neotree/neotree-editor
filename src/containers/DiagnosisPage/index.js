@@ -26,7 +26,7 @@ function Diagnosis() {
 
       if (diagnosisId !== 'new') {
         try {
-          const res = await fetch(`/get-diagnosis?diagnosisId=${diagnosisId}`);
+          const res = await fetch(`/get-diagnosis?id=${diagnosisId}`);
           const { diagnosis } = await res.json();
           setDiagnosis(diagnosis);
         } catch (e) { alert(e.message); }

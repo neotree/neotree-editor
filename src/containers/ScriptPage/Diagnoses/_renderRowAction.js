@@ -29,7 +29,7 @@ function Action({ row, }) {
       >
         <MenuItem
           component={Link}
-          to={`/scripts/${row.scriptId}/diagnoses/${row.diagnosisId}`}
+          to={`/scripts/${row.scriptId}/diagnoses/${row.id}`}
           onClick={handleClose}
         >Edit</MenuItem>
 

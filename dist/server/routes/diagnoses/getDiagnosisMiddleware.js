@@ -23,13 +23,13 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var diagnosisId, done, diagnosis, _JSON$parse, data, s;
+      var id, done, diagnosis, _JSON$parse, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              diagnosisId = req.query.diagnosisId;
+              id = req.query.id;
 
               done = function done(err, diagnosis) {
                 res.locals.setResponse(err, {
@@ -43,7 +43,7 @@ module.exports = function () {
               _context.next = 6;
               return _database.Diagnosis.findOne({
                 where: {
-                  diagnosis_id: diagnosisId
+                  id: id
                 }
               });
 
