@@ -2,7 +2,7 @@ import { Screen } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
-    const { screenId } = req.query;
+    const { id } = req.query;
 
     const done = (err, screen) => {
       res.locals.setResponse(err, { screen });
@@ -11,7 +11,7 @@ module.exports = () => (req, res, next) => {
 
     let screen = null;
     try {
-      screen = await Screen.findOne({ where: { screen_id: screenId } });
+      screen = await Screen.findOne({ where: { id } });
       if (screen) {
         const { data, ...s } = JSON.parse(JSON.stringify(screen));
         screen = { ...data, ...s };

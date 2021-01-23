@@ -2,7 +2,7 @@ import { Diagnosis } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
-    const { diagnosisId } = req.query;
+    const { id } = req.query;
 
     const done = (err, diagnosis) => {
       res.locals.setResponse(err, { diagnosis });
@@ -11,7 +11,7 @@ module.exports = () => (req, res, next) => {
 
     let diagnosis = null;
     try {
-      diagnosis = await Diagnosis.findOne({ where: { diagnosis_id: diagnosisId } });
+      diagnosis = await Diagnosis.findOne({ where: { id } });
       if (diagnosis) {
         const { data, ...s } = JSON.parse(JSON.stringify(diagnosis));
         diagnosis = { ...data, ...s };
