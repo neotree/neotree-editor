@@ -1,27 +1,31 @@
 "use strict";
 
+var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
+
 var _models = require("../../models");
+
+var _responseMiddleware = _interopRequireDefault(require("./responseMiddleware"));
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
     var key = req.headers['x-api-key'];
 
     var done = function done(e, apiKey) {
-      res.locals.setResponse(e, !apiKey ? null : {
-        apiKey: apiKey
-      });
-
       if (e || !apiKey) {
         e = e || {
           msg: 'Invalid api key'
         };
-        return app.responseMiddleware(req, res, next);
+        res.locals.setResponse(e);
+        return (0, _responseMiddleware["default"])(req, res, next);
       }
 
+      res.locals.setResponse(null, {
+        apiKey: apiKey
+      });
       next();
     };
 

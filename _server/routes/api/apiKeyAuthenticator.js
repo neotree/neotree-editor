@@ -1,14 +1,16 @@
 import { ApiKey } from '../../models';
+import responseMiddleware from './responseMiddleware';
 
-module.exports = app => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   const key = req.headers['x-api-key'];
 
   const done = (e, apiKey) => {
-    res.locals.setResponse(e, !apiKey ? null : { apiKey });
     if (e || !apiKey) {
       e = e || { msg: 'Invalid api key' };
-      return app.responseMiddleware(req, res, next);
+      res.locals.setResponse(e);
+      return responseMiddleware(req, res, next);
     }
+    res.locals.setResponse(null, { apiKey });
     next();
   };
 
