@@ -1,85 +1,58 @@
-import { Log, Screen } from '../../models';
-import { findAndUpdateScreens } from './updateScreensMiddleware';
 import firebase from '../../firebase';
+import { Screen } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const payload = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const { items, targetScriptId: scriptId } = req.body;
 
-  const done = (err, items = []) => {
-    if (err) app.logger.log(err);
-    if (items.length) {
-      app.io.emit('create_screens', { screens: items.map(s => ({ screenId: s.screen_id })) });
-      Log.create({
-        name: 'create_screens',
-        data: JSON.stringify({ screens: items.map(s => ({ screenId: s.screen_id })) })
+    const done = (err, items = []) => {
+      res.locals.setResponse(err, { items });
+      next();
+    };
+
+    let snaps = [];
+    try {
+      snaps = await Promise.all(items.map(() => firebase.database().ref(`screens/${scriptId}`).push()));
+    } catch (e) { return done(e); }
+
+    let screensCount = 0;
+    try {
+      screensCount = await Screen.count({ where: { script_id: scriptId, deletedAt: null } });
+    } catch (e) { /* Do nothing */ }
+
+    let screens = [];
+    try {
+      screens = await Screen.findAll({ where: { id: items.map(s => s.id) } });
+      screens = screens.map((s, i) => {
+        s = JSON.parse(JSON.stringify(s));
+        delete s.id;
+        return {
+          ...s,
+          screen_id: snaps[i].key,
+          script_id: scriptId,
+          position: screensCount + 1,
+          data: JSON.stringify({
+            ...s.data,
+            scriptId,
+            screenId: snaps[i].key,
+            position: screensCount + 1,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          }),
+        };
       });
-    }
-    res.locals.setResponse(err, { items });
-    next(); return null;
-  };
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = payload => new Promise((resolve, reject) => {
-    firebase.database().ref(`screens/${payload.script_id}`).push().then(snap => {
-      const { data: { position, ...data }, ...rest } = payload; // eslint-disable-line
+    try {
+      const rslts = await Promise.all(screens.map(screen => {
+        return Screen.findOrCreate({ where: { screen_id: screen.screen_id }, defaults: { ...screen } });
+      }));
+      screens = rslts.map(rslt => {
+        const { data, ...screen } = JSON.parse(JSON.stringify(rslt[0]));
+        return { ...data, ...screen };
+      });
+    } catch (e) { return done(e); }
 
-      const screenId = snap.key;
-
-      const screen = {
-        ...rest,
-        ...data,
-        screenId,
-        scriptId: payload.script_id,
-        createdAt: firebase.database.ServerValue.TIMESTAMP
-      };
-
-      firebase.database()
-        .ref(`screens/${payload.script_id}/${screenId}`).set(screen).then(() => {
-          resolve({
-            ...rest,
-            screen_id: screenId,
-            data: JSON.stringify(screen)
-          });
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
-
-  Promise.all([
-    Screen.count({ where: { script_id: payload.script_id } }),
-    Screen.findAll({ where: { id: payload.ids } })
-  ])
-    .then(([count, screens]) => {
-      screens = payload.ids
-        .map(id => screens.filter(scr => scr.id === id)[0])
-        .filter(scr => scr);
-
-      Promise.all(screens.map((screen, i) => {
-        screen = JSON.parse(JSON.stringify(screen));
-        const { createdAt, updateAt, id, screen_id, ...scr } = screen; // eslint-disable-line
-        return saveToFirebase({
-          ...scr,
-          position: count + (i + 1),
-          script_id: payload.script_id
-        });
-      }))
-      .then(items => Promise.all(items.map(item => Screen.create({ ...item })))
-        .then(items => {
-          Promise.all(items.map(item => {
-            // update screens positions
-            return findAndUpdateScreens(
-              {
-                attributes: ['id'],
-                where: { script_id: item.script_id },
-                order: [['position', 'ASC']]
-              },
-              screens => screens.map((scr, i) => ({ ...scr, position: i + 1 }))
-            );
-          }))
-          .then(() => done(null, items))
-          .catch(() => done(null, items));
-        }))
-        .catch(done);
-    })
-    .catch(done);
+    done(null, screens);
+  })();
 };

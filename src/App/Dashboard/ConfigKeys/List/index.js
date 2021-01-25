@@ -43,7 +43,7 @@ class List extends Component {
     const { updateState } = this.props;
     const { configKey, label, summary } = this.state;
     this.setState({ creatingConfigKey: true });
-    Api.post('/create-config-key', { data: JSON.stringify({ configKey, label, summary }) })
+    Api.post('/create-config-key', { configKey, label, summary })
       .then(({ payload }) => {
         this.setState({ creatingConfigKey: false });
         updateState(state =>
@@ -59,7 +59,7 @@ class List extends Component {
     const { updateState } = this.props;
     const id = this.state.configKeyIdForAction;
     this.setState({ deletingConfigKey: true });
-    Api.post('/delete-config-key', { id })
+    Api.post('/delete-config-keys', { configKeys: [{ id }] })
       .then(() => {
         this.setState({ deletingConfigKey: false });
         updateState(state =>
@@ -101,7 +101,7 @@ class List extends Component {
   handleDuplicateKey = id => {
     const { updateState } = this.props;
     this.setState({ duplicatingConfigKey: true });
-    Api.post('/duplicate-config-key', { id })
+    Api.post('/duplicate-config-keys', { configKeys: [{ id }] })
       .then(({ payload }) => {
         this.setState({ duplicatingConfigKey: false });
         updateState(state => {
@@ -259,7 +259,7 @@ class List extends Component {
       <div>
         <DataTable
           style={{ width: '780px' }} shadow={0}
-          rows={configKeys.map(key => ({ id: key.id, ...key.data }))}
+          rows={configKeys}
         >
           <TableHeader name='configKey'>Key</TableHeader>
           <TableHeader name='label'>Label</TableHeader>

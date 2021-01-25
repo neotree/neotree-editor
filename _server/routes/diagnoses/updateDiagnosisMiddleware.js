@@ -1,23 +1,40 @@
-import { Diagnosis, Log } from '../../models';
+import { Diagnosis } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const { id, ...payload } = req.body;
+export const updateDiagnosis = ({ id, ...payload }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
 
-  const done = (err, diagnosis) => {
-    if (diagnosis) {
-      app.io.emit('update_diagnoses', { diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] });
-      Log.create({
-        name: 'update_diagnoses',
-        data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] })
-      });
-    }
-    res.locals.setResponse(err, { diagnosis });
-    next(); return null;
-  };
+    let diagnosis = null;
+    try {
+      diagnosis = await Diagnosis.findOne({ where: { id } });
+    } catch (e) { return reject(e); }
 
-  if (!id) return done({ msg: 'Required diagnosis "id" is not provided.' });
+    if (!diagnosis) return reject(new Error(`Diagnosis with id "${id}" not found`));
 
-  Diagnosis.update(payload, { where: { id }, individualHooks: true })
-    .then(([, [diagnosis]]) => done(null, diagnosis))
-    .catch(done);
+    try {
+      await Diagnosis.update(
+        {
+          position: payload.position || diagnosis.position,
+          data: JSON.stringify({ ...diagnosis.data, ...payload }),
+        },
+        { where: { id } }
+      );
+    } catch (e) { /* Do nothing */ }
+
+    resolve(diagnosis);
+  })();
+});
+
+export default () => (req, res, next) => {
+  (async () => {
+    const done = (err, diagnosis) => {
+      res.locals.setResponse(err, { diagnosis });
+      next();
+    };
+
+    let diagnosis = null;
+    try { diagnosis = await updateDiagnosis(req.body); } catch (e) { return done(e); }
+
+    done(null, diagnosis);
+  })();
 };

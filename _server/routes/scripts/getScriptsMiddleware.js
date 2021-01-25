@@ -1,14 +1,21 @@
 import { Script } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const done = (err, scripts) => {
+      res.locals.setResponse(err, { scripts });
+      next();
+    };
 
-  const done = (err, scripts) => {
-    res.locals.setResponse(err, { scripts });
-    next(); return null;
-  };
+    let scripts = [];
+    try {
+      scripts = await Script.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
+      scripts = scripts.map(script => {
+        const { data, ...s } = JSON.parse(JSON.stringify(script));
+        return { ...data, ...s };
+      });
+    } catch (e) { return done(e); }
 
-  Script.findAll({ where: payload, order: [['createdAt', 'DESC']] })
-    .then(scripts => done(null, scripts))
-    .catch(done);
+    done(null, scripts);
+  })();
 };

@@ -27,21 +27,24 @@ const ConfigKey = sqlz.define(
         this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 
-ConfigKey.afterUpdate(cKey => {
-  const { id, data: { createdAt: cAt, ...data }, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
-  firebase.database().ref(`configkeys/${id}`).update({
-    ...data,
-    ...c,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return new Promise(resolve => resolve(cKey));
-});
-ConfigKey.afterDestroy(instance => {
-  firebase.database().ref(`configkeys/${instance.id}`).remove();
-  return new Promise(resolve => resolve(instance));
-});
+// ConfigKey.afterUpdate(cKey => {
+//   const { id, data: { createdAt: cAt, ...data }, createdAt, ...c } = JSON.parse(JSON.stringify(cKey)); // eslint-disable-line
+//   firebase.database().ref(`configkeys/${id}`).update({
+//     ...data,
+//     ...c,
+//     updatedAt: firebase.database.ServerValue.TIMESTAMP
+//   });
+//   return new Promise(resolve => resolve(cKey));
+// });
+// ConfigKey.afterDestroy(instance => {
+//   firebase.database().ref(`configkeys/${instance.id}`).remove();
+//   return new Promise(resolve => resolve(instance));
+// });
 
 export default ConfigKey;

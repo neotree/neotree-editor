@@ -1,14 +1,23 @@
 import { Script } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const { scriptId } = req.query;
 
-  const done = (err, script) => {
-    res.locals.setResponse(err, { script });
-    next(); return null;
-  };
+    const done = (err, script) => {
+      res.locals.setResponse(err, { script });
+      next();
+    };
 
-  Script.findOne({ where: payload })
-    .then((script) => done(null, script))
-    .catch(done);
+    let script = null;
+    try {
+      script = await Script.findOne({ where: { script_id: scriptId } });
+      if (script) {
+        const { data, ...s } = JSON.parse(JSON.stringify(script));
+        script = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
+
+    done(null, script);
+  })();
 };

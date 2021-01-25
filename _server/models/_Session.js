@@ -10,7 +10,10 @@ const Session = sqlz.define(
     },
     userId: Sequelize.STRING,
     expires: Sequelize.DATE,
-    data: Sequelize.STRING(50000)
+    data: Sequelize.STRING(50000),
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 

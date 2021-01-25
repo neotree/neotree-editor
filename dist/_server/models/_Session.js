@@ -27,7 +27,10 @@ var Session = _sequelize2["default"].define('session', {
   },
   userId: _sequelize["default"].STRING,
   expires: _sequelize["default"].DATE,
-  data: _sequelize["default"].STRING(50000)
+  data: _sequelize["default"].STRING(50000),
+  deletedAt: {
+    type: _sequelize["default"].DATE
+  }
 });
 
 var _default = Session;

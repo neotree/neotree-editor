@@ -71,8 +71,8 @@ const Copy = ({ data, children, itemsType, onSuccess }) => {
               >
                 <option value="">Select script</option>
                 {scripts.map((scr, i) => (
-                  <option key={i} value={scr.id}>
-                    {scr.data.title}
+                  <option key={i} value={scr.script_id}>
+                    {scr.title}
                   </option>
                 ))}
               </select>
@@ -85,7 +85,7 @@ const Copy = ({ data, children, itemsType, onSuccess }) => {
                 onClick={() => {
                   setCopying(true);
                   setError(null);
-                  Api.post(`/copy-${itemsType}`, { ...data, script_id })
+                  Api.post(`/copy-${itemsType}`, { ...data, targetScriptId: script_id })
                     .then(({ error, payload: { items } }) => {
                       setError(error);
                       setCopying(false);

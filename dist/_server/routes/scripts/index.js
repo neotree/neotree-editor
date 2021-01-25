@@ -16,16 +16,29 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  var responseMiddleware = app.responseMiddleware;
-  router.get('/get-scripts', require('./getScriptsMiddleware')(app), responseMiddleware);
-  router.get('/get-script', require('./getScriptMiddleware')(app), responseMiddleware);
-  router.get('/get-full-script', require('./getFullScriptMiddleware')(app), responseMiddleware);
-  router.get('/get-script-items', require('./getScriptItemsMiddleware')(app), responseMiddleware);
-  router.post('/create-script', require('./createScriptMiddleware')(app), responseMiddleware);
-  router.post('/update-script', require('./updateScriptMiddleware')(app), responseMiddleware);
-  router.post('/update-scripts', require('./updateScriptsMiddleware')(app), responseMiddleware);
-  router.post('/delete-script', require('./deleteScriptMiddleware')(app), responseMiddleware);
-  router.post('/duplicate-script', require('./duplicateScriptMiddleware')["default"](app), responseMiddleware);
+  router.get('/get-scripts', require('./getScriptsMiddleware')(app), app.responseMiddleware);
+  router.get('/get-script', require('./getScriptMiddleware')(app), app.responseMiddleware);
+  router.get('/get-script-items', require('./getScriptItemsMiddleware')(app), app.responseMiddleware);
+  router.post('/create-script', require('./createScriptMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-script', require('./updateScriptMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-scripts', require('./updateScriptsMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/delete-scripts', require('./deleteScriptsMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/duplicate-scripts', require('./duplicateScriptsMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
   return router;
 };
 

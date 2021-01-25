@@ -1,17 +1,23 @@
 import { Screen } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const {
-    filters,
-    ...payload
-  } = JSON.parse(req.query.payload || {});
+  const { scriptId } = req.query;
 
-  const done = (err, screens) => {
-    res.locals.setResponse(err, { screens });
-    next(); return null;
-  };
+  (async () => {
+    const done = (err, screens) => {
+      res.locals.setResponse(err, { screens });
+      next();
+    };
 
-  Screen.findAll({ where: payload, order: [['position', 'ASC']], ...filters })
-    .then(screens => done(null, screens))
-    .catch(done);
+    let screens = [];
+    try {
+      screens = await Screen.findAll({ where: { script_id: scriptId, deletedAt: null }, order: [['position', 'ASC']], });
+      screens = screens.map(screen => {
+        const { data, ...s } = JSON.parse(JSON.stringify(screen));
+        return { ...data, ...s };
+      });
+    } catch (e) { return done(e); }
+
+    done(null, screens);
+  })();
 };

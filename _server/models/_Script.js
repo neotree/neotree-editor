@@ -27,23 +27,26 @@ const Script = sqlz.define(
         this.setDataValue('data', typeof data === 'object' ? JSON.stringify(value) : value);
       }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 
-Script.afterUpdate(script => {
-  const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
-  firebase.database().ref(`scripts/${id}`).update({
-    ...data,
-    ...scr,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return new Promise(resolve => resolve(script));
-});
-Script.afterDestroy(instance => {
-  firebase.database().ref(`screens/${instance.id}`).remove();
-  firebase.database().ref(`diagnosis/${instance.id}`).remove();
-  firebase.database().ref(`scripts/${instance.id}`).remove();
-  return new Promise(resolve => resolve(instance));
-});
+// Script.afterUpdate(script => {
+//   const { id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+//   firebase.database().ref(`scripts/${id}`).update({
+//     ...data,
+//     ...scr,
+//     updatedAt: firebase.database.ServerValue.TIMESTAMP
+//   });
+//   return new Promise(resolve => resolve(script));
+// });
+// Script.afterDestroy(instance => {
+//   firebase.database().ref(`screens/${instance.id}`).remove();
+//   firebase.database().ref(`diagnosis/${instance.id}`).remove();
+//   firebase.database().ref(`scripts/${instance.id}`).remove();
+//   return new Promise(resolve => resolve(instance));
+// });
 
 export default Script;

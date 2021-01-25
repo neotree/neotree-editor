@@ -1,29 +1,21 @@
-import { Log, Script } from '../../models';
+import { updateScript } from './updateScriptMiddleware';
 
-module.exports = (app) => (req, res, next) => {
-  const { scripts, returnUpdated } = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const { scripts } = req.body;
 
-  const done = (err, payload) => {
-    if (!err) {
-      app.io.emit('update_scripts', { scripts: scripts.map(s => ({ scriptId: s.id })) });
-      Log.create({
-        name: 'update_scripts',
-        data: JSON.stringify({ scripts: scripts.map(s => ({ scriptId: s.id })) })
-      });
-    }
-    res.locals.setResponse(err, payload);
-    next(); return null;
-  };
+    const done = (err, updatedScripts) => {
+      if (err) {
+        res.locals.setResponse(err);
+        return next();
+      }
+      res.locals.setResponse(null, { updatedScripts });
+      next();
+    };
 
-  Promise.all(scripts.map(({ id, ...scr }) =>
-    Script.update({ ...scr }, { where: { id }, individualHooks: true }))
-  ).then(rslts => {
-    if (!returnUpdated) return done(null, { rslts });
+    let updatedScripts = [];
+    try { updatedScripts = await Promise.all(scripts.map(s => updateScript(s))); } catch (e) { return done(e); }
 
-    Script.findAll({ where: { id: scripts.map(scr => scr.id) } })
-      .then(scripts => done(null, { scripts }))
-      .catch(done);
-
-    return null;
-  }).catch(done);
+    done(null, updatedScripts);
+  })();
 };

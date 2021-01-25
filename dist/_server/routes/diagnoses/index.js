@@ -16,15 +16,32 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  var responseMiddleware = app.responseMiddleware;
-  router.post('/copy-diagnoses', require('./copyDiagnosesMiddleware')(app), responseMiddleware);
-  router.get('/get-diagnoses', require('./getDiagnosesMiddleware')(app), responseMiddleware);
-  router.get('/get-diagnosis', require('./getDiagnosisMiddleware')(app), responseMiddleware);
-  router.get('/get-full-diagnosis', require('./getFullDiagnosisMiddleware')(app), responseMiddleware);
-  router.post('/create-diagnosis', require('./createDiagnosisMiddleware')(app), responseMiddleware);
-  router.post('/update-diagnosis', require('./updateDiagnosisMiddleware')(app), responseMiddleware);
-  router.post('/update-diagnoses', require('./updateDiagnosesMiddleware')["default"](app), responseMiddleware);
-  router.post('/delete-diagnosis', require('./deleteDiagnosisMiddleware')(app), responseMiddleware);
+  router.get('/get-diagnoses', require('./getDiagnosesMiddleware')(app), app.responseMiddleware);
+  router.get('/get-diagnosis', require('./getDiagnosisMiddleware')(app), app.responseMiddleware);
+  router.post('/create-diagnosis', require('./createDiagnosisMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-diagnosis', require('./updateDiagnosisMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-diagnoses', require('./updateDiagnosesMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/delete-diagnoses', require('./deleteDiagnosesMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/duplicate-diagnoses', require('./duplicateDiagnosesMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/copy-diagnoses', require('./copyDiagnosesMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
   return router;
 };
 

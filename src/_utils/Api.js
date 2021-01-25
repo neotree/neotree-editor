@@ -1,11 +1,12 @@
 /* global fetch, window */
 import 'isomorphic-fetch';
+import queryString from 'query-string';
 
 const makeApiCall = (method = 'GET', url, data = {}) => {
   let opts = { method, credentials: 'same-origin' };
   if (!method || (method === 'GET') || (method === 'get')) {
     opts = { ...opts };
-    url = `${url}?payload=${JSON.stringify(data)}`;
+    url = `${url}?${queryString.stringify({ ...data })}`;
   } else {
     opts = {
       ...opts,

@@ -17,7 +17,10 @@ const User = sqlz.define(
       allowNull: false
     },
     password: { type: Sequelize.STRING },
-    role: { type: Sequelize.INTEGER, defaultValue: 0 }
+    role: { type: Sequelize.INTEGER, defaultValue: 0 },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 

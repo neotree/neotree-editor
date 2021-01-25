@@ -1,52 +1,52 @@
-import { Diagnosis, Log } from '../../models';
 import firebase from '../../firebase';
+import { Diagnosis } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const payload = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const { scriptId, ...payload } = req.body;
 
-  const done = (err, diagnosis) => {
-    if (err) app.logger.log(err);
-    if (diagnosis) {
-      app.io.emit('create_diagnoses', { diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] });
-      Log.create({
-        name: 'create_diagnoses',
-        data: JSON.stringify({ diagnoses: [{ diagnosisId: diagnosis.diagnosis_id }] })
+    const done = (err, diagnosis) => {
+      res.locals.setResponse(err, { diagnosis });
+      next();
+    };
+
+    let diagnosisId = null;
+    try {
+      const snap = await firebase.database().ref(`diagnosis/${scriptId}`).push();
+      diagnosisId = snap.key;
+    } catch (e) { return done(e); }
+
+    let diagnosesCount = 0;
+    try {
+      diagnosesCount = await Diagnosis.count({ where: { script_id: scriptId, deletedAt: null } });
+    } catch (e) { /* Do nothing */ }
+
+    let diagnosis = {
+      ...payload,
+      diagnosisId,
+      scriptId,
+      position: diagnosesCount + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try {
+      const rslts = await Diagnosis.findOrCreate({
+        where: { diagnosis_id: diagnosis.diagnosisId },
+        defaults: {
+          script_id: scriptId,
+          diagnosis_id: diagnosis.diagnosisId,
+          position: diagnosis.position,
+          type: diagnosis.type,
+          data: JSON.stringify(diagnosis),
+        }
       });
-    }
-    res.locals.setResponse(err, { diagnosis });
-    next(); return null;
-  };
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        diagnosis = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = () => new Promise((resolve, reject) => {
-    firebase.database().ref(`diagnosis/${payload.script_id}`).push().then(snap => {
-      const { data, ...rest } = payload;
-
-      const diagnosisId = snap.key;
-
-      const _data = data ? JSON.parse(data) : null;
-
-      firebase.database()
-        .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set({
-          ...rest,
-          ..._data,
-          diagnosisId,
-          scriptId: payload.script_id,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-          resolve(diagnosisId);
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
-
-  Promise.all([
-    Diagnosis.count({ where: { script_id: payload.script_id } }),
-    saveToFirebase()
-  ])
-    .then(([count, diagnosis_id]) => {
-      Diagnosis.create({ ...payload, position: count + 1, diagnosis_id })
-        .then((diagnosis) => done(null, diagnosis))
-        .catch(done);
-    }).catch(done);
+    done(null, diagnosis);
+  })();
 };

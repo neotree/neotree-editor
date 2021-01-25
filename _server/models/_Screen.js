@@ -38,21 +38,24 @@ const Screen = sqlz.define(
       //   key: 'id'
       // }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 
-Screen.afterUpdate(script => {
-  const { id, screen_id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
-  firebase.database().ref(`screens/${script.script_id}/${screen_id}`).update({
-    ...data,
-    ...scr,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return new Promise(resolve => resolve(script));
-});
-Screen.afterDestroy(instance => {
-  firebase.database().ref(`screens/${instance.script_id}/${instance.screen_id}`).remove();
-  return new Promise(resolve => resolve(instance));
-});
+// Screen.afterUpdate(script => {
+//   const { id, screen_id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+//   firebase.database().ref(`screens/${script.script_id}/${screen_id}`).update({
+//     ...data,
+//     ...scr,
+//     updatedAt: firebase.database.ServerValue.TIMESTAMP
+//   });
+//   return new Promise(resolve => resolve(script));
+// });
+// Screen.afterDestroy(instance => {
+//   firebase.database().ref(`screens/${instance.script_id}/${instance.screen_id}`).remove();
+//   return new Promise(resolve => resolve(instance));
+// });
 
 export default Screen;

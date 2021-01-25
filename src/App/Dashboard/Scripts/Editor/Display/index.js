@@ -12,7 +12,7 @@ class Display extends Component {
     script: {
       title: '',
       description: '',
-      ...(this.props.script || {}).data
+      ...this.props.script
     }
   };
 
@@ -23,7 +23,7 @@ class Display extends Component {
   }
 
   setScriptAsState = (props = this.props) => {
-    if (props.script) this.setState({ script: props.script.data });
+    if (props.script) this.setState({ script: props.script });
   };
 
   handleBackClick = () => this.props.history.goBack();
@@ -43,16 +43,12 @@ class Display extends Component {
   });
 
   handleSubmitClick = () => {
-    const { isEditMode, history, actions, scriptId } = this.props;
+    const { isEditMode, history, actions } = this.props;
     const { script } = this.state;
 
     this.setState({ savingScript: true });
     actions.post(isEditMode ? 'update-script' : 'create-script', {
-      ...(isEditMode ? { id: scriptId } : {}),
-      data: JSON.stringify({
-        title: script.title,
-        description: script.description
-      }),
+      ...script,
       onResponse: () => this.setState({ savingScript: true }),
       onFailure: saveScriptError => this.setState({ saveScriptError }),
       onSuccess: ({ payload }) => {

@@ -7,10 +7,6 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
-
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
-
 var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
 
 var _sequelize = _interopRequireDefault(require("sequelize"));
@@ -23,10 +19,6 @@ var _firebase = _interopRequireDefault(require("../firebase"));
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
-
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-
-function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -64,35 +56,25 @@ var Screen = _sequelize2["default"].define('screen', {
     //   key: 'id'
     // }
 
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE
   }
-});
+}); // Screen.afterUpdate(script => {
+//   const { id, screen_id, data: { createdAt: cAt, ...data }, createdAt, ...scr } = JSON.parse(JSON.stringify(script));  // eslint-disable-line
+//   firebase.database().ref(`screens/${script.script_id}/${screen_id}`).update({
+//     ...data,
+//     ...scr,
+//     updatedAt: firebase.database.ServerValue.TIMESTAMP
+//   });
+//   return new Promise(resolve => resolve(script));
+// });
+// Screen.afterDestroy(instance => {
+//   firebase.database().ref(`screens/${instance.script_id}/${instance.screen_id}`).remove();
+//   return new Promise(resolve => resolve(instance));
+// });
 
-Screen.afterUpdate(function (script) {
-  var _JSON$parse = JSON.parse(JSON.stringify(script)),
-      id = _JSON$parse.id,
-      screen_id = _JSON$parse.screen_id,
-      _JSON$parse$data = _JSON$parse.data,
-      cAt = _JSON$parse$data.createdAt,
-      data = (0, _objectWithoutProperties2["default"])(_JSON$parse$data, ["createdAt"]),
-      createdAt = _JSON$parse.createdAt,
-      scr = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "screen_id", "data", "createdAt"]); // eslint-disable-line
 
-
-  _firebase["default"].database().ref("screens/".concat(script.script_id, "/").concat(screen_id)).update(_objectSpread(_objectSpread(_objectSpread({}, data), scr), {}, {
-    updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-  }));
-
-  return new Promise(function (resolve) {
-    return resolve(script);
-  });
-});
-Screen.afterDestroy(function (instance) {
-  _firebase["default"].database().ref("screens/".concat(instance.script_id, "/").concat(instance.screen_id)).remove();
-
-  return new Promise(function (resolve) {
-    return resolve(instance);
-  });
-});
 var _default = Screen;
 var _default2 = _default;
 exports["default"] = _default2;

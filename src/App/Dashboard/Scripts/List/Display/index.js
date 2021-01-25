@@ -42,7 +42,7 @@ class Display extends Component {
     const { updateState } = this.props;
     const id = this.state.scriptIdForAction;
     this.setState({ deletingScript: true });
-    Api.post('/delete-script', { id })
+    Api.post('/delete-scripts', { scripts: [{ id }] })
       .catch(deleteScriptError => this.setState({
         deleteScriptError,
         deletingScript: false
@@ -163,7 +163,7 @@ class Display extends Component {
           >
             <div
               className="ui__cursor_pointer"
-              onClick={this.handleEditScriptClick.bind(this, scriptId)}
+              onClick={this.handleEditScriptClick.bind(this, rowData.script_id)}
             >
               <MdCreate style={{ fontSize: '24px' }} />
             </div>&nbsp;
@@ -171,7 +171,7 @@ class Display extends Component {
               <MdMoreVert style={{ fontSize: '24px' }} />
             </div>
             <Menu target={menuId} align="right">
-                <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, scriptId)}>
+                <MenuItem onClick={this.openDeleteConfirmDialog.bind(this, rowData.id)}>
                   Delete
                 </MenuItem>
                 {/*<MenuItem onClick={() => this.handleDuplicateScript(scriptId)}>
@@ -183,7 +183,7 @@ class Display extends Component {
                   </ClipboardCopyButton>
                 </MenuItem>*/}
                 <MenuItem>
-                  <ExportLink options={{ script: scriptId }} />
+                  <ExportLink options={{ script: rowData.script_id }} />
                 </MenuItem>
             </Menu>
           </div>
@@ -199,7 +199,7 @@ class Display extends Component {
         <DataTable
           style={{ width: '780px' }}
           shadow={0}
-          rows={scripts.map(scr => ({ id: scr.id, ...scr.data }))}
+          rows={scripts}
         >
           <TableHeader name="title">Title</TableHeader>
           <TableHeader name="description">Description</TableHeader>

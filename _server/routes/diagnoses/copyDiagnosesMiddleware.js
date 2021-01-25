@@ -1,85 +1,58 @@
-import { Log, Diagnosis } from '../../models';
-import { findAndUpdateDiagnoses } from './updateDiagnosesMiddleware';
 import firebase from '../../firebase';
+import { Diagnosis } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const payload = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const { items, targetScriptId: scriptId } = req.body;
 
-  const done = (err, items = []) => {
-    if (err) app.logger.log(err);
-    if (items.length) {
-      app.io.emit('create_diagnoses', { diagnoses: items.map(s => ({ diagnosisId: s.diagnosis_id })) });
-      Log.create({
-        name: 'create_diagnoses',
-        data: JSON.stringify({ diagnoses: items.map(s => ({ diagnosisId: s.diagnosis_id })) })
+    const done = (err, items = []) => {
+      res.locals.setResponse(err, { items });
+      next();
+    };
+
+    let snaps = [];
+    try {
+      snaps = await Promise.all(items.map(() => firebase.database().ref(`diagnosis/${scriptId}`).push()));
+    } catch (e) { return done(e); }
+
+    let diagnosesCount = 0;
+    try {
+      diagnosesCount = await Diagnosis.count({ where: { script_id: scriptId, deletedAt: null } });
+    } catch (e) { /* Do nothing */ }
+
+    let diagnoses = [];
+    try {
+      diagnoses = await Diagnosis.findAll({ where: { id: items.map(s => s.id) } });
+      diagnoses = diagnoses.map((s, i) => {
+        s = JSON.parse(JSON.stringify(s));
+        delete s.id;
+        return {
+          ...s,
+          diagnosis_id: snaps[i].key,
+          script_id: scriptId,
+          position: diagnosesCount + 1,
+          data: JSON.stringify({
+            ...s.data,
+            scriptId,
+            diagnosisId: snaps[i].key,
+            position: diagnosesCount + 1,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          }),
+        };
       });
-    }
-    res.locals.setResponse(err, { items });
-    next(); return null;
-  };
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = payload => new Promise((resolve, reject) => {
-    firebase.database().ref(`diagnosis/${payload.script_id}`).push().then(snap => {
-      const { data: { position, ...data }, ...rest } = payload; // eslint-disable-line
+    try {
+      const rslts = await Promise.all(diagnoses.map(diagnosis => {
+        return Diagnosis.findOrCreate({ where: { diagnosis_id: diagnosis.diagnosis_id }, defaults: { ...diagnosis } });
+      }));
+      diagnoses = rslts.map(rslt => {
+        const { data, ...diagnosis } = JSON.parse(JSON.stringify(rslt[0]));
+        return { ...data, ...diagnosis };
+      });
+    } catch (e) { /* Do nothing */ }
 
-      const diagnosisId = snap.key;
-
-      const diagnosis = {
-        ...rest,
-        ...data,
-        diagnosisId,
-        scriptId: payload.script_id,
-        createdAt: firebase.database.ServerValue.TIMESTAMP
-      };
-
-      firebase.database()
-        .ref(`diagnosis/${payload.script_id}/${diagnosisId}`).set(diagnosis).then(() => {
-        resolve({
-          ...rest,
-          diagnosis_id: diagnosisId,
-          data: JSON.stringify(diagnosis)
-        });
-      })
-        .catch(reject);
-    })
-      .catch(reject);
-  });
-
-  Promise.all([
-    Diagnosis.count({ where: { script_id: payload.script_id } }),
-    Diagnosis.findAll({ where: { id: payload.ids } })
-  ])
-    .then(([count, diagnoses]) => {
-      diagnoses = payload.ids
-        .map(id => diagnoses.filter(scr => scr.id === id)[0])
-        .filter(scr => scr);
-
-      Promise.all(diagnoses.map((diagnosis, i) => {
-        diagnosis = JSON.parse(JSON.stringify(diagnosis));
-        const { createdAt, updateAt, id, diagnosis_id, ...scr } = diagnosis; // eslint-disable-line
-        return saveToFirebase({
-          ...scr,
-          position: count + (i + 1),
-          script_id: payload.script_id
-        });
-      }))
-        .then(items => Promise.all(items.map(item => Diagnosis.create({ ...item })))
-          .then(items => {
-            Promise.all(items.map(item => {
-              // update diagnoses positions
-              return findAndUpdateDiagnoses(
-                {
-                  attributes: ['id'],
-                  where: { script_id: item.script_id },
-                  order: [['position', 'ASC']]
-                },
-                diagnoses => diagnoses.map((scr, i) => ({ ...scr, position: i + 1 }))
-              );
-            }))
-              .then(() => done(null, items))
-              .catch(() => done(null, items));
-          }))
-        .catch(done);
-    })
-    .catch(done);
+    done(null, diagnoses);
+  })();
 };

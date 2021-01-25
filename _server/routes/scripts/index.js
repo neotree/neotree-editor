@@ -3,60 +3,72 @@ import express from 'express';
 const router = express.Router();
 
 module.exports = app => {
-  const { responseMiddleware } = app;
-
   router.get(
     '/get-scripts',
     require('./getScriptsMiddleware')(app),
-    responseMiddleware
+    app.responseMiddleware
   );
 
   router.get(
     '/get-script',
     require('./getScriptMiddleware')(app),
-    responseMiddleware
-  );
-
-  router.get(
-    '/get-full-script',
-    require('./getFullScriptMiddleware')(app),
-    responseMiddleware
+    app.responseMiddleware
   );
 
   router.get(
     '/get-script-items',
     require('./getScriptItemsMiddleware')(app),
-    responseMiddleware
+    app.responseMiddleware
   );
 
   router.post(
     '/create-script',
     require('./createScriptMiddleware')(app),
-    responseMiddleware
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    app.responseMiddleware
   );
 
   router.post(
     '/update-script',
-    require('./updateScriptMiddleware')(app),
-    responseMiddleware
+    require('./updateScriptMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    app.responseMiddleware
   );
 
   router.post(
     '/update-scripts',
     require('./updateScriptsMiddleware')(app),
-    responseMiddleware
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    app.responseMiddleware
   );
 
   router.post(
-    '/delete-script',
-    require('./deleteScriptMiddleware')(app),
-    responseMiddleware
+    '/delete-scripts',
+    require('./deleteScriptsMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    app.responseMiddleware
   );
 
   router.post(
-    '/duplicate-script',
-    require('./duplicateScriptMiddleware').default(app),
-    responseMiddleware
+    '/duplicate-scripts',
+    require('./duplicateScriptsMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    app.responseMiddleware
   );
 
   return router;

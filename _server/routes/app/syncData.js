@@ -1,73 +1,66 @@
 import { Op } from 'sequelize';
-import { Script, Screen, ConfigKey, Diagnosis, Log } from '../../models';
+import { Script, Screen, ConfigKey, Diagnosis, Device, } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
-  const lastSyncDate = payload.lastSyncDate ?
-    new Date(payload.lastSyncDate).getTime() : null;
+  (async () => {
+    const { lastSyncDate: _lastSyncDate, deviceId, scriptsCount, } = req.query;
+    const lastSyncDate = _lastSyncDate ? new Date(_lastSyncDate).getTime() : null;
 
-  const done = (e, payload) => {
-    res.locals.setResponse(e, payload);
-    next();
-  };
+    const done = (e, payload) => {
+      res.locals.setResponse(e, payload);
+      next();
+    };
 
-  Promise.all([
-    !lastSyncDate ? null : Log.findAll({
-      where: {
-        createdAt: { [Op.gte]: lastSyncDate },
-        name: { [Op.or]: ['delete_scripts', 'delete_screens', 'delete_daignoses', 'delete_config_keys'] },
+    let device = null;
+    if (deviceId) {
+      try { device = await Device.findOne({ where: { device_id: deviceId } }); } catch (e) { /* do nothing */ }
+
+      if (device && scriptsCount && (scriptsCount !== device.details.scripts_count)) {
+        const details = JSON.stringify({ ...device.details, scripts_count: scriptsCount, });
+        try { await Device.update({ details }, { where: { device_id: deviceId } }); } catch (e) { /* do nothing */ }
+
+        try { device = await Device.findOne({ where: { device_id: deviceId } }); } catch (e) { /* do nothing */ }
       }
-    }),
+    }
 
-    Script.findAll({ where: !lastSyncDate ?
-      {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-    Script.findAll({ where: !lastSyncDate ?
-      {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+    const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
+    const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
 
-    Screen.findAll({ where: !lastSyncDate ?
-      {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-    Screen.findAll({ where: !lastSyncDate ?
-      {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+    Promise.all([
+      Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Script.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-    Diagnosis.findAll({ where: !lastSyncDate ?
-      {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-    Diagnosis.findAll({ where: !lastSyncDate ?
-      {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
+      Screen.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Screen.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-    ConfigKey.findAll({ where: !lastSyncDate ?
-      {} : { updatedAt: { [Op.gte]: lastSyncDate } } }),
-    ConfigKey.findAll({ where: !lastSyncDate ?
-      {} : { createdAt: { [Op.gte]: lastSyncDate } } }),
-  ])
-    .then((rslts = []) => {
-      done(null, {
-        scripts: {
-          lastCreated: rslts[1] || [],
-          lastUpdated: rslts[2] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_scripts')
-            .reduce((acc, log) => [...acc, ...(log.data.scripts || []).map(s => ({ id: s.id }))], []),
-        },
-        screens: {
-          lastCreated: rslts[3] || [],
-          lastUpdated: rslts[4] || [],
-          lastDeleted: (rslts[0] || []).filter(log => log.name === 'delete_screens')
-            .reduce((acc, log) => [...acc, ...(log.data.screens || []).map(s => ({ id: s.id }))], []),
-        },
+      Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      Diagnosis.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
 
-        diagnoses: {
-          lastCreated: rslts[5] || [],
-          lastUpdated: rslts[6] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_diagnoses')
-            .reduce((acc, log) => [...acc, ...(log.data.diagnoses || []).map(s => ({ id: s.id }))], []),
-        },
-
-        config_keys: {
-          lastCreated: rslts[7] || [],
-          lastUpdated: rslts[8] || [],
-          lastDeleted: !lastSyncDate ? [] : (rslts[0] || []).filter(log => log.name === 'delete_config_keys')
-            .reduce((acc, log) => [...acc, ...(log.data.config_keys || []).map(s => ({ id: s.id }))], []),
-        }
-      });
-    })
-    .catch(done);
+      ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
+      ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
+    ])
+      .then(([
+               scripts,
+               deletedScripts,
+               screens,
+               deletedScreens,
+               diagnoses,
+               deletedDiagnoses,
+               configKeys,
+               deletedConfigKeys,
+             ]) => {
+        done(null, {
+          device,
+          scripts,
+          deletedScripts,
+          screens,
+          deletedScreens,
+          diagnoses,
+          deletedDiagnoses,
+          configKeys,
+          deletedConfigKeys,
+        });
+      })
+      .catch(done);
+  })();
 };

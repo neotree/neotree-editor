@@ -1,16 +1,24 @@
 import { Screen, Diagnosis } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const { scriptId } = req.query;
 
-  const done = (err, screens, diagnoses) => {
-    res.locals.setResponse(err, { screens, diagnoses });
-    next(); return null;
-  };
+    const done = (err, data) => {
+      res.locals.setResponse(err, { ...data });
+      next();
+    };
 
-  Promise.all([
-    Screen.findAll({ where: payload, order: [['position', 'ASC']] }),
-    Diagnosis.findAll({ where: payload })
-  ]).catch(done)
-    .then(([screens, diagnoses]) => done(null, screens, diagnoses));
+    let screens = [];
+    try {
+      screens = await Screen.findAll({ where: { script_id: scriptId } });
+    } catch (e) { /* Do nothing */ }
+
+    let diagnoses = [];
+    try {
+      diagnoses = await Diagnosis.findAll({ where: { script_id: scriptId } });
+    } catch (e) { /* Do nothing */ }
+
+    done(null, { screens, diagnoses });
+  })();
 };

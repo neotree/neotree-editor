@@ -28,7 +28,10 @@ const UserProfile = sqlz.define(
       // }
     },
     firstname: { type: Sequelize.STRING },
-    lastname: { type: Sequelize.STRING }
+    lastname: { type: Sequelize.STRING },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 

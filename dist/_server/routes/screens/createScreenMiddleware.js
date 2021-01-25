@@ -2,15 +2,17 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _slicedToArray2 = _interopRequireDefault(require("@babel/runtime/helpers/slicedToArray"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _models = require("../../models");
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
+
+var _models = require("../../models");
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
@@ -20,72 +22,108 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
-    var payload = req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var _req$body, scriptId, payload, done, screenId, snap, screensCount, screen, rslts, _JSON$parse, data, s;
 
-    var done = function done(err, screen) {
-      if (err) app.logger.log(err);
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, ["scriptId"]);
 
-      if (screen) {
-        app.io.emit('create_screens', {
-          screens: [{
-            screenId: screen.screen_id
-          }]
-        });
+              done = function done(err, screen) {
+                res.locals.setResponse(err, {
+                  screen: screen
+                });
+                next();
+              };
 
-        _models.Log.create({
-          name: 'create_screens',
-          data: JSON.stringify({
-            screens: [{
-              screenId: screen.screen_id
-            }]
-          })
-        });
-      }
+              screenId = null;
+              _context.prev = 3;
+              _context.next = 6;
+              return _firebase["default"].database().ref("screens/".concat(scriptId)).push();
 
-      res.locals.setResponse(err, {
-        screen: screen
-      });
-      next();
-      return null;
-    };
+            case 6:
+              snap = _context.sent;
+              screenId = snap.key;
+              _context.next = 13;
+              break;
 
-    var saveToFirebase = function saveToFirebase() {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref("screens/".concat(payload.script_id)).push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-          var screenId = snap.key;
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-          var _data = data ? JSON.parse(data) : null;
+            case 13:
+              screensCount = 0;
+              _context.prev = 14;
+              _context.next = 17;
+              return _models.Screen.count({
+                where: {
+                  script_id: scriptId,
+                  deletedAt: null
+                }
+              });
 
-          _firebase["default"].database().ref("screens/".concat(payload.script_id, "/").concat(screenId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-            screenId: screenId,
-            scriptId: payload.script_id,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          })).then(function () {
-            resolve(screenId);
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 17:
+              screensCount = _context.sent;
+              _context.next = 22;
+              break;
 
-    Promise.all([_models.Screen.count({
-      where: {
-        script_id: payload.script_id
-      }
-    }), saveToFirebase()]).then(function (_ref) {
-      var _ref2 = (0, _slicedToArray2["default"])(_ref, 2),
-          count = _ref2[0],
-          screen_id = _ref2[1];
+            case 20:
+              _context.prev = 20;
+              _context.t1 = _context["catch"](14);
 
-      _models.Screen.create(_objectSpread(_objectSpread({}, payload), {}, {
-        position: count + 1,
-        screen_id: screen_id
-      })).then(function (screen) {
-        return done(null, screen);
-      })["catch"](done);
-    })["catch"](done);
+            case 22:
+              screen = _objectSpread(_objectSpread({}, payload), {}, {
+                screenId: screenId,
+                scriptId: scriptId,
+                position: screensCount + 1,
+                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+              });
+              _context.prev = 23;
+              _context.next = 26;
+              return _models.Screen.findOrCreate({
+                where: {
+                  screen_id: screen.screenId
+                },
+                defaults: {
+                  script_id: scriptId,
+                  screen_id: screen.screenId,
+                  position: screen.position,
+                  type: screen.type,
+                  data: JSON.stringify(screen)
+                }
+              });
+
+            case 26:
+              rslts = _context.sent;
+
+              if (rslts && rslts[0]) {
+                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                screen = _objectSpread(_objectSpread({}, data), s);
+              }
+
+              _context.next = 33;
+              break;
+
+            case 30:
+              _context.prev = 30;
+              _context.t2 = _context["catch"](23);
+              return _context.abrupt("return", done(_context.t2));
+
+            case 33:
+              done(null, screen);
+
+            case 34:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 20], [23, 30]]);
+    }))();
   };
 };

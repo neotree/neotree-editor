@@ -25,7 +25,7 @@ const Diagnoses = props => {
 
   useEffect(() => {
     setLoading(true);
-    Api.get('/get-diagnoses', { script_id: scriptId })
+    Api.get('/get-diagnoses', { scriptId })
       .then(r => { setLoading(false); return r; })
       .then(({ payload }) => {
         setLoading(false);

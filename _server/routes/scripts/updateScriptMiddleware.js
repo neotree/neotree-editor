@@ -1,23 +1,40 @@
-import { Log, Script } from '../../models';
+import { Script } from '../../models';
 
-module.exports = (app) => (req, res, next) => {
-  const { id, ...payload } = req.body;
+export const updateScript = ({ id, ...payload }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!id) return reject(new Error('Required script "id" is not provided.'));
 
-  const done = (err, script) => {
-    if (!err) {
-      app.io.emit('update_scripts', { scripts: [{ scriptId: id }] });
-      Log.create({
-        name: 'update_scripts',
-        data: JSON.stringify({ scripts: [{ scriptId: id }] })
-      });
-    }
-    res.locals.setResponse(err, { script });
-    next(); return null;
-  };
+    let script = null;
+    try {
+      script = await Script.findOne({ where: { id } });
+    } catch (e) { return reject(e); }
 
-  if (!id) return done({ msg: 'Required script "id" is not provided.' });
+    if (!script) return reject(new Error(`Script with id "${id}" not found`));
 
-  Script.update(payload, { where: { id }, individualHooks: true })
-    .then(script => done(null, script))
-    .catch(done);
+    try {
+      await Script.update(
+        {
+          position: payload.position || script.position,
+          data: JSON.stringify({ ...script.data, ...payload }),
+        },
+        { where: { id, deletedAt: null } }
+      );
+    } catch (e) { /* Do nothing */ }
+
+    resolve(script);
+  })();
+});
+
+export default () => (req, res, next) => {
+  (async () => {
+    const done = (err, script) => {
+      res.locals.setResponse(err, { script });
+      next();
+    };
+
+    let script = null;
+    try { script = await updateScript(req.body); } catch (e) { return done(e); }
+
+    done(null, script);
+  })();
 };

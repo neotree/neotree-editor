@@ -1,23 +1,40 @@
-import { ConfigKey, Log } from '../../models';
+import { ConfigKey } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const { id, ...payload } = req.body;
+export const updateConfigKey = ({ id, ...payload }) => new Promise((resolve, reject) => {
+  (async () => {
+    if (!id) return reject(new Error('Required configKey "id" is not provided.'));
 
-  const done = (err, configKey) => {
-    if (!err) {
-      app.io.emit('update_config_keys', { configKeys: [{ configKeyId: id }] });
-      Log.create({
-        name: 'update_config_keys',
-        data: JSON.stringify({ configKeys: [{ configKeyId: id }] })
-      });
-    }
-    res.locals.setResponse(err, { configKey });
-    next(); return null;
-  };
+    let configKey = null;
+    try {
+      configKey = await ConfigKey.findOne({ where: { id } });
+    } catch (e) { return reject(e); }
 
-  if (!id) return done({ msg: 'Required configKey "id" is not provided.' });
+    if (!configKey) return reject(new Error(`ConfigKey with id "${id}" not found`));
 
-  ConfigKey.update(payload, { where: { id }, individualHooks: true })
-    .then(configKey => done(null, configKey))
-    .catch(done);
+    try {
+      await ConfigKey.update(
+        {
+          position: payload.position || configKey.position,
+          data: JSON.stringify({ ...configKey.data, ...payload }),
+        },
+        { where: { id, deletedAt: null } }
+      );
+    } catch (e) { /* Do nothing */ }
+
+    resolve(configKey);
+  })();
+});
+
+export default () => (req, res, next) => {
+  (async () => {
+    const done = (err, configKey) => {
+      res.locals.setResponse(err, { configKey });
+      next();
+    };
+
+    let configKey = null;
+    try { configKey = await updateConfigKey(req.body); } catch (e) { return done(e); }
+
+    done(null, configKey);
+  })();
 };

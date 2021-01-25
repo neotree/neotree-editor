@@ -16,15 +16,32 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  var responseMiddleware = app.responseMiddleware;
-  router.post('/copy-screens', require('./copyScreensMiddleware')(app), responseMiddleware);
-  router.get('/get-screens', require('./getScreensMiddleware')(app), responseMiddleware);
-  router.get('/get-screen', require('./getScreenMiddleware')(app), responseMiddleware);
-  router.get('/get-full-screen', require('./getFullScreenMiddleware')(app), responseMiddleware);
-  router.post('/create-screen', require('./createScreenMiddleware')(app), responseMiddleware);
-  router.post('/update-screen', require('./updateScreenMiddleware')(app), responseMiddleware);
-  router.post('/update-screens', require('./updateScreensMiddleware')["default"](app), responseMiddleware);
-  router.post('/delete-screen', require('./deleteScreenMiddleware')(app), responseMiddleware);
+  router.get('/get-screens', require('./getScreensMiddleware')(app), app.responseMiddleware);
+  router.get('/get-screen', require('./getScreenMiddleware')(app), app.responseMiddleware);
+  router.post('/create-screen', require('./createScreenMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-screen', require('./updateScreenMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/update-screens', require('./updateScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/delete-screens', require('./deleteScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/duplicate-screens', require('./duplicateScreensMiddleware')["default"](app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
+  router.post('/copy-screens', require('./copyScreensMiddleware')(app), function (req, res, next) {
+    app.io.emit('data_updated');
+    next();
+  }, app.responseMiddleware);
   return router;
 };
 

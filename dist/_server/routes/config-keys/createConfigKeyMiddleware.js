@@ -2,13 +2,17 @@
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 
-var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
-var _models = require("../../models");
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var _firebase = _interopRequireDefault(require("../../firebase"));
+
+var _models = require("../../models");
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
@@ -18,60 +22,102 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-module.exports = function (app) {
+module.exports = function () {
   return function (req, res, next) {
-    var payload = req.body;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+      var payload, done, configKeyId, snap, configKeysCount, configKey, rslts, _JSON$parse, data, s;
 
-    var done = function done(err, configKey) {
-      if (configKey) {
-        app.io.emit('create_config_keys', {
-          configKeys: [{
-            configKeyId: configKey.id
-          }]
-        });
+      return _regenerator["default"].wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              payload = req.body;
 
-        _models.Log.create({
-          name: 'create_config_keys',
-          data: JSON.stringify({
-            configKeys: [{
-              configKeyId: configKey.id
-            }]
-          })
-        });
-      }
+              done = function done(err, configKey) {
+                res.locals.setResponse(err, {
+                  configKey: configKey
+                });
+                next();
+              };
 
-      res.locals.setResponse(err, {
-        configKey: configKey
-      });
-      next();
-      return null;
-    };
+              configKeyId = null;
+              _context.prev = 3;
+              _context.next = 6;
+              return _firebase["default"].database().ref('configKeys').push();
 
-    var saveToFirebase = function saveToFirebase() {
-      return new Promise(function (resolve, reject) {
-        _firebase["default"].database().ref('configkeys').push().then(function (snap) {
-          var data = payload.data,
-              rest = (0, _objectWithoutProperties2["default"])(payload, ["data"]);
-          var configKeyId = snap.key;
+            case 6:
+              snap = _context.sent;
+              configKeyId = snap.key;
+              _context.next = 13;
+              break;
 
-          var _data = data ? JSON.parse(data) : null;
+            case 10:
+              _context.prev = 10;
+              _context.t0 = _context["catch"](3);
+              return _context.abrupt("return", done(_context.t0));
 
-          _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set(_objectSpread(_objectSpread(_objectSpread({}, rest), _data), {}, {
-            configKeyId: configKeyId,
-            createdAt: _firebase["default"].database.ServerValue.TIMESTAMP
-          })).then(function () {
-            resolve(configKeyId);
-          })["catch"](reject);
-        })["catch"](reject);
-      });
-    };
+            case 13:
+              configKeysCount = 0;
+              _context.prev = 14;
+              _context.next = 17;
+              return _models.ConfigKey.count({
+                where: {}
+              });
 
-    saveToFirebase().then(function (id) {
-      _models.ConfigKey.create(_objectSpread(_objectSpread({}, payload), {}, {
-        id: id
-      })).then(function (configKey) {
-        return done(null, configKey);
-      })["catch"](done);
-    })["catch"](done);
+            case 17:
+              configKeysCount = _context.sent;
+              _context.next = 22;
+              break;
+
+            case 20:
+              _context.prev = 20;
+              _context.t1 = _context["catch"](14);
+
+            case 22:
+              configKey = _objectSpread(_objectSpread({}, payload), {}, {
+                configKeyId: configKeyId,
+                position: configKeysCount + 1,
+                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
+                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
+              });
+              _context.prev = 23;
+              _context.next = 26;
+              return _models.ConfigKey.findOrCreate({
+                where: {
+                  config_key_id: configKey.configKeyId
+                },
+                defaults: {
+                  id: configKey.configKeyId,
+                  position: configKey.position,
+                  data: JSON.stringify(configKey)
+                }
+              });
+
+            case 26:
+              rslts = _context.sent;
+
+              if (rslts && rslts[0]) {
+                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                configKey = _objectSpread(_objectSpread({}, data), s);
+              }
+
+              _context.next = 33;
+              break;
+
+            case 30:
+              _context.prev = 30;
+              _context.t2 = _context["catch"](23);
+              return _context.abrupt("return", done(_context.t2));
+
+            case 33:
+              done(null, configKey);
+
+            case 34:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee, null, [[3, 10], [14, 20], [23, 30]]);
+    }))();
   };
 };

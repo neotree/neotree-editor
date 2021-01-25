@@ -29,6 +29,9 @@ var ApiKey = _sequelize2["default"].define('api_key', {
   key: {
     type: _sequelize["default"].STRING,
     allowNull: false
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE
   }
 });
 

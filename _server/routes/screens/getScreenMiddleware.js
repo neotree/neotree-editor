@@ -1,14 +1,23 @@
 import { Screen } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const { id } = req.query;
 
-  const done = (err, screen) => {
-    res.locals.setResponse(err, { screen });
-    next(); return null;
-  };
+    const done = (err, screen) => {
+      res.locals.setResponse(err, { screen });
+      next();
+    };
 
-  Screen.findOne({ where: payload })
-    .then((screen) => done(null, screen))
-    .catch(done);
+    let screen = null;
+    try {
+      screen = await Screen.findOne({ where: { id } });
+      if (screen) {
+        const { data, ...s } = JSON.parse(JSON.stringify(screen));
+        screen = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
+
+    done(null, screen);
+  })();
 };

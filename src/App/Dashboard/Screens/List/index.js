@@ -25,7 +25,7 @@ const Screens = props => {
 
   useEffect(() => {
     setLoading(true);
-    Api.get('/get-screens', { script_id: scriptId })
+    Api.get('/get-screens', { scriptId })
       .then(r => { setLoading(false); return r; })
       .then(({ payload }) => {
         setLoading(false);

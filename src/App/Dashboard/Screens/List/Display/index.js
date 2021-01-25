@@ -46,7 +46,7 @@ class Display extends Component {
   handleDeleteScreenClick = id => () => {
     const { updateState, scriptId } = this.props;
     this.setState({ deletingScreen: false });
-    Api.post('/delete-screen', { id, scriptId })
+    Api.post('/delete-screens', { screens: [{ id }] })
       .catch(deleteScreenError => this.setState({ deleteScreenError, deletingScreen: false }))
       .then(() => {
         this.setState({ deletingScreen: false });
@@ -192,7 +192,7 @@ class Display extends Component {
             {selected.length > 0 && (
               <Copy
                 itemsType="screens"
-                data={{ ids: screens.map(s => selected.map(s => `${s}`).includes(`${s.id}`) ? s.id : null).filter(id => id !== null) }}
+                data={{ items: screens.map(s => selected.map(s => `${s}`).includes(`${s.id}`) ? ({ id: s.id }) : null).filter(s => s !== null) }}
                 onSuccess={(items, script_id) => {
                   if (match.params.scriptId === script_id) {
                     updateState(({ screens }) => ({
@@ -213,14 +213,14 @@ class Display extends Component {
           {(screens && screens.length > 0) ?
             <Table
               style={styles.table}
-              rows={screens.map(scr => ({ ...scr.data, id: scr.id, position: scr.position }))}
+              rows={screens.map((s, i) => ({ ...s, index: i + 1 }))}
               rowKeyColumn="position"
               onSort={this.swapScreenItems}
               selected={selected}
               onSelect={selected => this.setState({ selected })}
             >
                 {/*<TableHeader name="$aVoid" cellFormatter={(aVoid, rowData, index) => `${index + 1}`} />*/}
-                <TableHeader name="position">Pos</TableHeader>
+                <TableHeader name="index">Pos</TableHeader>
                 <TableHeader name="epicId">Epic</TableHeader>
                 <TableHeader name="storyId">Story</TableHeader>
                 <TableHeader name="refId">Ref.</TableHeader>

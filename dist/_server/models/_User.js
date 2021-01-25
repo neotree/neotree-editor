@@ -41,6 +41,9 @@ var User = _sequelize2["default"].define('user', {
   role: {
     type: _sequelize["default"].INTEGER,
     defaultValue: 0
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE
   }
 });
 

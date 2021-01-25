@@ -1,50 +1,49 @@
 import firebase from '../../firebase';
-import { Log, Script } from '../../models';
+import { Script, } from '../../models';
 
-module.exports = (app, params) => (req, res, next) => {
-  const payload = params || req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const payload = req.body;
 
-  const done = (err, script) => {
-    if (script) {
-      app.io.emit('create_scripts', { scripts: [{ scriptId: script.id }] });
-      Log.create({
-        name: 'create_scripts',
-        data: JSON.stringify({ scripts: [{ scriptId: script.id }] })
+    const done = (err, script) => {
+      res.locals.setResponse(err, { script });
+      next();
+    };
+
+    let scriptId = null;
+    try {
+      const snap = await firebase.database().ref('scripts').push();
+      scriptId = snap.key;
+    } catch (e) { return done(e); }
+
+    let scriptsCount = 0;
+    try {
+      scriptsCount = await Script.count({ where: {} });
+    } catch (e) { /* Do nothing */ }
+
+    let script = {
+      ...payload,
+      scriptId,
+      position: scriptsCount + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try {
+      const rslts = await Script.findOrCreate({
+        where: { script_id: script.scriptId },
+        defaults: {
+          id: script.scriptId,
+          position: script.position,
+          data: JSON.stringify(script),
+        }
       });
-    }
-    res.locals.setResponse(err, { script });
-    next(); return null;
-  };
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        script = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = () => new Promise((resolve, reject) => {
-    firebase.database().ref('scripts').push().then(snap => {
-      const { data, ...rest } = payload;
-
-      const scriptId = snap.key;
-
-      const _data = data ? JSON.parse(data) : null;
-
-      firebase.database()
-        .ref(`scripts/${scriptId}`).set({
-          ...rest,
-          ..._data,
-          scriptId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-          resolve(scriptId);
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
-
-  Promise.all([
-    Script.count({ where: {} }),
-    saveToFirebase()
-  ])
-    .then(([count, id]) => {
-      Script.create({ ...payload, position: count + 1, id, script_id: id })
-        .then((script) => done(null, script))
-        .catch(done);
-    }).catch(done);
+    done(null, script);
+  })();
 };

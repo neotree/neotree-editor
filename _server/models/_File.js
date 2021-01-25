@@ -29,7 +29,10 @@ const File = sqlz.define(
       //   model: User,
       //   key: 'id'
       // }
-    }
+    },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 

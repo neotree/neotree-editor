@@ -1,47 +1,49 @@
-import { ConfigKey, Log } from '../../models';
 import firebase from '../../firebase';
+import { ConfigKey, } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const payload = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const payload = req.body;
 
-  const done = (err, configKey) => {
-    if (configKey) {
-      app.io.emit('create_config_keys', { configKeys: [{ configKeyId: configKey.id }] });
-      Log.create({
-        name: 'create_config_keys',
-        data: JSON.stringify({ configKeys: [{ configKeyId: configKey.id }] })
+    const done = (err, configKey) => {
+      res.locals.setResponse(err, { configKey });
+      next();
+    };
+
+    let configKeyId = null;
+    try {
+      const snap = await firebase.database().ref('configKeys').push();
+      configKeyId = snap.key;
+    } catch (e) { return done(e); }
+
+    let configKeysCount = 0;
+    try {
+      configKeysCount = await ConfigKey.count({ where: {} });
+    } catch (e) { /* Do nothing */ }
+
+    let configKey = {
+      ...payload,
+      configKeyId,
+      position: configKeysCount + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try {
+      const rslts = await ConfigKey.findOrCreate({
+        where: { config_key_id: configKey.configKeyId },
+        defaults: {
+          id: configKey.configKeyId,
+          position: configKey.position,
+          data: JSON.stringify(configKey),
+        }
       });
-    }
-    res.locals.setResponse(err, { configKey });
-    next(); return null;
-  };
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        configKey = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = () => new Promise((resolve, reject) => {
-    firebase.database().ref('configkeys').push().then(snap => {
-      const { data, ...rest } = payload;
-
-      const configKeyId = snap.key;
-
-      const _data = data ? JSON.parse(data) : null;
-
-      firebase.database()
-        .ref(`configkeys/${configKeyId}`).set({
-          ...rest,
-          ..._data,
-          configKeyId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-          resolve(configKeyId);
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
-
-  saveToFirebase()
-    .then(id => {
-      ConfigKey.create({ ...payload, id })
-        .then((configKey) => done(null, configKey))
-        .catch(done);
-    }).catch(done);
+    done(null, configKey);
+  })();
 };

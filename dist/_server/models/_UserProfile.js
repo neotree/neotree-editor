@@ -52,6 +52,9 @@ var UserProfile = _sequelize2["default"].define('user_profile', {
   },
   lastname: {
     type: _sequelize["default"].STRING
+  },
+  deletedAt: {
+    type: _sequelize["default"].DATE
   }
 });
 

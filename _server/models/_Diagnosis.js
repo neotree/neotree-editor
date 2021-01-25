@@ -35,21 +35,24 @@ const Diagnosis = sqlz.define(
       //   key: 'id'
       // }
     },
+    deletedAt: {
+      type: Sequelize.DATE,
+    },
   }
 );
 
-Diagnosis.afterUpdate(diagnosis => {
-  const { id, diagnosis_id, data: { createdAt: cAt, ...data }, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
-  firebase.database().ref(`diagnosis/${diagnosis.script_id}/${diagnosis_id}`).update({
-    ...data,
-    ...d,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return new Promise(resolve => resolve(diagnosis));
-});
-Diagnosis.afterDestroy(instance => {
-  firebase.database().ref(`diagnosis/${instance.script_id}/${instance.diagnosis_id}`).remove();
-  return new Promise(resolve => resolve(instance));
-});
+// Diagnosis.afterUpdate(diagnosis => {
+//   const { id, diagnosis_id, data: { createdAt: cAt, ...data }, createdAt, ...d } = JSON.parse(JSON.stringify(diagnosis)); // eslint-disable-line
+//   firebase.database().ref(`diagnosis/${diagnosis.script_id}/${diagnosis_id}`).update({
+//     ...data,
+//     ...d,
+//     updatedAt: firebase.database.ServerValue.TIMESTAMP
+//   });
+//   return new Promise(resolve => resolve(diagnosis));
+// });
+// Diagnosis.afterDestroy(instance => {
+//   firebase.database().ref(`diagnosis/${instance.script_id}/${instance.diagnosis_id}`).remove();
+//   return new Promise(resolve => resolve(instance));
+// });
 
 export default Diagnosis;

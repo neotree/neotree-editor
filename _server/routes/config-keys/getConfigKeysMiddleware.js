@@ -1,14 +1,21 @@
 import { ConfigKey } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const done = (err, configKeys) => {
+      res.locals.setResponse(err, { configKeys });
+      next();
+    };
 
-  const done = (err, configKeys) => {
-    res.locals.setResponse(err, { configKeys });
-    next(); return null;
-  };
+    let configKeys = [];
+    try {
+      configKeys = await ConfigKey.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
+      configKeys = configKeys.map(configKey => {
+        const { data, ...s } = JSON.parse(JSON.stringify(configKey));
+        return { ...data, ...s };
+      });
+    } catch (e) { return done(e); }
 
-  ConfigKey.findAll({ where: payload })
-    .then(configKeys => done(null, configKeys))
-    .catch(done);
+    done(null, configKeys);
+  })();
 };

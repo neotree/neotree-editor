@@ -1,14 +1,23 @@
 import { ConfigKey } from '../../models';
 
 module.exports = () => (req, res, next) => {
-  const payload = JSON.parse(req.query.payload || '{}');
+  (async () => {
+    const { configKeyId } = req.query;
 
-  const done = (err, configKey) => {
-    res.locals.setResponse(err, { configKey });
-    next(); return null;
-  };
+    const done = (err, configKey) => {
+      res.locals.setResponse(err, { configKey });
+      next();
+    };
 
-  ConfigKey.findOne({ where: payload })
-    .then((configKey) => done(null, configKey))
-    .catch(done);
+    let configKey = null;
+    try {
+      configKey = await ConfigKey.findOne({ where: { config_key_id: configKeyId } });
+      if (configKey) {
+        const { data, ...s } = JSON.parse(JSON.stringify(configKey));
+        configKey = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
+
+    done(null, configKey);
+  })();
 };

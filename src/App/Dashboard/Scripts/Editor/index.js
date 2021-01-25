@@ -45,7 +45,7 @@ const ScriptEditor = props => {
 
     if (scriptId && (scriptId !== 'new')) {
       setLoading(true);
-      Api.get('/get-script', { id: scriptId })
+      Api.get('/get-script', { scriptId })
         .then(r => { setLoading(false); return r; })
         .then(({ payload }) => {
           setLoading(false);

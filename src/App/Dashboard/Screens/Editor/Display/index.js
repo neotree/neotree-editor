@@ -31,7 +31,7 @@ export class Editor extends React.Component {
     isModified: false,
     isModifiedConfirmed: false,
     skippable: false,
-    screen: this.props.screen ? this.props.screen.data : {
+    screen: {
       epicId: null,
       storyId: null,
       refId: null,
@@ -44,7 +44,8 @@ export class Editor extends React.Component {
       infoText: null,
       notes: null,
       condition: null,
-      metadata: {}
+      metadata: {},
+      ...this.props.screen
     }
   };
 
@@ -62,7 +63,7 @@ export class Editor extends React.Component {
     if (props.screen) {
       const newState = {
         type: props.screen.type,
-        screen: { ...props.screen.data, type: props.screen.type }
+        screen: { ...props.screen }
       };
       this.setState(newState);
     }
@@ -87,8 +88,7 @@ export class Editor extends React.Component {
     const action = isEditMode ? 'update-screen' : 'create-screen';
     this.setState({ updatingScreen: true });
     actions.post(action, {
-      id: screenId,
-      data: JSON.stringify(screen),
+      ...screen,
       onResponse: () => this.setState({ updatingScreen: false }),
       onFailure: updateScreenError => this.setState({ updateScreenError }),
       onSuccess: ({ payload }) => {

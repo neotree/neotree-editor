@@ -1,52 +1,52 @@
-import { Log, Screen } from '../../models';
 import firebase from '../../firebase';
+import { Screen } from '../../models';
 
-module.exports = app => (req, res, next) => {
-  const payload = req.body;
+module.exports = () => (req, res, next) => {
+  (async () => {
+    const { scriptId, ...payload } = req.body;
 
-  const done = (err, screen) => {
-    if (err) app.logger.log(err);
-    if (screen) {
-      app.io.emit('create_screens', { screens: [{ screenId: screen.screen_id }] });
-      Log.create({
-        name: 'create_screens',
-        data: JSON.stringify({ screens: [{ screenId: screen.screen_id }] })
+    const done = (err, screen) => {
+      res.locals.setResponse(err, { screen });
+      next();
+    };
+
+    let screenId = null;
+    try {
+      const snap = await firebase.database().ref(`screens/${scriptId}`).push();
+      screenId = snap.key;
+    } catch (e) { return done(e); }
+
+    let screensCount = 0;
+    try {
+      screensCount = await Screen.count({ where: { script_id: scriptId, deletedAt: null } });
+    } catch (e) { /* Do nothing */ }
+
+    let screen = {
+      ...payload,
+      screenId,
+      scriptId,
+      position: screensCount + 1,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    };
+
+    try {
+      const rslts = await Screen.findOrCreate({
+        where: { screen_id: screen.screenId },
+        defaults: {
+          script_id: scriptId,
+          screen_id: screen.screenId,
+          position: screen.position,
+          type: screen.type,
+          data: JSON.stringify(screen),
+        }
       });
-    }
-    res.locals.setResponse(err, { screen });
-    next(); return null;
-  };
+      if (rslts && rslts[0]) {
+        const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
+        screen = { ...data, ...s };
+      }
+    } catch (e) { return done(e); }
 
-  const saveToFirebase = () => new Promise((resolve, reject) => {
-    firebase.database().ref(`screens/${payload.script_id}`).push().then(snap => {
-      const { data, ...rest } = payload;
-
-      const screenId = snap.key;
-
-      const _data = data ? JSON.parse(data) : null;
-
-      firebase.database()
-        .ref(`screens/${payload.script_id}/${screenId}`).set({
-          ...rest,
-          ..._data,
-          screenId,
-          scriptId: payload.script_id,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        }).then(() => {
-          resolve(screenId);
-        })
-        .catch(reject);
-    })
-    .catch(reject);
-  });
-
-  Promise.all([
-    Screen.count({ where: { script_id: payload.script_id } }),
-    saveToFirebase()
-  ])
-    .then(([count, screen_id]) => {
-      Screen.create({ ...payload, position: count + 1, screen_id })
-        .then((screen) => done(null, screen))
-        .catch(done);
-    }).catch(done);
+    done(null, screen);
+  })();
 };
