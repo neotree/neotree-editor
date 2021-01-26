@@ -1,4 +1,5 @@
 import multer from 'multer';
+import { uuid } from 'uuidv4';
 import { File } from '../../database';
 import * as endpoints from '../../../constants/api-endpoints/files';
 
@@ -18,6 +19,7 @@ module.exports = (router) => {
       };
 
       File.create({
+        id: uuid(),
         filename: f.originalname,
         content_type: f.mimetype,
         size: f.size,
