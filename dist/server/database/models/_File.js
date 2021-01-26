@@ -24,8 +24,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 var File = _sequelize2["default"].define('file', {
   id: {
-    type: _sequelize["default"].INTEGER,
-    autoIncrement: true,
+    type: _sequelize["default"].STRING,
+    allowNull: false,
     primaryKey: true
   },
   metadata: {

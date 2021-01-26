@@ -6,6 +6,8 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _multer = _interopRequireDefault(require("multer"));
 
+var _uuidv = require("uuidv4");
+
 var _database = require("../../database");
 
 var endpoints = _interopRequireWildcard(require("../../../constants/api-endpoints/files"));
@@ -38,6 +40,7 @@ module.exports = function (router) {
     };
 
     _database.File.create({
+      id: (0, _uuidv.uuid)(),
       filename: f.originalname,
       content_type: f.mimetype,
       size: f.size,
