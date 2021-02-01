@@ -1,5 +1,9 @@
+/* global fetch */
 import React from 'react';
+import io from 'socket.io-client';
 import * as defaults from './_defaults';
+
+const socket = io();
 
 export const AppContext = React.createContext(null);
 
@@ -34,6 +38,27 @@ export const provideAppContext = Component => function AppContextProvider(props)
       ...(typeof s === 'function' ? s(prev) : s),
     }));
   })();
+
+  const getBackupStatus = () => new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        const res = await fetch('/get-backup-status');
+        const { shouldBackup, appInfo } = await res.json();
+        value.setState({
+          shouldBackup,
+          version: appInfo.version
+        });
+        resolve({ shouldBackup, appInfo });
+      } catch (e) { reject(e); }
+    })();
+  });
+
+  React.useEffect(() => {
+    getBackupStatus();
+    socket.on('data_updated', getBackupStatus);
+  }, []);
+
+  console.log(state.shouldBackup);
 
   return (
     <AppContext.Provider
