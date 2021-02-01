@@ -20,6 +20,7 @@ export default {
   viewport: getViewPort(),
   BREAKPOINTS,
   AUTH_FORM_WIDTH: 350,
+  HEADER_INFO_BAR: 30,
   HEADER_HEIGHT: 60,
   HEADER_ZINDEX: 100,
   DRAWER_WIDTH: 200,

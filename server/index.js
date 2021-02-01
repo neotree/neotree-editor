@@ -2,6 +2,7 @@ import path from 'path';
 import express from 'express';
 import * as database from './database';
 import syncFirebase from './firebase/sync';
+import backupData, { shouldBackup } from './utils/backupData';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -31,6 +32,11 @@ const isProd = process.env.NODE_ENV === 'production';
   }
 
   app.sequelize = sequelize;
+
+  try {
+    const appInfo = await database.App.findOne({ where: { id: 1 } });
+    if (!appInfo) await backupData(app);
+  } catch (e) { console.log(e); }
 
   // firebase
   try { await syncFirebase(); } catch (e) { console.log(e); }

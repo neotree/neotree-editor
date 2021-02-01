@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import Paper from '@material-ui/core/Paper';
+import { useAppContext } from '@/contexts/app';
 import makeStyles from '../utils/makeStyles';
 import LayoutItem from '../LayoutItem';
 
@@ -13,11 +14,11 @@ const useStyles = makeStyles(() => ({
     transition: 'left .3s',
     boxSizing: 'border-box',
   },
-  rootDimensions: ({ _layout, hasHeader }) => {
+  rootDimensions: ({ _layout, hasHeader, app }) => {
     const isDesktop = _layout.viewport === 'desktop';
     const display = _layout.DISPLAY_DRAWER || isDesktop;
     return {
-      top: hasHeader && isDesktop ? _layout.HEADER_HEIGHT : 0,
+      top: (hasHeader && isDesktop ? _layout.HEADER_HEIGHT : 0) + (!app.shouldBackup ? 0 : _layout.HEADER_INFO_BAR),
       left: 0,
       width: _layout.DRAWER_WIDTH,
       zIndex: isDesktop ? _layout.HEADER_ZINDEX - 1 : _layout.HEADER_ZINDEX + 2,
@@ -43,7 +44,8 @@ export default function LayoutDrawer({
   className,
   ...props
 }) {
-  const classes = useStyles({ hasHeader });
+  const { state: app } = useAppContext();
+  const classes = useStyles({ hasHeader, app });
 
   return (
     <>
