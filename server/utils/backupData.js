@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { Op } from 'sequelize';
+import { exec } from 'child_process';
 import * as database from '../database';
 
 export const shouldBackup = () => new Promise((resolve, reject) => {
@@ -131,10 +132,25 @@ export default function backupData(app) {
           }
           fs.writeFileSync(`${dataDirPath}/app.json`, JSON.stringify(appInfo));
           io.emit('data_published');
+
+          exec(
+            `cd ${process.env.BACKUP_DIR_PATH} && git add . && git commit -m ${process.env.APP_ENV}-v${appInfo.version} && git push`,
+            (error, stdout, stderr
+          ) => {
+            if (error) {
+              console.log(`error: ${error.message}`);
+              return;
+            }
+            if (stderr) {
+              console.log(`stderr: ${stderr}`);
+              return;
+            }
+            console.log(`stdout: ${stdout}`);
+          });
         }
 
         resolve();
-      } catch (e) { console.log('ERROR', e); reject(e); }
+      } catch (e) { reject(e); }
     })();
   });
 };

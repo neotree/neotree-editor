@@ -12,7 +12,7 @@ import ListItemLink from '@/components/ListItemLink';
 import { useAppContext } from '@/contexts/app';
 
 export default function AuthenticatedUserLayout(props) {
-  const { state: { navSection } } = useAppContext();
+  const { state: { navSection, version } } = useAppContext();
 
   return (
     <>
@@ -20,7 +20,9 @@ export default function AuthenticatedUserLayout(props) {
         {...props}
         header={(
           <>
-            <Link to="/"><Logo size={40} /></Link>
+            <Link to="/"><Logo size={40} /></Link>&nbsp;
+
+            {!!version && <Typography variant="subtitle1">v{version}</Typography>}
 
             <LayoutItem>
               {({ state: { HEADER_TITLE } }) => (

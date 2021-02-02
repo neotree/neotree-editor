@@ -16,6 +16,8 @@ var database = _interopRequireWildcard(require("./database"));
 
 var _sync = _interopRequireDefault(require("./firebase/sync"));
 
+var _backupData = _interopRequireWildcard(require("./utils/backupData"));
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -27,7 +29,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 var isProd = process.env.NODE_ENV === 'production';
 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-  var app, httpServer, sequelize, bodyParser, session, SequelizeStore, sessStore, webpackConfig, compiler;
+  var app, httpServer, sequelize, appInfo, bodyParser, session, SequelizeStore, sessStore, webpackConfig, compiler;
   return _regenerator["default"].wrap(function _callee$(_context) {
     while (1) {
       switch (_context.prev = _context.next) {
@@ -71,22 +73,50 @@ var isProd = process.env.NODE_ENV === 'production';
           process.exit(1);
 
         case 19:
-          app.sequelize = sequelize; // firebase
-
+          app.sequelize = sequelize;
           _context.prev = 20;
           _context.next = 23;
-          return (0, _sync["default"])();
+          return database.App.findOne({
+            where: {
+              id: 1
+            }
+          });
 
         case 23:
-          _context.next = 28;
+          appInfo = _context.sent;
+
+          if (appInfo) {
+            _context.next = 27;
+            break;
+          }
+
+          _context.next = 27;
+          return (0, _backupData["default"])(app);
+
+        case 27:
+          _context.next = 32;
           break;
 
-        case 25:
-          _context.prev = 25;
+        case 29:
+          _context.prev = 29;
           _context.t1 = _context["catch"](20);
           console.log(_context.t1);
 
-        case 28:
+        case 32:
+          _context.prev = 32;
+          _context.next = 35;
+          return (0, _sync["default"])();
+
+        case 35:
+          _context.next = 40;
+          break;
+
+        case 37:
+          _context.prev = 37;
+          _context.t2 = _context["catch"](32);
+          console.log(_context.t2);
+
+        case 40:
           //body-parser
           bodyParser = require('body-parser');
           app.use(bodyParser.json());
@@ -138,12 +168,12 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 42:
+        case 54:
         case "end":
           return _context.stop();
       }
     }
-  }, _callee, null, [[8, 15], [20, 25]]);
+  }, _callee, null, [[8, 15], [20, 29], [32, 37]]);
 }))();
 ;
 
