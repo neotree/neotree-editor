@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/neotree-editor.iml" filepath="$PROJECT_DIR$/.idea/neotree-editor.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../server/.idea/server.iml" filepath="$PROJECT_DIR$/../server/.idea/server.iml" />
     </modules>
   </component>
 </project>
