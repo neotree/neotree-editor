@@ -45,8 +45,8 @@ export const provideAppContext = Component => function AppContextProvider(props)
         const res = await fetch('/get-backup-status');
         const { shouldBackup, appInfo } = await res.json();
         value.setState({
-          shouldBackup: false,
-          version: null, // appInfo ? appInfo.version : 1
+          shouldBackup,
+          version: appInfo ? appInfo.version : 1
         });
         resolve({ shouldBackup, appInfo });
       } catch (e) { reject(e); }
