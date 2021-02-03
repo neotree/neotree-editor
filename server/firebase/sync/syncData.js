@@ -88,7 +88,7 @@ export default () => new Promise((resolve, reject) => {
         })),
 
         ...screens.map(s => Screen.findOrCreate({
-          where: { screen_id: s.screenId },
+          where: { script_id: s.scriptId, screen_id: s.screenId },
           defaults: {
             type: s.type,
             position: s.position,
@@ -99,7 +99,7 @@ export default () => new Promise((resolve, reject) => {
         })),
 
         ...diagnoses.map(s => Diagnosis.findOrCreate({
-          where: { diagnosis_id: s.diagnosisId },
+          where: { script_id: s.scriptId, diagnosis_id: s.diagnosisId },
           defaults: {
             position: s.position,
             diagnosis_id: s.diagnosisId,

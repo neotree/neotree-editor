@@ -34,22 +34,19 @@ function ScreenEditor({ screen, script }) {
 
   const canSaveScreen = () => form.title && !savingScreen;
 
-  const saveScreen = React.useCallback(() => {
+  const saveScreen = React.useCallback((opts = {}) => {
+    const { redirectOnSuccess, form: _form } = opts;
     (async () => {
       setSavingScreen(true);
       try {
         let res = await fetch(screen ? '/update-screen' : '/create-screen', {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, ..._form }),
         });
         res = await res.json();
-        if (res.errors && res.errors.length) {
-          alert(JSON.stringify(res.errors));
-        } else {
-          // history.push(`/scripts/${script.script_id}${screen ? '' : `/screens/${res.screen.id}`}`);
-          history.push(`/scripts/${scriptId}/screens`);
-        }
+        if (res.errors && res.errors.length) return alert(JSON.stringify(res.errors));
+        if (redirectOnSuccess !== false) history.push(`/scripts/${scriptId}/screens`);
       } catch (e) { alert(e.message); }
       setSavingScreen(false);
     })();
@@ -60,8 +57,9 @@ function ScreenEditor({ screen, script }) {
       <UploadFilesPrompt 
         data={form.metadata}
         save={files => {
-          setForm(f => ({ metadata: { ...f.metadata, ...files } }));
-          setTimeout(saveScreen, 0);
+          const _form = { ...form, metadata: { ...form.metadata, ...files } };
+          setForm(_form);
+          saveScreen({ redirectOnSuccess: false, form: _form });
         }}
       />
 
