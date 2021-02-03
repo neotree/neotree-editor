@@ -258,6 +258,7 @@ var _default = function _default() {
               })), (0, _toConsumableArray2["default"])(screens.map(function (s) {
                 return _models.Screen.findOrCreate({
                   where: {
+                    script_id: s.scriptId,
                     screen_id: s.screenId
                   },
                   defaults: {
@@ -271,6 +272,7 @@ var _default = function _default() {
               })), (0, _toConsumableArray2["default"])(diagnoses.map(function (s) {
                 return _models.Diagnosis.findOrCreate({
                   where: {
+                    script_id: s.scriptId,
                     diagnosis_id: s.diagnosisId
                   },
                   defaults: {

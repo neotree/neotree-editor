@@ -40,22 +40,19 @@ function DiagnosisEditor({ diagnosis, script }) {
 
   const canSaveDiagnosis = () => form.name && !savingDiagnosis;
 
-  const saveDiagnosis = React.useCallback(() => {
+  const saveDiagnosis = React.useCallback((opts = {}) => {
+    const { redirectOnSuccess, form: _form } = opts;
     (async () => {
       setSavingDiagnosis(true);
       try {
         let res = await fetch(diagnosis ? '/update-diagnosis' : '/create-diagnosis', {
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, ..._form }),
         });
         res = await res.json();
-        if (res.errors && res.errors.length) {
-          alert(JSON.stringify(res.errors));
-        } else {
-          // history.push(`/scripts/${script.script_id}${diagnosis ? '/diagnoses' : `/diagnoses/${res.diagnosis.id}`}`);
-          history.push(`/scripts/${scriptId}/diagnoses`);
-        }
+        if (res.errors && res.errors.length) return alert(JSON.stringify(res.errors));
+        if (redirectOnSuccess !== false) history.push(`/scripts/${scriptId}/diagnoses`);
       } catch (e) { alert(e.message); }
       setSavingDiagnosis(false);
     })();
@@ -66,8 +63,9 @@ function DiagnosisEditor({ diagnosis, script }) {
         <UploadFilesPrompt 
           data={form}
           save={files => {
-            setForm({ ...files });
-            setTimeout(saveDiagnosis, 0);
+            const _form = { ...form, ...files };
+            setForm(_form);
+            saveDiagnosis({ redirectOnSuccess: false, form: _form });
           }}
         />
 
