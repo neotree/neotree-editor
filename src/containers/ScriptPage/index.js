@@ -1,11 +1,12 @@
 /* global fetch, alert */
 import React from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, Redirect } from 'react-router-dom';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import OverlayLoader from '@/components/OverlayLoader';
 import LazyComponent from '@/components/LazyComponent';
+import { useAppContext } from '@/AppContext';
 import Form from './Form';
 
 const LoaderComponent = () => (
@@ -18,6 +19,9 @@ const Screens = LazyComponent(() => import('./Screens'), { LoaderComponent });
 const Diagnoses = LazyComponent(() => import('./Diagnoses'), { LoaderComponent });
 
 function ScriptPage() {
+  const { state: { viewMode } } = useAppContext();
+  if (viewMode === 'view') return <Redirect to="/" />;
+
   const history = useHistory();
   const { scriptId, scriptSection: _scriptSection } = useParams();
 

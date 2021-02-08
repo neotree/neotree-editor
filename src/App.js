@@ -16,6 +16,7 @@ const theme = createMuiTheme({
   layout: {
     SIDEBAR_WIDTH: 250,
     HEADER_HEIGHT: 60,
+    INFO_BAR: 40,
   },
 });
 

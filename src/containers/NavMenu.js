@@ -1,3 +1,4 @@
+/* global fetch */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Typography from '@material-ui/core/Typography';
@@ -11,9 +12,32 @@ import { usePageContext, SidebarItem, HeaderItem } from '@/components/Layout';
 
 function NavMenu() {
   const { navMenu, toggleSidebar, screenType } = usePageContext();
-  const { state: appState } = useAppContext();
+  const { setState, state: appState } = useAppContext();
 
   React.useEffect(() => {
+    navMenu.setInfoBar(
+      <>
+        <Typography noWrap variant="caption">You're in {appState.viewMode} mode.</Typography>&nbsp;
+        <Link
+          to="#"
+          onClick={() => {
+            (async () => {
+              const viewMode = appState.viewMode === 'development' ? 'view' : 'development';
+              setState({ viewMode });
+              await fetch('/set-view-mode', {
+                headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                body: JSON.stringify({ viewMode }),
+              });
+            })();
+          }}
+        >
+          <Typography variant="caption" color="primary">Switch to {appState.viewMode === 'development' ? 'view' : 'development'} mode</Typography>
+        </Link>&nbsp;
+        {appState.viewMode === 'view' && <Typography noWrap variant="caption">to make changes</Typography>}
+      </>
+    );
+
     navMenu.setHeaderLeft(
       <>
         {screenType !== 'desktop' && (
@@ -92,6 +116,7 @@ function NavMenu() {
     );
 
     return () => {
+      navMenu.setInfoBar(null);
       navMenu.setHeaderLeft(null);
       navMenu.setHeaderRight(null);
     };

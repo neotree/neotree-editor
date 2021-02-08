@@ -8,13 +8,17 @@ import { usePageContext } from '../PageContext';
 
 const useStyles = makeStyles(theme => ({
   root: {
-    height: theme.layout.HEADER_HEIGHT,
     width: '100%',
+  },
+  rootNoInfoBar: {
+    height: theme.layout.HEADER_HEIGHT,
+  },
+  rootInfoBar: {
+    height: theme.layout.HEADER_HEIGHT + theme.layout.INFO_BAR,
   },
   header: {
     zIndex: 99,
     position: 'fixed',
-    top: 0,
     left: 0,
     height: theme.layout.HEADER_HEIGHT,
     width: '100%',
@@ -26,6 +30,12 @@ const useStyles = makeStyles(theme => ({
     color: theme.palette.primary.contrastText,
 
     '& a': { color: theme.palette.primary.contrastText, }
+  },
+  headerNoInfoBar: {
+    top: 0,
+  },
+  headerInfoBar: {
+    top: theme.layout.INFO_BAR,
   },
   section: {
     display: 'flex',
@@ -59,6 +69,7 @@ const useStyles = makeStyles(theme => ({
 
 const Header = () => {
   const {
+    hasInfoBar,
     state: {
       headerLeft,
       headerRight,
@@ -85,8 +96,18 @@ const Header = () => {
   };
 
   return (
-    <div className={cx(classes.root)}>
-      <div className={cx(classes.header)}>
+    <div
+      className={cx(classes.root, {
+        [classes.rootNoInfoBar]: !hasInfoBar,
+        [classes.rootInfoBar]: hasInfoBar,
+      })}
+    >
+      <div
+        className={cx(classes.header, {
+          [classes.headerNoInfoBar]: !hasInfoBar,
+          [classes.headerInfoBar]: hasInfoBar,
+        })}
+      >
         {hasSidebar && renderChildren(
           <HeaderItem className={cx(classes.item, classes.leftItem)}>
             <IconButton onClick={() => toggleSidebar()} size="small">

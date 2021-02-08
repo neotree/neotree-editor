@@ -1,11 +1,12 @@
 /* global fetch, alert */
 import React from 'react';
-import { setDocumentTitle, setNavSection } from '@/AppContext';
+import { setDocumentTitle, setNavSection, useAppContext } from '@/AppContext';
 import PageLoader from '@/components/PageLoader';
 import DataTable from '@/components/DataTable';
 import copy from '@/constants/copy/scripts';
 
 const Scripts = () => {
+  const { state: { viewMode } } = useAppContext();
   setNavSection('scripts');
   setDocumentTitle(copy.PAGE_TITLE);
 
@@ -35,8 +36,8 @@ const Scripts = () => {
             selectable={false}
             title={copy.PAGE_TITLE}
             data={scripts}
-            renderHeaderActions={require('./_renderHeaderActions').default}
-            renderRowAction={require('./_renderRowAction').default}
+            renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
+            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ rowIndex }) => rowIndex + 1, },
               { key: 'title', label: 'Title', },

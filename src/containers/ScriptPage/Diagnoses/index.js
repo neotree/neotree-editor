@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import copy from '@/constants/copy/diagnoses';
+import { useAppContext } from '@/AppContext';
 
 const DiagnosesList = () => {
+  const { state: { viewMode } } = useAppContext();
   const { scriptId } = useParams();
 
   const [diagnoses, setDiagnoses] = React.useState([]);
@@ -34,8 +36,8 @@ const DiagnosesList = () => {
             noDataMsg="No diagnoses"
             title={copy.PAGE_TITLE}
             data={diagnoses}
-            renderHeaderActions={require('./_renderHeaderActions').default}
-            renderRowAction={require('./_renderRowAction').default}
+            renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
+            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'name', label: 'Name', },
