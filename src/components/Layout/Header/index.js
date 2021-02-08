@@ -1,116 +1,116 @@
-/* global window, alert, fetch */
 import React from 'react';
-import PropTypes from 'prop-types';
+import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
-import Paper from '@material-ui/core/Paper';
-import Typography from '@material-ui/core/Typography';
-import Button from '@material-ui/core/Button';
-import { useAppContext } from '@/contexts/app';
-import makeStyles from '../utils/makeStyles';
+import IconButton from '@material-ui/core/IconButton';
+import MenuIcon from '@material-ui/icons/Menu';
+import HeaderItem from '../_HeaderItem';
+import { usePageContext } from '../PageContext';
 
 const useStyles = makeStyles(theme => ({
+  root: {
+    height: theme.layout.HEADER_HEIGHT,
+    width: '100%',
+  },
   header: {
-    width: '100%',
-    boxSizing: 'border-box',
-  },
-  headerHeight: ({ _layout, app }) => ({
-    height: _layout.HEADER_HEIGHT,
-    marginBottom: !app.shouldBackup ? 0 : _layout.HEADER_INFO_BAR,
-  }),
-  contentBar: ({ app, _layout }) => ({
-    position: 'fixed',
-    top: !app.shouldBackup ? 0 : _layout.HEADER_INFO_BAR,
-    left: 0,
-    height: 'inherit',
-    width: '100%',
-    boxSizing: 'border-box',
-  }),
-  contentBarZIndex: ({ _layout }) => ({ zIndex: _layout.HEADER_ZINDEX }),
-  content: {
-    padding: `${theme.spacing()}px ${theme.spacing(2)}px`,
-    height: 'inherit',
-    width: '100%',
-    margin: 'auto',
-    display: 'flex',
-    alignItems: 'center',
-    boxSizing: 'border-box',
-    color: theme.palette.primary.contrastText,
-    backgroundColor: theme.palette.primary.main,
-
-    '& > *:not(:last-child)': {
-      marginRight: theme.spacing(2),
-    }
-  },
-  infoBar: ({ _layout }) => ({
-    backgroundColor: theme.palette.background.paper,
-    height: _layout.HEADER_INFO_BAR,
-    padding: 5,
-    display: 'flex',
-    flexFlow: 'column',
-    justifyContent: 'center',
-    color: theme.palette.text.primary,
-    boxSizing: 'border-box',
+    zIndex: 99,
     position: 'fixed',
     top: 0,
     left: 0,
-    zIndex: _layout.HEADER_ZINDEX,
+    height: theme.layout.HEADER_HEIGHT,
     width: '100%',
-    textAlign: 'center',
-    overflow: 'hidden'
-  }),
+    boxShadow: '0 0 10px rgba(0,0,0,.3)',
+    boxSizing: 'border-box',
+    display: 'flex',
+    // padding: `0 ${theme.spacing(2)}px`,
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+
+    '& a': { color: theme.palette.primary.contrastText, }
+  },
+  section: {
+    display: 'flex',
+    alignItems: 'center',
+    height: '100%',
+  },
+  leftSection: {
+
+  },
+  centerSection: {
+    flex: 1,
+  },
+  rightSection: {
+
+  },
+  item: {
+    // padding: theme.spacing(),
+    display: 'flex',
+    alignItems: 'center',
+  },
+  leftItem: {
+
+  },
+  centerItem: {
+
+  },
+  rightItem: {
+
+  },
 }));
 
-export default function LayoutHeader({
-  hasDrawer, // eslint-disable-line
-  className,
-  ...props
-}) {
-  const { state: app } = useAppContext();
-  const classes = useStyles({ app });
+const Header = () => {
+  const {
+    state: {
+      headerLeft,
+      headerRight,
+      headerCenter,
+      hasSidebar,
+      toggleSidebar,
+    }
+  } = usePageContext();
+
+  const classes = useStyles();
+
+  const renderChildren = (children, placement) => {
+    if (children && (children.type === React.Fragment)) children = children.props.children;
+    return React.Children.map(children, child => {
+      if (!child) return null;
+      if (!child) return null;
+      if (child.type === HeaderItem) return child;
+      return (
+        <HeaderItem className={cx(classes.item, classes[`${placement}Item`])}>
+          {child}
+        </HeaderItem>
+      );
+    });
+  };
 
   return (
-    <>
-      {!!app.shouldBackup && (
-        <div
-          className={cx(classes.infoBar)}
-        >
-          <div>
-            <Typography noWrap variant="caption">You have changes waiting to be published</Typography>&nbsp;
-            <Button
-              size="small"
-              color="primary"
-              onClick={async () => {
-                try {
-                  const res = await fetch('/publish', { method: 'POST' });
-                  const { errors } = await res.json();
-                  if (errors && errors.length) return alert(JSON.stringify(errors));
-                  window.location.reload();
-                } catch (e) { alert(e.message); }
-              }}
-            >Publish</Button>
-          </div>
-        </div>
-      )}
+    <div className={cx(classes.root)}>
+      <div className={cx(classes.header)}>
+        {hasSidebar && renderChildren(
+          <HeaderItem className={cx(classes.item, classes.leftItem)}>
+            <IconButton onClick={() => toggleSidebar()} size="small">
+              <MenuIcon />
+            </IconButton>
+          </HeaderItem>,
+          'left',
+        )}
 
-      <div
-        className={cx(classes.header, classes.headerHeight)}
-      >
-        <div
-          className={cx(classes.contentBar, classes.contentBarZIndex)}
-        >
-          <Paper
-            {...props}
-            square
-            elevation={3}
-            className={cx(className, classes.content)}
-          />
+        <div className={cx(classes.section, classes.leftSection)}>
+          {renderChildren(headerLeft, 'left')}
+        </div>
+
+        <div className={cx(classes.section, classes.centerSection)}>
+          {renderChildren(headerCenter, 'center')}
+        </div>
+
+        <div className={cx(classes.section, classes.rightSection)}>
+          {renderChildren(headerRight, 'right')}
         </div>
       </div>
-    </>
+    </div>
   );
-}
-
-LayoutHeader.propTypes = {
-  className: PropTypes.string,
-  hasDrawer: PropTypes.bool,
 };
+
+
+export default Header;

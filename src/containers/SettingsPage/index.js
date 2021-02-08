@@ -1,7 +1,6 @@
 import React from 'react';
 import copy from '@/constants/copy/settings';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle, setNavSection } from '@/contexts/app';
+import { setDocumentTitle, setNavSection } from '@/AppContext';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import ApiKey from './ApiKey';
@@ -10,7 +9,6 @@ import ApiKey from './ApiKey';
 
 const SettingsPage = () => {
   setDocumentTitle(copy.PAGE_TITLE);
-  setHeaderTitle(copy.PAGE_TITLE);
   setNavSection('settings');
 
   return (

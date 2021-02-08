@@ -2,7 +2,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
-import { makeStyles } from '@/components/Layout';
+import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
 
 const useStyles = makeStyles(() => ({

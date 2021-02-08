@@ -3,8 +3,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import screensCopy from '@/constants/copy/screens';
 import scritpsCopy from '@/constants/copy/scripts';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle } from '@/contexts/app';
+import { setDocumentTitle } from '@/AppContext';
 import OverlayLoader from '@/components/OverlayLoader';
 import Form from './Form';
 
@@ -43,7 +42,6 @@ function Screen() {
   ].filter(c => c);
 
   setDocumentTitle(titleChunks.join(' > '));
-  setHeaderTitle(titleChunks.join(' / '));
 
   if (loading) return <OverlayLoader transparent />;
 

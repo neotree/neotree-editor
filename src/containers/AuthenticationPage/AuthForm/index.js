@@ -7,7 +7,7 @@ import Button from '@material-ui/core/Button';
 import WindowEventListener from '@/components/WindowEventListener';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@/components/Layout';
+import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
 import { checkEmailRegistration, authenticate } from '@/api/auth';
 

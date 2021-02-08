@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import copy from '@/constants/copy';
-import { useAppContext } from '@/contexts/app';
+import { useAppContext } from '@/AppContext';
 
 export default function DocumentTitle() {
   const { state: { documentTitle } } = useAppContext();

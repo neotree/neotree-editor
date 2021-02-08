@@ -1,13 +1,13 @@
 import React from 'react';
 import LazyPage from '@/components/LazyPage';
 import authCopy from '@/constants/copy/authentication';
-import { makeStyles } from '@/components/Layout';
+import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
 import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
 import Logo from '@/components/Logo';
 import { Switch, Route, Redirect, useParams } from 'react-router-dom';
-import { setDocumentTitle } from '@/contexts/app';
+import { setDocumentTitle } from '@/AppContext';
 
 const AuthForm = LazyPage(() => import('./AuthForm'));
 const ForgotPasswordForm = LazyPage(() => import('./ForgotPasswordForm'));

@@ -4,8 +4,7 @@ import PropTypes from 'prop-types';
 import { useParams } from 'react-router-dom';
 import diagnosesCopy from '@/constants/copy/diagnoses';
 import scritpsCopy from '@/constants/copy/scripts';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle } from '@/contexts/app';
+import { setDocumentTitle } from '@/AppContext';
 import OverlayLoader from '@/components/OverlayLoader';
 import Form from './Form';
 
@@ -42,9 +41,7 @@ function Diagnosis() {
     diagnosesCopy.PAGE_TITLE,
     diagnosis ? diagnosis.title : loading ? '' : 'New diagnosis',
   ].filter(c => c);
-
   setDocumentTitle(titleChunks.join(' > '));
-  setHeaderTitle(titleChunks.join(' / '));
 
   if (loading) return <OverlayLoader transparent />;
 
