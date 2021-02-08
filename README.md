@@ -8,7 +8,8 @@ App designed for managing neonatal patients in low resource settings, providing 
 
 ## Server configuration
 
-- Create a file called `.env` and copy and paste the content in `.env-example` into the new file. 
+- Create file: `.env`.
+- Copy and paste the content in `.env-example` into the new file. 
 - Change the values to your needs.
 
 ## Scripts
