@@ -135,6 +135,7 @@ const CopyScriptItems = React.forwardRef(({
                       if (errors && errors.length) {
                         alert(JSON.stringify(errors));
                       } else {
+                        setDisplaySuccessModal(true);
                         if (onSuccess) onSuccess(items, scriptId);
                       }
                     } catch (e) { alert(e.message); }
