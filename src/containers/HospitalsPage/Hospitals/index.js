@@ -7,7 +7,7 @@ import TableRow from '@material-ui/core/TableRow';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardHeader from '@material-ui/core/CardHeader';
-import { useAppContext } from '@/contexts/app';
+import { useAppContext } from '@/AppContext';
 import * as api from '@/api/hospitals';
 import AddHospitalForm from './AddHospitalForm';
 import HospitalManagerForm from './HospitalManagerForm';

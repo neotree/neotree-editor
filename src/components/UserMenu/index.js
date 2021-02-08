@@ -9,7 +9,7 @@ import Paper from '@material-ui/core/Paper';
 import ClickAwayListener from '@material-ui/core/ClickAwayListener';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
-import { useAppContext } from '@/contexts/app';
+import { useAppContext } from '@/AppContext';
 import AvatarForm from '@/components/AvatarForm';
 import SignOut from '@/components/SignOut';
 

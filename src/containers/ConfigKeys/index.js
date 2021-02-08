@@ -1,16 +1,13 @@
 /* global fetch, alert */
 import React from 'react';
-import { setNavSection, setDocumentTitle } from '@/contexts/app';
-import { setHeaderTitle } from '@/components/Layout';
+import { setNavSection, setDocumentTitle } from '@/AppContext';
 import copy from '@/constants/copy/configKeys';
 import PageLoader from '@/components/PageLoader';
 import DataTable from '@/components/DataTable';
 
 const ConfigKeys = () => {
   setNavSection('configKeys');
-
   setDocumentTitle(copy.PAGE_TITLE);
-  setHeaderTitle(copy.PAGE_TITLE);
 
   const [configKeys, setConfigKeys] = React.useState([]);
   const [configKeysInitialised, setConfigKeysInitialised] = React.useState(false);

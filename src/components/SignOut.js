@@ -1,7 +1,7 @@
 /* global window, alert */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useAppContext } from '@/contexts/app';
+import { useAppContext } from '@/AppContext';
 import useConfirmModal from '@/utils/useConfirmModal';
 import copy from '@/constants/copy';
 import * as api from '@/api/auth';

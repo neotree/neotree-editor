@@ -1,7 +1,6 @@
 /* global fetch, alert */
 import React from 'react';
-import { setHeaderTitle } from '@/components/Layout';
-import { setDocumentTitle, setNavSection } from '@/contexts/app';
+import { setDocumentTitle, setNavSection } from '@/AppContext';
 import PageLoader from '@/components/PageLoader';
 import DataTable from '@/components/DataTable';
 import copy from '@/constants/copy/scripts';
@@ -9,7 +8,6 @@ import copy from '@/constants/copy/scripts';
 const Scripts = () => {
   setNavSection('scripts');
   setDocumentTitle(copy.PAGE_TITLE);
-  setHeaderTitle(copy.PAGE_TITLE);
 
   const [scripts, setScripts] = React.useState([]);
   const [scriptsInitialised, setScriptsInitialised] = React.useState(false);
