@@ -10,7 +10,11 @@ App designed for managing neonatal patients in low resource settings, providing 
 
 - Create file: `.env`
 - Copy and paste the content in `.env-example` into the new file 
-- Change the values to your needs
+- Change the `.env` values to your needs
+
+**Get `Firebase SDK` from values: https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk**
+
+**Get `Firebase Admin SDK` from values: https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk**
 
 ## Scripts
 
