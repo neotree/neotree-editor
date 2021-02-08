@@ -1,14 +1,17 @@
 /* global fetch, alert */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useParams } from 'react-router-dom';
+import { Redirect, useParams } from 'react-router-dom';
 import diagnosesCopy from '@/constants/copy/diagnoses';
 import scritpsCopy from '@/constants/copy/scripts';
-import { setDocumentTitle } from '@/AppContext';
+import { setDocumentTitle, useAppContext } from '@/AppContext';
 import OverlayLoader from '@/components/OverlayLoader';
 import Form from './Form';
 
 function Diagnosis() {
+  const { state: { viewMode } } = useAppContext();
+  if (viewMode === 'view') return <Redirect to="/" />;
+
   const { scriptId, diagnosisId } = useParams();
   const [diagnosis, setDiagnosis] = React.useState(null);
   const [script, setScript] = React.useState(null);

@@ -14,7 +14,7 @@ import AddUserForm from './AddUserForm';
 import UserManagerForm from './UserManagerForm';
 
 const Users = () => {
-  const { state: { authenticatedUser } } = useAppContext();
+  const { state: { authenticatedUser, viewMode } } = useAppContext();
   const [state, _setState] = React.useState({
     users: [],
     loading: false,
@@ -54,7 +54,7 @@ const Users = () => {
     <>
       <Card>
         <CardHeader
-          action={(
+          action={viewMode === 'view' ? null : (
             <>
               <AddUserForm updateState={setState} hospitals={hospitals} />
             </>
@@ -67,7 +67,7 @@ const Users = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Email</TableCell>
-                <TableCell align="right">Action</TableCell>
+                {viewMode === 'view' ? null : <TableCell align="right">Action</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -75,14 +75,16 @@ const Users = () => {
                 return (
                   <TableRow key={`user-${i}`}>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell align="right">
-                      <UserManagerForm
-                        user={u}
-                        hospitals={hospitals}
-                        authenticatedUser={authenticatedUser}
-                        updateState={setState}
-                      />
-                    </TableCell>
+                    {viewMode === 'view' ? null : (
+                      <TableCell align="right">
+                        <UserManagerForm
+                          user={u}
+                          hospitals={hospitals}
+                          authenticatedUser={authenticatedUser}
+                          updateState={setState}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}

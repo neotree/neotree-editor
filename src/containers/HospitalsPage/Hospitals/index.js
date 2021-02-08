@@ -13,7 +13,7 @@ import AddHospitalForm from './AddHospitalForm';
 import HospitalManagerForm from './HospitalManagerForm';
 
 const Hospitals = () => {
-  const { state: { authenticatedUser } } = useAppContext();
+  const { state: { authenticatedUser, viewMode } } = useAppContext();
   const [state, _setState] = React.useState({
     hospitals: [],
     loading: false,
@@ -46,7 +46,7 @@ const Hospitals = () => {
     <>
       <Card>
         <CardHeader
-          action={(
+          action={viewMode === 'view' ? null : (
             <>
               <AddHospitalForm updateState={setState} />
             </>
@@ -59,7 +59,7 @@ const Hospitals = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
-                <TableCell align="right">Action</TableCell>
+                {viewMode === 'view' ? null : <TableCell align="right">Action</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -67,13 +67,15 @@ const Hospitals = () => {
                 return (
                   <TableRow key={`hospital-${i}`}>
                     <TableCell>{u.name}</TableCell>
-                    <TableCell align="right">
-                      <HospitalManagerForm
-                        hospital={u}
-                        authenticatedUser={authenticatedUser}
-                        updateState={setState}
-                      />
-                    </TableCell>
+                    {viewMode === 'view' ? null : (
+                      <TableCell align="right">
+                        <HospitalManagerForm
+                          hospital={u}
+                          authenticatedUser={authenticatedUser}
+                          updateState={setState}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}

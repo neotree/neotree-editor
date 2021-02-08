@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom';
 import copy from '@/constants/copy/screens';
 import DataTable from '@/components/DataTable';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import { useAppContext } from '@/AppContext';
 
 const ScreensList = () => {
+  const { state: { viewMode } } = useAppContext();
   const { scriptId } = useParams();
 
   const [screens, setScreens] = React.useState([]);
@@ -34,8 +36,8 @@ const ScreensList = () => {
             noDataMsg="No screens"
             title={copy.PAGE_TITLE}
             data={screens}
-            renderHeaderActions={require('./_renderHeaderActions').default}
-            renderRowAction={require('./_renderRowAction').default}
+            renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
+            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'type', label: 'Type', },

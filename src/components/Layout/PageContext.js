@@ -18,6 +18,7 @@ export const providePageContext = Component => React.forwardRef(function PageCon
   const [state, _setState] = React.useState({
     screenType: getScreenType(theme),
     sidebarIsVisible: false,
+    infoBar: null,
     headerLeft: null,
     headerRight: null,
     headerCenter: null,
@@ -33,6 +34,7 @@ export const providePageContext = Component => React.forwardRef(function PageCon
 
   const {
     screenType,
+    infoBar,
     headerLeft,
     headerRight,
     headerCenter,
@@ -44,6 +46,7 @@ export const providePageContext = Component => React.forwardRef(function PageCon
 
   const hasHeader = !!(headerLeft || headerRight || headerCenter);
   const hasSidebar = !!(sidebarBottom || sidebarTop || sidebarCenter);
+  const hasInfoBar = !!(infoBar);
 
   React.useEffect(() => {
     const onResize = () => setState({ screenType: getScreenType(theme, window.innerWidth) });
@@ -67,9 +70,11 @@ export const providePageContext = Component => React.forwardRef(function PageCon
         screenType,
         hasHeader,
         hasSidebar,
+        hasInfoBar,
         sidebarIsVisible,
         toggleSidebar: () => setState(s => ({ sidebarIsVisible: !s.sidebarIsVisible })),
         navMenu: {
+          setInfoBar: infoBar => setState({ infoBar }),
           setHeaderLeft: headerLeft => setState({ headerLeft }),
           setHeaderRight: headerRight => setState({ headerRight }),
           setHeaderCenter: headerCenter => setState({ headerCenter }),

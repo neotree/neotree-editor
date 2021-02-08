@@ -1,11 +1,12 @@
 /* global fetch, alert */
 import React from 'react';
-import { setNavSection, setDocumentTitle } from '@/AppContext';
+import { setNavSection, setDocumentTitle, useAppContext } from '@/AppContext';
 import copy from '@/constants/copy/configKeys';
 import PageLoader from '@/components/PageLoader';
 import DataTable from '@/components/DataTable';
 
 const ConfigKeys = () => {
+  const { state: { viewMode } } = useAppContext();
   setNavSection('configKeys');
   setDocumentTitle(copy.PAGE_TITLE);
 
@@ -35,8 +36,8 @@ const ConfigKeys = () => {
             selectable={false}
             title={copy.PAGE_TITLE}
             data={configKeys}
-            renderHeaderActions={require('./_renderHeaderActions').default}
-            renderRowAction={require('./_renderRowAction').default}
+            renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
+            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
             displayFields={[
               { key: 'configKey', label: 'Key', },
               { key: 'label', label: 'Label', },

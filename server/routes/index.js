@@ -26,6 +26,12 @@ module.exports = app => {
     })();
   });
 
+  router.get('/get-view-mode', (req, res) => res.json({ mode: req.session.viewMode || 'view' }));
+  router.post('/set-view-mode', (req, res) => {
+    req.session.viewMode = req.body.viewMode;
+    res.json({ viewMode: req.session.viewMode || 'view' });
+  });
+
   return router
     .use(require('./auth')(app))
     .use(require('./data')(app))

@@ -1,13 +1,16 @@
 /* global fetch, alert */
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { Redirect, useParams } from 'react-router-dom';
 import screensCopy from '@/constants/copy/screens';
 import scritpsCopy from '@/constants/copy/scripts';
-import { setDocumentTitle } from '@/AppContext';
+import { setDocumentTitle, useAppContext } from '@/AppContext';
 import OverlayLoader from '@/components/OverlayLoader';
 import Form from './Form';
 
 function Screen() {
+  const { state: { viewMode } } = useAppContext();
+  if (viewMode === 'view') return <Redirect to="/" />;
+
   const { scriptId, screenId } = useParams();
   const [screen, setScreen] = React.useState(null);
   const [script, setScript] = React.useState(null);

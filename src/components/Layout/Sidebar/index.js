@@ -19,13 +19,18 @@ const useStyles = makeStyles(theme => ({
     left: 0,
     height: `calc(100% - ${theme.layout.HEADER_HEIGHT}px)`,
     width: theme.layout.SIDEBAR_WIDTH,
-    top: theme.layout.HEADER_HEIGHT,
     borderRight: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     boxSizing: 'border-box',
     display: 'flex',
     flexFlow: 'column',
     overflowY: 'auto',
+  },
+  rootNoInfoBar: {
+    top: theme.layout.HEADER_HEIGHT,
+  },
+  rootInfoBar: {
+    top: theme.layout.HEADER_HEIGHT + theme.layout.INFO_BAR,
   },
   transition: {
     transition: 'left .3s',
@@ -64,6 +69,7 @@ const useStyles = makeStyles(theme => ({
 const Sidebar = () => {
   const {
     toggleSidebar,
+    hasInfoBar,
     state: {
       screenType,
       sidebarTop,
@@ -98,6 +104,8 @@ const Sidebar = () => {
         className={cx(classes.root, {
           [classes.hidden]: !sidebarIsVisible,
           [classes.transition]: screenType !== 'desktop',
+          [classes.rootNoInfoBar]: !hasInfoBar,
+          [classes.rootInfoBar]: hasInfoBar,
         })}
       >
         <div className={cx(classes.section, classes.topSection)}>
