@@ -24,6 +24,7 @@ const useStyles = makeStyles(theme => ({
     height: '100%',
     overlay: 'auto',
     display: 'flex',
+    backgroundColor: theme.palette.background.default,
   },
   rootInner: {
     margin: 'auto',
@@ -37,10 +38,10 @@ const useStyles = makeStyles(theme => ({
     margin: '25px auto',
     padding: theme.spacing(2),
   },
-  paperWidth: ({ _layout }) => ({
+  paperWidth: {
     width: '90%',
-    maxWidth: _layout.AUTH_FORM_WIDTH,
-  }),
+    maxWidth: 350,
+  },
 }));
 
 const AuthenticationPage = () => {

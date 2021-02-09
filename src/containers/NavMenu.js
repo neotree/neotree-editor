@@ -1,7 +1,8 @@
-/* global fetch */
+/* global fetch, alert */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Typography from '@material-ui/core/Typography';
+import Button from '@material-ui/core/Button';
 import MenuItem from '@material-ui/core/MenuItem';
 import IconButton from '@material-ui/core/IconButton';
 import MenuIcon from '@material-ui/icons/Menu';
@@ -34,7 +35,29 @@ function NavMenu() {
         >
           <Typography variant="caption" color="primary">Switch to {appState.viewMode === 'development' ? 'view' : 'development'} mode</Typography>
         </Link>&nbsp;
-        {appState.viewMode === 'view' && <Typography noWrap variant="caption">to make changes</Typography>}
+        {appState.viewMode === 'view' ?
+          <Typography noWrap variant="caption">to make changes</Typography>
+          :
+          (
+            <>
+              {appState.shouldBackup && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="secondary"
+                  disableElevation
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/publish', { method: 'POST' });
+                      const { errors } = await res.json();
+                      if (errors && errors.length) return alert(JSON.stringify(errors));
+                      window.location.reload();
+                    } catch (e) { alert(e.message); }
+                  }}
+                >Publish</Button>
+              )}
+            </>
+          )}
       </>
     );
 

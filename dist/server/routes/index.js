@@ -118,6 +118,17 @@ module.exports = function (app) {
       }, _callee2, null, [[0, 12]]);
     }))();
   });
+  router.get('/get-view-mode', function (req, res) {
+    return res.json({
+      mode: req.session.viewMode || 'view'
+    });
+  });
+  router.post('/set-view-mode', function (req, res) {
+    req.session.viewMode = req.body.viewMode;
+    res.json({
+      viewMode: req.session.viewMode || 'view'
+    });
+  });
   return router.use(require('./auth')(app)).use(require('./data')(app)).use('/api', require('./api')(app)).use(require('./files')(app)).use(require('./users')(app)).use(require('./scripts')(app)).use(require('./screens')(app)).use(require('./diagnoses')(app)).use(require('./config-keys')(app)).use(require('./devices')(app)).use(require('./hospitals')(app));
 };
 
