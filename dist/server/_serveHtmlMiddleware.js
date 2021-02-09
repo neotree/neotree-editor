@@ -63,7 +63,8 @@ module.exports = function () {
                 authenticatedUser: user,
                 app_name: process.env.APP_NAME,
                 app_slug: process.env.APP_SLUG,
-                app_url: process.env.APP_URL
+                app_url: process.env.APP_URL,
+                viewMode: req.session.viewMode || 'view'
               }, null, 4);
               $('head').append("<script type=\"text/javascript\">\n    const $APP = ".concat($APP, ";\n</script>\n"));
               res.send($.html());
