@@ -1,4 +1,4 @@
-/* global fetch, alert */
+/* global fetch, alert, window */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Typography from '@material-ui/core/Typography';
@@ -73,6 +73,8 @@ function NavMenu() {
         )}
 
         <Link to="/"><Logo size={40} /></Link>
+
+        <Typography variant="subtitle1">v{appState.version || 1}</Typography>
 
         <Typography variant="subtitle1">NeoTree</Typography>
       </>
