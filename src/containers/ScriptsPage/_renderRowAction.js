@@ -6,11 +6,13 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
+import { useAppContext } from '@/AppContext';
 
 import DeleteScripts from './Forms/DeleteScripts';
 import DuplicateScripts from './Forms/DuplicateScripts';
 
 function Action({ row, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -30,21 +32,25 @@ function Action({ row, }) {
           component={Link}
           to={`/scripts/${row.scriptId}`}
           onClick={handleClose}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={handleClose}
-          scripts={[row]} // {[{ scriptId: row.scriptId }]}
-          component={DuplicateScripts}
-        >Duplicate</MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            scripts={[row]}
+            component={DuplicateScripts}
+          >Duplicate</MenuItem>
+        )}
 
-        <MenuItem
-          onClick={handleClose}
-          scripts={[{ id: row.id }]}
-          component={DeleteScripts}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            scripts={[{ id: row.id }]}
+            component={DeleteScripts}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

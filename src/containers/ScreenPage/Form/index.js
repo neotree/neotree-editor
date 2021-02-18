@@ -6,10 +6,12 @@ import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
 import Button from '@material-ui/core/Button';
+import Typography from '@material-ui/core/Typography';
 import Collapse from '@material-ui/core/Collapse';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import OverlayLoader from '@/components/OverlayLoader';
+import { useAppContext } from '@/AppContext';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
@@ -17,6 +19,7 @@ import MetadataItems from './Metadata/Items';
 import MetadataFields from './Metadata/Fields';
 
 function ScreenEditor({ screen, script }) {
+  const { state: { viewMode } } = useAppContext();
   const history = useHistory();
   const { scriptId } = useParams();
 
@@ -86,10 +89,12 @@ function ScreenEditor({ screen, script }) {
 
         {!!form.type && (
           <CardActions style={{ justifyContent: 'flex-end' }}>
+            {viewMode === 'view' && <Typography color="error" variant="caption">Can't save because you're in view mode</Typography>}
+
             <Button
               color="primary"
               onClick={() => saveScreen()}
-              disabled={!canSaveScreen()}
+              disabled={(viewMode === 'view') || !canSaveScreen()}
             >Save</Button>
           </CardActions>
         )}

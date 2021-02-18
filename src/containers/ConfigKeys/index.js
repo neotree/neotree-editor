@@ -37,13 +37,13 @@ const ConfigKeys = () => {
             title={copy.PAGE_TITLE}
             data={configKeys}
             renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
-            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
+            renderRowAction={require('./_renderRowAction').default}
             displayFields={[
               { key: 'configKey', label: 'Key', },
               { key: 'label', label: 'Label', },
               { key: 'summary', label: 'Summary', },
             ]}
-            onSortData={configKeys => {
+            onSortData={viewMode === 'view' ? undefined : configKeys => {
               setConfigKeys(configKeys);
               (async () => {
                 try {

@@ -6,12 +6,14 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
+import { useAppContext } from '@/AppContext';
 
 import DeleteDiagnoses from './Forms/DeleteDiagnoses';
 import CopyDiagnoses from './Forms/CopyDiagnoses';
 // import DuplicateScreens from './Forms/DuplicateDiagnoses';
 
 function Action({ row, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -31,27 +33,25 @@ function Action({ row, }) {
           component={Link}
           to={`/scripts/${row.scriptId}/diagnoses/${row.id}`}
           onClick={handleClose}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={handleClose}
-          items={[row]} // {[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
-          component={CopyDiagnoses}
-        >Copy</MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            items={[row]}
+            component={CopyDiagnoses}
+          >Copy</MenuItem>
+        )}
 
-        {/* <MenuItem
-          onClick={handleClose}
-          items={[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId }]}
-          component={DuplicateScreens}
-        >Duplicate</MenuItem> */}
-
-        <MenuItem
-          onClick={handleClose}
-          diagnoses={[{ id: row.id }]}
-          component={DeleteDiagnoses}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            diagnoses={[{ id: row.id }]}
+            component={DeleteDiagnoses}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

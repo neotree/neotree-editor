@@ -27,6 +27,7 @@ export default SortableElement(({
   setSelected,
   displayFields,
   action,
+  sortable,
 }) => {
   return (
     <TableRow
@@ -45,9 +46,13 @@ export default SortableElement(({
           />
         </TableCell>
       )}
-      <TableCell padding="none">
-        <DragHandle />
-      </TableCell>
+
+      {sortable && (
+        <TableCell padding="none">
+          <DragHandle />
+        </TableCell>
+      )}
+
       {displayFields.map((f, j) => {
         const children = f.render ?
           f.render({ row, rowIndex: i, column: f.key, columnIndex: j, })
@@ -59,6 +64,7 @@ export default SortableElement(({
           </TableCell>
         );
       })}
+
       {!action ? null : (
         <TableCell align="right" padding="none">
           {action}
