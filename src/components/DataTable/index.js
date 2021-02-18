@@ -86,12 +86,15 @@ function DataTable({
                       />
                     </TableCell>
                   )}
-                  <TableCell />
+
+                  {!!onSortData && <TableCell/>}
+
                   {displayFields.map((f, i) => (
                     <TableCell {...f.cellProps} key={`${f.key}${i}`}>
                       <b>{f.label}</b>
                     </TableCell>
                   ))}
+
                   {!renderRowAction ? null : (
                     <TableCell align="right">
                       <b>Action</b>
@@ -109,6 +112,7 @@ function DataTable({
                 selected={selected}
                 setSelected={setSelected}
                 useDragHandle
+                sortable={!!onSortData}
                 onSortEnd={({ oldIndex, newIndex }) => {
                   const _data = update(data, {
                     $splice: [

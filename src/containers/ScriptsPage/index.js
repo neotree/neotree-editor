@@ -37,13 +37,13 @@ const Scripts = () => {
             title={copy.PAGE_TITLE}
             data={scripts}
             renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
-            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
+            renderRowAction={require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ rowIndex }) => rowIndex + 1, },
               { key: 'title', label: 'Title', },
               { key: 'description', label: 'Description', }
             ]}
-            onSortData={scripts => {
+            onSortData={viewMode === 'view' ? undefined : scripts => {
               setScripts(scripts);
               (async () => {
                 try {

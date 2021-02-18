@@ -6,14 +6,18 @@ import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
 import Button from '@material-ui/core/Button';
+import Typography from '@material-ui/core/Typography';
 import TextField from '@material-ui/core/TextField';
 import TitleTextImageForm from '@/components/TitleTextImageForm';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import OverlayLoader from '@/components/OverlayLoader';
+import { useAppContext } from '@/AppContext';
 import Symptoms from './Symptoms';
 
 function DiagnosisEditor({ diagnosis, script }) {
+  const { state: { viewMode } } = useAppContext();
+
   const history = useHistory();
   const { scriptId } = useParams();
 
@@ -148,10 +152,12 @@ function DiagnosisEditor({ diagnosis, script }) {
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
+          {viewMode === 'view' && <Typography color="error" variant="caption">Can't save because you're in view mode</Typography>}
+
           <Button
             color="primary"
             onClick={() => saveDiagnosis()}
-            disabled={!canSaveDiagnosis()}
+            disabled={(viewMode === 'view') || !canSaveDiagnosis()}
           >Save</Button>
         </CardActions>
       </Card>

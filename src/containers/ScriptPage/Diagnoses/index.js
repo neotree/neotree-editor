@@ -32,18 +32,18 @@ const DiagnosesList = () => {
       {!diagnosesInitialised ? null : (
         <>
           <DataTable
-            selectable
+            selectable={viewMode !== 'view'}
             noDataMsg="No diagnoses"
             title={copy.PAGE_TITLE}
             data={diagnoses}
             renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
-            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
+            renderRowAction={require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'name', label: 'Name', },
               { key: 'description', label: 'Description', }
             ]}
-            onSortData={diagnoses => {
+            onSortData={viewMode === 'view' ? undefined : diagnoses => {
               setDiagnoses(diagnoses);
               (async () => {
                 try {

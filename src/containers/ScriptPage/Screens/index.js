@@ -32,12 +32,12 @@ const ScreensList = () => {
       {!screensInitialised ? null : (
         <>
           <DataTable
-            selectable
+            selectable={viewMode !== 'view'}
             noDataMsg="No screens"
             title={copy.PAGE_TITLE}
             data={screens}
             renderHeaderActions={viewMode === 'view' ? null : require('./_renderHeaderActions').default}
-            renderRowAction={viewMode === 'view' ? null : require('./_renderRowAction').default}
+            renderRowAction={require('./_renderRowAction').default}
             displayFields={[
               { key: 'position', label: 'Position', render: ({ row }) => row.position, },
               { key: 'type', label: 'Type', },
@@ -46,7 +46,7 @@ const ScreensList = () => {
               { key: 'refId', label: 'Ref', },
               { key: 'title', label: 'Title', },
             ]}
-            onSortData={screens => {
+            onSortData={viewMode === 'view' ? undefined : screens => {
               setScreens(screens);
               (async () => {
                 try {

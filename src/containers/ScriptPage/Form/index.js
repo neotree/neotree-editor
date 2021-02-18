@@ -14,8 +14,10 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Button from '@material-ui/core/Button';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import OverlayLoader from '@/components/OverlayLoader';
+import { useAppContext } from '@/AppContext';
 
 function ScriptEditorForm({ script }) {
+  const { state: { viewMode } } = useAppContext();
   const history = useHistory();
 
   const [form, _setForm] = React.useState({ ...script });
@@ -107,10 +109,12 @@ function ScriptEditorForm({ script }) {
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
+          {viewMode === 'view' && <Typography color="error" variant="caption">Can't save because you're in view mode</Typography>}
+
           <Button
             color="primary"
             onClick={() => saveScript()}
-            disabled={!canSaveScript()}
+            disabled={(viewMode === 'view') || !canSaveScript()}
           >Save</Button>
         </CardActions>
       </Card>

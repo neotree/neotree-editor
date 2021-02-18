@@ -6,12 +6,14 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
+import { useAppContext } from '@/AppContext';
 
 import DeleteScreens from './Forms/DeleteScreens';
 import CopyScreens from './Forms/CopyScreens';
 // import DuplicateScreens from './Forms/DuplicateScreens';
 
 function Action({ row, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -31,27 +33,25 @@ function Action({ row, }) {
           component={Link}
           to={`/scripts/${row.scriptId}/screens/${row.id}`}
           onClick={handleClose}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={handleClose}
-          items={[row]} // {[{ screenId: row.screenId, scriptId: row.scriptId, }]}
-          component={CopyScreens}
-        >Copy</MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            items={[row]} // {[{ screenId: row.screenId, scriptId: row.scriptId, }]}
+            component={CopyScreens}
+          >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
+        )}
 
-        {/* <MenuItem
-          onClick={handleClose}
-          screens={[{ screenId: row.screenId, scriptId: row.scriptId, }]}
-          component={DuplicateScreens}
-        >Duplicate</MenuItem> */}
-
-        <MenuItem
-          onClick={handleClose}
-          screens={[{ id: row.id }]}
-          component={DeleteScreens}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            screens={[{ id: row.id }]}
+            component={DeleteScreens}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

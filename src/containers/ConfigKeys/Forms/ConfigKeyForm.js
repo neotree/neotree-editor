@@ -10,6 +10,7 @@ import TextField from '@material-ui/core/TextField';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Typography from '@material-ui/core/Typography';
 import OverlayLoader from '@/components/OverlayLoader';
+import { useAppContext } from '@/AppContext';
 
 const ConfigKeyForm = React.forwardRef(({
   children,
@@ -17,6 +18,8 @@ const ConfigKeyForm = React.forwardRef(({
   configKey,
   ...props
 }, ref) => {
+  const { state: { viewMode } } = useAppContext();
+
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [formError, setFormError] = React.useState(null);
@@ -138,14 +141,12 @@ const ConfigKeyForm = React.forwardRef(({
             </Button>
           ) : (
             <>
-              <Button
-                onClick={() => setOpen(false)}
-              >Cancel</Button>
+              {viewMode === 'view' && <Typography color="error" variant="caption">Can't save because you're in view mode</Typography>}
 
               <Button
                 variant="contained"
                 color="primary"
-                disabled={!!formError}
+                disabled={(viewMode === 'view') || !!formError}
                 onClick={() => {
                   setSaving(true);
                   saveConfigKey(configKey, form, (e) => {
@@ -155,6 +156,10 @@ const ConfigKeyForm = React.forwardRef(({
                   });
                 }}
               >Save</Button>
+
+              <Button
+                onClick={() => setOpen(false)}
+              >Cancel</Button>
             </>
           )}
         </DialogActions>

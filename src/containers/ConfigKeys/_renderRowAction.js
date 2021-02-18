@@ -5,12 +5,14 @@ import MenuIcon from '@material-ui/icons/MoreVert';
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
+import { useAppContext } from '@/AppContext';
 
 import DeleteConfigKeys from './Forms/DeleteConfigKeys';
 import DuplicateConfigKeys from './Forms/DuplicateConfigKeys';
 import ConfigKeyForm from './Forms/ConfigKeyForm';
 
 function Action({ row, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -30,21 +32,25 @@ function Action({ row, }) {
           onClick={handleClose}
           configKey={row}
           component={ConfigKeyForm}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={handleClose}
-          configKeys={[{ id: row.id }]}
-          component={DuplicateConfigKeys}
-        >Duplicate</MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            configKeys={[{ id: row.id }]}
+            component={DuplicateConfigKeys}
+          >Duplicate</MenuItem>
+        )}
 
-        <MenuItem
-          onClick={handleClose}
-          configKeys={[{ id: row.id }]}
-          component={DeleteConfigKeys}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={handleClose}
+            configKeys={[{ id: row.id }]}
+            component={DeleteConfigKeys}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

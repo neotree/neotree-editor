@@ -5,6 +5,7 @@ import Row from './Row';
 
 export default SortableContainer(({
   rows,
+  sortable,
   classes,
   selected,
   selectable,
@@ -19,6 +20,7 @@ export default SortableContainer(({
         <Row
           key={`${key}${i}`}
           row={row}
+          sortable={sortable}
           index={i}
           rowIndex={i}
           classes={classes}
