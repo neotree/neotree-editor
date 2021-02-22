@@ -12,7 +12,7 @@ var _express = _interopRequireDefault(require("express"));
 
 var database = _interopRequireWildcard(require("../database"));
 
-var _backupData = _interopRequireWildcard(require("../utils/backupData"));
+var _backup = require("../utils/backup");
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -26,7 +26,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
-  router.get('/get-backup-status', function (req, res) {
+  router.use(require('./auth')(app)).use(require('./data')(app)).use('/api', require('./api')(app)).use(require('./files')(app)).use(require('./users')(app)).use(require('./scripts')(app)).use(require('./screens')(app)).use(require('./diagnoses')(app)).use(require('./config-keys')(app)).use(require('./devices')(app)).use(require('./hospitals')(app));
+  router.get('/get-app-info', function (req, res) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var appInfo, _shouldBackup;
 
@@ -45,7 +46,7 @@ module.exports = function (app) {
             case 3:
               appInfo = _context.sent;
               _context.next = 6;
-              return (0, _backupData.shouldBackup)();
+              return (0, _backup.shouldBackup)();
 
             case 6:
               _shouldBackup = _context.sent;
@@ -71,7 +72,7 @@ module.exports = function (app) {
       }, _callee, null, [[0, 10]]);
     }))();
   });
-  router.post('/publish', function (req, res) {
+  router.post('/publish-changes', function (req, res) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
       var appInfo, _shouldBackup;
 
@@ -81,7 +82,7 @@ module.exports = function (app) {
             case 0:
               _context2.prev = 0;
               _context2.next = 3;
-              return (0, _backupData["default"])(app);
+              return (0, _backup.backupData)(app);
 
             case 3:
               _context2.next = 5;
@@ -92,7 +93,7 @@ module.exports = function (app) {
             case 5:
               appInfo = _context2.sent;
               _context2.next = 8;
-              return (0, _backupData.shouldBackup)();
+              return (0, _backup.shouldBackup)();
 
             case 8:
               _shouldBackup = _context2.sent;
@@ -118,6 +119,53 @@ module.exports = function (app) {
       }, _callee2, null, [[0, 12]]);
     }))();
   });
+  router.post('/discard-changes', function (req, res) {
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
+      var appInfo, _shouldBackup;
+
+      return _regenerator["default"].wrap(function _callee3$(_context3) {
+        while (1) {
+          switch (_context3.prev = _context3.next) {
+            case 0:
+              _context3.prev = 0;
+              _context3.next = 3;
+              return (0, _backup.restoreBackup)(app);
+
+            case 3:
+              _context3.next = 5;
+              return database.App.findOne({
+                id: 1
+              });
+
+            case 5:
+              appInfo = _context3.sent;
+              _context3.next = 8;
+              return (0, _backup.shouldBackup)();
+
+            case 8:
+              _shouldBackup = _context3.sent;
+              res.json({
+                shouldBackup: _shouldBackup,
+                appInfo: appInfo
+              });
+              _context3.next = 15;
+              break;
+
+            case 12:
+              _context3.prev = 12;
+              _context3.t0 = _context3["catch"](0);
+              res.json({
+                errors: [_context3.t0.message]
+              });
+
+            case 15:
+            case "end":
+              return _context3.stop();
+          }
+        }
+      }, _callee3, null, [[0, 12]]);
+    }))();
+  });
   router.get('/get-view-mode', function (req, res) {
     return res.json({
       mode: req.session.viewMode || 'view'
@@ -129,7 +177,7 @@ module.exports = function (app) {
       viewMode: req.session.viewMode || 'view'
     });
   });
-  return router.use(require('./auth')(app)).use(require('./data')(app)).use('/api', require('./api')(app)).use(require('./files')(app)).use(require('./users')(app)).use(require('./scripts')(app)).use(require('./screens')(app)).use(require('./diagnoses')(app)).use(require('./config-keys')(app)).use(require('./devices')(app)).use(require('./hospitals')(app));
+  return router;
 };
 
 ;
