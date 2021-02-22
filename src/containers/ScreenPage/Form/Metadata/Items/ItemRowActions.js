@@ -5,9 +5,11 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import IconButton from '@material-ui/core/IconButton';
+import { useAppContext } from '@/AppContext';
 import ItemForm from './ItemForm';
 
 function ItemRowActions({ row, rowIndex, form, setMetadata, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -32,18 +34,20 @@ function ItemRowActions({ row, rowIndex, form, setMetadata, }) {
             items: form.metadata.items
               .map((item, i) => rowIndex === i ? { ...item, ...v } : item)
           })}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={e => {
-            setMetadata({
-              items: form.metadata.items.filter((item, i) => i !== rowIndex),
-            });
-            handleClose(e);
-          }}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={e => {
+              setMetadata({
+                items: form.metadata.items.filter((item, i) => i !== rowIndex),
+              });
+              handleClose(e);
+            }}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

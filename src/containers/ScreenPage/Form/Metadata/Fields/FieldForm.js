@@ -16,6 +16,7 @@ import Radio from '@material-ui/core/Radio';
 import { FieldTypes } from '@/constants/types';
 import { DateTimePicker, TimePicker, } from '@material-ui/pickers';
 import Checkbox from '@material-ui/core/Checkbox';
+import { useAppContext } from '@/AppContext';
 import Title from '../../Title';
 
 const FieldForm = React.forwardRef(({
@@ -26,6 +27,7 @@ const FieldForm = React.forwardRef(({
   form: { type },
   ...props
 }, ref) => {
+  const { state: { viewMode } } = useAppContext();
   const [open, setOpen] = React.useState(false);
 
   const defaultForm = {
@@ -384,6 +386,7 @@ const FieldForm = React.forwardRef(({
           <Button
             variant="contained"
             color="primary"
+            disabled={viewMode === 'view'}
             onClick={() => {
               onSave(form);
               setOpen(false);

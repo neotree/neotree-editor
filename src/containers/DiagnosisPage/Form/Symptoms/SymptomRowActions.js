@@ -5,9 +5,11 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import IconButton from '@material-ui/core/IconButton';
+import { useAppContext } from '@/AppContext';
 import SymptomForm from './SymptomForm';
 
 function SymptomRowActions({ row, rowIndex, form, setForm, }) {
+  const { state: { viewMode } } = useAppContext();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const handleClose = () => setAnchorEl(null);
 
@@ -32,18 +34,20 @@ function SymptomRowActions({ row, rowIndex, form, setForm, }) {
             symptoms: form.symptoms
               .map((symptom, i) => rowIndex === i ? { ...symptom, ...v } : symptom)
           })}
-        >Edit</MenuItem>
+        >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
 
-        <MenuItem
-          onClick={e => {
-            setForm({
-              symptoms: form.symptoms.filter((symptom, i) => i !== rowIndex),
-            });
-            handleClose(e);
-          }}
-        >
-          <Typography color="error">Delete</Typography>
-        </MenuItem>
+        {viewMode === 'view' ? null : (
+          <MenuItem
+            onClick={e => {
+              setForm({
+                symptoms: form.symptoms.filter((symptom, i) => i !== rowIndex),
+              });
+              handleClose(e);
+            }}
+          >
+            <Typography color="error">Delete</Typography>
+          </MenuItem>
+        )}
       </Menu>
     </>
   );

@@ -10,6 +10,7 @@ import Typography from '@material-ui/core/Typography';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
+import { useAppContext } from '@/AppContext';
 import { SymptomTypes } from '@/constants/types';
 
 const SymptomForm = React.forwardRef(({
@@ -20,6 +21,7 @@ const SymptomForm = React.forwardRef(({
   // form: { type },
   ...props
 }, ref) => {
+  const { state: { viewMode } } = useAppContext();
   const [open, setOpen] = React.useState(false);
 
   const defaultForm = {
@@ -119,6 +121,7 @@ const SymptomForm = React.forwardRef(({
           <Button
             variant="contained"
             color="primary"
+            disabled={viewMode === 'view'}
             onClick={() => {
               onSave(form);
               setOpen(false);

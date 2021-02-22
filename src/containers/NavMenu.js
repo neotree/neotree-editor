@@ -7,6 +7,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import IconButton from '@material-ui/core/IconButton';
 import MenuIcon from '@material-ui/icons/Menu';
 import Logo from '@/components/Logo';
+import OverlayLoader from '@/components/OverlayLoader';
 import UserMenu from '@/components/UserMenu';
 import { useAppContext } from '@/AppContext';
 import { usePageContext, SidebarItem, HeaderItem } from '@/components/Layout';
@@ -14,6 +15,7 @@ import { usePageContext, SidebarItem, HeaderItem } from '@/components/Layout';
 function NavMenu() {
   const { navMenu, toggleSidebar, screenType } = usePageContext();
   const { setState, state: appState } = useAppContext();
+  const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     navMenu.setInfoBar(
@@ -41,20 +43,39 @@ function NavMenu() {
           (
             <>
               {appState.shouldBackup && (
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="secondary"
-                  disableElevation
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/publish', { method: 'POST' });
-                      const { errors } = await res.json();
-                      if (errors && errors.length) return alert(JSON.stringify(errors));
-                      window.location.reload();
-                    } catch (e) { alert(e.message); }
-                  }}
-                >Publish</Button>
+                <>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="secondary"
+                    disableElevation
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        const res = await fetch('/discard-changes', { method: 'POST' });
+                        const { errors } = await res.json();
+                        if (errors && errors.length) return alert(JSON.stringify(errors));
+                        window.location.reload();
+                      } catch (e) { alert(e.message); }
+                      setLoading(false);
+                    }}
+                  >Discard changes</Button>&nbsp;
+
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="secondary"
+                    disableElevation
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/publish-changes', { method: 'POST' });
+                        const { errors } = await res.json();
+                        if (errors && errors.length) return alert(JSON.stringify(errors));
+                        window.location.reload();
+                      } catch (e) { alert(e.message); }
+                    }}
+                  >Publish</Button>
+                </>
               )}
             </>
           )}
@@ -147,7 +168,11 @@ function NavMenu() {
     };
   }, [appState, screenType]);
 
-  return null;
+  return (
+    <>
+      {loading && <OverlayLoader />}
+    </>
+  );
 }
 
 export default NavMenu;
