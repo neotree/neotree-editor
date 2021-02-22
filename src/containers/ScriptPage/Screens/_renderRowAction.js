@@ -40,7 +40,7 @@ function Action({ row, }) {
             onClick={handleClose}
             items={[row]} // {[{ screenId: row.screenId, scriptId: row.scriptId, }]}
             component={CopyScreens}
-          >{viewMode === 'view' ? 'View' : 'Edit'}</MenuItem>
+          >Copy</MenuItem>
         )}
 
         {viewMode === 'view' ? null : (

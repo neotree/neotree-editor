@@ -9,6 +9,7 @@ import TextField from '@material-ui/core/TextField';
 import Grid from '@material-ui/core/Grid';
 import Switch from '@material-ui/core/Switch';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
+import { useAppContext } from '@/AppContext';
 
 const ItemForm = React.forwardRef(({
   children,
@@ -18,6 +19,7 @@ const ItemForm = React.forwardRef(({
   form: { type },
   ...props
 }, ref) => {
+  const { state: { viewMode } } = useAppContext();
   const [open, setOpen] = React.useState(false);
 
   const defaultForm = {
@@ -261,6 +263,7 @@ const ItemForm = React.forwardRef(({
           <Button
             variant="contained"
             color="primary"
+            disabled={viewMode === 'view'}
             onClick={() => {
               onSave(form);
               setOpen(false);

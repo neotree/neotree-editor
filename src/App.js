@@ -35,7 +35,7 @@ const App = () => {
   const getBackupStatus = () => new Promise((resolve, reject) => {
     (async () => {
       try {
-        const res = await fetch('/get-backup-status');
+        const res = await fetch('/get-app-info');
         const { shouldBackup, appInfo } = await res.json();
         setState({
           shouldBackup,

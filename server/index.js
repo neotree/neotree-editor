@@ -2,7 +2,7 @@ import path from 'path';
 import express from 'express';
 import * as database from './database';
 import syncFirebase from './firebase/sync';
-import backupData, { shouldBackup } from './utils/backupData';
+import { backupData } from './utils/backup';
 
 const isProd = process.env.NODE_ENV === 'production';
 
