@@ -16,7 +16,7 @@ var database = _interopRequireWildcard(require("./database"));
 
 var _sync = _interopRequireDefault(require("./firebase/sync"));
 
-var _backupData = _interopRequireWildcard(require("./utils/backupData"));
+var _backup = require("./utils/backup");
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -91,7 +91,7 @@ var isProd = process.env.NODE_ENV === 'production';
           }
 
           _context.next = 27;
-          return (0, _backupData["default"])(app);
+          return (0, _backup.backupData)(app);
 
         case 27:
           _context.next = 32;
