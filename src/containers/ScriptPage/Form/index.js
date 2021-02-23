@@ -72,7 +72,8 @@ function ScriptEditorForm({ script }) {
           <div>
             <TextField
               fullWidth
-              error={!form.printTitle}
+              // required
+              // error={!form.printTitle}
               value={form.printTitle || ''}
               label="Print title"
               onChange={e => setForm({ printTitle: e.target.value })}
