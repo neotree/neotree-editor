@@ -74,42 +74,46 @@ module.exports = function () {
             case 9:
               device = _context.sent;
               device = device ? device[0] : null;
-              info = _database.App.findAll({
+              _context.next = 13;
+              return _database.App.findAll({
                 where: {}
               });
-              info = info ? info[0] : null;
-              _context.next = 17;
-              break;
 
-            case 15:
-              _context.prev = 15;
-              _context.t0 = _context["catch"](6);
+            case 13:
+              info = _context.sent;
+              info = info ? info[0] : null;
+              _context.next = 19;
+              break;
 
             case 17:
               _context.prev = 17;
-              _context.next = 20;
+              _context.t0 = _context["catch"](6);
+
+            case 19:
+              _context.prev = 19;
+              _context.next = 22;
               return _firebase.firebaseAdmin.database().ref("devices/".concat(deviceId)).set(device);
 
-            case 20:
-              _context.next = 24;
+            case 22:
+              _context.next = 26;
               break;
 
-            case 22:
-              _context.prev = 22;
-              _context.t1 = _context["catch"](17);
-
             case 24:
+              _context.prev = 24;
+              _context.t1 = _context["catch"](19);
+
+            case 26:
               done(null, {
                 device: device,
                 info: info
               });
 
-            case 25:
+            case 27:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[6, 15], [17, 22]]);
+      }, _callee, null, [[6, 17], [19, 24]]);
     }))();
   };
 };
