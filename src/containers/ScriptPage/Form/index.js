@@ -44,7 +44,7 @@ function ScriptEditorForm({ script }) {
           history.push(`/scripts${script ? '' : `/${res.script.script_id}`}`);
           window.location.reload();
         }
-      } catch (e) { alert(e.message); }
+      } catch (e) { alert(`Ooops... ${e.message}`); }
       setSavingScript(false);
     })();
   });
@@ -64,6 +64,18 @@ function ScriptEditorForm({ script }) {
               value={form.title || ''}
               label="Title"
               onChange={e => setForm({ title: e.target.value })}
+            />
+          </div>
+
+          <br />
+
+          <div>
+            <TextField
+              fullWidth
+              error={!form.printTitle}
+              value={form.printTitle || ''}
+              label="Print title"
+              onChange={e => setForm({ printTitle: e.target.value })}
             />
           </div>
 

@@ -54,8 +54,8 @@ export const provideAppContext = Component => function AppContextProvider(props)
   });
 
   React.useEffect(() => {
-    getBackupStatus();
-    socket.on('data_updated', getBackupStatus);
+    // getBackupStatus();
+    // socket.on('data_updated', getBackupStatus);
   }, []);
 
   console.log(state.shouldBackup);
