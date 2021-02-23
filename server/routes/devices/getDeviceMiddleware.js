@@ -31,7 +31,7 @@ module.exports = () => (req, res, next) => {
       });
       device = device ? device[0] : null;
 
-      info = App.findAll({ where: {} });
+      info = await App.findAll({ where: {} });
       info = info ? info[0] : null;
     } catch (e) { /* Do nothing */ }
 
