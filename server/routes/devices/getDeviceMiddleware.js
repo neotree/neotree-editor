@@ -1,4 +1,4 @@
-import { Device, } from '../../database';
+import { Device, App, } from '../../database';
 import { firebaseAdmin } from '../../firebase';
 
 function makeid(chars = '', length = 4) {
@@ -19,6 +19,7 @@ module.exports = () => (req, res, next) => {
     if (!deviceId) return done(new Error('"deviceId" is not provided'));
 
     let device = null;
+    let info = null;
     try {
       device = await Device.findOrCreate({
         where: { device_id: deviceId },
@@ -29,10 +30,13 @@ module.exports = () => (req, res, next) => {
         },
       });
       device = device ? device[0] : null;
+
+      info = App.findAll({ where: {} });
+      info = info ? info[0] : null;
     } catch (e) { /* Do nothing */ }
 
     try { await firebaseAdmin.database().ref(`devices/${deviceId}`).set(device); } catch (e) { /* Do nothing */ }
 
-    done(null, { device });
+    done(null, { device, info });
   })();
 };
