@@ -4,6 +4,13 @@ import apiKeyAuthenticator from './apiKeyAuthenticator';
 const router = express.Router();
 
 module.exports = app => {
+  router.post(
+    '/update-device-registration',
+    apiKeyAuthenticator(app),
+    require('./updateDeviceMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
   router.get(
     '/key',
     require('./getApiKeyMiddleware')(app),
