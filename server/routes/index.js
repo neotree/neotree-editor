@@ -34,6 +34,7 @@ module.exports = app => {
         await backupData(app);
         const appInfo = await database.App.findOne({ id: 1 });
         const _shouldBackup = await shouldBackup();
+        app.io.emit('data_published');
         res.json({ shouldBackup: _shouldBackup, appInfo });
       } catch (e) { res.json({ errors: [e.message] }); }
     })();
@@ -45,6 +46,7 @@ module.exports = app => {
         await restoreBackup(app);
         const appInfo = await database.App.findOne({ id: 1 });
         const _shouldBackup = await shouldBackup();
+        app.io.emit('changes_discarded');
         res.json({ shouldBackup: _shouldBackup, appInfo });
       } catch (e) { res.json({ errors: [e.message] }); }
     })();

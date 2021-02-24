@@ -38,8 +38,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-function backupData(app) {
-  var io = app.io;
+function backupData() {
   return new Promise(function (resolve, reject) {
     try {
       if (!_fs["default"].existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
@@ -62,7 +61,7 @@ function backupData(app) {
               _shouldBackup = _context.sent;
 
               if (!_shouldBackup) {
-                _context.next = 66;
+                _context.next = 65;
                 break;
               }
 
@@ -251,7 +250,6 @@ function backupData(app) {
             case 63:
               _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/app.json"), JSON.stringify(appInfo));
 
-              io.emit('data_published');
               (0, _child_process.exec)("cd ".concat(process.env.BACKUP_DIR_PATH, " && git add . && git commit -m v").concat(appInfo.version, " && git push origin master"), function (error, stdout, stderr) {
                 if (error) {
                   console.log("error: ".concat(error.message));
@@ -266,22 +264,22 @@ function backupData(app) {
                 console.log("stdout: ".concat(stdout));
               });
 
-            case 66:
+            case 65:
               resolve();
-              _context.next = 72;
+              _context.next = 71;
               break;
 
-            case 69:
-              _context.prev = 69;
+            case 68:
+              _context.prev = 68;
               _context.t0 = _context["catch"](0);
               reject(_context.t0);
 
-            case 72:
+            case 71:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 69]]);
+      }, _callee, null, [[0, 68]]);
     }))();
   });
 }

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { Op } from 'sequelize';
 import { Script, Screen, ConfigKey, Diagnosis, Device, } from '../../database';
 
@@ -23,23 +24,58 @@ module.exports = () => (req, res, next) => {
       }
     }
 
-    const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
-    const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
+    try {
+      let scripts = [];
+      let screens = [];
+      let diagnoses =  [];
+      let configKeys = [];
+      let deletedScripts = [];
+      let deletedScreens = [];
+      let deletedDiagnoses = [];
+      let deletedConfigKeys = [];
 
-    Promise.all([
-      Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Script.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
+      const backUpFolderExists = fs.existsSync(process.env.BACKUP_DIR_PATH);
 
-      Screen.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Screen.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
+      if (backUpFolderExists && !lastSyncDate) {
+        const readDir = dir => new Promise((resolve, reject) => {
+          (async () => {
+            dir = `${process.env.BACKUP_DIR_PATH}/${dir}`;
 
-      Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      Diagnosis.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
+            try {
+              if (!fs.existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
 
-      ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } }),
-      ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } }),
-    ])
-      .then(([
+              const files = await Promise.all(fs.readdirSync(dir).map(fname => new Promise(resolve => {
+                const data = fs.readFileSync(`${dir}/${fname}`);
+                resolve(JSON.parse(data));
+              })));
+              resolve(files.sort((a, b) => a.id - b.id));
+            } catch (e) { return reject(e); }
+          })();
+        });
+
+        scripts = await readDir('scripts');
+        screens = await readDir('screens');
+        diagnoses = await readDir('diagnoses');
+        configKeys = await readDir('configKeys');
+      } else {
+        const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
+        const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
+
+        scripts = await Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
+        deletedScripts = await Script.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
+
+        screens = await Screen.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
+        deletedScreens = await Screen.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
+
+        diagnoses = await Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
+        deletedDiagnoses = await Diagnosis.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
+
+        configKeys = await ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
+        deletedConfigKeys = await ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
+      }
+
+      done(null, {
+        device,
         scripts,
         deletedScripts,
         screens,
@@ -48,19 +84,7 @@ module.exports = () => (req, res, next) => {
         deletedDiagnoses,
         configKeys,
         deletedConfigKeys,
-      ]) => {
-        done(null, {
-          device,
-          scripts,
-          deletedScripts,
-          screens,
-          deletedScreens,
-          diagnoses,
-          deletedDiagnoses,
-          configKeys,
-          deletedConfigKeys,
-        });
-      })
-      .catch(done);
+      });
+    } catch (e) { done(e); }
   })();
 };

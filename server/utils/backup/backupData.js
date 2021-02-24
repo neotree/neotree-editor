@@ -4,8 +4,7 @@ import { exec } from 'child_process';
 import * as database from '../../database';
 import shouldBackup from './shouldBackup';
 
-export default function backupData(app) {
-  const { io } = app;
+export default function backupData() {
   return new Promise((resolve, reject) => {
     try {
       if (!fs.existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
@@ -94,7 +93,6 @@ export default function backupData(app) {
             rslts = await database.App.update(appInfo, { where: { id: 1 } });
           }
           fs.writeFileSync(`${process.env.BACKUP_DIR_PATH}/app.json`, JSON.stringify(appInfo));
-          io.emit('data_published');
 
           exec(
             `cd ${process.env.BACKUP_DIR_PATH} && git add . && git commit -m v${appInfo.version} && git push origin master`,
