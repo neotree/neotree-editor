@@ -67,12 +67,14 @@ function NavMenu() {
                     color="secondary"
                     disableElevation
                     onClick={async () => {
+                      setLoading(true);
                       try {
                         const res = await fetch('/publish-changes', { method: 'POST' });
                         const { errors } = await res.json();
                         if (errors && errors.length) return alert(JSON.stringify(errors));
                         window.location.reload();
                       } catch (e) { alert(e.message); }
+                      setLoading(false);
                     }}
                   >Publish</Button>
                 </>

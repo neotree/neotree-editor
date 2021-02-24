@@ -53,6 +53,8 @@ const App = () => {
 
   React.useEffect(() => {
     socket.on('data_updated', data => console.log('socket: data_updated', data)); // eslint-disable-line
+    socket.on('data_published', data => console.log('socket: data_published', data)); // eslint-disable-line
+    socket.on('changes_discarded', data => console.log('socket: changes_discarded', data)); // eslint-disable-line
   }, []);
 
   return (
