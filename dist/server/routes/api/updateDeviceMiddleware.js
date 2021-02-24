@@ -43,7 +43,7 @@ module.exports = function () {
 
             case 5:
               device = _context.sent;
-              params.details = _objectSpread(_objectSpread({}, device.details), params.details);
+              params.details = JSON.stringify(_objectSpread(_objectSpread({}, device.details), params.details));
               _context.next = 9;
               return _database.Device.update(params, {
                 where: {
