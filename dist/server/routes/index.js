@@ -97,26 +97,27 @@ module.exports = function (app) {
 
             case 8:
               _shouldBackup = _context2.sent;
+              app.io.emit('data_published');
               res.json({
                 shouldBackup: _shouldBackup,
                 appInfo: appInfo
               });
-              _context2.next = 15;
+              _context2.next = 16;
               break;
 
-            case 12:
-              _context2.prev = 12;
+            case 13:
+              _context2.prev = 13;
               _context2.t0 = _context2["catch"](0);
               res.json({
                 errors: [_context2.t0.message]
               });
 
-            case 15:
+            case 16:
             case "end":
               return _context2.stop();
           }
         }
-      }, _callee2, null, [[0, 12]]);
+      }, _callee2, null, [[0, 13]]);
     }))();
   });
   router.post('/discard-changes', function (req, res) {
@@ -144,26 +145,27 @@ module.exports = function (app) {
 
             case 8:
               _shouldBackup = _context3.sent;
+              app.io.emit('changes_discarded');
               res.json({
                 shouldBackup: _shouldBackup,
                 appInfo: appInfo
               });
-              _context3.next = 15;
+              _context3.next = 16;
               break;
 
-            case 12:
-              _context3.prev = 12;
+            case 13:
+              _context3.prev = 13;
               _context3.t0 = _context3["catch"](0);
               res.json({
                 errors: [_context3.t0.message]
               });
 
-            case 15:
+            case 16:
             case "end":
               return _context3.stop();
           }
         }
-      }, _callee3, null, [[0, 12]]);
+      }, _callee3, null, [[0, 13]]);
     }))();
   });
   router.get('/get-view-mode', function (req, res) {
