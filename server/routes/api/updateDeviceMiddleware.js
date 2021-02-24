@@ -9,8 +9,8 @@ module.exports = () => (req, res, next) => {
 
     try {
       device = await Device.findOne({ where: { device_id } });
-      
-      params.details = { ...device.details, ...params.details };
+
+      params.details = JSON.stringify({ ...device.details, ...params.details });
 
       await Device.update(params, { where: { device_id } });
 
