@@ -8,7 +8,12 @@ module.exports = () => (req, res, next) => {
     let device = null;
 
     try {
+      device = await Device.findOne({ where: { device_id } });
+      
+      params.details = { ...device.details, ...params.details };
+
       await Device.update(params, { where: { device_id } });
+
       device = await Device.findOne({ where: { device_id } });
     } catch (e) { error = e; }
 
