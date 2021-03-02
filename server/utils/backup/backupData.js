@@ -35,12 +35,36 @@ export default function backupData() {
           const hospitals = await database.Hospital.findAll({ where: whereLastUpdated });
           // const files = await database.File.findAll({ where: whereLastUpdated });
 
+          const readDir = dir => new Promise((resolve, reject) => {
+            (async () => {
+              dir = `${process.env.BACKUP_DIR_PATH}/${dir}`;
+
+              try {
+                if (!fs.existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
+
+                const files = await Promise.all(fs.readdirSync(dir).map(fname => new Promise(resolve => {
+                  const data = fs.readFileSync(`${dir}/${fname}`);
+                  resolve(JSON.parse(data));
+                })));
+                resolve(files.sort((a, b) => a.id - b.id));
+              } catch (e) { return reject(e); }
+            })();
+          });
+
           const writeData = (data = [], folder) => data.map(item => new Promise((resolve, reject) => {
-            if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
-            try {
-              fs.writeFileSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`, JSON.stringify(item));
+            (async () => {
+              if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
+              try {
+                fs.writeFileSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`, JSON.stringify(item));
+              } catch (e) { return reject(e); }
+
+              try {
+                const files = await readDir(folder);
+                files.filter(f => f.deletedAt).forEach(f => fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`));
+              } catch (e) { /* DO NOTHING */ }
+
               resolve();
-            } catch (e) { reject(e); }
+            })();
           }));
 
           await Promise.all(Object.assign(
