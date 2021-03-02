@@ -40,10 +40,12 @@ function ScriptEditorForm({ script }) {
           body: JSON.stringify(form),
         });
         res = await res.json();
-        if (res.errors && res.errors.length) {
-          alert(JSON.stringify(res.errors));
+        if (res.errors && res.errors.length) return alert(JSON.stringify(res.errors));
+        if (script) {
+          history.push('/scripts');
         } else {
-          history.push(`/scripts${script ? '' : `/${res.script.script_id}`}`);
+          window.location.href = `/scripts/${res.script.script_id}`;
+          // history.push(`/scripts/${res.script.script_id}`);
           // window.location.reload();
         }
       } catch (e) { alert(`Ooops... ${e.message}`); }
