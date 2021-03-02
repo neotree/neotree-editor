@@ -174,57 +174,67 @@ function backupData() {
               writeData = function writeData() {
                 var data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
                 var folder = arguments.length > 1 ? arguments[1] : undefined;
-                return data.map(function (item) {
-                  return new Promise(function (resolve, reject) {
-                    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-                      var files;
-                      return _regenerator["default"].wrap(function _callee2$(_context2) {
-                        while (1) {
-                          switch (_context2.prev = _context2.next) {
-                            case 0:
-                              if (!_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder))) _fs["default"].mkdirSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder));
-                              _context2.prev = 1;
+                return new Promise(function (resolve, reject) {
+                  (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
+                    var files;
+                    return _regenerator["default"].wrap(function _callee2$(_context2) {
+                      while (1) {
+                        switch (_context2.prev = _context2.next) {
+                          case 0:
+                            _context2.prev = 0;
+                            _context2.next = 3;
+                            return data.map(function (item) {
+                              return new Promise(function (resolve, reject) {
+                                if (!_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder))) _fs["default"].mkdirSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder));
 
-                              _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"), JSON.stringify(item));
+                                try {
+                                  _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"), JSON.stringify(item));
 
-                              _context2.next = 8;
-                              break;
-
-                            case 5:
-                              _context2.prev = 5;
-                              _context2.t0 = _context2["catch"](1);
-                              return _context2.abrupt("return", reject(_context2.t0));
-
-                            case 8:
-                              _context2.prev = 8;
-                              _context2.next = 11;
-                              return readDir(folder);
-
-                            case 11:
-                              files = _context2.sent;
-                              files.filter(function (f) {
-                                return f.deletedAt;
-                              }).forEach(function (f) {
-                                return _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"));
+                                  resolve();
+                                } catch (e) {
+                                  reject(e);
+                                }
                               });
-                              _context2.next = 17;
-                              break;
+                            });
 
-                            case 15:
-                              _context2.prev = 15;
-                              _context2.t1 = _context2["catch"](8);
+                          case 3:
+                            _context2.next = 8;
+                            break;
 
-                            case 17:
-                              resolve();
+                          case 5:
+                            _context2.prev = 5;
+                            _context2.t0 = _context2["catch"](0);
+                            return _context2.abrupt("return", reject(_context2.t0));
 
-                            case 18:
-                            case "end":
-                              return _context2.stop();
-                          }
+                          case 8:
+                            _context2.prev = 8;
+                            _context2.next = 11;
+                            return readDir(folder);
+
+                          case 11:
+                            files = _context2.sent;
+                            files.filter(function (f) {
+                              return f.deletedAt;
+                            }).forEach(function (f) {
+                              return _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"));
+                            });
+                            _context2.next = 17;
+                            break;
+
+                          case 15:
+                            _context2.prev = 15;
+                            _context2.t1 = _context2["catch"](8);
+
+                          case 17:
+                            resolve();
+
+                          case 18:
+                          case "end":
+                            return _context2.stop();
                         }
-                      }, _callee2, null, [[1, 5], [8, 15]]);
-                    }))();
-                  });
+                      }
+                    }, _callee2, null, [[0, 5], [8, 15]]);
+                  }))();
                 });
               };
 
