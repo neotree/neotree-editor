@@ -51,11 +51,16 @@ export default function backupData() {
             })();
           });
 
-          const writeData = (data = [], folder) => data.map(item => new Promise((resolve, reject) => {
+          const writeData = (data = [], folder) => new Promise((resolve, reject) => {
             (async () => {
-              if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
               try {
-                fs.writeFileSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`, JSON.stringify(item));
+                await data.map(item => new Promise((resolve, reject) => {
+                  if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
+                  try {
+                    fs.writeFileSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`, JSON.stringify(item));
+                    resolve();
+                  } catch (e) { reject(e); }
+                }));
               } catch (e) { return reject(e); }
 
               try {
@@ -65,7 +70,7 @@ export default function backupData() {
 
               resolve();
             })();
-          }));
+          });
 
           await Promise.all(Object.assign(
             [],
