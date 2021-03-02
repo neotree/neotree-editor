@@ -46,28 +46,28 @@ function backupData() {
       return reject(e);
     }
 
-    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _shouldBackup, lastBackUpDetails, appInfo, whereLastUpdated, scripts, screens, diagnoses, configKeys, hospitals, writeData, whereLastDeleted, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, deletedHospitals, deleteData, rslts;
+    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
+      var _shouldBackup, lastBackUpDetails, appInfo, whereLastUpdated, scripts, screens, diagnoses, configKeys, hospitals, readDir, writeData, whereLastDeleted, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, deletedHospitals, deleteData, rslts;
 
-      return _regenerator["default"].wrap(function _callee$(_context) {
+      return _regenerator["default"].wrap(function _callee3$(_context3) {
         while (1) {
-          switch (_context.prev = _context.next) {
+          switch (_context3.prev = _context3.next) {
             case 0:
-              _context.prev = 0;
-              _context.next = 3;
+              _context3.prev = 0;
+              _context3.next = 3;
               return (0, _shouldBackup2["default"])();
 
             case 3:
-              _shouldBackup = _context.sent;
+              _shouldBackup = _context3.sent;
 
               if (!_shouldBackup) {
-                _context.next = 65;
+                _context3.next = 66;
                 break;
               }
 
               lastBackUpDetails = _fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/app.json")) ? _fs["default"].readFileSync("".concat(process.env.BACKUP_DIR_PATH, "/app.json")) : JSON.stringify({});
               lastBackUpDetails = JSON.parse(lastBackUpDetails);
-              _context.next = 9;
+              _context3.next = 9;
               return database.App.findOne({
                 where: {
                   id: 1
@@ -76,116 +76,206 @@ function backupData() {
               });
 
             case 9:
-              appInfo = _context.sent;
+              appInfo = _context3.sent;
               appInfo = !appInfo ? null : JSON.parse(JSON.stringify(appInfo));
               appInfo = _objectSpread({}, appInfo);
               whereLastUpdated = !lastBackUpDetails.last_backup_date ? {} : {
                 updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastBackUpDetails.last_backup_date),
                 deletedAt: null
               };
-              _context.next = 15;
+              _context3.next = 15;
               return database.Script.findAll({
                 where: whereLastUpdated
               });
 
             case 15:
-              scripts = _context.sent;
-              _context.next = 18;
+              scripts = _context3.sent;
+              _context3.next = 18;
               return database.Screen.findAll({
                 where: whereLastUpdated
               });
 
             case 18:
-              screens = _context.sent;
-              _context.next = 21;
+              screens = _context3.sent;
+              _context3.next = 21;
               return database.Diagnosis.findAll({
                 where: whereLastUpdated
               });
 
             case 21:
-              diagnoses = _context.sent;
-              _context.next = 24;
+              diagnoses = _context3.sent;
+              _context3.next = 24;
               return database.ConfigKey.findAll({
                 where: whereLastUpdated
               });
 
             case 24:
-              configKeys = _context.sent;
-              _context.next = 27;
+              configKeys = _context3.sent;
+              _context3.next = 27;
               return database.Hospital.findAll({
                 where: whereLastUpdated
               });
 
             case 27:
-              hospitals = _context.sent;
+              hospitals = _context3.sent;
 
               // const files = await database.File.findAll({ where: whereLastUpdated });
+              readDir = function readDir(dir) {
+                return new Promise(function (resolve, reject) {
+                  (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
+                    var files;
+                    return _regenerator["default"].wrap(function _callee$(_context) {
+                      while (1) {
+                        switch (_context.prev = _context.next) {
+                          case 0:
+                            dir = "".concat(process.env.BACKUP_DIR_PATH, "/").concat(dir);
+                            _context.prev = 1;
+
+                            if (_fs["default"].existsSync(process.env.BACKUP_DIR_PATH)) {
+                              _context.next = 4;
+                              break;
+                            }
+
+                            return _context.abrupt("return", reject(new Error('Backup directory not found')));
+
+                          case 4:
+                            _context.next = 6;
+                            return Promise.all(_fs["default"].readdirSync(dir).map(function (fname) {
+                              return new Promise(function (resolve) {
+                                var data = _fs["default"].readFileSync("".concat(dir, "/").concat(fname));
+
+                                resolve(JSON.parse(data));
+                              });
+                            }));
+
+                          case 6:
+                            files = _context.sent;
+                            resolve(files.sort(function (a, b) {
+                              return a.id - b.id;
+                            }));
+                            _context.next = 13;
+                            break;
+
+                          case 10:
+                            _context.prev = 10;
+                            _context.t0 = _context["catch"](1);
+                            return _context.abrupt("return", reject(_context.t0));
+
+                          case 13:
+                          case "end":
+                            return _context.stop();
+                        }
+                      }
+                    }, _callee, null, [[1, 10]]);
+                  }))();
+                });
+              };
+
               writeData = function writeData() {
                 var data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
                 var folder = arguments.length > 1 ? arguments[1] : undefined;
                 return data.map(function (item) {
                   return new Promise(function (resolve, reject) {
-                    if (!_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder))) _fs["default"].mkdirSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder));
+                    (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
+                      var files;
+                      return _regenerator["default"].wrap(function _callee2$(_context2) {
+                        while (1) {
+                          switch (_context2.prev = _context2.next) {
+                            case 0:
+                              if (!_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder))) _fs["default"].mkdirSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder));
+                              _context2.prev = 1;
 
-                    try {
-                      _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"), JSON.stringify(item));
+                              _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"), JSON.stringify(item));
 
-                      resolve();
-                    } catch (e) {
-                      reject(e);
-                    }
+                              _context2.next = 8;
+                              break;
+
+                            case 5:
+                              _context2.prev = 5;
+                              _context2.t0 = _context2["catch"](1);
+                              return _context2.abrupt("return", reject(_context2.t0));
+
+                            case 8:
+                              _context2.prev = 8;
+                              _context2.next = 11;
+                              return readDir(folder);
+
+                            case 11:
+                              files = _context2.sent;
+                              files.filter(function (f) {
+                                return f.deletedAt;
+                              }).forEach(function (f) {
+                                return _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"));
+                              });
+                              _context2.next = 17;
+                              break;
+
+                            case 15:
+                              _context2.prev = 15;
+                              _context2.t1 = _context2["catch"](8);
+
+                            case 17:
+                              resolve();
+
+                            case 18:
+                            case "end":
+                              return _context2.stop();
+                          }
+                        }
+                      }, _callee2, null, [[1, 5], [8, 15]]);
+                    }))();
                   });
                 });
               };
 
-              _context.next = 31;
+              _context3.next = 32;
               return Promise.all(Object.assign([], writeData(scripts, 'scripts'), writeData(screens, 'screens'), writeData(diagnoses, 'diagnoses'), writeData(configKeys, 'configKeys'), writeData(hospitals, 'hospitals') // writeData(files, 'files')
               ));
 
-            case 31:
+            case 32:
               if (!lastBackUpDetails.last_backup_date) {
-                _context.next = 51;
+                _context3.next = 52;
                 break;
               }
 
               whereLastDeleted = {
                 deletedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastBackUpDetails.last_backup_date)
               };
-              _context.next = 35;
+              _context3.next = 36;
               return database.Script.findAll({
                 where: whereLastDeleted
               });
 
-            case 35:
-              deletedScripts = _context.sent;
-              _context.next = 38;
+            case 36:
+              deletedScripts = _context3.sent;
+              _context3.next = 39;
               return database.Screen.findAll({
                 where: whereLastDeleted
               });
 
-            case 38:
-              deletedScreens = _context.sent;
-              _context.next = 41;
+            case 39:
+              deletedScreens = _context3.sent;
+              _context3.next = 42;
               return database.Diagnosis.findAll({
                 where: whereLastDeleted
               });
 
-            case 41:
-              deletedDiagnoses = _context.sent;
-              _context.next = 44;
+            case 42:
+              deletedDiagnoses = _context3.sent;
+              _context3.next = 45;
               return database.ConfigKey.findAll({
                 where: whereLastDeleted
               });
 
-            case 44:
-              deletedConfigKeys = _context.sent;
-              _context.next = 47;
+            case 45:
+              deletedConfigKeys = _context3.sent;
+              _context3.next = 48;
               return database.Hospital.findAll({
                 where: whereLastDeleted
               });
 
-            case 47:
-              deletedHospitals = _context.sent;
+            case 48:
+              deletedHospitals = _context3.sent;
 
               // const deletedFiles = await database.File.findAll({ where: whereLastDeleted });
               deleteData = function deleteData() {
@@ -206,11 +296,11 @@ function backupData() {
                 });
               };
 
-              _context.next = 51;
+              _context3.next = 52;
               return Promise.all(Object.assign([], deleteData(deletedScripts, 'scripts'), deleteData(deletedScreens, 'screens'), deleteData(deletedDiagnoses, 'diagnoses'), deleteData(deletedConfigKeys, 'configKeys'), deleteData(deletedHospitals, 'hospitals') // deleteData(deletedFiles, 'files')
               ));
 
-            case 51:
+            case 52:
               rslts = null;
               appInfo = _objectSpread(_objectSpread({}, appInfo), {}, {
                 last_backup_date: new Date(),
@@ -218,11 +308,11 @@ function backupData() {
               });
 
               if (!(appInfo.id !== 1)) {
-                _context.next = 60;
+                _context3.next = 61;
                 break;
               }
 
-              _context.next = 56;
+              _context3.next = 57;
               return database.App.findOrCreate({
                 where: {
                   id: 1
@@ -230,24 +320,24 @@ function backupData() {
                 defaults: appInfo
               });
 
-            case 56:
-              rslts = _context.sent;
+            case 57:
+              rslts = _context3.sent;
               appInfo = JSON.parse(JSON.stringify(rslts[0]));
-              _context.next = 63;
+              _context3.next = 64;
               break;
 
-            case 60:
-              _context.next = 62;
+            case 61:
+              _context3.next = 63;
               return database.App.update(appInfo, {
                 where: {
                   id: 1
                 }
               });
 
-            case 62:
-              rslts = _context.sent;
-
             case 63:
+              rslts = _context3.sent;
+
+            case 64:
               _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/app.json"), JSON.stringify(appInfo));
 
               (0, _child_process.exec)("cd ".concat(process.env.BACKUP_DIR_PATH, " && git add . && git commit -m v").concat(appInfo.version, " && git push origin master"), function (error, stdout, stderr) {
@@ -264,22 +354,22 @@ function backupData() {
                 console.log("stdout: ".concat(stdout));
               });
 
-            case 65:
+            case 66:
               resolve();
-              _context.next = 71;
+              _context3.next = 72;
               break;
 
-            case 68:
-              _context.prev = 68;
-              _context.t0 = _context["catch"](0);
-              reject(_context.t0);
+            case 69:
+              _context3.prev = 69;
+              _context3.t0 = _context3["catch"](0);
+              reject(_context3.t0);
 
-            case 71:
+            case 72:
             case "end":
-              return _context.stop();
+              return _context3.stop();
           }
         }
-      }, _callee, null, [[0, 68]]);
+      }, _callee3, null, [[0, 69]]);
     }))();
   });
 }
