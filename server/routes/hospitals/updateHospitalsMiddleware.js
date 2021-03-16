@@ -1,22 +1,22 @@
-import { updateHospital } from './updateHospitalMiddleware';
+import { Hospital } from '../../database';
 
-module.exports = (app) => (req, res, next) => {
+module.exports = () => (req, res, next) => {
   (async () => {
     const { hospitals } = req.body;
 
-    const done = (err, updatedHospitals) => {
+    const done = (err, rslts = []) => {
       if (err) {
         res.locals.setResponse(err);
         return next();
       }
-      app.io.emit('update_config_keys', { key: app.getRandomString(), hospitals: hospitals.map(s => ({ hospitalId: s.hospitalId })) });
-      res.locals.setResponse(null, { updatedHospitals });
+      res.locals.setResponse(null, { updatedHospitals: rslts.map(rslt => rslt[1]) });
       next();
     };
 
-    let updatedHospitals = [];
-    try { updatedHospitals = await Promise.all(hospitals.map(s => updateHospital(s))); } catch (e) { return done(e); }
-
-    done(null, updatedHospitals);
+    try {
+      const updatedHospitals = await Promise.all(hospitals.map(({ id, ...payload }) =>
+        Hospital.update(payload, { where: { id }, returning: true, plain: true, })));
+      done(null, updatedHospitals);
+    } catch (e) { return done(e); }
   })();
 };

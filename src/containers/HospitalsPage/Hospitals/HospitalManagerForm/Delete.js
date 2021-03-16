@@ -57,11 +57,11 @@ const Delete = ({ hospital, updateState, disabled }) => {
             color="secondary"
             onClick={() => {
               setLoading(true);
-              api.deleteHospitals({ hospitals: [{ hospitalId: hospital.hospitalId }] })
+              api.deleteHospitals({ hospitals: [{ id: hospital.id }] })
                 .then(() => {
                   setLoading(false);
                   setOpenConfirmDialog(false);
-                  updateState(({ hospitals }) => ({ hospitals: hospitals.filter(u => u.hospitalId !== hospital.hospitalId) }));
+                  updateState(({ hospitals }) => ({ hospitals: hospitals.filter(u => u.id !== hospital.id) }));
                 })
                 .catch(err => {
                   setLoading(false);

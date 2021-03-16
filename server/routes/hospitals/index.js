@@ -19,24 +19,40 @@ module.exports = app => {
   router.post(
     endpoints.ADD_HOSPITAL,
     require('./addHospitalMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_HOSPITAL,
     require('./updateHospitalMiddleware').default(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.UPDATE_HOSPITALS,
     require('./updateHospitalsMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 
   router.post(
     endpoints.DELETE_HOSPITALS,
     require('./deleteHospitalsMiddleware')(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
     require('../../utils/responseMiddleware')
   );
 

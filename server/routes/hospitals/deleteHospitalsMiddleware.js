@@ -1,45 +1,19 @@
-import firebase from '../../firebase';
+import { Hospital } from '../../database/models';
 
-export const deleteHospital = ({ hospitalId: id }, deleteAssociatedData) => new Promise((resolve, reject) => {
+module.exports = () => (req, res, next) => {
   (async () => {
-    if (!id) return reject(new Error('Required hospital "id" is not provided.'));
-
-    let hospital = null;
-    try {
-      hospital = await new Promise((resolve) => {
-        firebase.database()
-          .ref(`hospitals/${id}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-    } catch (e) { /* Do nothing */ }
-
-    try { await firebase.database().ref(`hospitals/${id}`).remove(); } catch (e) { return reject(e); }
-
-    if (deleteAssociatedData === false) return resolve(hospital);
-
-    try { await firebase.database().ref(`screens/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    try { await firebase.database().ref(`diagnosis/${id}`).remove(); } catch (e) { /* do nothing */ }
-
-    resolve(hospital);
-  })();
-});
-
-module.exports = (app) => (req, res, next) => {
-  (async () => {
-    const { hospitals, deleteAssociatedData, } = req.body;
+    const { hospitals, } = req.body;
 
     const done = (err, rslts = []) => {
-      if (rslts.length) app.io.emit('delete_config_keys', { key: app.getRandomString(), hospitals });
       res.locals.setResponse(err, { hospitals: rslts });
       next();
     };
 
-    let rslts = [];
-    try {
-      rslts = await Promise.all(hospitals.map(s => deleteHospital(s, deleteAssociatedData)));
-    } catch (e) { return done(e); }
+    const deletedAt = new Date();
 
-    done(null, rslts);
+    try {
+      const rslts = await Hospital.update({ deletedAt }, { where: { id: hospitals.map(s => s.id) } });
+      done(null, rslts);
+    } catch (e) { return done(e); }
   })();
 };
