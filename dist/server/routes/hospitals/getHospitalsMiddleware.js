@@ -6,7 +6,7 @@ var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"))
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _database = require("../../database");
 
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
@@ -27,39 +27,31 @@ module.exports = function () {
                 next();
               };
 
-              hospitals = {};
-              _context.prev = 2;
-              _context.next = 5;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref('hospitals').on('value', function (snap) {
-                  return resolve(snap.val());
-                });
+              _context.prev = 1;
+              _context.next = 4;
+              return _database.Hospital.findAll({
+                where: {
+                  deletedAt: null
+                }
               });
 
-            case 5:
+            case 4:
               hospitals = _context.sent;
-              hospitals = hospitals || {};
-              _context.next = 12;
+              done(null, hospitals || []);
+              _context.next = 11;
               break;
 
-            case 9:
-              _context.prev = 9;
-              _context.t0 = _context["catch"](2);
+            case 8:
+              _context.prev = 8;
+              _context.t0 = _context["catch"](1);
               return _context.abrupt("return", done(_context.t0));
 
-            case 12:
-              done(null, Object.keys(hospitals).map(function (key) {
-                return hospitals[key];
-              }).sort(function (a, b) {
-                return a.position - b.position;
-              }));
-
-            case 13:
+            case 11:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[2, 9]]);
+      }, _callee, null, [[1, 8]]);
     }))();
   };
 };
