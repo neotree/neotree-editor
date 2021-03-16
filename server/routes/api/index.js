@@ -37,6 +37,13 @@ module.exports = app => {
   );
 
   router.get(
+    '/get-hospitals',
+    apiKeyAuthenticator(app),
+    require('./getHospitalsMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
     '/get-scripts',
     apiKeyAuthenticator(app),
     require('./getScriptsMiddleware')(app),
