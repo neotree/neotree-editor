@@ -39,7 +39,7 @@ const isProd = process.env.NODE_ENV === 'production';
   } catch (e) { console.log(e); }
 
   // firebase
-  try { await syncFirebase(); } catch (e) { console.log(e); }
+  // try { await syncFirebase(); } catch (e) { console.log(e); }
 
   //body-parser
   const bodyParser = require('body-parser');
