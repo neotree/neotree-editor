@@ -103,20 +103,8 @@ var isProd = process.env.NODE_ENV === 'production';
           console.log(_context.t1);
 
         case 32:
-          _context.prev = 32;
-          _context.next = 35;
-          return (0, _sync["default"])();
-
-        case 35:
-          _context.next = 40;
-          break;
-
-        case 37:
-          _context.prev = 37;
-          _context.t2 = _context["catch"](32);
-          console.log(_context.t2);
-
-        case 40:
+          // firebase
+          // try { await syncFirebase(); } catch (e) { console.log(e); }
           //body-parser
           bodyParser = require('body-parser');
           app.use(bodyParser.json());
@@ -168,12 +156,12 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 54:
+        case 46:
         case "end":
           return _context.stop();
       }
     }
-  }, _callee, null, [[8, 15], [20, 29], [32, 37]]);
+  }, _callee, null, [[8, 15], [20, 29]]);
 }))();
 ;
 

@@ -8,6 +8,8 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
+var _database = require("../../database");
+
 var _firebase = _interopRequireDefault(require("../../firebase"));
 
 function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
@@ -21,7 +23,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var payload, done, hospitalId, snap, hospitals, hospital;
+      var payload, done, snap, hospital_id, hospital;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -35,72 +37,35 @@ module.exports = function () {
                 next();
               };
 
-              hospitalId = null;
-              _context.prev = 3;
-              _context.next = 6;
-              return _firebase["default"].database().ref('hospitals').push();
+              _context.prev = 2;
+              _context.next = 5;
+              return _firebase["default"].database().ref('configKeys').push();
 
-            case 6:
+            case 5:
               snap = _context.sent;
-              hospitalId = snap.key;
-              _context.next = 13;
-              break;
+              hospital_id = snap.key;
+              _context.next = 9;
+              return _database.Hospital.create(_objectSpread(_objectSpread({}, payload), {}, {
+                hospital_id: hospital_id
+              }));
 
-            case 10:
-              _context.prev = 10;
-              _context.t0 = _context["catch"](3);
-              return _context.abrupt("return", done(_context.t0));
+            case 9:
+              hospital = _context.sent;
+              done(null, hospital);
+              _context.next = 16;
+              break;
 
             case 13:
-              hospitals = {};
-              _context.prev = 14;
-              _context.next = 17;
-              return new Promise(function (resolve) {
-                _firebase["default"].database().ref('hospitals').on('value', function (snap) {
-                  return resolve(snap.val());
-                });
-              });
+              _context.prev = 13;
+              _context.t0 = _context["catch"](2);
+              return _context.abrupt("return", done(_context.t0));
 
-            case 17:
-              hospitals = _context.sent;
-              hospitals = hospitals || {};
-              _context.next = 23;
-              break;
-
-            case 21:
-              _context.prev = 21;
-              _context.t1 = _context["catch"](14);
-
-            case 23:
-              hospital = _objectSpread(_objectSpread({}, payload), {}, {
-                hospitalId: hospitalId,
-                id: hospitalId,
-                position: Object.keys(hospitals).length + 1,
-                createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
-                updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
-              });
-              _context.prev = 24;
-              _context.next = 27;
-              return _firebase["default"].database().ref("hospitals/".concat(hospitalId)).set(hospital);
-
-            case 27:
-              _context.next = 32;
-              break;
-
-            case 29:
-              _context.prev = 29;
-              _context.t2 = _context["catch"](24);
-              return _context.abrupt("return", done(_context.t2));
-
-            case 32:
-              done(null, hospital);
-
-            case 33:
+            case 16:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 21], [24, 29]]);
+      }, _callee, null, [[2, 13]]);
     }))();
   };
 };
