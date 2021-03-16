@@ -23,6 +23,7 @@ module.exports = function (app) {
   router.post('/generate-key', require('./generateApiKeyMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-config-keys', (0, _apiKeyAuthenticator["default"])(app), require('./getConfigKeysMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-config-key', (0, _apiKeyAuthenticator["default"])(app), require('./getConfigKeyMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.get('/get-hospitals', (0, _apiKeyAuthenticator["default"])(app), require('./getHospitalsMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-scripts', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptsMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-script', (0, _apiKeyAuthenticator["default"])(app), require('./getScriptMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-screens', (0, _apiKeyAuthenticator["default"])(app), require('./getScreensMiddleware')(app), require('../../utils/responseMiddleware'));
