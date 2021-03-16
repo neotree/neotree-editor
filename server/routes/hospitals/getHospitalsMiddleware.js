@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { Hospital } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -7,19 +7,9 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let hospitals = {};
     try {
-      hospitals = await new Promise((resolve) => {
-        firebase.database()
-          .ref('hospitals')
-          .on('value', snap => resolve(snap.val()));
-      });
-      hospitals = hospitals || {};
+      const hospitals = await Hospital.findAll({ where: { deletedAt: null } });
+      done(null, hospitals || []);
     } catch (e) { return done(e); }
-
-    done(
-      null,
-      Object.keys(hospitals).map(key => hospitals[key]).sort((a, b) => a.position - b.position)
-    );
   })();
 };
