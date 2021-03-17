@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next();
   };
 
-  Hospital.findAll({ where: { ...payload } })
+  Hospital.findAll({ where: { deletedAt: null, ...payload } })
     .then(hospitals => done(null, { hospitals }))
     .catch(done);
 };
