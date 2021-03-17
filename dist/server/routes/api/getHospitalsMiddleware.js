@@ -24,7 +24,9 @@ module.exports = function () {
     };
 
     _database.Hospital.findAll({
-      where: _objectSpread({}, payload)
+      where: _objectSpread({
+        deletedAt: null
+      }, payload)
     }).then(function (hospitals) {
       return done(null, {
         hospitals: hospitals
