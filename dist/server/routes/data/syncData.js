@@ -25,13 +25,13 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var _req$query, _lastSyncDate, deviceId, scriptsCount, lastSyncDate, done, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, whereLastSyncDateGreaterThanLastUpdated, whereLastSyncDateGreaterThanLastDeleted;
+      var _req$query, _lastSyncDate, deviceId, scriptsCount, mode, lastSyncDate, done, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, whereLastSyncDateGreaterThanLastUpdated, whereLastSyncDateGreaterThanLastDeleted;
 
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
             case 0:
-              _req$query = req.query, _lastSyncDate = _req$query.lastSyncDate, deviceId = _req$query.deviceId, scriptsCount = _req$query.scriptsCount;
+              _req$query = req.query, _lastSyncDate = _req$query.lastSyncDate, deviceId = _req$query.deviceId, scriptsCount = _req$query.scriptsCount, mode = _req$query.mode;
               lastSyncDate = _lastSyncDate ? new Date(_lastSyncDate).getTime() : null;
 
               done = function done(e, payload) {
@@ -120,7 +120,7 @@ module.exports = function () {
               deletedConfigKeys = [];
               backUpFolderExists = _fs["default"].existsSync(process.env.BACKUP_DIR_PATH);
 
-              if (!(backUpFolderExists && !lastSyncDate)) {
+              if (!(backUpFolderExists && mode === 'production')) {
                 _context2.next = 56;
                 break;
               }

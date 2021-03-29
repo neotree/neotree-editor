@@ -4,7 +4,7 @@ import { Script, Screen, ConfigKey, Diagnosis, Device, } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
-    const { lastSyncDate: _lastSyncDate, deviceId, scriptsCount, } = req.query;
+    const { lastSyncDate: _lastSyncDate, deviceId, scriptsCount, mode, } = req.query;
     const lastSyncDate = _lastSyncDate ? new Date(_lastSyncDate).getTime() : null;
 
     const done = (e, payload) => {
@@ -27,7 +27,7 @@ module.exports = () => (req, res, next) => {
     try {
       let scripts = [];
       let screens = [];
-      let diagnoses =  [];
+      let diagnoses = [];
       let configKeys = [];
       let deletedScripts = [];
       let deletedScreens = [];
@@ -36,7 +36,7 @@ module.exports = () => (req, res, next) => {
 
       const backUpFolderExists = fs.existsSync(process.env.BACKUP_DIR_PATH);
 
-      if (backUpFolderExists && !lastSyncDate) {
+      if (backUpFolderExists && (mode === 'production')) {
         const readDir = dir => new Promise((resolve, reject) => {
           (async () => {
             dir = `${process.env.BACKUP_DIR_PATH}/${dir}`;
