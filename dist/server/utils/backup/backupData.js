@@ -216,7 +216,9 @@ function backupData() {
                             files.filter(function (f) {
                               return f.deletedAt;
                             }).forEach(function (f) {
-                              return _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"));
+                              if (_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"))) {
+                                _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(f.id, ".json"));
+                              }
                             });
                             _context2.next = 17;
                             break;
@@ -296,7 +298,9 @@ function backupData() {
                     if (!_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder))) _fs["default"].mkdirSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder));
 
                     try {
-                      _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"));
+                      if (_fs["default"].existsSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"))) {
+                        _fs["default"].unlinkSync("".concat(process.env.BACKUP_DIR_PATH, "/").concat(folder, "/").concat(item.id, ".json"));
+                      }
 
                       resolve();
                     } catch (e) {

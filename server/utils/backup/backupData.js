@@ -65,7 +65,11 @@ export default function backupData() {
 
               try {
                 const files = await readDir(folder);
-                files.filter(f => f.deletedAt).forEach(f => fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`));
+                files.filter(f => f.deletedAt).forEach(f => {
+                  if (fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`)) {
+                    fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`);
+                  }
+                });
               } catch (e) { /* DO NOTHING */ }
 
               resolve();
@@ -94,7 +98,9 @@ export default function backupData() {
             const deleteData = (data = [], folder) => data.map(item => new Promise((resolve, reject) => {
               if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
               try {
-                fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`);
+                if (fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`)) {
+                  fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${item.id}.json`);
+                }
                 resolve();
               } catch (e) { reject(e); }
             }));
