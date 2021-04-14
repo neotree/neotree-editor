@@ -113,42 +113,38 @@ function DiagnosisEditor({ diagnosis, script }) {
           </div>
           <br /><br />
 
-          {!diagnosis ? null : (
-            <>
-              <TitleTextImageForm
-                noTitle
-                labels={{ text: 'Text 1', image: 'Image 1', }}
-                value={{ text: form.text1, image: form.image1, }}
-                onChange={({ text, image }) => setForm({
-                  text1: text,
-                  image1: image,
-                })}
-              />
-              <br /><br />
+          <TitleTextImageForm
+            noTitle
+            labels={{ text: 'Text 1', image: 'Image 1', }}
+            value={{ text: form.text1, image: form.image1, }}
+            onChange={({ text, image }) => setForm({
+              text1: text,
+              image1: image,
+            })}
+          />
+          <br /><br />
 
-              <TitleTextImageForm
-                noTitle
-                labels={{ text: 'Text 2', image: 'Image 2', }}
-                value={{ text: form.text2, image: form.image2, }}
-                onChange={({ text, image }) => setForm({
-                  text2: text,
-                  image2: image,
-                })}
-              />
-              <br /><br />
+          <TitleTextImageForm
+            noTitle
+            labels={{ text: 'Text 2', image: 'Image 2', }}
+            value={{ text: form.text2, image: form.image2, }}
+            onChange={({ text, image }) => setForm({
+              text2: text,
+              image2: image,
+            })}
+          />
+          <br /><br />
 
-              <TitleTextImageForm
-                noTitle
-                labels={{ text: 'Text 3', image: 'Image 3', }}
-                value={{ text: form.text3, image: form.image3, }}
-                onChange={({ text, image }) => setForm({
-                  text3: text,
-                  image3: image,
-                })}
-              />
-              <br /><br />
-            </>
-          )}
+          <TitleTextImageForm
+            noTitle
+            labels={{ text: 'Text 3', image: 'Image 3', }}
+            value={{ text: form.text3, image: form.image3, }}
+            onChange={({ text, image }) => setForm({
+              text3: text,
+              image3: image,
+            })}
+          />
+          <br /><br />
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
