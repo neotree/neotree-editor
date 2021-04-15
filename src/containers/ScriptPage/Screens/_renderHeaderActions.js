@@ -16,7 +16,7 @@ function Actions({ selected }) {
       {selected.length > 0 && (
         <>
           <CopyScreens 
-            items={selected.map(({ row }) => ({ screenId: row.screenId, scriptId: row.scriptId, }))}
+            items={selected.map(({ row }) => ({ screenId: row.screenId, scriptId: row.scriptId, id: row.id, }))}
           >
             <Button>Copy</Button>
           </CopyScreens>
