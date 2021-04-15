@@ -15,7 +15,7 @@ function Actions({ selected }) {
     <>
       {selected.length > 0 && (
         <>
-          <CopyDiagnoses diagnoses={selected.map(({ row }) => ({ diagnosisId: row.diagnosisId, scriptId: row.scriptId }))}>
+          <CopyDiagnoses items={selected.map(({ row }) => ({ diagnosisId: row.diagnosisId, scriptId: row.scriptId, id: row.id, }))}>
             <Button>Copy</Button>
           </CopyDiagnoses>
         </>
