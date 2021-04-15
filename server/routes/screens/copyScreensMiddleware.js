@@ -26,6 +26,8 @@ module.exports = () => (req, res, next) => {
       screens = screens.map((s, i) => {
         s = JSON.parse(JSON.stringify(s));
         delete s.id;
+        delete s.createdAt;
+        delete s.updatedAt;
         return {
           ...s,
           screen_id: snaps[i].key,
@@ -34,6 +36,7 @@ module.exports = () => (req, res, next) => {
           data: JSON.stringify({
             ...s.data,
             scriptId,
+            script_id: scriptId,
             screenId: snaps[i].key,
             position: screensCount + 1,
             createdAt: firebase.database.ServerValue.TIMESTAMP,
@@ -45,7 +48,10 @@ module.exports = () => (req, res, next) => {
 
     try {
       const rslts = await Promise.all(screens.map(screen => {
-        return Screen.findOrCreate({ where: { screen_id: screen.screen_id }, defaults: { ...screen } });
+        return Screen.findOrCreate({
+          where: { screen_id: screen.screen_id },
+          defaults: { ...screen, createdAt: new Date(), updatedAt: new Date(), }
+        });
       }));
       screens = rslts.map(rslt => {
         const { data, ...screen } = JSON.parse(JSON.stringify(rslt[0]));

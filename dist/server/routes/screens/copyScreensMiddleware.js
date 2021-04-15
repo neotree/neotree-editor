@@ -95,12 +95,15 @@ module.exports = function () {
               screens = screens.map(function (s, i) {
                 s = JSON.parse(JSON.stringify(s));
                 delete s.id;
+                delete s.createdAt;
+                delete s.updatedAt;
                 return _objectSpread(_objectSpread({}, s), {}, {
                   screen_id: snaps[i].key,
                   script_id: scriptId,
                   position: screensCount + 1,
                   data: JSON.stringify(_objectSpread(_objectSpread({}, s.data), {}, {
                     scriptId: scriptId,
+                    script_id: scriptId,
                     screenId: snaps[i].key,
                     position: screensCount + 1,
                     createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
@@ -124,7 +127,10 @@ module.exports = function () {
                   where: {
                     screen_id: screen.screen_id
                   },
-                  defaults: _objectSpread({}, screen)
+                  defaults: _objectSpread(_objectSpread({}, screen), {}, {
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                  })
                 });
               }));
 

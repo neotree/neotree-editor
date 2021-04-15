@@ -92,15 +92,18 @@ module.exports = function () {
 
             case 25:
               diagnoses = _context.sent;
-              diagnoses = diagnoses.map(function (s, i) {
-                s = JSON.parse(JSON.stringify(s));
-                delete s.id;
-                return _objectSpread(_objectSpread({}, s), {}, {
+              diagnoses = diagnoses.map(function (d, i) {
+                d = JSON.parse(JSON.stringify(d));
+                delete d.id;
+                delete d.createdAt;
+                delete d.updatedAt;
+                return _objectSpread(_objectSpread({}, d), {}, {
                   diagnosis_id: snaps[i].key,
                   script_id: scriptId,
                   position: diagnosesCount + 1,
-                  data: JSON.stringify(_objectSpread(_objectSpread({}, s.data), {}, {
+                  data: JSON.stringify(_objectSpread(_objectSpread({}, d.data), {}, {
                     scriptId: scriptId,
+                    script_id: scriptId,
                     diagnosisId: snaps[i].key,
                     position: diagnosesCount + 1,
                     createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
