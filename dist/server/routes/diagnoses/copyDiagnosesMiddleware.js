@@ -4,9 +4,9 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
-
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
@@ -92,19 +92,24 @@ module.exports = function () {
 
             case 25:
               diagnoses = _context.sent;
-              diagnoses = diagnoses.map(function (d, i) {
-                d = JSON.parse(JSON.stringify(d));
-                delete d.id;
-                delete d.createdAt;
-                delete d.updatedAt;
+              diagnoses = diagnoses.map(function (dignosis, i) {
+                var _JSON$parse = JSON.parse(JSON.stringify(dignosis)),
+                    id = _JSON$parse.id,
+                    createdAt = _JSON$parse.createdAt,
+                    updatedAt = _JSON$parse.updatedAt,
+                    data = _JSON$parse.data,
+                    d = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "createdAt", "updatedAt", "data"]); // eslint-disable-line
+
+
                 return _objectSpread(_objectSpread({}, d), {}, {
                   diagnosis_id: snaps[i].key,
                   script_id: scriptId,
                   position: diagnosesCount + 1,
-                  data: JSON.stringify(_objectSpread(_objectSpread({}, d.data), {}, {
+                  data: JSON.stringify(_objectSpread(_objectSpread({}, data), {}, {
                     scriptId: scriptId,
                     script_id: scriptId,
                     diagnosisId: snaps[i].key,
+                    diagnosis_id: snaps[i].key,
                     position: diagnosesCount + 1,
                     createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
                     updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
@@ -134,9 +139,9 @@ module.exports = function () {
             case 35:
               rslts = _context.sent;
               diagnoses = rslts.map(function (rslt) {
-                var _JSON$parse = JSON.parse(JSON.stringify(rslt[0])),
-                    data = _JSON$parse.data,
-                    diagnosis = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                var _JSON$parse2 = JSON.parse(JSON.stringify(rslt[0])),
+                    data = _JSON$parse2.data,
+                    diagnosis = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["data"]);
 
                 return _objectSpread(_objectSpread({}, data), diagnosis);
               });

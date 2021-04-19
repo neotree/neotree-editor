@@ -23,20 +23,18 @@ module.exports = () => (req, res, next) => {
     let screens = [];
     try {
       screens = await Screen.findAll({ where: { id: items.map(s => s.id) } });
-      screens = screens.map((s, i) => {
-        s = JSON.parse(JSON.stringify(s));
-        delete s.id;
-        delete s.createdAt;
-        delete s.updatedAt;
+      screens = screens.map((screen, i) => {
+        const { id, createdAt, updatedAt, data, ...s } = JSON.parse(JSON.stringify(screen)); // eslint-disable-line
         return {
           ...s,
           screen_id: snaps[i].key,
           script_id: scriptId,
           position: screensCount + 1,
           data: JSON.stringify({
-            ...s.data,
+            ...data,
             scriptId,
             script_id: scriptId,
+            screen_id: snaps[i].key,
             screenId: snaps[i].key,
             position: screensCount + 1,
             createdAt: firebase.database.ServerValue.TIMESTAMP,
