@@ -4,9 +4,9 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
-
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
+
+var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
@@ -92,18 +92,23 @@ module.exports = function () {
 
             case 25:
               screens = _context.sent;
-              screens = screens.map(function (s, i) {
-                s = JSON.parse(JSON.stringify(s));
-                delete s.id;
-                delete s.createdAt;
-                delete s.updatedAt;
+              screens = screens.map(function (screen, i) {
+                var _JSON$parse = JSON.parse(JSON.stringify(screen)),
+                    id = _JSON$parse.id,
+                    createdAt = _JSON$parse.createdAt,
+                    updatedAt = _JSON$parse.updatedAt,
+                    data = _JSON$parse.data,
+                    s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "createdAt", "updatedAt", "data"]); // eslint-disable-line
+
+
                 return _objectSpread(_objectSpread({}, s), {}, {
                   screen_id: snaps[i].key,
                   script_id: scriptId,
                   position: screensCount + 1,
-                  data: JSON.stringify(_objectSpread(_objectSpread({}, s.data), {}, {
+                  data: JSON.stringify(_objectSpread(_objectSpread({}, data), {}, {
                     scriptId: scriptId,
                     script_id: scriptId,
+                    screen_id: snaps[i].key,
                     screenId: snaps[i].key,
                     position: screensCount + 1,
                     createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
@@ -137,9 +142,9 @@ module.exports = function () {
             case 35:
               rslts = _context.sent;
               screens = rslts.map(function (rslt) {
-                var _JSON$parse = JSON.parse(JSON.stringify(rslt[0])),
-                    data = _JSON$parse.data,
-                    screen = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                var _JSON$parse2 = JSON.parse(JSON.stringify(rslt[0])),
+                    data = _JSON$parse2.data,
+                    screen = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["data"]);
 
                 return _objectSpread(_objectSpread({}, data), screen);
               });

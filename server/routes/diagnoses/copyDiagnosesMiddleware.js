@@ -23,21 +23,19 @@ module.exports = () => (req, res, next) => {
     let diagnoses = [];
     try {
       diagnoses = await Diagnosis.findAll({ where: { id: items.map(s => s.id) } });
-      diagnoses = diagnoses.map((d, i) => {
-        d = JSON.parse(JSON.stringify(d));
-        delete d.id;
-        delete d.createdAt;
-        delete d.updatedAt;
+      diagnoses = diagnoses.map((dignosis, i) => {
+        const { id, createdAt, updatedAt, data, ...d } = JSON.parse(JSON.stringify(dignosis)); // eslint-disable-line
         return {
           ...d,
           diagnosis_id: snaps[i].key,
           script_id: scriptId,
           position: diagnosesCount + 1,
           data: JSON.stringify({
-            ...d.data,
+            ...data,
             scriptId,
             script_id: scriptId,
             diagnosisId: snaps[i].key,
+            diagnosis_id: snaps[i].key,
             position: diagnosesCount + 1,
             createdAt: firebase.database.ServerValue.TIMESTAMP,
             updatedAt: firebase.database.ServerValue.TIMESTAMP,
