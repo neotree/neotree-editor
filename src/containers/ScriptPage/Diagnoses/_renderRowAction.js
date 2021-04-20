@@ -38,7 +38,7 @@ function Action({ row, }) {
         {viewMode === 'view' ? null : (
           <MenuItem
             onClick={handleClose}
-            items={[row]}
+            items={[{ diagnosisId: row.diagnosisId, scriptId: row.scriptId, id: row.id, }]}
             component={CopyDiagnoses}
           >Copy</MenuItem>
         )}
