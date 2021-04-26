@@ -10,15 +10,15 @@ module.exports = () => (req, res, next) => {
     try {
       device = await Device.findOne({ where: { device_id } });
 
-      let details = null;
-      if (device && (typeof device.details === 'string')) details = JSON.parse(device.details);
-
-      params.details = JSON.stringify({ ...details, ...params.details });
-
-      await Device.update(params, { where: { device_id } });
-
-      device = await Device.findOne({ where: { device_id } });
-    } catch (e) { error = e; }
+      // let details = null;
+      // if (device && (typeof device.details === 'string')) details = JSON.parse(device.details);
+      //
+      // params.details = JSON.stringify({ ...details, ...params.details });
+      //
+      // await Device.update(params, { where: { device_id } });
+      //
+      // device = await Device.findOne({ where: { device_id } });
+    } catch (e) { error = new Error(`Failed to update device ${e.message}`); }
 
     res.locals.setResponse(error, { device });
     next();
