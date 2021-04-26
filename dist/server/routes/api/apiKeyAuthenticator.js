@@ -8,7 +8,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 
 module.exports = function () {
   return function (req, res, next) {
-    var key = req.headers['x-api-key'] || req.query.apiKey || req.body.apiKey;
+    var key = req.headers['x-api-key'] || (req.query || {}).apiKey || (req.body || {}).apiKey;
 
     var done = function done(e, apiKey) {
       res.locals.setResponse(e, !apiKey ? null : {
