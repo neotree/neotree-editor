@@ -16,18 +16,14 @@ module.exports = function () {
       });
 
       if (e || !apiKey) {
-        e = e || {
-          msg: 'Invalid api key'
-        };
+        e = e || new Error('Invalid api key');
         return require('../../utils/responseMiddleware')(req, res, next);
       }
 
       next();
     };
 
-    if (!key) return done({
-      msg: 'Api key not provided'
-    });
+    if (!key) return done(new Error('Api key not provided'));
 
     _database.ApiKey.findOne({
       where: {

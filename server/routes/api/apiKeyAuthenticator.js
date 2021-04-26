@@ -6,13 +6,13 @@ module.exports = () => (req, res, next) => {
   const done = (e, apiKey) => {
     res.locals.setResponse(e, !apiKey ? null : { apiKey });
     if (e || !apiKey) {
-      e = e || { msg: 'Invalid api key' };
+      e = e || new Error('Invalid api key');
       return require('../../utils/responseMiddleware')(req, res, next);
     }
     next();
   };
 
-  if (!key) return done({ msg: 'Api key not provided' });
+  if (!key) return done(new Error('Api key not provided'));
 
   ApiKey.findOne({ where: { key } })
     .then(apiKey => done(null, apiKey))
