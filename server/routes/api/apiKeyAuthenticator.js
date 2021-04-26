@@ -1,7 +1,7 @@
 import { ApiKey } from '../../database';
 
 module.exports = () => (req, res, next) => {
-  const key = req.headers['x-api-key'] || req.query.apiKey || req.body.apiKey;
+  const key = req.headers['x-api-key'] || (req.query || {}).apiKey || (req.body || {}).apiKey;
 
   const done = (e, apiKey) => {
     res.locals.setResponse(e, !apiKey ? null : { apiKey });
