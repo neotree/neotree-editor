@@ -26,7 +26,7 @@ module.exports = function () {
         device_id = _req$body.deviceId,
         params = (0, _objectWithoutProperties2["default"])(_req$body, ["deviceId"]);
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var error, device;
+      var error, device, details;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -43,44 +43,46 @@ module.exports = function () {
 
             case 5:
               device = _context.sent;
-              params.details = JSON.stringify(_objectSpread(_objectSpread({}, device.details), params.details));
-              _context.next = 9;
+              details = null;
+              if (device && typeof device.details === 'string') details = JSON.parse(device.details);
+              params.details = JSON.stringify(_objectSpread(_objectSpread({}, details), params.details));
+              _context.next = 11;
               return _database.Device.update(params, {
                 where: {
                   device_id: device_id
                 }
               });
 
-            case 9:
-              _context.next = 11;
+            case 11:
+              _context.next = 13;
               return _database.Device.findOne({
                 where: {
                   device_id: device_id
                 }
               });
 
-            case 11:
+            case 13:
               device = _context.sent;
-              _context.next = 17;
+              _context.next = 19;
               break;
 
-            case 14:
-              _context.prev = 14;
+            case 16:
+              _context.prev = 16;
               _context.t0 = _context["catch"](2);
               error = _context.t0;
 
-            case 17:
+            case 19:
               res.locals.setResponse(error, {
                 device: device
               });
               next();
 
-            case 19:
+            case 21:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[2, 14]]);
+      }, _callee, null, [[2, 16]]);
     }))();
   };
 };
