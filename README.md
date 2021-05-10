@@ -24,3 +24,40 @@ App designed for managing neonatal patients in low resource settings, providing 
 * `npm run dist` - run production server
 * `npm run prod-server` - run production server (looks for config files prefixed `NEOTREE_PRODUCTION_`)
 * `npm run stage-server` - run production (stage) server (looks for config files prefixed `NEOTREE_STAGE_`)
+
+
+# Server setup
+
+## Git
+
+**Clone project**
+
+## Set NODE_ENV
+`sudo nano /etc/enviroment`
+
+Paste `NODE_ENV="production"` and save.
+ 
+`source /etc/enviroment`
+
+## Postgres
+
+## NodeJS
+Install nodejs https://www.digitalocean.com/community/tutorials/how-to-set-up-a-node-js-application-for-production-on-debian-10
+ 
+Replace 14.x with your preferred version string (if different).
+
+`cd ~`
+
+`curl -sL https://deb.nodesource.com/setup_14.x -o nodesource_setup.sh`
+
+`sudo bash nodesource_setup.sh`
+
+`sudo apt install nodejs`
+ 
+## Install pm2
+`sudo npm install pm2 -g`
+
+`sudo pm2 startup`
+
+## Nginx
+Install nginx https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-ubuntu-20-04
