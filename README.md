@@ -21,10 +21,10 @@ App designed for managing neonatal patients in low resource settings, providing 
 * `npm install` - install dependencies
 * `npm start` - run development server
 * `npm run build` - build app for deployment
-* `npm run dist` - run production server
-* `npm run prod-server` - run production server (looks for config files prefixed `NEOTREE_PRODUCTION_`)
-* `npm run stage-server` - run production (stage) server (looks for config files prefixed `NEOTREE_STAGE_`)
+* `npm run prod-server` - run production server
+* `npm run stage-server` - run production (stage) server
 
+***
 
 # Server setup
 
