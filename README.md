@@ -1,6 +1,6 @@
 # NeoTree Web Editor
 
-[Server enviroment setup](https://raw.githubusercontent.com/neotree/neotree-editor/master/documentation/SERVER_SETUP.md "Server setup").
+[Server enviroment setup](https://github.com/neotree/neotree-editor/tree/master/documentation/server_enviroment "Server setup").
 
 ***
 
