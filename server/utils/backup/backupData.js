@@ -23,10 +23,11 @@ export default function backupData() {
           appInfo = !appInfo ? null : JSON.parse(JSON.stringify(appInfo));
           appInfo = { ...appInfo };
 
-          const whereLastUpdated = !lastBackUpDetails.last_backup_date ? {} : {
-            updatedAt: { [Op.gte]: lastBackUpDetails.last_backup_date },
-            deletedAt: null,
-          };
+          const whereLastUpdated = {};
+          // const whereLastUpdated = !lastBackUpDetails.last_backup_date ? {} : {
+          //   updatedAt: { [Op.gte]: lastBackUpDetails.last_backup_date },
+          //   deletedAt: null,
+          // };
 
           const scripts = await database.Script.findAll({ where: whereLastUpdated });
           const screens = await database.Screen.findAll({ where: whereLastUpdated });
@@ -53,6 +54,15 @@ export default function backupData() {
 
           const writeData = (data = [], folder) => new Promise((resolve, reject) => {
             (async () => {
+              try {
+                const files = await readDir(folder);
+                files.forEach(f => {
+                  if (fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`)) {
+                    fs.unlinkSync(`${process.env.BACKUP_DIR_PATH}/${folder}/${f.id}.json`);
+                  }
+                });
+              } catch (e) { /* DO NOTHING */ }
+
               try {
                 await data.map(item => new Promise((resolve, reject) => {
                   if (!fs.existsSync(`${process.env.BACKUP_DIR_PATH}/${folder}`)) fs.mkdirSync(`${process.env.BACKUP_DIR_PATH}/${folder}`);
