@@ -18,6 +18,7 @@ const firebaseOptions = JSON.parse(JSON.stringify({
 firebase.initializeApp(firebaseOptions);
 
 const firebaseAdminOptions = JSON.parse(JSON.stringify({
+  databaseURL: getParsedValue(process.env.firebaseAdminSDK_databaseURL),
   type: getParsedValue(process.env.firebaseAdminSDK_type),
   project_id: getParsedValue(process.env.firebaseAdminSDK_project_id),
   private_key_id: getParsedValue(process.env.firebaseAdminSDK_private_key_id),
@@ -32,7 +33,7 @@ const firebaseAdminOptions = JSON.parse(JSON.stringify({
 
 firebaseAdmin.initializeApp({
   credential: firebaseAdmin.credential.cert(firebaseAdminOptions),
-  databaseURL: `https://${process.env.firebaseAdminSDK_project_id}.firebaseio.com`
+  databaseURL: firebaseAdminOptions.databaseURL || `https://${process.env.firebaseAdminSDK_project_id}.firebaseio.com`
 });
 
 export { firebase, firebaseAdmin, firebaseAdminOptions, firebaseOptions, };
