@@ -43,6 +43,7 @@ var firebaseOptions = JSON.parse(JSON.stringify({
 exports.firebaseOptions = firebaseOptions;
 firebase.initializeApp(firebaseOptions);
 var firebaseAdminOptions = JSON.parse(JSON.stringify({
+  databaseURL: getParsedValue(process.env.firebaseAdminSDK_databaseURL),
   type: getParsedValue(process.env.firebaseAdminSDK_type),
   project_id: getParsedValue(process.env.firebaseAdminSDK_project_id),
   private_key_id: getParsedValue(process.env.firebaseAdminSDK_private_key_id),
@@ -57,7 +58,7 @@ var firebaseAdminOptions = JSON.parse(JSON.stringify({
 exports.firebaseAdminOptions = firebaseAdminOptions;
 firebaseAdmin.initializeApp({
   credential: firebaseAdmin.credential.cert(firebaseAdminOptions),
-  databaseURL: "https://".concat(process.env.firebaseAdminSDK_project_id, ".firebaseio.com")
+  databaseURL: firebaseAdminOptions.databaseURL || "https://".concat(process.env.firebaseAdminSDK_project_id, ".firebaseio.com")
 });
 var _default = firebaseAdmin;
 var _default2 = _default;
