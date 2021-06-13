@@ -1,6 +1,8 @@
 # NeoTree Web Editor
 
-Note that this project is part of the overall [Neotree System](https://github.com/neotree/neotree), an open source technology platform for supporting health care workers provide neonatal care in low resource settings. For more information see the [main repo](https://github.com/neotree/neotree) .
+Note that this project is part of the overall [Neotree System](https://github.com/neotree/neotree), an open source technology platform for supporting health care workers provide neonatal care in low resource settings. For more information see the [main repo](https://github.com/neotree/neotree).
+
+Instructions on how to use the web editor once it has been setup can be found [here](https://github.com/neotree/neotree-editor/blob/master/editor-usage-instructions.pdf).
 
 [Server enviroment setup](https://github.com/neotree/neotree-editor/tree/master/documentation/server_enviroment "Server setup").
 
