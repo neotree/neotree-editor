@@ -1,9 +1,23 @@
 import express from 'express';
 import * as endpoints from '../../../constants/api-endpoints/scripts';
+import { Screen } from '../../database';
 
 const router = express.Router();
 
 module.exports = app => {
+  router.get(
+    endpoints.GET_SCRIPT_DIAGNOSES_SCREENS,
+    (req, res) => {
+      const { script_id } = req.query;
+      (async () => {
+          try {
+            const count = await Screen.count({ where: { type: 'diagnosis', script_id } });
+            res.json({ count, });
+          } catch(e) { res.json({ error: e.message }); }
+      })();
+    },
+  );
+
   router.get(
     endpoints.GET_SCRIPTS,
     require('./getScriptsMiddleware')(app),

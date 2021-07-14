@@ -14,7 +14,12 @@ var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _database = require("../../database");
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+var _excluded = ["id"],
+    _excluded2 = ["id"],
+    _excluded3 = ["id"],
+    _excluded4 = ["id"];
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -51,7 +56,7 @@ module.exports = function () {
       configKeys = JSON.parse(JSON.stringify(configKeys));
       Promise.all([].concat((0, _toConsumableArray2["default"])(scripts.map(function (_ref3) {
         var scriptId = _ref3.id,
-            s = (0, _objectWithoutProperties2["default"])(_ref3, ["id"]);
+            s = (0, _objectWithoutProperties2["default"])(_ref3, _excluded);
         return _firebase["default"].database().ref("scripts/".concat(scriptId)).set(_objectSpread(_objectSpread({}, s.data), {}, {
           scriptId: scriptId,
           createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
@@ -59,7 +64,7 @@ module.exports = function () {
         }));
       })), (0, _toConsumableArray2["default"])(screens.map(function (_ref4) {
         var id = _ref4.id,
-            s = (0, _objectWithoutProperties2["default"])(_ref4, ["id"]);
+            s = (0, _objectWithoutProperties2["default"])(_ref4, _excluded2);
         return _firebase["default"].database().ref("screens/".concat(s.script_id, "/").concat(s.screen_id)).set(_objectSpread(_objectSpread({}, s.data), {}, {
           screenId: s.screen_id,
           scriptId: s.script_id,
@@ -68,7 +73,7 @@ module.exports = function () {
         }));
       })), (0, _toConsumableArray2["default"])(diagnoses.map(function (_ref5) {
         var id = _ref5.id,
-            s = (0, _objectWithoutProperties2["default"])(_ref5, ["id"]);
+            s = (0, _objectWithoutProperties2["default"])(_ref5, _excluded3);
         return _firebase["default"].database().ref("diagnosis/".concat(s.script_id, "/").concat(s.diagnosis_id)).set(_objectSpread(_objectSpread({}, s.data), {}, {
           diagnosisId: s.diagnosis_id,
           scriptId: s.script_id,
@@ -77,7 +82,7 @@ module.exports = function () {
         }));
       })), (0, _toConsumableArray2["default"])(configKeys.map(function (_ref6) {
         var configKeyId = _ref6.id,
-            s = (0, _objectWithoutProperties2["default"])(_ref6, ["id"]);
+            s = (0, _objectWithoutProperties2["default"])(_ref6, _excluded4);
         return _firebase["default"].database().ref("configkeys/".concat(configKeyId)).set(_objectSpread(_objectSpread({}, s.data), {}, {
           configKeyId: configKeyId,
           createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,

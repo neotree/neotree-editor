@@ -14,7 +14,10 @@ var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _models = require("../../database/models");
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+var _excluded = ["id", "createdAt", "updatedAt", "data"],
+    _excluded2 = ["data"];
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -25,7 +28,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, items, scriptId, done, snaps, screensCount, screens, rslts;
+      var _req$body, items, scriptId, done, snaps, screensCount, canAddDiagnosisScreen, countDiagnosisScreens, screens, rslts;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -60,8 +63,9 @@ module.exports = function () {
 
             case 12:
               screensCount = 0;
-              _context.prev = 13;
-              _context.next = 16;
+              canAddDiagnosisScreen = true;
+              _context.prev = 14;
+              _context.next = 17;
               return _models.Screen.count({
                 where: {
                   script_id: scriptId,
@@ -69,19 +73,30 @@ module.exports = function () {
                 }
               });
 
-            case 16:
+            case 17:
               screensCount = _context.sent;
-              _context.next = 21;
+              _context.next = 20;
+              return _models.Screen.count({
+                where: {
+                  type: 'diagnosis',
+                  script_id: scriptId
+                }
+              });
+
+            case 20:
+              countDiagnosisScreens = _context.sent;
+              canAddDiagnosisScreen = !countDiagnosisScreens;
+              _context.next = 26;
               break;
 
-            case 19:
-              _context.prev = 19;
-              _context.t1 = _context["catch"](13);
+            case 24:
+              _context.prev = 24;
+              _context.t1 = _context["catch"](14);
 
-            case 21:
+            case 26:
               screens = [];
-              _context.prev = 22;
-              _context.next = 25;
+              _context.prev = 27;
+              _context.next = 30;
               return _models.Screen.findAll({
                 where: {
                   id: items.map(function (s) {
@@ -90,15 +105,17 @@ module.exports = function () {
                 }
               });
 
-            case 25:
+            case 30:
               screens = _context.sent;
-              screens = screens.map(function (screen, i) {
+              screens = screens.filter(function (s) {
+                return s.type === 'diagnosis' ? canAddDiagnosisScreen : true;
+              }).map(function (screen, i) {
                 var _JSON$parse = JSON.parse(JSON.stringify(screen)),
                     id = _JSON$parse.id,
                     createdAt = _JSON$parse.createdAt,
                     updatedAt = _JSON$parse.updatedAt,
                     data = _JSON$parse.data,
-                    s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "createdAt", "updatedAt", "data"]); // eslint-disable-line
+                    s = (0, _objectWithoutProperties2["default"])(_JSON$parse, _excluded); // eslint-disable-line
 
 
                 return _objectSpread(_objectSpread({}, s), {}, {
@@ -116,17 +133,17 @@ module.exports = function () {
                   }))
                 });
               });
-              _context.next = 32;
+              _context.next = 37;
               break;
 
-            case 29:
-              _context.prev = 29;
-              _context.t2 = _context["catch"](22);
+            case 34:
+              _context.prev = 34;
+              _context.t2 = _context["catch"](27);
               return _context.abrupt("return", done(_context.t2));
 
-            case 32:
-              _context.prev = 32;
-              _context.next = 35;
+            case 37:
+              _context.prev = 37;
+              _context.next = 40;
               return Promise.all(screens.map(function (screen) {
                 return _models.Screen.findOrCreate({
                   where: {
@@ -139,31 +156,31 @@ module.exports = function () {
                 });
               }));
 
-            case 35:
+            case 40:
               rslts = _context.sent;
               screens = rslts.map(function (rslt) {
                 var _JSON$parse2 = JSON.parse(JSON.stringify(rslt[0])),
                     data = _JSON$parse2.data,
-                    screen = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["data"]);
+                    screen = (0, _objectWithoutProperties2["default"])(_JSON$parse2, _excluded2);
 
                 return _objectSpread(_objectSpread({}, data), screen);
               });
-              _context.next = 41;
+              _context.next = 46;
               break;
 
-            case 39:
-              _context.prev = 39;
-              _context.t3 = _context["catch"](32);
+            case 44:
+              _context.prev = 44;
+              _context.t3 = _context["catch"](37);
 
-            case 41:
+            case 46:
               done(null, screens);
 
-            case 42:
+            case 47:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 9], [13, 19], [22, 29], [32, 39]]);
+      }, _callee, null, [[3, 9], [14, 24], [27, 34], [37, 44]]);
     }))();
   };
 };

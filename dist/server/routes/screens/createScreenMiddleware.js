@@ -14,7 +14,10 @@ var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _database = require("../../database");
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+var _excluded = ["scriptId"],
+    _excluded2 = ["data"];
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -25,13 +28,13 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, scriptId, payload, done, screenId, snap, screensCount, screen, rslts, _JSON$parse, data, s;
+      var _req$body, scriptId, payload, done, countDiagnosisScreens, screenId, snap, screensCount, screen, rslts, _JSON$parse, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, ["scriptId"]);
+              _req$body = req.body, scriptId = _req$body.scriptId, payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
 
               done = function done(err, screen) {
                 res.locals.setResponse(err, {
@@ -40,26 +43,44 @@ module.exports = function () {
                 next();
               };
 
+              if (!(payload.type === 'diagnosis')) {
+                _context.next = 7;
+                break;
+              }
+
+              _context.next = 5;
+              return _database.Screen.count({
+                where: {
+                  type: 'diagnosis',
+                  script_id: scriptId
+                }
+              });
+
+            case 5:
+              countDiagnosisScreens = _context.sent;
+              if (countDiagnosisScreens) done(new Error('A script can only have one screen with type `diagnosis`'));
+
+            case 7:
               screenId = null;
-              _context.prev = 3;
-              _context.next = 6;
+              _context.prev = 8;
+              _context.next = 11;
               return _firebase["default"].database().ref("screens/".concat(scriptId)).push();
 
-            case 6:
+            case 11:
               snap = _context.sent;
               screenId = snap.key;
-              _context.next = 13;
+              _context.next = 18;
               break;
 
-            case 10:
-              _context.prev = 10;
-              _context.t0 = _context["catch"](3);
+            case 15:
+              _context.prev = 15;
+              _context.t0 = _context["catch"](8);
               return _context.abrupt("return", done(_context.t0));
 
-            case 13:
+            case 18:
               screensCount = 0;
-              _context.prev = 14;
-              _context.next = 17;
+              _context.prev = 19;
+              _context.next = 22;
               return _database.Screen.count({
                 where: {
                   script_id: scriptId,
@@ -67,16 +88,16 @@ module.exports = function () {
                 }
               });
 
-            case 17:
+            case 22:
               screensCount = _context.sent;
-              _context.next = 22;
+              _context.next = 27;
               break;
 
-            case 20:
-              _context.prev = 20;
-              _context.t1 = _context["catch"](14);
+            case 25:
+              _context.prev = 25;
+              _context.t1 = _context["catch"](19);
 
-            case 22:
+            case 27:
               screen = _objectSpread(_objectSpread({}, payload), {}, {
                 screenId: screenId,
                 scriptId: scriptId,
@@ -84,8 +105,8 @@ module.exports = function () {
                 createdAt: _firebase["default"].database.ServerValue.TIMESTAMP,
                 updatedAt: _firebase["default"].database.ServerValue.TIMESTAMP
               });
-              _context.prev = 23;
-              _context.next = 26;
+              _context.prev = 28;
+              _context.next = 31;
               return _database.Screen.findOrCreate({
                 where: {
                   screen_id: screen.screenId
@@ -99,31 +120,31 @@ module.exports = function () {
                 }
               });
 
-            case 26:
+            case 31:
               rslts = _context.sent;
 
               if (rslts && rslts[0]) {
-                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["data"]);
+                _JSON$parse = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, _excluded2);
                 screen = _objectSpread(_objectSpread({}, data), s);
               }
 
-              _context.next = 33;
+              _context.next = 38;
               break;
 
-            case 30:
-              _context.prev = 30;
-              _context.t2 = _context["catch"](23);
+            case 35:
+              _context.prev = 35;
+              _context.t2 = _context["catch"](28);
               return _context.abrupt("return", done(_context.t2));
 
-            case 33:
+            case 38:
               done(null, screen);
 
-            case 34:
+            case 39:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10], [14, 20], [23, 30]]);
+      }, _callee, null, [[8, 15], [19, 25], [28, 35]]);
     }))();
   };
 };

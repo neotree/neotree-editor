@@ -18,7 +18,7 @@ import Properties from './Properties';
 import MetadataItems from './Metadata/Items';
 import MetadataFields from './Metadata/Fields';
 
-function ScreenEditor({ screen, script }) {
+function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
   const { scriptId } = useParams();
@@ -74,7 +74,13 @@ function ScreenEditor({ screen, script }) {
           />
           <br /><br />
 
-          <ScreenType form={form} setForm={setForm} screen={screen} script={script} />
+          <ScreenType 
+            form={form} 
+            setForm={setForm} 
+            screen={screen} 
+            script={script} 
+            canAddDiagnosisScreen={canAddDiagnosisScreen}
+          />
 
           <Collapse in={!!form.type}>
             <div>
@@ -102,13 +108,13 @@ function ScreenEditor({ screen, script }) {
 
       <br />
 
-      {['single_select', 'multi_select', 'list', 'progress', 'checklist'].includes(form.type) && (
+      {['single_select', 'multi_select', 'list', 'progress', 'checklist', 'diagnosis'].includes(form.type) && (
         <>
           <MetadataItems form={form} setForm={setForm} screen={screen} script={script} />
         </>
       )}
 
-      {form.type === 'form' && <MetadataFields form={form} setForm={setForm} screen={screen} script={script} />}
+      {['form'].includes(form.type) && <MetadataFields form={form} setForm={setForm} screen={screen} script={script} />}
 
       {savingScreen && <OverlayLoader transparent />}
     </>
@@ -118,6 +124,7 @@ function ScreenEditor({ screen, script }) {
 ScreenEditor.propTypes = {
   screen: PropTypes.object,
   script: PropTypes.object,
+  canAddDiagnosisScreen: PropTypes.bool.isRequired,
 };
 
 export default ScreenEditor;

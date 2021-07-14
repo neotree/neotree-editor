@@ -8,9 +8,9 @@ import Button from '@material-ui/core/Button';
 import { ScreenTypes } from '@/constants/types';
 import Title from './Title';
 
-function ScreenType({ setForm, form }) {
+function ScreenType({ setForm, form, canAddDiagnosisScreen }) {
   const [type, setType] = React.useState('');
-
+  
   return (
     <>
       <Collapse in={!form.type}>
@@ -24,6 +24,7 @@ function ScreenType({ setForm, form }) {
                 value={t.name}
                 control={<Radio />}
                 label={t.label}
+                disabled={(t.name === 'diagnosis') && !canAddDiagnosisScreen}
               />
             ))}
           </RadioGroup>
@@ -50,6 +51,7 @@ ScreenType.propTypes = {
   script: PropTypes.object,
   form: PropTypes.object,
   setForm: PropTypes.func,
+  canAddDiagnosisScreen: PropTypes.bool.isRequired,
 };
 
 export default ScreenType;

@@ -10,6 +10,8 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 
 var _database = require("../../database");
 
+var _excluded = ["id"];
+
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
@@ -44,7 +46,7 @@ module.exports = function () {
               _context.next = 5;
               return Promise.all(hospitals.map(function (_ref2) {
                 var id = _ref2.id,
-                    payload = (0, _objectWithoutProperties2["default"])(_ref2, ["id"]);
+                    payload = (0, _objectWithoutProperties2["default"])(_ref2, _excluded);
                 return _database.Hospital.update(payload, {
                   where: {
                     id: id

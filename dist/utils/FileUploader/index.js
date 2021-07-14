@@ -17,6 +17,8 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 
 var _uuidv = _interopRequireDefault(require("uuidv4"));
 
+var _excluded = ["url", "metadata", "fieldname", "preserveFilename"];
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -41,7 +43,7 @@ var Upload = /*#__PURE__*/function () {
         metadata = opts.metadata,
         fieldname = opts.fieldname,
         preserveFilename = opts.preserveFilename,
-        options = (0, _objectWithoutProperties2["default"])(opts, ["url", "metadata", "fieldname", "preserveFilename"]);
+        options = (0, _objectWithoutProperties2["default"])(opts, _excluded);
     if (!file) throw new Error('MISSING: file!');
     if (!url) throw new Error('MISSING: url!');
     this.file = file;
@@ -135,8 +137,8 @@ var Upload = /*#__PURE__*/function () {
     }
   }, {
     key: "__reactstandin__regenerateByEval",
-    // @ts-ignore
-    value: function __reactstandin__regenerateByEval(key, code) {
+    value: // @ts-ignore
+    function __reactstandin__regenerateByEval(key, code) {
       // @ts-ignore
       this[key] = eval(code);
     }

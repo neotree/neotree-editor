@@ -93,6 +93,34 @@ function Properties(props) {
       </div>
       <br /><br />
 
+      {form.type === 'diagnosis' && (
+        <>
+          <div>
+            <TextField
+              fullWidth
+              required
+              error={!form.previewTitle}
+              value={form.previewTitle || ''}
+              label="Preview title"
+              onChange={e => setForm({ previewTitle: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              fullWidth
+              required
+              error={!form.previewPrintTitle}
+              value={form.previewPrintTitle || ''}
+              label="Preview print section title"
+              onChange={e => setForm({ previewPrintTitle: e.target.value })}
+            />
+          </div>
+          <br /><br />
+        </>
+      )}
+
       <div>
         <TextField
           fullWidth
