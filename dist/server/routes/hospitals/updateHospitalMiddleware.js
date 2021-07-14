@@ -15,6 +15,8 @@ var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/h
 
 var _models = require("../../database/models");
 
+var _excluded = ["id"];
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -28,7 +30,7 @@ var _default = function _default() {
   return function (req, res, next) {
     var _req$body = req.body,
         id = _req$body.id,
-        payload = (0, _objectWithoutProperties2["default"])(_req$body, ["id"]);
+        payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
       var done, rslt;
       return _regenerator["default"].wrap(function _callee$(_context) {

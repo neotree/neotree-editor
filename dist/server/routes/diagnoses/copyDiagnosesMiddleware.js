@@ -14,7 +14,10 @@ var _firebase = _interopRequireDefault(require("../../firebase"));
 
 var _models = require("../../database/models");
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+var _excluded = ["id", "createdAt", "updatedAt", "data"],
+    _excluded2 = ["data"];
+
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -98,7 +101,7 @@ module.exports = function () {
                     createdAt = _JSON$parse.createdAt,
                     updatedAt = _JSON$parse.updatedAt,
                     data = _JSON$parse.data,
-                    d = (0, _objectWithoutProperties2["default"])(_JSON$parse, ["id", "createdAt", "updatedAt", "data"]); // eslint-disable-line
+                    d = (0, _objectWithoutProperties2["default"])(_JSON$parse, _excluded); // eslint-disable-line
 
 
                 return _objectSpread(_objectSpread({}, d), {}, {
@@ -141,7 +144,7 @@ module.exports = function () {
               diagnoses = rslts.map(function (rslt) {
                 var _JSON$parse2 = JSON.parse(JSON.stringify(rslt[0])),
                     data = _JSON$parse2.data,
-                    diagnosis = (0, _objectWithoutProperties2["default"])(_JSON$parse2, ["data"]);
+                    diagnosis = (0, _objectWithoutProperties2["default"])(_JSON$parse2, _excluded2);
 
                 return _objectSpread(_objectSpread({}, data), diagnosis);
               });

@@ -7,3 +7,4 @@ export const UPDATE_SCRIPT = '/update-script';
 export const UPDATE_SCRIPTS = '/update-scripts';
 export const DELETE_SCRIPTS = '/delete-scripts';
 export const DUPLICATE_SCRIPTS = '/duplicate-scripts';
+export const GET_SCRIPT_DIAGNOSES_SCREENS = '/get-script-diagnoses-screens-count';

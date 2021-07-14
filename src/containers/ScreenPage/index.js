@@ -12,6 +12,7 @@ function Screen() {
   const [screen, setScreen] = React.useState(null);
   const [script, setScript] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
+  const [canAddDiagnosisScreen, setCanAddDiagnosisScreen] = React.useState(true);
 
   React.useEffect(() => {
     (async () => {
@@ -20,6 +21,10 @@ function Screen() {
         const res = await fetch(`/get-script?scriptId=${scriptId}`);
         const { script } = await res.json();
         setScript(script);
+
+        const countRes = await fetch(`/get-script-diagnoses-screens-count?script_id=${scriptId}`);
+        const { count } = await countRes.json();
+        setCanAddDiagnosisScreen(!count);
       } catch (e) { /* DO NOTHING */ }
 
       if (screenId !== 'new') {
@@ -50,6 +55,8 @@ function Screen() {
       <Form
         script={script}
         screen={screen}
+        canAddDiagnosisScreen={canAddDiagnosisScreen}
+        setCanAddDiagnosisScreen={setCanAddDiagnosisScreen}
       />
     </>
   );

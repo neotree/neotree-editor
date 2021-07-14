@@ -10,6 +10,11 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
+    if (payload.type === 'diagnosis') {
+      const countDiagnosisScreens = await Screen.count({ where: { type: 'diagnosis', script_id: scriptId } });
+      if (countDiagnosisScreens) done(new Error('A script can only have one screen with type `diagnosis`'));
+    }
+
     let screenId = null;
     try {
       const snap = await firebase.database().ref(`screens/${scriptId}`).push();

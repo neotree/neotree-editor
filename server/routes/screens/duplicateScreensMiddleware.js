@@ -15,6 +15,7 @@ export const copyScreen = ({ id }) => {
       let screen = null;
       try {
         screen = await Screen.findOne({ where: { id } });
+        if (screen.type === 'diagnosis') return reject(new Error('A script can only have one screen with type `diagnosis`'));
       } catch (e) { /* Do nothing */ }
 
       if (!screen) return reject(new Error(`Screen with id "${id}" not found`));

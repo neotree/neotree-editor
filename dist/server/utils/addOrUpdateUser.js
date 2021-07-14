@@ -18,12 +18,15 @@ var _database = require("../database");
 
 var _firebase = _interopRequireDefault(require("../database/firebase"));
 
+var _excluded = ["id", "username", "password"],
+    _excluded2 = ["id"];
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -46,7 +49,7 @@ module.exports = function addOrUpdateUser(_ref) {
   var id = _ref.id,
       username = _ref.username,
       password = _ref.password,
-      userParams = (0, _objectWithoutProperties2["default"])(_ref, ["id", "username", "password"]);
+      userParams = (0, _objectWithoutProperties2["default"])(_ref, _excluded);
   if (username) userParams.email = userParams.email || username;
   return new Promise(function (resolve, reject) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
@@ -188,7 +191,7 @@ module.exports = function addOrUpdateUser(_ref) {
 
             case 56:
               _context.prev = 56;
-              _user = user, _id = _user.id, u = (0, _objectWithoutProperties2["default"])(_user, ["id"]); // eslint-disable-line
+              _user = user, _id = _user.id, u = (0, _objectWithoutProperties2["default"])(_user, _excluded2); // eslint-disable-line
 
               _context.next = 60;
               return _firebase["default"].database().ref("users/".concat(user.email_hash)).set(u);

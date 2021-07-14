@@ -22,7 +22,7 @@ var _models = require("../../database/models");
   enterModule && enterModule(module);
 })();
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -68,40 +68,49 @@ var copyScreen = function copyScreen(_ref) {
 
             case 15:
               screen = _context.sent;
-              _context.next = 20;
-              break;
+
+              if (!(screen.type === 'diagnosis')) {
+                _context.next = 18;
+                break;
+              }
+
+              return _context.abrupt("return", reject(new Error('A script can only have one screen with type `diagnosis`')));
 
             case 18:
-              _context.prev = 18;
-              _context.t1 = _context["catch"](12);
+              _context.next = 22;
+              break;
 
             case 20:
+              _context.prev = 20;
+              _context.t1 = _context["catch"](12);
+
+            case 22:
               if (screen) {
-                _context.next = 22;
+                _context.next = 24;
                 break;
               }
 
               return _context.abrupt("return", reject(new Error("Screen with id \"".concat(id, "\" not found"))));
 
-            case 22:
+            case 24:
               screen = JSON.parse(JSON.stringify(screen));
               screensCount = 0;
-              _context.prev = 24;
-              _context.next = 27;
+              _context.prev = 26;
+              _context.next = 29;
               return _models.Screen.count({
                 where: {}
               });
 
-            case 27:
+            case 29:
               screensCount = _context.sent;
-              _context.next = 32;
+              _context.next = 34;
               break;
 
-            case 30:
-              _context.prev = 30;
-              _context.t2 = _context["catch"](24);
-
             case 32:
+              _context.prev = 32;
+              _context.t2 = _context["catch"](26);
+
+            case 34:
               delete screen.id;
               screen = _objectSpread(_objectSpread({}, screen), {}, {
                 screen_id: screenId,
@@ -114,8 +123,8 @@ var copyScreen = function copyScreen(_ref) {
                 }))
               });
               savedScreen = null;
-              _context.prev = 35;
-              _context.next = 38;
+              _context.prev = 37;
+              _context.next = 40;
               return _models.Screen.findOrCreate({
                 where: {
                   screen_id: screen.screen_id
@@ -123,25 +132,25 @@ var copyScreen = function copyScreen(_ref) {
                 defaults: _objectSpread({}, screen)
               });
 
-            case 38:
+            case 40:
               savedScreen = _context.sent;
-              _context.next = 44;
+              _context.next = 46;
               break;
 
-            case 41:
-              _context.prev = 41;
-              _context.t3 = _context["catch"](35);
+            case 43:
+              _context.prev = 43;
+              _context.t3 = _context["catch"](37);
               return _context.abrupt("return", reject(_context.t3));
 
-            case 44:
+            case 46:
               resolve(savedScreen);
 
-            case 45:
+            case 47:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[1, 8], [12, 18], [24, 30], [35, 41]]);
+      }, _callee, null, [[1, 8], [12, 20], [26, 32], [37, 43]]);
     }))();
   });
 };

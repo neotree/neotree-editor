@@ -1,14 +1,14 @@
 /* global fetch, $APP */
 import React from 'react';
 import io from 'socket.io-client';
-import { MuiThemeProvider, createMuiTheme } from '@material-ui/core/styles';
+import { MuiThemeProvider, createTheme } from '@material-ui/core/styles';
 import DocumentTitle from '@/components/DocumentTitle';
 import Containers from './containers';
 import AppContext from './AppContext';
 
 const socket = io();
 
-const theme = createMuiTheme({
+const theme = createTheme({
   palette: {
     primary: { main: '#2980b9' },
     secondary: { main: '#f39c12' },

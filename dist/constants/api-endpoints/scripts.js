@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DUPLICATE_SCRIPTS = exports.DELETE_SCRIPTS = exports.UPDATE_SCRIPTS = exports.UPDATE_SCRIPT = exports.CREATE_SCRIPT = exports.GET_SCRIPT_ITEMS = exports.GET_FULL_SCRIPT = exports.GET_SCRIPTS = exports.GET_SCRIPT = void 0;
+exports.GET_SCRIPT_DIAGNOSES_SCREENS = exports.DUPLICATE_SCRIPTS = exports.DELETE_SCRIPTS = exports.UPDATE_SCRIPTS = exports.UPDATE_SCRIPT = exports.CREATE_SCRIPT = exports.GET_SCRIPT_ITEMS = exports.GET_FULL_SCRIPT = exports.GET_SCRIPTS = exports.GET_SCRIPT = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -32,6 +32,8 @@ var DELETE_SCRIPTS = '/delete-scripts';
 exports.DELETE_SCRIPTS = DELETE_SCRIPTS;
 var DUPLICATE_SCRIPTS = '/duplicate-scripts';
 exports.DUPLICATE_SCRIPTS = DUPLICATE_SCRIPTS;
+var GET_SCRIPT_DIAGNOSES_SCREENS = '/get-script-diagnoses-screens-count';
+exports.GET_SCRIPT_DIAGNOSES_SCREENS = GET_SCRIPT_DIAGNOSES_SCREENS;
 ;
 
 (function () {
@@ -50,6 +52,7 @@ exports.DUPLICATE_SCRIPTS = DUPLICATE_SCRIPTS;
   reactHotLoader.register(UPDATE_SCRIPTS, "UPDATE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
   reactHotLoader.register(DELETE_SCRIPTS, "DELETE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
   reactHotLoader.register(DUPLICATE_SCRIPTS, "DUPLICATE_SCRIPTS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPT_DIAGNOSES_SCREENS, "GET_SCRIPT_DIAGNOSES_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/scripts.js");
 })();
 
 ;

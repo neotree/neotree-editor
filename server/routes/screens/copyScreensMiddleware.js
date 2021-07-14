@@ -16,14 +16,17 @@ module.exports = () => (req, res, next) => {
     } catch (e) { return done(e); }
 
     let screensCount = 0;
+    let canAddDiagnosisScreen = true;
     try {
       screensCount = await Screen.count({ where: { script_id: scriptId, deletedAt: null } });
+      const countDiagnosisScreens = await Screen.count({ where: { type: 'diagnosis', script_id: scriptId } });
+      canAddDiagnosisScreen = !countDiagnosisScreens;
     } catch (e) { /* Do nothing */ }
 
     let screens = [];
     try {
       screens = await Screen.findAll({ where: { id: items.map(s => s.id) } });
-      screens = screens.map((screen, i) => {
+      screens = screens.filter(s => s.type === 'diagnosis' ? canAddDiagnosisScreen : true).map((screen, i) => {
         const { id, createdAt, updatedAt, data, ...s } = JSON.parse(JSON.stringify(screen)); // eslint-disable-line
         return {
           ...s,

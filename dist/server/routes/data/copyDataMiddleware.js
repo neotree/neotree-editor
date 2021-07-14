@@ -16,12 +16,15 @@ var _updateScreensMiddleware = require("../../routes/screens/updateScreensMiddle
 
 var _splitCamelCase = _interopRequireDefault(require("../../../utils/splitCamelCase"));
 
+var _excluded = ["data"],
+    _excluded2 = ["ids"];
+
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) { symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); } keys.push.apply(keys, symbols); } return keys; }
 
 function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(Object(source), true).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
@@ -83,7 +86,7 @@ module.exports = function () {
 
           var persitScriptItems = function persitScriptItems(Model, _ref) {
             var data = _ref.data,
-                params = (0, _objectWithoutProperties2["default"])(_ref, ["data"]);
+                params = (0, _objectWithoutProperties2["default"])(_ref, _excluded);
             return new Promise(function (resolve, reject) {
               var done = function done(err, item) {
                 if (err) {
@@ -197,7 +200,7 @@ module.exports = function () {
     };
 
     var ids = source.ids,
-        s = (0, _objectWithoutProperties2["default"])(source, ["ids"]);
+        s = (0, _objectWithoutProperties2["default"])(source, _excluded2);
     Promise.all(ids.map(function (dataId) {
       return copy(_objectSpread(_objectSpread({}, s), {}, {
         dataId: dataId

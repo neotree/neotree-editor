@@ -43,8 +43,8 @@ var CustomMiddleware = /*#__PURE__*/function () {
     }
   }, {
     key: "__reactstandin__regenerateByEval",
-    // @ts-ignore
-    value: function __reactstandin__regenerateByEval(key, code) {
+    value: // @ts-ignore
+    function __reactstandin__regenerateByEval(key, code) {
       // @ts-ignore
       this[key] = eval(code);
     }

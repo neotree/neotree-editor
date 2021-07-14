@@ -18,38 +18,39 @@
  */
 
 export const DefaultValueType = {
-    COMPUTE: 'compute',
-    DATE_NOW: 'date_now',
-    DATE_NOON: 'date_noon',
-    DATE_MIDNIGHT: 'date_midnight',
-    EMPTY: '',
-    UID: 'uid'
+  COMPUTE: 'compute',
+  DATE_NOW: 'date_now',
+  DATE_NOON: 'date_noon',
+  DATE_MIDNIGHT: 'date_midnight',
+  EMPTY: '',
+  UID: 'uid'
 };
 
 export const DataType = {
-    BOOLEAN: 'boolean',
-    DATETIME: 'datetime',
-    DATE: 'date',
-    ID: 'id',
-    NUMBER: 'number',
-    PERIOD: 'period',
-    SET_ID: 'set<id>',
-    STRING: 'string',
-    TIME: 'time',
-    VOID: 'void'
+  BOOLEAN: 'boolean',
+  DATETIME: 'datetime',
+  DATE: 'date',
+  ID: 'id',
+  NUMBER: 'number',
+  PERIOD: 'period',
+  SET_ID: 'set<id>',
+  STRING: 'string',
+  TIME: 'time',
+  VOID: 'void'
 };
 
 export const FieldTypes = [
-    { name: 'date', label: 'Date' },
-    { name: 'datetime', label: 'Date + Time' },
-    { name: 'dropdown', label: 'Dropdown' },
-    { name: 'number', label: 'Number' },    
-    { name: 'text', label: 'Text' },
-    { name: 'time', label: 'Time' },
-    { name: 'period', label: 'Time period' },
+  { name: 'date', label: 'Date' },
+  { name: 'datetime', label: 'Date + Time' },
+  { name: 'dropdown', label: 'Dropdown' },
+  { name: 'number', label: 'Number' },
+  { name: 'text', label: 'Text' },
+  { name: 'time', label: 'Time' },
+  { name: 'period', label: 'Time period' },
 ];
 
 export const ScreenTypes = [
+  { name: 'diagnosis', label: 'Diagnosis' },
   { name: 'checklist', label: 'Checklist' },
   { name: 'form', label: 'Form' },
   { name: 'management', label: 'Management' },
