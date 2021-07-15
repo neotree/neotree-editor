@@ -63,6 +63,17 @@ function Items({ form, setMetadata }) {
                   render: ({ row, column }) => row[column] ? <CheckIcon fontSize="small" color="primary" /> : null
                 },
              ];
+            case 'diagnosis':
+              return [
+                { key: 'id', label: 'ID', },
+                { key: 'label', label: 'Label', },
+                {
+                  key: 'checked',
+                  label: 'Checked',
+                  cellProps: { align: 'right' },
+                  render: ({ row, column }) => row[column] ? <CheckIcon fontSize="small" color="primary" /> : null
+                },
+             ];
             case 'list':
               return [
                 { key: 'label', label: 'Label', },

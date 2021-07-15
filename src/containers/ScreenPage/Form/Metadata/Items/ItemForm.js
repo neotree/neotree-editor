@@ -31,6 +31,8 @@ const ItemForm = React.forwardRef(({
           return 'boolean';
         case 'single_select':
           return 'id';
+        case 'diagnosis':
+          return 'diagnosis';
         default:
           return null;
       }
@@ -233,7 +235,7 @@ const ItemForm = React.forwardRef(({
                     </Grid>
                     <br />
 
-                    {type === 'multi_select' && (
+                    {['multi_select', 'diagnosis'].includes(type) && (
                       <>
                         <div>
                           <FormControlLabel
