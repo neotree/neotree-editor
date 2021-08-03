@@ -24,6 +24,7 @@ function DiagnosisEditor({ diagnosis, script }) {
   const [form, _setForm] = React.useState({
     description: null,
     expression: null,
+    expressionMeaning: null,
     image1: null,
     image2: null,
     image3: null,
@@ -107,8 +108,20 @@ function DiagnosisEditor({ diagnosis, script }) {
             <TextField
               fullWidth
               value={form.expression || ''}
-              label="Diagnosis expression"
+              label="Diagnosis expression (e.g. $Temp > 37 or $Gestation < 20)"
               onChange={e => setForm({ expression: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              value={form.expressionMeaning || ''}
+              label="Expression explanation (Temperature greater than 37 degrees or Gestation period less than 20 weeks)"
+              onChange={e => setForm({ expressionMeaning: e.target.value })}
             />
           </div>
           <br /><br />
