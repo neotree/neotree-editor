@@ -12,6 +12,8 @@ var _path = _interopRequireDefault(require("path"));
 
 var _express = _interopRequireDefault(require("express"));
 
+var _cors = _interopRequireDefault(require("cors"));
+
 var database = _interopRequireWildcard(require("./database"));
 
 var _sync = _interopRequireDefault(require("./firebase/sync"));
@@ -43,6 +45,8 @@ var isProd = process.env.NODE_ENV === 'production';
           app.logger = require('../utils/logger');
           app.io = require('socket.io')(httpServer); // socket io
 
+          app.use((0, _cors["default"])());
+
           app.getRandomString = function () {
             var separator = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
 
@@ -60,53 +64,53 @@ var isProd = process.env.NODE_ENV === 'production';
           // database
 
           sequelize = null;
-          _context.prev = 8;
-          _context.next = 11;
+          _context.prev = 9;
+          _context.next = 12;
           return database.connect();
 
-        case 11:
+        case 12:
           sequelize = _context.sent;
           app.logger.log('Database connected');
-          _context.next = 19;
+          _context.next = 20;
           break;
 
-        case 15:
-          _context.prev = 15;
-          _context.t0 = _context["catch"](8);
+        case 16:
+          _context.prev = 16;
+          _context.t0 = _context["catch"](9);
           app.logger.error('Database connection failed', _context.t0);
           process.exit(1);
 
-        case 19:
+        case 20:
           app.sequelize = sequelize;
-          _context.prev = 20;
-          _context.next = 23;
+          _context.prev = 21;
+          _context.next = 24;
           return database.App.findOne({
             where: {
               id: 1
             }
           });
 
-        case 23:
+        case 24:
           appInfo = _context.sent;
 
           if (appInfo) {
-            _context.next = 27;
+            _context.next = 28;
             break;
           }
 
-          _context.next = 27;
+          _context.next = 28;
           return (0, _backup.backupData)(app);
 
-        case 27:
-          _context.next = 32;
+        case 28:
+          _context.next = 33;
           break;
 
-        case 29:
-          _context.prev = 29;
-          _context.t1 = _context["catch"](20);
+        case 30:
+          _context.prev = 30;
+          _context.t1 = _context["catch"](21);
           console.log(_context.t1);
 
-        case 32:
+        case 33:
           // firebase
           // try { await syncFirebase(); } catch (e) { console.log(e); }
           //body-parser
@@ -160,12 +164,12 @@ var isProd = process.env.NODE_ENV === 'production';
             app.logger.log("Server started on port ".concat(process.env.SERVER_PORT));
           });
 
-        case 46:
+        case 47:
         case "end":
           return _context.stop();
       }
     }
-  }, _callee, null, [[8, 15], [20, 29]]);
+  }, _callee, null, [[9, 16], [21, 30]]);
 }))();
 ;
 

@@ -1,5 +1,6 @@
 import path from 'path';
 import express from 'express';
+import cors from 'cors';
 import * as database from './database';
 import syncFirebase from './firebase/sync';
 import { backupData } from './utils/backup';
@@ -11,6 +12,8 @@ const isProd = process.env.NODE_ENV === 'production';
   const httpServer = require('http').Server(app);
   app.logger = require('../utils/logger');
   app.io = require('socket.io')(httpServer); // socket io
+
+  app.use(cors());
 
   app.getRandomString = (separator = '') => {
     const getRandString = () => Math.random().toString(36).substring(2).toUpperCase();
