@@ -11,6 +11,7 @@ import Device from './_Device';
 import Log from './_Log';
 import Hospital from './_Hospital';
 import App from './_App';
+import Configuration from './_Configuration';
 
 const init = () => new Promise((resolve, reject) => {
   const errors = [];
@@ -25,6 +26,7 @@ const init = () => new Promise((resolve, reject) => {
       try { await Screen.sync(); } catch (e) { errors.push(e); }
       try { await Diagnosis.sync(); } catch (e) { errors.push(e); }
       try { await ConfigKey.sync(); } catch (e) { errors.push(e); }
+      try { await Configuration.sync(); } catch (e) { errors.push(e); }
       try { await ApiKey.sync(); } catch (e) { errors.push(e); }
       try { await Device.sync(); } catch (e) { errors.push(e); }
       try { await Log.sync(); } catch (e) { errors.push(e); }
@@ -47,6 +49,7 @@ export {
   Screen,
   Diagnosis,
   ConfigKey,
+  Configuration,
   ApiKey,
   Device,
   Log,
