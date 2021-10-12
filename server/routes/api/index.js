@@ -1,9 +1,11 @@
 import express from 'express';
 import apiKeyAuthenticator from './apiKeyAuthenticator';
 
-const router = express.Router();
+let router = express.Router();
 
 module.exports = app => {
+  router = require('./configuration').default(app, router);
+  
   router.post(
     '/update-device-registration',
     apiKeyAuthenticator(app),

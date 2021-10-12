@@ -77,6 +77,12 @@ Object.defineProperty(exports, "App", {
     return _App["default"];
   }
 });
+Object.defineProperty(exports, "Configuration", {
+  enumerable: true,
+  get: function get() {
+    return _Configuration["default"];
+  }
+});
 exports.init = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
@@ -106,6 +112,8 @@ var _Log = _interopRequireDefault(require("./_Log"));
 var _Hospital = _interopRequireDefault(require("./_Hospital"));
 
 var _App = _interopRequireDefault(require("./_App"));
+
+var _Configuration = _interopRequireDefault(require("./_Configuration"));
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -252,7 +260,7 @@ var init = function init() {
             case 72:
               _context.prev = 72;
               _context.next = 75;
-              return _ApiKey["default"].sync();
+              return _Configuration["default"].sync();
 
             case 75:
               _context.next = 80;
@@ -266,7 +274,7 @@ var init = function init() {
             case 80:
               _context.prev = 80;
               _context.next = 83;
-              return _Device["default"].sync();
+              return _ApiKey["default"].sync();
 
             case 83:
               _context.next = 88;
@@ -280,7 +288,7 @@ var init = function init() {
             case 88:
               _context.prev = 88;
               _context.next = 91;
-              return _Log["default"].sync();
+              return _Device["default"].sync();
 
             case 91:
               _context.next = 96;
@@ -292,6 +300,20 @@ var init = function init() {
               errors.push(_context.t11);
 
             case 96:
+              _context.prev = 96;
+              _context.next = 99;
+              return _Log["default"].sync();
+
+            case 99:
+              _context.next = 104;
+              break;
+
+            case 101:
+              _context.prev = 101;
+              _context.t12 = _context["catch"](96);
+              errors.push(_context.t12);
+
+            case 104:
               if (!errors.length) {
                 resolve(_sequelize["default"]);
               } else {
@@ -300,12 +322,12 @@ var init = function init() {
                 }).join('\n')));
               }
 
-            case 97:
+            case 105:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85], [88, 93]]);
+      }, _callee, null, [[0, 5], [8, 13], [16, 21], [24, 29], [32, 37], [40, 45], [48, 53], [56, 61], [64, 69], [72, 77], [80, 85], [88, 93], [96, 101]]);
     }))();
   });
 };

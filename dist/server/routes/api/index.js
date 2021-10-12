@@ -18,6 +18,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var router = _express["default"].Router();
 
 module.exports = function (app) {
+  router = require('./configuration')["default"](app, router);
   router.post('/update-device-registration', (0, _apiKeyAuthenticator["default"])(app), require('./updateDeviceMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/key', require('./getApiKeyMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/download-api-config', require('./downloadApiConfigFileMiddleware')(app), require('../../utils/responseMiddleware'));

@@ -120,7 +120,7 @@ function DiagnosisEditor({ diagnosis, script }) {
               multiline
               rows={3}
               value={form.expressionMeaning || ''}
-              label="Expression explanation (Temperature greater than 37 degrees or Gestation period less than 20 weeks)"
+              label="Expression explanation (e.g. Temperature greater than 37 degrees or Gestation period less than 20 weeks)"
               onChange={e => setForm({ expressionMeaning: e.target.value })}
             />
           </div>
