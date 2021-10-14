@@ -21,7 +21,7 @@ export default (app, router) => {
                     configuration = await Configuration.findOne({ where: { unique_key: key } });
                     if (configuration) {
                         configuration = JSON.parse(JSON.stringify(configuration));
-                        configuration.data = JSON.parse(configuration.data);
+                        // configuration.data = JSON.parse(configuration.data);
                     }
                 } catch (e) { return done(e); }
             
@@ -50,7 +50,7 @@ export default (app, router) => {
                         configuration = await Configuration.findOne({ where: { unique_key: payload.unique_key } });
                         if (configuration) {
                             configuration = JSON.parse(JSON.stringify(configuration));
-                            configuration.data = JSON.parse(configuration.data);
+                            // configuration.data = JSON.parse(configuration.data);
                         }
                     }
                 } catch (e) { return done(e); }
@@ -92,7 +92,7 @@ export default (app, router) => {
                     configuration = await Configuration.findOne({ where: { unique_key: key } });
                     if (configuration) {
                         configuration = JSON.parse(JSON.stringify(configuration));
-                        configuration.data = JSON.parse(configuration.data);
+                        // configuration.data = JSON.parse(configuration.data);
                     }
                 } catch (e) { return done(e); }
             

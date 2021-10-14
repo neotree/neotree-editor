@@ -76,8 +76,7 @@ var _default = function _default(app, router) {
               configuration = _context.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration));
-                configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
               }
 
               _context.next = 17;
@@ -150,8 +149,7 @@ var _default = function _default(app, router) {
               configuration = _context2.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration));
-                configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
               }
 
             case 14:
@@ -251,8 +249,7 @@ var _default = function _default(app, router) {
               configuration = _context3.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration));
-                configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
               }
 
               _context3.next = 26;
