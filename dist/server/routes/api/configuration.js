@@ -229,8 +229,8 @@ var _default = function _default(app, router) {
             case 14:
               _context3.prev = 14;
               _context3.next = 17;
-              return _database.Configuration.update(_objectSpread(_objectSpread({}, payload), !configuration.data ? null : {
-                data: JSON.stringify(_objectSpread({}, configuration.data))
+              return _database.Configuration.update(_objectSpread(_objectSpread({}, payload), !payload.data ? null : {
+                data: JSON.stringify(_objectSpread({}, payload.data))
               }), {
                 where: {
                   unique_key: unique_key,
