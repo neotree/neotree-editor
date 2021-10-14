@@ -21,7 +21,6 @@ export default (app, router) => {
                     configuration = await Configuration.findOne({ where: { unique_key: key } });
                     if (configuration) {
                         configuration = JSON.parse(JSON.stringify(configuration));
-                        // configuration.data = JSON.parse(configuration.data);
                     }
                 } catch (e) { return done(e); }
             
@@ -50,7 +49,6 @@ export default (app, router) => {
                         configuration = await Configuration.findOne({ where: { unique_key: payload.unique_key } });
                         if (configuration) {
                             configuration = JSON.parse(JSON.stringify(configuration));
-                            // configuration.data = JSON.parse(configuration.data);
                         }
                     }
                 } catch (e) { return done(e); }
@@ -65,7 +63,7 @@ export default (app, router) => {
         '/update-configuration',
         apiKeyAuthenticator(app),
         (req, res, next) => {
-            const { key, ...payload } = req.body;
+            const { unique_key, ...payload } = req.body;
 
             const done = (err, configuration) => {
                 res.locals.setResponse(err, { configuration });
@@ -73,26 +71,25 @@ export default (app, router) => {
             };
 
             (async () => {
-                if (!key) return done(new Error('Required configuration "key" is not provided.'));
+                if (!unique_key) return done(new Error('Required configuration "unique_key" is not provided.'));
             
                 let configuration = null;
                 try {
-                    configuration = await Configuration.findOne({ where: { unique_key: key } });
+                    configuration = await Configuration.findOne({ where: { unique_key: unique_key } });
                 } catch (e) { return done(e); }
             
-                if (!configuration) return reject(new Error(`Configuration with unique_key "${key}" not found`));
+                if (!configuration) return reject(new Error(`Configuration with unique_key "${unique_key}" not found`));
             
                 try {
                     await Configuration.update(
                         {
                             data: JSON.stringify({ ...configuration.data, ...payload }),
                         },
-                        { where: { unique_key: key, deletedAt: null } }
+                        { where: { unique_key: unique_key, deletedAt: null } }
                     );
-                    configuration = await Configuration.findOne({ where: { unique_key: key } });
+                    configuration = await Configuration.findOne({ where: { unique_key: unique_key } });
                     if (configuration) {
                         configuration = JSON.parse(JSON.stringify(configuration));
-                        // configuration.data = JSON.parse(configuration.data);
                     }
                 } catch (e) { return done(e); }
             

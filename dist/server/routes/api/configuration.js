@@ -19,7 +19,7 @@ var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator
 
 var _database = require("../../database");
 
-var _excluded = ["key"];
+var _excluded = ["unique_key"];
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -76,7 +76,7 @@ var _default = function _default(app, router) {
               configuration = _context.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration));
               }
 
               _context.next = 17;
@@ -149,7 +149,7 @@ var _default = function _default(app, router) {
               configuration = _context2.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration));
               }
 
             case 14:
@@ -174,7 +174,7 @@ var _default = function _default(app, router) {
   }, require('../../utils/responseMiddleware'));
   router.post('/update-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     var _req$body = req.body,
-        key = _req$body.key,
+        unique_key = _req$body.unique_key,
         payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
 
     var done = function done(err, configuration) {
@@ -190,12 +190,12 @@ var _default = function _default(app, router) {
         while (1) {
           switch (_context3.prev = _context3.next) {
             case 0:
-              if (key) {
+              if (unique_key) {
                 _context3.next = 2;
                 break;
               }
 
-              return _context3.abrupt("return", done(new Error('Required configuration "key" is not provided.')));
+              return _context3.abrupt("return", done(new Error('Required configuration "unique_key" is not provided.')));
 
             case 2:
               configuration = null;
@@ -203,7 +203,7 @@ var _default = function _default(app, router) {
               _context3.next = 6;
               return _database.Configuration.findOne({
                 where: {
-                  unique_key: key
+                  unique_key: unique_key
                 }
               });
 
@@ -223,7 +223,7 @@ var _default = function _default(app, router) {
                 break;
               }
 
-              return _context3.abrupt("return", reject(new Error("Configuration with unique_key \"".concat(key, "\" not found"))));
+              return _context3.abrupt("return", reject(new Error("Configuration with unique_key \"".concat(unique_key, "\" not found"))));
 
             case 14:
               _context3.prev = 14;
@@ -232,7 +232,7 @@ var _default = function _default(app, router) {
                 data: JSON.stringify(_objectSpread(_objectSpread({}, configuration.data), payload))
               }, {
                 where: {
-                  unique_key: key,
+                  unique_key: unique_key,
                   deletedAt: null
                 }
               });
@@ -241,7 +241,7 @@ var _default = function _default(app, router) {
               _context3.next = 19;
               return _database.Configuration.findOne({
                 where: {
-                  unique_key: key
+                  unique_key: unique_key
                 }
               });
 
@@ -249,7 +249,7 @@ var _default = function _default(app, router) {
               configuration = _context3.sent;
 
               if (configuration) {
-                configuration = JSON.parse(JSON.stringify(configuration)); // configuration.data = JSON.parse(configuration.data);
+                configuration = JSON.parse(JSON.stringify(configuration));
               }
 
               _context3.next = 26;
