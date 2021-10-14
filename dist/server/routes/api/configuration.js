@@ -7,9 +7,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports["default"] = void 0;
 
-var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
-
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
@@ -19,9 +19,7 @@ var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator
 
 var _database = require("../../database");
 
-var _excluded = ["data"],
-    _excluded2 = ["data"],
-    _excluded3 = ["key"];
+var _excluded = ["key"];
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -39,8 +37,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var _default = function _default(app, router) {
   router.get('/get-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var key, done, configKeys, configuration, _JSON$parse, data, s;
-
+      var key, done, configKeys, configuration;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
@@ -79,8 +76,8 @@ var _default = function _default(app, router) {
               configuration = _context.sent;
 
               if (configuration) {
-                _JSON$parse = JSON.parse(JSON.stringify(configuration)), data = _JSON$parse.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse, _excluded);
-                configuration = _objectSpread(_objectSpread({}, data), s);
+                configuration = JSON.parse(JSON.stringify(configuration));
+                configuration.data = JSON.parse(configuration.data);
               }
 
               _context.next = 17;
@@ -107,8 +104,7 @@ var _default = function _default(app, router) {
   }, require('../../utils/responseMiddleware'));
   router.post('/add-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var payload, done, configuration, rslts, _JSON$parse2, data, s;
-
+      var payload, done, configuration;
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
@@ -125,39 +121,63 @@ var _default = function _default(app, router) {
               configuration = null;
               _context2.prev = 3;
               _context2.next = 6;
-              return _database.Configuration.create(payload);
+              return _database.Configuration.findOne({
+                where: {
+                  unique_key: payload.unique_key
+                }
+              });
 
             case 6:
-              rslts = _context2.sent;
+              configuration = _context2.sent;
 
-              if (rslts && rslts[0]) {
-                _JSON$parse2 = JSON.parse(JSON.stringify(rslts[0])), data = _JSON$parse2.data, s = (0, _objectWithoutProperties2["default"])(_JSON$parse2, _excluded2);
-                configuration = _objectSpread(_objectSpread({}, data), s);
+              if (configuration) {
+                _context2.next = 14;
+                break;
               }
 
-              _context2.next = 13;
-              break;
+              _context2.next = 10;
+              return _database.Configuration.create(payload);
 
             case 10:
-              _context2.prev = 10;
+              _context2.next = 12;
+              return _database.Configuration.findOne({
+                where: {
+                  unique_key: payload.unique_key
+                }
+              });
+
+            case 12:
+              configuration = _context2.sent;
+
+              if (configuration) {
+                configuration = JSON.parse(JSON.stringify(configuration));
+                configuration.data = JSON.parse(configuration.data);
+              }
+
+            case 14:
+              _context2.next = 19;
+              break;
+
+            case 16:
+              _context2.prev = 16;
               _context2.t0 = _context2["catch"](3);
               return _context2.abrupt("return", done(_context2.t0));
 
-            case 13:
+            case 19:
               done(null, configuration);
 
-            case 14:
+            case 20:
             case "end":
               return _context2.stop();
           }
         }
-      }, _callee2, null, [[3, 10]]);
+      }, _callee2, null, [[3, 16]]);
     }))();
   }, require('../../utils/responseMiddleware'));
   router.post('/update-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     var _req$body = req.body,
         key = _req$body.key,
-        payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded3);
+        payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
 
     var done = function done(err, configuration) {
       res.locals.setResponse(err, {
@@ -220,23 +240,38 @@ var _default = function _default(app, router) {
               });
 
             case 17:
-              _context3.next = 22;
-              break;
+              _context3.next = 19;
+              return _database.Configuration.findOne({
+                where: {
+                  unique_key: key
+                }
+              });
 
             case 19:
-              _context3.prev = 19;
+              configuration = _context3.sent;
+
+              if (configuration) {
+                configuration = JSON.parse(JSON.stringify(configuration));
+                configuration.data = JSON.parse(configuration.data);
+              }
+
+              _context3.next = 26;
+              break;
+
+            case 23:
+              _context3.prev = 23;
               _context3.t1 = _context3["catch"](14);
               return _context3.abrupt("return", done(_context3.t1));
 
-            case 22:
+            case 26:
               done(null, configuration);
 
-            case 23:
+            case 27:
             case "end":
               return _context3.stop();
           }
         }
-      }, _callee3, null, [[3, 9], [14, 19]]);
+      }, _callee3, null, [[3, 9], [14, 23]]);
     }))();
   }, require('../../utils/responseMiddleware'));
   return router;

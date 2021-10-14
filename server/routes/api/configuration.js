@@ -20,8 +20,8 @@ export default (app, router) => {
                     configKeys = await ConfigKey.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
                     configuration = await Configuration.findOne({ where: { unique_key: key } });
                     if (configuration) {
-                        const { data, ...s } = JSON.parse(JSON.stringify(configuration));
-                        configuration = { ...data, ...s };
+                        configuration = JSON.parse(JSON.stringify(configuration));
+                        configuration.data = JSON.parse(configuration.data);
                     }
                 } catch (e) { return done(e); }
             
@@ -39,16 +39,20 @@ export default (app, router) => {
                 const payload = req.body;
             
                 const done = (err, configuration) => {
-                res.locals.setResponse(err, { configuration });
-                next();
+                    res.locals.setResponse(err, { configuration });
+                    next();
                 };
                 let configuration = null;
                 try {
-                const rslts = await Configuration.create(payload);
-                if (rslts && rslts[0]) {
-                    const { data, ...s } = JSON.parse(JSON.stringify(rslts[0]));
-                    configuration = { ...data, ...s };
-                }
+                    configuration = await Configuration.findOne({ where: { unique_key: payload.unique_key } });
+                    if (!configuration) {
+                        await Configuration.create(payload);
+                        configuration = await Configuration.findOne({ where: { unique_key: payload.unique_key } });
+                        if (configuration) {
+                            configuration = JSON.parse(JSON.stringify(configuration));
+                            configuration.data = JSON.parse(configuration.data);
+                        }
+                    }
                 } catch (e) { return done(e); }
             
                 done(null, configuration);
@@ -85,6 +89,11 @@ export default (app, router) => {
                         },
                         { where: { unique_key: key, deletedAt: null } }
                     );
+                    configuration = await Configuration.findOne({ where: { unique_key: key } });
+                    if (configuration) {
+                        configuration = JSON.parse(JSON.stringify(configuration));
+                        configuration.data = JSON.parse(configuration.data);
+                    }
                 } catch (e) { return done(e); }
             
                 done(null, configuration);
