@@ -1,5 +1,5 @@
 import apiKeyAuthenticator from './apiKeyAuthenticator';
-import { Configuration, } from '../../database';
+import { Configuration, ConfigKey } from '../../database';
 
 export default (app, router) => {
     router.get(
@@ -9,21 +9,23 @@ export default (app, router) => {
             (async () => {
                 const { key } = req.query;
             
-                const done = (err, configuration) => {
-                res.locals.setResponse(err, { configuration });
-                next();
+                const done = (err, rslts) => {
+                    res.locals.setResponse(err, { configuration: null, configKeys: [], ...rslts });
+                    next();
                 };
             
+                let configKeys = [];
                 let configuration = null;
                 try {
-                configuration = await Configuration.findOne({ where: { unique_key: key } });
-                if (configuration) {
-                    const { data, ...s } = JSON.parse(JSON.stringify(configuration));
-                    configuration = { ...data, ...s };
-                }
+                    configKeys = await ConfigKey.findAll({ where: { deletedAt: null }, order: [['position', 'ASC']], });
+                    configuration = await Configuration.findOne({ where: { unique_key: key } });
+                    if (configuration) {
+                        const { data, ...s } = JSON.parse(JSON.stringify(configuration));
+                        configuration = { ...data, ...s };
+                    }
                 } catch (e) { return done(e); }
             
-                done(null, configuration);
+                done(null, { configuration, configKeys, });
             })();
         },
         require('../../utils/responseMiddleware')

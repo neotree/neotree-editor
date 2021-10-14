@@ -9,9 +9,9 @@ exports["default"] = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
-var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
-
 var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
+
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
@@ -39,7 +39,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var _default = function _default(app, router) {
   router.get('/get-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var key, done, configuration, _JSON$parse, data, s;
+      var key, done, configKeys, configuration, _JSON$parse, data, s;
 
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) {
@@ -47,23 +47,35 @@ var _default = function _default(app, router) {
             case 0:
               key = req.query.key;
 
-              done = function done(err, configuration) {
-                res.locals.setResponse(err, {
-                  configuration: configuration
-                });
+              done = function done(err, rslts) {
+                res.locals.setResponse(err, _objectSpread({
+                  configuration: null,
+                  configKeys: []
+                }, rslts));
                 next();
               };
 
+              configKeys = [];
               configuration = null;
-              _context.prev = 3;
-              _context.next = 6;
+              _context.prev = 4;
+              _context.next = 7;
+              return _database.ConfigKey.findAll({
+                where: {
+                  deletedAt: null
+                },
+                order: [['position', 'ASC']]
+              });
+
+            case 7:
+              configKeys = _context.sent;
+              _context.next = 10;
               return _database.Configuration.findOne({
                 where: {
                   unique_key: key
                 }
               });
 
-            case 6:
+            case 10:
               configuration = _context.sent;
 
               if (configuration) {
@@ -71,23 +83,26 @@ var _default = function _default(app, router) {
                 configuration = _objectSpread(_objectSpread({}, data), s);
               }
 
-              _context.next = 13;
+              _context.next = 17;
               break;
 
-            case 10:
-              _context.prev = 10;
-              _context.t0 = _context["catch"](3);
+            case 14:
+              _context.prev = 14;
+              _context.t0 = _context["catch"](4);
               return _context.abrupt("return", done(_context.t0));
 
-            case 13:
-              done(null, configuration);
+            case 17:
+              done(null, {
+                configuration: configuration,
+                configKeys: configKeys
+              });
 
-            case 14:
+            case 18:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[3, 10]]);
+      }, _callee, null, [[4, 14]]);
     }))();
   }, require('../../utils/responseMiddleware'));
   router.post('/add-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
