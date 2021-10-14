@@ -19,7 +19,7 @@ var _apiKeyAuthenticator = _interopRequireDefault(require("./apiKeyAuthenticator
 
 var _database = require("../../database");
 
-var _excluded = ["unique_key"];
+var _excluded = ["id", "unique_key"];
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -174,6 +174,7 @@ var _default = function _default(app, router) {
   }, require('../../utils/responseMiddleware'));
   router.post('/update-configuration', (0, _apiKeyAuthenticator["default"])(app), function (req, res, next) {
     var _req$body = req.body,
+        id = _req$body.id,
         unique_key = _req$body.unique_key,
         payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
 
@@ -228,9 +229,9 @@ var _default = function _default(app, router) {
             case 14:
               _context3.prev = 14;
               _context3.next = 17;
-              return _database.Configuration.update({
-                data: JSON.stringify(_objectSpread(_objectSpread({}, configuration.data), payload))
-              }, {
+              return _database.Configuration.update(_objectSpread(_objectSpread({}, payload), !configuration.data ? null : {
+                data: JSON.stringify(_objectSpread({}, configuration.data))
+              }), {
                 where: {
                   unique_key: unique_key,
                   deletedAt: null

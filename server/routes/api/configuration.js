@@ -63,7 +63,7 @@ export default (app, router) => {
         '/update-configuration',
         apiKeyAuthenticator(app),
         (req, res, next) => {
-            const { unique_key, ...payload } = req.body;
+            const { id, unique_key, ...payload } = req.body;
 
             const done = (err, configuration) => {
                 res.locals.setResponse(err, { configuration });
@@ -83,7 +83,8 @@ export default (app, router) => {
                 try {
                     await Configuration.update(
                         {
-                            data: JSON.stringify({ ...configuration.data, ...payload }),
+                            ...payload,
+                            ...(!configuration.data ? null : { data: JSON.stringify({ ...configuration.data }) }),
                         },
                         { where: { unique_key: unique_key, deletedAt: null } }
                     );
