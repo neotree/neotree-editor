@@ -84,7 +84,7 @@ export default (app, router) => {
                     await Configuration.update(
                         {
                             ...payload,
-                            ...(!configuration.data ? null : { data: JSON.stringify({ ...configuration.data }) }),
+                            ...(!payload.data ? null : { data: JSON.stringify({ ...payload.data }) }),
                         },
                         { where: { unique_key: unique_key, deletedAt: null } }
                     );
