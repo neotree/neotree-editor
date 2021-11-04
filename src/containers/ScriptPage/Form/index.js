@@ -112,6 +112,7 @@ function ScriptEditorForm({ script }) {
             {[
               { name: 'admission', label: 'Admission', },
               { name: 'discharge', label: 'Discharge', },
+              { name: 'neolab', label: 'NeoLab', },
             ].map(t => (
               <FormControlLabel
                 key={t.name}
