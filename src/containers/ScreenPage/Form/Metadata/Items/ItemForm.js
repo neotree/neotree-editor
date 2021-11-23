@@ -258,7 +258,7 @@ const ItemForm = React.forwardRef(({
                           />
                         </div>
 
-                        {type === 'diagnosis' && (
+                        {/* {type === 'diagnosis' && (
                           <>
                             <TitleTextImageForm
                               noTitle
@@ -293,7 +293,7 @@ const ItemForm = React.forwardRef(({
                             />
                             <br /><br />
                           </>
-                        )}
+                        )} */}
                       </>
                     )}
                   </>

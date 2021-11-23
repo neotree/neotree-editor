@@ -23,7 +23,8 @@ module.exports = function (app) {
   _passport["default"].serializeUser(function (user, done) {
     // app.logger.log('passport.serializeUser');
     done(null, {
-      email: user.email
+      email: user.email,
+      id: user.id
     });
     return null;
   });
@@ -34,7 +35,7 @@ module.exports = function (app) {
       where: {
         email: user.email
       },
-      attributes: ['email']
+      attributes: ['email', 'id']
     }).then(function (user) {
       done(null, user);
       return null;

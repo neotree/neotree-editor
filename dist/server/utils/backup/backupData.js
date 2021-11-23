@@ -42,7 +42,8 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
-function backupData() {
+function backupData(app, req) {
+  var userId = req && req.user ? req.user.id : '';
   return new Promise(function (resolve, reject) {
     try {
       if (!_fs["default"].existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
@@ -381,7 +382,7 @@ function backupData() {
             case 64:
               _fs["default"].writeFileSync("".concat(process.env.BACKUP_DIR_PATH, "/app.json"), JSON.stringify(appInfo));
 
-              (0, _child_process.exec)("cd ".concat(process.env.BACKUP_DIR_PATH, " && git add . && git commit -m v").concat(appInfo.version, " && git push origin master"), function (error, stdout, stderr) {
+              (0, _child_process.exec)("cd ".concat(process.env.BACKUP_DIR_PATH, " && git add . && git commit -m \"v").concat(appInfo.version).concat(userId ? " - Published by User ID: ".concat(userId, "\"") : '', " && git push origin master"), function (error, stdout, stderr) {
                 if (error) {
                   console.log("error: ".concat(error.message));
                   return;

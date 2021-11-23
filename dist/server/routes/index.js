@@ -86,7 +86,7 @@ module.exports = function (app) {
             case 0:
               _context2.prev = 0;
               _context2.next = 3;
-              return (0, _backup.backupData)(app);
+              return (0, _backup.backupData)(app, req);
 
             case 3:
               _context2.next = 5;
