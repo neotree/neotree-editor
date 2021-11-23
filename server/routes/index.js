@@ -31,7 +31,7 @@ module.exports = app => {
   router.post('/publish-changes', (req, res) => {
     (async () => {
       try {
-        await backupData(app);
+        await backupData(app, req);
         const appInfo = await database.App.findOne({ id: 1 });
         const _shouldBackup = await shouldBackup();
         app.io.emit('data_published');

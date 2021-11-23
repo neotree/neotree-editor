@@ -7,13 +7,13 @@ const LocalStrategy = require('passport-local').Strategy;
 module.exports = app => {
   passport.serializeUser((user, done) => {
     // app.logger.log('passport.serializeUser');
-    done(null, { email: user.email });
+    done(null, { email: user.email, id: user.id, });
     return null;
   });
 
   passport.deserializeUser((user, done) => {
     // app.logger.log('passport.deserializeUser');
-    User.findOne({ where: { email: user.email }, attributes: ['email'] })
+    User.findOne({ where: { email: user.email }, attributes: ['email', 'id'] })
       .then(user => { done(null, user); return null; })
       .catch(done);
   });

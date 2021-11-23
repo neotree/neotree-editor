@@ -17,6 +17,9 @@ function Properties(props) {
       refId: null,
       step: null,
       title: null,
+      title2: null,
+      title3: null,
+      title4: null,
       sectionTitle: null,
       actionText: null,
       contentText: null,
@@ -95,6 +98,42 @@ function Properties(props) {
 
       {form.type === 'diagnosis' && (
         <>
+          <div>
+            <TextField
+              fullWidth
+              required
+              error={!form.title2}
+              value={form.title2 || ''}
+              label="Title 2"
+              onChange={e => setForm({ title2: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              fullWidth
+              required
+              error={!form.title3}
+              value={form.title3 || ''}
+              label="Title 3"
+              onChange={e => setForm({ title3: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              fullWidth
+              required
+              error={!form.title4}
+              value={form.title4 || ''}
+              label="Title 4"
+              onChange={e => setForm({ title4: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
           <div>
             <TextField
               fullWidth
