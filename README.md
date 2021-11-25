@@ -1,4 +1,4 @@
-# NeoTree Web Editor
+# Neotree Web Editor
 
 [![DOI](https://zenodo.org/badge/307626495.svg)](https://zenodo.org/badge/latestdoi/307626495)
 
