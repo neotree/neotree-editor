@@ -95,7 +95,7 @@ function NavMenu() {
           </HeaderItem>
         )}
 
-        <Link to="/"><Logo size={40} /></Link>
+        <Link to="/"><Logo color="light" /></Link>
 
         <Typography variant="subtitle1">v{appState.version || 1}</Typography>
 

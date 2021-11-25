@@ -59,7 +59,7 @@ const AuthenticationPage = () => {
         <div className={cx(classes.rootInner)}>
           <Paper className={cx(classes.paper, classes.paperWidth)}>
             <div className={cx(classes.header)}>
-              <Logo />
+              <Logo size={100} style={{ margin: 'auto' }} />
               <br />
               <Typography variant="button">{copy.FORM_TITLE}</Typography>
             </div>
