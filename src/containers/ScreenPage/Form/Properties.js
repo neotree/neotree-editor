@@ -24,6 +24,9 @@ function Properties(props) {
       actionText: null,
       contentText: null,
       instructions: null,
+      instructions2: null,
+      instructions3: null,
+      instructions4: null,
       notes: null,
       ...form,
     });
@@ -224,6 +227,46 @@ function Properties(props) {
         />
       </div>
       <br /><br />
+
+      {form.type === 'diagnosis' && (
+        <>
+          <div>
+            <TextField
+              rows={5}
+              multiline
+              fullWidth
+              value={form.instructions2 || ''}
+              label="Instructions 2"
+              onChange={e => setForm({ instructions2: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              rows={5}
+              multiline
+              fullWidth
+              value={form.instructions3 || ''}
+              label="Instructions 3"
+              onChange={e => setForm({ instructions3: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              rows={5}
+              multiline
+              fullWidth
+              value={form.instructions4 || ''}
+              label="Instructions 4"
+              onChange={e => setForm({ instructions4: e.target.value })}
+            />
+          </div>
+          <br /><br />
+        </>
+      )}
 
       <div>
         <TextField
