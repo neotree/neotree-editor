@@ -48,6 +48,10 @@ const FieldForm = React.forwardRef(({
     maxDate: null,
     minTime: null,
     maxTime: null,
+    minDateKey: '',
+    maxDateKey: '',
+    minTimeKey: '',
+    maxTimeKey: '',
     ...data,
   };
   const [form, _setForm] = React.useState(defaultForm);
@@ -215,6 +219,7 @@ const FieldForm = React.forwardRef(({
                         value={form.minTime === 'time_now' ? null : form.minTime}
                         onChange={minTime => setForm({ minTime })}
                       />
+
                       <FormControlLabel
                         label="Current time"
                         control={(
@@ -225,6 +230,16 @@ const FieldForm = React.forwardRef(({
                           />
                         )}
                       />
+
+                      {/* <div>
+                        <TextField
+                          fullWidth
+                          value={form.minTimeKey || ''}
+                          label="Min Time Key (e.g $TimeOfBirth)"
+                          onChange={e => setForm({ minTimeKey: e.target.value })}
+                        />
+                      </div>
+                      <br /> */}
                     </Grid>
 
                     <Grid item xs={6} sm={6}>
@@ -236,6 +251,7 @@ const FieldForm = React.forwardRef(({
                         value={form.maxTime === 'time_now' ? null : form.maxTime}
                         onChange={maxTime => setForm({ maxTime })}
                       />
+
                       <FormControlLabel
                         label="Current time"
                         control={(
@@ -246,6 +262,16 @@ const FieldForm = React.forwardRef(({
                           />
                         )}
                       />
+
+                      {/* <div>
+                        <TextField
+                          fullWidth
+                          value={form.maxTimeKey || ''}
+                          label="Max Time Key (e.g $TimeOfBirth)"
+                          onChange={e => setForm({ maxTimeKey: e.target.value })}
+                        />
+                      </div>
+                      <br /> */}
                     </Grid>
                   </Grid>
                   <br /><br />
@@ -264,6 +290,7 @@ const FieldForm = React.forwardRef(({
                         value={form.minDate === 'date_now' ? null : form.minDate}
                         onChange={minDate => setForm({ minDate })}
                       />
+
                       <FormControlLabel
                         label="Current date"
                         control={(
@@ -274,6 +301,16 @@ const FieldForm = React.forwardRef(({
                           />
                         )}
                       />
+
+                      <div>
+                        <TextField
+                          fullWidth
+                          value={form.minDateKey || ''}
+                          label="Min Date Key (e.g. $DateOfBirth)"
+                          onChange={e => setForm({ minDateKey: e.target.value })}
+                        />
+                      </div>
+                      <br />
                     </Grid>
 
                     <Grid item xs={6} sm={6}>
@@ -285,6 +322,7 @@ const FieldForm = React.forwardRef(({
                         value={form.maxDate === 'date_now' ? null : form.maxDate}
                         onChange={maxDate => setForm({ maxDate })}
                       />
+
                       <FormControlLabel
                         label="Current date"
                         control={(
@@ -295,6 +333,16 @@ const FieldForm = React.forwardRef(({
                           />
                         )}
                       />
+
+                      <div>
+                        <TextField
+                          fullWidth
+                          value={form.maxDateKey || ''}
+                          label="Max Date Key (e.g. $DateOfBirth)"
+                          onChange={e => setForm({ maxDateKey: e.target.value })}
+                        />
+                      </div>
+                      <br />
                     </Grid>
                   </Grid>
                   <br /><br />
