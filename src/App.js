@@ -10,8 +10,14 @@ const socket = io();
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#2980b9' },
-    secondary: { main: '#f39c12' },
+    primary: { 
+      main: '#70A487', // '#2980b9' 
+      contrastText: '#fff',
+    },
+    secondary: { 
+      main: '#2B304A', // '#f39c12' 
+      contrastText: '#fff',
+    },
   },
   layout: {
     SIDEBAR_WIDTH: 250,
