@@ -24,7 +24,7 @@ module.exports = (router) => {
         content_type: f.mimetype,
         size: f.size,
         data: f.buffer,
-        uploaded_by: req.user ? req.user.id : null
+        // uploaded_by: req.user ? req.user.id : null
       }).then((rslts) => {
         done(null, !rslts ? null : {
           id: rslts.id,

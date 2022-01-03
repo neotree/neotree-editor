@@ -73,7 +73,11 @@ function TitleTextImageForm({ labels, value, onChange, noTitle }) {
             >
                 <FileIput
                   accept="image/*"
-                  onUploadSuccess={files => onChange({ image: files[0] })}
+                  onUploadComplete={res => {
+                    const f = res[0];
+                    if (f && f.error) return alert(f.error.message || f.error);
+                    onChange({ image: f });
+                  }}
                 >
                   <Fab
                     size="small"

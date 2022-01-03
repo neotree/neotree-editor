@@ -10,7 +10,8 @@ export default function uploadFile(file) {
         body: formData
       })
       .then(response => response.json())
-      .then(({ file: f, error: e, }) => {
+      .then(({ file: f, error: e, errors, }) => {
+        e = (e ? [e] : (errors ? errors : [])).join('\n');
         if (e) return reject(e);
         resolve({
           type: f.content_type,
