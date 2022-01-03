@@ -48,8 +48,8 @@ module.exports = function (router) {
       filename: f.originalname,
       content_type: f.mimetype,
       size: f.size,
-      data: f.buffer,
-      uploaded_by: req.user ? req.user.id : null
+      data: f.buffer // uploaded_by: req.user ? req.user.id : null
+
     }).then(function (rslts) {
       done(null, !rslts ? null : {
         id: rslts.id,

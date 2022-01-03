@@ -23,6 +23,7 @@ const useStyles = makeStyles(() => ({
 
 const FileInput = React.forwardRef(({
     onUploadSuccess,
+    onUploadComplete,
     children,
     className,
     ...props
@@ -52,7 +53,8 @@ const FileInput = React.forwardRef(({
                         const files = [...e.target.files];
                         const done = (e, rslts = []) => {
                             setUploading(false);
-                            onUploadSuccess(rslts);
+                            if (onUploadSuccess) onUploadSuccess(rslts);
+                            if (onUploadComplete) onUploadComplete(rslts);
                         };
                         Promise.all(files.map(f => new Promise((resolve) => {
                             uploadFile(f)
@@ -71,6 +73,7 @@ const FileInput = React.forwardRef(({
 FileInput.propTypes = {
     children: PropTypes.node,
     onUploadSuccess: PropTypes.func,
+    onUploadComplete: PropTypes.func,
 };
 
 export default FileInput;
