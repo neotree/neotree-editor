@@ -39,6 +39,7 @@ const FieldForm = React.forwardRef(({
     format: null,
     type: null,
     key: null,
+    refKey: null,
     label: null,
     minValue: null,
     maxValue: null,
@@ -162,6 +163,18 @@ const FieldForm = React.forwardRef(({
                   value={form.label || ''}
                   label="Label"
                   onChange={e => setForm({ label: e.target.value })}
+                />
+              </div>
+              <br />
+
+              <div>
+                <TextField
+                  fullWidth
+                  // required
+                  // error={!form.label}
+                  value={form.refKey || ''}
+                  label="Reference key"
+                  onChange={e => setForm({ refKey: e.target.value })}
                 />
               </div>
               <br />
