@@ -176,6 +176,10 @@ const FieldForm = React.forwardRef(({
                   label="Reference key"
                   onChange={e => setForm({ refKey: e.target.value })}
                 />
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                >Link this field to <b>another field with this key</b></Typography>
               </div>
               <br />
 
