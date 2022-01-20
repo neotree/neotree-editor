@@ -11,7 +11,7 @@ module.exports = app => {
       const { script_id } = req.query;
       (async () => {
           try {
-            const count = await Screen.count({ where: { type: 'diagnosis', script_id } });
+            const count = await Screen.count({ where: { type: 'diagnosis', script_id, deletedAt: null, } });
             res.json({ count, });
           } catch(e) { res.json({ error: e.message }); }
       })();
