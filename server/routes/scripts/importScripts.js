@@ -5,7 +5,7 @@ import { createScript } from './createScriptMiddleware';
 import { createScreen } from '../screens/createScreenMiddleware';
 import { createDiagnosis } from '../diagnoses/createDiagnosisMiddleware';
 
-export function importScripts(app) {
+export function importScripts() {
     return (req, res, next) => {
         const { url, scriptId } = req.body;
         (async () => {
