@@ -47,7 +47,7 @@ function ImportScript() {
       const e = json.error ? [json.error] : json.errors;
       if (e) throw new Error(e.map(e => e.message || e.msg || e).join('\n'));
       // onClose();
-      // window.location.reload();
+      window.location.reload();
     } catch (e) { setError(e.message); }
     setImporting(false);
   }
