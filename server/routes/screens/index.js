@@ -1,5 +1,6 @@
 import express from 'express';
 import * as endpoints from '../../../constants/api-endpoints/screens';
+import { createScreenMiddleware } from './createScreenMiddleware';
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ module.exports = app => {
 
   router.post(
     endpoints.CREATE_SCREEN,
-    require('./createScreenMiddleware')(app),
+    createScreenMiddleware(app),
     (req, res, next) => {
       app.io.emit('data_updated');
       next();

@@ -1,10 +1,28 @@
 import express from 'express';
 import * as endpoints from '../../../constants/api-endpoints/scripts';
 import { Screen } from '../../database';
+import { importScripts, getImportScripts } from './importScripts';
+import { createScriptMiddleware } from './createScriptMiddleware';
 
 const router = express.Router();
 
 module.exports = app => {
+  router.post(
+    '/import-scripts', 
+    importScripts(app),
+    (req, res, next) => {
+      app.io.emit('data_updated');
+      next();
+    },
+    require('../../utils/responseMiddleware'),
+  );
+
+  router.get(
+    '/get-import-scripts', 
+    getImportScripts(app),
+    require('../../utils/responseMiddleware'),
+  );
+
   router.get(
     endpoints.GET_SCRIPT_DIAGNOSES_SCREENS,
     (req, res) => {
@@ -38,7 +56,7 @@ module.exports = app => {
 
   router.post(
     endpoints.CREATE_SCRIPT,
-    require('./createScriptMiddleware')(app),
+    createScriptMiddleware(app),
     (req, res, next) => {
       app.io.emit('data_updated');
       next();
