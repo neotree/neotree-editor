@@ -7,7 +7,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Typography from '@material-ui/core/Typography';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/AppContext';
-
+import { CopyImportInfo } from '@/components/CopyImportInfo';
 import DeleteScripts from './Forms/DeleteScripts';
 import DuplicateScripts from './Forms/DuplicateScripts';
 
@@ -41,6 +41,10 @@ function Action({ row, }) {
             component={DuplicateScripts}
           >Duplicate</MenuItem>
         )}
+
+        {/* <MenuItem
+          component={CopyImportInfo}
+        >Copy import info</MenuItem> */}
 
         {viewMode === 'view' ? null : (
           <MenuItem
