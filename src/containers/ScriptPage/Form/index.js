@@ -11,10 +11,12 @@ import { useHistory } from 'react-router-dom';
 import Divider from '@/components/Divider';
 import Typography from '@material-ui/core/Typography';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
+import Grid from '@material-ui/core/Grid';
 import Button from '@material-ui/core/Button';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import OverlayLoader from '@/components/OverlayLoader';
 import { useAppContext } from '@/AppContext';
+import { ImportScript } from '@/components/ImportScript';
 
 function ScriptEditorForm({ script }) {
   const { state: { viewMode } } = useAppContext();
@@ -57,7 +59,14 @@ function ScriptEditorForm({ script }) {
     <>
       <Card>
         <CardContent>
-          <TitleWithBackArrow backLink="/scripts" title={`${script ? 'Edit' : 'Add'} script`} />
+          <Grid container>
+            <Grid item xs={10}>
+              <TitleWithBackArrow backLink="/scripts" title={`${script ? 'Edit' : 'Add'} script`} />
+            </Grid>
+            <Grid item xs={2} style={{ textAlign: 'right' }}>
+              {!!script && <ImportScript scriptId={script.script_id} />}
+            </Grid>
+          </Grid>
           <br /><br />
 
           <div>

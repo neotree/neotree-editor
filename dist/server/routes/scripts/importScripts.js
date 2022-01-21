@@ -43,13 +43,14 @@ function importScripts() {
   return function (req, res, next) {
     var _req$body = req.body,
         url = _req$body.url,
-        scriptId = _req$body.scriptId;
+        importScriptId = _req$body.importScriptId,
+        updateScriptId = _req$body.updateScriptId;
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee5() {
       return _regenerator["default"].wrap(function _callee5$(_context5) {
         while (1) {
           switch (_context5.prev = _context5.next) {
             case 0:
-              ("".concat(url).match('https') ? _https["default"] : _http["default"]).get("".concat(url, "/get-import-scripts?scriptId=").concat(scriptId), function (resp) {
+              ("".concat(url).match('https') ? _https["default"] : _http["default"]).get("".concat(url, "/get-import-scripts?scriptId=").concat(importScriptId), function (resp) {
                 var _data = '';
                 resp.on('data', function (chunk) {
                   _data += chunk;
@@ -71,7 +72,7 @@ function importScripts() {
                             return Promise.all(Object.keys(data).map(function (key) {
                               return new Promise(function (resolve) {
                                 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
-                                  var _data$key, script, screens, diagnoses, newScript, saveScreens, saveDiagnoses;
+                                  var _data$key, script, screens, diagnoses, savedScript, deleteScreens, deleteDiagnoses, updateScript, saveScreens, saveDiagnoses, deletedAt;
 
                                   return _regenerator["default"].wrap(function _callee3$(_context3) {
                                     while (1) {
@@ -79,14 +80,87 @@ function importScripts() {
                                         case 0:
                                           _data$key = data[key], script = _data$key.script, screens = _data$key.screens, diagnoses = _data$key.diagnoses;
                                           delete script.data.id;
-                                          _context3.next = 4;
+                                          savedScript = null;
+                                          deleteScreens = [];
+                                          deleteDiagnoses = [];
+
+                                          if (updateScriptId) {
+                                            _context3.next = 11;
+                                            break;
+                                          }
+
+                                          _context3.next = 8;
                                           return (0, _createScriptMiddleware.createScript)(script.data);
 
-                                        case 4:
-                                          newScript = _context3.sent;
+                                        case 8:
+                                          savedScript = _context3.sent;
+                                          _context3.next = 26;
+                                          break;
 
-                                          if (!newScript) {
-                                            _context3.next = 12;
+                                        case 11:
+                                          _context3.next = 13;
+                                          return _database.Script.findOne({
+                                            where: {
+                                              script_id: updateScriptId
+                                            }
+                                          });
+
+                                        case 13:
+                                          updateScript = _context3.sent;
+
+                                          if (!updateScript) {
+                                            _context3.next = 23;
+                                            break;
+                                          }
+
+                                          _context3.next = 17;
+                                          return _database.Script.update({
+                                            type: script.type,
+                                            data: JSON.stringify(_objectSpread(_objectSpread({}, script.data), {}, {
+                                              scriptId: updateScriptId,
+                                              script_id: updateScriptId
+                                            }))
+                                          }, {
+                                            where: {
+                                              id: updateScript.id,
+                                              deletedAt: null
+                                            }
+                                          });
+
+                                        case 17:
+                                          _context3.next = 19;
+                                          return _database.Screen.findAll({
+                                            where: {
+                                              script_id: updateScriptId
+                                            }
+                                          });
+
+                                        case 19:
+                                          deleteScreens = _context3.sent;
+                                          _context3.next = 22;
+                                          return _database.Diagnosis.findAll({
+                                            where: {
+                                              script_id: updateScriptId
+                                            }
+                                          });
+
+                                        case 22:
+                                          deleteDiagnoses = _context3.sent;
+
+                                        case 23:
+                                          _context3.next = 25;
+                                          return _database.Script.findOne({
+                                            where: {
+                                              script_id: updateScriptId
+                                            }
+                                          });
+
+                                        case 25:
+                                          savedScript = _context3.sent;
+
+                                        case 26:
+                                          if (!savedScript) {
+                                            _context3.next = 38;
                                             break;
                                           }
 
@@ -109,7 +183,7 @@ function importScripts() {
                                                       delete s.data.id;
                                                       _context.next = 7;
                                                       return (0, _createScreenMiddleware.createScreen)(_objectSpread(_objectSpread({}, s.data), {}, {
-                                                        scriptId: newScript.script_id
+                                                        scriptId: updateScriptId || savedScript.script_id
                                                       }));
 
                                                     case 7:
@@ -150,10 +224,10 @@ function importScripts() {
                                             };
                                           }();
 
-                                          _context3.next = 9;
+                                          _context3.next = 30;
                                           return saveScreens();
 
-                                        case 9:
+                                        case 30:
                                           saveDiagnoses = /*#__PURE__*/function () {
                                             var _ref5 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
                                               var _diagnoses,
@@ -173,7 +247,7 @@ function importScripts() {
                                                       delete d.data.id;
                                                       _context2.next = 7;
                                                       return (0, _createDiagnosisMiddleware.createDiagnosis)(_objectSpread(_objectSpread({}, d.data), {}, {
-                                                        scriptId: newScript.script_id
+                                                        scriptId: updateScriptId || savedScript.script_id
                                                       }));
 
                                                     case 7:
@@ -214,13 +288,38 @@ function importScripts() {
                                             };
                                           }();
 
-                                          _context3.next = 12;
+                                          _context3.next = 33;
                                           return saveDiagnoses();
 
-                                        case 12:
-                                          resolve(newScript);
+                                        case 33:
+                                          deletedAt = new Date();
+                                          _context3.next = 36;
+                                          return _database.Screen.update({
+                                            deletedAt: deletedAt
+                                          }, {
+                                            where: {
+                                              id: deleteScreens.map(function (s) {
+                                                return s.id;
+                                              })
+                                            }
+                                          });
 
-                                        case 13:
+                                        case 36:
+                                          _context3.next = 38;
+                                          return _database.Diagnosis.update({
+                                            deletedAt: deletedAt
+                                          }, {
+                                            where: {
+                                              id: deleteDiagnoses.map(function (s) {
+                                                return s.id;
+                                              })
+                                            }
+                                          });
+
+                                        case 38:
+                                          resolve(savedScript);
+
+                                        case 39:
                                         case "end":
                                           return _context3.stop();
                                       }

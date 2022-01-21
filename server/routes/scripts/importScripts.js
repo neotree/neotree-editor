@@ -7,9 +7,9 @@ import { createDiagnosis } from '../diagnoses/createDiagnosisMiddleware';
 
 export function importScripts() {
     return (req, res, next) => {
-        const { url, scriptId } = req.body;
+        const { url, importScriptId, updateScriptId, } = req.body;
         (async () => {
-            (`${url}`.match('https') ? https : http).get(`${url}/get-import-scripts?scriptId=${scriptId}`, resp => {
+            (`${url}`.match('https') ? https : http).get(`${url}/get-import-scripts?scriptId=${importScriptId}`, resp => {
                 let _data = '';
 
                 resp.on('data', (chunk) => {
@@ -31,16 +31,39 @@ export function importScripts() {
                                         const { script, screens, diagnoses } = data[key];
     
                                         delete script.data.id;
-                                        const newScript = await createScript(script.data);
+                                        let savedScript = null;
+                                        let deleteScreens = [];
+                                        let deleteDiagnoses = [];
+                                        if (!updateScriptId) {
+                                            savedScript = await createScript(script.data);
+                                        } else {
+                                            const updateScript = await Script.findOne({ where: { script_id: updateScriptId } });
+                                            if (updateScript) {
+                                                await Script.update(
+                                                    {
+                                                        type: script.type,
+                                                        data: JSON.stringify({ 
+                                                            ...script.data,
+                                                            scriptId: updateScriptId,
+                                                            script_id: updateScriptId, 
+                                                        }),
+                                                    },
+                                                    { where: { id: updateScript.id, deletedAt: null } }
+                                                );
+                                                deleteScreens = await Screen.findAll({ where: { script_id: updateScriptId, } });
+                                                deleteDiagnoses = await Diagnosis.findAll({ where: { script_id: updateScriptId, } });
+                                            }
+                                            savedScript = await Script.findOne({ where: { script_id: updateScriptId } });
+                                        }
     
-                                        if (newScript) {
+                                        if (savedScript) {
                                             const saveScreens = async (_screens = screens, saved = []) => {
                                                 const s = _screens.shift();
                                                 try {
                                                     delete s.data.id;
                                                     const newScreen = await createScreen({  
                                                         ...s.data,
-                                                        scriptId: newScript.script_id, 
+                                                        scriptId: updateScriptId || savedScript.script_id, 
                                                     });
                                                     if (newScreen) saved.push(newScreen);
                                                 } catch(e) { /* */ }
@@ -55,7 +78,7 @@ export function importScripts() {
                                                     delete d.data.id;
                                                     const newScreen = await createDiagnosis({  
                                                         ...d.data,
-                                                        scriptId: newScript.script_id, 
+                                                        scriptId: updateScriptId || savedScript.script_id, 
                                                     });
                                                     if (newScreen) saved.push(newScreen);
                                                 } catch(e) { /* */ }
@@ -63,9 +86,13 @@ export function importScripts() {
                                                 return saved;
                                             };
                                             await saveDiagnoses();
+
+                                            const deletedAt = new Date();
+                                            await Screen.update({ deletedAt }, { where: { id: deleteScreens.map(s => s.id) } });
+                                            await Diagnosis.update({ deletedAt }, { where: { id: deleteDiagnoses.map(s => s.id) } });
                                         }
     
-                                        resolve(newScript);
+                                        resolve(savedScript);
                                     })();
                                 })));
                             } catch (e) { error = e.message; }
