@@ -27,6 +27,8 @@ function Properties(props) {
       instructions2: null,
       instructions3: null,
       instructions4: null,
+      hcwDiagnosesInstructions: null,
+      suggestedDiagnosesInstructions: null,
       notes: null,
       ...form,
     });
@@ -265,6 +267,36 @@ function Properties(props) {
             />
           </div>
           <br /><br />
+
+          <Grid container spacing={1}>
+            <Grid item xs={12} sm={6}>
+              <div>
+                <TextField
+                  rows={5}
+                  multiline
+                  fullWidth
+                  value={form.hcwDiagnosesInstructions || ''}
+                  label="HCW diagnoses instructions"
+                  onChange={e => setForm({ hcwDiagnosesInstructions: e.target.value })}
+                />
+              </div>
+              <br /><br />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <div>
+                <TextField
+                  rows={5}
+                  multiline
+                  fullWidth
+                  value={form.suggestedDiagnosesInstructions || ''}
+                  label="Suggested diagnoses instructions"
+                  onChange={e => setForm({ suggestedDiagnosesInstructions: e.target.value })}
+                />
+              </div>
+              <br /><br />
+            </Grid>
+          </Grid>
         </>
       )}
 
