@@ -23,7 +23,6 @@ export function importScripts() {
                         let resp = null;
 
                         try { 
-                            console.log('DATA ---> ', _data);
                             data = _data ? JSON.parse(_data) : {}; 
                             
                             try {
@@ -98,7 +97,6 @@ export function importScripts() {
                                 })));
                             } catch (e) { error = e.message; }
                         } catch (e) { 
-                            console.log('IMPORT ERR ----> ', e.message);
                             error = 'Failed to import, make sure the URL is correct';
                         }
                         res.locals.setResponse(error, { data: resp, });

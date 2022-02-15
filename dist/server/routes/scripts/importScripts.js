@@ -66,10 +66,9 @@ function importScripts() {
                             error = null;
                             resp = null;
                             _context4.prev = 3;
-                            console.log('DATA ---> ', _data);
                             data = _data ? JSON.parse(_data) : {};
-                            _context4.prev = 6;
-                            _context4.next = 9;
+                            _context4.prev = 5;
+                            _context4.next = 8;
                             return Promise.all(Object.keys(data).map(function (key) {
                               return new Promise(function (resolve) {
                                 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
@@ -330,38 +329,37 @@ function importScripts() {
                               });
                             }));
 
-                          case 9:
+                          case 8:
                             resp = _context4.sent;
-                            _context4.next = 15;
+                            _context4.next = 14;
                             break;
 
-                          case 12:
-                            _context4.prev = 12;
-                            _context4.t0 = _context4["catch"](6);
+                          case 11:
+                            _context4.prev = 11;
+                            _context4.t0 = _context4["catch"](5);
                             error = _context4.t0.message;
 
-                          case 15:
-                            _context4.next = 21;
+                          case 14:
+                            _context4.next = 19;
                             break;
 
-                          case 17:
-                            _context4.prev = 17;
+                          case 16:
+                            _context4.prev = 16;
                             _context4.t1 = _context4["catch"](3);
-                            console.log('IMPORT ERR ----> ', _context4.t1.message);
                             error = 'Failed to import, make sure the URL is correct';
 
-                          case 21:
+                          case 19:
                             res.locals.setResponse(error, {
                               data: resp
                             });
                             next();
 
-                          case 23:
+                          case 21:
                           case "end":
                             return _context4.stop();
                         }
                       }
-                    }, _callee4, null, [[3, 17], [6, 12]]);
+                    }, _callee4, null, [[3, 16], [5, 11]]);
                   }))();
                 });
               }).on('error', function (e) {
