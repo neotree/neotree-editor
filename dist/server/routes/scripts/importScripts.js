@@ -340,21 +340,22 @@ function importScripts() {
                             error = _context4.t0.message;
 
                           case 14:
-                            _context4.next = 19;
+                            _context4.next = 20;
                             break;
 
                           case 16:
                             _context4.prev = 16;
                             _context4.t1 = _context4["catch"](3);
+                            console.log(_context4.t1);
                             error = 'Failed to import, make sure the URL is correct';
 
-                          case 19:
+                          case 20:
                             res.locals.setResponse(error, {
                               data: resp
                             });
                             next();
 
-                          case 21:
+                          case 22:
                           case "end":
                             return _context4.stop();
                         }

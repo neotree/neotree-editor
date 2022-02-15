@@ -97,6 +97,7 @@ export function importScripts() {
                                 })));
                             } catch (e) { error = e.message; }
                         } catch (e) { 
+                            console.log(e);
                             error = 'Failed to import, make sure the URL is correct';
                         }
                         res.locals.setResponse(error, { data: resp, });
