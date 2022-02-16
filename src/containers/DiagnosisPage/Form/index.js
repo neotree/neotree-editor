@@ -97,6 +97,18 @@ function DiagnosisEditor({ diagnosis, script }) {
           <div>
             <TextField
               fullWidth
+              required
+              error={!form.key}
+              value={form.key || ''}
+              label="Key"
+              onChange={e => setForm({ key: e.target.value })}
+            />
+          </div>
+          <br /><br />
+
+          <div>
+            <TextField
+              fullWidth
               value={form.description || ''}
               label="Description"
               onChange={e => setForm({ description: e.target.value })}

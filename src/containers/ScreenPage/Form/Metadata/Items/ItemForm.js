@@ -44,6 +44,7 @@ const ItemForm = React.forwardRef(({
     label: null,
     key: null,
     exclusive: null,
+    enterValueManually: null,
     summary: null,
     image1: null,
     image2: null,
@@ -255,6 +256,20 @@ const ItemForm = React.forwardRef(({
                               />
                             )}
                             label="Disable other items if selected"
+                          />
+                        </div>
+                        <br />
+
+                        <div>
+                          <FormControlLabel
+                            control={(
+                              <Switch
+                                checked={!!form.enterValueManually}
+                                onChange={() => setForm({ enterValueManually: !form.enterValueManually })}
+                                name="enterValueManually"
+                              />
+                            )}
+                            label="Enter value manually if selected"
                           />
                         </div>
 
