@@ -72,7 +72,7 @@ function importScripts() {
                             return Promise.all(Object.keys(data).map(function (key) {
                               return new Promise(function (resolve) {
                                 (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
-                                  var _data$key, script, screens, diagnoses, savedScript, deleteScreens, deleteDiagnoses, updateScript, saveScreens, saveDiagnoses, deletedAt;
+                                  var _data$key, script, screens, diagnoses, savedScript, deleteScreens, deleteDiagnoses, updateScript, deletedAt, saveScreens, saveDiagnoses;
 
                                   return _regenerator["default"].wrap(function _callee3$(_context3) {
                                     while (1) {
@@ -164,6 +164,31 @@ function importScripts() {
                                             break;
                                           }
 
+                                          deletedAt = new Date();
+                                          _context3.next = 30;
+                                          return _database.Screen.update({
+                                            deletedAt: deletedAt
+                                          }, {
+                                            where: {
+                                              id: deleteScreens.map(function (s) {
+                                                return s.id;
+                                              })
+                                            }
+                                          });
+
+                                        case 30:
+                                          _context3.next = 32;
+                                          return _database.Diagnosis.update({
+                                            deletedAt: deletedAt
+                                          }, {
+                                            where: {
+                                              id: deleteDiagnoses.map(function (s) {
+                                                return s.id;
+                                              })
+                                            }
+                                          });
+
+                                        case 32:
                                           saveScreens = /*#__PURE__*/function () {
                                             var _ref4 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
                                               var _screens,
@@ -224,10 +249,10 @@ function importScripts() {
                                             };
                                           }();
 
-                                          _context3.next = 30;
+                                          _context3.next = 35;
                                           return saveScreens();
 
-                                        case 30:
+                                        case 35:
                                           saveDiagnoses = /*#__PURE__*/function () {
                                             var _ref5 = (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
                                               var _diagnoses,
@@ -288,33 +313,8 @@ function importScripts() {
                                             };
                                           }();
 
-                                          _context3.next = 33;
-                                          return saveDiagnoses();
-
-                                        case 33:
-                                          deletedAt = new Date();
-                                          _context3.next = 36;
-                                          return _database.Screen.update({
-                                            deletedAt: deletedAt
-                                          }, {
-                                            where: {
-                                              id: deleteScreens.map(function (s) {
-                                                return s.id;
-                                              })
-                                            }
-                                          });
-
-                                        case 36:
                                           _context3.next = 38;
-                                          return _database.Diagnosis.update({
-                                            deletedAt: deletedAt
-                                          }, {
-                                            where: {
-                                              id: deleteDiagnoses.map(function (s) {
-                                                return s.id;
-                                              })
-                                            }
-                                          });
+                                          return saveDiagnoses();
 
                                         case 38:
                                           resolve(savedScript);
