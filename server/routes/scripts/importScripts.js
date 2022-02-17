@@ -57,6 +57,10 @@ export function importScripts() {
                                         }
     
                                         if (savedScript) {
+                                            const deletedAt = new Date();
+                                            await Screen.update({ deletedAt }, { where: { id: deleteScreens.map(s => s.id) } });
+                                            await Diagnosis.update({ deletedAt }, { where: { id: deleteDiagnoses.map(s => s.id) } });
+
                                             const saveScreens = async (_screens = screens, saved = []) => {
                                                 const s = _screens.shift();
                                                 try {
@@ -86,10 +90,6 @@ export function importScripts() {
                                                 return saved;
                                             };
                                             await saveDiagnoses();
-
-                                            const deletedAt = new Date();
-                                            await Screen.update({ deletedAt }, { where: { id: deleteScreens.map(s => s.id) } });
-                                            await Diagnosis.update({ deletedAt }, { where: { id: deleteDiagnoses.map(s => s.id) } });
                                         }
     
                                         resolve(savedScript);
