@@ -35,7 +35,7 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/utils/getWindowLocation.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/utils/getWindowLocation.js");
 })();
 
 ;

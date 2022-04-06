@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.SIGNIN_MISSNG_PASSWORD = exports.SIGNIN_WRONG_PASSWORD = exports.SIGNIN_NO_USER = exports.UNAUTHORIZED = void 0;
+exports.UNAUTHORIZED = exports.SIGNIN_WRONG_PASSWORD = exports.SIGNIN_NO_USER = exports.SIGNIN_MISSNG_PASSWORD = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -31,10 +31,10 @@ exports.SIGNIN_MISSNG_PASSWORD = SIGNIN_MISSNG_PASSWORD;
     return;
   }
 
-  reactHotLoader.register(UNAUTHORIZED, "UNAUTHORIZED", "/home/farai/WorkBench/neotree-editor/constants/error-codes/auth.js");
-  reactHotLoader.register(SIGNIN_NO_USER, "SIGNIN_NO_USER", "/home/farai/WorkBench/neotree-editor/constants/error-codes/auth.js");
-  reactHotLoader.register(SIGNIN_WRONG_PASSWORD, "SIGNIN_WRONG_PASSWORD", "/home/farai/WorkBench/neotree-editor/constants/error-codes/auth.js");
-  reactHotLoader.register(SIGNIN_MISSNG_PASSWORD, "SIGNIN_MISSNG_PASSWORD", "/home/farai/WorkBench/neotree-editor/constants/error-codes/auth.js");
+  reactHotLoader.register(UNAUTHORIZED, "UNAUTHORIZED", "/home/farai/Workbench/neotree-editor/constants/error-codes/auth.js");
+  reactHotLoader.register(SIGNIN_NO_USER, "SIGNIN_NO_USER", "/home/farai/Workbench/neotree-editor/constants/error-codes/auth.js");
+  reactHotLoader.register(SIGNIN_WRONG_PASSWORD, "SIGNIN_WRONG_PASSWORD", "/home/farai/Workbench/neotree-editor/constants/error-codes/auth.js");
+  reactHotLoader.register(SIGNIN_MISSNG_PASSWORD, "SIGNIN_MISSNG_PASSWORD", "/home/farai/Workbench/neotree-editor/constants/error-codes/auth.js");
 })();
 
 ;

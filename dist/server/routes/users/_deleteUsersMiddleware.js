@@ -175,7 +175,7 @@ module.exports = function () {
     return;
   }
 
-  reactHotLoader.register(deleteUser, "deleteUser", "/home/farai/WorkBench/neotree-editor/server/routes/users/_deleteUsersMiddleware.js");
+  reactHotLoader.register(deleteUser, "deleteUser", "/home/farai/Workbench/neotree-editor/server/routes/users/_deleteUsersMiddleware.js");
 })();
 
 ;

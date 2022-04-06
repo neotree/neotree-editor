@@ -5,12 +5,6 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "shouldBackup", {
-  enumerable: true,
-  get: function get() {
-    return _shouldBackup["default"];
-  }
-});
 Object.defineProperty(exports, "backupData", {
   enumerable: true,
   get: function get() {
@@ -21,6 +15,12 @@ Object.defineProperty(exports, "restoreBackup", {
   enumerable: true,
   get: function get() {
     return _restoreBackup["default"];
+  }
+});
+Object.defineProperty(exports, "shouldBackup", {
+  enumerable: true,
+  get: function get() {
+    return _shouldBackup["default"];
   }
 });
 

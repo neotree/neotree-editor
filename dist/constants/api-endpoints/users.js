@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DELETE_USERS = exports.ADD_USER = exports.UPDATE_USERS = exports.UPDATE_USER = exports.GET_USERS = void 0;
+exports.UPDATE_USERS = exports.UPDATE_USER = exports.GET_USERS = exports.DELETE_USERS = exports.ADD_USER = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -33,11 +33,11 @@ exports.DELETE_USERS = DELETE_USERS;
     return;
   }
 
-  reactHotLoader.register(GET_USERS, "GET_USERS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(UPDATE_USER, "UPDATE_USER", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(UPDATE_USERS, "UPDATE_USERS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(ADD_USER, "ADD_USER", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(DELETE_USERS, "DELETE_USERS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(GET_USERS, "GET_USERS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(UPDATE_USER, "UPDATE_USER", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(UPDATE_USERS, "UPDATE_USERS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(ADD_USER, "ADD_USER", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(DELETE_USERS, "DELETE_USERS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/users.js");
 })();
 
 ;

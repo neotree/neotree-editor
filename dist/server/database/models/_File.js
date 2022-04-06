@@ -75,8 +75,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(File, "File", "/home/farai/WorkBench/neotree-editor/server/database/models/_File.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_File.js");
+  reactHotLoader.register(File, "File", "/home/farai/Workbench/neotree-editor/server/database/models/_File.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_File.js");
 })();
 
 ;

@@ -8,15 +8,16 @@ import wrapMetadataFormItem from '../_wrapMetadataFormItem';
 import ItemForm from './ItemForm';
 import ItemRowActions from './ItemRowActions';
 
-function Items({ form, setMetadata }) {
+function Items({ form, setMetadata, title, filterItems, editable, }) {
   return (
     <>
       <DataTable
+        filter={filterItems}
         selectable={false}
         noDataMsg="No items"
-        title="Items"
+        title={title || 'Items'}
         data={form.metadata.items}
-        renderHeaderActions={() => (
+        renderHeaderActions={!editable ? undefined : () => (
           <ItemForm
             form={form}
             onSave={item => setMetadata({ items: [...form.metadata.items, item] })}
@@ -26,7 +27,7 @@ function Items({ form, setMetadata }) {
             </IconButton>
           </ItemForm>
         )}
-        renderRowAction={(row, i) => (
+        renderRowAction={!editable ? undefined : (row, i) => (
           <ItemRowActions
             row={row}
             form={form}
@@ -36,6 +37,12 @@ function Items({ form, setMetadata }) {
         )}
         displayFields={(() => {
           switch (form.type) {
+            case 'edliz_summary_table':
+              return [
+                { key: 'id', label: 'ID', },
+                { key: 'subType', label: 'Sub type', },
+                { key: 'label', label: 'Label', },
+             ];
             case 'checklist':
               return [
                 { key: 'key', label: 'Key', },
@@ -93,7 +100,7 @@ function Items({ form, setMetadata }) {
               return [];
           }
         })()}
-        onSortData={items => {
+        onSortData={!editable ? undefined : items => {
           setMetadata({ items });
         }}
       />
@@ -104,6 +111,9 @@ function Items({ form, setMetadata }) {
 Items.propTypes = {
   setMetadata: PropTypes.func.isRequired,
   form: PropTypes.object.isRequired,
+  title: PropTypes.string,
+  filterItems: PropTypes.func,
+  editable: PropTypes.bool,
 };
 
 export default wrapMetadataFormItem(Items);

@@ -42,8 +42,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Session, "Session", "/home/farai/WorkBench/neotree-editor/server/database/models/_Session.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_Session.js");
+  reactHotLoader.register(Session, "Session", "/home/farai/Workbench/neotree-editor/server/database/models/_Session.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_Session.js");
 })();
 
 ;

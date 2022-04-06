@@ -60,8 +60,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(ConfigKey, "ConfigKey", "/home/farai/WorkBench/neotree-editor/server/database/models/_Configuration.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_Configuration.js");
+  reactHotLoader.register(ConfigKey, "ConfigKey", "/home/farai/Workbench/neotree-editor/server/database/models/_Configuration.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_Configuration.js");
 })();
 
 ;

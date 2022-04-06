@@ -27,8 +27,8 @@ exports.UPLOAD_FILE = UPLOAD_FILE;
     return;
   }
 
-  reactHotLoader.register(GET_FILE, "GET_FILE", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/files.js");
-  reactHotLoader.register(UPLOAD_FILE, "UPLOAD_FILE", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/files.js");
+  reactHotLoader.register(GET_FILE, "GET_FILE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/files.js");
+  reactHotLoader.register(UPLOAD_FILE, "UPLOAD_FILE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/files.js");
 })();
 
 ;

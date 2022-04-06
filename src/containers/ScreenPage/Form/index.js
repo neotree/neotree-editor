@@ -17,6 +17,7 @@ import FlowControl from './FlowControl';
 import Properties from './Properties';
 import MetadataItems from './Metadata/Items';
 import MetadataFields from './Metadata/Fields';
+import EdlizSummaryTable from './EdlizSummaryTable';
 
 function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
   const { state: { viewMode } } = useAppContext();
@@ -115,6 +116,8 @@ function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
       )}
 
       {['form'].includes(form.type) && <MetadataFields form={form} setForm={setForm} screen={screen} script={script} />}
+
+      {['edliz_summary_table'].includes(form.type) && <EdlizSummaryTable form={form} setForm={setForm} screen={screen} script={script} />}
 
       {savingScreen && <OverlayLoader transparent />}
     </>

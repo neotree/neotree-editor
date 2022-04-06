@@ -58,7 +58,7 @@ module.exports = function (app) {
     return;
   }
 
-  reactHotLoader.register(router, "router", "/home/farai/WorkBench/neotree-editor/server/routes/config-keys/index.js");
+  reactHotLoader.register(router, "router", "/home/farai/Workbench/neotree-editor/server/routes/config-keys/index.js");
 })();
 
 ;

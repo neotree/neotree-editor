@@ -180,7 +180,7 @@ var isProd = process.env.NODE_ENV === 'production';
     return;
   }
 
-  reactHotLoader.register(isProd, "isProd", "/home/farai/WorkBench/neotree-editor/server/index.js");
+  reactHotLoader.register(isProd, "isProd", "/home/farai/Workbench/neotree-editor/server/index.js");
 })();
 
 ;

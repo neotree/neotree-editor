@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.COPY_SCREENS = exports.DUPLICATE_SCREENS = exports.DELETE_SCREENS = exports.UPDATE_SCREENS = exports.UPDATE_SCREEN = exports.CREATE_SCREEN = exports.GET_SCREEN_ITEMS = exports.GET_FULL_SCREEN = exports.GET_SCREENS = exports.GET_SCREEN = void 0;
+exports.UPDATE_SCREENS = exports.UPDATE_SCREEN = exports.GET_SCREEN_ITEMS = exports.GET_SCREENS = exports.GET_SCREEN = exports.GET_FULL_SCREEN = exports.DUPLICATE_SCREENS = exports.DELETE_SCREENS = exports.CREATE_SCREEN = exports.COPY_SCREENS = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -43,16 +43,16 @@ exports.COPY_SCREENS = COPY_SCREENS;
     return;
   }
 
-  reactHotLoader.register(GET_SCREEN, "GET_SCREEN", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(GET_SCREENS, "GET_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(GET_FULL_SCREEN, "GET_FULL_SCREEN", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(GET_SCREEN_ITEMS, "GET_SCREEN_ITEMS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(CREATE_SCREEN, "CREATE_SCREEN", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(UPDATE_SCREEN, "UPDATE_SCREEN", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(UPDATE_SCREENS, "UPDATE_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(DELETE_SCREENS, "DELETE_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(DUPLICATE_SCREENS, "DUPLICATE_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
-  reactHotLoader.register(COPY_SCREENS, "COPY_SCREENS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(GET_SCREEN, "GET_SCREEN", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(GET_SCREENS, "GET_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(GET_FULL_SCREEN, "GET_FULL_SCREEN", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(GET_SCREEN_ITEMS, "GET_SCREEN_ITEMS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(CREATE_SCREEN, "CREATE_SCREEN", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(UPDATE_SCREEN, "UPDATE_SCREEN", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(UPDATE_SCREENS, "UPDATE_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(DELETE_SCREENS, "DELETE_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(DUPLICATE_SCREENS, "DUPLICATE_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
+  reactHotLoader.register(COPY_SCREENS, "COPY_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/screens.js");
 })();
 
 ;

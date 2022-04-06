@@ -127,7 +127,7 @@ module.exports = function () {
     return;
   }
 
-  reactHotLoader.register(makeid, "makeid", "/home/farai/WorkBench/neotree-editor/server/routes/devices/getDeviceMiddleware.js");
+  reactHotLoader.register(makeid, "makeid", "/home/farai/Workbench/neotree-editor/server/routes/devices/getDeviceMiddleware.js");
 })();
 
 ;

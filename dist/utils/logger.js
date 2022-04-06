@@ -75,8 +75,8 @@ module.exports = {
     return;
   }
 
-  reactHotLoader.register(isProd, "isProd", "/home/farai/WorkBench/neotree-editor/utils/logger.js");
-  reactHotLoader.register(logger, "logger", "/home/farai/WorkBench/neotree-editor/utils/logger.js");
+  reactHotLoader.register(isProd, "isProd", "/home/farai/Workbench/neotree-editor/utils/logger.js");
+  reactHotLoader.register(logger, "logger", "/home/farai/Workbench/neotree-editor/utils/logger.js");
 })();
 
 ;

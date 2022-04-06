@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.IMPORT_FIREBASE = exports.EXPORT_DATA = exports.SYNC_DATA = exports.EXPORT_TO_FIREBASE = exports.COPY_DATA = void 0;
+exports.SYNC_DATA = exports.IMPORT_FIREBASE = exports.EXPORT_TO_FIREBASE = exports.EXPORT_DATA = exports.COPY_DATA = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -33,11 +33,11 @@ exports.IMPORT_FIREBASE = IMPORT_FIREBASE;
     return;
   }
 
-  reactHotLoader.register(COPY_DATA, "COPY_DATA", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/data.js");
-  reactHotLoader.register(EXPORT_TO_FIREBASE, "EXPORT_TO_FIREBASE", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/data.js");
-  reactHotLoader.register(SYNC_DATA, "SYNC_DATA", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/data.js");
-  reactHotLoader.register(EXPORT_DATA, "EXPORT_DATA", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/data.js");
-  reactHotLoader.register(IMPORT_FIREBASE, "IMPORT_FIREBASE", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/data.js");
+  reactHotLoader.register(COPY_DATA, "COPY_DATA", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/data.js");
+  reactHotLoader.register(EXPORT_TO_FIREBASE, "EXPORT_TO_FIREBASE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/data.js");
+  reactHotLoader.register(SYNC_DATA, "SYNC_DATA", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/data.js");
+  reactHotLoader.register(EXPORT_DATA, "EXPORT_DATA", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/data.js");
+  reactHotLoader.register(IMPORT_FIREBASE, "IMPORT_FIREBASE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/data.js");
 })();
 
 ;

@@ -40,7 +40,7 @@ function encryptPassword(password) {
     return;
   }
 
-  reactHotLoader.register(encryptPassword, "encryptPassword", "/home/farai/WorkBench/neotree-editor/server/utils/encryptPassword.js");
+  reactHotLoader.register(encryptPassword, "encryptPassword", "/home/farai/Workbench/neotree-editor/server/utils/encryptPassword.js");
 })();
 
 ;

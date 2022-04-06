@@ -80,7 +80,7 @@ exports.connect = connect;
     return;
   }
 
-  reactHotLoader.register(connect, "connect", "/home/farai/WorkBench/neotree-editor/server/database/index.js");
+  reactHotLoader.register(connect, "connect", "/home/farai/Workbench/neotree-editor/server/database/index.js");
 })();
 
 ;

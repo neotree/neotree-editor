@@ -156,7 +156,7 @@ exports["default"] = Upload;
     return;
   }
 
-  reactHotLoader.register(Upload, "Upload", "/home/farai/WorkBench/neotree-editor/utils/FileUploader/index.js");
+  reactHotLoader.register(Upload, "Upload", "/home/farai/Workbench/neotree-editor/utils/FileUploader/index.js");
 })();
 
 ;
