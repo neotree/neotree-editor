@@ -5,70 +5,10 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "sequelize", {
-  enumerable: true,
-  get: function get() {
-    return _sequelize["default"];
-  }
-});
-Object.defineProperty(exports, "User", {
-  enumerable: true,
-  get: function get() {
-    return _User["default"];
-  }
-});
-Object.defineProperty(exports, "File", {
-  enumerable: true,
-  get: function get() {
-    return _File["default"];
-  }
-});
-Object.defineProperty(exports, "Script", {
-  enumerable: true,
-  get: function get() {
-    return _Script["default"];
-  }
-});
-Object.defineProperty(exports, "Screen", {
-  enumerable: true,
-  get: function get() {
-    return _Screen["default"];
-  }
-});
-Object.defineProperty(exports, "Diagnosis", {
-  enumerable: true,
-  get: function get() {
-    return _Diagnosis["default"];
-  }
-});
-Object.defineProperty(exports, "ConfigKey", {
-  enumerable: true,
-  get: function get() {
-    return _ConfigKey["default"];
-  }
-});
 Object.defineProperty(exports, "ApiKey", {
   enumerable: true,
   get: function get() {
     return _ApiKey["default"];
-  }
-});
-Object.defineProperty(exports, "Device", {
-  enumerable: true,
-  get: function get() {
-    return _Device["default"];
-  }
-});
-Object.defineProperty(exports, "Log", {
-  enumerable: true,
-  get: function get() {
-    return _Log["default"];
-  }
-});
-Object.defineProperty(exports, "Hospital", {
-  enumerable: true,
-  get: function get() {
-    return _Hospital["default"];
   }
 });
 Object.defineProperty(exports, "App", {
@@ -77,13 +17,73 @@ Object.defineProperty(exports, "App", {
     return _App["default"];
   }
 });
+Object.defineProperty(exports, "ConfigKey", {
+  enumerable: true,
+  get: function get() {
+    return _ConfigKey["default"];
+  }
+});
 Object.defineProperty(exports, "Configuration", {
   enumerable: true,
   get: function get() {
     return _Configuration["default"];
   }
 });
+Object.defineProperty(exports, "Device", {
+  enumerable: true,
+  get: function get() {
+    return _Device["default"];
+  }
+});
+Object.defineProperty(exports, "Diagnosis", {
+  enumerable: true,
+  get: function get() {
+    return _Diagnosis["default"];
+  }
+});
+Object.defineProperty(exports, "File", {
+  enumerable: true,
+  get: function get() {
+    return _File["default"];
+  }
+});
+Object.defineProperty(exports, "Hospital", {
+  enumerable: true,
+  get: function get() {
+    return _Hospital["default"];
+  }
+});
+Object.defineProperty(exports, "Log", {
+  enumerable: true,
+  get: function get() {
+    return _Log["default"];
+  }
+});
+Object.defineProperty(exports, "Screen", {
+  enumerable: true,
+  get: function get() {
+    return _Screen["default"];
+  }
+});
+Object.defineProperty(exports, "Script", {
+  enumerable: true,
+  get: function get() {
+    return _Script["default"];
+  }
+});
+Object.defineProperty(exports, "User", {
+  enumerable: true,
+  get: function get() {
+    return _User["default"];
+  }
+});
 exports.init = void 0;
+Object.defineProperty(exports, "sequelize", {
+  enumerable: true,
+  get: function get() {
+    return _sequelize["default"];
+  }
+});
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
@@ -342,7 +342,7 @@ exports.init = init;
     return;
   }
 
-  reactHotLoader.register(init, "init", "/home/farai/WorkBench/neotree-editor/server/database/models/index.js");
+  reactHotLoader.register(init, "init", "/home/farai/Workbench/neotree-editor/server/database/models/index.js");
 })();
 
 ;

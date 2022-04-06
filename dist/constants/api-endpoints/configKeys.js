@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DUPLICATE_CONFIG_KEYS = exports.DELETE_CONFIG_KEYS = exports.UPDATE_CONFIG_KEYS = exports.UPDATE_CONFIG_KEY = exports.CREATE_CONFIG_KEY = exports.GET_FULL_CONFIG_KEY = exports.GET_CONFIG_KEYS = exports.GET_CONFIG_KEY = void 0;
+exports.UPDATE_CONFIG_KEYS = exports.UPDATE_CONFIG_KEY = exports.GET_FULL_CONFIG_KEY = exports.GET_CONFIG_KEYS = exports.GET_CONFIG_KEY = exports.DUPLICATE_CONFIG_KEYS = exports.DELETE_CONFIG_KEYS = exports.CREATE_CONFIG_KEY = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -39,14 +39,14 @@ exports.DUPLICATE_CONFIG_KEYS = DUPLICATE_CONFIG_KEYS;
     return;
   }
 
-  reactHotLoader.register(GET_CONFIG_KEY, "GET_CONFIG_KEY", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(GET_CONFIG_KEYS, "GET_CONFIG_KEYS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(GET_FULL_CONFIG_KEY, "GET_FULL_CONFIG_KEY", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(CREATE_CONFIG_KEY, "CREATE_CONFIG_KEY", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(UPDATE_CONFIG_KEY, "UPDATE_CONFIG_KEY", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(UPDATE_CONFIG_KEYS, "UPDATE_CONFIG_KEYS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(DELETE_CONFIG_KEYS, "DELETE_CONFIG_KEYS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
-  reactHotLoader.register(DUPLICATE_CONFIG_KEYS, "DUPLICATE_CONFIG_KEYS", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(GET_CONFIG_KEY, "GET_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(GET_CONFIG_KEYS, "GET_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(GET_FULL_CONFIG_KEY, "GET_FULL_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(CREATE_CONFIG_KEY, "CREATE_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(UPDATE_CONFIG_KEY, "UPDATE_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(UPDATE_CONFIG_KEYS, "UPDATE_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(DELETE_CONFIG_KEYS, "DELETE_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
+  reactHotLoader.register(DUPLICATE_CONFIG_KEYS, "DUPLICATE_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
 })();
 
 ;

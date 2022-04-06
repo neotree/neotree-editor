@@ -44,6 +44,7 @@ function DataTable({
   onSortData,
   displayFields,
   renderHeaderActions,
+  filter,
 }) {
   selectable = selectable !== false;
   const classes = useStyles();
@@ -105,6 +106,7 @@ function DataTable({
 
               <Body
                 rows={data}
+                filter={filter}
                 selectable={selectable}
                 renderRowAction={renderRowAction}
                 classes={classes}
@@ -140,7 +142,8 @@ DataTable.propTypes = {
   displayFields: PropTypes.array.isRequired,
   renderHeaderActions: PropTypes.func,
   onSortData: PropTypes.func,
-  data: PropTypes.array.isRequired
+  data: PropTypes.array.isRequired,
+  filter: PropTypes.func,
 };
 
 export default DataTable;

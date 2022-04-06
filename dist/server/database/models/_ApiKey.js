@@ -47,8 +47,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(ApiKey, "ApiKey", "/home/farai/WorkBench/neotree-editor/server/database/models/_ApiKey.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_ApiKey.js");
+  reactHotLoader.register(ApiKey, "ApiKey", "/home/farai/Workbench/neotree-editor/server/database/models/_ApiKey.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_ApiKey.js");
 })();
 
 ;

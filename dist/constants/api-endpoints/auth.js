@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.CHECK_EMAIL_REGISTRATION = exports.GET_AUTHENTICATED_USER = exports.SIGN_OUT = exports.SIGN_IN = exports.SIGN_UP = void 0;
+exports.SIGN_UP = exports.SIGN_OUT = exports.SIGN_IN = exports.GET_AUTHENTICATED_USER = exports.CHECK_EMAIL_REGISTRATION = void 0;
 
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
@@ -33,11 +33,11 @@ exports.CHECK_EMAIL_REGISTRATION = CHECK_EMAIL_REGISTRATION;
     return;
   }
 
-  reactHotLoader.register(SIGN_UP, "SIGN_UP", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/auth.js");
-  reactHotLoader.register(SIGN_IN, "SIGN_IN", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/auth.js");
-  reactHotLoader.register(SIGN_OUT, "SIGN_OUT", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/auth.js");
-  reactHotLoader.register(GET_AUTHENTICATED_USER, "GET_AUTHENTICATED_USER", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/auth.js");
-  reactHotLoader.register(CHECK_EMAIL_REGISTRATION, "CHECK_EMAIL_REGISTRATION", "/home/farai/WorkBench/neotree-editor/constants/api-endpoints/auth.js");
+  reactHotLoader.register(SIGN_UP, "SIGN_UP", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/auth.js");
+  reactHotLoader.register(SIGN_IN, "SIGN_IN", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/auth.js");
+  reactHotLoader.register(SIGN_OUT, "SIGN_OUT", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/auth.js");
+  reactHotLoader.register(GET_AUTHENTICATED_USER, "GET_AUTHENTICATED_USER", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/auth.js");
+  reactHotLoader.register(CHECK_EMAIL_REGISTRATION, "CHECK_EMAIL_REGISTRATION", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/auth.js");
 })();
 
 ;

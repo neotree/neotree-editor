@@ -166,7 +166,7 @@ function shouldBackup() {
     return;
   }
 
-  reactHotLoader.register(shouldBackup, "shouldBackup", "/home/farai/WorkBench/neotree-editor/server/utils/backup/shouldBackup.js");
+  reactHotLoader.register(shouldBackup, "shouldBackup", "/home/farai/Workbench/neotree-editor/server/utils/backup/shouldBackup.js");
 })();
 
 ;

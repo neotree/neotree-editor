@@ -56,8 +56,8 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(Hospital, "Hospital", "/home/farai/WorkBench/neotree-editor/server/database/models/_Hospital.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/database/models/_Hospital.js");
+  reactHotLoader.register(Hospital, "Hospital", "/home/farai/Workbench/neotree-editor/server/database/models/_Hospital.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_Hospital.js");
 })();
 
 ;

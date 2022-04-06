@@ -5,7 +5,7 @@ var _typeof = require("@babel/runtime/helpers/typeof");
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.firebaseAdmin = exports.firebase = exports["default"] = exports.firebaseOptions = exports.firebaseAdminOptions = void 0;
+exports.firebaseOptions = exports.firebaseAdminOptions = exports.firebaseAdmin = exports.firebase = exports["default"] = void 0;
 
 require("firebase/auth");
 
@@ -76,10 +76,10 @@ exports["default"] = _default2;
     return;
   }
 
-  reactHotLoader.register(getParsedValue, "getParsedValue", "/home/farai/WorkBench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/home/farai/WorkBench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/home/farai/WorkBench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(_default, "default", "/home/farai/WorkBench/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(getParsedValue, "getParsedValue", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
 })();
 
 ;

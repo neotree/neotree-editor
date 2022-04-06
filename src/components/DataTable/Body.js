@@ -12,10 +12,12 @@ export default SortableContainer(({
   setSelected,
   displayFields,
   renderRowAction,
+  filter,
 }) => (
   <TableBody>
     {rows.map((row, i) => {
       const key = i;
+      if (filter && !filter(row)) return null;
       return (
         <Row
           key={`${key}${i}`}
