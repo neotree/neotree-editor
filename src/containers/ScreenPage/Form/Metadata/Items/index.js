@@ -9,6 +9,7 @@ import ItemForm from './ItemForm';
 import ItemRowActions from './ItemRowActions';
 
 function Items({ form, setMetadata, title, filterItems, editable, }) {
+  editable = editable !== false;
   return (
     <>
       <DataTable
