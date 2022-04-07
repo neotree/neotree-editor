@@ -10,6 +10,8 @@ export default function EdlizSummaryTable(props) {
         metadata: {
             ...props.form.metadata,
             items: edlizSummaryTable,
+            key: 'EDLIZSummaryTableScore',
+            label: 'EDLIZ summary table score',
         }
     });
 
