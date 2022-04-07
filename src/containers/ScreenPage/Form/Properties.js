@@ -7,6 +7,7 @@ import MetadataManagement from './Metadata/Management';
 import MetadataTimer from './Metadata/Timer';
 import MetadataYesNo from './Metadata/YesNo';
 import MetadataSelect from './Metadata/Select';
+import MetadataKeyLabel from './Metadata/KeyLabel';
 
 function Properties(props) {
   const { setForm, form } = props;
@@ -205,6 +206,9 @@ function Properties(props) {
             break;
           case 'single_select':
             Component = MetadataSelect;
+            break;
+          case 'edliz_summary_table':
+            Component = MetadataKeyLabel;
             break;
           default:
             // do nothing
