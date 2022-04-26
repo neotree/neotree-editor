@@ -10,7 +10,6 @@ import Typography from '@material-ui/core/Typography';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import cx from 'classnames';
 import { checkEmailRegistration, authenticate } from '@/api/auth';
-import makeApiCall from '@/api/makeApiCall';
 
 const useStyles = makeStyles(() => ({
   actionsWrap: { textAlign: 'right', },
@@ -118,26 +117,6 @@ const AuthForm = ({ copy }) => {
 
   return (
     <>
-      <button
-        onClick={async () => {
-          const res = await makeApiCall('/api/add-stats', {
-            method: 'POST',
-            body: {
-              stats: [{
-                "type": "click",
-                "count": 1,
-                // "sum": 1.5,
-                "dur": 30,
-                "segmentation": {
-                  "key1": "value1",
-                  "key2": "value2"
-                }
-              }],
-            }
-          });
-          console.log(res);
-        }}
-      >Add event</button>
       <WindowEventListener
         events={{
           keyup: e => {
