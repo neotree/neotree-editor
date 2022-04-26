@@ -1,9 +1,30 @@
 import express from 'express';
 import apiKeyAuthenticator from './apiKeyAuthenticator';
+import Countly from 'countly-sdk-nodejs';
 
 let router = express.Router();
 
 module.exports = app => {
+  router.post('/add-stats', (req, res) => {
+    const stats = req.body.stats || [];
+    Countly.init({
+      app_key: process.env.COUNTLY_APP_KEY,
+      url: process.env.COUNTLY_HOST,
+      debug: true
+    });
+    // Countly.begin_session();
+    stats.forEach(stat => {
+      Countly.add_event({
+        key: stat.type,
+        count: stat.count,
+        // sum: 0,
+        dur: stat.duration,
+        segmentation: { ...stat.data }
+      });
+    });
+    res.json({ success: true });
+  });
+
   router = require('./configuration').default(app, router);
   
   router.post(
