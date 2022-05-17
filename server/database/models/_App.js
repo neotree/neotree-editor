@@ -16,6 +16,11 @@ const Script = sqlz.define(
       allowNull: false,
     },
 
+    should_track_usage: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false,
+    },
+
     last_backup_date: {
       type: Sequelize.DATE,
     },

@@ -31,6 +31,10 @@ var Script = _sequelize2["default"].define('app', {
     defaultValue: 1,
     allowNull: false
   },
+  should_track_usage: {
+    type: _sequelize["default"].BOOLEAN,
+    defaultValue: false
+  },
   last_backup_date: {
     type: _sequelize["default"].DATE
   },

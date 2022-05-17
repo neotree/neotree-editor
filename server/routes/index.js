@@ -28,6 +28,20 @@ module.exports = app => {
     })();
   });
 
+  router.post('/update-app-info', (req, res) => {
+    const { id, ...payload } = req.body;
+    (async () => {
+      try {
+        await database.App.update(
+          { ...payload },
+          { where: { id, } }
+        );
+        const appInfo = await database.App.findOne({ where: { id } });
+        res.json({ appInfo });
+      } catch (e) { res.json({ errors: [e.message] }); }
+    })();
+  });
+
   router.post('/publish-changes', (req, res) => {
     (async () => {
       try {

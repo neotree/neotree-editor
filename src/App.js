@@ -45,6 +45,7 @@ const App = () => {
         const { shouldBackup, appInfo } = await res.json();
         setState({
           shouldBackup,
+          appInfo,
           version: appInfo ? appInfo.version : 1
         });
         resolve({ shouldBackup, appInfo });
