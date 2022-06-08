@@ -117,7 +117,7 @@ function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
 
       {['form'].includes(form.type) && <MetadataFields form={form} setForm={setForm} screen={screen} script={script} />}
 
-      {['edliz_summary_table'].includes(form.type) && <EdlizSummaryTable form={form} setForm={setForm} screen={screen} script={script} />}
+      {['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(form.type) && <EdlizSummaryTable form={form} setForm={setForm} screen={screen} script={script} />}
 
       {savingScreen && <OverlayLoader transparent />}
     </>
