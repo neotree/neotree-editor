@@ -1,22 +1,15 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import edlizSummaryTable from '@/constants/edlizSummaryTable';
-import { useAppContext } from '@/AppContext';
 import MetadataItems from './Metadata/Items';
 
-const getData = country => {
-    const data = edlizSummaryTable.filter(data => data.country === country)[0];
-    return data ? data.data : [];
-};
-
 export default function EdlizSummaryTable(props) {
-    const { state: { country }, } = useAppContext();
     const { form: _form, setForm: _setForm, screen } = props;
     const [form, setForm] = React.useState(screen ? _form : {
         ...props.form,
         metadata: {
             ...props.form.metadata,
-            items: getData(country),
+            items: edlizSummaryTable[_form.type],
             key: 'EDLIZSummaryTableScore',
             label: 'EDLIZ summary table score',
         }
@@ -32,16 +25,6 @@ export default function EdlizSummaryTable(props) {
     };
 
     React.useEffect(() => { _setForm(form); }, [form]);
-
-    React.useEffect(() => {
-        setForm(prev => ({
-            ...prev,
-            metadata: {
-                ...prev.metadata,
-                items: getData(country),
-            },
-        }));
-    }, [country]);
 
     return (
         <React.Fragment>

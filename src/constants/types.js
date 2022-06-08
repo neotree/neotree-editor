@@ -60,7 +60,8 @@ export const ScreenTypes = [
   { name: 'progress', label: 'Progress' },
   { name: 'timer', label: 'Timer' },
   { name: 'yesno', label: 'Yes/No' },
-  { name: 'edliz_summary_table', label: 'EDLIZ summary table' },
+  { name: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
+  { name: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
 ];
 
 export const SymptomTypes = [

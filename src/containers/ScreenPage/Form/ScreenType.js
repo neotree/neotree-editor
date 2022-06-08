@@ -6,7 +6,6 @@ import Radio from '@material-ui/core/Radio';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Button from '@material-ui/core/Button';
 import { ScreenTypes } from '@/constants/types';
-import edlizSummaryTable from '@/constants/edlizSummaryTable';
 import { useAppContext } from '@/AppContext';
 import Title from './Title';
 
@@ -21,12 +20,7 @@ function ScreenType({ setForm, form, canAddDiagnosisScreen }) {
           <Title>Screen type</Title>
 
           <RadioGroup name="type" value={type} onChange={e => setType(e.target.value)}>
-            {ScreenTypes.filter(t => {
-              if (t === 'edliz_summary_table') {
-                return !!edlizSummaryTable.filter(data => data.country === country)[0];
-              }
-              return true;
-            }).map(t => {
+            {ScreenTypes.map(t => {
               return (
                 <FormControlLabel
                   key={t.name}
