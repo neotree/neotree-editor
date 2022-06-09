@@ -210,6 +210,12 @@ function Properties(props) {
           case 'edliz_summary_table':
             Component = MetadataKeyLabel;
             break;
+          case 'mwi_edliz_summary_table':
+            Component = MetadataKeyLabel;
+            break;
+          case 'zw_edliz_summary_table':
+            Component = MetadataKeyLabel;
+            break;
           default:
             // do nothing
         }

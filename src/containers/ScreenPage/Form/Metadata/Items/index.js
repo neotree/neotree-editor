@@ -38,6 +38,12 @@ function Items({ form, setMetadata, title, filterItems, editable, }) {
         )}
         displayFields={(() => {
           switch (form.type) {
+            case 'edliz_summary_table':
+              return [
+                { key: 'id', label: 'ID', },
+                { key: 'subType', label: 'Sub type', },
+                { key: 'label', label: 'Label', },
+             ];
             case 'zw_edliz_summary_table':
               return [
                 { key: 'id', label: 'ID', },
