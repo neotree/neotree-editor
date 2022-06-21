@@ -81,9 +81,9 @@ var _default = function _default(req, res) {
                 device_id: req.body.user,
                 events: [{
                   key: stat.data.screenTitle || stat.data.screenId,
-                  dur: stat.duration,
-                  count: stat.count,
-                  timestamp: stat.timestamp || new Date().getTime()
+                  count: stat.count // dur: stat.duration,
+                  // timestamp: stat.timestamp || new Date().getTime(),
+
                 }]
               });
             }); // countlyServer.add_request({ 
