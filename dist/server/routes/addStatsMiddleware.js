@@ -13,8 +13,6 @@ var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"))
 
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
-var _countlySdkNodejs = _interopRequireDefault(require("countly-sdk-nodejs"));
-
 var database = _interopRequireWildcard(require("../database"));
 
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
@@ -30,15 +28,20 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 
+var Countly = require("countly-sdk-nodejs").Bulk;
+
 var hasEnvVariables = process.env.COUNTLY_APP_KEY && process.env.COUNTLY_HOST;
+var countlyServer = null;
 
 if (hasEnvVariables) {
-  _countlySdkNodejs["default"].init({
+  countlyServer = new Countly({
     app_key: process.env.COUNTLY_APP_KEY,
     url: process.env.COUNTLY_HOST,
     debug: true
   });
 }
+
+countlyServer.start();
 
 var _default = function _default(req, res) {
   (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
@@ -57,7 +60,7 @@ var _default = function _default(req, res) {
           case 2:
             appInfo = _context.sent;
 
-            if (!(hasEnvVariables && appInfo && !appInfo.should_track_usage)) {
+            if (!(countlyServer && hasEnvVariables && appInfo && !appInfo.should_track_usage)) {
               _context.next = 5;
               break;
             }
@@ -67,24 +70,25 @@ var _default = function _default(req, res) {
             }));
 
           case 5:
-            stats = req.body.stats || []; // Countly.begin_session();
-
-            stats.forEach(function (stat) {
-              _countlySdkNodejs["default"].track_view(stat.data.screenTitle || stat.data.screenId); // Countly.add_event({
-              //     key: stat.type,
-              //     count: stat.count,
-              //     // sum: 0,
-              //     dur: stat.duration,
-              //     segmentation: { ...stat.data }
-              // });
-
-            }); // Countly.end_session();
-
+            stats = req.body.stats || [];
+            console.log(stats);
+            countlyServer.add_request({
+              begin_session: 1,
+              // metrics:{ _os:"Linux" }, 
+              // device_id: "users_device_id", 
+              events: stats.map(function (stat) {
+                return {
+                  key: stat.data.screenTitle || stat.data.screenId,
+                  dur: stat.duration,
+                  count: stat.count
+                };
+              })
+            });
             res.json({
               success: true
             });
 
-          case 8:
+          case 9:
           case "end":
             return _context.stop();
         }
@@ -104,7 +108,9 @@ exports["default"] = _default2;
     return;
   }
 
+  reactHotLoader.register(Countly, "Countly", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
   reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(countlyServer, "countlyServer", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
   reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
 })();
 
