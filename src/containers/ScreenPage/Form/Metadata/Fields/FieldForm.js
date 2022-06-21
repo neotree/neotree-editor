@@ -385,12 +385,12 @@ const FieldForm = React.forwardRef(({
               </>
             )}
 
-            {form.type === 'period' && (
+            {(form.type === 'period') || (form.type === 'number') && (
               <>
                 <TextField
                   fullWidth
-                  required
-                  error={/(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?/.test(form.calculation) ? false : true}
+                  // required
+                  // error={/(\$[a-zA-Z0-9]+)+(\s*-\s*(\$[a-zA-Z0-9]+))?/.test(form.calculation) ? false : true}
                   value={form.calculation || ''}
                   label="Reference expression"
                   onChange={e => setForm({ calculation: e.target.value })}
@@ -398,7 +398,7 @@ const FieldForm = React.forwardRef(({
                 <Typography
                   variant="caption"
                   color="textSecondary"
-                >Example: <b>$key</b></Typography>
+                >Example: <b>$key</b> or <b>SUM($key1,$key2...)</b> or <b>DIVIDE($key1,$key2...)</b> or <b>MULTIPLY($key1,$key2...)</b> or <b>SUBTRACT($key1,$key2...)</b></Typography>
               </>
             )}
 
