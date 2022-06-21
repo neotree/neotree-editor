@@ -26,17 +26,31 @@ export default (req, res) => {
 
         console.log(stats);
 
-        countlyServer.add_request({ 
-            begin_session: 1, 
-            metrics:{ _os: req.body.device, }, 
-            device_id: req.body.user, 
-            events: stats.map(stat => ({
-                key: stat.data.screenTitle || stat.data.screenId,
-                dur: stat.duration,
-                count: stat.count,
-                timestamp: stat.timestamp || new Date().getTime(),
-            })),
+        stats.forEach(stat => {
+            countlyServer.add_request({ 
+                begin_session: 1, 
+                metrics:{ _os: req.body.device, }, 
+                device_id: req.body.user, 
+                events: [{
+                    key: stat.data.screenTitle || stat.data.screenId,
+                    dur: stat.duration,
+                    count: stat.count,
+                    timestamp: stat.timestamp || new Date().getTime(),
+                }],
+            });
         });
+
+        // countlyServer.add_request({ 
+        //     begin_session: 1, 
+        //     metrics:{ _os: req.body.device, }, 
+        //     device_id: req.body.user, 
+        //     events: stats.map(stat => ({
+        //         key: stat.data.screenTitle || stat.data.screenId,
+        //         dur: stat.duration,
+        //         count: stat.count,
+        //         timestamp: stat.timestamp || new Date().getTime(),
+        //     })),
+        // });
 
         res.json({ success: true });
     })();
