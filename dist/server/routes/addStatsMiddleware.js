@@ -11,6 +11,8 @@ exports["default"] = void 0;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
+var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
+
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 
 var database = _interopRequireWildcard(require("../database"));
@@ -71,33 +73,37 @@ var _default = function _default(req, res) {
 
           case 5:
             stats = req.body.stats || [];
-            console.log(stats);
-            stats.forEach(function (stat) {
-              countlyServer.add_request({
-                begin_session: 1,
+            console.log(stats); // stats.forEach(stat => {
+            //     countlyServer.add_request({ 
+            //         begin_session: 1, 
+            //         metrics:{ _os: req.body.device, }, 
+            //         device_id: req.body.user, 
+            //         events: [{
+            //             key: stat.data.screenTitle || stat.data.screenId,
+            //             count: stat.count,
+            //             // dur: stat.duration,
+            //             // timestamp: stat.timestamp || new Date().getTime(),
+            //         }],
+            //     });
+            // });
+
+            countlyServer.add_bulk_request([{
+              begin_session: 1,
+              device_id: req.body.user
+            }].concat((0, _toConsumableArray2["default"])(stats.map(function (stat, i) {
+              return {
                 metrics: {
                   _os: req.body.device
                 },
                 device_id: req.body.user,
-                events: [{
+                events: JSON.stringify({
                   key: stat.data.screenTitle || stat.data.screenId,
                   count: stat.count // dur: stat.duration,
                   // timestamp: stat.timestamp || new Date().getTime(),
 
-                }]
-              });
-            }); // countlyServer.add_request({ 
-            //     begin_session: 1, 
-            //     metrics:{ _os: req.body.device, }, 
-            //     device_id: req.body.user, 
-            //     events: stats.map(stat => ({
-            //         key: stat.data.screenTitle || stat.data.screenId,
-            //         dur: stat.duration,
-            //         count: stat.count,
-            //         timestamp: stat.timestamp || new Date().getTime(),
-            //     })),
-            // });
-
+                })
+              };
+            }))));
             res.json({
               success: true
             });
