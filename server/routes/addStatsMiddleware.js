@@ -32,7 +32,7 @@ export default (req, res) => {
             device_id: req.body.user, 
             events: stats.map(stat => ({
                 key: stat.data.screenTitle || stat.data.screenId,
-                dur: stat.duration,
+                // dur: stat.duration,
                 count: stat.count,
             })),
         });
