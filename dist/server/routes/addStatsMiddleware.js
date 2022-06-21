@@ -74,8 +74,10 @@ var _default = function _default(req, res) {
             console.log(stats);
             countlyServer.add_request({
               begin_session: 1,
-              // metrics:{ _os:"Linux" }, 
-              // device_id: "users_device_id", 
+              metrics: {
+                _os: req.body.device
+              },
+              device_id: req.body.user,
               events: stats.map(function (stat) {
                 return {
                   key: stat.data.screenTitle || stat.data.screenId,
