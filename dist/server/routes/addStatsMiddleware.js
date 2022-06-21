@@ -81,8 +81,9 @@ var _default = function _default(req, res) {
               events: stats.map(function (stat) {
                 return {
                   key: stat.data.screenTitle || stat.data.screenId,
-                  // dur: stat.duration,
-                  count: stat.count
+                  dur: stat.duration,
+                  count: stat.count,
+                  timestamp: stat.timestamp || new Date().getTime()
                 };
               })
             });
