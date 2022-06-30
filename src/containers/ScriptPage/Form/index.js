@@ -23,7 +23,7 @@ function ScriptEditorForm({ script }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
 
-  const [form, _setForm] = React.useState({ ...script, exportable: true, });
+  const [form, _setForm] = React.useState({ exportable: true, ...script });
   const setForm = s => _setForm(prev => ({
     ...prev,
     ...(typeof s === 'function' ? s(prev) : s),
