@@ -7,6 +7,7 @@ import CardActions from '@material-ui/core/CardActions';
 import TextField from '@material-ui/core/TextField';
 import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
+import Checkbox from '@material-ui/core/Checkbox';
 import { useHistory } from 'react-router-dom';
 import Divider from '@/components/Divider';
 import Typography from '@material-ui/core/Typography';
@@ -22,7 +23,7 @@ function ScriptEditorForm({ script }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
 
-  const [form, _setForm] = React.useState({ ...script });
+  const [form, _setForm] = React.useState({ ...script, exportable: true, });
   const setForm = s => _setForm(prev => ({
     ...prev,
     ...(typeof s === 'function' ? s(prev) : s),
@@ -131,6 +132,15 @@ function ScriptEditorForm({ script }) {
               />
             ))}
           </RadioGroup>
+          <br /><br />
+
+          <FormControlLabel 
+            control={<Checkbox />}
+            value="exportable"
+            label="Exportable"
+            checked={form.exportable !== false}
+            onChange={() => setForm({ exportable: !form.exportable, })}
+          />
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
