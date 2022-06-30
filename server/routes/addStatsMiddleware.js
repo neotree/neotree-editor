@@ -16,6 +16,37 @@ if (hasEnvVariables) {
 
 countlyServer.start();
 
+export function testCounty(_, res) {
+    countlyServer.add_bulk_request([
+        { begin_session: 1, device_id: 'user@email.com', },
+        { 
+            metrics:{ _os: 'android', }, 
+            device_id: 'device_id',
+            events: JSON.stringify({
+                key: 'Test1',
+                count: 1,
+            }),
+        },
+        { 
+            metrics:{ _os: 'android', }, 
+            device_id: 'device_id',
+            events: JSON.stringify({
+                key: 'Test2',
+                count: 1,
+            }),
+        },
+        { 
+            metrics:{ _os: 'android', }, 
+            device_id: 'device_id',
+            events: JSON.stringify({
+                key: 'Test3',
+                count: 1,
+            }),
+        },
+    ]);
+    res.json({ status: 'ok', });
+}
+
 export default (req, res) => {
     (async () => {
         const appInfo = await database.App.findOne({ where: { id: 1 } });

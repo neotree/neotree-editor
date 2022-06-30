@@ -8,6 +8,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports["default"] = void 0;
+exports.testCounty = testCounty;
 
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 
@@ -44,6 +45,43 @@ if (hasEnvVariables) {
 }
 
 countlyServer.start();
+
+function testCounty(_, res) {
+  countlyServer.add_bulk_request([{
+    begin_session: 1,
+    device_id: 'user@email.com'
+  }, {
+    metrics: {
+      _os: 'android'
+    },
+    device_id: 'device_id',
+    events: JSON.stringify({
+      key: 'Test1',
+      count: 1
+    })
+  }, {
+    metrics: {
+      _os: 'android'
+    },
+    device_id: 'device_id',
+    events: JSON.stringify({
+      key: 'Test2',
+      count: 1
+    })
+  }, {
+    metrics: {
+      _os: 'android'
+    },
+    device_id: 'device_id',
+    events: JSON.stringify({
+      key: 'Test3',
+      count: 1
+    })
+  }]);
+  res.json({
+    status: 'ok'
+  });
+}
 
 var _default = function _default(req, res) {
   (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
@@ -131,6 +169,7 @@ exports["default"] = _default2;
   reactHotLoader.register(Countly, "Countly", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
   reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
   reactHotLoader.register(countlyServer, "countlyServer", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(testCounty, "testCounty", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
   reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
 })();
 

@@ -18,6 +18,8 @@ var database = _interopRequireWildcard(require("../database"));
 
 var _backup = require("../utils/backup");
 
+var _addStatsMiddleware = require("./addStatsMiddleware");
+
 var _excluded = ["id"];
 
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
@@ -86,6 +88,7 @@ module.exports = function (app) {
       }, _callee, null, [[0, 10]]);
     }))();
   });
+  router.get('/test-countly', _addStatsMiddleware.testCounty);
   router.post('/update-app-info', function (req, res) {
     var _req$body = req.body,
         id = _req$body.id,

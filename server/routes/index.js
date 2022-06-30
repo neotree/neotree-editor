@@ -1,6 +1,7 @@
 import express from 'express';
 import * as database from '../database';
 import { backupData, shouldBackup, restoreBackup } from '../utils/backup';
+import { testCounty } from './addStatsMiddleware';
 
 const router = express.Router();
 
@@ -27,6 +28,8 @@ module.exports = app => {
       } catch (e) { res.json({ errors: [e.message] }); }
     })();
   });
+
+  router.get('/test-countly', testCounty);
 
   router.post('/update-app-info', (req, res) => {
     const { id, ...payload } = req.body;
