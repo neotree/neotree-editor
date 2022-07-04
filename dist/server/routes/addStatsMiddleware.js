@@ -42,9 +42,8 @@ if (hasEnvVariables) {
     url: process.env.COUNTLY_HOST,
     debug: true
   });
+  if (countlyServer) countlyServer.start();
 }
-
-countlyServer.start();
 
 function testCounty(_, res) {
   countlyServer.add_bulk_request([{
