@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { Op } from 'sequelize';
-import { Script, Screen, ConfigKey, Diagnosis, Device, } from '../../database';
+import { Script, Screen, ConfigKey, Diagnosis, Device, App } from '../../database';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -11,6 +11,9 @@ module.exports = () => (req, res, next) => {
       res.locals.setResponse(e, payload);
       next();
     };
+
+    let webeditorInfo = await App.findAll({ where: {} });
+    webeditorInfo = webeditorInfo ? webeditorInfo[0] : null;
 
     let device = null;
     if (deviceId) {
@@ -75,6 +78,7 @@ module.exports = () => (req, res, next) => {
       }
 
       done(null, {
+        webeditorInfo,
         device,
         scripts,
         deletedScripts,
