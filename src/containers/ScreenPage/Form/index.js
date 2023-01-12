@@ -8,6 +8,10 @@ import CardActions from '@material-ui/core/CardActions';
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import Collapse from '@material-ui/core/Collapse';
+import Checkbox from '@material-ui/core/Checkbox';
+import Grid from '@material-ui/core/Grid';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import TextField from '@material-ui/core/TextField';
 import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import OverlayLoader from '@/components/OverlayLoader';
@@ -74,6 +78,30 @@ function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
             title={`${screen ? 'Edit' : 'Add'} screen`} 
           />
           <br /><br />
+
+          {form.type === 'management' && (
+            <>
+              <Grid alignItems="baseline">
+                <TextField 
+                    label="Reference Key"
+                    placeholder="$refKey"
+                    value={form.refKey}
+                    onChange={e => setForm({ refKey: e.target.value })}
+                />
+
+                &nbsp;&nbsp;
+
+                <FormControlLabel
+                  checked={form.printable}
+                  label="Print"
+                  control={<Checkbox />}
+                  onChange={(e) => setForm({ printable: !form.printable })}
+                />
+              </Grid>
+
+              <br /><br />
+            </>
+          )}
 
           <ScreenType 
             form={form} 
