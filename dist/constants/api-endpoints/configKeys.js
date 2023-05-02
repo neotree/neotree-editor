@@ -4,16 +4,13 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.UPDATE_CONFIG_KEYS = exports.UPDATE_CONFIG_KEY = exports.GET_FULL_CONFIG_KEY = exports.GET_CONFIG_KEYS = exports.GET_CONFIG_KEY = exports.DUPLICATE_CONFIG_KEYS = exports.DELETE_CONFIG_KEYS = exports.CREATE_CONFIG_KEY = void 0;
-
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-
 var GET_CONFIG_KEY = '/get-config-key';
 exports.GET_CONFIG_KEY = GET_CONFIG_KEY;
 var GET_CONFIG_KEYS = '/get-config-keys';
@@ -31,14 +28,11 @@ exports.DELETE_CONFIG_KEYS = DELETE_CONFIG_KEYS;
 var DUPLICATE_CONFIG_KEYS = '/duplicate-config-keys';
 exports.DUPLICATE_CONFIG_KEYS = DUPLICATE_CONFIG_KEYS;
 ;
-
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
   if (!reactHotLoader) {
     return;
   }
-
   reactHotLoader.register(GET_CONFIG_KEY, "GET_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
   reactHotLoader.register(GET_CONFIG_KEYS, "GET_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
   reactHotLoader.register(GET_FULL_CONFIG_KEY, "GET_FULL_CONFIG_KEY", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
@@ -48,9 +42,7 @@ exports.DUPLICATE_CONFIG_KEYS = DUPLICATE_CONFIG_KEYS;
   reactHotLoader.register(DELETE_CONFIG_KEYS, "DELETE_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
   reactHotLoader.register(DUPLICATE_CONFIG_KEYS, "DUPLICATE_CONFIG_KEYS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/configKeys.js");
 })();
-
 ;
-
 (function () {
   var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);

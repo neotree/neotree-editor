@@ -4,16 +4,13 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.UPDATE_DIAGNOSIS = exports.UPDATE_DIAGNOSES = exports.GET_FULL_DIAGNOSIS = exports.GET_DIAGNOSIS_ITEMS = exports.GET_DIAGNOSIS = exports.GET_DIAGNOSES = exports.DUPLICATE_DIAGNOSES = exports.DELETE_DIAGNOSES = exports.CREATE_DIAGNOSIS = exports.COPY_DIAGNOSES = void 0;
-
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-
 var GET_DIAGNOSIS = '/get-diagnosis';
 exports.GET_DIAGNOSIS = GET_DIAGNOSIS;
 var GET_DIAGNOSES = '/get-diagnoses';
@@ -35,14 +32,11 @@ exports.DUPLICATE_DIAGNOSES = DUPLICATE_DIAGNOSES;
 var COPY_DIAGNOSES = '/copy-diagnoses';
 exports.COPY_DIAGNOSES = COPY_DIAGNOSES;
 ;
-
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
   if (!reactHotLoader) {
     return;
   }
-
   reactHotLoader.register(GET_DIAGNOSIS, "GET_DIAGNOSIS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/diagnoses.js");
   reactHotLoader.register(GET_DIAGNOSES, "GET_DIAGNOSES", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/diagnoses.js");
   reactHotLoader.register(GET_FULL_DIAGNOSIS, "GET_FULL_DIAGNOSIS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/diagnoses.js");
@@ -54,9 +48,7 @@ exports.COPY_DIAGNOSES = COPY_DIAGNOSES;
   reactHotLoader.register(DUPLICATE_DIAGNOSES, "DUPLICATE_DIAGNOSES", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/diagnoses.js");
   reactHotLoader.register(COPY_DIAGNOSES, "COPY_DIAGNOSES", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/diagnoses.js");
 })();
-
 ;
-
 (function () {
   var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);
