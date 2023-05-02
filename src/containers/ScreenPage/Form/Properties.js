@@ -178,7 +178,7 @@ function Properties(props) {
 
       <div>
         <TextField
-          rows={5}
+          minRows={5}
           multiline
           fullWidth
           value={form.contentText || ''}
@@ -230,7 +230,7 @@ function Properties(props) {
 
       <div>
         <TextField
-          rows={5}
+          minRows={5}
           multiline
           fullWidth
           value={form.instructions || ''}
@@ -244,7 +244,7 @@ function Properties(props) {
         <>
           <div>
             <TextField
-              rows={5}
+              minRows={5}
               multiline
               fullWidth
               value={form.instructions2 || ''}
@@ -256,7 +256,7 @@ function Properties(props) {
 
           <div>
             <TextField
-              rows={5}
+              minRows={5}
               multiline
               fullWidth
               value={form.instructions3 || ''}
@@ -268,7 +268,7 @@ function Properties(props) {
 
           <div>
             <TextField
-              rows={5}
+              minRows={5}
               multiline
               fullWidth
               value={form.instructions4 || ''}
@@ -282,7 +282,7 @@ function Properties(props) {
             <Grid item xs={12} sm={6}>
               <div>
                 <TextField
-                  rows={5}
+                  minRows={5}
                   multiline
                   fullWidth
                   value={form.hcwDiagnosesInstructions || ''}
@@ -296,7 +296,7 @@ function Properties(props) {
             <Grid item xs={12} sm={6}>
               <div>
                 <TextField
-                  rows={5}
+                  minRows={5}
                   multiline
                   fullWidth
                   value={form.suggestedDiagnosesInstructions || ''}
@@ -312,7 +312,7 @@ function Properties(props) {
 
       <div>
         <TextField
-          rows={5}
+          minRows={5}
           multiline
           fullWidth
           value={form.notes || ''}
