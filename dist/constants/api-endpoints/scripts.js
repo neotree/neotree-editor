@@ -4,16 +4,13 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.UPDATE_SCRIPTS = exports.UPDATE_SCRIPT = exports.GET_SCRIPT_ITEMS = exports.GET_SCRIPT_DIAGNOSES_SCREENS = exports.GET_SCRIPTS = exports.GET_SCRIPT = exports.GET_FULL_SCRIPT = exports.DUPLICATE_SCRIPTS = exports.DELETE_SCRIPTS = exports.CREATE_SCRIPT = void 0;
-
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-
 var GET_SCRIPT = '/get-script';
 exports.GET_SCRIPT = GET_SCRIPT;
 var GET_SCRIPTS = '/get-scripts';
@@ -35,14 +32,11 @@ exports.DUPLICATE_SCRIPTS = DUPLICATE_SCRIPTS;
 var GET_SCRIPT_DIAGNOSES_SCREENS = '/get-script-diagnoses-screens-count';
 exports.GET_SCRIPT_DIAGNOSES_SCREENS = GET_SCRIPT_DIAGNOSES_SCREENS;
 ;
-
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
-
   if (!reactHotLoader) {
     return;
   }
-
   reactHotLoader.register(GET_SCRIPT, "GET_SCRIPT", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/scripts.js");
   reactHotLoader.register(GET_SCRIPTS, "GET_SCRIPTS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/scripts.js");
   reactHotLoader.register(GET_FULL_SCRIPT, "GET_FULL_SCRIPT", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/scripts.js");
@@ -54,9 +48,7 @@ exports.GET_SCRIPT_DIAGNOSES_SCREENS = GET_SCRIPT_DIAGNOSES_SCREENS;
   reactHotLoader.register(DUPLICATE_SCRIPTS, "DUPLICATE_SCRIPTS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/scripts.js");
   reactHotLoader.register(GET_SCRIPT_DIAGNOSES_SCREENS, "GET_SCRIPT_DIAGNOSES_SCREENS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/scripts.js");
 })();
-
 ;
-
 (function () {
   var leaveModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.leaveModule : undefined;
   leaveModule && leaveModule(module);

@@ -1,7 +1,6 @@
 "use strict";
 
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
-
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
@@ -23,13 +22,9 @@ Object.defineProperty(exports, "shouldBackup", {
     return _shouldBackup["default"];
   }
 });
-
 var _shouldBackup = _interopRequireDefault(require("./shouldBackup"));
-
 var _backupData = _interopRequireDefault(require("./backupData"));
-
 var _restoreBackup = _interopRequireDefault(require("./restoreBackup"));
-
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
