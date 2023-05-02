@@ -17,6 +17,7 @@ import { FieldTypes } from '@/constants/types';
 import { DateTimePicker, TimePicker, } from '@material-ui/pickers';
 import Checkbox from '@material-ui/core/Checkbox';
 import { useAppContext } from '@/AppContext';
+import { FieldConfig } from '@/components/FieldConfig';
 import Title from '../../Title';
 
 const FieldForm = React.forwardRef(({
@@ -377,7 +378,7 @@ const FieldForm = React.forwardRef(({
                 <TextField
                   fullWidth
                   multiline
-                  rows={5}
+                  minRows={5}
                   value={form.values || ''}
                   label="Dropdown values"
                   onChange={e => setForm({ values: e.target.value })}
@@ -440,6 +441,13 @@ const FieldForm = React.forwardRef(({
               </>
             )}
             </div>
+
+			<br />
+
+			<FieldConfig 
+				value={form.prePopulate || []}
+				onChange={prePopulate => setForm({ prePopulate })}
+			/>
           </Collapse>
         </DialogContent>
 

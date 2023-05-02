@@ -130,7 +130,7 @@ function DiagnosisEditor({ diagnosis, script }) {
             <TextField
               fullWidth
               multiline
-              rows={3}
+              minRows={3}
               value={form.expressionMeaning || ''}
               label="Expression explanation (e.g. Temperature greater than 37 degrees or Gestation period less than 20 weeks)"
               onChange={e => setForm({ expressionMeaning: e.target.value })}

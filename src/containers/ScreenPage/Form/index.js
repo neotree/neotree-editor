@@ -16,6 +16,7 @@ import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import OverlayLoader from '@/components/OverlayLoader';
 import { useAppContext } from '@/AppContext';
+import { FieldConfig } from '@/components/FieldConfig';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
@@ -118,6 +119,16 @@ function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
 
               <Properties form={form} setForm={setForm} screen={screen} script={script} />
               <br />
+
+			  {!['form', 'edliz_summary_table', 'zw_edliz_summary_table', 'mwi_edliz_summary_table', 'diagnosis', 'management'].includes(form.type) && (
+					<>
+						<FieldConfig 
+							value={form.prePopulate || []}
+							onChange={prePopulate => setForm({ prePopulate })}
+						/>
+						<br />
+					</>
+				)}
             </div>
           </Collapse>
         </CardContent>
