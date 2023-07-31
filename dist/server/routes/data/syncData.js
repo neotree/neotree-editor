@@ -15,7 +15,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var _req$query, _lastSyncDate, deviceId, scriptsCount, mode, deviceDataOnly, lastSyncDate, done, webeditorInfo, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, _whereLastSyncDateGreaterThanLastUpdated, _whereLastSyncDateGreaterThanLastDeleted;
+      var _req$query, _lastSyncDate, deviceId, scriptsCount, mode, deviceDataOnly, lastSyncDate, done, webeditorInfo, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, whereLastSyncDateGreaterThanLastUpdated, whereLastSyncDateGreaterThanLastDeleted;
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) switch (_context2.prev = _context2.next) {
           case 0:
@@ -169,21 +169,21 @@ module.exports = function () {
             _context2.next = 88;
             break;
           case 61:
+            whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : {
+              updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+            };
+            whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : {
+              deletedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
+            };
             if (deviceDataOnly) {
               _context2.next = 82;
               break;
             }
-            _whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : {
-              updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-            };
-            _whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : {
-              deletedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
-            };
             _context2.next = 66;
             return _database.Script.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, _whereLastSyncDateGreaterThanLastUpdated)
+              }, whereLastSyncDateGreaterThanLastUpdated)
             });
           case 66:
             scripts = _context2.sent;
@@ -193,7 +193,7 @@ module.exports = function () {
                 deletedAt: {
                   $not: null
                 }
-              }, _whereLastSyncDateGreaterThanLastDeleted)
+              }, whereLastSyncDateGreaterThanLastDeleted)
             });
           case 69:
             deletedScripts = _context2.sent;
@@ -201,7 +201,7 @@ module.exports = function () {
             return _database.Screen.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, _whereLastSyncDateGreaterThanLastUpdated)
+              }, whereLastSyncDateGreaterThanLastUpdated)
             });
           case 72:
             screens = _context2.sent;
@@ -211,7 +211,7 @@ module.exports = function () {
                 deletedAt: {
                   $not: null
                 }
-              }, _whereLastSyncDateGreaterThanLastDeleted)
+              }, whereLastSyncDateGreaterThanLastDeleted)
             });
           case 75:
             deletedScreens = _context2.sent;
@@ -219,7 +219,7 @@ module.exports = function () {
             return _database.Diagnosis.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, _whereLastSyncDateGreaterThanLastUpdated)
+              }, whereLastSyncDateGreaterThanLastUpdated)
             });
           case 78:
             diagnoses = _context2.sent;
@@ -229,7 +229,7 @@ module.exports = function () {
                 deletedAt: {
                   $not: null
                 }
-              }, _whereLastSyncDateGreaterThanLastDeleted)
+              }, whereLastSyncDateGreaterThanLastDeleted)
             });
           case 81:
             deletedDiagnoses = _context2.sent;
