@@ -39,29 +39,31 @@ module.exports = () => (req, res, next) => {
 
       const backUpFolderExists = fs.existsSync(process.env.BACKUP_DIR_PATH);
 
-	  if (!deviceDataOnly) {
-		if (backUpFolderExists && (mode === 'production')) {
-			const readDir = dir => new Promise((resolve, reject) => {
-			(async () => {
-				dir = `${process.env.BACKUP_DIR_PATH}/${dir}`;
+	if (backUpFolderExists && (mode === 'production')) {
+		const readDir = dir => new Promise((resolve, reject) => {
+		(async () => {
+			dir = `${process.env.BACKUP_DIR_PATH}/${dir}`;
 
-				try {
-				if (!fs.existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
+			try {
+			if (!fs.existsSync(process.env.BACKUP_DIR_PATH)) return reject(new Error('Backup directory not found'));
 
-				const files = await Promise.all(fs.readdirSync(dir).map(fname => new Promise(resolve => {
-					const data = fs.readFileSync(`${dir}/${fname}`);
-					resolve(JSON.parse(data));
-				})));
-				resolve(files.sort((a, b) => a.id - b.id));
-				} catch (e) { return reject(e); }
-			})();
-			});
+			const files = await Promise.all(fs.readdirSync(dir).map(fname => new Promise(resolve => {
+				const data = fs.readFileSync(`${dir}/${fname}`);
+				resolve(JSON.parse(data));
+			})));
+			resolve(files.sort((a, b) => a.id - b.id));
+			} catch (e) { return reject(e); }
+		})();
+		});
 
+		if (!deviceDataOnly) {
 			scripts = await readDir('scripts');
 			screens = await readDir('screens');
 			diagnoses = await readDir('diagnoses');
-			configKeys = await readDir('configKeys');
-		} else {
+		}
+		configKeys = await readDir('configKeys');
+	} else {
+		if (!deviceDataOnly) {
 			const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
 			const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
 
@@ -73,10 +75,10 @@ module.exports = () => (req, res, next) => {
 
 			diagnoses = await Diagnosis.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
 			deletedDiagnoses = await Diagnosis.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
-
-			configKeys = await ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
-			deletedConfigKeys = await ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
 		}
+
+		configKeys = await ConfigKey.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
+		deletedConfigKeys = await ConfigKey.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
 	}
 
       done(null, {
