@@ -15,7 +15,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee2() {
-      var _req$query, _lastSyncDate, deviceId, scriptsCount, mode, deviceDataOnly, lastSyncDate, done, webeditorInfo, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, whereLastSyncDateGreaterThanLastUpdated, whereLastSyncDateGreaterThanLastDeleted;
+      var _req$query, _lastSyncDate, deviceId, scriptsCount, mode, deviceDataOnly, lastSyncDate, done, webeditorInfo, device, details, scripts, screens, diagnoses, configKeys, deletedScripts, deletedScreens, deletedDiagnoses, deletedConfigKeys, backUpFolderExists, readDir, _whereLastSyncDateGreaterThanLastUpdated, _whereLastSyncDateGreaterThanLastDeleted;
       return _regenerator["default"].wrap(function _callee2$(_context2) {
         while (1) switch (_context2.prev = _context2.next) {
           case 0:
@@ -100,10 +100,6 @@ module.exports = function () {
             deletedDiagnoses = [];
             deletedConfigKeys = [];
             backUpFolderExists = _fs["default"].existsSync(process.env.BACKUP_DIR_PATH);
-            if (deviceDataOnly) {
-              _context2.next = 87;
-              break;
-            }
             if (!(backUpFolderExists && mode === 'production')) {
               _context2.next = 61;
               break;
@@ -149,6 +145,10 @@ module.exports = function () {
                 }))();
               });
             };
+            if (deviceDataOnly) {
+              _context2.next = 56;
+              break;
+            }
             _context2.next = 49;
             return readDir('scripts');
           case 49:
@@ -161,82 +161,88 @@ module.exports = function () {
             return readDir('diagnoses');
           case 55:
             diagnoses = _context2.sent;
+          case 56:
             _context2.next = 58;
             return readDir('configKeys');
           case 58:
             configKeys = _context2.sent;
-            _context2.next = 87;
+            _context2.next = 88;
             break;
           case 61:
-            whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : {
+            if (deviceDataOnly) {
+              _context2.next = 82;
+              break;
+            }
+            _whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : {
               updatedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
             };
-            whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : {
+            _whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : {
               deletedAt: (0, _defineProperty2["default"])({}, _sequelize.Op.gte, lastSyncDate)
             };
-            _context2.next = 65;
+            _context2.next = 66;
             return _database.Script.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, whereLastSyncDateGreaterThanLastUpdated)
+              }, _whereLastSyncDateGreaterThanLastUpdated)
             });
-          case 65:
+          case 66:
             scripts = _context2.sent;
-            _context2.next = 68;
+            _context2.next = 69;
             return _database.Script.findAll({
               where: _objectSpread({
                 deletedAt: {
                   $not: null
                 }
-              }, whereLastSyncDateGreaterThanLastDeleted)
+              }, _whereLastSyncDateGreaterThanLastDeleted)
             });
-          case 68:
+          case 69:
             deletedScripts = _context2.sent;
-            _context2.next = 71;
+            _context2.next = 72;
             return _database.Screen.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, whereLastSyncDateGreaterThanLastUpdated)
+              }, _whereLastSyncDateGreaterThanLastUpdated)
             });
-          case 71:
+          case 72:
             screens = _context2.sent;
-            _context2.next = 74;
+            _context2.next = 75;
             return _database.Screen.findAll({
               where: _objectSpread({
                 deletedAt: {
                   $not: null
                 }
-              }, whereLastSyncDateGreaterThanLastDeleted)
+              }, _whereLastSyncDateGreaterThanLastDeleted)
             });
-          case 74:
+          case 75:
             deletedScreens = _context2.sent;
-            _context2.next = 77;
+            _context2.next = 78;
             return _database.Diagnosis.findAll({
               where: _objectSpread({
                 deletedAt: null
-              }, whereLastSyncDateGreaterThanLastUpdated)
+              }, _whereLastSyncDateGreaterThanLastUpdated)
             });
-          case 77:
+          case 78:
             diagnoses = _context2.sent;
-            _context2.next = 80;
+            _context2.next = 81;
             return _database.Diagnosis.findAll({
               where: _objectSpread({
                 deletedAt: {
                   $not: null
                 }
-              }, whereLastSyncDateGreaterThanLastDeleted)
+              }, _whereLastSyncDateGreaterThanLastDeleted)
             });
-          case 80:
+          case 81:
             deletedDiagnoses = _context2.sent;
-            _context2.next = 83;
+          case 82:
+            _context2.next = 84;
             return _database.ConfigKey.findAll({
               where: _objectSpread({
                 deletedAt: null
               }, whereLastSyncDateGreaterThanLastUpdated)
             });
-          case 83:
+          case 84:
             configKeys = _context2.sent;
-            _context2.next = 86;
+            _context2.next = 87;
             return _database.ConfigKey.findAll({
               where: _objectSpread({
                 deletedAt: {
@@ -244,9 +250,9 @@ module.exports = function () {
                 }
               }, whereLastSyncDateGreaterThanLastDeleted)
             });
-          case 86:
-            deletedConfigKeys = _context2.sent;
           case 87:
+            deletedConfigKeys = _context2.sent;
+          case 88:
             done(null, {
               webeditorInfo: webeditorInfo,
               device: device,
@@ -259,17 +265,17 @@ module.exports = function () {
               configKeys: configKeys,
               deletedConfigKeys: deletedConfigKeys
             });
-            _context2.next = 93;
+            _context2.next = 94;
             break;
-          case 90:
-            _context2.prev = 90;
+          case 91:
+            _context2.prev = 91;
             _context2.t3 = _context2["catch"](34);
             done(_context2.t3);
-          case 93:
+          case 94:
           case "end":
             return _context2.stop();
         }
-      }, _callee2, null, [[9, 15], [19, 24], [26, 32], [34, 90]]);
+      }, _callee2, null, [[9, 15], [19, 24], [26, 32], [34, 91]]);
     }))();
   };
 };
