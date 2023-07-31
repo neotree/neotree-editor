@@ -63,10 +63,9 @@ module.exports = () => (req, res, next) => {
 		}
 		configKeys = await readDir('configKeys');
 	} else {
-		if (!deviceDataOnly) {
-			const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
-			const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
-
+		const whereLastSyncDateGreaterThanLastUpdated = !lastSyncDate ? {} : { updatedAt: { [Op.gte]: lastSyncDate } };
+		const whereLastSyncDateGreaterThanLastDeleted = !lastSyncDate ? {} : { deletedAt: { [Op.gte]: lastSyncDate } };
+		if (!deviceDataOnly) {		
 			scripts = await Script.findAll({ where: { deletedAt: null, ...whereLastSyncDateGreaterThanLastUpdated } });
 			deletedScripts = await Script.findAll({ where: { deletedAt: { $not: null }, ...whereLastSyncDateGreaterThanLastDeleted } });
 
