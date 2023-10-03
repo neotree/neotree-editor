@@ -23,11 +23,15 @@ function ScriptEditorForm({ script }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
 
-  const [form, _setForm] = React.useState({ exportable: true, ...script });
-  const setForm = s => _setForm(prev => ({
-    ...prev,
-    ...(typeof s === 'function' ? s(prev) : s),
-  }));
+	const [form, _setForm] = React.useState({ 
+		exportable: true, 
+		nuid_search_enabled: false,
+		...script 
+	});
+	const setForm = s => _setForm(prev => ({
+		...prev,
+		...(typeof s === 'function' ? s(prev) : s),
+	}));
 
   const [savingScript, setSavingScript] = React.useState(false);
 
@@ -132,15 +136,25 @@ function ScriptEditorForm({ script }) {
               />
             ))}
           </RadioGroup>
-          <br /><br />
+          <br />
 
-          <FormControlLabel 
-            control={<Checkbox />}
-            value="exportable"
-            label="Exportable"
-            checked={form.exportable !== false}
-            onChange={() => setForm({ exportable: !form.exportable, })}
-          />
+			<FormControlLabel 
+				control={<Checkbox />}
+				value="exportable"
+				label="Exportable"
+				checked={form.exportable !== false}
+				onChange={() => setForm({ exportable: !form.exportable, })}
+			/>
+
+			<br />
+
+			<FormControlLabel 
+				control={<Checkbox />}
+				value="nuid_search_enabled"
+				label="Enable NUID Search"
+				checked={form.nuid_search_enabled !== false}
+				onChange={() => setForm({ nuid_search_enabled: !form.nuid_search_enabled, })}
+			/>
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
