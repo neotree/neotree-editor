@@ -128,7 +128,7 @@ function Properties(props) {
           </div>
           <br /><br />
 
-          <div>
+          {/* <div>
             <TextField
               fullWidth
               required
@@ -138,7 +138,7 @@ function Properties(props) {
               onChange={e => setForm({ title4: e.target.value })}
             />
           </div>
-          <br /><br />
+          <br /><br /> */}
 
           <div>
             <TextField
@@ -266,7 +266,7 @@ function Properties(props) {
           </div>
           <br /><br />
 
-          <div>
+          {/* <div>
             <TextField
               minRows={5}
               multiline
@@ -276,7 +276,7 @@ function Properties(props) {
               onChange={e => setForm({ instructions4: e.target.value })}
             />
           </div>
-          <br /><br />
+          <br /><br /> */}
 
           <Grid container spacing={1}>
             <Grid item xs={12} sm={6}>
