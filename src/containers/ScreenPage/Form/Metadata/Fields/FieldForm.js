@@ -386,7 +386,7 @@ const FieldForm = React.forwardRef(({
               </>
             )}
 
-            {(form.type === 'period') || (form.type === 'number') && (
+			{((form.type === 'period') || (form.type === 'number')) && (
               <>
                 <TextField
                   fullWidth
