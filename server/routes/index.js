@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import https from 'https';
 import * as database from '../database';
 import { backupData, shouldBackup, restoreBackup } from '../utils/backup';
 import { testCounty } from './addStatsMiddleware';
@@ -25,6 +27,46 @@ module.exports = app => {
         const appInfo = await database.App.findOne({ where: { id: 1 } });
         const _shouldBackup = await shouldBackup();
         res.json({ shouldBackup: _shouldBackup, appInfo });
+      } catch (e) { res.json({ errors: [e.message] }); }
+    })();
+  });
+
+  router.get('/remove-confidential-data', (req, res) => {
+    (async () => {
+      try {
+		console.log('getting screens...');
+        const screensRes = await database.Screen.findAll({ where: { deletedAt: null }, });
+        const screens = screensRes.map(screen => {
+			const { data, ...s } = JSON.parse(JSON.stringify(screen));
+			return { ...data, ...s };
+		});
+		console.log(screens.length + ' screens found...');
+		const confidentialKeysMap = screens.reduce((acc, item) => {
+			const metadata = { fields: [], items: [], ...item.metadata };
+			const fields = metadata.fields;
+			const items = metadata.items;
+			fields.forEach(f => { if (f.confidential) acc[f.key] = true; });
+			items.forEach(f => { if (f.confidential) acc[f.key] = true; });
+			if (metadata.confidential && metadata.key) acc[metadata.key] = true;
+			return acc;
+		}, {});
+		const keys = Object.keys(confidentialKeysMap);
+		res.json({ keys });
+		// console.log('posting to ' + `${process.env.NODEAPI_URL}/remove-confidential-data`, { keys });
+		// const _fetch = `${process.env.NODEAPI_URL}`.substring(0, 5) === 'https' ? https : http;
+		// _fetch.request(`${process.env.NODEAPI_URL}/remove-confidential-data`, { 
+		// 	method: 'POST', 
+		// 	body: JSON.stringify({ keys }),
+		// 	headers: { 'Content-type': 'application/json; charset=UTF-8', Connection: 'keep-alive', }, 
+		// }, (resp) => {
+		// 	// The whole response has been received. Print out the result.
+		// 	resp.on('end', () => {
+		// 		res.json({ success: true, });
+		// 	});
+
+		// }).on("error", (error) => {
+		// 	res.json({ error });
+		// });
       } catch (e) { res.json({ errors: [e.message] }); }
     })();
   });
