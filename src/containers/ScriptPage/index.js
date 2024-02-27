@@ -6,6 +6,7 @@ import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import OverlayLoader from '@/components/OverlayLoader';
 import LazyComponent from '@/components/LazyComponent';
+import * as api from '@/api/hospitals';
 import Form from './Form';
 
 const LoaderComponent = () => (
@@ -21,6 +22,7 @@ function ScriptPage() {
   const history = useHistory();
   const { scriptId, scriptSection: _scriptSection } = useParams();
 
+  const [hospitals, setHospitals] = React.useState([]);
   const [script, setScript] = React.useState(null);
   const [scriptInitialised, setScriptInitialised] = React.useState(false);
   const [loadingScript, setLoadingScript] = React.useState(false);
@@ -35,6 +37,9 @@ function ScriptPage() {
           const res = await fetch(`/get-script?scriptId=${scriptId}`);
           const { script } = await res.json();
           setScript(script);
+
+		  const { hospitals } = await api.getHospitals();
+		  setHospitals(hospitals || []);
         } catch (e) { alert(e.message); }
       }
       setScriptInitialised(true);
@@ -46,7 +51,7 @@ function ScriptPage() {
 
   return (
     <>
-      <Form script={script} />
+      <Form script={script} hospitals={hospitals} />
 
       <br />
 

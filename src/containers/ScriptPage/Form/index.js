@@ -19,13 +19,14 @@ import OverlayLoader from '@/components/OverlayLoader';
 import { useAppContext } from '@/AppContext';
 import { ImportScript } from '@/components/ImportScript';
 
-function ScriptEditorForm({ script }) {
+function ScriptEditorForm({ script, hospitals }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
 
 	const [form, _setForm] = React.useState({ 
 		exportable: true, 
 		nuid_search_enabled: false,
+		hospital: '',
 		...script 
 	});
 	const setForm = s => _setForm(prev => ({
@@ -75,6 +76,35 @@ function ScriptEditorForm({ script }) {
           <br /><br />
 
           <div>
+			<Typography variant="caption">Hospital</Typography>
+			<select
+				value={form.hospital}
+				onChange={e => setForm({ hospital: e.target.value })}
+				style={{
+					background: 'transparent',
+					border: '1px solid #999',
+					padding: 10,
+					outline: 'none !important',
+					borderRadius: 5,
+					display: 'block',
+					width: '100%',
+				}}
+			>
+				<option value="">-- select --</option>
+				{hospitals.map(h => {
+					return (
+						<option
+							key={h.hospital_id}
+							value={h.hospital_id}
+						>{h.name}</option>
+					);
+				})}
+			</select>
+          </div>
+
+          <br />
+
+		  <div>
             <TextField
               fullWidth
               required
@@ -175,6 +205,7 @@ function ScriptEditorForm({ script }) {
 
 ScriptEditorForm.propTypes = {
   script: PropTypes.object,
+  hospitals: PropTypes.array,
 };
 
 export default ScriptEditorForm;
