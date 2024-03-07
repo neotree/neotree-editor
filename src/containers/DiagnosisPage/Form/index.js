@@ -2,6 +2,7 @@
 import React from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import Grid from '@material-ui/core/Grid';
 import Card from '@material-ui/core/Card';
 import CardContent from '@material-ui/core/CardContent';
 import CardActions from '@material-ui/core/CardActions';
@@ -22,6 +23,7 @@ function DiagnosisEditor({ diagnosis, script }) {
   const { scriptId } = useParams();
 
   const [form, _setForm] = React.useState({
+    severity_order: null,
     description: null,
     expression: null,
     expressionMeaning: null,
@@ -35,6 +37,7 @@ function DiagnosisEditor({ diagnosis, script }) {
     symptoms: [],
     scriptId,
     ...diagnosis,
+    severity_order: `${diagnosis?.severity_order || ''}`
   });
   const setForm = s => _setForm(prev => ({
     ...prev,
@@ -94,16 +97,27 @@ function DiagnosisEditor({ diagnosis, script }) {
           </div>
           <br /><br />
 
-          <div>
-            <TextField
-              fullWidth
-              required
-              error={!form.key}
-              value={form.key || ''}
-              label="Key"
-              onChange={e => setForm({ key: e.target.value })}
-            />
-          </div>
+          <Grid container>
+            <div>
+                <TextField
+                value={form.severity_order || ''}
+                label="Severity Order"
+                type="number"
+                onChange={e => setForm({ severity_order: e.target.value })}
+                />
+            </div>
+
+            <div style={{ marginLeft: 10, flex: 1 }}>
+                <TextField
+                    fullWidth
+                    required
+                    error={!form.key}
+                    value={form.key || ''}
+                    label="Key"
+                    onChange={e => setForm({ key: e.target.value })}
+                />
+            </div>
+          </Grid>
           <br /><br />
 
           <div>

@@ -18,15 +18,14 @@ var _default = new _sequelize["default"](process.env.POSTGRES_DB_NAME, process.e
   host: process.env.POSTGRES_DB_HOST,
   logging: false // process.env.NODE_ENV !== 'production'
 });
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/sequelize.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/sequelize.js");
 })();
 ;
 (function () {

@@ -11,18 +11,16 @@ exports.UPLOAD_FILE = exports.GET_FILE = void 0;
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var GET_FILE = '/file/:fileId';
-exports.GET_FILE = GET_FILE;
-var UPLOAD_FILE = '/upload-file';
-exports.UPLOAD_FILE = UPLOAD_FILE;
+var GET_FILE = exports.GET_FILE = '/file/:fileId';
+var UPLOAD_FILE = exports.UPLOAD_FILE = '/upload-file';
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_FILE, "GET_FILE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/files.js");
-  reactHotLoader.register(UPLOAD_FILE, "UPLOAD_FILE", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/files.js");
+  reactHotLoader.register(GET_FILE, "GET_FILE", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/files.js");
+  reactHotLoader.register(UPLOAD_FILE, "UPLOAD_FILE", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/files.js");
 })();
 ;
 (function () {

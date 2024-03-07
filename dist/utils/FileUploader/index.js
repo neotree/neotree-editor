@@ -18,7 +18,7 @@ var _excluded = ["url", "metadata", "fieldname", "preserveFilename"];
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var Upload = /*#__PURE__*/function () {
+var Upload = exports["default"] = /*#__PURE__*/function () {
   function Upload(file) {
     var _this = this;
     var opts = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
@@ -125,14 +125,13 @@ var Upload = /*#__PURE__*/function () {
   }]);
   return Upload;
 }();
-exports["default"] = Upload;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(Upload, "Upload", "/home/farai/Workbench/neotree-editor/utils/FileUploader/index.js");
+  reactHotLoader.register(Upload, "Upload", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/FileUploader/index.js");
 })();
 ;
 (function () {

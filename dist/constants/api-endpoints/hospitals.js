@@ -11,30 +11,24 @@ exports.UPDATE_HOSPITALS = exports.UPDATE_HOSPITAL = exports.GET_HOSPITALS = exp
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var GET_HOSPITALS = '/get-hospitals';
-exports.GET_HOSPITALS = GET_HOSPITALS;
-var GET_HOSPITAL = '/get-hospital';
-exports.GET_HOSPITAL = GET_HOSPITAL;
-var ADD_HOSPITAL = '/add-hospital';
-exports.ADD_HOSPITAL = ADD_HOSPITAL;
-var UPDATE_HOSPITAL = '/update-hospital';
-exports.UPDATE_HOSPITAL = UPDATE_HOSPITAL;
-var UPDATE_HOSPITALS = '/update-hospitals';
-exports.UPDATE_HOSPITALS = UPDATE_HOSPITALS;
-var DELETE_HOSPITALS = '/delete-hospitals';
-exports.DELETE_HOSPITALS = DELETE_HOSPITALS;
+var GET_HOSPITALS = exports.GET_HOSPITALS = '/get-hospitals';
+var GET_HOSPITAL = exports.GET_HOSPITAL = '/get-hospital';
+var ADD_HOSPITAL = exports.ADD_HOSPITAL = '/add-hospital';
+var UPDATE_HOSPITAL = exports.UPDATE_HOSPITAL = '/update-hospital';
+var UPDATE_HOSPITALS = exports.UPDATE_HOSPITALS = '/update-hospitals';
+var DELETE_HOSPITALS = exports.DELETE_HOSPITALS = '/delete-hospitals';
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_HOSPITALS, "GET_HOSPITALS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
-  reactHotLoader.register(GET_HOSPITAL, "GET_HOSPITAL", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
-  reactHotLoader.register(ADD_HOSPITAL, "ADD_HOSPITAL", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
-  reactHotLoader.register(UPDATE_HOSPITAL, "UPDATE_HOSPITAL", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
-  reactHotLoader.register(UPDATE_HOSPITALS, "UPDATE_HOSPITALS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
-  reactHotLoader.register(DELETE_HOSPITALS, "DELETE_HOSPITALS", "/home/farai/Workbench/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(GET_HOSPITALS, "GET_HOSPITALS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(GET_HOSPITAL, "GET_HOSPITAL", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(ADD_HOSPITAL, "ADD_HOSPITAL", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(UPDATE_HOSPITAL, "UPDATE_HOSPITAL", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(UPDATE_HOSPITALS, "UPDATE_HOSPITALS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
+  reactHotLoader.register(DELETE_HOSPITALS, "DELETE_HOSPITALS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/hospitals.js");
 })();
 ;
 (function () {

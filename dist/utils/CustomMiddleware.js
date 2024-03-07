@@ -15,7 +15,7 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/de
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var CustomMiddleware = /*#__PURE__*/function () {
+var CustomMiddleware = exports["default"] = /*#__PURE__*/function () {
   function CustomMiddleware() {
     (0, _classCallCheck2["default"])(this, CustomMiddleware);
     (0, _defineProperty2["default"])(this, "go", function (next) {
@@ -42,14 +42,13 @@ var CustomMiddleware = /*#__PURE__*/function () {
   }]);
   return CustomMiddleware;
 }();
-exports["default"] = CustomMiddleware;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/home/farai/Workbench/neotree-editor/utils/CustomMiddleware.js");
+  reactHotLoader.register(CustomMiddleware, "CustomMiddleware", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/CustomMiddleware.js");
 })();
 ;
 (function () {

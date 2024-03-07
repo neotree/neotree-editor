@@ -50,16 +50,15 @@ var User = _sequelize2["default"].define('user', {
   }
 });
 var _default = User;
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(User, "User", "/home/farai/Workbench/neotree-editor/server/database/models/_User.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_User.js");
+  reactHotLoader.register(User, "User", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_User.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_User.js");
 })();
 ;
 (function () {
