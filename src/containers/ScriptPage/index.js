@@ -32,18 +32,21 @@ function ScriptPage() {
   React.useEffect(() => {
     (async () => {
       setLoadingScript(true);
-      if (scriptId !== 'new') {
-        try {
-          const res = await fetch(`/get-script?scriptId=${scriptId}`);
-          const { script } = await res.json();
-          setScript(script);
+      try {
+        const { hospitals } = await api.getHospitals();
+		setHospitals(hospitals || []);
 
-		  const { hospitals } = await api.getHospitals();
-		  setHospitals(hospitals || []);
-        } catch (e) { alert(e.message); }
+        if (scriptId !== 'new') {
+            const res = await fetch(`/get-script?scriptId=${scriptId}`);
+            const { script } = await res.json();
+            setScript(script);
+        }
+      } catch(e) {
+        //
+      } finally {
+        setScriptInitialised(true);
+        setLoadingScript(false);
       }
-      setScriptInitialised(true);
-      setLoadingScript(false);
     })();
   }, []);
 
