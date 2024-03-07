@@ -22,6 +22,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 //       !u ? null : { activated: u.password ? true : false, userId: u.id, email: u.email },
 //     ));
 // };
+
 module.exports = function () {
   return function (req, res, next) {
     var email = req.query.email;

@@ -30,6 +30,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 //     });
 //   })(req, res, next);
 // };
+
 module.exports = function () {
   return function (req, res, next) {
     var _req$body = req.body,

@@ -14,12 +14,12 @@ var _models = require("../../database/models");
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
 })();
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { (0, _defineProperty2["default"])(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { (0, _defineProperty2["default"])(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var copyScreen = function copyScreen(_ref) {
+var copyScreen = exports.copyScreen = function copyScreen(_ref) {
   var id = _ref.id;
   return new Promise(function (resolve, reject) {
     if (!id) return reject(new Error('Required screen "id" is not provided.'));
@@ -123,7 +123,6 @@ var copyScreen = function copyScreen(_ref) {
     }))();
   });
 };
-exports.copyScreen = copyScreen;
 var _default = function _default() {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee3() {
@@ -178,16 +177,15 @@ var _default = function _default() {
     }))();
   };
 };
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(copyScreen, "copyScreen", "/home/farai/Workbench/neotree-editor/server/routes/screens/duplicateScreensMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/routes/screens/duplicateScreensMiddleware.js");
+  reactHotLoader.register(copyScreen, "copyScreen", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/duplicateScreensMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/duplicateScreensMiddleware.js");
 })();
 ;
 (function () {

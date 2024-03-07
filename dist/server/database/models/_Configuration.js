@@ -41,16 +41,15 @@ var ConfigKey = _sequelize2["default"].define('configuration', {
   }
 });
 var _default = ConfigKey;
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(ConfigKey, "ConfigKey", "/home/farai/Workbench/neotree-editor/server/database/models/_Configuration.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_Configuration.js");
+  reactHotLoader.register(ConfigKey, "ConfigKey", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_Configuration.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_Configuration.js");
 })();
 ;
 (function () {

@@ -12,15 +12,14 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
   return a;
 };
 var _default = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-var _default2 = _default; // eslint-disable-line
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default; // eslint-disable-line
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/utils/emailRegex.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/emailRegex.js");
 })();
 ;
 (function () {

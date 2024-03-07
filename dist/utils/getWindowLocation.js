@@ -18,15 +18,14 @@ var _default = function _default() {
   }
   return loc;
 };
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/utils/getWindowLocation.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/getWindowLocation.js");
 })();
 ;
 (function () {

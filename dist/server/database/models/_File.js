@@ -50,23 +50,21 @@ var File = _sequelize2["default"].define('file', {
     //   key: 'id'
     // }
   },
-
   deletedAt: {
     type: _sequelize["default"].DATE,
     defaultValue: null
   }
 });
 var _default = File;
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(File, "File", "/home/farai/Workbench/neotree-editor/server/database/models/_File.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/database/models/_File.js");
+  reactHotLoader.register(File, "File", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_File.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_File.js");
 })();
 ;
 (function () {

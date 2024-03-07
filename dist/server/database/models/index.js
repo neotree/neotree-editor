@@ -105,7 +105,7 @@ var _Configuration = _interopRequireDefault(require("./_Configuration"));
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
-var init = function init() {
+var init = exports.init = function init() {
   return new Promise(function (resolve, reject) {
     var errors = [];
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
@@ -270,14 +270,13 @@ var init = function init() {
     }))();
   });
 };
-exports.init = init;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(init, "init", "/home/farai/Workbench/neotree-editor/server/database/models/index.js");
+  reactHotLoader.register(init, "init", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/index.js");
 })();
 ;
 (function () {

@@ -11,8 +11,8 @@ var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"))
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
 var database = _interopRequireWildcard(require("../database"));
-function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
-function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { "default": obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj["default"] = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+function _getRequireWildcardCache(e) { if ("function" != typeof WeakMap) return null; var r = new WeakMap(), t = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(e) { return e ? t : r; })(e); }
+function _interopRequireWildcard(e, r) { if (!r && e && e.__esModule) return e; if (null === e || "object" != _typeof(e) && "function" != typeof e) return { "default": e }; var t = _getRequireWildcardCache(r); if (t && t.has(e)) return t.get(e); var n = { __proto__: null }, a = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var u in e) if ("default" !== u && Object.prototype.hasOwnProperty.call(e, u)) { var i = a ? Object.getOwnPropertyDescriptor(e, u) : null; i && (i.get || i.set) ? Object.defineProperty(n, u, i) : n[u] = e[u]; } return n["default"] = e, t && t.set(e, n), n; }
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -123,7 +123,6 @@ var _default = function _default(req, res) {
               })
             };
           }))));
-
           res.json({
             success: true
           });
@@ -134,19 +133,18 @@ var _default = function _default(req, res) {
     }, _callee);
   }))();
 };
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(Countly, "Countly", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(countlyServer, "countlyServer", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(testCounty, "testCounty", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(Countly, "Countly", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(countlyServer, "countlyServer", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(testCounty, "testCounty", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
 })();
 ;
 (function () {

@@ -10,8 +10,8 @@ var firebase = _interopRequireWildcard(require("firebase"));
 exports.firebase = firebase;
 var firebaseAdmin = _interopRequireWildcard(require("firebase-admin"));
 exports.firebaseAdmin = firebaseAdmin;
-function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
-function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { "default": obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj["default"] = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+function _getRequireWildcardCache(e) { if ("function" != typeof WeakMap) return null; var r = new WeakMap(), t = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(e) { return e ? t : r; })(e); }
+function _interopRequireWildcard(e, r) { if (!r && e && e.__esModule) return e; if (null === e || "object" != _typeof(e) && "function" != typeof e) return { "default": e }; var t = _getRequireWildcardCache(r); if (t && t.has(e)) return t.get(e); var n = { __proto__: null }, a = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var u in e) if ("default" !== u && Object.prototype.hasOwnProperty.call(e, u)) { var i = a ? Object.getOwnPropertyDescriptor(e, u) : null; i && (i.get || i.set) ? Object.defineProperty(n, u, i) : n[u] = e[u]; } return n["default"] = e, t && t.set(e, n), n; }
 (function () {
   var enterModule = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.enterModule : undefined;
   enterModule && enterModule(module);
@@ -22,7 +22,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 var getParsedValue = function getParsedValue(v) {
   return JSON.parse("\"".concat(v || '', "\""));
 };
-var firebaseOptions = JSON.parse(JSON.stringify({
+var firebaseOptions = exports.firebaseOptions = JSON.parse(JSON.stringify({
   apiKey: getParsedValue(process.env.firebaseSDK_apiKey),
   authDomain: getParsedValue(process.env.firebaseSDK_authDomain),
   databaseURL: getParsedValue(process.env.firebaseSDK_databaseURL),
@@ -32,9 +32,8 @@ var firebaseOptions = JSON.parse(JSON.stringify({
   appId: getParsedValue(process.env.firebaseSDK_appId),
   measurementId: getParsedValue(process.env.firebaseSDK_measurementId)
 }));
-exports.firebaseOptions = firebaseOptions;
 firebase.initializeApp(firebaseOptions);
-var firebaseAdminOptions = JSON.parse(JSON.stringify({
+var firebaseAdminOptions = exports.firebaseAdminOptions = JSON.parse(JSON.stringify({
   databaseURL: getParsedValue(process.env.firebaseAdminSDK_databaseURL),
   type: getParsedValue(process.env.firebaseAdminSDK_type),
   project_id: getParsedValue(process.env.firebaseAdminSDK_project_id),
@@ -47,24 +46,22 @@ var firebaseAdminOptions = JSON.parse(JSON.stringify({
   auth_provider_x509_cert_url: getParsedValue(process.env.firebaseAdminSDK_auth_provider_x509_cert_url),
   client_x509_cert_url: getParsedValue(process.env.firebaseAdminSDK_client_x509_cert_url)
 }));
-exports.firebaseAdminOptions = firebaseAdminOptions;
 firebaseAdmin.initializeApp({
   credential: firebaseAdmin.credential.cert(firebaseAdminOptions),
   databaseURL: firebaseAdminOptions.databaseURL || "https://".concat(process.env.firebaseAdminSDK_project_id, ".firebaseio.com")
 });
 var _default = firebaseAdmin;
-var _default2 = _default;
-exports["default"] = _default2;
+var _default2 = exports["default"] = _default;
 ;
 (function () {
   var reactHotLoader = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal.default : undefined;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(getParsedValue, "getParsedValue", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(_default, "default", "/home/farai/Workbench/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(getParsedValue, "getParsedValue", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
 })();
 ;
 (function () {
