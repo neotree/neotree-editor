@@ -53,6 +53,7 @@ const ItemForm = React.forwardRef(({
     text1: null,
     text2: null,
     text3: null,
+    severity_order: null,
     ...data,
   };
 
@@ -246,6 +247,19 @@ const ItemForm = React.forwardRef(({
 
                     {['multi_select', 'diagnosis'].includes(type) && (
                       <>
+                        {type === 'diagnosis' && (
+                            <>
+                                <div>
+                                    <TextField
+                                        value={form.severity_order || ''}
+                                        label="Severity Order"
+                                        type="number"
+                                        onChange={e => setForm({ severity_order: e.target.value })}
+                                    />
+                                </div>
+                                <br /><br />
+                            </>
+                        )}
                         <div>
                           <FormControlLabel
                             control={(
