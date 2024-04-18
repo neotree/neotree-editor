@@ -126,8 +126,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(updateScreen, "updateScreen", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/updateScreenMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/updateScreenMiddleware.js");
+  reactHotLoader.register(updateScreen, "updateScreen", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/screens/updateScreenMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/screens/updateScreenMiddleware.js");
 })();
 ;
 (function () {

@@ -299,8 +299,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(copyConfigKey, "copyConfigKey", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/config-keys/duplicateConfigKeysMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/config-keys/duplicateConfigKeysMiddleware.js");
+  reactHotLoader.register(copyConfigKey, "copyConfigKey", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/config-keys/duplicateConfigKeysMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/config-keys/duplicateConfigKeysMiddleware.js");
 })();
 ;
 (function () {

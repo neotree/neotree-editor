@@ -106,7 +106,7 @@ module.exports = function () {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(encryptPassword, "encryptPassword", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/auth/signUpMiddleware.js");
+  reactHotLoader.register(encryptPassword, "encryptPassword", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/auth/signUpMiddleware.js");
 })();
 ;
 (function () {

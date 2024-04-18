@@ -62,7 +62,7 @@ var connect = exports.connect = function connect() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(connect, "connect", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/index.js");
+  reactHotLoader.register(connect, "connect", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/database/index.js");
 })();
 ;
 (function () {

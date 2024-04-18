@@ -52,8 +52,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(Device, "Device", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_Device.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/_Device.js");
+  reactHotLoader.register(Device, "Device", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/database/models/_Device.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/database/models/_Device.js");
 })();
 ;
 (function () {

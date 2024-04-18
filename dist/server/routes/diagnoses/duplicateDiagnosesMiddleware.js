@@ -178,8 +178,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(copyDiagnosis, "copyDiagnosis", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/duplicateDiagnosesMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/duplicateDiagnosesMiddleware.js");
+  reactHotLoader.register(copyDiagnosis, "copyDiagnosis", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/duplicateDiagnosesMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/duplicateDiagnosesMiddleware.js");
 })();
 ;
 (function () {

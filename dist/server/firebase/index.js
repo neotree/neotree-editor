@@ -58,10 +58,10 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(getParsedValue, "getParsedValue", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(getParsedValue, "getParsedValue", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseOptions, "firebaseOptions", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(firebaseAdminOptions, "firebaseAdminOptions", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/firebase/index.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/firebase/index.js");
 })();
 ;
 (function () {

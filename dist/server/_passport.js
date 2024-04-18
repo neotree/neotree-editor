@@ -84,7 +84,7 @@ module.exports = function (app) {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(LocalStrategy, "LocalStrategy", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/_passport.js");
+  reactHotLoader.register(LocalStrategy, "LocalStrategy", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/_passport.js");
 })();
 ;
 (function () {

@@ -126,8 +126,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(updateDiagnosis, "updateDiagnosis", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/updateDiagnosisMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/updateDiagnosisMiddleware.js");
+  reactHotLoader.register(updateDiagnosis, "updateDiagnosis", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/updateDiagnosisMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/updateDiagnosisMiddleware.js");
 })();
 ;
 (function () {

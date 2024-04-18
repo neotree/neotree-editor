@@ -27,16 +27,16 @@ var GET_SCRIPT_DIAGNOSES_SCREENS = exports.GET_SCRIPT_DIAGNOSES_SCREENS = '/get-
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_SCRIPT, "GET_SCRIPT", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(GET_SCRIPTS, "GET_SCRIPTS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(GET_FULL_SCRIPT, "GET_FULL_SCRIPT", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(GET_SCRIPT_ITEMS, "GET_SCRIPT_ITEMS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(CREATE_SCRIPT, "CREATE_SCRIPT", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(UPDATE_SCRIPT, "UPDATE_SCRIPT", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(UPDATE_SCRIPTS, "UPDATE_SCRIPTS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(DELETE_SCRIPTS, "DELETE_SCRIPTS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(DUPLICATE_SCRIPTS, "DUPLICATE_SCRIPTS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
-  reactHotLoader.register(GET_SCRIPT_DIAGNOSES_SCREENS, "GET_SCRIPT_DIAGNOSES_SCREENS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPT, "GET_SCRIPT", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPTS, "GET_SCRIPTS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_FULL_SCRIPT, "GET_FULL_SCRIPT", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPT_ITEMS, "GET_SCRIPT_ITEMS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(CREATE_SCRIPT, "CREATE_SCRIPT", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(UPDATE_SCRIPT, "UPDATE_SCRIPT", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(UPDATE_SCRIPTS, "UPDATE_SCRIPTS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(DELETE_SCRIPTS, "DELETE_SCRIPTS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(DUPLICATE_SCRIPTS, "DUPLICATE_SCRIPTS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
+  reactHotLoader.register(GET_SCRIPT_DIAGNOSES_SCREENS, "GET_SCRIPT_DIAGNOSES_SCREENS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/scripts.js");
 })();
 ;
 (function () {

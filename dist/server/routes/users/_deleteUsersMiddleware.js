@@ -136,7 +136,7 @@ module.exports = function () {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(deleteUser, "deleteUser", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/users/_deleteUsersMiddleware.js");
+  reactHotLoader.register(deleteUser, "deleteUser", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/users/_deleteUsersMiddleware.js");
 })();
 ;
 (function () {

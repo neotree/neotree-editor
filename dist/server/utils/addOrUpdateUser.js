@@ -175,7 +175,7 @@ module.exports = function addOrUpdateUser(_ref) {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(encryptPassword, "encryptPassword", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/utils/addOrUpdateUser.js");
+  reactHotLoader.register(encryptPassword, "encryptPassword", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/utils/addOrUpdateUser.js");
 })();
 ;
 (function () {

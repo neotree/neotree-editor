@@ -160,8 +160,8 @@ function createDiagnosisMiddleware() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(createDiagnosis, "createDiagnosis", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/createDiagnosisMiddleware.js");
-  reactHotLoader.register(createDiagnosisMiddleware, "createDiagnosisMiddleware", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/diagnoses/createDiagnosisMiddleware.js");
+  reactHotLoader.register(createDiagnosis, "createDiagnosis", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/createDiagnosisMiddleware.js");
+  reactHotLoader.register(createDiagnosisMiddleware, "createDiagnosisMiddleware", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/diagnoses/createDiagnosisMiddleware.js");
 })();
 ;
 (function () {

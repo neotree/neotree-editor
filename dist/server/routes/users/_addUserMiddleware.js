@@ -222,8 +222,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(addUser, "addUser", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/users/_addUserMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/users/_addUserMiddleware.js");
+  reactHotLoader.register(addUser, "addUser", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/users/_addUserMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/users/_addUserMiddleware.js");
 })();
 ;
 (function () {

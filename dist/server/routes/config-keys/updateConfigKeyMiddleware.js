@@ -127,8 +127,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(updateConfigKey, "updateConfigKey", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/config-keys/updateConfigKeyMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/config-keys/updateConfigKeyMiddleware.js");
+  reactHotLoader.register(updateConfigKey, "updateConfigKey", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/config-keys/updateConfigKeyMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/config-keys/updateConfigKeyMiddleware.js");
 })();
 ;
 (function () {

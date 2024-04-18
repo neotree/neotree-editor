@@ -23,12 +23,12 @@ var DELETE_COUNTRY = exports.DELETE_COUNTRY = '/delete-country';
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_COUNTRIES, "GET_COUNTRIES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
-  reactHotLoader.register(GET_COUNTRY, "GET_COUNTRY", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
-  reactHotLoader.register(ADD_COUNTRY, "ADD_COUNTRY", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
-  reactHotLoader.register(UPDATE_COUNTRY, "UPDATE_COUNTRY", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
-  reactHotLoader.register(UPDATE_COUNTRIES, "UPDATE_COUNTRIES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
-  reactHotLoader.register(DELETE_COUNTRY, "DELETE_COUNTRY", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(GET_COUNTRIES, "GET_COUNTRIES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(GET_COUNTRY, "GET_COUNTRY", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(ADD_COUNTRY, "ADD_COUNTRY", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(UPDATE_COUNTRY, "UPDATE_COUNTRY", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(UPDATE_COUNTRIES, "UPDATE_COUNTRIES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
+  reactHotLoader.register(DELETE_COUNTRY, "DELETE_COUNTRY", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/countries.js");
 })();
 ;
 (function () {

@@ -60,8 +60,8 @@ module.exports = {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(isProd, "isProd", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/logger.js");
-  reactHotLoader.register(logger, "logger", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/logger.js");
+  reactHotLoader.register(isProd, "isProd", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/logger.js");
+  reactHotLoader.register(logger, "logger", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/logger.js");
 })();
 ;
 (function () {

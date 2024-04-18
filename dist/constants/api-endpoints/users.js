@@ -22,11 +22,11 @@ var DELETE_USERS = exports.DELETE_USERS = '/delete-users';
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_USERS, "GET_USERS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(UPDATE_USER, "UPDATE_USER", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(UPDATE_USERS, "UPDATE_USERS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(ADD_USER, "ADD_USER", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/users.js");
-  reactHotLoader.register(DELETE_USERS, "DELETE_USERS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(GET_USERS, "GET_USERS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(UPDATE_USER, "UPDATE_USER", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(UPDATE_USERS, "UPDATE_USERS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(ADD_USER, "ADD_USER", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/users.js");
+  reactHotLoader.register(DELETE_USERS, "DELETE_USERS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/users.js");
 })();
 ;
 (function () {
