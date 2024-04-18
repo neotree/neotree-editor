@@ -87,6 +87,30 @@ const FieldForm = React.forwardRef(({
     </>
   );
 
+  const getErrors = () => {
+    const errors = [];
+    if (form.type === 'dropdown') {
+        const dropdownValues = (form.values || '').split('\n')
+            .map((v = '') => v.trim())
+            .map((v) => {
+                v = v.split(',');
+                return { value: v[0], label: v[1], };
+            });
+        const values = dropdownValues.map(v => v.value);
+        const labels = dropdownValues.map(v => v.label);
+        const missing = dropdownValues.filter(v => !v.value || !v.label);
+        const duplicateValues = values.filter((item, index) => values.indexOf(item) !== index);
+        const duplicateLabels = labels.filter((item, index) => labels.indexOf(item) !== index);
+        if (duplicateLabels.length || duplicateValues.length) {
+            errors.push('Dropdown values contain duplicate data');
+        }
+        if (missing.length) {
+            errors.push('Incorrect dropdown values format');
+        }
+    }
+    return errors;
+  }
+
   return (
     <>
       <div
@@ -452,6 +476,17 @@ const FieldForm = React.forwardRef(({
         </DialogContent>
 
         <DialogActions>
+            <div style={{ flex: 1 }}>
+                {getErrors().map(e => (
+                    <Typography 
+                        key={e}
+                        variant="caption"
+                        color="error"
+                        component="div"
+                    >{e}</Typography>
+                ))}
+            </div>
+
           <Button
             onClick={() => setOpen(false)}
           >Cancel</Button>
@@ -459,7 +494,7 @@ const FieldForm = React.forwardRef(({
           <Button
             variant="contained"
             color="primary"
-            disabled={viewMode === 'view'}
+            disabled={!!getErrors().length || (viewMode === 'view')}
             onClick={() => {
               onSave(form);
               setOpen(false);
