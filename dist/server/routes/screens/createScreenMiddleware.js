@@ -163,8 +163,8 @@ function createScreenMiddleware() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(createScreen, "createScreen", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/createScreenMiddleware.js");
-  reactHotLoader.register(createScreenMiddleware, "createScreenMiddleware", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/screens/createScreenMiddleware.js");
+  reactHotLoader.register(createScreen, "createScreen", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/screens/createScreenMiddleware.js");
+  reactHotLoader.register(createScreenMiddleware, "createScreenMiddleware", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/screens/createScreenMiddleware.js");
 })();
 ;
 (function () {

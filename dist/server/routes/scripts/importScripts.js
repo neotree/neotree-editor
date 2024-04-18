@@ -381,8 +381,8 @@ function getImportScripts() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(importScripts, "importScripts", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/importScripts.js");
-  reactHotLoader.register(getImportScripts, "getImportScripts", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/importScripts.js");
+  reactHotLoader.register(importScripts, "importScripts", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/importScripts.js");
+  reactHotLoader.register(getImportScripts, "getImportScripts", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/importScripts.js");
 })();
 ;
 (function () {

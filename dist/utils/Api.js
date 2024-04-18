@@ -131,9 +131,9 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(ApiFetch, "ApiFetch", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/Api.js");
-  reactHotLoader.register(makeApiCall, "makeApiCall", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/Api.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/Api.js");
+  reactHotLoader.register(ApiFetch, "ApiFetch", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/Api.js");
+  reactHotLoader.register(makeApiCall, "makeApiCall", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/Api.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/Api.js");
 })();
 ;
 (function () {

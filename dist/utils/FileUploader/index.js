@@ -131,7 +131,7 @@ var Upload = exports["default"] = /*#__PURE__*/function () {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(Upload, "Upload", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/FileUploader/index.js");
+  reactHotLoader.register(Upload, "Upload", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/FileUploader/index.js");
 })();
 ;
 (function () {

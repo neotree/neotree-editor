@@ -27,16 +27,16 @@ var COPY_DIAGNOSES = exports.COPY_DIAGNOSES = '/copy-diagnoses';
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(GET_DIAGNOSIS, "GET_DIAGNOSIS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(GET_DIAGNOSES, "GET_DIAGNOSES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(GET_FULL_DIAGNOSIS, "GET_FULL_DIAGNOSIS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(GET_DIAGNOSIS_ITEMS, "GET_DIAGNOSIS_ITEMS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(CREATE_DIAGNOSIS, "CREATE_DIAGNOSIS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(UPDATE_DIAGNOSIS, "UPDATE_DIAGNOSIS", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(UPDATE_DIAGNOSES, "UPDATE_DIAGNOSES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(DELETE_DIAGNOSES, "DELETE_DIAGNOSES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(DUPLICATE_DIAGNOSES, "DUPLICATE_DIAGNOSES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
-  reactHotLoader.register(COPY_DIAGNOSES, "COPY_DIAGNOSES", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(GET_DIAGNOSIS, "GET_DIAGNOSIS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(GET_DIAGNOSES, "GET_DIAGNOSES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(GET_FULL_DIAGNOSIS, "GET_FULL_DIAGNOSIS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(GET_DIAGNOSIS_ITEMS, "GET_DIAGNOSIS_ITEMS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(CREATE_DIAGNOSIS, "CREATE_DIAGNOSIS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(UPDATE_DIAGNOSIS, "UPDATE_DIAGNOSIS", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(UPDATE_DIAGNOSES, "UPDATE_DIAGNOSES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(DELETE_DIAGNOSES, "DELETE_DIAGNOSES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(DUPLICATE_DIAGNOSES, "DUPLICATE_DIAGNOSES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
+  reactHotLoader.register(COPY_DIAGNOSES, "COPY_DIAGNOSES", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/api-endpoints/diagnoses.js");
 })();
 ;
 (function () {

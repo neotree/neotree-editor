@@ -178,7 +178,7 @@ function restoreBackup() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(restoreBackup, "restoreBackup", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/utils/backup/restoreBackup.js");
+  reactHotLoader.register(restoreBackup, "restoreBackup", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/utils/backup/restoreBackup.js");
 })();
 ;
 (function () {

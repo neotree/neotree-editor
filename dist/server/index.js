@@ -147,7 +147,7 @@ var isProd = process.env.NODE_ENV === 'production';
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(isProd, "isProd", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/index.js");
+  reactHotLoader.register(isProd, "isProd", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/index.js");
 })();
 ;
 (function () {

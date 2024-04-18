@@ -36,7 +36,7 @@ module.exports = function (app) {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(router, "router", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/auth/index.js");
+  reactHotLoader.register(router, "router", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/auth/index.js");
 })();
 ;
 (function () {

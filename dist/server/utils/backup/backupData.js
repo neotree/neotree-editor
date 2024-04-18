@@ -340,7 +340,7 @@ function backupData(app, req) {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(backupData, "backupData", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/utils/backup/backupData.js");
+  reactHotLoader.register(backupData, "backupData", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/utils/backup/backupData.js");
 })();
 ;
 (function () {

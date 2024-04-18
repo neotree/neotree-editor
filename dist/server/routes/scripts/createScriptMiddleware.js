@@ -148,8 +148,8 @@ function createScriptMiddleware() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(createScript, "createScript", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/createScriptMiddleware.js");
-  reactHotLoader.register(createScriptMiddleware, "createScriptMiddleware", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/createScriptMiddleware.js");
+  reactHotLoader.register(createScript, "createScript", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/createScriptMiddleware.js");
+  reactHotLoader.register(createScriptMiddleware, "createScriptMiddleware", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/createScriptMiddleware.js");
 })();
 ;
 (function () {

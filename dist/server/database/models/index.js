@@ -276,7 +276,7 @@ var init = exports.init = function init() {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(init, "init", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/database/models/index.js");
+  reactHotLoader.register(init, "init", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/database/models/index.js");
 })();
 ;
 (function () {

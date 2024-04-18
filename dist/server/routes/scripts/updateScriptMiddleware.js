@@ -127,8 +127,8 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(updateScript, "updateScript", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/updateScriptMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/scripts/updateScriptMiddleware.js");
+  reactHotLoader.register(updateScript, "updateScript", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/updateScriptMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/scripts/updateScriptMiddleware.js");
 })();
 ;
 (function () {

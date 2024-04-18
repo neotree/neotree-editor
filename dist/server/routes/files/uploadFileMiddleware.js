@@ -55,8 +55,8 @@ module.exports = function (router) {
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(storage, "storage", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/files/uploadFileMiddleware.js");
-  reactHotLoader.register(upload, "upload", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/files/uploadFileMiddleware.js");
+  reactHotLoader.register(storage, "storage", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/files/uploadFileMiddleware.js");
+  reactHotLoader.register(upload, "upload", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/files/uploadFileMiddleware.js");
 })();
 ;
 (function () {

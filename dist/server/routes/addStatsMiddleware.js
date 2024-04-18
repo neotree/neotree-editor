@@ -140,11 +140,11 @@ var _default2 = exports["default"] = _default;
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(Countly, "Countly", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(countlyServer, "countlyServer", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(testCounty, "testCounty", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(Countly, "Countly", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(hasEnvVariables, "hasEnvVariables", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(countlyServer, "countlyServer", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(testCounty, "testCounty", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/addStatsMiddleware.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/server/routes/addStatsMiddleware.js");
 })();
 ;
 (function () {

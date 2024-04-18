@@ -21,10 +21,10 @@ var SIGNIN_MISSNG_PASSWORD = exports.SIGNIN_MISSNG_PASSWORD = 'Incorrect usernam
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(UNAUTHORIZED, "UNAUTHORIZED", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/error-messages/auth.js");
-  reactHotLoader.register(SIGNIN_NO_USER, "SIGNIN_NO_USER", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/error-messages/auth.js");
-  reactHotLoader.register(SIGNIN_WRONG_PASSWORD, "SIGNIN_WRONG_PASSWORD", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/error-messages/auth.js");
-  reactHotLoader.register(SIGNIN_MISSNG_PASSWORD, "SIGNIN_MISSNG_PASSWORD", "/Users/lafarai/WorkBench/BWS/neotree-editor/constants/error-messages/auth.js");
+  reactHotLoader.register(UNAUTHORIZED, "UNAUTHORIZED", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/error-messages/auth.js");
+  reactHotLoader.register(SIGNIN_NO_USER, "SIGNIN_NO_USER", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/error-messages/auth.js");
+  reactHotLoader.register(SIGNIN_WRONG_PASSWORD, "SIGNIN_WRONG_PASSWORD", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/error-messages/auth.js");
+  reactHotLoader.register(SIGNIN_MISSNG_PASSWORD, "SIGNIN_MISSNG_PASSWORD", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/constants/error-messages/auth.js");
 })();
 ;
 (function () {

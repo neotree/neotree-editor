@@ -19,7 +19,7 @@ var _default2 = exports["default"] = _default; // eslint-disable-line
   if (!reactHotLoader) {
     return;
   }
-  reactHotLoader.register(_default, "default", "/Users/lafarai/WorkBench/BWS/neotree-editor/utils/emailRegex.js");
+  reactHotLoader.register(_default, "default", "/Users/lafarai/Werq/BWS/NeoTree/neotree-editor/utils/emailRegex.js");
 })();
 ;
 (function () {
