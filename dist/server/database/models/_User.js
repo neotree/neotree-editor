@@ -22,6 +22,10 @@ var User = _sequelize2["default"].define('user', {
     autoIncrement: true,
     primaryKey: true
   },
+  role: {
+    type: _sequelize["default"].INTEGER,
+    defaultValue: 1
+  },
   user_id: {
     type: _sequelize["default"].STRING,
     allowNull: false

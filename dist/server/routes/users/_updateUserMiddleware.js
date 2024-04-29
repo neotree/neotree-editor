@@ -4,10 +4,7 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
-var _objectWithoutProperties2 = _interopRequireDefault(require("@babel/runtime/helpers/objectWithoutProperties"));
-var _firebase = _interopRequireDefault(require("../../firebase"));
 var _database = require("../../database");
-var _excluded = ["userId"];
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { (0, _defineProperty2["default"])(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
@@ -16,78 +13,77 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res, next) {
     var _req$body = req.body,
-      userId = _req$body.userId,
-      payload = (0, _objectWithoutProperties2["default"])(_req$body, _excluded);
+      role = _req$body.role,
+      user_id = _req$body.user_id,
+      hospitals = _req$body.hospitals,
+      countries = _req$body.countries;
     var done = function done(err, user) {
       res.locals.setResponse(err, {
         user: user
       });
       next();
     };
-    if (!userId) return done({
+    if (!user_id) return done({
       msg: 'Required user "id" is not provided.'
     });
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var user;
+      var u, _JSON$parse, data, user;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) switch (_context.prev = _context.next) {
           case 0:
-            user = null;
-            _context.prev = 1;
-            _context.next = 4;
-            return new Promise(function (resolve) {
-              _firebase["default"].database().ref("users/".concat(userId)).on('value', function (snap) {
-                return resolve(snap.val());
-              });
+            _context.prev = 0;
+            _context.next = 3;
+            return _database.User.findOne({
+              where: {
+                user_id: user_id
+              }
             });
-          case 4:
-            user = _context.sent;
-            _context.next = 9;
-            break;
-          case 7:
-            _context.prev = 7;
-            _context.t0 = _context["catch"](1);
-          case 9:
-            if (user) {
-              _context.next = 11;
+          case 3:
+            u = _context.sent;
+            if (!u) {
+              _context.next = 14;
               break;
             }
-            return _context.abrupt("return", done('User not found'));
-          case 11:
-            user = _objectSpread(_objectSpread({}, user), payload);
-            _context.prev = 12;
+            _JSON$parse = JSON.parse(JSON.stringify(u)), data = _JSON$parse.data;
+            _context.next = 8;
+            return _database.User.update(Object.assign({}, {
+              data: JSON.stringify(_objectSpread(_objectSpread({}, data), {}, {
+                countries: countries || data.countries,
+                hospitals: hospitals || data.hospitals
+              }))
+            }, role ? {
+              role: role
+            } : {}), {
+              where: {
+                user_id: user_id
+              }
+            });
+          case 8:
+            _context.next = 10;
+            return _database.User.findOne({
+              where: {
+                user_id: user_id
+              }
+            });
+          case 10:
+            user = _context.sent;
+            done(null, user);
             _context.next = 15;
-            return _firebase["default"].database().ref("users/".concat(userId)).set(user);
+            break;
+          case 14:
+            done(new Error('User not found'));
           case 15:
             _context.next = 20;
             break;
           case 17:
             _context.prev = 17;
-            _context.t1 = _context["catch"](12);
-            return _context.abrupt("return", done(_context.t1));
+            _context.t0 = _context["catch"](0);
+            done(_context.t0);
           case 20:
-            _context.prev = 20;
-            _context.next = 23;
-            return _database.User.update({
-              data: JSON.stringify(user)
-            }, {
-              where: {
-                email: user.email
-              }
-            });
-          case 23:
-            _context.next = 27;
-            break;
-          case 25:
-            _context.prev = 25;
-            _context.t2 = _context["catch"](20);
-          case 27:
-            done(null, user);
-          case 28:
           case "end":
             return _context.stop();
         }
-      }, _callee, null, [[1, 7], [12, 17], [20, 25]]);
+      }, _callee, null, [[0, 17]]);
     }))();
   };
 };
