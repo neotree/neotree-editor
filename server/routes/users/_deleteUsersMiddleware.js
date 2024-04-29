@@ -1,29 +1,4 @@
-import firebase from '../../firebase';
 import { User } from '../../database/models';
-
-const deleteUser = userId => new Promise((resolve, reject) => {
-  (async () => {
-    if (!userId) return reject(new Error('Required user "id" is not provided.'));
-
-    let user = null;
-    try {
-      user = await new Promise((resolve) => {
-        firebase.database().ref(`users/${userId}`)
-          .on('value', snap => resolve(snap.val()));
-      });
-    } catch (e) { /* Do nothing */ }
-
-    if (!user) return reject('User not found');
-
-    try { await firebase.auth().deleteUser(userId); } catch (e) { return reject(e); }
-
-    try { await firebase.database().ref(`users/${userId}`).remove(); } catch (e) { return reject(e); }
-
-    try { await User.destroy({ where: { user_id: userId }, }); } catch (e) { /* Do nothing*/ }
-
-    resolve(user);
-  })();
-});
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -34,9 +9,13 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let deletedUsers = [];
-    try { deletedUsers = await Promise.all(users.map(u => deleteUser(u.userId))); } catch (e) { return done(e); }
-
-    done(null, deletedUsers);
+    try { 
+        await Promise.all(users.filter(u => u.user_id).map(u => User.destroy({
+            where: { user_id: u.user_id, },
+        }))); 
+        done(null, users);
+    } catch (e) { 
+        done(e); 
+    }
   })();
 };

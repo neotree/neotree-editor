@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { User } from '../../database/models';
 
 module.exports = () => (req, res, next) => {
   (async () => {
@@ -7,19 +7,11 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let users = {};
+    let users = [];
     try {
-      users = await new Promise((resolve) => {
-        firebase.database()
-          .ref('users')
-          .on('value', snap => resolve(snap.val()));
-      });
-      users = users || {};
+      users = await User.findAll({ where: { deletedAt: null }, order: [['createdAt', 'ASC']], });
     } catch (e) { return done(e); }
 
-    done(
-      null,
-      Object.keys(users).map(key => users[key])
-    );
+    done(null, users);
   })();
 };
