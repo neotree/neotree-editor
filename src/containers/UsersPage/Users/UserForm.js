@@ -11,8 +11,15 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import Grid from '@material-ui/core/Grid';
 import CountryInput, { countries } from '@/components/CountryInput';
 import Autocomplete from '@material-ui/lab/Autocomplete';
+import Checkbox from '@material-ui/core/Checkbox';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
 
-export const defaultForm = { email: '', countries: [], hospitals: [], };
+export const defaultForm = { 
+    email: '', 
+    role: 1,
+    countries: [], 
+    hospitals: [], 
+};
 
 const UserForm = ({ onChange, user, hospitals }) => {
   const [form, _setForm] = useState(defaultForm);
@@ -23,7 +30,13 @@ const UserForm = ({ onChange, user, hospitals }) => {
 
   React.useEffect(() => { onChange(form); }, [form]);
 
-  React.useEffect(() => { setForm({ ...user }); }, [user]);
+  React.useEffect(() => { 
+    setForm({ 
+        ...user,
+        hospitals: user ? user.data.hospitals : [],
+        countries: user ? user.data.countries : [],
+    }); 
+}, [user]);
 
   return (
     <>
@@ -38,6 +51,16 @@ const UserForm = ({ onChange, user, hospitals }) => {
             error={!form.email}
             onChange={e => setForm({ email: e.target.value })}
           />
+        </Grid>
+
+        <Grid item xs={12} sm={12}>
+            <FormControlLabel 
+				control={<Checkbox />}
+				value="isAdmin"
+				label="Is admin?"
+				checked={form.role === 2}
+				onChange={() => setForm({ role: form.role === 1 ? 2 : 1, })}
+			/>
         </Grid>
 
         <Grid xs={12}>
@@ -55,7 +78,7 @@ const UserForm = ({ onChange, user, hospitals }) => {
               return (
                 <ListItem key={c}>
                   <ListItemText primary={country.name} />
-                  <IconButton size="small">
+                  <IconButton size="small" onClick={() => setForm(f => ({ countries: f.countries.filter(code => code !== c) }))}>
                     <DeleteIcon />
                   </IconButton>
                 </ListItem>
@@ -78,18 +101,17 @@ const UserForm = ({ onChange, user, hospitals }) => {
           <br />
           <Typography variant="button">Hospitals</Typography>
           <Divider />
-          <br />
         </Grid>
 
         <Grid item xs={12} sm={12}>
           <List>
             {form.hospitals.map(h => {
-              const hospital = hospitals.filter(hospital => hospital.hospitalId === h)[0];
+              const hospital = hospitals.filter(hospital => hospital.hospital_id === h)[0];
               if (!hospital) return null;
               return (
                 <ListItem key={h}>
                   <ListItemText primary={hospital.name} />
-                  <IconButton size="small">
+                  <IconButton size="small" onClick={() => setForm(f => ({ hospitals: f.hospitals.filter(id => id !== h) }))}>
                     <DeleteIcon />
                   </IconButton>
                 </ListItem>
@@ -99,10 +121,10 @@ const UserForm = ({ onChange, user, hospitals }) => {
 
           <Autocomplete
             fullWidth
-            options={hospitals}
+            options={(hospitals || []).filter(h => !form.hospitals.includes(h.hospital_id))}
             value={{}}
             getOptionLabel={o => o.name || ''}
-            onChange={(e, { hospitalId: hospital }) => {
+            onChange={(e, { hospital_id: hospital }) => {
               setForm(({ hospitals }) => ({
                 hospitals: [...hospitals, ...(hospitals.includes(hospital) ? [] : [hospital])]
               }));

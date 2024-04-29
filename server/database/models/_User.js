@@ -10,6 +10,10 @@ const User = sqlz.define(
       autoIncrement: true,
       primaryKey: true
     },
+    role: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1,
+    },
     user_id: {
       type: Sequelize.STRING,
       allowNull: false,

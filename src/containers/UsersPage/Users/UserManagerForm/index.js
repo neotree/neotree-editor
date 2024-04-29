@@ -63,7 +63,7 @@ const UserManagerForm = ({ updateState, user, authenticatedUser, hospitals, }) =
                   setLoading(false);
                   setOpen(false);
                   updateState(({ users }) => ({
-                    users: users.map(u => u.userId === user.userId ? user : u)
+                    users: users.map(u => u.user_id !== user.user_id ? u : user)
                   }));
                 })
                 .catch(err => {

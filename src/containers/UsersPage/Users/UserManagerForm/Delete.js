@@ -57,11 +57,11 @@ const Delete = ({ user, updateState, disabled }) => {
             color="secondary"
             onClick={() => {
               setLoading(true);
-              api.deleteUsers({ users: [{ userId: user.userId }] })
+              api.deleteUsers({ users: [{ user_id: user.user_id }] })
                 .then(() => {
                   setLoading(false);
                   setOpenConfirmDialog(false);
-                  updateState(({ users }) => ({ users: users.filter(u => u.userId !== user.userId) }));
+                  updateState(({ users }) => ({ users: users.filter(u => u.user_id !== user.user_id) }));
                 })
                 .catch(err => {
                   setLoading(false);
