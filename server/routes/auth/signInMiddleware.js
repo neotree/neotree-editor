@@ -10,6 +10,11 @@ module.exports = app => (req, res, next) => {
       next(); return null;
     }
 
+    if (req.body.isAdminAuth && (user.role !== 2)) {
+        res.locals.setResponse(new Error('Only admin users are allowed to login.'));
+        next(); return null;
+    }
+
     req.logIn(user, err => {
       if (err) {
         res.locals.setResponse(err);

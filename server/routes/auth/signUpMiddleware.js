@@ -13,7 +13,7 @@ const encryptPassword = password => new Promise((resolve, reject) => {
 
 module.exports = () => (req, res, next) => {
   (async () => {
-    const { password, username, } = req.body;
+    const { password, username, isAdminAuth, } = req.body;
 
     const done = ((err, rslts) => {
       res.locals.setResponse(err, rslts);
@@ -31,11 +31,19 @@ module.exports = () => (req, res, next) => {
     } catch (e) { return done(e); }
 
     let user = null;
-    try { user = await User.findOne({ where: { email: username } }); } catch (e) { return done(e); }
+    try { 
+        user = await User.findOne({ where: { email: username } });
+        
+        if (!user) return done('Failed to sign up, try again');
 
-    req.logIn(user, err => {
-      if (err) done(err);
-      done(null, { user });
-    });
+        if (isAdminAuth && (user.role !== 2)) return done(null, { user });
+
+        req.logIn(user, err => {
+            if (err) done(err);
+            done(null, { user });
+        });
+    } catch (e) { 
+        return done(e); 
+    }
   })();
 };
