@@ -26,11 +26,11 @@ var encryptPassword = function encryptPassword(password) {
 module.exports = function () {
   return function (req, res, next) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var _req$body, password, username, done, errors, encryptedPassword, user;
+      var _req$body, password, username, isAdminAuth, done, errors, encryptedPassword, user;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) switch (_context.prev = _context.next) {
           case 0:
-            _req$body = req.body, password = _req$body.password, username = _req$body.username;
+            _req$body = req.body, password = _req$body.password, username = _req$body.username, isAdminAuth = _req$body.isAdminAuth;
             done = function done(err, rslts) {
               res.locals.setResponse(err, rslts);
               next();
@@ -79,24 +79,37 @@ module.exports = function () {
             });
           case 26:
             user = _context.sent;
-            _context.next = 32;
-            break;
+            if (user) {
+              _context.next = 29;
+              break;
+            }
+            return _context.abrupt("return", done('Failed to sign up, try again'));
           case 29:
-            _context.prev = 29;
-            _context.t2 = _context["catch"](23);
-            return _context.abrupt("return", done(_context.t2));
-          case 32:
+            if (!(isAdminAuth && user.role !== 2)) {
+              _context.next = 31;
+              break;
+            }
+            return _context.abrupt("return", done(null, {
+              user: user
+            }));
+          case 31:
             req.logIn(user, function (err) {
               if (err) done(err);
               done(null, {
                 user: user
               });
             });
-          case 33:
+            _context.next = 37;
+            break;
+          case 34:
+            _context.prev = 34;
+            _context.t2 = _context["catch"](23);
+            return _context.abrupt("return", done(_context.t2));
+          case 37:
           case "end":
             return _context.stop();
         }
-      }, _callee, null, [[5, 11], [14, 19], [23, 29]]);
+      }, _callee, null, [[5, 11], [14, 19], [23, 34]]);
     }))();
   };
 };

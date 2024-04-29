@@ -3,7 +3,7 @@
 var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefault");
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/asyncToGenerator"));
-var _firebase = _interopRequireDefault(require("../../firebase"));
+var _models = require("../../database/models");
 var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoaderGlobal["default"].signature : function (a) {
   return a;
 };
@@ -20,32 +20,30 @@ module.exports = function () {
               });
               next();
             };
-            users = {};
+            users = [];
             _context.prev = 2;
             _context.next = 5;
-            return new Promise(function (resolve) {
-              _firebase["default"].database().ref('users').on('value', function (snap) {
-                return resolve(snap.val());
-              });
+            return _models.User.findAll({
+              where: {
+                deletedAt: null
+              },
+              order: [['createdAt', 'ASC']]
             });
           case 5:
             users = _context.sent;
-            users = users || {};
-            _context.next = 12;
+            _context.next = 11;
             break;
-          case 9:
-            _context.prev = 9;
+          case 8:
+            _context.prev = 8;
             _context.t0 = _context["catch"](2);
             return _context.abrupt("return", done(_context.t0));
+          case 11:
+            done(null, users);
           case 12:
-            done(null, Object.keys(users).map(function (key) {
-              return users[key];
-            }));
-          case 13:
           case "end":
             return _context.stop();
         }
-      }, _callee, null, [[2, 9]]);
+      }, _callee, null, [[2, 8]]);
     }))();
   };
 };
