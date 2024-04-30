@@ -20,67 +20,74 @@ function NavMenu() {
   React.useEffect(() => {
     navMenu.setInfoBar(
       <>
-        <Typography noWrap variant="caption">You're in {appState.viewMode} mode.</Typography>&nbsp;
-        <Link
-          to="#"
-          onClick={() => {
-            (async () => {
-              const viewMode = appState.viewMode === 'development' ? 'view' : 'development';
-              setState({ viewMode });
-              await fetch('/set-view-mode', {
-                headers: { 'Content-Type': 'application/json' },
-                method: 'POST',
-                body: JSON.stringify({ viewMode }),
-              });
-            })();
-          }}
-        >
-          <Typography variant="caption" color="primary">Switch to {appState.viewMode === 'development' ? 'view' : 'development'} mode</Typography>
-        </Link>&nbsp;
-        {appState.viewMode === 'view' ?
-          <Typography noWrap variant="caption">to make changes</Typography>
-          :
-          (
-            <>
-              {appState.shouldBackup && (
-                <>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="secondary"
-                    disableElevation
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        const res = await fetch('/discard-changes', { method: 'POST' });
-                        const { errors } = await res.json();
-                        if (errors && errors.length) return alert(JSON.stringify(errors));
-                        window.location.reload();
-                      } catch (e) { alert(e.message); }
-                      setLoading(false);
-                    }}
-                  >Discard changes</Button>&nbsp;
+        <Typography noWrap variant="caption">You're in {appState.viewMode} mode.</Typography>
 
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="secondary"
-                    disableElevation
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        const res = await fetch('/publish-changes', { method: 'POST' });
-                        const { errors } = await res.json();
-                        if (errors && errors.length) return alert(JSON.stringify(errors));
-                        window.location.reload();
-                      } catch (e) { alert(e.message); }
-                      setLoading(false);
+        {appState.authenticatedUser && (appState.authenticatedUser.role === 2) && (
+            <>
+                &nbsp;
+                <Link
+                    to="#"
+                    onClick={() => {
+                        (async () => {
+                            const viewMode = appState.viewMode === 'development' ? 'view' : 'development';
+                            setState({ viewMode });
+                            await fetch('/set-view-mode', {
+                                headers: { 'Content-Type': 'application/json' },
+                                method: 'POST',
+                                body: JSON.stringify({ viewMode }),
+                            });
+                        })();
                     }}
-                  >Publish</Button>
-                </>
-              )}
+                >
+                    <Typography variant="caption" color="primary">Switch to {appState.viewMode === 'development' ? 'view' : 'development'} mode</Typography>
+                </Link>&nbsp;
+
+                {appState.viewMode === 'view' ?
+                    <Typography noWrap variant="caption">to make changes</Typography>
+                    :
+                    (
+                        <>
+                        {appState.shouldBackup && (
+                            <>
+                            <Button
+                                size="small"
+                                variant="contained"
+                                color="secondary"
+                                disableElevation
+                                onClick={async () => {
+                                setLoading(true);
+                                try {
+                                    const res = await fetch('/discard-changes', { method: 'POST' });
+                                    const { errors } = await res.json();
+                                    if (errors && errors.length) return alert(JSON.stringify(errors));
+                                    window.location.reload();
+                                } catch (e) { alert(e.message); }
+                                setLoading(false);
+                                }}
+                            >Discard changes</Button>&nbsp;
+
+                            <Button
+                                size="small"
+                                variant="contained"
+                                color="secondary"
+                                disableElevation
+                                onClick={async () => {
+                                setLoading(true);
+                                try {
+                                    const res = await fetch('/publish-changes', { method: 'POST' });
+                                    const { errors } = await res.json();
+                                    if (errors && errors.length) return alert(JSON.stringify(errors));
+                                    window.location.reload();
+                                } catch (e) { alert(e.message); }
+                                setLoading(false);
+                                }}
+                            >Publish</Button>
+                            </>
+                        )}
+                        </>
+                    )}
             </>
-          )}
+        )}
       </>
     );
 

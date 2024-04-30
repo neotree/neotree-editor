@@ -18,13 +18,15 @@ module.exports = () => (req, res) => {
 
     const html = fs.readFileSync(path.resolve(__dirname, '../src/index.html'), 'utf8');
     const $ = cheerio.load(html);
+    let viewMode = req.session.viewMode || 'view';
+    if (user && (user.role !== 2)) viewMode = 'view';
     const $APP = JSON.stringify({
       authenticatedUser: user,
       app_name: process.env.APP_NAME,
       app_slug: process.env.APP_SLUG,
       app_url: process.env.APP_URL,
       country: process.env.COUNTRY,
-      viewMode: req.session.viewMode || 'view',
+      viewMode,
     }, null, 4);
     $('head').append(`<script type="text/javascript">\n    const $APP = ${$APP};\n</script>\n`);
     res.send($.html());

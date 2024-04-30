@@ -73,7 +73,7 @@ const AuthForm = ({ copy }) => {
       username: email,
       password,
       password2,
-      isAdminAuth: true,
+      isAdminAuth: false,
     })
       .then(() => { window.location.href = '/'; })
       .catch(e => {

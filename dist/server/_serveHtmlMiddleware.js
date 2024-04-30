@@ -13,7 +13,7 @@ var __signature__ = typeof reactHotLoaderGlobal !== 'undefined' ? reactHotLoader
 module.exports = function () {
   return function (req, res) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var user, html, $, $APP;
+      var user, html, $, viewMode, $APP;
       return _regenerator["default"].wrap(function _callee$(_context) {
         while (1) switch (_context.prev = _context.next) {
           case 0:
@@ -43,17 +43,19 @@ module.exports = function () {
           case 11:
             html = _fs["default"].readFileSync(_path["default"].resolve(__dirname, '../src/index.html'), 'utf8');
             $ = _cheerio["default"].load(html);
+            viewMode = req.session.viewMode || 'view';
+            if (user && user.role !== 2) viewMode = 'view';
             $APP = JSON.stringify({
               authenticatedUser: user,
               app_name: process.env.APP_NAME,
               app_slug: process.env.APP_SLUG,
               app_url: process.env.APP_URL,
               country: process.env.COUNTRY,
-              viewMode: req.session.viewMode || 'view'
+              viewMode: viewMode
             }, null, 4);
             $('head').append("<script type=\"text/javascript\">\n    const $APP = ".concat($APP, ";\n</script>\n"));
             res.send($.html());
-          case 16:
+          case 18:
           case "end":
             return _context.stop();
         }
