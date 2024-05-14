@@ -1,12 +1,121 @@
 import express from 'express';
 import * as endpoints from '../../../constants/api-endpoints/scripts';
-import { Screen } from '../../database';
+import { Screen, Script } from '../../database';
 import { importScripts, getImportScripts } from './importScripts';
 import { createScriptMiddleware } from './createScriptMiddleware';
 
 const router = express.Router();
 
 module.exports = app => {
+    router.get('/script-labels', (req, res) => {
+        (async () => {
+            try {
+                const scriptIds = `${req.query.scriptId || ''}`.split(',');
+                const data = {};
+
+                for (const scriptId of scriptIds) {
+                    data[scriptId] = [];
+                    const res = await Screen.findAll({ where: { script_id: scriptId, deletedAt: null }, order: [['position', 'ASC']], });
+                    const screens = res.map(screen => {
+                        const { data, ...s } = JSON.parse(JSON.stringify(screen));
+                        return { ...data, ...s, };
+                    });
+                    
+                    screens.forEach(s => {
+                        const metadata = s.metadata || {};
+                        const items = (metadata.items || []);
+                        const fields = (metadata.fields || []);
+
+                        switch (s.type) {
+                            case 'yesno':
+                                data[scriptId].push({
+                                    key: metadata.key,
+                                    labels: [
+                                        metadata.positiveLabel || 'Yes',
+                                        metadata.negativeLabel || 'No',
+                                    ],
+                                    values: [
+                                        'Yes',
+                                        'No',
+                                    ],
+                                });
+                                break;
+                            case 'checklist':
+                                items
+                                    .forEach(item => data[scriptId].push({
+                                        key: item.key,
+                                        labels: [item.label],
+                                        values: [item.label],
+                                    }));
+                                break;
+                            case 'multi_select':
+                                data[scriptId].push({
+                                    key: metadata.key,
+                                    ...items.reduce((acc, item) => ({
+                                        ...acc,
+                                        values: [...acc.values, item.id],
+                                        labels: [...acc.labels, item.label],
+                                    }), { values: [], labels: [], }),
+                                });
+                                break;
+                            case 'single_select':
+                                data[scriptId].push({
+                                    key: metadata.key,
+                                    ...items.reduce((acc, item) => ({
+                                        ...acc,
+                                        values: [...acc.values, item.id],
+                                        labels: [...acc.labels, item.label],
+                                    }), { values: [], labels: [], }),
+                                });
+                                break;
+                            case 'form':
+                                fields.forEach(f => data[scriptId].push({
+                                    key: f.key,
+                                    labels: [f.label],
+                                    values: [f.label],
+                                }));
+                                break;
+                            case 'timer':
+                                data[scriptId].push({
+                                    values: [metadata.label],
+                                    labels: [metadata.label],
+                                    key: metadata.key,
+                                });
+                                break;
+                            case 'progress':
+                                
+                                break;
+                            case 'management':
+                                
+                                break;
+                            case 'list':
+                                
+                                break;
+                            case 'diagnosis':
+                                
+                                break;
+                            case 'zw_edliz_summary_table':
+                                
+                                break;
+                            case 'mwi_edliz_summary_table':
+                                
+                                break;
+                            case 'edliz_summary_table':
+                                
+                                break;
+                            default:
+                                // do nothing
+                        }
+                    });
+                }
+
+                res.json(data);
+            } catch(e) {
+                res.status(500).json({ error: e.message, });
+            }
+        })();
+    });
+
   router.post(
     '/import-scripts', 
     importScripts(app),
