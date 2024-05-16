@@ -31,7 +31,7 @@ var router = _express["default"].Router();
 module.exports = function (app) {
   router.get('/script-labels', function (req, res) {
     (0, _asyncToGenerator2["default"])( /*#__PURE__*/_regenerator["default"].mark(function _callee() {
-      var scriptIds, data, _iterator, _step, _loop;
+      var scriptIds, data, _iterator, _step, _loop, filename, mimetype;
       return _regenerator["default"].wrap(function _callee$(_context2) {
         while (1) switch (_context2.prev = _context2.next) {
           case 0:
@@ -111,20 +111,63 @@ module.exports = function (app) {
                           })));
                           break;
                         case 'form':
-                          fields.forEach(function (f) {
-                            return data[scriptId].push({
-                              key: f.key,
-                              labels: [f.label],
-                              values: [f.label]
+                          fields.forEach(function (field) {
+                            var fieldsTypes = {
+                              DATE: 'date',
+                              DATETIME: 'datetime',
+                              DROPDOWN: 'dropdown',
+                              NUMBER: 'number',
+                              PERIOD: 'period',
+                              TEXT: 'text',
+                              TIME: 'time'
+                            };
+                            var opts = (field.values || '').split('\n').map(function () {
+                              var v = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+                              return v.trim();
+                            }).filter(function (v) {
+                              return v;
+                            }).map(function (v) {
+                              v = v.split(',');
+                              return {
+                                value: v[0],
+                                label: v[1]
+                              };
                             });
+                            switch (field.type) {
+                              case fieldsTypes.NUMBER:
+                                break;
+                              case fieldsTypes.DATE:
+                                break;
+                              case fieldsTypes.DATETIME:
+                                break;
+                              case fieldsTypes.DROPDOWN:
+                                data[scriptId].push({
+                                  key: field.key,
+                                  labels: opts.map(function (o) {
+                                    return o.label;
+                                  }),
+                                  values: opts.map(function (o) {
+                                    return o.value;
+                                  })
+                                });
+                                break;
+                              case fieldsTypes.PERIOD:
+                                break;
+                              case fieldsTypes.TEXT:
+                                break;
+                              case fieldsTypes.TIME:
+                                break;
+                              default:
+                                break;
+                            }
                           });
                           break;
                         case 'timer':
-                          data[scriptId].push({
-                            values: [metadata.label],
-                            labels: [metadata.label],
-                            key: metadata.key
-                          });
+                          // data[scriptId].push({
+                          //     values: [metadata.label],
+                          //     labels: [metadata.label],
+                          //     key: metadata.key,
+                          // });
                           break;
                         case 'progress':
                           break;
@@ -172,20 +215,24 @@ module.exports = function (app) {
             _iterator.f();
             return _context2.finish(16);
           case 19:
-            res.json(data);
-            _context2.next = 25;
+            filename = "".concat(scriptIds.join('_'), ".json");
+            mimetype = 'application/json';
+            res.setHeader('Content-disposition', "attachment; filename=".concat(filename));
+            res.setHeader('Content-type', mimetype);
+            res.json(scriptIds.length > 1 ? data : Object.values(data)[0]);
+            _context2.next = 29;
             break;
-          case 22:
-            _context2.prev = 22;
+          case 26:
+            _context2.prev = 26;
             _context2.t2 = _context2["catch"](0);
             res.status(500).json({
               error: _context2.t2.message
             });
-          case 25:
+          case 29:
           case "end":
             return _context2.stop();
         }
-      }, _callee, null, [[0, 22], [4, 13, 16, 19]]);
+      }, _callee, null, [[0, 26], [4, 13, 16, 19]]);
     }))();
   });
   router.post('/import-scripts', (0, _importScripts.importScripts)(app), function (req, res, next) {
