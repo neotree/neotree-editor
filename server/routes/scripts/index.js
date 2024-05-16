@@ -69,18 +69,54 @@ module.exports = app => {
                                 });
                                 break;
                             case 'form':
-                                fields.forEach(f => data[scriptId].push({
-                                    key: f.key,
-                                    labels: [f.label],
-                                    values: [f.label],
-                                }));
+                                fields.forEach(field => {
+                                    const fieldsTypes = {
+                                        DATE: 'date',
+                                        DATETIME: 'datetime',
+                                        DROPDOWN: 'dropdown',
+                                        NUMBER: 'number',
+                                        PERIOD: 'period',
+                                        TEXT: 'text',
+                                        TIME: 'time'
+                                    };
+                                    const opts = (field.values || '').split('\n')
+                                        .map((v = '') => v.trim())
+                                        .filter((v) => v)
+                                        .map((v) => {
+                                            v = v.split(',');
+                                            return { value: v[0], label: v[1], };
+                                        });
+                                    switch (field.type) {
+                                        case fieldsTypes.NUMBER:
+                                            break;
+                                        case fieldsTypes.DATE:
+                                            break;
+                                        case fieldsTypes.DATETIME:
+                                            break;
+                                        case fieldsTypes.DROPDOWN:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                labels: opts.map(o => o.label),
+                                                values: opts.map(o => o.value),
+                                            });
+                                            break;
+                                        case fieldsTypes.PERIOD:
+                                            break;
+                                        case fieldsTypes.TEXT:
+                                            break;
+                                        case fieldsTypes.TIME:
+                                            break;
+                                        default:
+                                            break;
+                                    }
+                                });
                                 break;
                             case 'timer':
-                                data[scriptId].push({
-                                    values: [metadata.label],
-                                    labels: [metadata.label],
-                                    key: metadata.key,
-                                });
+                                // data[scriptId].push({
+                                //     values: [metadata.label],
+                                //     labels: [metadata.label],
+                                //     key: metadata.key,
+                                // });
                                 break;
                             case 'progress':
                                 
@@ -109,7 +145,13 @@ module.exports = app => {
                     });
                 }
 
-                res.json(data);
+                const filename = `${scriptIds.join('_')}.json`;
+                const mimetype = 'application/json';
+
+                res.setHeader('Content-disposition', `attachment; filename=${filename}`);
+                res.setHeader('Content-type', mimetype);
+
+                res.json(scriptIds.length > 1 ? data : Object.values(data)[0]);
             } catch(e) {
                 res.status(500).json({ error: e.message, });
             }
