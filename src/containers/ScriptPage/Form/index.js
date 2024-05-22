@@ -18,6 +18,7 @@ import TitleWithBackArrow from '@/components/TitleWithBackArrow';
 import OverlayLoader from '@/components/OverlayLoader';
 import { useAppContext } from '@/AppContext';
 import { ImportScript } from '@/components/ImportScript';
+import { NuidSearch } from './nuid-search';
 
 function ScriptEditorForm({ script, hospitals }) {
   const { state: { viewMode } } = useAppContext();
@@ -26,6 +27,7 @@ function ScriptEditorForm({ script, hospitals }) {
 	const [form, _setForm] = React.useState({ 
 		exportable: true, 
 		nuid_search_enabled: false,
+        nuidSearchFields: [],
 		hospital: '',
 		...script 
 	});
@@ -178,13 +180,15 @@ function ScriptEditorForm({ script, hospitals }) {
 
 			<br />
 
-			<FormControlLabel 
-				control={<Checkbox />}
-				value="nuid_search_enabled"
-				label="Enable NUID Search"
-				checked={form.nuid_search_enabled !== false}
-				onChange={() => setForm({ nuid_search_enabled: !form.nuid_search_enabled, })}
-			/>
+            <NuidSearch 
+                enabled={form.nuid_search_enabled !== false}
+                fields={form.nuidSearchFields || []}
+                savedFields={script.nuidSearchFields && script.nuidSearchFields.length ? script.nuidSearchFields : undefined}
+                onChange={({ enabled, fields }) => setForm({ 
+                    nuid_search_enabled: enabled, 
+                    nuidSearchFields: enabled ? fields : [],
+                })}
+            />
         </CardContent>
 
         <CardActions style={{ justifyContent: 'flex-end' }}>
