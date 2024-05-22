@@ -20,7 +20,7 @@ import SettingsIcon from '@material-ui/icons/Settings';
 
 const defaultField = {
     calculation: null,
-    condition: null,
+    condition: '',
     confidential: false,
     dataType: null,
     defaultValue: null,
@@ -31,7 +31,6 @@ const defaultField = {
     label: null,
     minValue: null,
     maxValue: null,
-    values: null,
     optional: false,
     minDate: null,
     maxDate: null,
@@ -41,22 +40,20 @@ const defaultField = {
     maxDateKey: '',
     minTimeKey: '',
     maxTimeKey: '',
+    values: '',
 };
 
-const defaultFields = [
+const defaultAmissionFields = [
     {
         ...defaultField,
         type: 'dropdown',
         key: 'BabyTransfered',
-        values: 'Y,Yes\nN,No',
         label: 'Has the baby been transfered from another facility',
-        condition: '',
     },
     {
         ...defaultField,
         type: 'text',
-        key: 'BabyTransferedNUID',
-        values: 'Y,Yes\nN,No',
+        key: 'patientNUID',
         label: "Search patient's NUID",
         condition: "$BabyTransfered = 'Y'",
     },
@@ -66,15 +63,23 @@ const defaultFields = [
         key: 'BabyTwin',
         values: 'Y,Yes\nN,No',
         label: 'Does the baby have a twin?',
-        condition: '',
     },
     {
         ...defaultField,
         type: 'text',
         key: 'BabyTwinNUID',
-        values: 'Y,Yes\nN,No',
         label: "Search twin's NUID",
         condition: "$BabyTwin = 'Y'",
+    },
+];
+
+const defaultOtherTypesFields = [
+    {
+        ...defaultField,
+        type: 'text',
+        key: 'patientNUID',
+        values: 'Y,Yes\nN,No',
+        label: "Search patient's NUID",
     },
 ];
 
@@ -83,6 +88,7 @@ export function NuidSearch({
     onChange,
     savedFields,
     fields: fieldsProp,
+    scriptType,
 }) {
     const [open, setOpen] = useState(false);
     const [checked, setChecked] = useState(!!enabled);
@@ -107,7 +113,8 @@ export function NuidSearch({
 
     const onOpen = () => {
         setOpen(true);
-        setFields(savedFields || (fieldsProp.length ? fieldsProp : defaultFields));
+        const defaults = scriptType === 'admission' ? defaultAmissionFields : defaultOtherTypesFields;
+        setFields(savedFields || (fieldsProp.length ? fieldsProp : defaults));
     };
 
     return (
@@ -391,4 +398,5 @@ NuidSearch.propTypes = {
     enabled: PropTypes.bool,
     onChange: PropTypes.func,
     fields: PropTypes.arrayOf(PropTypes.any),
+    scriptType: PropTypes.string,
 };
