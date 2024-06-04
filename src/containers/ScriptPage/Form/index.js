@@ -184,7 +184,7 @@ function ScriptEditorForm({ script, hospitals }) {
                 scriptType={form.type}
                 enabled={form.nuid_search_enabled !== false}
                 fields={form.nuidSearchFields || []}
-                savedFields={script.nuidSearchFields && script.nuidSearchFields.length ? script.nuidSearchFields : undefined}
+                savedFields={script && script.nuidSearchFields && script.nuidSearchFields.length ? script.nuidSearchFields : undefined}
                 onChange={({ enabled, fields }) => setForm({ 
                     nuid_search_enabled: enabled, 
                     nuidSearchFields: enabled ? fields : [],
