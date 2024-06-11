@@ -48,6 +48,7 @@ const defaultAmissionFields = [
         ...defaultField,
         type: 'dropdown',
         key: 'BabyTransfered',
+        values: 'Y,Yes\nN,No',
         label: 'Has the baby been transfered from another facility',
     },
     {
