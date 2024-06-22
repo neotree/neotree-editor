@@ -17,6 +17,7 @@ import UploadFilesPrompt from '@/components/UploadFilesPrompt';
 import OverlayLoader from '@/components/OverlayLoader';
 import { useAppContext } from '@/AppContext';
 import { FieldConfig } from '@/components/FieldConfig';
+import { PrintConfig } from '@/components/PrintConfig';
 import ScreenType from './ScreenType';
 import FlowControl from './FlowControl';
 import Properties from './Properties';
@@ -24,15 +25,28 @@ import MetadataItems from './Metadata/Items';
 import MetadataFields from './Metadata/Fields';
 import EdlizSummaryTable from './EdlizSummaryTable';
 
+const defaultForm = {
+    metadata: { 
+        items: [], 
+        fields: [], 
+    },
+    printable: true,
+    printCategory: null,
+};
+
 function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
   const { state: { viewMode } } = useAppContext();
   const history = useHistory();
   const { scriptId } = useParams();
 
   const [form, _setForm] = React.useState({
-    metadata: { items: [], fields: [], },
+    ...defaultForm,
     scriptId,
     ...screen,
+    metadata: {
+        ...defaultForm.metadata,
+        ...(screen ? screen.metadata : {}),
+    },
   });
   const setForm = s => _setForm(prev => ({
     ...prev,
@@ -129,6 +143,19 @@ function ScreenEditor({ screen, script, canAddDiagnosisScreen }) {
 						<br />
 					</>
 				)}
+
+                {['yesno', 'timer', 'single_select', 'multi_select', 'checklist', 'zw_edliz_summary_table', 'mwi_edliz_summary_table', 'diagnosis'].includes(form.type) && (
+                    <>
+                        <PrintConfig 
+                            data={{
+                                printable: form.printable,
+                                printCategory: form.printCategory,
+                            }}
+                            onChange={data => setForm({ ...data })}
+                        />
+                        <br />
+                    </>
+                )}
             </div>
           </Collapse>
         </CardContent>
