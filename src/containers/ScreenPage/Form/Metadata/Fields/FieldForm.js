@@ -18,6 +18,7 @@ import { DateTimePicker, TimePicker, } from '@material-ui/pickers';
 import Checkbox from '@material-ui/core/Checkbox';
 import { useAppContext } from '@/AppContext';
 import { FieldConfig } from '@/components/FieldConfig';
+import { PrintConfig } from '@/components/PrintConfig';
 import Title from '../../Title';
 
 const FieldForm = React.forwardRef(({
@@ -54,6 +55,8 @@ const FieldForm = React.forwardRef(({
     maxDateKey: '',
     minTimeKey: '',
     maxTimeKey: '',
+    printable: true,
+    printCategory: null,
     ...data,
   };
   const [form, _setForm] = React.useState(defaultForm);
@@ -472,6 +475,16 @@ const FieldForm = React.forwardRef(({
 				value={form.prePopulate || []}
 				onChange={prePopulate => setForm({ prePopulate })}
 			/>
+
+            <br />
+
+            <PrintConfig 
+                data={{
+                    printable: form.printable,
+                    printCategory: form.printCategory,
+                }}
+                onChange={data => setForm({ ...data })}
+            />
           </Collapse>
         </DialogContent>
 

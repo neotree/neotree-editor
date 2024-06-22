@@ -12,6 +12,7 @@ import RadioGroup from '@material-ui/core/RadioGroup';
 import Radio from '@material-ui/core/Radio';
 import { useAppContext } from '@/AppContext';
 import { SymptomTypes } from '@/constants/types';
+import { PrintConfig } from '@/components/PrintConfig';
 
 const SymptomForm = React.forwardRef(({
   children,
@@ -29,6 +30,8 @@ const SymptomForm = React.forwardRef(({
     expression: null,
     type: SymptomTypes[0].name || '',
     weight: null,
+    printable: true,
+    printCategory: null,
     ...data,
   };
   const [form, _setForm] = React.useState(defaultForm);
@@ -111,6 +114,16 @@ const SymptomForm = React.forwardRef(({
               color="textSecondary"
             >Example: <b>($key = true and $key2 = false) or $key3 = 'HD'</b></Typography>
           </div>
+
+          <br /><br />
+
+            <PrintConfig 
+                data={{
+                    printable: form.printable,
+                    printCategory: form.printCategory,
+                }}
+                onChange={data => setForm({ ...data })}
+            />
         </DialogContent>
 
         <DialogActions>
