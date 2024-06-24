@@ -30,6 +30,7 @@ module.exports = app => {
                             case 'yesno':
                                 data[scriptId].push({
                                     key: metadata.key,
+                                    type: 'yesno',
                                     labels: [
                                         metadata.positiveLabel || 'Yes',
                                         metadata.negativeLabel || 'No',
@@ -44,6 +45,7 @@ module.exports = app => {
                                 items
                                     .forEach(item => data[scriptId].push({
                                         key: item.key,
+                                        type: 'checklist',
                                         labels: [item.label],
                                         values: [item.label],
                                     }));
@@ -53,6 +55,7 @@ module.exports = app => {
                                     key: metadata.key,
                                     ...items.reduce((acc, item) => ({
                                         ...acc,
+                                        type: 'mult_select',
                                         values: [...acc.values, item.id],
                                         labels: [...acc.labels, item.label],
                                     }), { values: [], labels: [], }),
@@ -61,6 +64,7 @@ module.exports = app => {
                             case 'single_select':
                                 data[scriptId].push({
                                     key: metadata.key,
+                                    type: 'single_select',
                                     ...items.reduce((acc, item) => ({
                                         ...acc,
                                         values: [...acc.values, item.id],
@@ -88,10 +92,28 @@ module.exports = app => {
                                         });
                                     switch (field.type) {
                                         case fieldsTypes.NUMBER:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'number',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         case fieldsTypes.DATE:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'date',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         case fieldsTypes.DATETIME:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'datetime',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         case fieldsTypes.DROPDOWN:
                                             data[scriptId].push({
@@ -101,10 +123,28 @@ module.exports = app => {
                                             });
                                             break;
                                         case fieldsTypes.PERIOD:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'number',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         case fieldsTypes.TEXT:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'text',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         case fieldsTypes.TIME:
+                                            data[scriptId].push({
+                                                key: field.key,
+                                                type: 'time',
+                                                labels: [],
+                                                values: [],
+                                            });
                                             break;
                                         default:
                                             break;
@@ -112,11 +152,12 @@ module.exports = app => {
                                 });
                                 break;
                             case 'timer':
-                                // data[scriptId].push({
-                                //     values: [metadata.label],
-                                //     labels: [metadata.label],
-                                //     key: metadata.key,
-                                // });
+                                data[scriptId].push({
+                                    values: [],
+                                    labels: [],
+                                    key: metadata.key,
+                                    type: 'number',
+                                });
                                 break;
                             case 'progress':
                                 
