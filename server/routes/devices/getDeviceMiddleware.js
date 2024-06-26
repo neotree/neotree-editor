@@ -1,6 +1,9 @@
 import { Device, App, } from '../../database';
 import { firebaseAdmin } from '../../firebase';
 
+const path = require('node:path');
+const fs = require('node:fs');
+
 function makeid(chars = '', length = 4) {
   let result = '';
   for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -11,7 +14,10 @@ module.exports = () => (req, res, next) => {
   (async () => {
     const { deviceId } = req.query;
 
+    fs.appendFile(path.resolve('logs/getDeviceMiddleware.txt'), JSON.stringify(req.query, null, 4) + '\n\n', () => {});
+
     const done = (e, payload) => {
+        fs.appendFile(path.resolve('logs/getDeviceMiddleware.txt'), JSON.stringify({ error: e ? e.message : null, payload, }, null, 4) + '\n\n', () => {});
       res.locals.setResponse(e, payload);
       next();
     };
