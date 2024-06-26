@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 import { Script, Diagnosis, Screen } from '../../database/models';
 
 export const copyScript = ({ id }) => {

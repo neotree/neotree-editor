@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 import { ConfigKey, } from '../../database';
 
 module.exports = () => (req, res, next) => {
@@ -10,11 +10,7 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let configKeyId = null;
-    try {
-      const snap = await firebase.database().ref('configKeys').push();
-      configKeyId = snap.key;
-    } catch (e) { return done(e); }
+    let configKeyId = v4();
 
     let configKeysCount = 0;
     try {
@@ -25,8 +21,6 @@ module.exports = () => (req, res, next) => {
       ...payload,
       configKeyId,
       position: configKeysCount + 1,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
     };
 
     try {

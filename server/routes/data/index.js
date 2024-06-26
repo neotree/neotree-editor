@@ -12,12 +12,6 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
-  router.post(
-   endpoints.EXPORT_TO_FIREBASE,
-    require('./exportToFirebaseMiddleware')(app),
-    require('../../utils/responseMiddleware')
-  );
-
   router.get(
     endpoints.SYNC_DATA,
     require('./syncData')(app),
