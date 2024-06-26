@@ -1,14 +1,10 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 import { Diagnosis } from '../../database';
 
 export async function createDiagnosis(_payload = {}) {
   const { scriptId, ...payload } = _payload;
 
-  let diagnosisId = null;
-  try {
-    const snap = await firebase.database().ref(`diagnosis/${scriptId}`).push();
-    diagnosisId = snap.key;
-  } catch (e) { throw e; }
+  let diagnosisId = v4();
 
   let diagnosesCount = 0;
   try {
@@ -22,8 +18,6 @@ export async function createDiagnosis(_payload = {}) {
     scriptId,
     script_id: scriptId,
     position: diagnosesCount + 1,
-    createdAt: firebase.database.ServerValue.TIMESTAMP,
-    updatedAt: firebase.database.ServerValue.TIMESTAMP,
   };
 
   try {

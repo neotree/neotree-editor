@@ -1,5 +1,5 @@
 import { Hospital, } from '../../database';
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 
 module.exports = () => (req, res, next) => {
   (async () => {

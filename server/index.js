@@ -2,7 +2,6 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import * as database from './database';
-import syncFirebase from './firebase/sync';
 import { backupData } from './utils/backup';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -40,9 +39,6 @@ const isProd = process.env.NODE_ENV === 'production';
     const appInfo = await database.App.findOne({ where: { id: 1 } });
     if (!appInfo) await backupData(app);
   } catch (e) { console.log(e); }
-
-  // firebase
-  // try { await syncFirebase(); } catch (e) { console.log(e); }
 
   //body-parser
   const bodyParser = require('body-parser');

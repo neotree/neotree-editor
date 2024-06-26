@@ -1,4 +1,5 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
+
 import { ConfigKey, Diagnosis, Screen } from '../../database/models';
 
 export const copyConfigKey = ({ id }) => {
@@ -6,11 +7,7 @@ export const copyConfigKey = ({ id }) => {
     if (!id) return reject(new Error('Required configKey "id" is not provided.'));
 
     (async () => {
-      let configKeyId = null;
-      try {
-        const snap = await firebase.database().ref('configKeys').push();
-        configKeyId = snap.key;
-      } catch (e) { return reject(e); }
+      let configKeyId = v4();
 
       let configKey = null;
       try {
@@ -26,51 +23,6 @@ export const copyConfigKey = ({ id }) => {
         configKeysCount = await ConfigKey.count({ where: {} });
       } catch (e) { /* Do nothing */ }
 
-      let screens = [];
-      try {
-        screens = await Screen.findAll({ where: { config_key_id: configKey.config_key_id, deletedAt: null }, order: [['position', 'ASC']] });
-        const snaps = await Promise.all(screens.map(() => firebase.database().ref(`screens/${configKeyId}`).push()));
-        screens = screens.map((s, i) => {
-          s = JSON.parse(JSON.stringify(s));
-          delete s.id;
-          return {
-            ...s,
-            config_key_id: configKeyId,
-            screen_id: snaps[i].key,
-            data: JSON.stringify({
-              ...s.data,
-              configKeyId,
-              screenId: snaps[i].key,
-              createdAt: firebase.database.ServerValue.TIMESTAMP,
-              updatedAt: firebase.database.ServerValue.TIMESTAMP,
-            }),
-          };
-        });
-      } catch (e) { /* Do nothing */ }
-
-      let diagnoses = [];
-      try {
-        diagnoses = await Diagnosis.findAll({ where: { config_key_id: configKey.config_key_id, deletedAt: null }, order: [['position', 'ASC']] });
-        const snaps = await Promise.all(diagnoses.map(() => firebase.database().ref(`diagnosis/${configKeyId}`).push()));
-        diagnoses = diagnoses.map((d, i) => {
-          d = JSON.parse(JSON.stringify(d));
-          delete d.id;
-          return {
-            ...d,
-            config_key_id: configKeyId,
-            diagnosis_id: snaps[i].key,
-            data: JSON.stringify({
-              ...d.data,
-              configKeyId,
-              diagnosisId: snaps[i].key,
-              createdAt: firebase.database.ServerValue.TIMESTAMP,
-              updatedAt: firebase.database.ServerValue.TIMESTAMP,
-            }),
-          };
-        });
-      } catch (e) { /* Do nothing */ }
-
-      delete configKey.id;
       configKey = {
         ...configKey,
         config_key_id: configKeyId,
@@ -79,8 +31,6 @@ export const copyConfigKey = ({ id }) => {
           ...configKey.data,
           configKeyId,
           position: configKeysCount + 1,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         }),
       };
 

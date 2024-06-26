@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 import { Diagnosis } from '../../database/models';
 
 module.exports = () => (req, res, next) => {
@@ -10,11 +10,6 @@ module.exports = () => (req, res, next) => {
       next();
     };
 
-    let snaps = [];
-    try {
-      snaps = await Promise.all(items.map(() => firebase.database().ref(`diagnosis/${scriptId}`).push()));
-    } catch (e) { return done(e); }
-
     let diagnosesCount = 0;
     try {
       diagnosesCount = await Diagnosis.count({ where: { script_id: scriptId, deletedAt: null } });
@@ -25,20 +20,19 @@ module.exports = () => (req, res, next) => {
       diagnoses = await Diagnosis.findAll({ where: { id: items.map(s => s.id) } });
       diagnoses = diagnoses.map((dignosis, i) => {
         const { id, createdAt, updatedAt, data, ...d } = JSON.parse(JSON.stringify(dignosis)); // eslint-disable-line
+        const diagnosisId = v4();
         return {
           ...d,
-          diagnosis_id: snaps[i].key,
+          diagnosis_id: diagnosisId,
           script_id: scriptId,
           position: diagnosesCount + 1,
           data: JSON.stringify({
             ...data,
             scriptId,
             script_id: scriptId,
-            diagnosisId: snaps[i].key,
-            diagnosis_id: snaps[i].key,
+            diagnosisId: diagnosisId,
+            diagnosis_id: diagnosisId,
             position: diagnosesCount + 1,
-            createdAt: firebase.database.ServerValue.TIMESTAMP,
-            updatedAt: firebase.database.ServerValue.TIMESTAMP,
           }),
         };
       });

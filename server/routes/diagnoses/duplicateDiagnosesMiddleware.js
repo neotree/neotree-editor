@@ -1,4 +1,4 @@
-import firebase from '../../firebase';
+import { v4 } from 'uuidv4';
 import { Diagnosis } from '../../database/models';
 
 export const copyDiagnosis = ({ id }) => {
@@ -6,11 +6,7 @@ export const copyDiagnosis = ({ id }) => {
     if (!id) return reject(new Error('Required diagnosis "id" is not provided.'));
 
     (async () => {
-      let diagnosisId = null;
-      try {
-        const snap = await firebase.database().ref('diagnoses').push();
-        diagnosisId = snap.key;
-      } catch (e) { return reject(e); }
+      let diagnosisId = v4();
 
       let diagnosis = null;
       try {
@@ -35,8 +31,6 @@ export const copyDiagnosis = ({ id }) => {
           ...diagnosis.data,
           diagnosisId,
           position: diagnosesCount + 1,
-          createdAt: firebase.database.ServerValue.TIMESTAMP,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP,
         }),
       };
 

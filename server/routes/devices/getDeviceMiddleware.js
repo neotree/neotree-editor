@@ -1,5 +1,4 @@
 import { Device, App, } from '../../database';
-import { firebaseAdmin } from '../../firebase';
 
 const path = require('node:path');
 const fs = require('node:fs');
@@ -40,8 +39,6 @@ module.exports = () => (req, res, next) => {
       info = await App.findAll({ where: {} });
       info = info ? info[0] : null;
     } catch (e) { /* Do nothing */ }
-
-    try { await firebaseAdmin.database().ref(`devices/${deviceId}`).set(device); } catch (e) { /* Do nothing */ }
 
     done(null, { device, info });
   })();
