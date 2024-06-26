@@ -1,4 +1,6 @@
 import React from 'react';
+import { useHistory } from 'react-router-dom';
+import queryString from 'query-string';
 import Table from '@material-ui/core/Table';
 import TableHead from '@material-ui/core/TableHead';
 import TableBody from '@material-ui/core/TableBody';
@@ -14,6 +16,8 @@ import AddUserForm from './AddUserForm';
 import UserManagerForm from './UserManagerForm';
 
 const Users = () => {
+    const router = useHistory();
+    const query = queryString.parse(router.location.search);
   const { state: { authenticatedUser, viewMode } } = useAppContext();
   const [state, _setState] = React.useState({
     users: [],
@@ -36,6 +40,19 @@ const Users = () => {
       setState({ loading: true, });
       let users = [];
       let hospitals = [];
+
+      try {
+            fetch('/api/get-device-registration?deviceId=98dc1a02d72f1e1a', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': query.apiKey,
+                }
+            })
+                .then(console.log)
+                .catch(console.log);
+        } catch(e) {
+            console.log(e);
+        }
 
       try {
         const rslts = await getUsers();
