@@ -1,14 +1,12 @@
 import { File } from '../../database';
 
 module.exports = () => (req, res, next) => {
-  const payload = res.locals.reqQuery;
-
   const done = (e, payload) => {
     res.locals.setResponse(e, payload);
     next();
   };
 
-  File.count({ where: { ...payload } })
-    .then(filesCount => done(null, { filesCount }))
+  File.findAll({ where: { id: req.params.fileId, }, attributes: ['id', 'filename', 'content_type', 'size', 'metadata', 'data'], })
+    .then(files => done(null, { file: files[0] || null, }))
     .catch(done);
 };
