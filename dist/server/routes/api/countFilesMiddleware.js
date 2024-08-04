@@ -15,7 +15,7 @@ module.exports = function () {
       res.locals.setResponse(e, payload);
       next();
     };
-    _database.Script.count({
+    _database.File.count({
       where: _objectSpread({}, payload)
     }).then(function (filesCount) {
       return done(null, {
