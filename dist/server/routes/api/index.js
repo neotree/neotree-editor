@@ -31,6 +31,7 @@ module.exports = function (app) {
   router.get('/sync-data', (0, _apiKeyAuthenticator["default"])(app), require('../data/syncData')(app), require('../../utils/responseMiddleware'));
   router.get('/get-device-registration', (0, _apiKeyAuthenticator["default"])(app), require('../devices/getDeviceMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-files', (0, _apiKeyAuthenticator["default"])(app), require('./getFilesMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.get('/count-files', (0, _apiKeyAuthenticator["default"])(app), require('./countFilesMiddleware')(app), require('../../utils/responseMiddleware'));
   return router;
 };
 ;

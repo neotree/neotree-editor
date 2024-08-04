@@ -118,5 +118,12 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
+  router.get(
+    '/count-files',
+    apiKeyAuthenticator(app),
+    require('./countFilesMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
   return router;
 };
