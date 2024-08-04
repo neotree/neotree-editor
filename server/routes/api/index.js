@@ -119,6 +119,13 @@ module.exports = app => {
   );
 
   router.get(
+    '/get-file-data/:fileId',
+    apiKeyAuthenticator(app),
+    require('./getFileDataMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
     '/count-files',
     apiKeyAuthenticator(app),
     require('./countFilesMiddleware')(app),

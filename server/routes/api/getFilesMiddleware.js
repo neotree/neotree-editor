@@ -1,4 +1,4 @@
-import { Script as File } from '../../database';
+import { File } from '../../database';
 
 module.exports = () => (req, res, next) => {
   const payload = res.locals.reqQuery;
@@ -8,7 +8,7 @@ module.exports = () => (req, res, next) => {
     next();
   };
 
-  File.findAll({ where: { ...payload } })
+  File.findAll({ where: { ...payload }, attributes: ['id', 'filename', 'content_type', 'size', 'metadata'], })
     .then(files => done(null, { files }))
     .catch(done);
 };
