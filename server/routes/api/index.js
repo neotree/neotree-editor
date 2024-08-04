@@ -111,5 +111,12 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
+  router.get(
+    '/get-files',
+    apiKeyAuthenticator(app),
+    require('./getFilesMiddleware')(app),
+    require('../../utils/responseMiddleware')
+  );
+
   return router;
 };
