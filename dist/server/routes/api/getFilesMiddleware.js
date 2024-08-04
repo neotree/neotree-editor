@@ -15,8 +15,9 @@ module.exports = function () {
       res.locals.setResponse(e, payload);
       next();
     };
-    _database.Script.findAll({
-      where: _objectSpread({}, payload)
+    _database.File.findAll({
+      where: _objectSpread({}, payload),
+      attributes: ['id', 'filename', 'content_type', 'size', 'metadata']
     }).then(function (files) {
       return done(null, {
         files: files
