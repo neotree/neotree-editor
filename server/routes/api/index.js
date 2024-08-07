@@ -132,5 +132,26 @@ module.exports = app => {
     require('../../utils/responseMiddleware')
   );
 
+  router.get(
+    '/get-devices',
+    apiKeyAuthenticator(app),
+    require('./getDevices')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    '/get-editor-info',
+    apiKeyAuthenticator(app),
+    require('./getEditorInfo')(app),
+    require('../../utils/responseMiddleware')
+  );
+
+  router.get(
+    '/get-users',
+    apiKeyAuthenticator(app),
+    require('./getUsers')(app),
+    require('../../utils/responseMiddleware')
+  );
+
   return router;
 };

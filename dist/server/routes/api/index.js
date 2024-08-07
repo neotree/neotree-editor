@@ -33,6 +33,9 @@ module.exports = function (app) {
   router.get('/get-files', (0, _apiKeyAuthenticator["default"])(app), require('./getFilesMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/get-file-data/:fileId', (0, _apiKeyAuthenticator["default"])(app), require('./getFileDataMiddleware')(app), require('../../utils/responseMiddleware'));
   router.get('/count-files', (0, _apiKeyAuthenticator["default"])(app), require('./countFilesMiddleware')(app), require('../../utils/responseMiddleware'));
+  router.get('/get-devices', (0, _apiKeyAuthenticator["default"])(app), require('./getDevices')(app), require('../../utils/responseMiddleware'));
+  router.get('/get-editor-info', (0, _apiKeyAuthenticator["default"])(app), require('./getEditorInfo')(app), require('../../utils/responseMiddleware'));
+  router.get('/get-users', (0, _apiKeyAuthenticator["default"])(app), require('./getUsers')(app), require('../../utils/responseMiddleware'));
   return router;
 };
 ;
