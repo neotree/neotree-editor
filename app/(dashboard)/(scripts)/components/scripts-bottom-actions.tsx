@@ -1,13 +1,13 @@
 'use client';
 
-import { Trash } from "lucide-react";
+import { Trash, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ActionsBar } from "@/components/actions-bar";
 import { useScriptsContext } from "@/contexts/scripts";
 
 export function BottomActions() {
-    const { selected, scripts, onDelete, } = useScriptsContext();
+    const { selected, scripts, onDelete, setScriptsIdsToExport } = useScriptsContext();
 
     if (!selected.length) return null;
 
@@ -24,6 +24,14 @@ export function BottomActions() {
                     >
                         <Trash className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Delete ${selected.length}` : 'Delete'}</span>
+                    </Button>
+
+                    <Button
+                        className="h-auto w-auto"
+                        onClick={() => setScriptsIdsToExport(scriptsIds)}
+                    >
+                        <Upload className="h-4 w-4 mr-1" />
+                        <span>{selected.length > 1 ? `Export ${selected.length}` : 'Export'}</span>
                     </Button>
                 </ActionsBar>
             )}

@@ -60,25 +60,16 @@ function useScriptsContentHook({
     const { viewOnly } = useAppContext();
     
     const [scripts, setScripts] = useState(scriptsProp);
-    const [activeItemId, setActiveItemId] = useState<string>();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
+    const [scriptsIdsToExport, setScriptsIdsToExport] = useState<string[]>([]);
 
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
 
     useEffect(() => { setScripts(scriptsProp); }, [scriptsProp]);
-
-    const onFormOpenChange = useCallback((open: boolean) => {
-        if (open && activeItemId) {
-            // do nothing
-        } else {
-            setIsFormOpen(open);
-        }
-        if (!open) setActiveItemId(undefined);
-    }, [activeItemId]);
 
     const onSave = useCallback(async (data: FormDataType[]) => {
         setSaving(true);
@@ -92,7 +83,6 @@ function useScriptsContentHook({
                 variant: 'error',
             });
         } else {
-            onFormOpenChange(false);
             router.refresh();
             alert({
                 title: 'Success',
@@ -102,7 +92,7 @@ function useScriptsContentHook({
         }
 
         setSaving(false);
-    }, [saveScripts, alert, onFormOpenChange, router]);
+    }, [saveScripts, alert, router]);
 
     const onDelete = useCallback(async (scriptsIds: string[]) => {
         confirm(async () => {
@@ -123,7 +113,6 @@ function useScriptsContentHook({
                     onClose: () => setScripts(_scripts),
                 });
             } else {
-                onFormOpenChange(false);
                 setSelected([]);
                 router.refresh();
                 alert({
@@ -177,18 +166,19 @@ function useScriptsContentHook({
         router.push(`/script/${scriptId}?${queryString.stringify({ ...searchParams, section: 'diagnoses', })}`);
     }, [router, searchParams, scriptId]);
 
-    const activeItem = useMemo(() => !activeItemId ? null : scripts.data.filter(t => t.scriptId === activeItemId)[0], [activeItemId, scripts]);
+    const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
     const disabled = useMemo(() => viewOnly, [viewOnly]);
 
     return {
         saving,
         isFormOpen,
-        activeItemId,
         loading, 
         selected,
         scripts,
-        activeItem,
+        scriptsIdsToExport,
+        scriptsToExport,
         disabled,
+        setScriptsIdsToExport,
         onCancelDiagnosisForm,
         onCancelScreenForm,
         onCancelScriptForm,
@@ -196,9 +186,7 @@ function useScriptsContentHook({
         setScripts,
         setSelected,
         setLoading,
-        setActiveItemId,
         setSaving,
-        onFormOpenChange,
         onSave,
         onDelete,
         onDuplicate,

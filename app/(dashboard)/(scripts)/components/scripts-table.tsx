@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
 import { BottomActions } from "./scripts-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-actions";
+import { ScriptsExportModal } from "./scripts-export-modal";
 
 export function ScriptsTable() {
     const { sys, viewOnly } = useAppContext();
@@ -16,6 +17,8 @@ export function ScriptsTable() {
         loading,
         selected,
         scripts,
+        scriptsIdsToExport,
+        setScriptsIdsToExport,
         setSelected,
         onSort,
     } = useScriptsContext();
@@ -23,6 +26,8 @@ export function ScriptsTable() {
     return (
         <>
             {loading && <Loader overlay />}
+
+            {!!scriptsIdsToExport.length && <ScriptsExportModal open onOpenChange={() => setScriptsIdsToExport([])} />}
 
             <div className="">
                 <DataTable 
