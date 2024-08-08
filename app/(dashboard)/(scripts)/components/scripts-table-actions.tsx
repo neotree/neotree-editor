@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye } from "lucide-react"
+import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload } from "lucide-react"
 
 import {
     DropdownMenu,
@@ -19,6 +19,7 @@ export function ScriptsTableActions({ item }: {
 }) {
     const { 
         disabled,
+        setScriptsIdsToExport,
         onDelete, 
         onDuplicate, 
     } = useScriptsContext();
@@ -59,6 +60,13 @@ export function ScriptsTableActions({ item }: {
                     >
                         <CopyPlus className="mr-2 h-4 w-4" />
                         Duplicate
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                        onClick={() => setScriptsIdsToExport([item.scriptId])}
+                    >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Export
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
