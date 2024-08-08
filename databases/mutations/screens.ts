@@ -6,7 +6,7 @@ import db from "../pg/drizzle";
 import { screens, screensDrafts, screensHistory } from "../pg/schema";
 import { _getScreen, _getScreens, _listRawScreens, _listScreens } from '../queries/screens';
 import logger from "@/lib/logger";
-import { _listScripts } from "../queries/scripts";
+import { _listScripts } from "../queries/_scripts";
 
 const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 

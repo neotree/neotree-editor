@@ -3,7 +3,6 @@ import { and, count, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-or
 import db from "@/databases/pg/drizzle";
 import { files } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import page from "@/app/(dashboard)/(scripts)/page";
 import { isEmpty } from "@/lib/isEmpty";
 import { FileDetails, GetFilesParams, GetFilesResults } from "./types";
 

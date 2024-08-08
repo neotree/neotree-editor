@@ -90,7 +90,7 @@ function useConfigKeysContentHook({
             router.refresh();
             alert({
                 title: 'Success',
-                message: 'Email templates saved successfully!',
+                message: 'Config keys saved successfully!',
                 variant: 'success',
             });
         }

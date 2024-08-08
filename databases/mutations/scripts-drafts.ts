@@ -5,8 +5,8 @@ import { io } from 'socket.io-client';
 import db from "../pg/drizzle";
 import { scriptsDrafts, screensHistory } from "../pg/schema";
 import { _getScriptDraft, _getScriptsDrafts, } from '../queries/scripts-drafts';
-import { _listScripts } from "../queries/scripts";
-import { _restoreScreens } from "./scripts/_restore-screens";
+import { _listScripts } from "../queries/_scripts";
+import { _restoreScreens } from "./_scripts/_restore-screens";
 
 const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 

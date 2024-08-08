@@ -12,10 +12,10 @@ export default function Loading() {
                         maxRows={25}
                         columns={[
                             {
-                                name: 'Key',
+                                name: 'Position',
                             },
                             {
-                                name: 'Label',
+                                name: 'Title',
                             },
                             {
                                 name: 'Description',

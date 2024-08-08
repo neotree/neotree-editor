@@ -3,7 +3,7 @@ import { v4 } from "uuid";
 
 import db from "../pg/drizzle";
 import { hospitals } from "../pg/schema";
-import { _getHospital, _getHospitals } from '../queries/hospitals';
+import { _getHospital, _getHospitals } from '../queries/_hospitals';
 
 export async function _deleteHospitals(hospitalIds: string[]) {
     if (hospitalIds.length) {

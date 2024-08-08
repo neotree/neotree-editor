@@ -11,7 +11,7 @@ export const deleteConfigKeys: typeof _deleteConfigKeys = async (...args) => {
         return await _deleteConfigKeys(...args);
     } catch(e: any) {
         logger.error('deleteConfigKeys ERROR', e.message);
-        return { errors: [e.message], info: null, success: false, };
+        return { errors: [e.message], success: false, };
     }
 };
 

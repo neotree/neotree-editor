@@ -13,7 +13,7 @@ import {
     SheetTrigger,
     SheetClose,
 } from "@/components/ui/sheet";
-import { getHospital, updateHospitals, createHospitals } from "@/app/actions/hospitals";
+import { getHospital, updateHospitals, createHospitals } from "@/app/actions/_hospitals";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { getRoles } from "@/app/actions/roles";

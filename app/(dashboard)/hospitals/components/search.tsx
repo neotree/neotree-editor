@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useMeasure } from 'react-use';
 
-import { searchHospitals } from "@/app/actions/hospitals";
+import { searchHospitals } from "@/app/actions/_hospitals";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/pagination";

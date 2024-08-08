@@ -6,7 +6,7 @@ import {
     _updateScripts,
     _updateScriptsWithoutPublishing,
     _importScripts,
-} from '@/databases/mutations/scripts';
+} from '@/databases/mutations/_scripts';
 import { 
     _listScripts,
     _getFullScript, 
@@ -16,7 +16,7 @@ import {
     _getScriptsDefaultResults, 
     GetScriptParams, 
     _countScriptsItems,
-} from "@/databases/queries/scripts";
+} from "@/databases/queries/_scripts";
 import logger from "@/lib/logger";
 import { _getScriptsDrafts } from '@/databases/queries/scripts-drafts';
 import { isAllowed } from "./is-allowed";

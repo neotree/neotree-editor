@@ -48,7 +48,7 @@ import {
     createDiagnosesDrafts,
     deleteDiagnosesDrafts,
 } from "@/app/actions/_diagnoses-drafts";
-import { getHospitals } from "@/app/actions/hospitals";
+import { getHospitals } from "@/app/actions/_hospitals";
 import { importRemoteScripts } from "@/app/actions/sites";
 import { uploadFile } from "@/app/actions/files";
 

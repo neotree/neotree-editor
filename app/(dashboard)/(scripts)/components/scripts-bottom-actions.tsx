@@ -1,18 +1,18 @@
 'use client';
 
-import { Trash, Copy } from "lucide-react";
+import { Trash } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ActionsBar } from "@/components/actions-bar";
+import { useScriptsContext } from "@/contexts/scripts";
 
-type Props = {
-    disabled?: boolean;
-    selected: string[];
-    onDelete: () => void;
-    onCopy: (scripts: { scriptReference: string; isDraft: boolean; }[]) => void;
-};
+export function BottomActions() {
+    const { selected, scripts, onDelete, } = useScriptsContext();
 
-export function ScriptsBottomActions({ disabled, selected, onDelete, onCopy, }: Props) {
+    if (!selected.length) return null;
+
+    const scriptsIds = scripts.data.filter((_, i) => selected.includes(i)).map(s => s.scriptId);
+
     return (
         <>
             {!!selected.length && (
@@ -20,11 +20,10 @@ export function ScriptsBottomActions({ disabled, selected, onDelete, onCopy, }: 
                     <Button
                         variant="destructive"
                         className="h-auto w-auto"
-                        disabled={disabled}
-                        onClick={() => onDelete()}
+                        onClick={() => onDelete(scriptsIds)}
                     >
                         <Trash className="h-4 w-4 mr-1" />
-                        <span>{selected.length > 1 ? `Delete ${selected.length} scripts` : 'Delete script'}</span>
+                        <span>{selected.length > 1 ? `Delete ${selected.length}` : 'Delete'}</span>
                     </Button>
                 </ActionsBar>
             )}
