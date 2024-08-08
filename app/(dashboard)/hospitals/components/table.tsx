@@ -10,7 +10,7 @@ import {
     updateHospitals, 
     createHospitals,
     searchHospitals,
-} from "@/app/actions/hospitals";
+} from "@/app/actions/_hospitals";
 import { DataTable } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
 import { Separator } from "@/components/ui/separator";

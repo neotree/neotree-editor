@@ -6,7 +6,7 @@ import db from "../pg/drizzle";
 import { diagnoses, diagnosesDrafts, diagnosesHistory } from "../pg/schema";
 import { _getDiagnosis, _getDiagnoses, _listRawDiagnoses, _listDiagnoses } from '../queries/diagnoses';
 import logger from "@/lib/logger";
-import { _listScripts } from "../queries/scripts";
+import { _listScripts } from "../queries/_scripts";
 
 const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 

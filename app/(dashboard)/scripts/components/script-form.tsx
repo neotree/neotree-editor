@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
-import { useScriptsContext, FormDataType, IScriptsContext } from "@/contexts/scripts";
+import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { defaultNuidSearchFields } from "@/constants/fields";
@@ -30,28 +30,55 @@ import { scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
+import { SocketEventsListener } from "./socket-events-listener";
 
 type Props = {
-    formData?: FormDataType;
-    hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
+    scriptId?: string;
+    scriptDraftId?: string;
+    formData?: Awaited<ReturnType<IScriptsContext['_getScript']>>['draft']['data'];
+    hideActions?: boolean;
+    draftVersion: number;
 };
 
-export function Form({ 
-    formData, 
-    hospitals,
+export function ScriptForm({ 
+    scriptId: updateScriptId, 
+    scriptDraftId: updateScriptDraftId,
+    formData,
+    hideActions,
+    draftVersion,
 }: Props) {
-    const { disabled, onSave, onCancelScriptForm } = useScriptsContext();
+    const newScriptId = useMemo(() => v4(), []);
+
+    const { viewOnly } = useAppContext();
+
+    const {  
+        hospitals,
+        _getScript: getScript, 
+        _updateDrafts: updateDrafts,
+        _createDrafts: createDrafts,
+    } = useScriptsContext();
+
+    const { alert } = useAlertModal();
+    const { confirm } = useConfirmModal();
+    const router = useRouter();
+
+    const [submitting, setSubmitting] = useState(false);
 
     const getDefaultFormValues = useCallback(() => ({
+        ...formData,
+        scriptDraftId: updateScriptDraftId || newScriptId,
+        scriptId: updateScriptId || formData?.scriptId || newScriptId,
+        version: formData?.version || draftVersion || 1,
         type: formData?.type || scriptTypes[0].value,
+        position: formData?.position || 1,
         title: formData?.title || '',
         printTitle: formData?.printTitle || '',
         description: formData?.description || '',
         hospitalId: formData?.hospitalId || null,
         exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
         nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
-        nuidSearchFields: (formData?.nuidSearchFields || []),
-    } satisfies FormDataType), [formData]);
+        nuidSearchFields: (formData?.nuidSearchFields || []) as Awaited<ReturnType<typeof getScript>>['nuidSearchFields'],
+    }), [formData, draftVersion, newScriptId, updateScriptDraftId, updateScriptId]);
 
     const {
         formState: { dirtyFields, },
@@ -72,10 +99,91 @@ export function Form({
 
     const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
 
-    const onSubmit = handleSubmit(data => onSave([data]));
+    useEffect(() => {
+        resetForm(getDefaultFormValues());
+    }, [formData, resetForm, getDefaultFormValues]);
+
+    const onSave = handleSubmit(({ scriptDraftId, ...data }) => {
+        (async () => {
+            try {
+                setSubmitting(true);
+
+                let error: string | undefined = undefined;
+    
+                if (updateScriptDraftId) {
+                    const res = await updateDrafts([{ scriptDraftId, data }]);
+                    error = res[0]?.error;
+                    if (!error) router.refresh();
+                } else {
+                    const res = await createDrafts([{ 
+                        scriptDraftId: data.scriptId, 
+                        scriptId: updateScriptId, 
+                        position: data.position,
+                        data, 
+                    }]);
+                    error = res?.error;
+                }
+
+                if (error) throw new Error(error);
+    
+                alert({
+                    variant: 'success',
+                    message: 'Script draft was saved successfully!',
+                    onClose: () => router.push('/'),
+                });
+            } catch(e: any) {
+                alert({
+                    title: '',
+                    message: 'Failed to save script: ' + e.message,
+                    variant: 'error',
+                });
+            } finally {
+                setSubmitting(false);
+            }
+        })();
+    });
+
+    const onCancel = useCallback((cb?: () => void) => {
+        const exit = () => {
+            router.push('/');
+        };
+
+        if (!formIsDirty) {
+            exit();
+        } else {
+            confirm(exit, {
+                danger: true,
+                title: 'Discard changes',
+                message: 'Are you sure you want to exit editor? Your unsaved changes will be lost',
+                negativeLabel: 'Cancel',
+                positiveLabel: 'Exit',
+            });
+        }
+    }, [confirm, router, formIsDirty]);
+    
+    const disabled = useMemo(() => submitting || viewOnly, [submitting, viewOnly]);
+
+    useEffect(() => {
+        const unloadCallback = (event: BeforeUnloadEvent) => {
+            if (formIsDirty) {
+                event.preventDefault();
+                event.returnValue = '';
+                return '';
+            }
+        };
+        window.addEventListener('beforeunload', unloadCallback);
+        return () => window.removeEventListener('beforeunload', unloadCallback);
+    }, [formIsDirty, onCancel]);
 
     return (
         <>
+            {submitting && <Loader overlay />}
+
+            <SocketEventsListener 
+                onDiscardDrafts={() => router.refresh()}
+                onPublishData={() => router.refresh()}
+            />
+
             <div 
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
@@ -196,18 +304,18 @@ export function Form({
                     </div>
                 </>
 
-                <div className={cn('flex gap-x-2')}>
+                <div className={cn('flex gap-x-2', hideActions && 'hidden')}>
                     <div className="ml-auto" />
 
                     <Button
                         variant="ghost"
-                        onClick={() => onCancelScriptForm()}
+                        onClick={() => onCancel()}
                     >
                         Cancel
                     </Button>
 
                     <Button
-                        onClick={() => onSubmit()}
+                        onClick={onSave}
                         disabled={!formIsDirty}
                     >
                         Save draft

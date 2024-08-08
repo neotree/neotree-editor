@@ -8,7 +8,7 @@ import {
     scripts as scriptsTable, 
 } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { _getScriptsWithItems, _listScripts } from '@/databases/queries/scripts';
+import { _getScriptsWithItems, _listScripts } from '@/databases/queries/_scripts';
 import { screenToDraftInsertData, scriptToDraftInsertData, diagnosisToDraftInsertData } from '@/databases/utils';
 import { _createScreensDrafts } from '../screens-drafts';
 import { _createDiagnosesDrafts } from '../diagnoses-drafts';

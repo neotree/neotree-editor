@@ -6,7 +6,7 @@ import { io } from 'socket.io-client';
 import { revalidatePath as _revalidatePath } from "next/cache";
 
 import logger from '@/lib/logger';
-import { _publishScripts } from '@/databases/mutations/scripts';
+import { _publishScripts } from '@/databases/mutations/_scripts';
 import { _publishConfigKeys } from '@/databases/mutations/_config-keys';
 import { isAllowed } from './is-allowed';
 import { _publishScreens } from '@/databases/mutations/screens';

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Trash, Plus, Edit2 } from 'lucide-react';
 
-import { getHospitals, searchHospitals } from "@/app/actions/hospitals";
+import { getHospitals, searchHospitals } from "@/app/actions/_hospitals";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";

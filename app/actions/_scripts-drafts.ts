@@ -13,7 +13,7 @@ import {
     GetScriptDraftParams, 
     _countScriptsDrafts,
 } from "@/databases/queries/scripts-drafts";
-import { _getLastScriptPosition } from '@/databases/queries/scripts';
+import { _getLastScriptPosition } from '@/databases/queries/_scripts';
 import logger from "@/lib/logger";
 import { _countConfigKeysDrafts } from '@/databases/queries/_config-keys-drafts';
 import { isAllowed } from "./is-allowed";

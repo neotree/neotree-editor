@@ -1,47 +1,55 @@
-import { getScriptsTableData } from "@/app/actions/_scripts";
-import { Content } from "@/components/content";
+import { redirect } from "next/navigation";
+
+import * as serverActions from '@/app/actions/scripts';
+import { getHospitals } from "@/app/actions/hospitals";
+import { ScriptsContextProvider } from "@/contexts/scripts";
 import { Title } from "@/components/title";
+import { canAccessPage } from "@/app/actions/is-allowed";
+import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScriptsTable } from "./components/scripts-table";
 import { ScriptsFab } from "./components/scripts-fab";
 
-type Props = {
-    params: { [key: string]: string; };
-    searchParams: { [key: string]: string; };
-};
+export default async function ScriptsPage() {
+    const { user, yes: hasAccess, } = await canAccessPage();
 
-export default async function Scripts({ searchParams: { page, status } }: Props) {
+    if (!user) redirect('/sign-in');
+
+    if (!hasAccess) {
+        return (
+            <Content>
+                <Card>
+                    <CardContent className="p-4 text-xl text-center text-danger bg-danger/10">
+                        You don&apos;t have sufficient rights to access this page! 
+                    </CardContent>
+                </Card>
+            </Content>
+        );
+    }
+
     const [scripts] = await Promise.all([
-        getScriptsTableData(),
+        serverActions.getScripts({ returnDraftsIfExist: true, }),
     ]);
 
     return (
         <>
             <Title>Scripts</Title>
 
-            <Content>
-                {scripts.error ? (
-                    <Card
-                        className="border-danger bg-danger/20 text-center"
-                    >
-                        <CardContent>
-                            <div className="text-danger">{scripts.error}</div>
+            <ScriptsContextProvider
+                {...serverActions}
+                scripts={scripts}
+                getHospitals={getHospitals}
+            >
+                <Content>
+                    <Card>
+                        <CardContent className="p-0">
+                            <ScriptsTable />
                         </CardContent>
                     </Card>
-                ) : (
-                    <div className="mb-20">
-                        <Card>
-                            <CardContent className="p-0">
-                                <ScriptsTable 
-                                    scripts={scripts}
-                                />
-                                
-                                <ScriptsFab />
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-            </Content>
+                </Content>
+
+                <ScriptsFab />
+            </ScriptsContextProvider>
         </>
-    )
+    );
 }

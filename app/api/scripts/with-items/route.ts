@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _getScriptsWithItems } from "@/databases/queries/scripts";
+import { _getScriptsWithItems } from "@/databases/queries/_scripts";
 import { parseJSON } from "@/lib/parse-json";
 
 export async function GET(req: NextRequest) {

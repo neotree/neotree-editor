@@ -3,64 +3,67 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import { configKeys, configKeysDrafts } from '@/databases/pg/schema';
+import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { ScriptField } from '@/types';
 
-export type SaveConfigKeysData = Partial<typeof configKeys.$inferSelect>;
+export type SaveScriptsData = Partial<typeof scripts.$inferSelect & {
+    nuidSearchFields?: ScriptField[];
+}>;
 
-export type SaveConfigKeysResponse = { 
+export type SaveScriptsResponse = { 
     success: boolean; 
     errors?: string[]; 
 };
 
-export async function _saveConfigKeys({ data, broadcastAction, }: {
-    data: SaveConfigKeysData[],
+export async function _saveScripts({ data, broadcastAction, }: {
+    data: SaveScriptsData[],
     broadcastAction?: boolean,
 }) {
-    const response: SaveConfigKeysResponse = { success: false, };
+    const response: SaveScriptsResponse = { success: false, };
 
     try {
         const errors = [];
 
         let index = 0;
-        for (const { configKeyId: itemConfigKeyId, ...item } of data) {
+        for (const { scriptId: itemScriptId, ...item } of data) {
             try {
                 index++;
 
-                const configKeyId = itemConfigKeyId || uuid.v4();
+                const scriptId = itemScriptId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemConfigKeyId ? null : await db.query.configKeysDrafts.findFirst({
-                        where: eq(configKeysDrafts.configKeyDraftId, configKeyId),
+                    const draft = !itemScriptId ? null : await db.query.scriptsDrafts.findFirst({
+                        where: eq(scriptsDrafts.scriptDraftId, scriptId),
                     });
 
-                    const published = (draft || !itemConfigKeyId) ? null : await db.query.configKeys.findFirst({
-                        where: eq(configKeys.configKeyId, configKeyId),
+                    const published = (draft || !itemScriptId) ? null : await db.query.scripts.findFirst({
+                        where: eq(scripts.scriptId, scriptId),
                     });
 
                     if (draft) {
                         const data = {
                             ...draft.data,
                             ...item,
-                        };
+                        } as typeof draft.data;
                         
                         await db
-                            .update(configKeysDrafts)
+                            .update(scriptsDrafts)
                             .set({
                                 data,
                                 position: data.position,
-                            }).where(eq(configKeysDrafts.configKeyDraftId, configKeyId));
+                            }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const confKey = await db.query.configKeys.findFirst({
+                            const confKey = await db.query.scripts.findFirst({
                                 columns: { position: true, },
-                                orderBy: desc(configKeys.position),
+                                orderBy: desc(scripts.position),
                             });
 
-                            const confKeyDraft = await db.query.configKeysDrafts.findFirst({
+                            const confKeyDraft = await db.query.scriptsDrafts.findFirst({
                                 columns: { position: true, },
-                                orderBy: desc(configKeysDrafts.position),
+                                orderBy: desc(scriptsDrafts.position),
                             });
 
                             position = Math.max(0, confKey?.position || 0, confKeyDraft?.position || 0) + 1;
@@ -69,16 +72,16 @@ export async function _saveConfigKeys({ data, broadcastAction, }: {
                         const data = {
                             ...published,
                             ...item,
-                            configKeyId,
+                            scriptId,
                             version: published?.version ? (published.version + 1) : 1,
                             position,
-                        } as typeof configKeys.$inferInsert;
+                        } as typeof scriptsDrafts.$inferInsert['data'];
 
-                        await db.insert(configKeysDrafts).values({
+                        await db.insert(scriptsDrafts).values({
                             data,
-                            configKeyDraftId: configKeyId,
+                            scriptDraftId: scriptId,
                             position: data.position,
-                            configKeyId: published?.configKeyId,
+                            scriptId: published?.scriptId,
                         });
                     }
                 }
@@ -95,9 +98,9 @@ export async function _saveConfigKeys({ data, broadcastAction, }: {
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
-        logger.error('_saveConfigKeys ERROR', e.message);
+        logger.error('_saveScripts ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_config_keys');
+        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_scripts');
         return response;
     }
 }

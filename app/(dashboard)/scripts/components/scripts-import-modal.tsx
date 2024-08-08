@@ -38,7 +38,7 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
     onOpenChange: (open: boolean) => void;
 }) {
     const { _getSites } = useAppContext();
-    const { importRemoteScripts } = useScriptsContext();
+    const { _importRemoteScripts } = useScriptsContext();
     const { alert } = useAlertModal();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -62,6 +62,7 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
 
     const confirmed = watch('confirmed');
     const siteIdValue = watch('siteId');
+    const scriptIdValue = watch('scriptId');
 
     const disabled = useMemo(() => loading || importing, [loading, importing]);
 
@@ -80,11 +81,10 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
         try {
             setImporting(true);
 
-            const res = await importRemoteScripts({ 
+            const res = await _importRemoteScripts({ 
                 siteId: data.siteId, 
-                scripts: [{ scriptId: data.scriptId, overWriteExistingScriptWithId }], 
-                broadcastAction: true,
-            });
+                scriptsIds: [{ scriptId: data.scriptId, overWriteExistingScriptWithId }], 
+            }, { broadcastAction: true, });
 
             res.errors?.forEach(e => errors.push(e));
 
@@ -175,10 +175,11 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
                         </div>
 
                         <div>
-                            <Label htmlFor="scriptId">Script ID *</Label>
+                            <Label htmlFor="scriptId" error={!!errors.scriptId?.message || !scriptIdValue}>Script ID *</Label>
                             <Input
                                 {...register('scriptId', { disabled, required: true, })}
                                 name="scriptId"
+                                error={!!errors.scriptId?.message || !scriptIdValue}
                             />
                         </div>
 
@@ -199,9 +200,6 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
                     </div>
                     
                     <DialogFooter className="border-t border-t-border px-4 py-2">
-                        <span className="text-xs text-danger">* Required</span>
-
-                        <div className="flex-1" />
                         <DialogClose asChild>
                             <Button
                                 variant="ghost"
@@ -214,7 +212,7 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
 
                         <Button
                             onClick={() => importScripts()}
-                            disabled={disabled || (overWriteExistingScriptWithId ? !confirmed : false)}
+                            disabled={disabled || !siteIdValue || !scriptIdValue || !confirmed}
                         >
                             Import
                         </Button>

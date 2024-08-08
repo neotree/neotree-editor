@@ -5,7 +5,7 @@ import {
     updateHospitals, 
     createHospitals,
     searchHospitals,
-} from "@/app/actions/hospitals";
+} from "@/app/actions/_hospitals";
 import { Content } from "@/components/content";
 import { Title } from "@/components/title";
 import { Card, CardContent } from "@/components/ui/card";
