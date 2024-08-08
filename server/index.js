@@ -1,93 +1,41 @@
-import path from 'path';
-import express from 'express';
-import cors from 'cors';
-import * as database from './database';
-import syncFirebase from './firebase/sync';
-import { backupData } from './utils/backup';
+require('dotenv/config');
+const { createServer } = require("node:http");
+const next = require("next");
+const { Server } = require("socket.io");
 
-const isProd = process.env.NODE_ENV === 'production';
+const dev = process.env.NODE_ENV !== "production";
+const hostname = process.env.HOSTNAME;
+const port = Number(process.env.PORT);
 
-(async () => {
-  let app = express();
-  const httpServer = require('http').Server(app);
-  app.logger = require('../utils/logger');
-  app.io = require('socket.io')(httpServer); // socket io
+const app = next({ dev, hostname, port });
+const handler = app.getRequestHandler();
 
-  app.use(cors());
+app.prepare().then(() => {
+    const httpServer = createServer(handler);
 
-  app.getRandomString = (separator = '') => {
-    const getRandString = () => Math.random().toString(36).substring(2).toUpperCase();
-    return `${getRandString()}${separator}${getRandString()}${separator}${getRandString()}`;
-  };
+    const io = new Server(httpServer);
 
-  // custom middlewares
-  app.use(require('./_requestQueryHandlerMiddleware')); // injects res.locals.reqQuery
-  app.use(require('./_requestHandlerMiddleware')); // injects res.locals.setResponse & res.locals.getResponse
+    io.on("connection", (socket) => {
+        console.log('Client connected');
 
-  // database
-  let sequelize = null;
-  try {
-    sequelize = await database.connect();
-    app.logger.log('Database connected');
-  } catch (e) {
-    app.logger.error('Database connection failed', e);
-    process.exit(1);
-  }
+        const onEvent = (eventName, ...args) => {
+            const cb = args.filter(arg => typeof arg === 'function')[0];
+            args = args.filter(arg => typeof arg !== 'function');
+            io.emit(eventName, ...args);
+            if (cb) cb({ status: 'ok', });
+        };
 
-  app.sequelize = sequelize;
-
-  try {
-    const appInfo = await database.App.findOne({ where: { id: 1 } });
-    if (!appInfo) await backupData(app);
-  } catch (e) { console.log(e); }
-
-  // firebase
-  // try { await syncFirebase(); } catch (e) { console.log(e); }
-
-  //body-parser
-  const bodyParser = require('body-parser');
-  app.use(bodyParser.json());
-  app.use(bodyParser.urlencoded({ extended: false }));
-
-  //express session
-  const session = require('express-session');
-  const SequelizeStore = require('connect-session-sequelize')(session.Store);
-  const sessStore = new SequelizeStore({ db: app.sequelize });
-  app.use(session({
-    secret: 'neotree',
-    saveUninitialized: false, // don't create session until something stored
-    resave: false, //don't save session if unmodified
-    store: sessStore,
-    cookie: { maxAge: 365 * 24 * 60 * 60 } // = 365 days (exp date will be created from ttl opt)
-  }));
-  sessStore.sync();
-
-  // webpack
-  if (!isProd) {
-    const webpackConfig = require('../webpack.config');
-    const compiler = require('webpack')(webpackConfig);
-    app.wdm = require('webpack-dev-middleware')(compiler, {
-      noInfo: true,
-      publicPath: webpackConfig.output.publicPath
+        socket.on('data_changed', (...args) => onEvent('data_changed', ...args));
+        socket.on('mode_changed', (...args) => onEvent('mode_changed', ...args));
+        socket.on('update_system', (...args) => onEvent('update_system', ...args));
     });
-    app.use(app.wdm);
-    app.use(require('webpack-hot-middleware')(compiler));
 
-    app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
-  } else {
-    app.use('/assets', express.static(path.resolve(__dirname, '../../assets')));
-  }
-
-  app = require('./_passport')(app);
-
-  app.use(express.static(path.resolve(__dirname, '../src'), { index: false, }));
-
-  app.use(require('./routes')(app));
-
-  app.get('*', require('./_serveHtmlMiddleware')(app));
-
-  app.server = httpServer.listen(process.env.SERVER_PORT, err => {
-    if (err) throw (err);
-    app.logger.log(`Server started on port ${process.env.SERVER_PORT}`);
-  });
-})();
+    httpServer
+        .once("error", (err) => {
+            console.error(err);
+            process.exit(1);
+        })
+        .listen(port, () => {
+            console.log(`> Ready on http://${hostname}:${port}`);
+        });
+});
