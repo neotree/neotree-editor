@@ -2,9 +2,9 @@
 
 import { cookies } from 'next/headers';
 import { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
-import { io } from 'socket.io-client';
 import { revalidatePath as _revalidatePath } from "next/cache";
 
+import socket from '@/lib/socket';
 import logger from '@/lib/logger';
 import { _publishScripts } from '@/databases/mutations/_scripts';
 import { _publishConfigKeys } from '@/databases/mutations/_config-keys';
@@ -20,8 +20,6 @@ import { _deleteAllScriptsDrafts, } from '@/databases/mutations/scripts-drafts';
 import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-drafts';
 import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export const revalidatePath = async (
     path: Parameters<typeof _revalidatePath>[0], 

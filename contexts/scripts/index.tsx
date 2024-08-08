@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useState, useMemo, useEffect, } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { arrayMoveImmutable } from "array-move";
 
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
@@ -88,6 +87,7 @@ function useScriptsContentHook({
                 title: 'Success',
                 message: 'Scripts saved successfully!',
                 variant: 'success',
+                onClose: () => router.push('/'),
             });
         }
 
@@ -117,7 +117,7 @@ function useScriptsContentHook({
                 router.refresh();
                 alert({
                     title: 'Success',
-                    message: 'Config keys deleted successfully!',
+                    message: 'Scripts deleted successfully!',
                     variant: 'success',
                 });
             }
@@ -131,8 +131,15 @@ function useScriptsContentHook({
         });
     }, [deleteScripts, confirm, alert, router, scripts]);
 
-    const onSort = useCallback(async (oldIndex: number, newIndex: number) => {
-        const sorted = arrayMoveImmutable([...scripts.data], oldIndex, newIndex);
+    const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
+        const sorted = scripts.data.map((s, i) => {
+            const item = sortedIndexes.filter(s => s.oldIndex === i)[0];
+            if (i === item.oldIndex) {
+                if (item.oldIndex === item.newIndex) return s;
+                return { ...scripts.data[item.newIndex], position: item.newIndex + 1, };
+            }
+            return s;
+        });
 
         const payload: { scriptId: string; position: number; }[] = [];
 
@@ -141,14 +148,16 @@ function useScriptsContentHook({
             if (old.position !== s.position) {
                 const position = i + 1;
                 payload.push({ scriptId: s.scriptId!, position, });
-                sorted[i].position = position;
+                // sorted[i].position = position;
             }
         });
 
         setScripts(prev => ({ ...prev, data: sorted, }));
-
+        
         await saveScripts({ data: payload, broadcastAction: true, });
-    }, [saveScripts, alert]);
+
+        router.refresh();
+    }, [saveScripts, alert, scripts, router]);
 
     const onDuplicate = useCallback(async (scriptsIds?: string[]) => {
         window.alert('DUPLICATE SCRIPT!!!');

@@ -159,7 +159,7 @@ export const DataTable = (props: DataTableProps) => {
                             {!displayRows.length && (
                                 <TableRow className="p-0">
                                     <TableCell
-                                        colSpan={columns.length}
+                                        colSpan={columns.length + (selectable ? 1 : 0) + (sortable ? 1 : 0)}
                                         className="p-4 text-center text-muted-foreground"
                                     >
                                         {props.noDataMessage || 'No data to display'}
