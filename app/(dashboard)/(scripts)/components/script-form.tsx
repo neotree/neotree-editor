@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { defaultNuidSearchFields } from "@/constants/fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useAppContext } from "@/contexts/app";
 import { scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
@@ -36,13 +35,15 @@ type Props = {
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
 };
 
-export function Form({ 
+export function ScriptForm({ 
     formData, 
     hospitals,
 }: Props) {
     const { disabled, onSave, onCancelScriptForm } = useScriptsContext();
 
     const getDefaultFormValues = useCallback(() => ({
+        position: formData?.position || undefined,
+        scriptId: formData?.scriptId || undefined,
         type: formData?.type || scriptTypes[0].value,
         title: formData?.title || '',
         printTitle: formData?.printTitle || '',
