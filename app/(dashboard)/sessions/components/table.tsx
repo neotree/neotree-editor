@@ -98,7 +98,7 @@ export function SessionsTable({ sessions }: Props) {
                                             variant="link"
                                             className="h-auto p-0"
                                         >
-                                            <Link href={`/sessions/${s.id}`}>
+                                            <Link href={`/sessions/${s.id}`} target="_blank">
                                                 View
                                                 <ExternalLink className="h-4 w-4 ml-2" />
                                             </Link>

@@ -35,6 +35,16 @@ export const getSessions: typeof queries._getSessions = async (...args) => {
     }
 };
 
+export const getSession: typeof queries._getSession = async (...args) => {
+    try {
+        await isAllowed();
+        return await queries._getSession(...args);
+    } catch(e: any) {
+        logger.error('getSession ERROR', e.message);
+        return { errors: [e.message], data: null, };
+    }
+};
+
 // export const getSession: typeof queries._getSession = async (...args) => {
 //     await isAllowed();
 //     return await queries._getSession(...args);
