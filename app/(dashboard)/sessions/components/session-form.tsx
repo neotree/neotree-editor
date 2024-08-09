@@ -2,20 +2,22 @@
 
 import { useMemo, useState } from "react";
 import CodeEditor, { TextareaCodeEditorProps } from '@uiw/react-textarea-code-editor';
+import { useTheme } from "next-themes";
+import { Edit2, Save } from "lucide-react";
 
 import { getSession } from "@/app/actions/sessions";
-import { useTheme } from "next-themes";
-import { Container } from "../container";
+import { getScript } from "@/app/actions/scripts";
 import { Button } from "@/components/ui/button";
-import { Edit2, Save } from "lucide-react";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { Container } from "./container";
 
 type Props = {
     session: Awaited<ReturnType<typeof getSession>>;
+    script: Awaited<ReturnType<typeof getScript>>['data'];
     getSession: typeof getSession;
 };
 
-export function Session({ session }: Props) {
+export function SessionForm({ session }: Props) {
     const { theme } = useTheme();
     const { confirm } = useConfirmModal();
 
