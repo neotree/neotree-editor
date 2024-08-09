@@ -7,6 +7,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
+import { displayBigNumber } from "@/lib/displayBigNumber";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,6 +19,9 @@ type Props = {
     collectionName?: string;
     hideControls?: boolean;
     hideSummary?: boolean;
+    classes?: {
+        pageNumber?: string;
+    },
     onPaginate: (page: number) => void;
 };
 
@@ -144,6 +148,7 @@ function PaginationComponent(props: Props) {
         collectionName = 'results',
         hideControls,
         hideSummary,
+        classes,
     } = props;
 
     const buttons = getButtons(props);
@@ -154,7 +159,12 @@ function PaginationComponent(props: Props) {
         <div className="flex flex-col justify-center items-center gap-y-2">
             {!hideSummary && (
                 <div className="text-xs opacity-50 min-w-10">
-                    Showing {totalRows ? (((currentPage - 1) * limit) + 1) : 0} - {Math.min(totalRows, currentPage * limit)} of {totalRows} {collectionName}
+                    Showing {totalRows ? 
+                        displayBigNumber(((currentPage - 1) * limit) + 1) : 0} 
+                        &nbsp;-&nbsp; 
+                        {displayBigNumber(Math.min(totalRows, currentPage * limit))} 
+                        &nbsp;of&nbsp; 
+                        {displayBigNumber(totalRows, { separator: ' ', })} {collectionName}
                 </div>
             )}
 
@@ -194,6 +204,7 @@ function PaginationComponent(props: Props) {
                                                 className={cn(
                                                     _disabled ? disabledClassname : '',
                                                     'hidden md:flex',
+                                                    classes?.pageNumber,
                                                 )}
                                             />
                                         );
@@ -219,6 +230,7 @@ function PaginationComponent(props: Props) {
                                                 className={cn(
                                                     _disabled ? disabledClassname : '',
                                                     'hidden md:flex',
+                                                    classes?.pageNumber
                                                 )}
                                                 isActive={isActive}
                                                 onClick={e => {
