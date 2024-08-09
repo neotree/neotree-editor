@@ -23,12 +23,14 @@ export async function _getDiagnoses(
 ): Promise<GetDiagnosesResults> {
     try {
         const { 
-            scriptsIds = [],
+            scriptsIds: _scriptsIds = [],
             diagnosesIds: _diagnosesIds, 
             returnDraftsIfExist, 
         } = { ...params };
 
         let diagnosesIds = _diagnosesIds || [];
+        const scriptsIds = _scriptsIds.filter(s => uuid.validate(s));
+        const oldScriptsIds = _scriptsIds.filter(s => !uuid.validate(s));
         
         // unpublished diagnoses conditions
         const whereDiagnosesDraftsScriptsIds = !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds);
@@ -47,6 +49,7 @@ export async function _getDiagnoses(
 
         // published diagnoses conditions
         const whereDiagnosesScriptsIds = !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds);
+        const whereDiagnosesOldScriptsIds = !oldScriptsIds?.length ? undefined : inArray(diagnoses.oldScriptId, oldScriptsIds);
         const whereDiagnosesIdsNotIn = !drafts.length ? undefined : notInArray(diagnoses.diagnosisId, drafts.map(d => d.diagnosisDraftId));
         const whereDiagnosesIds = !diagnosesIds?.length ? 
             undefined 
@@ -60,6 +63,7 @@ export async function _getDiagnoses(
             isNull(diagnoses.deletedAt),
             isNull(pendingDeletion),
             whereDiagnosesScriptsIds,
+            whereDiagnosesOldScriptsIds,
             ...((!whereDiagnosesIds || !whereOldDiagnosesIds) ? [] : [or(whereDiagnosesIds, whereOldDiagnosesIds)]),
             whereDiagnosesIdsNotIn,
         ];

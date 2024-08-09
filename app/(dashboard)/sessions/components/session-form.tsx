@@ -1,28 +1,35 @@
 'use client';
 
 import { useMemo, useState } from "react";
-import CodeEditor, { TextareaCodeEditorProps } from '@uiw/react-textarea-code-editor';
 import { useTheme } from "next-themes";
-import { Edit2, Save } from "lucide-react";
+import { Edit2, MoreHorizontal, Save } from "lucide-react";
+import CodeEditor, { TextareaCodeEditorProps } from '@uiw/react-textarea-code-editor';
 
 import { getSession } from "@/app/actions/sessions";
-import { getScript } from "@/app/actions/scripts";
+import { getScript, getScreens, getDiagnoses } from "@/app/actions/scripts";
 import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Container } from "./container";
+import { SessionFormSidebar } from "./session-form-sidebar";
 
 type Props = {
     session: Awaited<ReturnType<typeof getSession>>;
-    script: Awaited<ReturnType<typeof getScript>>['data'];
+    script: Awaited<ReturnType<typeof getScript>>;
+    screens: Awaited<ReturnType<typeof getScreens>>;
+    diagnoses: Awaited<ReturnType<typeof getDiagnoses>>;
     getSession: typeof getSession;
 };
 
-export function SessionForm({ session }: Props) {
+export function SessionForm(props: Props) {
+    const { session, script, diagnoses, screens, } = props;
+
     const { theme } = useTheme();
     const { confirm } = useConfirmModal();
 
     const [form, setForm] = useState(JSON.stringify(session.data, null, 4));
     const [disabled, setDiabled] = useState(true);
+    const [deskopSidebarHidden, setDesktopSidebarHidden] = useState(false);
+    const [tab, setTab] = useState('screens');
 
     const isFormDirty = useMemo(() => form !== JSON.stringify(session.data, null, 4), [session.data, form]);
 
@@ -38,13 +45,15 @@ export function SessionForm({ session }: Props) {
                         <div className="flex-1" />
 
                         {disabled ? (
-                            <Button
-                                variant="ghost"
-                                onClick={() => setDiabled(false)}
-                            >
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Edit
-                            </Button>
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setDiabled(false)}
+                                >
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    Edit
+                                </Button>
+                            </>
                         ) : (
                             <>
                                 <Button
@@ -76,21 +85,42 @@ export function SessionForm({ session }: Props) {
                                 </Button>
                             </>
                         )}
+
+                        {deskopSidebarHidden && (
+                            <div className="hidden md:block">
+                                <Button
+                                    variant="ghost"
+                                    className="text-primary"
+                                    onClick={() => setDesktopSidebarHidden(false)}
+                                >
+                                    <MoreHorizontal className="h-6 w-6" />
+                                </Button>
+                            </div>
+                        )}
                     </>
                 )}
             >
-                <CodeEditor
-                    value={form}
-                    language="json"
-                    placeholder="Enter JSON"
-                    onChange={(evn) => setForm(evn.target.value)}
-                    padding={15}
-                    disabled={disabled}
-                    data-color-mode={(theme || 'light') as TextareaCodeEditorProps['data-color-mode']}
-                    style={{
-                        fontFamily: 'ui-monospace,SFMono-Regular,SF Mono,Consolas,Liberation Mono,Menlo,monospace',
-                    }}
-                />
+                {!deskopSidebarHidden && (
+                    <SessionFormSidebar 
+                        {...props}
+                        onX={() => setDesktopSidebarHidden(true)}
+                    />
+                )}
+
+                <div className="md:pr-[350px]">
+                    <CodeEditor
+                        value={form}
+                        language="json"
+                        placeholder="Enter JSON"
+                        onChange={(evn) => setForm(evn.target.value)}
+                        padding={15}
+                        disabled={disabled}
+                        data-color-mode={(theme || 'light') as TextareaCodeEditorProps['data-color-mode']}
+                        style={{
+                            fontFamily: 'ui-monospace,SFMono-Regular,SF Mono,Consolas,Liberation Mono,Menlo,monospace',
+                        }}
+                    />
+                </div>
             </Container>
         </>
     );
