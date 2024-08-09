@@ -23,12 +23,14 @@ export async function _getScreens(
 ): Promise<GetScreensResults> {
     try {
         const { 
-            scriptsIds = [],
+            scriptsIds: _scriptsIds = [],
             screensIds: _screensIds, 
             returnDraftsIfExist, 
         } = { ...params };
 
         let screensIds = _screensIds || [];
+        const scriptsIds = _scriptsIds.filter(s => uuid.validate(s));
+        const oldScriptsIds = _scriptsIds.filter(s => !uuid.validate(s));
         
         // unpublished screens conditions
         const whereScreensDraftsScriptsIds = !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds);
@@ -47,6 +49,7 @@ export async function _getScreens(
 
         // published screens conditions
         const whereScreensScriptsIds = !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds);
+        const whereScreensOldScriptsIds = !oldScriptsIds?.length ? undefined : inArray(screens.oldScriptId, oldScriptsIds);
         const whereScreensIdsNotIn = !drafts.length ? undefined : notInArray(screens.screenId, drafts.map(d => d.screenDraftId));
         const whereScreensIds = !screensIds?.length ? 
             undefined 
@@ -60,6 +63,7 @@ export async function _getScreens(
             isNull(screens.deletedAt),
             isNull(pendingDeletion),
             whereScreensScriptsIds,
+            whereScreensOldScriptsIds,
             ...((!whereScreensIds || !whereOldScreensIds) ? [] : [or(whereScreensIds, whereOldScreensIds)]),
             whereScreensIdsNotIn,
         ];
