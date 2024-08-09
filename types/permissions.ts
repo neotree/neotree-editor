@@ -1,11 +1,11 @@
 export type PagePermission = 
     // pages
     'users_page' | 
-    'general_settings_page' |
-    'emails_settings_page' |
-    'logs_settings_page' |
-    'system_settings_page' |
-    'app_settings_page';
+    'admin_page' |
+    'admin_emails_page' |
+    'admin_logs_page' |
+    'admin_system_page' |
+    'admin_app_page';
 
 export type DataAction = 
     // mailer

@@ -1,7 +1,7 @@
 import { Title } from "@/components/title";
 import { Tabs } from '@/components/tabs';
 import MailerSettings from "./components/settings";
-import EmailTemplatesSettings from './components/templates';
+import EmailTemplatesAdmin from './components/templates';
 
 type Props = {
     params: { [key: string]: string; };
@@ -9,10 +9,10 @@ type Props = {
 };
 
 
-export default async function EmailsSettingsPage({ searchParams: { tab } }: Props) {
+export default async function AdminEmailsPage({ searchParams: { tab } }: Props) {
     return (
         <>
-            <Title>Emails Settings</Title>
+            <Title>Emails</Title>
 
             <Tabs 
                 searchParamsKey="tab"
@@ -28,7 +28,7 @@ export default async function EmailsSettingsPage({ searchParams: { tab } }: Prop
                 ]}
             />
 
-            {tab === 'templates' ? <EmailTemplatesSettings /> : <MailerSettings />}
+            {tab === 'templates' ? <EmailTemplatesAdmin /> : <MailerSettings />}
         </>
     );
 }

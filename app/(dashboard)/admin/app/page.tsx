@@ -1,9 +1,9 @@
 import { Title } from "@/components/title";
 
-export default async function AppSettingsPage() {
+export default async function AdminAppPage() {
     return (
         <>
-            <Title>App Settings</Title>
+            <Title>App</Title>
         </>
     );
 }

@@ -1,4 +1,4 @@
-export default async function GeneralSettingsPage() {
+export default async function GeneralAdminPage() {
     return (
         <>
             
