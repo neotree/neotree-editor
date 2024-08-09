@@ -2,8 +2,30 @@ import prismadb from "@/databases/prismadb";
 import { isEmpty } from "@/lib/isEmpty";
 import logger from "@/lib/logger";
 import { Prisma } from "@prisma/client";
-import { equal } from "assert";
 
+// GET ONE
+export type GetSessionResponse = {
+    errors?: string[];
+    data: Awaited<ReturnType<typeof prismadb.sessions.findUnique>>;
+};
+
+export async function _getSession(id: number): Promise<GetSessionResponse> {
+    try {
+        const data = await prismadb.sessions
+            .findUnique({
+                where: { id, },
+            });
+
+        return { 
+            data,
+        };
+    } catch(e: any) {
+        logger.log('_getSession ERROR', e.message);
+        return { data: null, errors: [e.message], }
+    }
+}
+
+// GET MANY
 export type GetSessionsFilters = {
     uid?: string;
     scriptId?: string;
