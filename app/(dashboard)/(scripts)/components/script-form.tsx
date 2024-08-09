@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { v4 } from "uuid";
+import { useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 
@@ -17,10 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAlertModal } from "@/hooks/use-alert-modal";
-import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
-import { useScriptsContext, FormDataType, IScriptsContext } from "@/contexts/scripts";
+import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { defaultNuidSearchFields } from "@/constants/fields";
@@ -31,7 +28,7 @@ import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
 
 type Props = {
-    formData?: FormDataType;
+    formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
 };
 
@@ -39,7 +36,16 @@ export function ScriptForm({
     formData, 
     hospitals,
 }: Props) {
-    const { disabled, onSave, onCancelScriptForm } = useScriptsContext();
+    const router = useRouter();
+
+    const { 
+        disabled, 
+        loading,
+        alert,
+        setLoading,
+        saveScripts, 
+        onCancelScriptForm 
+    } = useScriptsContext();
 
     const getDefaultFormValues = useCallback(() => ({
         position: formData?.position || undefined,
@@ -52,7 +58,7 @@ export function ScriptForm({
         exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
         nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
         nuidSearchFields: (formData?.nuidSearchFields || []),
-    } satisfies FormDataType), [formData]);
+    } satisfies ScriptFormDataType), [formData]);
 
     const {
         formState: { dirtyFields, },
@@ -60,7 +66,6 @@ export function ScriptForm({
         setValue,
         register,
         handleSubmit,
-        reset: resetForm,
     } = useForm({
         defaultValues: getDefaultFormValues(),
     });
@@ -73,10 +78,34 @@ export function ScriptForm({
 
     const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
 
-    const onSubmit = handleSubmit(data => onSave([data]));
+    const onSubmit = handleSubmit(async data => {
+        setLoading(true);
+
+        const res = await saveScripts({ data: [data], broadcastAction: true, });
+
+        if (res.errors?.length) {
+            alert({
+                title: 'Error',
+                message: res.errors.join(', '),
+                variant: 'error',
+            });
+        } else {
+            router.refresh();
+            alert({
+                title: 'Success',
+                message: 'Scripts saved successfully!',
+                variant: 'success',
+                onClose: () => router.push('/'),
+            });
+        }
+
+        setLoading(false);
+    });
 
     return (
         <>
+            {loading && <Loader overlay />}
+
             <div 
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
@@ -191,13 +220,13 @@ export function ScriptForm({
                             <NuidSearchFieldsConfig 
                                 disabled={disabled}
                                 fields={nuidSearchFields}
-                                onChange={fields => setValue('nuidSearchFields', fields, { shouldDirty: true, })}
+                                onChange={fields => setValue('nuidSearchFields', fields!, { shouldDirty: true, })}
                             />
                         )}
                     </div>
                 </>
 
-                <div className={cn('flex gap-x-2')}>
+                <div className={cn('flex gap-x-2 py-4')}>
                     <div className="ml-auto" />
 
                     <Button

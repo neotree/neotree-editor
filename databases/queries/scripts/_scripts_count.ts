@@ -1,5 +1,4 @@
-import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
-import * as uuid from "uuid";
+import { count, isNotNull, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, } from "@/databases/pg/schema";

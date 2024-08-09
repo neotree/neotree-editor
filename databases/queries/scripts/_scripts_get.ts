@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, scriptsDrafts, pendingDeletion, } from "@/databases/pg/schema";
+import { scripts, scriptsDrafts, pendingDeletion, hospitals, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { ScriptField } from "@/types";
 
@@ -15,6 +15,7 @@ export type GetScriptsResults = {
     data: (typeof scripts.$inferSelect & {
         isDraft: boolean;
         nuidSearchFields: ScriptField[];
+        hospitalName: string;
     })[];
     errors?: string[];
 };
@@ -61,12 +62,17 @@ export async function _getScripts(
             .select({
                 script: scripts,
                 pendingDeletion: pendingDeletion,
+                hospitalName: hospitals.name,
             })
             .from(scripts)
             .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
+            .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
             .where(!whereScripts.length ? undefined : and(...whereScripts));
 
-        const published = publishedRes.map(s => s.script);
+        const published = publishedRes.map(s => ({
+            ...s.script,
+            hospitalName: s.hospitalName,
+        }));
 
         const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
             where: inArray(pendingDeletion.scriptId, published.map(s => s.scriptId)),
@@ -100,6 +106,7 @@ export type GetScriptResults = {
     data?: null | typeof scripts.$inferSelect & {
         isDraft: boolean;
         nuidSearchFields: ScriptField[];
+        hospitalName: string;
     };
     errors?: string[];
 };
@@ -130,15 +137,28 @@ export async function _getScript(
 
         if (responseData) return { data: responseData, };
 
-        const published = await db.query.scripts.findFirst({
-            where: and(
+        const publishedRes = await db
+            .select({
+                script: scripts,
+                pendingDeletion,
+                draft: scriptsDrafts,
+                hospitalName: hospitals.name,
+            })
+            .from(scripts)
+            .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
+            .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
+            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scriptsDrafts.scriptId))
+            .where(and(
                 isNull(scripts.deletedAt),
+                isNull(pendingDeletion),
                 whereScriptId || whereOldScriptId,
-            ),
-            with: {
-                draft: true,
-            },
-        });
+            ));
+
+        const published = !publishedRes[0] ? null : {
+            ...publishedRes[0].script,
+            draft: publishedRes[0].draft || undefined,
+            hospitalName: publishedRes[0].hospitalName || '',
+        };
 
         draft = returnDraftIfExists ? published?.draft : undefined;
 

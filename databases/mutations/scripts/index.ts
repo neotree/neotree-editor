@@ -1,3 +1,9 @@
-export * from './_save-scripts';
-export * from './_delete-scripts';
-export * from './_import-remote-scripts';
+export * from './_scripts_save';
+export * from './_scripts_delete';
+export * from './_scripts_import-remote';
+
+export * from './_screens_save';
+export * from './_screens_delete';
+
+export * from './_diagnoses_save';
+export * from './_diagnoses_delete';
