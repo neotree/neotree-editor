@@ -33,9 +33,9 @@ export function useRoutes() {
         },
         ...(isDefaultUser ? [] : [
             {
-                label: 'Settings',
-                href: '/settings',
-                isActive: pathname.substring(0, 10) === '/settings/',
+                label: 'Admin',
+                href: '/admin',
+                isActive: pathname.substring(0, 10) === '/admin/',
                 id: v4(),
             }
         ]),

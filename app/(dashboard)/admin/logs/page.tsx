@@ -2,10 +2,10 @@ import { getLogs } from "@/app/actions/logs";
 import { Title } from "@/components/title";
 import { Content } from "./components/content";
 
-export default async function LogsSettingsPage() {
+export default async function AdminLogsPage() {
     return (
         <>
-            <Title>Logs Settings</Title>
+            <Title>Logs</Title>
 
             <Content 
                 _getLogs={getLogs}

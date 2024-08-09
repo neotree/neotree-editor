@@ -10,7 +10,7 @@ export default async function MailerSettings() {
 
     return (
         <>
-            <Title>Mailer Settings</Title>
+            <Title>Mailer Admin</Title>
 
             <MailerContextProvider
                 {...serverActions}
