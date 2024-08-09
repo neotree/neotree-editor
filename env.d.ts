@@ -6,6 +6,7 @@ namespace NodeJS {
         LOGGER:string;
         PORT: string;
         POSTGRES_DB_URL: string;
+        SESSION_POSTGRES_DB_URL: string;
         MONGODB_URL: string;
         NODEMAILER_PW: string;
         NODEMAILER_EMAIL: string;
