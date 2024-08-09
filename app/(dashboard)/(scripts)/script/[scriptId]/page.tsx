@@ -18,7 +18,7 @@ type Props = {
 export default async function Scripts({ params: { scriptId }, searchParams: { section } }: Props) {
     const [hospitals, { data: formData }] = await Promise.all([
         getHospitals(),
-        getScript({ scriptId }),
+        getScript({ scriptId, returnDraftIfExists: true, }),
     ]);
 
     if (!formData) {

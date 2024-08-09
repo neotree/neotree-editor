@@ -20,6 +20,7 @@ import { _deleteAllScriptsDrafts, } from '@/databases/mutations/scripts-drafts';
 import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-drafts';
 import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
+import { _clearPendingDeletion } from '@/databases/mutations/ops';
 
 export const revalidatePath = async (
     path: Parameters<typeof _revalidatePath>[0], 
@@ -113,6 +114,7 @@ export async function discardDrafts() {
          await _deleteAllScriptsDrafts();
          await _deleteAllScreensDrafts();
          await _deleteAllDiagnosesDrafts();
+         await _clearPendingDeletion();
 
         socket.emit('data_changed', 'discard_drafts');
     } catch(e: any) {

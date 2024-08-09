@@ -8,6 +8,8 @@ import { ScriptsTable } from "./components/scripts-table";
 import { ScriptsFab } from "./components/scripts-fab";
 
 export default async function ScriptsPage() { 
+    const scripts = await serverActions.getScripts({ returnDraftsIfExist: true, });
+
     return (
         <>
             <Title>Scripts</Title>
@@ -15,7 +17,9 @@ export default async function ScriptsPage() {
             <Content>
                 <Card>
                     <CardContent className="p-0">
-                        <ScriptsTable />
+                        <ScriptsTable 
+                            scripts={scripts}
+                        />
                     </CardContent>
                 </Card>
             </Content>

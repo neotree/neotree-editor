@@ -14,14 +14,14 @@ import { IScriptsContext, useScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
-export function ScriptsTableActions({ item }: {
+export function ScriptsTableActions({ item, onDelete, onDuplicate }: {
     item: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'][0];
+    onDelete: () => void;
+    onDuplicate: () => void;
 }) {
     const { 
         disabled,
         setScriptsIdsToExport,
-        onDelete, 
-        onDuplicate, 
     } = useScriptsContext();
 
     const { viewOnly } = useAppContext();
@@ -78,7 +78,7 @@ export function ScriptsTableActions({ item }: {
 
                     {!disabled && (
                         <DropdownMenuItem
-                            onClick={() => onDelete([item.scriptId])}
+                            onClick={() => onDelete()}
                             className="text-danger focus:bg-danger focus:text-danger-foreground"
                         >
                             <Trash className="mr-2 h-4 w-4" />

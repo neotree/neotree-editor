@@ -21,18 +21,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
-import { IScriptsContext } from '@/contexts/scripts';
+import { ScriptFormDataType } from '@/contexts/scripts';
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 
 type Props = {
     disabled?: boolean;
-    fields: Awaited<ReturnType<IScriptsContext['_getScript']>>['nuidSearchFields'];
-    onChange: (fields: Awaited<ReturnType<IScriptsContext['_getScript']>>['nuidSearchFields']) => void;
+    fields: ScriptFormDataType['nuidSearchFields'];
+    onChange: (fields: ScriptFormDataType['nuidSearchFields']) => void;
     onClose?: () => void;
 };
 
 export function NuidSearchFieldsConfig({ 
-    fields,
+    fields = [],
     disabled,
     onChange,
     onClose, 

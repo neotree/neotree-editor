@@ -4,14 +4,18 @@ import { Trash, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ActionsBar } from "@/components/actions-bar";
-import { useScriptsContext } from "@/contexts/scripts";
+import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 
-export function BottomActions() {
-    const { selected, scripts, onDelete, setScriptsIdsToExport } = useScriptsContext();
+export function BottomActions({ scripts, selected, onDelete }: {
+    selected: number[];
+    scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'];
+    onDelete: (scriptsIds: string[]) => void;
+}) {
+    const { setScriptsIdsToExport } = useScriptsContext();
 
     if (!selected.length) return null;
 
-    const scriptsIds = scripts.data.filter((_, i) => selected.includes(i)).map(s => s.scriptId);
+    const scriptsIds = scripts.filter((_, i) => selected.includes(i)).map(s => s.scriptId);
 
     return (
         <>
