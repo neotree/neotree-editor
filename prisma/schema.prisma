@@ -1,0 +1,23 @@
+generator client {
+    provider            = "prisma-client-js"
+    previewFeatures     = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+    provider            = "postgresql"
+    url                 = env("SESSIONS_DB_URL")
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model sessions {
+    id                  Int       @id @default(autoincrement())
+    uid                 String
+    ingested_at         DateTime? @db.Timestamp(6)
+    data                Json?
+    scriptid            String?
+    unique_key          String?   @db.VarChar
+
+    @@index([id(sort: Desc)], map: "id_desc")
+    @@index([scriptid])
+}
