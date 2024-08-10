@@ -37,7 +37,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
     onOpenChange: (open: boolean) => void;
 }) {
     const { _getSites } = useAppContext();
-    const { importRemoteScripts } = useScriptsContext();
+    const { copyScripts } = useScriptsContext();
     const { alert } = useAlertModal();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -76,9 +76,9 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
         try {
             setImporting(true);
 
-            const res = await importRemoteScripts({ 
-                siteId: data.siteId, 
-                scripts: scriptsIdsToExport.map(scriptId => ({ scriptId, })), 
+            const res = await copyScripts({ 
+                toRemoteSiteId: data.siteId, 
+                scriptsIds: scriptsIdsToExport, 
                 broadcastAction: true,
             });
 
@@ -189,7 +189,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                             onClick={() => importScripts()}
                             disabled={disabled}
                         >
-                            Import
+                            Export
                         </Button>
                     </DialogFooter>
                 </DialogContent>

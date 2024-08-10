@@ -129,16 +129,6 @@ export const getScript: typeof queries._getScript = async (...args) => {
     return await queries._getScript(...args);
 };
 
-export const importRemoteScripts: typeof mutations._importRemoteScripts = async (...args) => {
-    try {
-        await isAllowed();
-        return await mutations._importRemoteScripts(...args);
-    } catch(e: any) {
-        logger.error('importRemoteScripts ERROR', e.message);
-        return { errors: [e.message], success: false, };
-    }
-};
-
 export const deleteScripts: typeof mutations._deleteScripts = async (...args) => {
     try {
         await isAllowed();
@@ -368,7 +358,7 @@ export async function copyScripts(params?: {
 
         return response;
     } catch(e: any) {
-        logger.log('copyScripts ERROR', e.message);
-        return { errors: [e.message], success: false, info, };
+        logger.log('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
+        return { errors: e.response?.data?.errors || [e.message], success: false, info, };
     }
 }

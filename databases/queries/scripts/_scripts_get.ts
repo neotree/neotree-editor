@@ -26,9 +26,10 @@ export async function _getScripts(
     params?: GetScriptsParams
 ): Promise<GetScriptsResults> {
     try {
-        const { scriptsIds: _scriptsIds, returnDraftsIfExist, } = { ...params };
+        let { scriptsIds = [], returnDraftsIfExist, } = { ...params };
 
-        let scriptsIds = _scriptsIds || [];
+        scriptsIds = scriptsIds.filter(s => uuid.validate(s));
+        const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
         
         // unpublished scripts conditions
         const whereScriptsDraftsIds = !scriptsIds?.length ? 
@@ -55,11 +56,11 @@ export async function _getScripts(
         const whereScriptsIds = !scriptsIds?.length ? 
             undefined 
             : 
-            inArray(scripts.scriptId, scriptsIds.filter(id => uuid.validate(id)));
-        const whereOldScriptsIds = !scriptsIds?.length ? 
+            inArray(scripts.scriptId, scriptsIds);
+        const whereOldScriptsIds = !oldScriptsIds?.length ? 
             undefined 
             : 
-            inArray(scripts.oldScriptId, scriptsIds.filter(id => !uuid.validate(id)));
+            inArray(scripts.oldScriptId, oldScriptsIds);
         const whereScripts = [
             isNull(scripts.deletedAt),
             isNull(pendingDeletion),
