@@ -27,12 +27,15 @@ export default async function ScriptsLayout({ children }: {
         );
     }
 
+    const hospitals = await getHospitals();
+
     return (
         <>
             <Title>Scripts</Title>
 
             <ScriptsContextProvider
                 {...serverActions}
+                hospitals={hospitals}
                 getHospitals={getHospitals}
             >
                 {children}

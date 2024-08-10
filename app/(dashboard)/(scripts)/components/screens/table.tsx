@@ -11,21 +11,20 @@ import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
-import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
-import { ScriptsTableActions } from "./scripts-table-row-actions";
-import { ScriptsExportModal } from "./scripts-export-modal";
+import { ScreensTableBottomActions } from "./table-bottom-actions";
+import { ScreensTableRowActions } from "./table-row-actions";
 
 
 type Props = {
-    scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>;
+    screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
 };
 
-export function ScriptsTable({
-    scripts: scriptsProp,
+export function ScreensTable({
+    screens: screensProp,
 }: Props) {
-    const [scripts, setScripts] = useState(scriptsProp);
+    const [screens, setScreens] = useState(screensProp);
 
-    useEffect(() => { setScripts(scriptsProp); }, [scriptsProp]);
+    useEffect(() => { setScreens(screensProp); }, [screensProp]);
 
     const router = useRouter();
     const { sys, viewOnly } = useAppContext();
@@ -36,39 +35,36 @@ export function ScriptsTable({
         disabled,
         loading,
         selected,
-        scriptsIdsToExport,
-        hospitals,
         setLoading,
-        setScriptsIdsToExport,
         setSelected,
-        deleteScripts,
-        saveScripts,
+        deleteScreens,
+        saveScreens,
     } = useScriptsContext();
 
-    const onDelete = useCallback(async (scriptsIds: string[]) => {
+    const onDelete = useCallback(async (screensIds: string[]) => {
         confirm(async () => {
-            const _scripts = { ...scripts };
+            const _screens = { ...screens };
 
-            setScripts(prev => ({ ...prev, data: prev.data.filter(s => !scriptsIds.includes(s.scriptId)) }));
+            setScreens(prev => ({ ...prev, data: prev.data.filter(s => !screensIds.includes(s.screenId)) }));
             setSelected([]);
 
             setLoading(true);
 
-            const res = await deleteScripts({ scriptsIds, broadcastAction: true, });
+            const res = await deleteScreens({ screensIds, broadcastAction: true, });
 
             if (res.errors?.length) {
                 alert({
                     title: 'Error',
                     message: res.errors.join(', '),
                     variant: 'error',
-                    onClose: () => setScripts(_scripts),
+                    onClose: () => setScreens(_screens),
                 });
             } else {
                 setSelected([]);
                 router.refresh();
                 alert({
                     title: 'Success',
-                    message: 'Scripts deleted successfully!',
+                    message: 'Screens deleted successfully!',
                     variant: 'success',
                 });
             }
@@ -76,20 +72,20 @@ export function ScriptsTable({
             setLoading(false);
         }, {
             danger: true,
-            title: 'Delete scripts',
-            message: 'Are you sure you want to delete scripts?',
+            title: 'Delete screens',
+            message: 'Are you sure you want to delete screens?',
             positiveLabel: 'Yes, delete',
         });
-    }, [deleteScripts, confirm, alert, router, scripts]);
+    }, [deleteScreens, confirm, alert, router, screens]);
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
-        const payload: { scriptId: string; position: number; }[] = [];
+        const payload: { screenId: string; position: number; }[] = [];
         const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
-            const s = scripts.data[oldIndex];
+            const s = screens.data[oldIndex];
             let position = s.position;
             if (oldIndex !== newIndex) {
                 position = newIndex + 1;
-                payload.push({ scriptId: s.scriptId, position, });
+                payload.push({ screenId: s.screenId, position, });
             }
             return {
                 ...s,
@@ -97,76 +93,75 @@ export function ScriptsTable({
             };
         }).sort((a, b) => a.position - b.position);
 
-        setScripts(prev => ({ ...prev, data: sorted, }));
+        setScreens(prev => ({ ...prev, data: sorted, }));
         
-        await saveScripts({ data: payload, broadcastAction: true, });
+        await saveScreens({ data: payload, broadcastAction: true, });
 
         router.refresh();
-    }, [saveScripts, alert, scripts, router]);
+    }, [saveScreens, alert, screens, router]);
 
-    const onDuplicate = useCallback(async (scriptsIds?: string[]) => {
+    const onCopy = useCallback(async (screensIds: string[]) => {
         window.alert('DUPLICATE SCRIPT!!!');
     }, []);
-
-    const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
 
     return (
         <>
             {loading && <Loader overlay />}
 
-            {!!scriptsIdsToExport.length && <ScriptsExportModal open onOpenChange={() => setScriptsIdsToExport([])} />}
-
             <div className="">
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    title="Scripts"
+                    title=""
                     selectable={!disabled}
                     sortable={!disabled}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
                     getRowOptions={({ rowIndex }) => {
-                        const s = scripts.data[rowIndex];
+                        const s = screens.data[rowIndex];
                         return !s ? {} : {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
                     search={{
-                        inputPlaceholder: 'Search scripts',
+                        inputPlaceholder: 'Search screens',
                     }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                            <div>No scripts saved.</div>
+                            <div>No screens saved.</div>
                         </div>
                     )}
                     columns={[
                         {
                             name: 'Position',
+                            cellClassName: 'w-10',
+                            align: 'center',
                             cellRenderer({ rowIndex }) {
                                 return rowIndex + 1;
                             },
                         },
                         {
+                            name: 'Type',
+                        },
+                        {
+                            name: 'Epic',
+                        },
+                        {
+                            name: 'Story',
+                        },
+                        {
+                            name: 'Ref',
+                        },
+                        {
                             name: 'Title',
-                        },
-                        {
-                            name: 'Description',
-                        },
-                        {
-                            name: 'Hospital',
-                            cellRenderer({ rowIndex }) {
-                                const s = scripts.data[rowIndex];
-                                if (!s) return null;
-                                return hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.name || '';
-                            },
                         },
                         {
                             name: 'Version',
                             align: 'right',
                             cellClassName: cn('w-[100px]', sys.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
-                                const s = scripts.data[cell.rowIndex];
+                                const s = screens.data[cell.rowIndex];
 
                                 if (!s) return null;
 
@@ -183,36 +178,40 @@ export function ScriptsTable({
                         },
                         {
                             name: 'Action',
-                            align: 'right',
+                            align: 'center',
                             cellClassName: 'w-10',
-                            cellRenderer({ rowIndex, }) {
-                                const s = scripts.data[rowIndex];
+                            cellRenderer(cell) {
+                                const s = screens.data[cell.rowIndex];
                                 if (!s) return null;
                                 return (
-                                    <ScriptsTableActions 
-                                        item={s}
-                                        onDelete={() => onDelete([s.scriptId])}
-                                        onDuplicate={() => onDuplicate([s.scriptId])}
+                                    <ScreensTableRowActions 
+                                        screen={s}
+                                        onDelete={() => onDelete([s.screenId])}
+                                        onCopy={() => onCopy([s.screenId])}
                                     />
                                 );
                             },
                         },
                     ]}
-                    data={scripts.data.map(s => [
+                    data={screens.data.map(s => [
                         s.position,
-                        s.title || '',
-                        s.description || '',
-                        s.hospitalName || '',
+                        s.type,
+                        s.epicId,
+                        s.storyId,
+                        s.refId,
+                        s.title,
                         s.version,
                         '',
                     ])}
                 />
             </div>
 
-            <ScriptsTableBottomActions 
+            <ScreensTableBottomActions 
+                disabled={viewOnly}
                 selected={selected}
-                onDelete={onDelete}
-                scripts={scripts.data}
+                screens={screens}
+                onCopy={() => onCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
+                onDelete={() => onDelete(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
             />
         </>
     )

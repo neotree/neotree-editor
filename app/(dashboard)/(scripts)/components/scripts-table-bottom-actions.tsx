@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ActionsBar } from "@/components/actions-bar";
 import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 
-export function BottomActions({ scripts, selected, onDelete }: {
+export function ScriptsTableBottomActions({ scripts, selected, onDelete }: {
     selected: number[];
     scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'];
     onDelete: (scriptsIds: string[]) => void;

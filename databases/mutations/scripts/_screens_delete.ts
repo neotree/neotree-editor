@@ -41,7 +41,7 @@ export async function _deleteScreens(
         const screensArr = await db
             .select({
                 screenId: screens.screenId,
-                scriptId: screens.scriptId,
+                screenScriptId: screens.scriptId,
                 scriptDraftId: scriptsDrafts.scriptDraftId,
                 pendingDeletion: pendingDeletion,
             })
