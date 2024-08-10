@@ -23,23 +23,17 @@ export function ScreensTable({
     screens: screensProp,
 }: Props) {
     const [screens, setScreens] = useState(screensProp);
+    const [loading, setLoading] = useState(false);
+    const [selected, setSelected] = useState<number[]>([]);
 
     useEffect(() => { setScreens(screensProp); }, [screensProp]);
 
     const router = useRouter();
-    const { sys, viewOnly } = useAppContext();
+    const { sys, viewOnly, isDefaultUser } = useAppContext();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
-    const {
-        disabled,
-        loading,
-        selected,
-        setLoading,
-        setSelected,
-        deleteScreens,
-        saveScreens,
-    } = useScriptsContext();
+    const { deleteScreens, saveScreens } = useScriptsContext();
 
     const onDelete = useCallback(async (screensIds: string[]) => {
         confirm(async () => {
@@ -103,6 +97,8 @@ export function ScreensTable({
     const onCopy = useCallback(async (screensIds: string[]) => {
         window.alert('DUPLICATE SCRIPT!!!');
     }, []);
+
+    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
 
     return (
         <>
@@ -186,6 +182,7 @@ export function ScreensTable({
                                 return (
                                     <ScreensTableRowActions 
                                         screen={s}
+                                        disabled={disabled}
                                         onDelete={() => onDelete([s.screenId])}
                                         onCopy={() => onCopy([s.screenId])}
                                     />

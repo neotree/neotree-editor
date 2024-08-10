@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import * as serverActions from '@/app/actions/scripts';
+import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
 import { ScriptsContextProvider } from "@/contexts/scripts";
 import { Title } from "@/components/title";
@@ -35,6 +36,7 @@ export default async function ScriptsLayout({ children }: {
 
             <ScriptsContextProvider
                 {...serverActions}
+                {...filesActions}
                 hospitals={hospitals}
                 getHospitals={getHospitals}
             >

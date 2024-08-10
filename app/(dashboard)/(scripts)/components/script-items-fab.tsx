@@ -11,17 +11,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAppContext } from "@/contexts/app";
 import Link from "next/link";
 import { ScriptsImportModal } from "./scripts-import-modal";
 
-export function ScriptItemsFab() {
+export function ScriptItemsFab({ disabled }: {
+    disabled: boolean;
+}) {
     const [showImportModal, setShowImportsModal] = useState(false);
 
     const { scriptId } = useParams();
-    const { viewOnly, isDefaultUser } = useAppContext();
 
-    if (viewOnly || isDefaultUser) return null;
+    if (disabled) return null;
 
     return (
         <>

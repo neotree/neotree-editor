@@ -14,6 +14,7 @@ import { useAppContext } from "@/contexts/app";
 import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
+import { ScriptsFab } from "./scripts-fab";
 
 
 type Props = {
@@ -24,23 +25,19 @@ export function ScriptsTable({
     scripts: scriptsProp,
 }: Props) {
     const [scripts, setScripts] = useState(scriptsProp);
+    const [selected, setSelected] = useState<number[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [scriptsIdsToExport, setScriptsIdsToExport] = useState<string[]>([]);
 
     useEffect(() => { setScripts(scriptsProp); }, [scriptsProp]);
 
     const router = useRouter();
-    const { sys, viewOnly } = useAppContext();
+    const { sys, viewOnly, isDefaultUser } = useAppContext();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
     const {
-        disabled,
-        loading,
-        selected,
-        scriptsIdsToExport,
         hospitals,
-        setLoading,
-        setScriptsIdsToExport,
-        setSelected,
         deleteScripts,
         saveScripts,
     } = useScriptsContext();
@@ -108,13 +105,23 @@ export function ScriptsTable({
         window.alert('DUPLICATE SCRIPT!!!');
     }, []);
 
+    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
     const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
 
     return (
         <>
             {loading && <Loader overlay />}
 
-            {!!scriptsIdsToExport.length && <ScriptsExportModal open onOpenChange={() => setScriptsIdsToExport([])} />}
+            {!!scriptsIdsToExport.length && (
+                <ScriptsExportModal 
+                    open 
+                    scriptsIdsToExport={scriptsIdsToExport}
+                    onOpenChange={() => setScriptsIdsToExport([])} 
+                    setScriptsIdsToExport={setScriptsIdsToExport}
+                />
+            )}
+
+            <ScriptsFab disabled={disabled} />
 
             <div className="">
                 <DataTable 
@@ -191,6 +198,8 @@ export function ScriptsTable({
                                 return (
                                     <ScriptsTableActions 
                                         item={s}
+                                        disabled={disabled}
+                                        setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}
                                     />
@@ -211,8 +220,8 @@ export function ScriptsTable({
 
             <ScriptsTableBottomActions 
                 selected={selected}
-                onDelete={onDelete}
-                scripts={scripts.data}
+                onDelete={() => onDelete(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
+                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
             />
         </>
     )

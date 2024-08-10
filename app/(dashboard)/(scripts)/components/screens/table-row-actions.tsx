@@ -15,19 +15,19 @@ import { useAppContext } from "@/contexts/app";
 import { IScriptsContext } from "@/contexts/scripts";
 
 type Props = {
+    disabled: boolean;
     screen: Awaited<ReturnType<IScriptsContext['getScreens']>>['data'][0];
     onDelete: () => void;
     onCopy: () => void;
 };
 
 export function ScreensTableRowActions({ 
+    disabled,
     screen: { screenId },
     onDelete, 
     onCopy,
 }: Props) {
     const { scriptId, } = useParams();
-
-    const { viewOnly } = useAppContext();
 
     const editHref = `/script/${scriptId}/screen/${screenId}`;
 
@@ -51,11 +51,11 @@ export function ScreensTableRowActions({
                         <Link
                             href={editHref}
                         >
-                            {!viewOnly ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
+                            {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
                         </Link>
                     </DropdownMenuItem>
 
-                    {!viewOnly && (
+                    {!disabled && (
                         <>
                             <DropdownMenuItem 
                                 onClick={() => onCopy()}

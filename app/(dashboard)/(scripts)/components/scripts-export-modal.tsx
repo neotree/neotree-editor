@@ -30,12 +30,14 @@ import { Loader } from "@/components/loader";
 import { Alert } from "@/components/alert";
 import { Label } from "@/components/ui/label";
 
-export function ScriptsExportModal({ open, onOpenChange, }: {
+export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToExport, onOpenChange, }: {
     open: boolean;
+    scriptsIdsToExport: string[];
+    setScriptsIdsToExport: (ids: string[]) => void;
     onOpenChange: (open: boolean) => void;
 }) {
     const { _getSites } = useAppContext();
-    const { scriptsIdsToExport, importRemoteScripts, setScriptsIdsToExport } = useScriptsContext();
+    const { importRemoteScripts } = useScriptsContext();
     const { alert } = useAlertModal();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
