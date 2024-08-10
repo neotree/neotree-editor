@@ -20,7 +20,7 @@ export async function _getSession(id: number): Promise<GetSessionResponse> {
             data,
         };
     } catch(e: any) {
-        logger.log('_getSession ERROR', e.message);
+        logger.error('_getSession ERROR', e.message);
         return { data: null, errors: [e.message], }
     }
 }
@@ -135,7 +135,7 @@ export async function _getSessions(params?: GetSessionsParams): Promise<GetSessi
             }, 
         };
     } catch(e: any) {
-        logger.log('_getSessions ERROR', e.message);
+        logger.error('_getSessions ERROR', e.message);
         return { data: [], info: defaultSessionsDataInfo, errors: [e.message], }
     }
 }

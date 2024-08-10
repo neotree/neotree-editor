@@ -1,4 +1,4 @@
-import { and, count, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { screens, screensDrafts, pendingDeletion, } from "@/databases/pg/schema";
@@ -57,9 +57,11 @@ export async function _countScreens(opts?: CountScreensParams): Promise<CountScr
         );
         const [{ count: _pendingDeletion }] = await db.select({ count: count(), }).from(pendingDeletion).where(
             and(
-                whereScreensScriptsIds, 
+                !scriptsIds.length ? undefined : or(
+                    // inArray(pendingDeletion.scriptId, scriptsIds),
+                    inArray(pendingDeletion.screenScriptId, scriptsIds)
+                ), 
                 isNotNull(pendingDeletion.screenId),
-                whereScreensTypes,
             )
         );
         const [{ count: allPublished }] = await db.select({ count: count(), }).from(screens).where(and(

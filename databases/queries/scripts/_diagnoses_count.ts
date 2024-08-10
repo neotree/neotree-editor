@@ -1,4 +1,4 @@
-import { and, count, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { diagnoses, diagnosesDrafts, pendingDeletion, } from "@/databases/pg/schema";
@@ -41,7 +41,13 @@ export async function _countDiagnoses(opts?: CountDiagnosesParams): Promise<Coun
             and(whereDiagnosesDraftsScriptsIds, isNotNull(diagnosesDrafts.diagnosisId))
         );
         const [{ count: _pendingDeletion }] = await db.select({ count: count(), }).from(pendingDeletion).where(
-            and(whereDiagnosesScriptsIds, isNotNull(pendingDeletion.diagnosisId))
+            and(
+                !scriptsIds.length ? undefined : or(
+                    // inArray(pendingDeletion.scriptId, scriptsIds),
+                    inArray(pendingDeletion.diagnosisScriptId, scriptsIds)
+                ),
+                isNotNull(pendingDeletion.diagnosisId)
+            )
         );
         const [{ count: allPublished }] = await db.select({ count: count(), }).from(diagnoses).where(whereDiagnosesScriptsIds);
 
