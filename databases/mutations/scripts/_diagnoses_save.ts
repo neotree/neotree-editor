@@ -3,7 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import { diagnoses, diagnosesDrafts } from '@/databases/pg/schema';
+import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 
@@ -77,20 +77,29 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
 
                         if (data.scriptId) {
                             const scriptDraft = await db.query.scriptsDrafts.findFirst({
-                                where: eq(diagnosesDrafts.scriptDraftId, data.scriptId),
+                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
                                 columns: { scriptDraftId: true, },
                             });
 
-                            await db.insert(diagnosesDrafts).values({
-                                data,
-                                scriptId: data.scriptId,
-                                scriptDraftId: scriptDraft?.scriptDraftId,
-                                diagnosisDraftId: diagnosisId,
-                                position: data.position,
-                                diagnosisId: published?.diagnosisId,
+                            const publishedScript = await db.query.scripts.findFirst({
+                                where: eq(scripts.scriptId, data.scriptId),
+                                columns: { scriptId: true, },
                             });
+
+                            if (scriptDraft || publishedScript) {
+                                await db.insert(diagnosesDrafts).values({
+                                    data,
+                                    scriptId: publishedScript?.scriptId,
+                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    diagnosisDraftId: diagnosisId,
+                                    position: data.position,
+                                    diagnosisId: published?.diagnosisId,
+                                });
+                            } else {
+                                errors.push(`Could not save diagnosis ${index}: ${data.name}, because script was not found`);
+                            }
                         } else {
-                            errors.push(`Could not save item ${index}: ${data.name}, because scriptId was not specified`);
+                            errors.push(`Could not save diagnosis ${index}: ${data.name}, because scriptId was not specified`);
                         }
                     }
                 }

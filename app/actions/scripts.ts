@@ -208,6 +208,8 @@ export async function saveScriptsWithItems({ data }: {
                 deletedAt,
                 version,
                 oldScriptId,
+                scriptId: _ignoreScriptId,
+                position,
                 ...s 
             } = script;
 
@@ -237,6 +239,9 @@ export async function saveScriptsWithItems({ data }: {
                         version,
                         oldScriptId,
                         oldScreenId,
+                        screenId: _ignoreScreenId,
+                        scriptId: _ignoreScriptId,
+                        position,
                         ...s 
                     } = screen;
 
@@ -267,6 +272,9 @@ export async function saveScriptsWithItems({ data }: {
                         version,
                         oldScriptId,
                         oldDiagnosisId,
+                        diagnosisId: _ignoreDiagnosisId,
+                        scriptId: _ignoreScriptId,
+                        position,
                         ...d
                     } = diagnosis;
 

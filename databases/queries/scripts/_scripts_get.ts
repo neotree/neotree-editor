@@ -61,10 +61,11 @@ export async function _getScripts(
             undefined 
             : 
             inArray(scripts.oldScriptId, oldScriptsIds);
+            
         const whereScripts = [
             isNull(scripts.deletedAt),
             isNull(pendingDeletion),
-            ...((!whereScriptsIds || !whereOldScriptsIds) ? [] : [or(whereScriptsIds, whereOldScriptsIds)]),
+            or(whereScriptsIds, whereOldScriptsIds),
             whereScriptsIdsNotIn,
         ];
 
