@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { Edit2, MoreHorizontal, Save } from "lucide-react";
 import CodeEditor, { TextareaCodeEditorProps } from '@uiw/react-textarea-code-editor';
 
+import { cn } from "@/lib/utils";
 import { getSession } from "@/app/actions/sessions";
 import { getScript, getScreens, getDiagnoses } from "@/app/actions/scripts";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,6 @@ export function SessionForm(props: Props) {
     const [form, setForm] = useState(JSON.stringify(session.data, null, 4));
     const [disabled, setDiabled] = useState(true);
     const [deskopSidebarHidden, setDesktopSidebarHidden] = useState(false);
-    const [tab, setTab] = useState('screens');
 
     const isFormDirty = useMemo(() => form !== JSON.stringify(session.data, null, 4), [session.data, form]);
 
@@ -39,7 +39,7 @@ export function SessionForm(props: Props) {
                 header={(
                     <>
                         <div>
-                            UID: {session.data!.uid}
+                            UID: <b>{session.data!.uid}</b>
                         </div>
 
                         <div className="flex-1" />
@@ -107,7 +107,7 @@ export function SessionForm(props: Props) {
                     />
                 )}
 
-                <div className="md:pr-[350px]">
+                <div className={cn(!deskopSidebarHidden && 'md:pr-[350px]')}>
                     <CodeEditor
                         value={form}
                         language="json"
