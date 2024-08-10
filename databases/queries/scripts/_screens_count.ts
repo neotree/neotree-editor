@@ -6,6 +6,7 @@ import logger from "@/lib/logger";
 
 export type CountScreensParams = {
     scriptsIds?: string[];
+    types?: (typeof screens.$inferInsert)['type'][];
 };
 
 export type CountScreensResults = {
@@ -28,22 +29,43 @@ export const _defaultScreensCount = {
 } satisfies CountScreensResults['data'];
 
 export async function _countScreens(opts?: CountScreensParams): Promise<CountScreensResults> {
-    const { scriptsIds = [], } = { ...opts };
+    const { scriptsIds = [], types = [], } = { ...opts };
     try {
         const whereScreensScriptsIds = !scriptsIds.length ? undefined : inArray(screens.scriptId, scriptsIds);
         const whereScreensDraftsScriptsIds = !scriptsIds.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds);
 
-        const [{ count: allDrafts }] = await db.select({ count: count(), }).from(screensDrafts).where(whereScreensDraftsScriptsIds);
+        const whereScreensTypes = !types.length ? undefined : inArray(screens.type, types);
+        const whereScreensDraftsTypes = !types.length ? undefined : inArray(screensDrafts.type, types);
+
+        const [{ count: allDrafts }] = await db.select({ count: count(), }).from(screensDrafts).where(and(
+            whereScreensDraftsScriptsIds,
+            whereScreensDraftsTypes,
+        ));
         const [{ count: newDrafts }] = await db.select({ count: count(), }).from(screensDrafts).where(
-            and(whereScreensDraftsScriptsIds, isNull(screensDrafts.screenId))
+            and(
+                whereScreensDraftsScriptsIds, 
+                whereScreensDraftsTypes, 
+                isNull(screensDrafts.screenId),
+            )
         );
         const [{ count: publishedWithDrafts }] = await db.select({ count: count(), }).from(screensDrafts).where(
-            and(whereScreensDraftsScriptsIds, isNotNull(screensDrafts.screenId))
+            and(
+                whereScreensDraftsScriptsIds, 
+                whereScreensDraftsTypes, 
+                isNotNull(screensDrafts.screenId),
+            )
         );
         const [{ count: _pendingDeletion }] = await db.select({ count: count(), }).from(pendingDeletion).where(
-            and(whereScreensScriptsIds, isNotNull(pendingDeletion.screenId))
+            and(
+                whereScreensScriptsIds, 
+                isNotNull(pendingDeletion.screenId),
+                whereScreensTypes,
+            )
         );
-        const [{ count: allPublished }] = await db.select({ count: count(), }).from(screens).where(whereScreensScriptsIds);
+        const [{ count: allPublished }] = await db.select({ count: count(), }).from(screens).where(and(
+            whereScreensScriptsIds,
+            whereScreensTypes,
+        ));
 
         return  { 
             data: {

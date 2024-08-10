@@ -48,6 +48,10 @@ export function ScriptsContextProvider({
 
 export type ScriptFormDataType = Parameters<IScriptsContext['saveScripts']>[0]['data'][0];
 
+export type ScreenFormDataType = Parameters<IScriptsContext['saveScreens']>[0]['data'][0];
+
+export type DiagnosisFormDataType = Parameters<IScriptsContext['saveDiagnoses']>[0]['data'][0];
+
 function useScriptsContentHook({}: ScriptsContextProviderProps) {
     const router = useRouter();
     const { scriptId, } = useParams();

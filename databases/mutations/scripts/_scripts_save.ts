@@ -5,11 +5,9 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { ScriptField } from '@/types';
+import { ScriptType } from '../../queries/scripts/_scripts_get';
 
-export type SaveScriptsData = Partial<typeof scripts.$inferSelect & {
-    nuidSearchFields?: ScriptField[];
-}>;
+export type SaveScriptsData = Partial<ScriptType>;
 
 export type SaveScriptsResponse = { 
     success: boolean; 

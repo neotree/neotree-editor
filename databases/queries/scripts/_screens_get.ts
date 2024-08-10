@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { screens, screensDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { ScriptField, ScriptItem, ScriptImage } from "@/types";
 
 export type GetScreensParams = {
     screensIds?: string[];
@@ -11,10 +12,18 @@ export type GetScreensParams = {
     returnDraftsIfExist?: boolean;
 };
 
+export type ScreenType = typeof screens.$inferSelect & {
+    isDraft: boolean;
+    fields: ScriptField[];
+    items: ScriptItem[];
+    prePopulate: string[];
+    image1: null | ScriptImage;
+    image2: null | ScriptImage;
+    image3: null | ScriptImage;
+};
+
 export type GetScreensResults = {
-    data: (typeof screens.$inferSelect & {
-        isDraft: boolean;
-    })[];
+    data: ScreenType[];
     errors?: string[];
 };
 
@@ -108,9 +117,7 @@ export async function _getScreens(
 }
 
 export type GetScreenResults = {
-    data?: null | typeof screens.$inferSelect & {
-        isDraft: boolean;
-    };
+    data?: null | ScreenType;
     errors?: string[];
 };
 

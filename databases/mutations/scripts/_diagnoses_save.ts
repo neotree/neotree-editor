@@ -5,10 +5,9 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { diagnoses, diagnosesDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 
-export type SaveDiagnosesData = Partial<typeof diagnoses.$inferSelect & {
-    
-}>;
+export type SaveDiagnosesData = Partial<DiagnosisType>;
 
 export type SaveDiagnosesResponse = { 
     success: boolean; 
