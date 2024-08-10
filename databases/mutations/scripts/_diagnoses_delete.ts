@@ -41,7 +41,7 @@ export async function _deleteDiagnoses(
         const diagnosesArr = await db
             .select({
                 diagnosisId: diagnoses.diagnosisId,
-                scriptId: diagnoses.scriptId,
+                diagnosisScriptId: diagnoses.scriptId,
                 scriptDraftId: scriptsDrafts.scriptDraftId,
                 pendingDeletion: pendingDeletion,
             })

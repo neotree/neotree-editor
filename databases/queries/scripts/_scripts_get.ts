@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -36,9 +36,16 @@ export async function _getScripts(
         const whereScriptsDrafts = [
             ...(!whereScriptsDraftsIds ? [] : [whereScriptsDraftsIds]),
         ];
-        const drafts = !returnDraftsIfExist ? [] : await db.query.scriptsDrafts.findMany({
-            where: and(...whereScriptsDrafts),
-        });
+        const draftsRes = await db
+            .select({
+                scriptDraft: scriptsDrafts,
+                // hospitalName: hospitals.name,
+            })
+            .from(scriptsDrafts)
+            // .leftJoin(hospitals, eq(sql`${hospitals.hospitalId}::text`, sql`${scriptsDrafts.data}->>'hospitalId'`))
+            .where(and(...whereScriptsDrafts));
+
+        const drafts = draftsRes.map(s => ({ ...s.scriptDraft, }));
         scriptsIds = scriptsIds.filter(id => !drafts.map(d => d.scriptDraftId).includes(id));
 
         // published scripts conditions

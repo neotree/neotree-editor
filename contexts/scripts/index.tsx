@@ -21,6 +21,7 @@ export const ScriptsContext = createContext<IScriptsContext>(null!);
 export const useScriptsContext = () => useContext(ScriptsContext);
 
 type ScriptsContextProviderProps = typeof serverActions & {
+    hospitals: Awaited<ReturnType<typeof getHospitals>>
     getHospitals: typeof getHospitals;
 };
 
@@ -46,10 +47,7 @@ export function ScriptsContextProvider({
 
 export type ScriptFormDataType = Parameters<IScriptsContext['saveScripts']>[0]['data'][0];
 
-function useScriptsContentHook({
-    saveScripts,
-    deleteScripts,
-}: ScriptsContextProviderProps) {
+function useScriptsContentHook({}: ScriptsContextProviderProps) {
     const router = useRouter();
     const { scriptId, } = useParams();
     const { parsed: searchParams, } = useSearchParams();

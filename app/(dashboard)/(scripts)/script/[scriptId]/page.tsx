@@ -6,9 +6,9 @@ import { Tabs } from '@/components/tabs';
 import { scriptsPageTabs } from '@/constants';
 import { ScriptForm } from "../../components/script-form";
 import { PageContainer } from "../../components/page-container";
-// import Diagnoses from "../../components/diagnoses";
-// import Screens from "../../components/screens";
-// import { ScriptItemsFab } from "../../components/script-items-fab";
+import Diagnoses from "../../components/diagnoses";
+import Screens from "../../components/screens";
+import { ScriptItemsFab } from "../../components/script-items-fab";
 
 type Props = {
     params: { scriptId: string; };
@@ -50,14 +50,14 @@ export default async function Scripts({ params: { scriptId }, searchParams: { se
                         searchParamsKey="section"
                     />
 
-                    {/* {section === 'diagnoses' ? 
+                    {section === 'diagnoses' ? 
                         <Diagnoses scriptId={formData.scriptId!} /> 
                         : 
-                        <Screens scriptId={formData.scriptId!} />} */}
+                        <Screens scriptId={formData.scriptId!} />}
                 </div>
             </PageContainer>
 
-            {/* <ScriptItemsFab /> */}
+            <ScriptItemsFab />
         </>
     )
 }

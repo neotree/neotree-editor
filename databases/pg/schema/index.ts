@@ -704,7 +704,9 @@ export const pendingDeletion = pgTable(
         id: serial('id').primaryKey(),
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         screenId: uuid('screen_id').references(() => screens.screenId, { onDelete: 'cascade', }),
+        screenScriptId: uuid('screen_script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         diagnosisId: uuid('diagnosis_id').references(() => diagnoses.diagnosisId, { onDelete: 'cascade', }),
+        diagnosisScriptId: uuid('diagnosis_script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade', }),
         scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
         screenDraftId: uuid('screen_draft_id').references(() => screensDrafts.screenDraftId, { onDelete: 'cascade', }),
@@ -724,9 +726,17 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.screenId],
         references: [screens.screenId],
     }),
+    screenScript: one(scripts, {
+        fields: [pendingDeletion.screenScriptId],
+        references: [scripts.scriptId],
+    }),
     diagnosis: one(diagnoses, {
         fields: [pendingDeletion.diagnosisId],
         references: [diagnoses.diagnosisId],
+    }),
+    diagnosisScript: one(scripts, {
+        fields: [pendingDeletion.diagnosisScriptId],
+        references: [scripts.scriptId],
     }),
     configKey: one(configKeys, {
         fields: [pendingDeletion.configKeyId],
