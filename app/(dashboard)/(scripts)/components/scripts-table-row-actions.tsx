@@ -10,21 +10,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { IScriptsContext, useScriptsContext } from "@/contexts/scripts";
-import { useAppContext } from "@/contexts/app";
+import { IScriptsContext } from "@/contexts/scripts";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
-export function ScriptsTableActions({ item, onDelete, onDuplicate }: {
+export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onDelete, onDuplicate }: {
+    disabled: boolean;
     item: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'][0];
     onDelete: () => void;
     onDuplicate: () => void;
+    setScriptsIdsToExport: () => void;
 }) {
-    const { 
-        disabled,
-        setScriptsIdsToExport,
-    } = useScriptsContext();
-
-    const { viewOnly } = useAppContext();
     const [_, copyToClipboard] = useCopyToClipboard({ showValueOnToast: true, });
 
     if (!item) return null;
@@ -50,7 +45,7 @@ export function ScriptsTableActions({ item, onDelete, onDuplicate }: {
                             href={`/script/${item.scriptId}`}
                         >
                             <>
-                                {!viewOnly ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
+                                {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
                             </>
                         </Link>
                     </DropdownMenuItem>
@@ -63,7 +58,7 @@ export function ScriptsTableActions({ item, onDelete, onDuplicate }: {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => setScriptsIdsToExport([item.scriptId])}
+                        onClick={() => setScriptsIdsToExport()}
                     >
                         <Upload className="mr-2 h-4 w-4" />
                         Export

@@ -9,7 +9,6 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { UploadModal } from "@/components/upload-modal";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { useScriptsContext } from "@/contexts/scripts";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Image } from "@/components/image";
 
 export type ImageFieldProps = {
@@ -21,10 +20,10 @@ export type ImageFieldProps = {
 export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     const { confirm } = useConfirmModal();
-    const { _uploadFile } = useScriptsContext();
+    const { uploadFile } = useScriptsContext();
 
     const onUpload = useCallback(async (formData: FormData) => {
-        const { file, errors } = await _uploadFile(formData);
+        const { file, errors } = await uploadFile(formData);
         if (errors?.length) {
             throw new Error(errors.join(', '));
         } else if (file) {
@@ -38,7 +37,7 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                 contentType: file.contentType!,
             });
         }
-    }, [_uploadFile, onChange]);
+    }, [uploadFile, onChange]);
 
     const q = `${image?.data || ''}`.split('?').filter((_, i) => i).join('');
     const { width, height } = queryString.parse(q);

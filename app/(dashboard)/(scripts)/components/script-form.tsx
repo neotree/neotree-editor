@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 
@@ -24,6 +24,8 @@ import { defaultNuidSearchFields } from "@/constants/fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
+import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useAppContext } from "@/contexts/app";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
 
@@ -36,16 +38,11 @@ export function ScriptForm({
     formData, 
     hospitals,
 }: Props) {
+    const { alert } = useAlertModal();
+    const { viewOnly, isDefaultUser, } = useAppContext();
     const router = useRouter();
-
-    const { 
-        disabled, 
-        loading,
-        alert,
-        setLoading,
-        saveScripts, 
-        onCancelScriptForm 
-    } = useScriptsContext();
+    const [loading, setLoading] = useState(false);
+    const { saveScripts, onCancelScriptForm } = useScriptsContext();
 
     const getDefaultFormValues = useCallback(() => ({
         position: formData?.position || undefined,
@@ -101,6 +98,8 @@ export function ScriptForm({
 
         setLoading(false);
     });
+
+    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
 
     return (
         <>

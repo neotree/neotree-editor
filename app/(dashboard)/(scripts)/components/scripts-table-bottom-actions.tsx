@@ -4,18 +4,13 @@ import { Trash, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ActionsBar } from "@/components/actions-bar";
-import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 
-export function ScriptsTableBottomActions({ scripts, selected, onDelete }: {
+export function ScriptsTableBottomActions({ selected, setScriptsIdsToExport, onDelete }: {
     selected: number[];
-    scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'];
-    onDelete: (scriptsIds: string[]) => void;
+    onDelete: () => void;
+    setScriptsIdsToExport: () => void;
 }) {
-    const { setScriptsIdsToExport } = useScriptsContext();
-
     if (!selected.length) return null;
-
-    const scriptsIds = scripts.filter((_, i) => selected.includes(i)).map(s => s.scriptId);
 
     return (
         <>
@@ -24,7 +19,7 @@ export function ScriptsTableBottomActions({ scripts, selected, onDelete }: {
                     <Button
                         variant="destructive"
                         className="h-auto w-auto"
-                        onClick={() => onDelete(scriptsIds)}
+                        onClick={() => onDelete()}
                     >
                         <Trash className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Delete ${selected.length}` : 'Delete'}</span>
@@ -32,7 +27,7 @@ export function ScriptsTableBottomActions({ scripts, selected, onDelete }: {
 
                     <Button
                         className="h-auto w-auto"
-                        onClick={() => setScriptsIdsToExport(scriptsIds)}
+                        onClick={() => setScriptsIdsToExport()}
                     >
                         <Upload className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Export ${selected.length}` : 'Export'}</span>
