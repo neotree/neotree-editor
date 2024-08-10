@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useMemo, Fragment } from "react";
+import { useCallback, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 
@@ -68,11 +68,12 @@ export function ScreenForm({
     const {
         formIsDirty,
         saving,
+        scriptPageHref,
+        disabled,
         register,
         watch,
         setValue,
         save,
-        scriptPageHref,
     } = form;
 
     const type = watch('type');
@@ -85,8 +86,6 @@ export function ScreenForm({
     const image3 = watch('image3');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
-
-    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
 
     if (!showForm) {
         return (

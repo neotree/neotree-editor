@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { DiagnosisFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useAppContext } from "@/contexts/app";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
@@ -21,8 +22,9 @@ export function useDiagnosisForm({
 
     const { saveDiagnoses } = useScriptsContext();
     const { alert } = useAlertModal();
+    const { viewOnly } = useAppContext();
 
-    const scriptPageHref = useMemo(() => `/script/${scriptId}`, [scriptId]);
+    const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -89,11 +91,14 @@ export function useDiagnosisForm({
         }
     });
 
+    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+
     return {
         ...form,
         formIsDirty,
         saving,
         scriptPageHref,
+        disabled,
         save,
         getDefaultValues,
     }

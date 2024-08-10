@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useAppContext } from "@/contexts/app";
 
 export type UseScreenFormParams = {
     scriptId: string;
@@ -22,8 +23,9 @@ export function useScreenForm({
 
     const { saveScreens } = useScriptsContext();
     const { alert } = useAlertModal();
+    const { viewOnly } = useAppContext();
 
-    const scriptPageHref = useMemo(() => `/script/${scriptId}`, [scriptId]);
+    const scriptPageHref = useMemo(() => `/script/${scriptId}?section=screens`, [scriptId]);
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -125,11 +127,14 @@ export function useScreenForm({
         }
     });
 
+    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+
     return {
         ...form,
         formIsDirty,
         saving,
         scriptPageHref,
+        disabled,
         save,
         getDefaultValues,
     }
