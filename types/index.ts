@@ -7,6 +7,8 @@ export type ScriptItem = {
     label: string;
     position: number;
     itemId: string;
+    subType: string;
+    type: string;
 };
 
 export type ScriptField = {
