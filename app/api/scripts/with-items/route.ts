@@ -2,25 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _getScriptsWithItems } from "@/databases/queries/_scripts";
+import { _getScripts, _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
 import { parseJSON } from "@/lib/parse-json";
+import { getScriptsWithItems, saveScriptsWithItems } from "@/app/actions/scripts";
+
+export async function POST(req: NextRequest) {
+	try {
+        const isAuthorised = await isAuthenticated();
+
+        if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 500, });
+
+        const body = await req.json();
+        const scripts = body.data as Awaited<ReturnType<typeof getScriptsWithItems>>['data'];
+
+        const res = await saveScriptsWithItems({ data: scripts, });
+
+		return NextResponse.json(res, { status: res.errors?.length ? 500 : 200, });
+	} catch(e: any) {
+		logger.error('[POST] /api/scripts/with-items', e.message);
+		return NextResponse.json({ errors: ['Internal Error'] }, { status: 500, });
+	}
+}
 
 export async function GET(req: NextRequest) {
 	try {
         const isAuthorised = await isAuthenticated();
 
-        if (!isAuthorised.yes) return new NextResponse('Unauthorised', { status: 500, });
+        if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 500, });
 
         const scriptsIdsJSON = req.nextUrl.searchParams.get('scriptsIds');
         const scriptsIds = !scriptsIdsJSON ? [] : (parseJSON<string[]>(scriptsIdsJSON) || []);
 
-        const data = await _getScriptsWithItems({
-            scriptsIds,
-        });
+        const { errors, data } = await getScriptsWithItems({ scriptsIds, });
 
-		return NextResponse.json(data);
-	} catch(e) {
-		logger.error('[GET] /api/scripts/with-items', e);
-		return new NextResponse('Internal Error', { status: 500, });
+        if (errors?.length) return NextResponse.json({ errors, }, { status: 500, });
+
+		return NextResponse.json({ data, }, { status: 200, });
+	} catch(e: any) {
+		logger.error('[GET] /api/scripts/with-items', e.message);
+		return NextResponse.json({ errors: ['Internal Error'] }, { status: 500, });
 	}
 }
