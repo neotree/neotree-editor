@@ -33,12 +33,15 @@ import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
 import { Separator } from "@/components/ui/separator";
+import edlizSummaryData from "@/constants/edliz-summary-table";
+import { ScriptItem } from "@/types";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { getScreenDataType } from "../../utils";
 import { ImageField } from "../image-field";
 import { Fields } from "./fields";
 import { Items } from "./items";
+import { EdlizSummary } from "./edliz-summary";
 
 type Props = {
     scriptId: string;
@@ -95,7 +98,15 @@ export function ScreenForm({
                         <RadioGroup
                             disabled={disabled}
                             defaultValue={type}
-                            onValueChange={value => setValue('type', value as typeof type, { shouldDirty: true, })}
+                            onValueChange={value => {
+                                setValue('type', value as typeof type, { shouldDirty: true, });
+                                setValue('items', [], { shouldDirty: true, });
+                                if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
+                                    const items = edlizSummaryData[value] as ScriptItem[]; 
+                                    console.log(items);
+                                    setValue('items', items, { shouldDirty: true, });
+                                }
+                            }}
                             className="flex flex-col gap-y-4"
                         >
                             {screenTypes.map(t => {
@@ -192,6 +203,10 @@ export function ScreenForm({
                         onValueChange={v => {
                             const value = (v || screenTypes[0].value) as typeof type;
                             setValue('type', value, { shouldDirty: true, });
+                            setValue('items', [], { shouldDirty: true, });
+                            if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
+                                setValue('items', [], { shouldDirty: true, });
+                            }
                         }}
                     >
                         <SelectTrigger>
@@ -662,6 +677,13 @@ export function ScreenForm({
                     Save Draft
                 </Button>
             </div>
+
+            {isEdlizScreen && (
+                <EdlizSummary 
+                    form={form}
+                    disabled={disabled}
+                />
+            )}
 
             {isFormScreen && (
                 <>

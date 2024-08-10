@@ -1,4 +1,4 @@
-export default {
+const edlizSummaryData = {
     zw_edliz_summary_table: [
         {
             label: 'Confirmed sepsis or chorioamnionitis in mother',
@@ -262,3 +262,5 @@ export default {
         },
     ],
 };
+
+export default edlizSummaryData;
