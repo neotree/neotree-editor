@@ -72,7 +72,9 @@ function SessionFormSidebarComponent({ script, diagnoses, screens, }: Props) {
                 className="flex flex-col gap-y-4"
             >
                 <div className="flex flex-col gap-y-1 mt-4 px-4 text-sm">
-                    <div>Script: <b>{script.data?.title}</b></div>
+                    <div>Script ID: <b>{script.data?.oldScriptId || script.data?.scriptId}</b></div>
+                    <div>Script Title: <b>{script.data?.title}</b></div>
+                    <div>Script Version: <b>{script.data?.version}</b></div>
                     <div>Hospital: <b>{script.data?.hospitalName}</b></div>
                 </div>
 
