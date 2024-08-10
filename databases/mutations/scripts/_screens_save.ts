@@ -3,7 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import { screens, screensDrafts } from '@/databases/pg/schema';
+import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 
@@ -77,21 +77,30 @@ export async function _saveScreens({ data, broadcastAction, }: {
 
                         if (data.scriptId) {
                             const scriptDraft = await db.query.scriptsDrafts.findFirst({
-                                where: eq(screensDrafts.scriptDraftId, data.scriptId),
+                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
                                 columns: { scriptDraftId: true, },
                             });
 
-                            await db.insert(screensDrafts).values({
-                                data,
-                                type: data.type,
-                                scriptId: data.scriptId,
-                                scriptDraftId: scriptDraft?.scriptDraftId,
-                                screenDraftId: screenId,
-                                position: data.position,
-                                screenId: published?.screenId,
+                            const publishedScript = await db.query.scripts.findFirst({
+                                where: eq(scripts.scriptId, data.scriptId),
+                                columns: { scriptId: true, },
                             });
+
+                            if (scriptDraft || publishedScript) {
+                                await db.insert(screensDrafts).values({
+                                    data,
+                                    type: data.type,
+                                    scriptId: publishedScript?.scriptId,
+                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    screenDraftId: screenId,
+                                    position: data.position,
+                                    screenId: published?.screenId,
+                                });
+                            } else {
+                                errors.push(`Could not save screen ${index}: ${data.title}, because script was not found`);
+                            }
                         } else {
-                            errors.push(`Could not save item ${index}: ${data.title}, because scriptId was not specified`);
+                            errors.push(`Could not save screen ${index}: ${data.title}, because scriptId was not specified`);
                         }
                     }
                 }
