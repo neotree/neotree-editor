@@ -1,10 +1,9 @@
 import { and, inArray } from "drizzle-orm";
-import { getHeaders } from "@/lib/header";
 
 import db from "@/databases/pg/drizzle";
 import { sites } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { v4 } from "uuid";
+import getLocalSites from "./local-sites";
 
 export type SiteType = {
     name: typeof sites.$inferSelect['name'];
@@ -40,26 +39,15 @@ export async function _getSites(params?: GetSitesParams): Promise<GetSitesResult
             },
         });
 
-        const headers = getHeaders();
-
+        const localSites = getLocalSites();
         const devSites = [];
         if (process.env.NODE_ENV !== 'production') {
             if (types.includes('webeditor')) {
-                devSites.push({
-                    name: 'Local editor',
-                    siteId: v4(),
-                    link: headers.origin,
-                    type: 'webeditor',
-                });
+                devSites.push(localSites.webeditor);
             }
 
             if (types.includes('nodeapi')) {
-                devSites.push({
-                    name: 'Local nodeapi',
-                    siteId: v4(),
-                    link: headers.origin,
-                    type: 'nodeapi',
-                });
+                devSites.push(localSites.nodeapi);
             }
         }
 
