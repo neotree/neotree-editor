@@ -135,7 +135,7 @@ export async function _getDiagnosis(
         const whereDiagnosisDraftId = !whereDiagnosisId ? undefined : eq(diagnosesDrafts.diagnosisDraftId, diagnosisId);
 
         let draft = (returnDraftIfExists && whereDiagnosisDraftId) ? await db.query.diagnosesDrafts.findFirst({
-            where: whereDiagnosisId,
+            where: whereDiagnosisDraftId,
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -153,11 +153,11 @@ export async function _getDiagnosis(
             })
             .from(diagnoses)
             .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
-            .leftJoin(diagnosesDrafts, eq(diagnosesDrafts.diagnosisId, diagnosesDrafts.diagnosisId))
+            .leftJoin(diagnosesDrafts, eq(diagnoses.diagnosisId, diagnosesDrafts.diagnosisDraftId))
             .where(and(
                 isNull(diagnoses.deletedAt),
                 isNull(pendingDeletion),
-                whereDiagnosisId || whereOldDiagnosisId,
+                or(whereDiagnosisId, whereOldDiagnosisId)
             ));
 
         const published = !publishedRes[0] ? null : {

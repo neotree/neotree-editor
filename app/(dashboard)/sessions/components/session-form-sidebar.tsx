@@ -18,7 +18,6 @@ type Props = {
 };
 
 export function SessionFormSidebar(props: Props) {
-    console.log(props);
     return (
         <>
             <div 

@@ -132,7 +132,7 @@ export async function _getScript(
         const whereScriptDraftId = !whereScriptId ? undefined : eq(scriptsDrafts.scriptDraftId, scriptId);
 
         let draft = (returnDraftIfExists && whereScriptDraftId) ? await db.query.scriptsDrafts.findFirst({
-            where: whereScriptId,
+            where: whereScriptDraftId,
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -152,11 +152,11 @@ export async function _getScript(
             .from(scripts)
             .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
             .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
-            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scriptsDrafts.scriptId))
+            .leftJoin(scriptsDrafts, eq(scripts.scriptId, scriptsDrafts.scriptDraftId))
             .where(and(
                 isNull(scripts.deletedAt),
                 isNull(pendingDeletion),
-                whereScriptId || whereOldScriptId,
+                or(whereScriptId, whereOldScriptId),
             ));
 
         const published = !publishedRes[0] ? null : {

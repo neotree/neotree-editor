@@ -14,11 +14,10 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,16 +121,14 @@ export function ScreenForm({
                                         >{t.label}</Label>
 
                                         {!!helperText && (
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                <TooltipTrigger>
+                                            <Popover>
+                                                <PopoverTrigger>
                                                     <Info className="text-primary h-4 w-4" />
-                                                </TooltipTrigger>
-                                                <TooltipContent className="max-w-[200px] bg-primary text-primary-foreground">
+                                                </PopoverTrigger>
+                                                <PopoverContent className="max-w-[200px] bg-primary text-primary-foreground">
                                                     <div dangerouslySetInnerHTML={{ __html: helperText }} />
-                                                </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
+                                                </PopoverContent>
+                                            </Popover>
                                         )}
                                     </div>
                                 );

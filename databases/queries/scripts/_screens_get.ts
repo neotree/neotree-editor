@@ -137,7 +137,7 @@ export async function _getScreen(
         const whereScreenDraftId = !whereScreenId ? undefined : eq(screensDrafts.screenDraftId, screenId);
 
         let draft = (returnDraftIfExists && whereScreenDraftId) ? await db.query.screensDrafts.findFirst({
-            where: whereScreenId,
+            where: whereScreenDraftId,
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -155,11 +155,11 @@ export async function _getScreen(
             })
             .from(screens)
             .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
-            .leftJoin(screensDrafts, eq(screensDrafts.screenId, screensDrafts.screenId))
+            .leftJoin(screensDrafts, eq(screens.screenId, screensDrafts.screenDraftId))
             .where(and(
                 isNull(screens.deletedAt),
                 isNull(pendingDeletion),
-                whereScreenId || whereOldScreenId,
+                or(whereScreenId, whereOldScreenId),
             ));
 
         const published = !publishedRes[0] ? null : {
