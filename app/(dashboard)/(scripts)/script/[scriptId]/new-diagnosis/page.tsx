@@ -21,7 +21,7 @@ export default async function NewDiagnosisPage({ params: { scriptId, } }: Props)
             <Alert 
                 title="Error"
                 message="Script was not found or it might have been deleted!"
-                redirectTo={`/script/${scriptId}`}
+                redirectTo={`/script/${scriptId}?section=diagnoses`}
             />
         );
     }
