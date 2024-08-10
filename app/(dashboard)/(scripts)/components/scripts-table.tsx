@@ -1,13 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Edit } from "lucide-react";
 
-import { useConfirmModal } from "@/hooks/use-confirm-modal";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataTable } from "@/components/data-table";
-import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
+import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
@@ -15,98 +11,27 @@ import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
+import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 
+type Props = UseScriptsTableParams;
 
-type Props = {
-    scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>;
-};
-
-export function ScriptsTable({
-    scripts: scriptsProp,
-}: Props) {
-    const [scripts, setScripts] = useState(scriptsProp);
-    const [selected, setSelected] = useState<number[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [scriptsIdsToExport, setScriptsIdsToExport] = useState<string[]>([]);
-
-    useEffect(() => { setScripts(scriptsProp); }, [scriptsProp]);
-
-    const router = useRouter();
-    const { sys, viewOnly, isDefaultUser } = useAppContext();
-    const { confirm } = useConfirmModal();
-    const { alert } = useAlertModal();
-
+export function ScriptsTable(props: Props) {
     const {
-        hospitals,
-        deleteScripts,
-        saveScripts,
-    } = useScriptsContext();
+        scripts,
+        selected,
+        loading,
+        scriptsIdsToExport,
+        disabled,
+        scriptsToExport,
+        setSelected,
+        setScriptsIdsToExport,
+        onDelete,
+        onSort,
+        onDuplicate,
+    } = useScriptsTable(props);
 
-    const onDelete = useCallback(async (scriptsIds: string[]) => {
-        confirm(async () => {
-            const _scripts = { ...scripts };
-
-            setScripts(prev => ({ ...prev, data: prev.data.filter(s => !scriptsIds.includes(s.scriptId)) }));
-            setSelected([]);
-
-            setLoading(true);
-
-            const res = await deleteScripts({ scriptsIds, broadcastAction: true, });
-
-            if (res.errors?.length) {
-                alert({
-                    title: 'Error',
-                    message: res.errors.join(', '),
-                    variant: 'error',
-                    onClose: () => setScripts(_scripts),
-                });
-            } else {
-                setSelected([]);
-                router.refresh();
-                alert({
-                    title: 'Success',
-                    message: 'Scripts deleted successfully!',
-                    variant: 'success',
-                });
-            }
-
-            setLoading(false);
-        }, {
-            danger: true,
-            title: 'Delete scripts',
-            message: 'Are you sure you want to delete scripts?',
-            positiveLabel: 'Yes, delete',
-        });
-    }, [deleteScripts, confirm, alert, router, scripts]);
-
-    const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
-        const payload: { scriptId: string; position: number; }[] = [];
-        const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
-            const s = scripts.data[oldIndex];
-            let position = s.position;
-            if (oldIndex !== newIndex) {
-                position = newIndex + 1;
-                payload.push({ scriptId: s.scriptId, position, });
-            }
-            return {
-                ...s,
-                position,
-            };
-        }).sort((a, b) => a.position - b.position);
-
-        setScripts(prev => ({ ...prev, data: sorted, }));
-        
-        await saveScripts({ data: payload, broadcastAction: true, });
-
-        router.refresh();
-    }, [saveScripts, alert, scripts, router]);
-
-    const onDuplicate = useCallback(async (scriptsIds?: string[]) => {
-        window.alert('DUPLICATE SCRIPT!!!');
-    }, []);
-
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
-    const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
+    const { sys, viewOnly } = useAppContext();
+    const { hospitals, } = useScriptsContext();
 
     return (
         <>

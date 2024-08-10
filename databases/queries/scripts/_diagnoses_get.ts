@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { diagnoses, diagnosesDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { DiagnosisSymptom, ScriptImage } from "@/types";
 
 export type GetDiagnosesParams = {
     diagnosesIds?: string[];
@@ -11,10 +12,16 @@ export type GetDiagnosesParams = {
     returnDraftsIfExist?: boolean;
 };
 
+export type DiagnosisType = typeof diagnoses.$inferSelect & {
+    isDraft: boolean;
+    symptoms: DiagnosisSymptom[];
+    image1: null | ScriptImage;
+    image2: null | ScriptImage;
+    image3: null | ScriptImage;
+};
+
 export type GetDiagnosesResults = {
-    data: (typeof diagnoses.$inferSelect & {
-        isDraft: boolean;
-    })[];
+    data: DiagnosisType[];
     errors?: string[];
 };
 
@@ -108,9 +115,7 @@ export async function _getDiagnoses(
 }
 
 export type GetDiagnosisResults = {
-    data?: null | typeof diagnoses.$inferSelect & {
-        isDraft: boolean;
-    };
+    data?: null | DiagnosisType;
     errors?: string[];
 };
 

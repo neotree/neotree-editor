@@ -11,12 +11,14 @@ export type GetScriptsParams = {
     returnDraftsIfExist?: boolean;
 };
 
+export type ScriptType = typeof scripts.$inferSelect & {
+    isDraft: boolean;
+    nuidSearchFields: ScriptField[];
+    hospitalName: string;
+};
+
 export type GetScriptsResults = {
-    data: (typeof scripts.$inferSelect & {
-        isDraft: boolean;
-        nuidSearchFields: ScriptField[];
-        hospitalName: string;
-    })[];
+    data: ScriptType[];
     errors?: string[];
 };
 
@@ -110,11 +112,7 @@ export async function _getScripts(
 }
 
 export type GetScriptResults = {
-    data?: null | typeof scripts.$inferSelect & {
-        isDraft: boolean;
-        nuidSearchFields: ScriptField[];
-        hospitalName: string;
-    };
+    data?: null | ScriptType;
     errors?: string[];
 };
 

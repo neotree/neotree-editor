@@ -1,17 +1,22 @@
 import { Title } from "@/components/title";
-import { getFullScriptDraft } from "@/app/actions/_scripts-drafts";
-import { getScriptWithDraft, countScriptsItems } from "@/app/actions/_scripts";
-import { ScreenForm } from "../../../components/screens/screen-form";
-import { PageContainer } from "../../../components/page-container";
+import { countScreens, getScript } from "@/app/actions/scripts";
 import { Alert } from "@/components/alert";
+import { ScreenForm } from "../../../components/screens/form";
+import { PageContainer } from "../../../components/page-container";
 
 type Props = {
     params: { scriptId: string };
     searchParams: { [key: string]: string; };
 };
 
-export default async function NewScreens({ params: { scriptId, } }: Props) {
-    const countDiagnosesScreens = await countScriptsItems('screens', { scriptsIds: [scriptId], itemsTypes: ['diagnosis'] });
+export default async function NewScreenPage({ params: { scriptId, } }: Props) {
+    const [
+        script,
+        countDiagnosesScreens,
+    ] = await Promise.all([
+        getScript({ scriptId, returnDraftIfExists: true, }),
+        countScreens({ types: ['diagnosis'], scriptsIds: [scriptId], }),
+    ]);
 
     if (countDiagnosesScreens?.errors?.length) {
         return (
@@ -23,8 +28,15 @@ export default async function NewScreens({ params: { scriptId, } }: Props) {
         );
     }
 
-    const script = await getScriptWithDraft(scriptId);
-    const scriptDraft = script?.draft || await getFullScriptDraft(scriptId);
+    if (!script.data) {
+        return (
+            <Alert 
+                title="Error"
+                message="Script was not found or it might have been deleted!"
+                redirectTo={`/script/${scriptId}`}
+            />
+        );
+    }
 
     return (
         <>
@@ -35,10 +47,8 @@ export default async function NewScreens({ params: { scriptId, } }: Props) {
                 backLink={`/script/${scriptId}?section=screens`}
             >
                 <ScreenForm 
-                    scriptId={scriptDraft ? scriptDraft?.scriptId! : scriptId}
-                    scriptDraftId={scriptDraft?.scriptId!}
-                    draftVersion={1} 
-                    countDiagnosesScreens={countDiagnosesScreens?.data[0]?.total}
+                    scriptId={scriptId} 
+                    countDiagnosesScreens={countDiagnosesScreens.data.allPublished || countDiagnosesScreens.data.allDrafts}
                 />
             </PageContainer>
         </>

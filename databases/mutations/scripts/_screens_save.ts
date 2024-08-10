@@ -5,10 +5,9 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { screens, screensDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { ScreenType } from '../../queries/scripts/_screens_get';
 
-export type SaveScreensData = Partial<typeof screens.$inferSelect & {
-    
-}>;
+export type SaveScreensData = Partial<ScreenType>;
 
 export type SaveScreensResponse = { 
     success: boolean; 

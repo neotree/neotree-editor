@@ -1,10 +1,7 @@
-import { getFullScreenDraft } from "@/app/actions/_screens-drafts";
-import { getScreenWithDraft } from "@/app/actions/_screens";
+import { getScreen, getScript } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
-import { getScriptWithDraft } from "@/app/actions/_scripts";
-import { getScriptDraft } from "@/app/actions/_scripts-drafts";
-import { ScreenForm } from "../../../../components/screens/screen-form";
+import { ScreenForm } from "../../../../components/screens/form";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
@@ -13,15 +10,12 @@ type Props = {
 };
 
 export default async function Screens({ params: { screenId, scriptId } }: Props) {
-    const screen = await getScreenWithDraft(screenId);
-    const screenDraft = screen?.draft || await getFullScreenDraft(screenId);
+    const [screen, script] = await Promise.all([
+        getScreen({ screenId, returnDraftIfExists: true, }),
+        getScript({ scriptId, returnDraftIfExists: true, }),
+    ]);
 
-    const script = await getScriptWithDraft(scriptId);
-    const scriptDraft = script?.draft || await getScriptDraft(scriptId);
-
-    const formData = screen?.draft?.data || screenDraft?.data || screen;
-
-    if (!script && !scriptDraft) {
+    if (!script.data) {
         return (
             <Alert 
                 title="Error"
@@ -31,7 +25,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
         );
     }
 
-    if (!formData) {
+    if (!screen.data) {
         return (
             <Alert 
                 title="Not found"
@@ -43,7 +37,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
 
     return (
         <>
-            <Title>{'Edit screen - ' + formData?.title}</Title>
+            <Title>{'Edit screen - ' + screen.data.title}</Title>
 
             <PageContainer
                 title="Edit screen"
@@ -51,11 +45,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
             >
                 <ScreenForm 
                     scriptId={scriptId}
-                    scriptDraftId={script?.draft?.scriptId || undefined}
-                    screenId={screenId}
-                    screenDraftId={screenDraft?.screenDraftId}
-                    formData={formData} 
-                    draftVersion={screen?.draft?.data?.version || (screen?.version! + 1)}
+                    formData={screen.data} 
                 />
             </PageContainer>
         </>

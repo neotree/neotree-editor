@@ -1,18 +1,30 @@
 import { Title } from "@/components/title";
-import { getFullScriptDraft } from "@/app/actions/_scripts-drafts";
-import { getScriptWithDraft, countScriptsItems } from "@/app/actions/_scripts";
-import { DiagnosisForm } from "../../../components/diagnoses/diagnosis-form";
-import { PageContainer } from "../../../components/page-container";
+import { getScript } from "@/app/actions/scripts";
 import { Alert } from "@/components/alert";
+import { DiagnosisForm } from "../../../components/diagnoses/form";
+import { PageContainer } from "../../../components/page-container";
 
 type Props = {
     params: { scriptId: string };
     searchParams: { [key: string]: string; };
 };
 
-export default async function NewDiagnoses({ params: { scriptId, } }: Props) {
-    const script = await getScriptWithDraft(scriptId);
-    const scriptDraft = script?.draft || await getFullScriptDraft(scriptId);
+export default async function NewDiagnosisPage({ params: { scriptId, } }: Props) {
+    const [
+        script,
+    ] = await Promise.all([
+        getScript({ scriptId, returnDraftIfExists: true, }),
+    ]);
+
+    if (!script.data) {
+        return (
+            <Alert 
+                title="Error"
+                message="Script was not found or it might have been deleted!"
+                redirectTo={`/script/${scriptId}`}
+            />
+        );
+    }
 
     return (
         <>
@@ -22,11 +34,7 @@ export default async function NewDiagnoses({ params: { scriptId, } }: Props) {
                 title="New diagnosis"
                 backLink={`/script/${scriptId}?section=diagnoses`}
             >
-                <DiagnosisForm 
-                    scriptId={scriptDraft ? scriptDraft?.scriptId! : scriptId}
-                    scriptDraftId={scriptDraft?.scriptId!}
-                    draftVersion={1} 
-                />
+                <DiagnosisForm scriptId={scriptId} />
             </PageContainer>
         </>
     )

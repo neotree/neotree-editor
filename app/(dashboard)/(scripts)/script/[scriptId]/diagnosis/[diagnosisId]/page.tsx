@@ -1,10 +1,7 @@
-import { getFullDiagnosisDraft } from "@/app/actions/_diagnoses-drafts";
-import { getDiagnosisWithDraft } from "@/app/actions/_diagnoses";
+import { getDiagnosis, getScript } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
-import { getScriptWithDraft } from "@/app/actions/_scripts";
-import { getScriptDraft } from "@/app/actions/_scripts-drafts";
-import { DiagnosisForm } from "../../../../components/diagnoses/diagnosis-form";
+import { DiagnosisForm } from "../../../../components/diagnoses/form";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
@@ -13,15 +10,12 @@ type Props = {
 };
 
 export default async function Diagnoses({ params: { diagnosisId, scriptId } }: Props) {
-    const diagnosis = await getDiagnosisWithDraft(diagnosisId);
-    const diagnosisDraft = diagnosis?.draft || await getFullDiagnosisDraft(diagnosisId);
+    const [diagnosis, script] = await Promise.all([
+        getDiagnosis({ diagnosisId, returnDraftIfExists: true, }),
+        getScript({ scriptId, returnDraftIfExists: true, }),
+    ]);
 
-    const script = await getScriptWithDraft(scriptId);
-    const scriptDraft = script?.draft || await getScriptDraft(scriptId);
-
-    const formData = diagnosis?.draft?.data || diagnosisDraft?.data || diagnosis;
-
-    if (!script && !scriptDraft) {
+    if (!script.data) {
         return (
             <Alert 
                 title="Error"
@@ -31,7 +25,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
         );
     }
 
-    if (!formData) {
+    if (!diagnosis.data) {
         return (
             <Alert 
                 title="Not found"
@@ -43,7 +37,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
 
     return (
         <>
-            <Title>{'Edit diagnosis - ' + formData?.name}</Title>
+            <Title>{'Edit diagnosis - ' + diagnosis.data.name}</Title>
 
             <PageContainer
                 title="Edit diagnosis"
@@ -51,11 +45,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
             >
                 <DiagnosisForm 
                     scriptId={scriptId}
-                    scriptDraftId={script?.draft?.scriptId || undefined}
-                    diagnosisId={diagnosisId}
-                    diagnosisDraftId={diagnosisDraft?.diagnosisDraftId}
-                    formData={formData} 
-                    draftVersion={diagnosis?.draft?.data?.version || (diagnosis?.version! + 1)}
+                    formData={diagnosis.data} 
                 />
             </PageContainer>
         </>
