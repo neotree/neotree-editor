@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { Settings, Trash, MoreVertical, Edit2 } from "lucide-react";
+import { Settings, Trash, MoreVertical, Edit2, Plus } from "lucide-react";
 
 import {
     Sheet,
@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
+import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 
 type Props = {
     disabled?: boolean;
@@ -41,6 +42,7 @@ export function NuidSearchFieldsConfig({
     form: {
         watch,
         setValue,
+        getDefaultNuidSearchFields,
     },
 }: Props) {
     const fields = watch('nuidSearchFields');
@@ -48,6 +50,7 @@ export function NuidSearchFieldsConfig({
     
     const [selectedField, setSelectedField] = useState<{ index: number; field: ScriptField; }>();
     const [_nuidSearchEnabled, _setNuidSearchEnabled] = useState(nuidSearchEnabled);
+    const [selectedNewFieldType, setSelectedNewFieldType] = useState<typeof fields[0]['type']>();
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
@@ -77,6 +80,7 @@ export function NuidSearchFieldsConfig({
                 <Field 
                     open
                     field={selectedField?.field}
+                    fieldType={selectedField?.field?.type!}
                     onClose={() => setSelectedField(undefined)}
                     onChange={field => {
                         setValue(
@@ -88,6 +92,25 @@ export function NuidSearchFieldsConfig({
                             { shouldDirty: true, }
                         );
                         setSelectedField(undefined);
+                    }}
+                />
+            )}
+
+            {!!selectedNewFieldType && (
+                <Field 
+                    open
+                    fieldType={selectedNewFieldType}
+                    onClose={() => setSelectedNewFieldType(undefined)}
+                    onChange={field => {
+                        setValue(
+                            'nuidSearchFields',
+                            [...fields, {
+                                ...field,
+                                type: selectedNewFieldType,
+                            }],
+                            { shouldDirty: true, }
+                        );
+                        setSelectedNewFieldType(undefined);
                     }}
                 />
             )}
@@ -126,6 +149,37 @@ export function NuidSearchFieldsConfig({
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
                         <DataTable 
                             title="Fields"
+                            sortable
+                            headerActions={(
+                                <>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button 
+                                                variant="ghost" 
+                                                disabled={disabled}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add field
+                                            </Button>
+                                        </DropdownMenuTrigger>
+
+                                        <DropdownMenuContent>
+                                            <DropdownMenuItem 
+                                                className="focus:text-primary focus:bg-primary/20"
+                                                onClick={() => setSelectedNewFieldType('dropdown')}
+                                            >
+                                                Yes/No
+                                            </DropdownMenuItem>
+
+                                            <DropdownMenuItem
+                                                onClick={() => setSelectedNewFieldType('text')}
+                                            >
+                                                NUID Search
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </>
+                            )}
                             columns={[
                                 {
                                     name: 'Type'
@@ -221,24 +275,32 @@ export function NuidSearchFieldsConfig({
 export function Field({ 
     open,
     field,
+    fieldType,
     onChange,
     onClose,
 }: {
     open: boolean;
     field?: ScriptField;
+    fieldType: ScriptField['type'];
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { getDefaultValues } = useField(field);
+    const { getDefaultValues } = useField({ ...field, type: fieldType, } as ScriptField);
 
     const {
+        watch,
         register,
         handleSubmit,
     } = useForm({
         defaultValues: getDefaultValues(),
     });
 
+    const type = watch('type');
+    const values = watch('values');
+
     const onSave = handleSubmit(onChange);
+
+    const valuesErrors = useMemo(() => type === 'dropdown' ? validateDropdownValues(values) : [], [values, type]);
 
     return (
         <>
@@ -264,6 +326,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
+                            disabled={!!valuesErrors.length}
                         >
                             Save
                         </Button>
@@ -292,13 +355,16 @@ export function Field({
                         />
                     </div>
 
-                    <div>
-                        <Label htmlFor="values">Options *</Label>
-                        <Textarea 
-                            {...register('values', { required: true, })}
-                            rows={5}
-                        />
-                    </div>
+                    {type === 'dropdown' && (
+                        <div>
+                            <Label htmlFor="values">Options *</Label>
+                            <Textarea 
+                                {...register('values', { required: true, })}
+                                rows={5}
+                            />
+                            {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </>
