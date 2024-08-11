@@ -18,6 +18,7 @@ export function useScreensTable({
     const [screens, setScreens] = useState(screensParam);
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
+    const [screensIdsToCopy, setScreensIdsToCopy] = useState<string[]>([]);
 
     useEffect(() => { setScreens(screensParam); }, [screensParam]);
 
@@ -87,10 +88,6 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, alert, screens, router]);
 
-    const onCopy = useCallback(async (screensIds: string[]) => {
-        window.alert('DUPLICATE SCRIPT!!!');
-    }, []);
-
     const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
 
     return {
@@ -98,9 +95,10 @@ export function useScreensTable({
         loading,
         selected,
         disabled,
+        screensIdsToCopy, 
+        setScreensIdsToCopy,
         onDelete,
         onSort,
-        onCopy,
         setScreens,
         setLoading,
         setSelected,

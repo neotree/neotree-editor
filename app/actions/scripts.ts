@@ -183,7 +183,10 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
 	}
 }
 
-export async function saveScriptScreens({ screens, scriptId, }: {
+export async function saveScriptScreens({ 
+    screens, 
+    scriptId, 
+}: {
     scriptId: string;
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
 }): Promise<{ 
@@ -194,6 +197,10 @@ export async function saveScriptScreens({ screens, scriptId, }: {
     try {
         let saved = 0;
         const errors: string[] = [];
+
+        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+        if (script.errors?.length) throw new Error(script.errors.join(', '));
+        if (!script.data) throw new Error('Script not found');
 
         for (const screen of screens) {
             const { 
@@ -218,6 +225,7 @@ export async function saveScriptScreens({ screens, scriptId, }: {
                 data: [{
                     ...s,
                     scriptId,
+                    oldScriptId: script.data.oldScriptId,
                     screenId,
                     version: 1,
                 }],
@@ -237,7 +245,10 @@ export async function saveScriptScreens({ screens, scriptId, }: {
     }
 }
 
-export async function saveScriptDiagnoses({ diagnoses, scriptId, }: {
+export async function saveScriptDiagnoses({ 
+    diagnoses, 
+    scriptId, 
+}: {
     scriptId: string;
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
 }): Promise<{ 
@@ -249,6 +260,10 @@ export async function saveScriptDiagnoses({ diagnoses, scriptId, }: {
         let saved = 0;
         const errors: string[] = [];
 
+        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+        if (script.errors?.length) throw new Error(script.errors.join(', '));
+        if (!script.data) throw new Error('Script not found');
+
         for (const diagnosis of diagnoses) {
             const { 
                 id,
@@ -258,7 +273,6 @@ export async function saveScriptDiagnoses({ diagnoses, scriptId, }: {
                 isDraft,
                 deletedAt,
                 version,
-                oldScriptId,
                 oldDiagnosisId,
                 diagnosisId: _ignoreDiagnosisId,
                 scriptId: _ignoreScriptId,
@@ -272,6 +286,7 @@ export async function saveScriptDiagnoses({ diagnoses, scriptId, }: {
                 data: [{
                     ...d,
                     scriptId,
+                    oldScriptId: script.data.oldScriptId,
                     diagnosisId,
                     version: 1,
                 }],
@@ -467,5 +482,125 @@ export async function copyScripts(params?: {
     } catch(e: any) {
         logger.log('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
         return { errors: e.response?.data?.errors || [e.message], success: false, info, };
+    }
+}
+
+export async function copyScreens(params?: {
+    screensIds?: string[];
+    fromScriptsIds?: string[];
+    toScriptsIds?: string[];
+    confirmCopyAll?: boolean;
+    broadcastAction?: boolean;
+}): Promise<{ success: boolean; errors?: string[]; copied: number; }> {
+    let copied = 0;
+    const {
+        screensIds = [],
+        fromScriptsIds = [],
+        toScriptsIds = [],
+        confirmCopyAll,
+        broadcastAction,
+    } = { ...params };
+
+    try {
+        const errors: string[] = [];
+
+        const shouldConfirmCopyingAll = !fromScriptsIds.length && !screensIds.length;
+
+        if (shouldConfirmCopyingAll && !confirmCopyAll) throw new Error('You&apos;re about to copy all the screens, please confirm this action!');
+
+        const screens = await queries._getScreens({ scriptsIds: fromScriptsIds, screensIds, });
+        if (screens.errors?.length) throw new Error(screens.errors.join(', '));
+
+        if (!toScriptsIds.length) {
+            const screensGroupedByScriptId = screens.data.reduce((acc, s) => ({
+                ...acc,
+                [s.scriptId]: [...(acc[s.scriptId] || []), s],
+            }), {} as { [key: string]: typeof screens.data; })
+    
+            for (const scriptId of Object.keys(screensGroupedByScriptId)) {
+                const res = await saveScriptScreens({ scriptId, screens: screensGroupedByScriptId[scriptId], });
+                res.errors?.forEach(e => errors.push(e));
+                if (errors.length) continue;
+                copied += res.saved;
+            }
+        } else {
+            for (const scriptId of toScriptsIds) {
+                const res = await saveScriptScreens({ scriptId, screens: screens.data, });
+                res.errors?.forEach(e => errors.push(e));
+                if (errors.length) continue;
+                copied++;
+            }
+        }
+
+        if (broadcastAction && !errors.length) socket.emit('data_changed', 'copy_scripts');
+
+        return { 
+            copied,
+            success: !errors.length, 
+            errors: errors.length ? errors : undefined, 
+        };
+    } catch(e: any) {
+        logger.log('copyScreens ERROR', e.message);
+        return { errors: [e.message], success: false, copied, };
+    }
+}
+
+export async function copyDiagnoses(params?: {
+    diagnosesIds?: string[];
+    fromScriptsIds?: string[];
+    toScriptsIds?: string[];
+    confirmCopyAll?: boolean;
+    broadcastAction?: boolean;
+}): Promise<{ success: boolean; errors?: string[]; copied: number; }> {
+    let copied = 0;
+    const {
+        diagnosesIds = [],
+        fromScriptsIds = [],
+        toScriptsIds = [],
+        confirmCopyAll,
+        broadcastAction,
+    } = { ...params };
+
+    try {
+        const errors: string[] = [];
+
+        const shouldConfirmCopyingAll = !fromScriptsIds.length && !diagnosesIds.length;
+
+        if (shouldConfirmCopyingAll && !confirmCopyAll) throw new Error('You&apos;re about to copy all the diagnoses, please confirm this action!');
+
+        const diagnoses = await queries._getDiagnoses({ scriptsIds: fromScriptsIds, diagnosesIds, });
+        if (diagnoses.errors?.length) throw new Error(diagnoses.errors.join(', '));
+
+        if (!toScriptsIds.length) {
+            const diagnosesGroupedByScriptId = diagnoses.data.reduce((acc, s) => ({
+                ...acc,
+                [s.scriptId]: [...(acc[s.scriptId] || []), s],
+            }), {} as { [key: string]: typeof diagnoses.data; })
+    
+            for (const scriptId of Object.keys(diagnosesGroupedByScriptId)) {
+                const res = await saveScriptDiagnoses({ scriptId, diagnoses: diagnosesGroupedByScriptId[scriptId], });
+                res.errors?.forEach(e => errors.push(e));
+                if (errors.length) continue;
+                copied += res.saved;
+            }
+        } else {
+            for (const scriptId of toScriptsIds) {
+                const res = await saveScriptDiagnoses({ scriptId, diagnoses: diagnoses.data, });
+                res.errors?.forEach(e => errors.push(e));
+                if (errors.length) continue;
+                copied++;
+            }
+        }
+
+        if (broadcastAction && !errors.length) socket.emit('data_changed', 'copy_scripts');
+
+        return { 
+            copied,
+            success: !errors.length, 
+            errors: errors.length ? errors : undefined, 
+        };
+    } catch(e: any) {
+        logger.log('copyDiagnoses ERROR', e.message);
+        return { errors: [e.message], success: false, copied, };
     }
 }
