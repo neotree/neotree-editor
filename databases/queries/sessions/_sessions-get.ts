@@ -27,8 +27,8 @@ export async function _getSession(id: number): Promise<GetSessionResponse> {
 
 // GET MANY
 export type GetSessionsFilters = {
-    uid?: string;
-    scriptId?: string;
+    uids?: string;
+    scriptsIds?: string;
     search?: string;
     sort?: Prisma.sessionsOrderByWithRelationInput;
 };
@@ -72,10 +72,13 @@ export async function _getSessions(params?: GetSessionsParams): Promise<GetSessi
 
         const {
             search,
-            uid,
-            scriptId,
+            uids: _uid,
+            scriptsIds: _scriptsIds,
             sort: sortParam,
         } = filters;
+
+        const uids = `${_uid || ''}`.split(',').map(s => s.trim()).filter(s => s);
+        const scriptsIds = `${_scriptsIds || ''}`.split(',').map(s => s.trim()).filter(s => s);
 
         let limit = isEmpty(limitParam) ? 50 : Number(`${limitParam}`);
         limit = isNaN(limit) ? 50 : limit;
@@ -85,14 +88,14 @@ export async function _getSessions(params?: GetSessionsParams): Promise<GetSessi
         page = Math.max(1, isNaN(page) ? 1 : page);
 
         const where: Prisma.sessionsWhereInput = {
-            uid: (!uid && !search) ? undefined : Object.assign(
+            uid: (!uids.length && !search) ? undefined : Object.assign(
                 {},
-                !uid ? {} : { equals: uid, },
+                !uids.length ? {} : { in: uids, },
                 !search ? {} : { search, },
             ),
-            scriptid: (!scriptId && !search) ? undefined : Object.assign(
+            scriptid: (!scriptsIds.length && !search) ? undefined : Object.assign(
                 {},
-                !scriptId ? {} : { equals: scriptId, },
+                !scriptsIds.length ? {} : { in: scriptsIds, },
                 !search ? {} : { search, },
             ),
             // data: !search ? undefined : {
