@@ -13,7 +13,7 @@ export type UseScriptsTableParams = {
 };
 
 export function useScriptsTable({
-    scripts: scriptsParam
+    scripts: scriptsParam,
 }: UseScriptsTableParams) {
     const [scripts, setScripts] = useState(scriptsParam);
     const [selected, setSelected] = useState<number[]>([]);
@@ -27,7 +27,7 @@ export function useScriptsTable({
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
-    const { deleteScripts, saveScripts } = useScriptsContext();
+    const { deleteScripts, saveScripts, copyScripts } = useScriptsContext();
 
     const onDelete = useCallback(async (scriptsIds: string[]) => {
         confirm(async () => {
@@ -88,9 +88,45 @@ export function useScriptsTable({
         router.refresh();
     }, [saveScripts, alert, scripts, router]);
 
-    const onDuplicate = useCallback(async (scriptsIds?: string[]) => {
-        window.alert('DUPLICATE SCRIPT!!!');
-    }, []);
+    const onDuplicate = useCallback(async (scriptsIds: string[]) => {
+        scriptsIds = scriptsIds.filter(s => s);
+        const titles = scriptsIds.map(id => scripts.data.filter(s => s.scriptId === id)[0]?.title || '');
+
+        confirm(async () => {
+            try {
+                if (!scriptsIds.length) throw new Error('No scripts selected');
+    
+                setLoading(true);
+    
+                const res = await copyScripts({ 
+                    scriptsIds, 
+                    broadcastAction: true,
+                });
+    
+                if (res.errors?.length) throw new Error(res.errors.join(', '));
+    
+                router.refresh();
+    
+                alert({
+                    variant: 'success',
+                    title: 'Success',
+                    message: 'Scripts duplicated successfully!',
+                });
+            } catch(e: any) {
+                alert({
+                    variant: 'error',
+                    title: 'Error',
+                    message: 'Failed to duplicate scripts: ' + e.message,
+                });
+            } finally {
+                setLoading(false);
+            }
+        }, {
+            title: 'Duplicate script',
+            message: `<p>Are you sure you want to duplicate: ${titles.map(s => `<div><b>${s}</b></div>`).join('')}`,
+            positiveLabel: 'Yes, duplicate',
+        });
+    }, [confirm, copyScripts, alert, router, scripts]);
 
     const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
     const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
