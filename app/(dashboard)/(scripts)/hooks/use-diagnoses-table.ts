@@ -23,7 +23,7 @@ export function useDiagnosesTable({
     useEffect(() => { setDiagnoses(diagnosesParam); }, [diagnosesParam]);
 
     const router = useRouter();
-    const { viewOnly, isDefaultUser } = useAppContext();
+    const { viewOnly } = useAppContext();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
@@ -88,7 +88,7 @@ export function useDiagnosesTable({
         router.refresh();
     }, [saveDiagnoses, alert, diagnoses, router]);
 
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
+    const disabled = useMemo(() => viewOnly, [viewOnly]);
 
     return {
         diagnoses,

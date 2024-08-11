@@ -21,6 +21,43 @@ import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-draft
 import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
 import { _clearPendingDeletion } from '@/databases/mutations/ops';
+import * as opsQueries from '@/databases/queries/ops';
+
+export async function getEditorDetails(): Promise<{
+    errors?: string[];
+    shouldPublishData: boolean;
+    pendingDeletion: number;
+    drafts: typeof opsQueries.defaultCountDraftsData;
+}> {
+    const errors: string[] = [];
+    let shouldPublishData = false;
+    try {
+        const pendingDeletion = await opsQueries._countPendingDeletion();
+        pendingDeletion.errors?.forEach(e => errors.push(e));
+
+        const { errors: draftsErrors, ...drafts } = await opsQueries._countDrafts();
+        draftsErrors?.forEach(e => errors.push(e));
+
+        const mode = await getMode();
+
+        shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total);
+
+        return {
+            pendingDeletion: pendingDeletion.total,
+            drafts,
+            errors: errors.length ? errors : undefined,
+            shouldPublishData,
+        };
+    } catch(e: any) {
+        logger.log('getEditorDetails ERROR', e.message);
+        return {
+            errors: [e.message, ...errors],
+            pendingDeletion: 0,
+            drafts: opsQueries.defaultCountDraftsData,
+            shouldPublishData,
+        };
+    }
+}
 
 export const revalidatePath = async (
     path: Parameters<typeof _revalidatePath>[0], 

@@ -11,7 +11,7 @@ export function HeaderDesktopMenu() {
     const { sys } = useAppContext();
     const routes = useRoutes();
 
-    const showSidebar = useMemo(() => sys.use_sidebar_menu === 'yes', [sys.use_sidebar_menu]);
+    const showSidebar = useMemo(() => sys.data.use_sidebar_menu === 'yes', [sys.data.use_sidebar_menu]);
 
     if (showSidebar) return null;
 

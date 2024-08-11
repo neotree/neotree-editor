@@ -28,12 +28,12 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
     setScriptsIdsToExport: (ids: string[]) => void;
     onOpenChange: (open: boolean) => void;
 }) {
-    const { _getSites } = useAppContext();
+    const { getSites } = useAppContext();
     const { copyScripts } = useScriptsContext();
     const { alert } = useAlertModal();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [sites, setSites] = useState<Awaited<ReturnType<typeof _getSites>>>({ data: [] });
+    const [sites, setSites] = useState<Awaited<ReturnType<typeof getSites>>>({ data: [] });
 
     const {
         formState: { errors },
@@ -50,7 +50,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
 
     const loadSites = useCallback(async () => {
         try {
-            const res = await _getSites({ types: ['webeditor'], });
+            const res = await getSites({ types: ['webeditor'], });
             if (res.errors?.length) throw new Error(res.errors.join(', '));
             setSites(res);
         } catch(e: any) {
@@ -63,7 +63,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
         } finally {
             setLoading(false);
         }
-    }, [_getSites, alert, onOpenChange]);
+    }, [getSites, alert, onOpenChange]);
 
     const exportScripts = handleSubmit(async (data) => {
         try {

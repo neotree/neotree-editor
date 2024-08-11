@@ -8,10 +8,14 @@ import { Toaster } from "@/components/ui/sonner"
 import { ConfirmModal } from "@/components/modals/confirm";
 import { AlertModal } from "@/components/modals/alert";
 import { AppContextProvider } from "@/contexts/app";
-import { appServerActions } from "@/contexts/app/server-actions";
 import { getSys } from "@/app/actions/sys";
+import { getSites } from "@/app/actions/sites";
+import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
+import * as opsActions from "@/app/actions/ops";
+import * as sysActions from "@/app/actions/sys";
 
 import "./globals.css";
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 const roboto = Roboto({
     subsets: ['latin'],
@@ -39,16 +43,16 @@ export default async function RootLayout({
     children,
 }: Readonly<{ children: React.ReactNode; }>) {
     const [
+        editorDetails,
         authenticatedUser,
         mode,
         sys,
     ] = await Promise.all([
-        appServerActions._getAuthenticatedUser(),
-        appServerActions._getMode(),
+        opsActions.getEditorDetails(),
+        getAuthenticatedUser(),
+        opsActions.getMode(),
         getSys(),
     ]);
-
-    const draftsCount = mode !== 'development' ? undefined : await appServerActions._countAllDrafts();
 
     return (
         <html lang="en">
@@ -61,13 +65,33 @@ export default async function RootLayout({
                         disableTransitionOnChange
                     >
                         <AppContextProvider
-                            _sys={sys}
+                            {...opsActions}
+                            {...sysActions}
+                            {...editorDetails}
+                            sys={sys}
                             mode={mode || 'view'}
-                            draftsCount={draftsCount}
+                            getSites={getSites}
                             authenticatedUser={authenticatedUser}
-                            {...appServerActions}
                         >
                             {children}
+
+                            <SocketEventsListener 
+                                events={[
+                                    {
+                                        name: 'mode_changed',
+                                        onEvent: { refreshRouter: true, },
+                                    },
+                                    {
+                                        name: 'update_system',
+                                        onEvent: { refreshRouter: true, },
+                                    },
+                                    {
+                                        name: 'data_changed',
+                                        onEvent: { refreshRouter: true, },
+                                    },
+
+                                ]}
+                            />
                         </AppContextProvider>
                         <Toaster />
                         <ConfirmModal />

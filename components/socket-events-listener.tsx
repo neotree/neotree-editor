@@ -38,7 +38,10 @@ export function SocketEventsListener({ events }: {
 
                     onEvent.callback?.(...args);
 
-                    if (onEvent?.refreshRouter) router.refresh();
+                    if (onEvent?.refreshRouter) {
+                        console.log(eventName, 'refreshing...')
+                        router.refresh();
+                    }
 
                     if (onEvent.redirect?.to) {
                         if (onEvent.redirect.replace) {

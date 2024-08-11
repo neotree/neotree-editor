@@ -23,7 +23,7 @@ export function useScreensTable({
     useEffect(() => { setScreens(screensParam); }, [screensParam]);
 
     const router = useRouter();
-    const { viewOnly, isDefaultUser } = useAppContext();
+    const { viewOnly } = useAppContext();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
@@ -88,7 +88,7 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, alert, screens, router]);
 
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
+    const disabled = useMemo(() => viewOnly, [viewOnly]);
 
     return {
         screens,

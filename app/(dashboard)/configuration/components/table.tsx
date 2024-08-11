@@ -70,7 +70,7 @@ export function ConfigKeysTable() {
                         {
                             name: 'Version',
                             align: 'right',
-                            cellClassName: cn('min-w-10', sys.hide_data_table_version === 'yes' && 'hidden'),
+                            cellClassName: cn('min-w-10', sys.data.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
                                 const s = configKeys.data[cell.rowIndex];
 

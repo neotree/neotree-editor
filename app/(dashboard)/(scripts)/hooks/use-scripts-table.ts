@@ -23,7 +23,7 @@ export function useScriptsTable({
     useEffect(() => { setScripts(scriptsParam); }, [scriptsParam]);
 
     const router = useRouter();
-    const { viewOnly, isDefaultUser } = useAppContext();
+    const { viewOnly } = useAppContext();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
@@ -128,7 +128,7 @@ export function useScriptsTable({
         });
     }, [confirm, copyScripts, alert, router, scripts]);
 
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
+    const disabled = useMemo(() => viewOnly, [viewOnly]);
     const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
 
     return {
