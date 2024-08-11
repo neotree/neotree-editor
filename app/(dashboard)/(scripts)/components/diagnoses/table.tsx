@@ -10,6 +10,7 @@ import { useAppContext } from "@/contexts/app";
 import { DiagnosesTableBottomActions } from "./table-bottom-actions";
 import { DiagnosesTableRowActions } from "./table-row-actions";
 import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diagnoses-table';
+import { CopyDiagnosesModal } from "./copy-modal";
 
 type Props = UseDiagnosesTableParams;
 
@@ -19,18 +20,29 @@ export function DiagnosesTable(props: Props) {
         loading,
         selected,
         disabled,
+        diagnosesIdsToCopy,
+        setDiagnosesIdsToCopy,
         onDelete,
         onSort,
-        onCopy,
         setSelected,
     } = useDiagnosesTable(props);
 
-    const router = useRouter();
     const { sys, viewOnly } = useAppContext();
 
     return (
         <>
             {loading && <Loader overlay />}
+
+            {!!diagnosesIdsToCopy.length && (
+                <CopyDiagnosesModal 
+                    open 
+                    diagnosesIds={diagnosesIdsToCopy}
+                    onOpenChange={() => {
+                        setDiagnosesIdsToCopy([]);
+                        setSelected([]);
+                    }} 
+                />
+            )}
 
             <div className="">
                 <DataTable 
@@ -103,7 +115,7 @@ export function DiagnosesTable(props: Props) {
                                         diagnosis={s}
                                         disabled={disabled}
                                         onDelete={() => onDelete([s.diagnosisId])}
-                                        onCopy={() => onCopy([s.diagnosisId])}
+                                        onCopy={() => setDiagnosesIdsToCopy([s.diagnosisId])}
                                     />
                                 );
                             },
@@ -123,7 +135,7 @@ export function DiagnosesTable(props: Props) {
                 disabled={viewOnly}
                 selected={selected}
                 diagnoses={diagnoses}
-                onCopy={() => onCopy(selected.map(i => diagnoses.data[i]?.diagnosisId).filter(s => s))}
+                onCopy={() => setDiagnosesIdsToCopy(selected.map(i => diagnoses.data[i]?.diagnosisId).filter(s => s))}
                 onDelete={() => onDelete(selected.map(i => diagnoses.data[i]?.diagnosisId).filter(s => s))}
             />
         </>

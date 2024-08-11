@@ -18,6 +18,7 @@ export function useDiagnosesTable({
     const [diagnoses, setDiagnoses] = useState(diagnosesParam);
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
+    const [diagnosesIdsToCopy, setDiagnosesIdsToCopy] = useState<string[]>([]);
 
     useEffect(() => { setDiagnoses(diagnosesParam); }, [diagnosesParam]);
 
@@ -87,10 +88,6 @@ export function useDiagnosesTable({
         router.refresh();
     }, [saveDiagnoses, alert, diagnoses, router]);
 
-    const onCopy = useCallback(async (diagnosesIds: string[]) => {
-        window.alert('DUPLICATE SCRIPT!!!');
-    }, []);
-
     const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
 
     return {
@@ -98,9 +95,10 @@ export function useDiagnosesTable({
         loading,
         selected,
         disabled,
+        diagnosesIdsToCopy, 
+        setDiagnosesIdsToCopy,
         onDelete,
         onSort,
-        onCopy,
         setDiagnoses,
         setLoading,
         setSelected,

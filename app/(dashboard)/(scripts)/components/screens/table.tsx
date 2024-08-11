@@ -10,6 +10,7 @@ import { useAppContext } from "@/contexts/app";
 import { ScreensTableBottomActions } from "./table-bottom-actions";
 import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
+import { CopyScreensModal } from "./copy-modal";
 
 type Props = UseScreensTableParams;
 
@@ -19,18 +20,29 @@ export function ScreensTable(props: Props) {
         loading,
         selected,
         disabled,
+        screensIdsToCopy,
+        setScreensIdsToCopy,
         onDelete,
         onSort,
-        onCopy,
         setSelected,
     } = useScreensTable(props);
 
-    const router = useRouter();
     const { sys, viewOnly } = useAppContext();
 
     return (
         <>
             {loading && <Loader overlay />}
+
+            {!!screensIdsToCopy.length && (
+                <CopyScreensModal 
+                    open 
+                    screensIds={screensIdsToCopy}
+                    onOpenChange={() => {
+                        setScreensIdsToCopy([]);
+                        setSelected([]);
+                    }} 
+                />
+            )}
 
             <div className="">
                 <DataTable 
@@ -112,7 +124,7 @@ export function ScreensTable(props: Props) {
                                         screen={s}
                                         disabled={disabled}
                                         onDelete={() => onDelete([s.screenId])}
-                                        onCopy={() => onCopy([s.screenId])}
+                                        onCopy={() => setScreensIdsToCopy([s.screenId])}
                                     />
                                 );
                             },
@@ -135,7 +147,7 @@ export function ScreensTable(props: Props) {
                 disabled={viewOnly}
                 selected={selected}
                 screens={screens}
-                onCopy={() => onCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
+                onCopy={() => setScreensIdsToCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
                 onDelete={() => onDelete(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
             />
         </>
