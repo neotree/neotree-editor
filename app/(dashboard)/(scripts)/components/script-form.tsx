@@ -1,9 +1,5 @@
 'use client';
 
-import { useCallback, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
-
 import {
     Select,
     SelectContent,
@@ -20,88 +16,42 @@ import { Loader } from "@/components/loader";
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
-import { defaultNuidSearchFields } from "@/constants/fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { scriptTypes } from "@/constants";
-import { isEmpty } from "@/lib/isEmpty";
-import { useAlertModal } from "@/hooks/use-alert-modal";
-import { useAppContext } from "@/contexts/app";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
 import { ScriptItemsFab } from "./script-items-fab";
+import { useScriptForm } from "../hooks/use-script-form";
 
 type Props = {
     formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
 };
 
-export function ScriptForm({ 
-    formData, 
-    hospitals,
-}: Props) {
-    const { alert } = useAlertModal();
-    const { viewOnly, isDefaultUser, } = useAppContext();
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    const { saveScripts, onCancelScriptForm } = useScriptsContext();
+export function ScriptForm(props: Props) {
+    const { onCancelScriptForm } = useScriptsContext();
 
-    const getDefaultFormValues = useCallback(() => ({
-        position: formData?.position || undefined,
-        scriptId: formData?.scriptId || undefined,
-        type: formData?.type || scriptTypes[0].value,
-        title: formData?.title || '',
-        printTitle: formData?.printTitle || '',
-        description: formData?.description || '',
-        hospitalId: formData?.hospitalId || null,
-        exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
-        nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
-        nuidSearchFields: (formData?.nuidSearchFields || []),
-    } satisfies ScriptFormDataType), [formData]);
-
+    const form = useScriptForm(props);
     const {
-        formState: { dirtyFields, },
+        formData,
+        formIsDirty,
+        hospitals,
+        loading,
+        disabled,
         reset: resetForm,
         watch,
         setValue,
         register,
-        handleSubmit,
-    } = useForm({
-        defaultValues: getDefaultFormValues(),
-    });
+        getDefaultFormValues,
+        getDefaultNuidSearchFields,
+        onSubmit,
+    } = form;
 
     const type = watch('type');
     const hospitalId = watch('hospitalId');
     const exportable = watch('exportable');
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
-
-    const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
-
-    const onSubmit = handleSubmit(async data => {
-        setLoading(true);
-
-        const res = await saveScripts({ data: [data], broadcastAction: true, });
-
-        if (res.errors?.length) {
-            alert({
-                title: 'Error',
-                message: res.errors.join(', '),
-                variant: 'error',
-            });
-        } else {
-            router.refresh();
-            alert({
-                title: 'Success',
-                message: 'Scripts saved successfully!',
-                variant: 'success',
-                onClose: () => router.push('/'),
-            });
-        }
-
-        setLoading(false);
-    });
-
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
 
     return (
         <>
@@ -214,21 +164,15 @@ export function ScriptForm({
                             onCheckedChange={() => {
                                 const enabled = !nuidSearchEnabled;
                                 setValue('nuidSearchEnabled', enabled, { shouldDirty: true, });
-
-                                let fields = formData?.nuidSearchFields?.length ? formData.nuidSearchFields : (type === 'admission' ? 
-                                    defaultNuidSearchFields.admission : defaultNuidSearchFields.other) as unknown as typeof nuidSearchFields;
-                                if (!enabled) fields = [];
-                                setValue('nuidSearchFields', fields, { shouldDirty: true, });
+                                setValue('nuidSearchFields', getDefaultNuidSearchFields(), { shouldDirty: true, });
                             }}
                         />
                         <Label secondary htmlFor="nuidSearchEnabled">Enable NUID Search</Label>
-                        {nuidSearchEnabled && (
-                            <NuidSearchFieldsConfig 
-                                disabled={disabled}
-                                fields={nuidSearchFields}
-                                onChange={fields => setValue('nuidSearchFields', fields!, { shouldDirty: true, })}
-                            />
-                        )}
+
+                        <NuidSearchFieldsConfig 
+                            disabled={disabled}
+                            form={form}
+                        />
                     </div>
                 </>
 

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
+import { useField } from "../../hooks/use-field";
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -51,36 +52,7 @@ export function Field<P = {}>({
     const [showForm, setShowForm] = useState(!!field);
     const [open, setOpen] = useState(false);
 
-    const getDefaultValues = useCallback(() => {
-        return {
-            fieldId: field?.fieldId || v4(),
-            type: field?.type || '',
-            key: field?.key || '',
-            label: field?.label || '',
-            refKey: field?.refKey || '',
-            calculation: field?.calculation || '',
-            condition: field?.condition || '',
-            dataType: field?.dataType || '',
-            defaultValue: field?.defaultValue || '',
-            format: field?.format || '',
-            minValue: field?.minValue || '',
-            maxValue: field?.maxValue || '',
-            minDate: field?.minDate || '',
-            maxDate: field?.maxDate || '',
-            minTime: field?.minTime || '',
-            maxTime: field?.maxTime || '',
-            minDateKey: field?.minDateKey || '',
-            maxDateKey: field?.maxDateKey || '',
-            minTimeKey: field?.minTimeKey || '',
-            maxTimeKey: field?.maxTimeKey || '',
-            values: field?.values || '',
-            confidential: field?.confidential || false,
-            optional: field?.optional || false,
-            printable: field?.printable || false,
-            prePopulate: field?.prePopulate || [],
-            ...field
-        } satisfies FieldType;
-    }, [field]);
+    const { getDefaultValues } = useField(field);
 
     const {
         reset: resetForm,
