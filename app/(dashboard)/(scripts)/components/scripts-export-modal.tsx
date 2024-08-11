@@ -4,15 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogClose, } from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -27,8 +19,8 @@ import { useAppContext } from "@/contexts/app";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
-import { Alert } from "@/components/alert";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/modal";
 
 export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToExport, onOpenChange, }: {
     open: boolean;
@@ -41,15 +33,12 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
     const { alert } = useAlertModal();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [importing, setImporting] = useState(false);
     const [sites, setSites] = useState<Awaited<ReturnType<typeof _getSites>>>({ data: [] });
 
     const {
         formState: { errors },
-        watch,
         setValue,
         reset: resetForm,
-        register,
         handleSubmit,
     } = useForm({
         defaultValues: {
@@ -57,24 +46,30 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
         },
     });
 
-    const siteIdValue = watch('siteId');
+    const disabled = useMemo(() => loading, [loading]);
 
-    const disabled = useMemo(() => loading || importing, [loading, importing]);
-
-    const loadSites = useCallback(() => {
-        setLoading(true);
-        _getSites({ types: ['webeditor'], })
-            .then(setSites)
-            .catch((e: any) => setSites({ data: [], errors: [e.message], }))
-            .finally(() => {
-                setLoading(false);
-            });
-    }, [_getSites]);
-
-    const importScripts = handleSubmit(async (data) => {
-        const errors: string[] = [];
+    const loadSites = useCallback(async () => {
         try {
-            setImporting(true);
+            const res = await _getSites({ types: ['webeditor'], });
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
+            setSites(res);
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: 'Failed to load sites: ' + e.message,
+                variant: 'error',
+                onClose: () => onOpenChange(false),
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [_getSites, alert, onOpenChange]);
+
+    const exportScripts = handleSubmit(async (data) => {
+        try {
+            if (!data.siteId) throw new Error('Please select a site!');
+
+            setLoading(true);
 
             const res = await copyScripts({ 
                 toRemoteSiteId: data.siteId, 
@@ -82,99 +77,49 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                 broadcastAction: true,
             });
 
-            res.errors?.forEach(e => errors.push(e));
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            if (res.success) {
-                router.refresh();
-                alert({
-                    variant: 'success',
-                    title: 'Success',
-                    message: 'Scripts exported successfully!',
-                    onClose: () => {
-                        resetForm();
-                        onOpenChange(false);
-                    },
-                });
-            }
+            router.refresh();
+
+            alert({
+                variant: 'success',
+                title: 'Success',
+                message: 'Script exported successfully!',
+                onClose: () => {
+                    resetForm({ siteId: '', });
+                    onOpenChange(false);
+                },
+            });
         } catch(e: any) {
-            errors.push(e.message);
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to export script: ' + e.message,
+            });
         } finally {
-            setImporting(false);
-            if (errors.length) {
-                alert({
-                    variant: 'error',
-                    title: 'Error',
-                    message: 'Failed to export scripts: ' + errors.join('\n'),
-                });
-            }
+            setLoading(false);
         }
     });
 
     useEffect(() => { if(open) { loadSites();  } }, [open, loadSites]);
 
-    if (loading) return <Loader overlay />;
-
-    if (sites.errors) {
-        <Alert 
-            variant="error"
-            title="Error"
-            message={"Failed to load sites: " + sites.errors.join('\n')}
-            onClose={() => onOpenChange(false)}
-        />
-    }
-
     return (
         <>
-            {importing && <Loader overlay />}
+            {loading && <Loader overlay />}
 
-            <Dialog
+            <Modal
                 open={open}
                 onOpenChange={() => {
                     onOpenChange(false);
                     if (!open) setScriptsIdsToExport([]);
                 }}
-            >
-                <DialogContent 
-                    hideCloseButton
-                    className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
-                >
-                    <DialogHeader className="border-b border-b-border px-4 py-4">
-                        <DialogTitle>Export scripts</DialogTitle>
-                        <DialogDescription className="hidden"></DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex-1 flex flex-col gap-y-5 overflow-y-auto px-4 py-2">
-                        <div>
-                            <Label htmlFor="siteId" error={!!errors.siteId?.message || !siteIdValue}>Site *</Label>
-                            <Select
-                                name="siteId"
-                                disabled={disabled}
-                                onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
-                            >
-                                <SelectTrigger
-                                    error={!!errors.siteId?.message || !siteIdValue}
-                                >
-                                    <SelectValue placeholder="Select site" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel>Sites</SelectLabel>
-                                    {sites.data.map(({ siteId, name }) => (
-                                        <SelectItem key={siteId} value={siteId}>
-                                            {name}
-                                        </SelectItem>
-                                    ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                            {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
-                        </div>
-                    </div>
-                    
-                    <DialogFooter className="border-t border-t-border px-4 py-2">
+                title="Export script"
+                actions={(
+                    <>
                         <span className="text-xs text-danger">* Required</span>
 
                         <div className="flex-1" />
+
                         <DialogClose asChild>
                             <Button
                                 variant="ghost"
@@ -186,14 +131,42 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                         </DialogClose>
 
                         <Button
-                            onClick={() => importScripts()}
+                            onClick={() => exportScripts()}
                             disabled={disabled}
                         >
                             Export
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                )}
+            >
+                <div className="flex flex-col gap-y-5">
+                    <div>
+                        <Label htmlFor="siteId">Site *</Label>
+                        <Select
+                            name="siteId"
+                            disabled={disabled}
+                            onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
+                        >
+                            <SelectTrigger >
+                                <SelectValue placeholder="Select site" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectLabel>Sites</SelectLabel>
+                                    {sites.data.map(({ siteId, name }) => (
+                                        <SelectItem key={siteId} value={siteId}>
+                                            {name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+
+                        {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 }
