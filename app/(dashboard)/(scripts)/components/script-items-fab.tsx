@@ -16,6 +16,7 @@ import { ScriptsImportModal } from "./scripts-import-modal";
 
 export function ScriptItemsFab({ disabled }: {
     disabled: boolean;
+    resetForm: () => void;
 }) {
     const [showImportModal, setShowImportsModal] = useState(false);
 
@@ -26,9 +27,9 @@ export function ScriptItemsFab({ disabled }: {
     return (
         <>
             <ScriptsImportModal 
-                overWriteExistingScriptWithId={scriptId as string}
                 open={showImportModal}
                 onOpenChange={setShowImportsModal}
+                onImportSuccess={() => window.location.reload()}
             />
 
             <div

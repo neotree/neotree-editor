@@ -155,13 +155,14 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
     })[] = [];
     const errors: string[] = [];
 	try {
-        const scripts = await queries._getScripts(params);
+        const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
+        const scripts = await queries._getScripts({ ...params, returnDraftsIfExist });
 
         scripts.errors?.forEach(e => errors.push(e));
 
         for (const s of scripts.data) {
-            const screens = await queries._getScreens({ scriptsIds: [s.scriptId], });
-            const diagnoses = await queries._getDiagnoses({ scriptsIds: [s.scriptId], });
+            const screens = await queries._getScreens({ scriptsIds: [s.scriptId], returnDraftsIfExist, });
+            const diagnoses = await queries._getDiagnoses({ scriptsIds: [s.scriptId], returnDraftsIfExist, });
 
             screens.errors?.forEach(e => errors.push(e));
             diagnoses.errors?.forEach(e => errors.push(e));

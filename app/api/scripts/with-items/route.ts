@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
 
         const scriptsIdsJSON = req.nextUrl.searchParams.get('scriptsIds');
-        const scriptsIds = !scriptsIdsJSON ? [] : (parseJSON<string[]>(scriptsIdsJSON) || []);
+        const scriptsIds = !scriptsIdsJSON ? undefined : JSON.parse(scriptsIdsJSON);
 
         const { errors, data } = await getScriptsWithItems({ scriptsIds, });
 
