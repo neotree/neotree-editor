@@ -15,15 +15,15 @@ import { isAllowed } from "./is-allowed";
 //     }
 // };
 
-// export const countSessions: typeof queries._countSessions = async (...args) => {
-//     try {
-//         await isAllowed();
-//         return await queries._countSessions(...args);
-//     } catch(e: any) {
-//         logger.error('countSessions ERROR', e.message);
-//         return { errors: [e.message], data: 0, };
-//     }
-// };
+export const countSessions: typeof queries._countSessions = async (...args) => {
+    try {
+        await isAllowed();
+        return await queries._countSessions(...args);
+    } catch(e: any) {
+        logger.error('countSessions ERROR', e.message);
+        return { errors: [e.message], total: 0, };
+    }
+};
 
 export const getSessions: typeof queries._getSessions = async (...args) => {
     try {
