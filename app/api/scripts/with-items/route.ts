@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
 
         const body = await req.json();
-        const scripts = body.data as Awaited<ReturnType<typeof getScriptsWithItems>>['data'];
+        const scripts = body.data as Parameters<typeof saveScriptsWithItems>[0]['data'];
 
         const res = await saveScriptsWithItems({ data: scripts, });
 

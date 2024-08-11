@@ -42,7 +42,10 @@ export async function _getScreens(
         const oldScriptsIds = _scriptsIds.filter(s => !uuid.validate(s));
         
         // unpublished screens conditions
-        const whereScreensDraftsScriptsIds = !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds);
+        const whereScreensDraftsScriptsIds = !scriptsIds?.length ? undefined : or(
+            inArray(screensDrafts.scriptId, scriptsIds),
+            inArray(screensDrafts.scriptDraftId, scriptsIds)
+        );
         const whereScreensDraftsIds = !screensIds?.length ? 
             undefined 
             : 
@@ -60,20 +63,22 @@ export async function _getScreens(
         const whereScreensScriptsIds = !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds);
         const whereScreensOldScriptsIds = !oldScriptsIds?.length ? undefined : inArray(screens.oldScriptId, oldScriptsIds);
         const whereScreensIdsNotIn = !drafts.length ? undefined : notInArray(screens.screenId, drafts.map(d => d.screenDraftId));
+
         const whereScreensIds = !screensIds?.length ? 
             undefined 
             : 
             inArray(screens.screenId, screensIds.filter(id => uuid.validate(id)));
+
         const whereOldScreensIds = !screensIds?.length ? 
             undefined 
             : 
             inArray(screens.oldScreenId, screensIds.filter(id => !uuid.validate(id)));
+
         const whereScreens = [
             isNull(screens.deletedAt),
             isNull(pendingDeletion),
-            whereScreensScriptsIds,
-            whereScreensOldScriptsIds,
-            ...((!whereScreensIds || !whereOldScreensIds) ? [] : [or(whereScreensIds, whereOldScreensIds)]),
+            or(whereScreensScriptsIds, whereScreensOldScriptsIds),
+            or(whereScreensIds, whereOldScreensIds),
             whereScreensIdsNotIn,
         ];
 
