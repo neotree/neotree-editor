@@ -7,7 +7,9 @@ export type CountSessionsResponse = {
     total: number;
 };
 
-export async function _countSessions(): Promise<CountSessionsResponse> {
+export async function _countSessions(params?: {
+    
+}): Promise<CountSessionsResponse> {
     try {
         const total = await prismadb.sessions.count();
         return { total };
