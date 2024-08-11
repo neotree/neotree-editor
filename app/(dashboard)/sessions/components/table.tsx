@@ -4,6 +4,8 @@ import { useTransition } from "react";
 import moment from "moment";
 import { useRouter } from "next/navigation";
 import queryString from "query-string";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 import { getSessions } from "@/app/actions/sessions";
 import { DataTable } from "@/components/data-table";
@@ -11,8 +13,7 @@ import { Pagination } from "@/components/pagination";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { Loader } from "@/components/loader";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Container } from "./container";
 
 type Props = {
@@ -40,9 +41,8 @@ export function SessionsTable({ sessions }: Props) {
                 pageNumber: '',
             }}
             onPaginate={page => {
-                
                 startTransition(() => {
-                    router.push('/sessions?' + queryString.stringify({ ...searchParams, page }));
+                    router.push('?' + queryString.stringify({ ...searchParams, page }));
                 });
             }}
         />
@@ -76,11 +76,41 @@ export function SessionsTable({ sessions }: Props) {
                     columns={[
                         {
                             name: 'UID',
-                            // cellClassName: 'w-40',
+                            cellClassName: cn('w-[300px]', searchParams.uids && 'bg-primary/20'),
+                            cellRenderer({ rowIndex }) {
+                                const s = sessions.data[rowIndex];
+                                if (!s || !s.uid) return null;
+                                return (
+                                    <>
+                                        <Link 
+                                            className="transition-colors hover:text-primary"
+                                            href={'/sessions?' + queryString.stringify({ uids: s.uid, })}
+                                            onClick={() => startTransition(() => {})}
+                                        >
+                                            <span>{s.uid}</span>
+                                        </Link>
+                                    </>
+                                );
+                            }
                         },
                         {
                             name: 'Script ID',
-                            // cellClassName: 'w-[250px]',
+                            cellClassName: cn('w-[300px]', searchParams.scriptsIds && 'bg-primary/20'),
+                            cellRenderer({ rowIndex }) {
+                                const s = sessions.data[rowIndex];
+                                if (!s || !s.scriptid) return null;
+                                return (
+                                    <>
+                                        <Link 
+                                            className="transition-colors hover:text-primary"
+                                            href={'/sessions?' + queryString.stringify({ scriptsIds: s.scriptid, })}
+                                            onClick={() => startTransition(() => {})}
+                                        >
+                                            <span>{s.scriptid}</span>
+                                        </Link>
+                                    </>
+                                );
+                            }
                         },
                         {
                             name: 'Ingestion Date',
