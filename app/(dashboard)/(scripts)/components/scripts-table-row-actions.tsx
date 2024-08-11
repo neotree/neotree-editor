@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { IScriptsContext } from "@/contexts/scripts";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { Clipboard } from "@/components/clipboard";
 
 export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onDelete, onDuplicate }: {
     disabled: boolean;
@@ -65,10 +66,12 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => copyToClipboard(item.scriptId)}
+                        asChild
                     >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy ID
+                        <Clipboard showValueOnToast value={item.scriptId}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy ID
+                        </Clipboard>
                     </DropdownMenuItem>
 
                     {!disabled && (
