@@ -20,16 +20,11 @@ export function TopBar({}: Props) {
     const { alert } = useAlertModal();
     const [loading, setLoading] = useState(false);
     const { 
-        totalDrafts, 
         mode, 
-        viewOnly, 
-        isAdmin, 
-        isSuperUser,
-        setMode, 
-        _publishData, 
-        _revalidatePath, 
-        countAllDrafts, 
-        _discardDrafts 
+        shouldPublishData,
+        setMode,
+        publishData: _publishData, 
+        discardDrafts: _discardDrafts 
     } = useAppContext();
 
     const publishData = useCallback(async () => {
@@ -43,9 +38,7 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.push('/');
-                await _revalidatePath('/');
-                await countAllDrafts();
+                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
@@ -61,7 +54,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_publishData, alert, _revalidatePath, countAllDrafts, router]);
+    }, [_publishData, alert, router]);
 
     const discardDrafts = useCallback(async () => {
         try {
@@ -74,9 +67,7 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.push('/');
-                await _revalidatePath('/');
-                await countAllDrafts();
+                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
@@ -92,7 +83,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_discardDrafts, alert, _revalidatePath, countAllDrafts, router]);
+    }, [_discardDrafts, alert, router]);
 
     return (
         <>
@@ -113,7 +104,7 @@ export function TopBar({}: Props) {
                         Switch to <b>{mode === 'development' ? 'view' : 'development'}</b> mode
                     </a>
 
-                    {!!totalDrafts && (mode === 'development') && (
+                    {shouldPublishData && (
                         <>
                             <Button
                                 variant="destructive"

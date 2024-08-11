@@ -86,7 +86,7 @@ export function DiagnosesTable(props: Props) {
                         {
                             name: 'Version',
                             align: 'right',
-                            cellClassName: cn('w-[100px]', sys.hide_data_table_version === 'yes' && 'hidden'),
+                            cellClassName: cn('w-[100px]', sys.data.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
                                 const s = diagnoses.data[cell.rowIndex];
 

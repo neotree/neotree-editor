@@ -11,7 +11,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useAppContext } from "@/contexts/app";
 import { IScriptsContext } from "@/contexts/scripts";
 
 type Props = {

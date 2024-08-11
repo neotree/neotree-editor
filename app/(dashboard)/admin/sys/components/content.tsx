@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 import { updateSys } from "@/app/actions/sys";
 import { useAppContext } from "@/contexts/app";
@@ -16,10 +17,12 @@ type Props = {
 };
 
 export function Content({ _updateSys }: Props) {
-    const { sys, setSys } = useAppContext();
+    const { sys, updateSys } = useAppContext();
 
-    const [form, setForm] = useState(sys);
+    const [form, setForm] = useState(sys.data);
     const [loading, setLoading] = useState(false);
+
+    const router = useRouter();
 
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
@@ -28,7 +31,7 @@ export function Content({ _updateSys }: Props) {
         try {
             setLoading(true);
 
-            const { errors, } = await _updateSys(form, { broadcastAction: true, });
+            const { errors, } = await updateSys(form, { broadcastAction: true, });
             
             if (errors?.length) {
                 alert({
@@ -37,7 +40,7 @@ export function Content({ _updateSys }: Props) {
                     variant: 'error',
                 });
             } else {
-                setSys(form);
+                router.refresh();
                 alert({
                     title: 'Success',
                     message: 'System saved successfully!',
@@ -47,7 +50,7 @@ export function Content({ _updateSys }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_updateSys, alert, setSys, form]);
+    }, [updateSys, alert, form]);
 
     const isDirty = useMemo(() => JSON.stringify(sys) !== JSON.stringify(form), [sys, form]);
 

@@ -20,7 +20,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     const { formData } = params;
 
     const { alert } = useAlertModal();
-    const { viewOnly, isDefaultUser, } = useAppContext();
+    const { viewOnly, } = useAppContext();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const { saveScripts, } = useScriptsContext();
@@ -80,7 +80,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
-    const disabled = useMemo(() => viewOnly || isDefaultUser, [isDefaultUser]);
+    const disabled = useMemo(() => viewOnly, [viewOnly]);
 
     return {
         ...params,

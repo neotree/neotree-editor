@@ -54,7 +54,7 @@ export function User({ user }: Props) {
 
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem asChild className={cn(sys.hide_account_settings_page === 'yes' && 'hidden')}>
+                    <DropdownMenuItem asChild className={cn(sys.data.hide_account_settings_page === 'yes' && 'hidden')}>
                         <Link href="/account">
                             Account settings
                         </Link>
