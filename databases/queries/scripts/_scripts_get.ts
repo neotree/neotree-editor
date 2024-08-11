@@ -30,45 +30,33 @@ export async function _getScripts(
 
         scriptsIds = scriptsIds.filter(s => uuid.validate(s));
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
+
+        if (oldScriptsIds.length) {
+            const res = await db.query.scripts.findMany({
+                where: inArray(scripts.oldScriptId, oldScriptsIds),
+                columns: { scriptId: true, oldScriptId: true, },
+            });
+            oldScriptsIds.forEach(oldScriptId => {
+                const s = res.filter(s => s.oldScriptId === oldScriptId)[0];
+                scriptsIds.push(s?.scriptId || uuid.v4());
+            });
+        }
         
         // unpublished scripts conditions
-        const whereScriptsDraftsIds = !scriptsIds?.length ? 
-            undefined 
-            : 
-            inArray(scriptsDrafts.scriptDraftId, scriptsIds.map(id => uuid.validate(id) ? id : uuid.v4()));
-        const whereScriptsDrafts = [
-            ...(!whereScriptsDraftsIds ? [] : [whereScriptsDraftsIds]),
-        ];
-        const draftsRes = await db
+        const draftsRes = !returnDraftsIfExist ? [] : await db
             .select({
                 scriptDraft: scriptsDrafts,
                 // hospitalName: hospitals.name,
             })
             .from(scriptsDrafts)
             // .leftJoin(hospitals, eq(sql`${hospitals.hospitalId}::text`, sql`${scriptsDrafts.data}->>'hospitalId'`))
-            .where(and(...whereScriptsDrafts));
+            .where(and(
+                !scriptsIds?.length ? undefined : inArray(scriptsDrafts.scriptDraftId, scriptsIds),
+            ));
 
         const drafts = draftsRes.map(s => ({ ...s.scriptDraft, }));
-        scriptsIds = scriptsIds.filter(id => !drafts.map(d => d.scriptDraftId).includes(id));
 
         // published scripts conditions
-        const whereScriptsIdsNotIn = !drafts.length ? undefined : notInArray(scripts.scriptId, drafts.map(d => d.scriptDraftId));
-        const whereScriptsIds = !scriptsIds?.length ? 
-            undefined 
-            : 
-            inArray(scripts.scriptId, scriptsIds);
-        const whereOldScriptsIds = !oldScriptsIds?.length ? 
-            undefined 
-            : 
-            inArray(scripts.oldScriptId, oldScriptsIds);
-            
-        const whereScripts = [
-            isNull(scripts.deletedAt),
-            isNull(pendingDeletion),
-            or(whereScriptsIds, whereOldScriptsIds),
-            whereScriptsIdsNotIn,
-        ];
-
         const publishedRes = await db
             .select({
                 script: scripts,
@@ -77,8 +65,14 @@ export async function _getScripts(
             })
             .from(scripts)
             .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
+            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scripts.scriptId))
             .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
-            .where(!whereScripts.length ? undefined : and(...whereScripts));
+            .where(and(
+                isNull(scripts.deletedAt),
+                isNull(pendingDeletion),
+                !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
+                !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
+            ));
 
         const published = publishedRes.map(s => ({
             ...s.script,

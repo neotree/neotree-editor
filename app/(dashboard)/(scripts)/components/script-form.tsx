@@ -60,6 +60,7 @@ export function ScriptForm({
 
     const {
         formState: { dirtyFields, },
+        reset: resetForm,
         watch,
         setValue,
         register,
@@ -106,7 +107,10 @@ export function ScriptForm({
         <>
             {loading && <Loader overlay />}
 
-            <ScriptItemsFab disabled={disabled} />
+            <ScriptItemsFab 
+                disabled={disabled} 
+                resetForm={() => resetForm(getDefaultFormValues())}
+            />
 
             <div 
                 className="flex flex-col gap-y-4 [&>*]:px-4"

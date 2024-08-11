@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { diagnoses, diagnosesDrafts, pendingDeletion, } from "@/databases/pg/schema";
+import { diagnoses, diagnosesDrafts, pendingDeletion, scripts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { DiagnosisSymptom, ScriptImage } from "@/types";
 
@@ -29,57 +29,52 @@ export async function _getDiagnoses(
     params?: GetDiagnosesParams
 ): Promise<GetDiagnosesResults> {
     try {
-        const { 
-            scriptsIds: _scriptsIds = [],
-            diagnosesIds: _diagnosesIds, 
+        let { 
+            scriptsIds: scriptsIds = [],
+            diagnosesIds: diagnosesIds = [], 
             returnDraftsIfExist, 
         } = { ...params };
 
-        let diagnosesIds = _diagnosesIds || [];
-        const scriptsIds = _scriptsIds.filter(s => uuid.validate(s));
-        const oldScriptsIds = _scriptsIds.filter(s => !uuid.validate(s));
+        diagnosesIds = diagnosesIds.filter(s => uuid.validate(s));
+        const oldDiagnosesIds = diagnosesIds.filter(s => !uuid.validate(s));
+
+        if (oldDiagnosesIds.length) {
+            const res = await db.query.diagnoses.findMany({
+                where: inArray(diagnoses.oldDiagnosisId, oldDiagnosesIds),
+                columns: { diagnosisId: true, oldDiagnosisId: true, },
+            });
+            oldDiagnosesIds.forEach(oldDiagnosisId => {
+                const s = res.filter(s => s.oldDiagnosisId === oldDiagnosisId)[0];
+                diagnosesIds.push(s?.diagnosisId || uuid.v4());
+            });
+        }
+
+        scriptsIds = scriptsIds.filter(s => uuid.validate(s));
+        const _oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
+
+        if (_oldScriptsIds.length) {
+            const res = await db.query.scripts.findMany({
+                where: inArray(scripts.oldScriptId, _oldScriptsIds),
+                columns: { scriptId: true, oldScriptId: true, },
+            });
+            _oldScriptsIds.forEach(oldScriptId => {
+                const s = res.filter(s => s.oldScriptId === oldScriptId)[0];
+                scriptsIds.push(s?.scriptId || uuid.v4());
+            });
+        }
         
         // unpublished diagnoses conditions
-        const whereDiagnosesDraftsScriptsIds = !scriptsIds?.length ? undefined : or(
-            inArray(diagnosesDrafts.scriptId, scriptsIds),
-            inArray(diagnosesDrafts.scriptDraftId, scriptsIds)
-        );
-        const whereDiagnosesDraftsIds = !diagnosesIds?.length ? 
-            undefined 
-            : 
-            inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds.map(id => uuid.validate(id) ? id : uuid.v4()));
-        const whereDiagnosesDrafts = [
-            whereDiagnosesDraftsScriptsIds,
-            whereDiagnosesDraftsIds,
-        ];
         const drafts = !returnDraftsIfExist ? [] : await db.query.diagnosesDrafts.findMany({
-            where: and(...whereDiagnosesDrafts),
+            where: and(
+                !scriptsIds?.length ? undefined : or(
+                    inArray(diagnosesDrafts.scriptId, scriptsIds),
+                    inArray(diagnosesDrafts.scriptDraftId, scriptsIds)
+                ),
+                !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds)
+            ),
         });
-        diagnosesIds = diagnosesIds.filter(id => !drafts.map(d => d.diagnosisDraftId).includes(id));
 
         // published diagnoses conditions
-        const whereDiagnosesScriptsIds = !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds);
-        const whereDiagnosesOldScriptsIds = !oldScriptsIds?.length ? undefined : inArray(diagnoses.oldScriptId, oldScriptsIds);
-        const whereDiagnosesIdsNotIn = !drafts.length ? undefined : notInArray(diagnoses.diagnosisId, drafts.map(d => d.diagnosisDraftId));
-
-        const whereDiagnosesIds = !diagnosesIds?.length ? 
-            undefined 
-            : 
-            inArray(diagnoses.diagnosisId, diagnosesIds.filter(id => uuid.validate(id)));
-
-        const whereOldDiagnosesIds = !diagnosesIds?.length ? 
-            undefined 
-            : 
-            inArray(diagnoses.oldDiagnosisId, diagnosesIds.filter(id => !uuid.validate(id)));
-
-        const whereDiagnoses = [
-            isNull(diagnoses.deletedAt),
-            isNull(pendingDeletion),
-            or(whereDiagnosesScriptsIds, whereDiagnosesOldScriptsIds),
-            or(whereDiagnosesIds, whereOldDiagnosesIds),
-            whereDiagnosesIdsNotIn,
-        ];
-
         const publishedRes = await db
             .select({
                 diagnosis: diagnoses,
@@ -87,7 +82,14 @@ export async function _getDiagnoses(
             })
             .from(diagnoses)
             .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
-            .where(!whereDiagnoses.length ? undefined : and(...whereDiagnoses));
+            .leftJoin(diagnosesDrafts, eq(diagnosesDrafts.diagnosisId, diagnoses.diagnosisId))
+            .where(and(
+                isNull(diagnoses.deletedAt),
+                isNull(pendingDeletion),
+                !returnDraftsIfExist ? undefined : isNull(diagnosesDrafts.diagnosisId),
+                !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds),
+                !diagnosesIds?.length ? undefined : inArray(diagnoses.diagnosisId, diagnosesIds),
+            ));
 
         const published = publishedRes.map(s => s.diagnosis);
 

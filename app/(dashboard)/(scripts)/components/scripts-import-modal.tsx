@@ -1,18 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -22,34 +13,43 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { DialogClose, } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
-import { Alert } from "@/components/alert";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/modal";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 
-export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpenChange, }: {
+export function ScriptsImportModal({ 
+    open, 
+    overWriteScriptWithId,
+    onOpenChange, 
+    onImportSuccess,
+}: {
     open: boolean;
-    overWriteExistingScriptWithId?: string;
+    overWriteScriptWithId?: string;
     onOpenChange: (open: boolean) => void;
+    onImportSuccess?: () => void;
 }) {
-    const { _getSites } = useAppContext();
-    const { importRemoteScripts } = useScriptsContext();
-    const { alert } = useAlertModal();
     const router = useRouter();
+    const routeParams = useParams();
+
+    const { _getSites } = useAppContext();
+    const { copyScripts } = useScriptsContext();
+    const { alert } = useAlertModal();
+
     const [loading, setLoading] = useState(false);
-    const [importing, setImporting] = useState(false);
     const [sites, setSites] = useState<Awaited<ReturnType<typeof _getSites>>>({ data: [] });
 
     const {
         formState: { errors },
+        reset: resetForm,
         watch,
         setValue,
-        reset: resetForm,
         register,
         handleSubmit,
     } = useForm({
@@ -61,147 +61,84 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
     });
 
     const confirmed = watch('confirmed');
-    const siteIdValue = watch('siteId');
 
-    const disabled = useMemo(() => loading || importing, [loading, importing]);
+    const disabled = useMemo(() => loading, [loading]);
 
-    const loadSites = useCallback(() => {
-        setLoading(true);
-        _getSites({ types: ['webeditor'], })
-            .then(setSites)
-            .catch((e: any) => setSites({ data: [], errors: [e.message], }))
-            .finally(() => {
-                setLoading(false);
+    const loadSites = useCallback(async () => {
+        try {
+            const res = await _getSites({ types: ['webeditor'], });
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
+            setSites(res);
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: 'Failed to load sites: ' + e.message,
+                variant: 'error',
+                onClose: () => onOpenChange(false),
             });
-    }, [_getSites]);
+        } finally {
+            setLoading(false);
+        }
+    }, [_getSites, alert, onOpenChange]);
 
     const importScripts = handleSubmit(async (data) => {
-        const errors: string[] = [];
         try {
-            setImporting(true);
+            if (!data.siteId) throw new Error('Please select a site!');
+            if (!data.scriptId) throw new Error('Please provide a script ID!');
+            if (!data.confirmed) throw new Error('Please confirm that you want to override this script!');
 
-            const res = await importRemoteScripts({ 
-                siteId: data.siteId, 
-                scripts: [{ scriptId: data.scriptId, overWriteExistingScriptWithId }], 
+            setLoading(true);
+
+            const res = await copyScripts({ 
+                fromRemoteSiteId: data.siteId, 
+                scriptsIds: [data.scriptId], 
+                overWriteScriptWithId: overWriteScriptWithId || routeParams.scriptId as string,
                 broadcastAction: true,
             });
 
-            res.errors?.forEach(e => errors.push(e));
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            if (res.success) {
-                router.refresh();
-                alert({
-                    variant: 'success',
-                    title: 'Success',
-                    message: 'Scripts imported successfully!',
-                    onClose: () => {
-                        resetForm();
-                        onOpenChange(false);
-                    },
-                });
-            }
+            router.refresh();
+
+            alert({
+                variant: 'success',
+                title: 'Success',
+                message: 'Script imported successfully!',
+                onClose: () => {
+                    onImportSuccess?.();
+                    resetForm({ siteId: '', scriptId: '', confirmed: false, });
+                    onOpenChange(false);
+                },
+            });
         } catch(e: any) {
-            errors.push(e.message);
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to import script: ' + e.message,
+            });
         } finally {
-            setImporting(false);
-            if (errors.length) {
-                alert({
-                    variant: 'error',
-                    title: 'Error',
-                    message: 'Failed to import scripts: ' + errors.join('\n'),
-                });
-            }
+            setLoading(false);
         }
     });
 
     useEffect(() => { if(open) { loadSites();  } }, [open, loadSites]);
 
-    if (loading) return <Loader overlay />;
-
-    if (sites.errors) {
-        <Alert 
-            variant="error"
-            title="Error"
-            message={"Failed to load sites: " + sites.errors.join('\n')}
-            onClose={() => onOpenChange(false)}
-        />
-    }
-
     return (
         <>
-            {importing && <Loader overlay />}
+            {loading && <Loader overlay />}
 
-            <Dialog
+            <Modal
                 open={open}
                 onOpenChange={() => {
                     onOpenChange(false);
-
                 }}
-            >
-                <DialogContent 
-                    hideCloseButton
-                    className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
-                >
-                    <DialogHeader className="border-b border-b-border px-4 py-4">
-                        <DialogTitle>Import scripts</DialogTitle>
-                        <DialogDescription className="hidden"></DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex-1 flex flex-col gap-y-5 overflow-y-auto px-4 py-2">
-                        <div>
-                            <Label htmlFor="siteId" error={!!errors.siteId?.message || !siteIdValue}>Site *</Label>
-                            <Select
-                                name="siteId"
-                                disabled={disabled}
-                                onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
-                            >
-                                <SelectTrigger
-                                    error={!!errors.siteId?.message || !siteIdValue}
-                                >
-                                    <SelectValue placeholder="Select site" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel>Sites</SelectLabel>
-                                    {sites.data.map(({ siteId, name }) => (
-                                        <SelectItem key={siteId} value={siteId}>
-                                            {name}
-                                        </SelectItem>
-                                    ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                            {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
-                        </div>
-
-                        <div>
-                            <Label htmlFor="scriptId">Script ID *</Label>
-                            <Input
-                                {...register('scriptId', { disabled, required: true, })}
-                                name="scriptId"
-                            />
-                        </div>
-
-                        {!!overWriteExistingScriptWithId && (
-                            <div>
-                                <div className="flex gap-x-2">
-                                    <Checkbox 
-                                        name="confirmed"
-                                        id="confirmed"
-                                        disabled={disabled}
-                                        checked={confirmed}
-                                        onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
-                                    />
-                                    <Label secondary htmlFor="confirmed">Confirm that you&apos;d like to override this script with the imported script</Label>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    
-                    <DialogFooter className="border-t border-t-border px-4 py-2">
+                title="Import script"
+                actions={(
+                    <>
                         <span className="text-xs text-danger">* Required</span>
 
                         <div className="flex-1" />
+
                         <DialogClose asChild>
                             <Button
                                 variant="ghost"
@@ -214,13 +151,61 @@ export function ScriptsImportModal({ open, overWriteExistingScriptWithId, onOpen
 
                         <Button
                             onClick={() => importScripts()}
-                            disabled={disabled || (overWriteExistingScriptWithId ? !confirmed : false)}
+                            disabled={disabled}
                         >
                             Import
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                )}
+            >
+                <div className="flex flex-col gap-y-5">
+                    <div>
+                        <Label htmlFor="siteId">Site *</Label>
+                        <Select
+                            name="siteId"
+                            disabled={disabled}
+                            onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
+                        >
+                            <SelectTrigger >
+                                <SelectValue placeholder="Select site" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectLabel>Sites</SelectLabel>
+                                    {sites.data.map(({ siteId, name }) => (
+                                        <SelectItem key={siteId} value={siteId}>
+                                            {name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+
+                        {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
+                    </div>
+
+                    <div>
+                        <Label htmlFor="scriptId">Script ID *</Label>
+                        <Input
+                            {...register('scriptId', { disabled, required: true, })}
+                            name="scriptId"
+                        />
+                        {!!errors.scriptId?.message && <div className="text-xs text-danger mt-1">{errors.scriptId.message}</div>}
+                    </div>
+
+                    <div className="flex gap-x-2">
+                        <Checkbox 
+                            name="confirmed"
+                            id="confirmed"
+                            disabled={disabled}
+                            checked={confirmed}
+                            onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
+                        />
+                        <Label secondary htmlFor="exportable">Confirm that you want to override this script</Label>
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 }
