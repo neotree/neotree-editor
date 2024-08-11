@@ -28,6 +28,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
+import { ScriptItemsFab } from "./script-items-fab";
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -104,6 +105,8 @@ export function ScriptForm({
     return (
         <>
             {loading && <Loader overlay />}
+
+            <ScriptItemsFab disabled={disabled} />
 
             <div 
                 className="flex flex-col gap-y-4 [&>*]:px-4"

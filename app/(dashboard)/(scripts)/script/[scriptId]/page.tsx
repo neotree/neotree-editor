@@ -8,7 +8,6 @@ import { ScriptForm } from "../../components/script-form";
 import { PageContainer } from "../../components/page-container";
 import Diagnoses from "../../components/diagnoses";
 import Screens from "../../components/screens";
-import { ScriptItemsFab } from "../../components/script-items-fab";
 
 type Props = {
     params: { scriptId: string; };
@@ -56,8 +55,6 @@ export default async function Scripts({ params: { scriptId }, searchParams: { se
                         <Screens scriptId={formData.scriptId!} />}
                 </div>
             </PageContainer>
-
-            <ScriptItemsFab />
         </>
     )
 }

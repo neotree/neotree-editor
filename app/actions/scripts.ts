@@ -182,21 +182,174 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
 	}
 }
 
-const _info = { scripts: 0, screens: 0, diagnoses: 0, };
-
-export async function saveScriptsWithItems({ data }: {
-    data: Awaited<ReturnType<typeof getScriptsWithItems>>['data']
+export async function saveScriptScreens({ screens, scriptId, }: {
+    scriptId: string;
+    screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
 }): Promise<{ 
     errors?: string[]; 
     success: boolean;
-    info: typeof _info, 
+    saved: number;
 }> {
-    const info = { ..._info };
+    try {
+        let saved = 0;
+        const errors: string[] = [];
+
+        for (const screen of screens) {
+            const { 
+                id,
+                publishDate,
+                createdAt,
+                updatedAt,
+                isDraft,
+                deletedAt,
+                version,
+                oldScriptId,
+                oldScreenId,
+                screenId: _ignoreScreenId,
+                scriptId: _ignoreScriptId,
+                position,
+                ...s 
+            } = screen;
+
+            const screenId = v4();
+
+            const res = await saveScreens({
+                data: [{
+                    ...s,
+                    scriptId,
+                    screenId,
+                    version: 1,
+                }],
+            });
+
+            res.errors?.forEach(e => errors.push(e));
+
+            if (!res.errors?.length) saved++;
+        }
+
+        if (errors.length) return { errors, saved, success: false, };
+
+        return { saved, success: true, };
+    } catch(e: any) {
+        logger.error('saveScriptScreens ERROR', e.message);
+        return { saved: 0, success: false, errors: [e.message], };
+    }
+}
+
+export async function saveScriptDiagnoses({ diagnoses, scriptId, }: {
+    scriptId: string;
+    diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+}): Promise<{ 
+    errors?: string[]; 
+    success: boolean;
+    saved: number;
+}> {
+    try {
+        let saved = 0;
+        const errors: string[] = [];
+
+        for (const diagnosis of diagnoses) {
+            const { 
+                id,
+                publishDate,
+                createdAt,
+                updatedAt,
+                isDraft,
+                deletedAt,
+                version,
+                oldScriptId,
+                oldDiagnosisId,
+                diagnosisId: _ignoreDiagnosisId,
+                scriptId: _ignoreScriptId,
+                position,
+                ...d
+            } = diagnosis;
+
+            const diagnosisId = v4();
+
+            const res = await saveDiagnoses({
+                data: [{
+                    ...d,
+                    scriptId,
+                    diagnosisId,
+                    version: 1,
+                }],
+            });
+
+            res.errors?.forEach(e => errors.push(e));
+
+            if (!res.errors?.length) saved++;
+        }
+
+        if (errors.length) return { errors, saved, success: false, };
+
+        return { saved, success: true, };
+    } catch(e: any) {
+        logger.error('saveScriptDiagnoses ERROR', e.message);
+        return { saved: 0, success: false, errors: [e.message], };
+    }
+}
+
+export async function deleteScriptsItems({ scriptsIds, }: {
+    scriptsIds: string[];
+}): Promise<{ 
+    errors?: string[]; 
+    success: boolean;
+}> {
+    try {
+        const errors: string[] = [];
+
+        const delScreens = await deleteScreens({ scriptsIds, });
+        delScreens.errors?.forEach(e => errors.push(e));
+
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, });
+        delDiagnoses.errors?.forEach(e => errors.push(e));
+
+        if (errors.length) return { errors, success: false, };
+
+        return { success: true, };
+    } catch(e: any) {
+        logger.error('deleteScriptsItems ERROR', e.message);
+        return { success: false, errors: [e.message], };
+    }
+}
+
+const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, };
+
+export async function saveScriptsWithItems({ data }: {
+    data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
+        overWriteScriptWithId?: string;
+    })[];
+}): Promise<{ 
+    errors?: string[]; 
+    success: boolean;
+    info: typeof saveScriptsWithItemsInfo,
+}> {
+    const info = { ...saveScriptsWithItemsInfo };
 
     try {
         const errors: string[] = [];
 
-        for (const script of data) {
+        for (const { overWriteScriptWithId, ...script } of data) {
+            const overWriteScript = !overWriteScriptWithId ? { data: null, } : await getScript({ 
+                scriptId: overWriteScriptWithId, 
+                returnDraftIfExists: true, 
+            });
+
+            overWriteScript.errors?.forEach(e => errors.push(e));
+            if (errors.length) continue;
+
+            if (overWriteScriptWithId && !overWriteScript?.data) {
+                errors.push('Overwrite script was not found');
+                continue;
+            }
+
+            if (overWriteScript?.data) {
+                const res = await deleteScriptsItems({ scriptsIds: [overWriteScript.data.scriptId], });
+                res.errors?.forEach(e => errors.push(e));
+            if (errors.length) continue;
+            }
+
             const { 
                 id,
                 screens = [], 
@@ -213,7 +366,7 @@ export async function saveScriptsWithItems({ data }: {
                 ...s 
             } = script;
 
-            const scriptId = v4();
+            const scriptId = overWriteScript?.data?.scriptId || v4();
 
             const res = await saveScripts({
                 data: [{
@@ -224,76 +377,17 @@ export async function saveScriptsWithItems({ data }: {
             });
 
             res.errors?.forEach(e => errors.push(e));
+            if (errors.length) continue;
 
-            if (!res.errors?.length) {
-                if (!res.errors?.length) info.scripts++;
+            info.scripts++;
 
-                for (const screen of screens) {
-                    const { 
-                        id,
-                        publishDate,
-                        createdAt,
-                        updatedAt,
-                        isDraft,
-                        deletedAt,
-                        version,
-                        oldScriptId,
-                        oldScreenId,
-                        screenId: _ignoreScreenId,
-                        scriptId: _ignoreScriptId,
-                        position,
-                        ...s 
-                    } = screen;
+            const saveScreens = await saveScriptScreens({ scriptId, screens, });
+            saveScreens.errors?.forEach(e => errors.push(e));
+            info.screens += saveScreens.saved;
 
-                    const screenId = v4();
-
-                    const res = await saveScreens({
-                        data: [{
-                            ...s,
-                            scriptId,
-                            screenId,
-                            version: 1,
-                        }],
-                    });
-
-                    res.errors?.forEach(e => errors.push(e));
-
-                    if (!res.errors?.length) info.screens++;
-                }
-
-                for (const diagnosis of diagnoses) {
-                    const { 
-                        id,
-                        publishDate,
-                        createdAt,
-                        updatedAt,
-                        isDraft,
-                        deletedAt,
-                        version,
-                        oldScriptId,
-                        oldDiagnosisId,
-                        diagnosisId: _ignoreDiagnosisId,
-                        scriptId: _ignoreScriptId,
-                        position,
-                        ...d
-                    } = diagnosis;
-
-                    const diagnosisId = v4();
-
-                    const res = await saveDiagnoses({
-                        data: [{
-                            ...d,
-                            scriptId,
-                            diagnosisId,
-                            version: 1,
-                        }],
-                    });
-
-                    res.errors?.forEach(e => errors.push(e));
-
-                    if (!res.errors?.length) info.diagnoses++;
-                }
-            }
+            const saveDiagnoses = await saveScriptDiagnoses({ scriptId, diagnoses, });
+            saveDiagnoses.errors?.forEach(e => errors.push(e));
+            info.diagnoses += saveDiagnoses.saved;
         }
 
         if (errors.length) return { success: false, errors, info, };
@@ -310,10 +404,10 @@ export async function copyScripts(params?: {
     confirmCopyAll?: boolean;
     toRemoteSiteId?: string;
     fromRemoteSiteId?: string;
-    overwriteScriptWithId?: string;
+    overWriteScriptWithId?: string;
     broadcastAction?: boolean;
 }): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>>> {
-    const info = { ..._info };
+    const info = { ...saveScriptsWithItemsInfo };
 
     const { 
         scriptsIds = [], 
@@ -321,6 +415,7 @@ export async function copyScripts(params?: {
         toRemoteSiteId,
         fromRemoteSiteId,
         broadcastAction,
+        overWriteScriptWithId,
     } = { ...params };
 
     try {
@@ -357,7 +452,10 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
             } else {
                 response = await saveScriptsWithItems({
-                    data: scripts.data,
+                    data: scripts.data.map(s => ({
+                        ...s,
+                        overWriteScriptWithId,
+                    })),
                 });
             }
         }

@@ -40,7 +40,10 @@ export async function _getDiagnoses(
         const oldScriptsIds = _scriptsIds.filter(s => !uuid.validate(s));
         
         // unpublished diagnoses conditions
-        const whereDiagnosesDraftsScriptsIds = !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds);
+        const whereDiagnosesDraftsScriptsIds = !scriptsIds?.length ? undefined : or(
+            inArray(diagnosesDrafts.scriptId, scriptsIds),
+            inArray(diagnosesDrafts.scriptDraftId, scriptsIds)
+        );
         const whereDiagnosesDraftsIds = !diagnosesIds?.length ? 
             undefined 
             : 
@@ -58,20 +61,22 @@ export async function _getDiagnoses(
         const whereDiagnosesScriptsIds = !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds);
         const whereDiagnosesOldScriptsIds = !oldScriptsIds?.length ? undefined : inArray(diagnoses.oldScriptId, oldScriptsIds);
         const whereDiagnosesIdsNotIn = !drafts.length ? undefined : notInArray(diagnoses.diagnosisId, drafts.map(d => d.diagnosisDraftId));
+
         const whereDiagnosesIds = !diagnosesIds?.length ? 
             undefined 
             : 
             inArray(diagnoses.diagnosisId, diagnosesIds.filter(id => uuid.validate(id)));
+
         const whereOldDiagnosesIds = !diagnosesIds?.length ? 
             undefined 
             : 
             inArray(diagnoses.oldDiagnosisId, diagnosesIds.filter(id => !uuid.validate(id)));
+
         const whereDiagnoses = [
             isNull(diagnoses.deletedAt),
             isNull(pendingDeletion),
-            whereDiagnosesScriptsIds,
-            whereDiagnosesOldScriptsIds,
-            ...((!whereDiagnosesIds || !whereOldDiagnosesIds) ? [] : [or(whereDiagnosesIds, whereOldDiagnosesIds)]),
+            or(whereDiagnosesScriptsIds, whereDiagnosesOldScriptsIds),
+            or(whereDiagnosesIds, whereOldDiagnosesIds),
             whereDiagnosesIdsNotIn,
         ];
 

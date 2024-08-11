@@ -12,7 +12,7 @@ export default async function ScriptsPage() {
             <Title>Scripts</Title>
 
             <Content>
-                <Card>
+                <Card className="mb-20">
                     <CardContent className="p-0">
                         <ScriptsTable 
                             scripts={scripts}

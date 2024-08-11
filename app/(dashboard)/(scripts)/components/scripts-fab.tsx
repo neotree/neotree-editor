@@ -33,6 +33,7 @@ export function ScriptsFab({ disabled }: {
                     fixed
                     bottom-5
                     right-10
+                    z-[1]
                 "
             >
                 <DropdownMenu>
