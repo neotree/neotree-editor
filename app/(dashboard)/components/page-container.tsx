@@ -9,7 +9,7 @@ export default async function DashboardPageContainer({ children }: {
         getAuthenticatedUser(),
     ]);
 
-    if (!user) redirect('/sign-in');
+    if (!user) redirect('/login');
 
     return (
         <>

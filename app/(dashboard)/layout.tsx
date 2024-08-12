@@ -10,7 +10,7 @@ export default async function SiteLayout({ children }: {
         getAuthenticatedUser(),
     ]);
 
-    if (!authenticatedUser) redirect('/sign-in');
+    if (!authenticatedUser) redirect('/login');
 
     return (
         <>

@@ -28,7 +28,7 @@ export function User({ user }: Props) {
     const { confirm } = useConfirmModal();
 
     const onSignOut = useCallback(() => {
-        confirm(() => signOut({ callbackUrl: '/sign-in', redirect: true, }), {
+        confirm(() => signOut({ callbackUrl: '/login', redirect: true, }), {
             title: 'Log out',
             message: 'Are you sure you want to log out?',
             negativeLabel: 'Cancel',

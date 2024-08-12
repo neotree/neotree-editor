@@ -11,7 +11,7 @@ import { ConfigKeysTable } from "./components/table";
 export default async function ConfigKeysPage() {
     const { user, yes: hasAccess, } = await canAccessPage();
 
-    if (!user) redirect('/sign-in');
+    if (!user) redirect('/login');
 
     if (!hasAccess) {
         return (
