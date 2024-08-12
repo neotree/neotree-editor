@@ -320,6 +320,9 @@ export const configKeysDrafts = pgTable(
         configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof configKeys.$inferInsert>().notNull(),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     },
 );
 
@@ -411,6 +414,9 @@ export const scriptsDrafts = pgTable(
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[]; }>().notNull(),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     },
 );
 
@@ -469,6 +475,7 @@ export const screens = pgTable(
         step: text('step').notNull().default(''),
         actionText: text('action_text').notNull().default(''),
         contentText: text('content_text').notNull().default(''),
+        infoText: text('info_text').notNull().default(''),
         title: text('title').notNull(),
         title1: text('title1').notNull().default(''),
         title2: text('title2').notNull().default(''),
@@ -544,6 +551,9 @@ export const screensDrafts = pgTable(
         type: screenTypeEnum('type').notNull(),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof screens.$inferInsert>().notNull(),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     },
 );
 
@@ -643,7 +653,7 @@ export const diagnosesRelations = relations(diagnoses, ({ many, one }) => ({
     }),
 }));
 
-// SCREENS DRAFTS
+// DIAGNOSES DRAFTS
 export const diagnosesDrafts = pgTable(
     'nt_diagnoses_drafts', 
     {
@@ -654,6 +664,9 @@ export const diagnosesDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof diagnoses.$inferInsert>().notNull(),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     },
 );
 
@@ -672,7 +685,7 @@ export const diagnosesDraftsRelations = relations(diagnosesDrafts, ({ one }) => 
     }),
 }));
 
-// SCREENS HISTORY
+// DIAGNOSES HISTORY
 export const diagnosesHistory = pgTable(
     'nt_diagnoses_history', 
     {

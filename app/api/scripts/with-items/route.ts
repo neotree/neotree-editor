@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getScripts, _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
-import { parseJSON } from "@/lib/parse-json";
 import { getScriptsWithItems, saveScriptsWithItems } from "@/app/actions/scripts";
 
 export async function POST(req: NextRequest) {
