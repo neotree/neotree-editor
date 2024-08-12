@@ -10,10 +10,12 @@ export type GetDiagnosesParams = {
     diagnosesIds?: string[];
     scriptsIds?: string[];
     returnDraftsIfExist?: boolean;
+    withDeleted?: boolean;
 };
 
 export type DiagnosisType = typeof diagnoses.$inferSelect & {
     isDraft: boolean;
+    isDeleted: boolean;
     symptoms: DiagnosisSymptom[];
     image1: null | ScriptImage;
     image2: null | ScriptImage;
@@ -102,11 +104,13 @@ export async function _getDiagnoses(
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
+                isDeleted: false,
             } as GetDiagnosesResults['data'][0])),
 
             ...drafts.map((s => ({
                 ...s.data,
                 isDraft: true,
+                isDeleted: false,
             } as GetDiagnosesResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -148,6 +152,7 @@ export async function _getDiagnosis(
         let responseData = !draft ? null : {
             ...draft.data,
             isDraft: false,
+            isDeleted: false,
         } as GetDiagnosisResults['data'];
 
         if (responseData) return { data: responseData, };
@@ -179,6 +184,7 @@ export async function _getDiagnosis(
         responseData = !data ? null : {
             ...data,
             isDraft: false,
+            isDeleted: false,
         };
 
         if (!responseData) return { data: null, };

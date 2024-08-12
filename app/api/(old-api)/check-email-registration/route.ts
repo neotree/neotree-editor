@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
 		return NextResponse.json(data);
 	} catch(e: any) {
-		logger.error('[GET] /api/get-hospitals', e.message);
+		logger.error('[GET] /api/check-email-registration', e.message);
 		return NextResponse.json({ errors: ['Internal Error'] });
 	}
 }

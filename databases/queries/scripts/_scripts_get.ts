@@ -9,10 +9,12 @@ import { ScriptField } from "@/types";
 export type GetScriptsParams = {
     scriptsIds?: string[];
     returnDraftsIfExist?: boolean;
+    withDeleted?: boolean;
 };
 
 export type ScriptType = typeof scripts.$inferSelect & {
     isDraft: boolean;
+    isDeleted: boolean;
     nuidSearchFields: ScriptField[];
     hospitalName: string;
 };
@@ -88,11 +90,13 @@ export async function _getScripts(
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
+                isDeleted: false,
             } as GetScriptsResults['data'][0])),
 
             ...drafts.map((s => ({
                 ...s.data,
                 isDraft: true,
+                isDeleted: false,
             } as GetScriptsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -134,6 +138,7 @@ export async function _getScript(
         let responseData = !draft ? null : {
             ...draft.data,
             isDraft: false,
+            isDeleted: false,
         } as GetScriptResults['data'];
 
         if (responseData) return { data: responseData, };
@@ -168,6 +173,7 @@ export async function _getScript(
         responseData = !data ? null : {
             ...data,
             isDraft: false,
+            isDeleted: false,
         };
 
         if (!responseData) return { data: null, };

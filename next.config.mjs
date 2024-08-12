@@ -23,6 +23,7 @@ const nextConfig = {
         { source: '/files/:fileId', destination: '/api/files/:fileId' },
         { source: '/check-email-registration', destination: '/api/check-email-registration', },
         { source: '/sign-in', destination: '/api/sign-in', },
+        { source: '/get-device-registration', destination: '/api/get-device-registration', },
     ],
 };
 

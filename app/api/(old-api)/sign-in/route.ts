@@ -15,8 +15,6 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { username: email, password, } = body;
 
-        console.log('XOXO');
-
         let user = !email ? null : await _getFullUser(email);
 
         if (!user) return NextResponse.json({ errors: ['Invalid credentials'], });
@@ -35,7 +33,7 @@ export async function POST(req: NextRequest) {
 
 		return NextResponse.json({ user: data, });
 	} catch(e: any) {
-		logger.error('[GET] /api/get-hospitals', e.message);
+		logger.error('[POST] /api/sign-in', e.message);
 		return NextResponse.json({ errors: ['Internal Error'] });
 	}
 }

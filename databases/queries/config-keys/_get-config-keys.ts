@@ -8,11 +8,13 @@ import logger from "@/lib/logger";
 export type GetConfigKeysParams = {
     configKeysIds?: string[];
     returnDraftsIfExist?: boolean;
+    withDeleted?: boolean;
 };
 
 export type GetConfigKeysResults = {
     data: (typeof configKeys.$inferSelect & {
         isDraft: boolean;
+        isDeleted: boolean;
     })[];
     errors?: string[];
 };
@@ -75,11 +77,13 @@ export async function _getConfigKeys(
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
+                isDeleted: false,
             } as GetConfigKeysResults['data'][0])),
 
             ...drafts.map((s => ({
                 ...s.data,
                 isDraft: true,
+                isDeleted: false,
             } as GetConfigKeysResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -97,6 +101,7 @@ export async function _getConfigKeys(
 export type GetConfigKeyResults = {
     data?: null | typeof configKeys.$inferSelect & {
         isDraft: boolean;
+        isDeleted: boolean;
     };
     errors?: string[];
 };
@@ -123,6 +128,7 @@ export async function _getConfigKey(
         let responseData = !draft ? null : {
             ...draft.data,
             isDraft: false,
+            isDeleted: false,
         } as GetConfigKeyResults['data'];
 
         if (responseData) return { data: responseData, };
@@ -144,6 +150,7 @@ export async function _getConfigKey(
         responseData = !data ? null : {
             ...data,
             isDraft: false,
+            isDeleted: false,
         };
 
         if (!responseData) return { data: null, };

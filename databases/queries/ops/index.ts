@@ -1,8 +1,16 @@
 import { count } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
-import { configKeysDrafts, diagnosesDrafts, pendingDeletion, screensDrafts, scriptsDrafts } from '@/databases/pg/schema';
+import { 
+    configKeysDrafts,
+    diagnosesDrafts,
+    screensDrafts,
+    scriptsDrafts ,
+    pendingDeletion
+} from '@/databases/pg/schema';
 import db from '../../pg/drizzle';
+
+export * from './_get-last-changes-dates';
 
 export async function _countPendingDeletion(): Promise<{ errors?: string[]; total: number; }> {
     try {
