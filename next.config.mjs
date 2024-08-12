@@ -24,6 +24,7 @@ const nextConfig = {
         { source: '/check-email-registration', destination: '/api/check-email-registration', },
         { source: '/sign-in', destination: '/api/sign-in', },
         { source: '/get-device-registration', destination: '/api/get-device-registration', },
+        { source: '/update-device-registration', destination: '/api/update-device-registration', },
     ],
 };
 
