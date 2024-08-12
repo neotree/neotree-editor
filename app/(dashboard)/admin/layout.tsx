@@ -13,7 +13,7 @@ export default async function AdminPageLayout({ children }: {
         getAuthenticatedUser(),
     ]);
 
-    if (!user) redirect('/sign-in');
+    if (!user) redirect('/login');
 
     return (
         <>

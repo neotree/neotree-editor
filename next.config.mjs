@@ -18,8 +18,11 @@ const nextConfig = {
         ],
     },
     rewrites: () => [
+        // map old API endpoints to new ones, will delete when all the devices are up to date!
         { source: '/file/:fileId', destination: '/api/files/:fileId' },
         { source: '/files/:fileId', destination: '/api/files/:fileId' },
+        { source: '/check-email-registration', destination: '/api/check-email-registration', },
+        { source: '/sign-in', destination: '/api/sign-in', },
     ],
 };
 

@@ -31,6 +31,7 @@ export async function _deleteUsers(userIds: string[]) {
 export async function _createUsers(
     data: (Omit<typeof users.$inferInsert, 'password'> & {
         userId: string;
+        password?: string;
     })[], 
     opts?: {
         returnInserted?: boolean;
@@ -40,7 +41,7 @@ export async function _createUsers(
     const insertData: typeof users.$inferInsert[] = [];
     
     for(const u of data) {
-        const password = await bcrypt.hash(v4(), 12);
+        const password = await bcrypt.hash(u.password || v4(), 12);
         insertData.push({
             ...u,
             password,

@@ -14,7 +14,7 @@ export default async function ScriptsLayout({ children }: {
 }) {
     const { user, yes: hasAccess, } = await canAccessPage();
 
-    if (!user) redirect('/sign-in');
+    if (!user) redirect('/login');
 
     if (!hasAccess) {
         return (

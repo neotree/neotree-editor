@@ -192,6 +192,7 @@ export const hospitals = pgTable(
         hospitalId: uuid('hospital_id').notNull().unique().defaultRandom(),
         oldHospitalId: text('old_hospital_id').unique(),
         name: text('name').notNull().unique(),
+        country: text('country').default(''),
         
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
