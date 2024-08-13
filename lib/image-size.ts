@@ -12,10 +12,14 @@ export function getRemoteImageSize(url: string) {
             })
             .on('end', function () {
                 const buffer = Buffer.concat(chunks);
-                const res = sizeOf(buffer, function(e) {
-                    if (e) reject(e);
-                });
-                resolve(res);
+                try {
+                    const res = sizeOf(buffer, function(e) {
+                        if (e) reject(e);
+                    });
+                    resolve(res);
+                } catch(e) {
+                    reject(e);
+                }
             })
             .on('error', function(e) {
                 reject(e);

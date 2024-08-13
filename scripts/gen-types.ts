@@ -6,6 +6,7 @@ import fs from 'node:fs';
 
 import db from '@/databases/pg/drizzle';
 import * as schema from '@/databases/pg/schema';
+import { writeFile } from '@/lib/write-file';
 
 const schemas: { [key: string]: ZodTypeAny; } = {
     MailerSettingsItemSelect: createSelectSchema(schema.mailerSettings),
@@ -87,19 +88,17 @@ const schemas: { [key: string]: ZodTypeAny; } = {
 main();
 
 async function main() {
-    const arr: string[] = [];
+    try {
+        const arr: string[] = [];
 
-    Object.keys(schemas).forEach(identifier => {
-        const { node } = zodToTs(schemas[identifier], identifier);
-        const nodeString = printNode(node);
-        arr.push(`export type ${identifier} = ${nodeString};\n`);
-    });
+        Object.keys(schemas).forEach(identifier => {
+            const { node } = zodToTs(schemas[identifier], identifier);
+            const nodeString = printNode(node);
+            arr.push(`export type ${identifier} = ${nodeString};\n`);
+        });
 
-    fs.writeFile('types/db.types.ts', arr.join('\n'), e => {
-        if (e) {
-            console.log('Failed to write db.types.ts', e.message);
-        } else {
-            console.log('db.types.ts created successfully!');
-        }
-    });
+        await writeFile({ path: 'types/db.types.ts', data: arr.join('\n'), });
+    } catch(e: any) {
+        console.log('ERROR: ', e);
+    }
 }
