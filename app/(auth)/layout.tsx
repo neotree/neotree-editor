@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
 import { Logo } from "@/components/logo";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
     title: `${process.env.NEXT_PUBLIC_APP_NAME} - Sign In`,
@@ -30,15 +31,21 @@ export default async function AuthLayout({ children }: {
                 "
             >
                 <div
-                    className="w-full max-w-[350px] flex flex-col gap-y-12"
+                    className="w-full max-w-[350px]"
                 >
-                    <div className="flex justify-center">
-                        <Logo />
-                    </div>
+                    <Card>
+                        <CardContent className="p-0">
+                            <div className="py-6 p-4 flex flex-col gap-y-12">
+                                <div className="flex justify-center">
+                                    <Logo />
+                                </div>
 
-                    <div>
-                        {children}
-                    </div>
+                                <div>
+                                    {children}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </>
