@@ -1,14 +1,12 @@
 import { eq, inArray } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { scriptsDrafts, screensHistory } from "../pg/schema";
 import { _getScriptDraft, _getScriptsDrafts, } from '../queries/scripts-drafts';
 import { _listScripts } from "../queries/_scripts";
 import { _restoreScreens } from "./_scripts/_restore-screens";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _deleteScriptsDrafts(
     scriptsDraftsIds: string[],

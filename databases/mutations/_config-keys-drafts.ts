@@ -1,13 +1,11 @@
-import { count, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { configKeysDrafts } from "../pg/schema";
 import { _countConfigKeysDrafts, _getConfigKeyDraft, _getConfigKeysDrafts } from '../queries/_config-keys-drafts';
 import { _listConfigKeys } from "../queries/_config-keys";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _deleteConfigKeysDrafts(
     configKeysDraftsIds: string[],

@@ -1,14 +1,12 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray, or } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import logger from "@/lib/logger";
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { diagnoses, diagnosesDrafts, diagnosesHistory } from "../pg/schema";
 import { _getDiagnosis, _getDiagnoses, _listRawDiagnoses, _listDiagnoses } from '../queries/diagnoses';
-import logger from "@/lib/logger";
 import { _listScripts } from "../queries/_scripts";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _copyDiagnoses(
     { diagnosesReferences, scriptsReferences }: { 

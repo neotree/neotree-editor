@@ -1,14 +1,12 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray, or } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import logger from "@/lib/logger";
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { screens, screensDrafts, screensHistory } from "../pg/schema";
 import { _getScreen, _getScreens, _listRawScreens, _listScreens } from '../queries/screens';
-import logger from "@/lib/logger";
 import { _listScripts } from "../queries/_scripts";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _copyScreens(
     { screensReferences, scriptsReferences }: { 

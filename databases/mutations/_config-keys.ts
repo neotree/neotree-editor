@@ -1,13 +1,11 @@
 import { and, eq, inArray, isNotNull, isNull, notInArray, asc, or } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
+import logger from "@/lib/logger";
 import db from "../pg/drizzle";
 import { configKeys, configKeysDrafts, configKeysHistory } from "../pg/schema";
 import { _getConfigKey, _getConfigKeys } from '../queries/_config-keys';
-import logger from "@/lib/logger";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _updateConfigKeysWithoutPublishing(
     payload: { 

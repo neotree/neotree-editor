@@ -1,13 +1,11 @@
 import { eq, inArray } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { screensDrafts } from "../pg/schema";
 import { _getScreenDraft, _getScreensDrafts } from '../queries/screens-drafts';
 import { _listScreens } from "../queries/screens";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _deleteScreensDrafts(
     screensDraftsIds: string[],
