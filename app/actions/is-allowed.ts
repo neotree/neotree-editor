@@ -32,11 +32,11 @@ export async function isAllowed(action?: PermissionParam) {
                 //pages
                 //mailer
                 case 'users_page':
-                case 'general_settings_page':
-                case 'emails_settings_page':
-                case 'logs_settings_page':
-                case 'system_settings_page':
-                case 'app_settings_page':
+                // case 'general_settings_page':
+                // case 'emails_settings_page':
+                // case 'logs_settings_page':
+                // case 'system_settings_page':
+                // case 'app_settings_page':
                     isAllowed = authenticated.user?.role !== 'user';
                     break;
 

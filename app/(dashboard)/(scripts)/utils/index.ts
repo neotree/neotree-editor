@@ -1,10 +1,8 @@
-import { IScriptsContext } from "@/contexts/scripts";
+import { IScriptsContext, ScreenFormDataType } from "@/contexts/scripts";
 import { ImageTextField } from "@/types";
 import queryString from "query-string";
 
-type DraftType = Awaited<ReturnType<IScriptsContext['_getScreen']>>['draft']['data'];
-
-export function getScreenDataType(type: DraftType['dataType']) {
+export function getScreenDataType(type: ScreenFormDataType['dataType']) {
     switch (type) {
         case 'yesno':
             return 'boolean';

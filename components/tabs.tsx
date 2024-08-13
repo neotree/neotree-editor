@@ -29,8 +29,8 @@ export function Tabs({
 
     const searchParams = useSearchParams();
 
-    const section = useMemo(() => !searchParamsKey ? null : searchParams.parsed[searchParamsKey], [searchParams.parsed]);
-    const activeTab = useMemo(() => tabs.filter(t => t.value === section)[0]?.value || tabs[0].value, [section]);
+    const section = useMemo(() => !searchParamsKey ? null : searchParams.parsed[searchParamsKey], [searchParams.parsed, searchParamsKey]);
+    const activeTab = useMemo(() => tabs.filter(t => t.value === section)[0]?.value || tabs[0].value, [section, tabs]);
     const useLink = useMemo(() => !!searchParamsKey, [searchParamsKey]);
 
     useEffect(() => {

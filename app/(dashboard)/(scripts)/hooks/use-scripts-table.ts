@@ -86,7 +86,7 @@ export function useScriptsTable({
         await saveScripts({ data: payload, broadcastAction: true, });
 
         router.refresh();
-    }, [saveScripts, alert, scripts, router]);
+    }, [saveScripts, scripts, router]);
 
     const onDuplicate = useCallback(async (scriptsIds: string[]) => {
         scriptsIds = scriptsIds.filter(s => s);
