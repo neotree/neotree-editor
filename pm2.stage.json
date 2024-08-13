@@ -1,0 +1,9 @@
+{
+    "script": "server/index.js",
+    "watch": true,
+    "ignore_watch": ["logs"],
+    "name": "neotree_webeditor_stage",
+    "watch_options": {
+        "followSymlinks": false
+    }
+}
