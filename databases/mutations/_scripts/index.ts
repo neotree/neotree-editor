@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, notInArray, or } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import logger from "@/lib/logger";
 import db from "../../pg/drizzle";
 import { screensDrafts, scripts, scriptsDrafts, scriptsHistory, screensHistory, diagnosesDrafts } from "../../pg/schema";
@@ -9,8 +9,6 @@ import { _getScript, _getScripts } from '../../queries/_scripts';
 import { _publishScreens } from "../screens";
 import { _restoreScreens } from "./_restore-screens";
 import { _publishDiagnoses } from "../diagnoses";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export * from './_import-scripts';
 export * from './_delete-screens';

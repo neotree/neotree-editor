@@ -1,13 +1,11 @@
 import { eq, inArray } from "drizzle-orm";
 import { v4 } from "uuid";
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import db from "../pg/drizzle";
 import { diagnosesDrafts } from "../pg/schema";
 import { _getDiagnosisDraft, _getDiagnosesDrafts } from '../queries/diagnoses-drafts';
 import { _listDiagnoses } from "../queries/diagnoses";
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _deleteDiagnosesDrafts(
     diagnosesDraftsIds: string[],

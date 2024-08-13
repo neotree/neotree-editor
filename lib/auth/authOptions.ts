@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { AuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 
 import db from "@/databases/pg/drizzle";
@@ -48,11 +48,7 @@ export const authOptions: AuthOptions = {
 
                 if (!user) throw new Error('Invalid credentials');
 
-                if (credentials.password) {
-                    const isCorrectPassword: boolean = await bcrypt.compare(credentials.password, `${user.password}`);
-
-                    if (!isCorrectPassword) throw new Error('Invalid credentials');
-                } else {
+                if (credentials.code) {
                     const token = await db.query.tokens.findFirst({
                         where: and(
                             eq(schema.tokens.token, Number(credentials.code)),
@@ -63,6 +59,12 @@ export const authOptions: AuthOptions = {
                     if (!token) throw new Error('That code wasn&apos;t valid. Have another go!');
 
                     await db.delete(schema.tokens).where(eq(schema.tokens.id, token.id));
+                } else if (credentials.password) {
+                    const isCorrectPassword: boolean = await bcrypt.compare(credentials.password, `${user.password}`);
+
+                    if (!isCorrectPassword) throw new Error('Invalid credentials');
+                } else {
+                    if (!user) throw new Error('Invalid credentials');
                 }
 
                 const updateFields: Partial<typeof schema.users.$inferSelect> = { lastLoginDate: new Date() };

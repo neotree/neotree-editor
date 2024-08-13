@@ -1,11 +1,9 @@
-import { io } from 'socket.io-client';
+import { eq } from 'drizzle-orm';
 
+import socket  from '@/lib/socket';
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { sys } from '@/databases/pg/schema';
-import { eq } from 'drizzle-orm';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export type UpdateSysResponse = { 
     success: boolean; 

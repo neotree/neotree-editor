@@ -1,9 +1,5 @@
-import { io } from 'socket.io-client';
-
+import socket  from '@/lib/socket';
 import logger from '@/lib/logger';
-import db from '@/databases/pg/drizzle';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _mutationTemplate(
     opts?: {

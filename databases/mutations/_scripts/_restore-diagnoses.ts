@@ -1,11 +1,9 @@
-import { io } from 'socket.io-client';
 import { inArray } from 'drizzle-orm';
 
 import db from '@/databases/pg/drizzle';
 import logger from '@/lib/logger';
+import socket  from '@/lib/socket';
 import { diagnoses, diagnosesHistory } from '@/databases/pg/schema';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _restoreDiagnoses(
     { restoreKeys }: {

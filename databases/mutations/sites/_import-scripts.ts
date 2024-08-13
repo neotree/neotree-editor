@@ -1,15 +1,13 @@
 import axios from 'axios';
 import { eq } from 'drizzle-orm';
-import { io } from 'socket.io-client';
 
+import socket  from '@/lib/socket';
 import db from "@/databases/pg/drizzle";
 import { sites } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import queryString from 'query-string';
 import { _getScriptsWithItems } from '@/databases/queries/_scripts';
 import { __importScripts } from '../_scripts';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _importRemoteScripts(
     { siteId, scriptsIds, }: {

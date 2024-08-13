@@ -1,5 +1,3 @@
-import { io } from 'socket.io-client';
-
 import db from "@/databases/pg/drizzle";
 import { 
     screensDrafts as screensDraftsTable, 
@@ -8,6 +6,7 @@ import {
     scripts as scriptsTable, 
 } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import socket  from '@/lib/socket';
 import { _getScriptsWithItems, _listScripts } from '@/databases/queries/_scripts';
 import { screenToDraftInsertData, scriptToDraftInsertData, diagnosisToDraftInsertData } from '@/databases/utils';
 import { _createScreensDrafts } from '../screens-drafts';
@@ -16,8 +15,6 @@ import { _deleteDiagnoses } from './_delete-diagnoses';
 
 import { eq } from 'drizzle-orm';
 import { _deleteScreens } from './_delete-screens';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export async function _importScripts(
     data: {

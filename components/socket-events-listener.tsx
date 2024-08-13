@@ -2,10 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { io } from 'socket.io-client';
 
-const isProd = process.env.NODE_ENV === 'production';
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
+import socket  from '@/lib/socket';
 
 export function SocketEventsListener({ events }: {
     events: {

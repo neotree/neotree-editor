@@ -1,12 +1,9 @@
-import { io } from 'socket.io-client';
-
+import socket  from '@/lib/socket';
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { files } from '@/databases/pg/schema';
 import { _getFileByFileId } from '@/databases/queries/files';
 import { FileDetails } from '@/databases/queries/files/types';
-
-const socket = io(process.env.NEXT_PUBLIC_APP_URL);
 
 export type SaveFileOptions = {
     broadcastAction?: boolean;
