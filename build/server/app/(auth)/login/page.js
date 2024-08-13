@@ -190,7 +190,7 @@
 
                         <div style="display:flex;align-items:center;justify-content:flex-end;">
                             <span>&copy;&nbsp;</span>
-                            <a style="color:${s.primary.DEFAULT};" href="http://localhost:85">Neotree</a>
+                            <a style="color:${s.primary.DEFAULT};" href="https://webeditor-dev.neotree.org">Neotree</a>
                         </div>
                     </div>
                 </div>
