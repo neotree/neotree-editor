@@ -209,6 +209,7 @@ export type HospitalSelect = {
     hospitalId: string;
     oldHospitalId: string | null;
     name: string;
+    country: string | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
@@ -219,6 +220,7 @@ export type HospitalInsert = {
     hospitalId?: string | undefined;
     oldHospitalId?: (string | null) | undefined;
     name: string;
+    country?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
@@ -336,6 +338,8 @@ export type ConfigKeyDraftSelect = {
     configKeyId: string | null;
     position: number;
     data: ConfigKeyDraftSelect;
+    createdAt: Date;
+    updatedAt: Date;
 };
 
 export type ConfigKeyDraftInsert = {
@@ -344,6 +348,8 @@ export type ConfigKeyDraftInsert = {
     configKeyId?: (string | null) | undefined;
     position: number;
     data: ConfigKeyDraftInsert;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
 };
 
 export type ConfigKeyHistoryItemSelect = {
@@ -412,6 +418,8 @@ export type ScriptDraftSelect = {
     scriptId: string | null;
     position: number;
     data: ScriptDraftSelect;
+    createdAt: Date;
+    updatedAt: Date;
 };
 
 export type ScriptDraftInsert = {
@@ -420,6 +428,8 @@ export type ScriptDraftInsert = {
     scriptId?: (string | null) | undefined;
     position: number;
     data: ScriptDraftInsert;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
 };
 
 export type ScriptHistoryItemSelect = {
@@ -461,6 +471,7 @@ export type ScreenSelect = {
     step: string;
     actionText: string;
     contentText: string;
+    infoText: string;
     title: string;
     title1: string;
     title2: string;
@@ -522,6 +533,7 @@ export type ScreenInsert = {
     step?: string | undefined;
     actionText?: string | undefined;
     contentText?: string | undefined;
+    infoText?: string | undefined;
     title: string;
     title1?: string | undefined;
     title2?: string | undefined;
@@ -571,6 +583,8 @@ export type ScreenDraftSelect = {
     type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table";
     position: number;
     data: ScreenDraftSelect;
+    createdAt: Date;
+    updatedAt: Date;
 };
 
 export type ScreenDraftInsert = {
@@ -582,6 +596,8 @@ export type ScreenDraftInsert = {
     type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table";
     position: number;
     data: ScreenDraftInsert;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
 };
 
 export type ScreenHistoryItemSelect = {
@@ -668,6 +684,8 @@ export type DiagnosisDraftSelect = {
     scriptDraftId: string | null;
     position: number;
     data: DiagnosisDraftSelect;
+    createdAt: Date;
+    updatedAt: Date;
 };
 
 export type DiagnosisDraftInsert = {
@@ -678,6 +696,8 @@ export type DiagnosisDraftInsert = {
     scriptDraftId?: (string | null) | undefined;
     position: number;
     data: DiagnosisDraftInsert;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
 };
 
 export type DiagnosisHistoryItemSelect = {
