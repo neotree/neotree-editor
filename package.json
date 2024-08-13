@@ -5,22 +5,15 @@
     "scripts": {
         "start": "node server/index.js",
         "dev": "node server/index.js",
-        "start:stage": "pm2 start pm2.stage.json",
-        "start:production": "pm2 start pm2.production.json",
         "build": "next build",
         "lint": "next lint",
         "db:studio": "npx drizzle-kit studio",
         "db:push": "npx drizzle-kit push",
-        "tsx": "tsx $1",
-        "start:prod-server": "node server/index.js",
-        "start:stage-server": "node server/index.js",
-        "start:dev-server": "node server/index.js",
-        "preprod-server": "yarn",
-        "prestage-server": "yarn",
-        "predev-server": "yarn",
-        "prod-server": "pm2 --name neotree_webeditor_production --watch --no-daemon start npm -- run start:prod-server",
-        "stage-server": "pm2 --name neotree_webeditor_stage --watch --no-daemon start npm -- run start:stage-server",
-        "dev-server": "pm2 --name neotree_webeditor_development --watch --no-daemon start npm -- run start:dev-server"
+        "prestart:stage": "yarn",
+        "prestart:production": "yarn",
+        "start:stage": "pm2 start pm2.stage.json",
+        "start:production": "pm2 start pm2.production.json",
+        "tsx": "tsx $1"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
