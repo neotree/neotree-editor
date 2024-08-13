@@ -13,9 +13,9 @@
         "start:prod-server": "node server/index.js",
         "start:stage-server": "node server/index.js",
         "start:dev-server": "node server/index.js",
-        "preprod-server": "npm i",
-        "prestage-server": "npm i",
-        "predev-server": "npm i",
+        "preprod-server": "yarn",
+        "prestage-server": "yarn",
+        "predev-server": "yarn",
         "prod-server": "pm2 --name neotree_webeditor_production --watch --no-daemon start npm -- run start:prod-server",
         "stage-server": "pm2 --name neotree_webeditor_stage --watch --no-daemon start npm -- run start:stage-server",
         "dev-server": "pm2 --name neotree_webeditor_development --watch --no-daemon start npm -- run start:dev-server"
