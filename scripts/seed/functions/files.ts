@@ -31,7 +31,9 @@ export async function seedFiles(site: typeof schema.sites.$inferSelect) {
             file.metadata = file.metadata || {};
             file.filename = [file.id, file.filename].filter(s => s).join('__');
             try {
-                const size = await getRemoteImageSize('https://webeditor-dev.neotree.org/file/1be556fa-70c2-48bd-ab8e-1c503400cb93');
+                const url = `${site.link}/file/${file.id}`;
+                console.log('getRemoteImageSize', url);
+                const size = await getRemoteImageSize(url);
                 file.metadata.width = size.width;
                 file.metadata.height = size.height;
                 file.filename = `${file.filename}?w=${file.metadata.width}&h=${file.metadata.height}`;
