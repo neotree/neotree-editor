@@ -86,7 +86,7 @@ export function useScreensTable({
         await saveScreens({ data: payload, broadcastAction: true, });
 
         router.refresh();
-    }, [saveScreens, alert, screens, router]);
+    }, [saveScreens, screens, router]);
 
     const disabled = useMemo(() => viewOnly, [viewOnly]);
 

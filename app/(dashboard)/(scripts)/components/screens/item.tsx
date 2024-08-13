@@ -39,6 +39,8 @@ export function Item<P = {}>({
             id: item?.id || '',
             label: item?.label || '',
             position: item?.position || 1,
+            subType: item?.subType || '',
+            type: item?.type || '',
             ...item
         } satisfies ItemType;
     }, [item]);

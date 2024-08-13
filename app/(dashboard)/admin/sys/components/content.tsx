@@ -50,7 +50,7 @@ export function Content({ _updateSys }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [updateSys, alert, form]);
+    }, [updateSys, alert, router, form]);
 
     const isDirty = useMemo(() => JSON.stringify(sys) !== JSON.stringify(form), [sys, form]);
 

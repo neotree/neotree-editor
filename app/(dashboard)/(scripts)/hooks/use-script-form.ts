@@ -50,7 +50,7 @@ export function useScriptForm(params: UseScriptFormParams) {
             defaultNuidSearchFields.admission : defaultNuidSearchFields.other) as unknown as typeof fields;
         if (!enabled) _fields = [];
         return _fields;
-    }, [form]);
+    }, [form, formData?.nuidSearchFields]);
 
     const { handleSubmit, formState: { dirtyFields, }, } = form;
 

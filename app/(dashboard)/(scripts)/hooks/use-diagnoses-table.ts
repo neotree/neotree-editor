@@ -86,7 +86,7 @@ export function useDiagnosesTable({
         await saveDiagnoses({ data: payload, broadcastAction: true, });
 
         router.refresh();
-    }, [saveDiagnoses, alert, diagnoses, router]);
+    }, [saveDiagnoses, diagnoses, router]);
 
     const disabled = useMemo(() => viewOnly, [viewOnly]);
 
