@@ -26,17 +26,20 @@ export async function sendMail({
     const logoLight = await getLogoBase64('logo-light.png');
 
     const transporter = nodemailer.createTransport({
-        service: "gmail",
+        host: process.env.MAIL_HOST,
+        port: Number(process.env.MAIL_PORT),
+        secure: false,
         auth: {
-            user: process.env.NODEMAILER_EMAIL,
-            pass: process.env.NODEMAILER_PW,
+            user: process.env.MAIL_USERNAME,
+            pass: process.env.MAIL_PASSWORD,
         },
     });
 
     transporter.use('compile', inlineBase64({ cidPrefix: 'wellToDoHedgehog107', }));
 
     const mailOptions: NodeMailerSendMailOptions = {
-        from: process.env.NODEMAILER_EMAIL,
+        from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+        sender: process.env.MAIL_FROM_ADDRESS,
         to: typeof toEmail === 'string' ? [toEmail] : toEmail,
         subject: `[${process.env.NEXT_PUBLIC_APP_NAME}] ${subject}`,
         text: textMessage,
