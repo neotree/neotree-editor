@@ -166,7 +166,7 @@ exports.id=5705,exports.ids=[5705],exports.modules={90938:(e,a,t)=>{let d={a2916
 
                         <div style="display:flex;align-items:center;justify-content:flex-end;">
                             <span>&copy;&nbsp;</span>
-                            <a style="color:${i.primary.DEFAULT};" href="http://localhost:85">Neotree</a>
+                            <a style="color:${i.primary.DEFAULT};" href="https://webeditor-dev.neotree.org">Neotree</a>
                         </div>
                     </div>
                 </div>
