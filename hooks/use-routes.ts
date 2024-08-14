@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/app";
 
 export function useRoutes() {
     const pathname = usePathname();
-    const { isDefaultUser } = useAppContext();
+    const { isDefaultUser, sys } = useAppContext();
 
     return [
         {
@@ -31,11 +31,11 @@ export function useRoutes() {
             href: '/hospitals',
             id: v4(),
         },
-        ...(isDefaultUser ? [] : [
+        ...((isDefaultUser || (sys.data.hide_admin_page === 'yes')) ? [] : [
             {
                 label: 'Admin',
                 href: '/admin',
-                isActive: pathname.substring(0, 10) === '/admin/',
+                isActive: pathname.substring(0, 7) === '/admin/',
                 id: v4(),
             }
         ]),

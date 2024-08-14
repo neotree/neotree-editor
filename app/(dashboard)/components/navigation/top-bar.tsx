@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
+import { cn } from "@/lib/utils";
 
 type Props = {
 
@@ -21,6 +22,7 @@ export function TopBar({}: Props) {
     const [loading, setLoading] = useState(false);
     const { 
         mode, 
+        sys,
         shouldPublishData,
         setMode,
         publishData: _publishData, 
@@ -85,17 +87,21 @@ export function TopBar({}: Props) {
         }
     }, [_discardDrafts, alert, router]);
 
+    const usePlainBg = sys.data.use_plain_background === 'yes';
+
     return (
         <>
             {loading && <Loader overlay />}
 
             <Content className="p-0 flex items-center justify-center h-full">
-                <div className="flex items-center justify-center gap-x-2 text-xs">
+                <div className="text-secondary-foreground flex items-center justify-center gap-x-2 text-xs">
                     <span>You&apos;re in <b>{mode}</b> mode</span>
 
                     <a 
                         href="#"
-                        className="text-primary"
+                        className={cn(
+                            usePlainBg ? 'text-primary' : 'text-primary',
+                        )}
                         onClick={e => {
                             e.preventDefault();
                             setMode(mode === 'development' ? 'view' : 'development');
