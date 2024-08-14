@@ -1,19 +1,19 @@
 {
   "pages": {
-    "/(dashboard)/(scripts)/page": [
+    "/(dashboard)/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/page.js"
+      "static/chunks/app/(dashboard)/admin/page.js"
     ],
-    "/(dashboard)/(scripts)/layout": [
+    "/(dashboard)/admin/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/layout.js"
+      "static/chunks/app/(dashboard)/admin/layout.js"
     ],
-    "/(dashboard)/(scripts)/loading": [
+    "/(dashboard)/admin/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/loading.js"
+      "static/chunks/app/(dashboard)/admin/loading.js"
     ],
     "/(dashboard)/layout": [
       "static/chunks/webpack.js",
@@ -40,6 +40,81 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/layout.js"
+    ],
+    "/(dashboard)/(scripts)/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/page.js"
+    ],
+    "/(dashboard)/(scripts)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/layout.js"
+    ],
+    "/(dashboard)/(scripts)/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/loading.js"
+    ],
+    "/not-found": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/not-found.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
+    ],
+    "/(dashboard)/admin/emails/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/admin/emails/page.js"
+    ],
+    "/(dashboard)/admin/emails/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/admin/emails/loading.js"
+    ],
+    "/(dashboard)/admin/sys/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/admin/sys/page.js"
+    ],
+    "/(dashboard)/admin/sys/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/admin/sys/loading.js"
+    ],
+    "/(dashboard)/hospitals/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/hospitals/page.js"
+    ],
+    "/(dashboard)/hospitals/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/hospitals/loading.js"
+    ],
+    "/(dashboard)/users/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/users/page.js"
+    ],
+    "/(dashboard)/users/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/users/loading.js"
+    ],
+    "/(dashboard)/configuration/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/configuration/page.js"
+    ],
+    "/(dashboard)/configuration/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/configuration/loading.js"
     ]
   }
 }

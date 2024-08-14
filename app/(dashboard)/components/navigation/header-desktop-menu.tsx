@@ -11,7 +11,8 @@ export function HeaderDesktopMenu() {
     const { sys } = useAppContext();
     const routes = useRoutes();
 
-    const showSidebar = useMemo(() => sys.data.use_sidebar_menu === 'yes', [sys.data.use_sidebar_menu]);
+    const showSidebar = sys.data.use_sidebar_menu === 'yes';
+    const usePlainBg = sys.data.use_plain_background === 'yes';
 
     if (showSidebar) return null;
 
@@ -26,11 +27,22 @@ export function HeaderDesktopMenu() {
                             key={i}
                             href={route.href}
                             className={cn(
+                                usePlainBg ? 
+                                    (
+                                        isActive ? 
+                                            'bg-primary text-primary-foreground' 
+                                            : 
+                                            'text-secondary hover:bg-primary/10 dark:hover:bg-primary-foreground/10'
+                                    ) 
+                                    :
+                                    (
+                                        isActive ? 
+                                            'bg-primary-foreground text-primary dark:bg-primary dark:text-primary-foreground' 
+                                            : 
+                                            'text-primary-foreground hover:bg-primary-foreground/20 dark:hover:bg-primary/20'
+                                    ),
                                 'px-4 flex flex-col justify-center transition-colors dark:text-foreground',
-                                isActive ? 
-                                    'bg-primary text-primary-foreground' 
-                                    : 
-                                    'text-secondary hover:bg-primary/10 dark:hover:bg-primary-foreground/10'
+                                
                             )}
                         >
                             {route.label}

@@ -56,7 +56,9 @@ export function AppContextProvider({
             (mode === 'view');
     }, [authenticatedUserRoles, mode]);
 
-    useEffect(() => { if (sys.data.hide_theme_toggle === 'no') setTheme('light'); }, [sys])
+    useEffect(() => { 
+        if (sys.data.hide_theme_toggle === 'yes') setTheme('light'); 
+    }, [sys])
 
     const ctx = {
         ...props,

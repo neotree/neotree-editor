@@ -36,6 +36,8 @@ export function User({ user }: Props) {
         });
     }, [confirm]);
 
+    const usePlainBg = sys.data.use_plain_background === 'yes';
+
     return (
         <>
             <DropdownMenu>
@@ -43,7 +45,10 @@ export function User({ user }: Props) {
                     <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="transition-colors rounded-full hover:text-primary-foreground hover:bg-primary h-12 w-12"
+                        className={cn(
+                            'transition-colors rounded-full hover:text-primary-foreground hover:bg-primary h-12 w-12',
+                            usePlainBg ? '' : 'text-primary-foreground hover:bg-primary-foreground/20',
+                        )}
                     >
                         <UserIcon className="h-6 w-6" />
                     </Button>

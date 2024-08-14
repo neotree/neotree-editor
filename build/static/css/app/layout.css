@@ -1273,6 +1273,9 @@ video {
 .border-b-border {
   border-bottom-color: hsl(var(--border));
 }
+.border-b-border\/5 {
+  border-bottom-color: hsl(var(--border) / 0.05);
+}
 .border-b-primary {
   border-bottom-color: hsl(var(--primary));
 }
@@ -1488,6 +1491,10 @@ video {
   font-size: 2.25rem;
   line-height: 2.5rem;
 }
+.text-6xl {
+  font-size: 3.75rem;
+  line-height: 1;
+}
 .text-\[0\.8rem\] {
   font-size: 0.8rem;
 }
@@ -1513,6 +1520,9 @@ video {
 }
 .font-bold {
   font-weight: 700;
+}
+.font-extrabold {
+  font-weight: 800;
 }
 .font-medium {
   font-weight: 500;
@@ -1801,6 +1811,10 @@ body,
 
 .hover\:bg-primary:hover {
   background-color: hsl(var(--primary));
+}
+
+.hover\:bg-primary-foreground\/20:hover {
+  background-color: hsl(var(--primary-foreground) / 0.2);
 }
 
 .hover\:bg-primary\/10:hover {
@@ -2317,6 +2331,10 @@ body,
   animation-duration: 500ms;
 }
 
+.dark\:visible:is(.dark *) {
+  visibility: visible;
+}
+
 .dark\:block:is(.dark *) {
   display: block;
 }
@@ -2351,6 +2369,10 @@ body,
   background-color: hsl(var(--background));
 }
 
+.dark\:bg-primary:is(.dark *) {
+  background-color: hsl(var(--primary));
+}
+
 .dark\:bg-secondary-foreground:is(.dark *) {
   background-color: hsl(var(--secondary-foreground));
 }
@@ -2363,8 +2385,16 @@ body,
   color: hsl(var(--foreground));
 }
 
+.dark\:text-primary-foreground:is(.dark *) {
+  color: hsl(var(--primary-foreground));
+}
+
 .dark\:text-secondary:is(.dark *) {
   color: hsl(var(--secondary));
+}
+
+.dark\:text-secondary-foreground:is(.dark *) {
+  color: hsl(var(--secondary-foreground));
 }
 
 .dark\:shadow-foreground\/10:is(.dark *) {
@@ -2374,6 +2404,10 @@ body,
 
 .dark\:hover\:bg-primary-foreground\/10:hover:is(.dark *) {
   background-color: hsl(var(--primary-foreground) / 0.1);
+}
+
+.dark\:hover\:bg-primary\/20:hover:is(.dark *) {
+  background-color: hsl(var(--primary) / 0.2);
 }
 
 .dark\:hover\:bg-secondary-foreground\/90:hover:is(.dark *) {
@@ -2474,6 +2508,11 @@ body,
 
   .sm\:text-left {
     text-align: left;
+  }
+
+  .sm\:text-9xl {
+    font-size: 8rem;
+    line-height: 1;
   }
 
   .data-\[state\=open\]\:sm\:slide-in-from-bottom-full[data-state=open] {

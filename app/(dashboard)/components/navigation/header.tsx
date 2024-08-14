@@ -3,7 +3,7 @@
 import { Logo } from "@/components/logo";
 import { Content } from "@/components/content";
 import { ModeToggle } from "@/components/mode-toggle";
-import { IAppContext } from "@/contexts/app";
+import { IAppContext, useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
 import { HeaderDesktopMenu } from "./header-desktop-menu";
 import { MobileMenu } from "./mobile-menu";
@@ -23,23 +23,28 @@ export function Header({
     showTopBar, 
     showThemeToggle, 
 }: Props) {
+    const { sys } = useAppContext();
+
+    const usePlainBg = sys.data.use_plain_background === 'yes';
+
     return (
         <>
             <div className={cn('h-16', !!showTopBar && 'h-24')} />
 
             {!!showTopBar && (
                 <div 
-                    className="
-                        fixed 
-                        top-0 
-                        left-0
-                        border-b
-                        border-b-border
-                        bg-background
-                        h-8
-                        w-full
-                        z-[1]
-                    "
+                    className={cn(
+                        `
+                            fixed 
+                            top-0 
+                            left-0
+                            border-b
+                            h-8
+                            w-full
+                            z-[1]
+                        `,
+                        usePlainBg ? 'bg-background border-b-border' : 'bg-secondary border-b-border/5',
+                    )}
                 >
                     <TopBar />
                 </div>
@@ -53,14 +58,13 @@ export function Header({
                         left-0
                         w-full
                         h-16
-                        bg-primary-foreground
-                        dark:bg-background
                         shadow-md
                         dark:shadow-foreground/10
                         flex
                         justify-center
                         z-[1]
                     `,
+                    usePlainBg ? 'bg-primary-foreground dark:bg-background' : 'bg-primary dark:bg-background',
                     !!showTopBar && 'top-8',
                 )}
             >
@@ -80,7 +84,7 @@ export function Header({
                     </div>
 
                     <div className="my-auto">
-                        <Logo size="sm" href="/" />
+                        <Logo size="sm" href="/" theme="dark" />
                     </div>
 
                     <div className="ml-auto" />

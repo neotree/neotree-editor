@@ -2,17 +2,25 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
+type Props = {
+    theme?: 'light' | 'dark' | 'auto',
+    variant?: 'default' | 'icon',
+    size?: 'sm' | 'lg' | 'xl' | '2xl';
+    href?: string;
+    className?: string;
+};
+
+export function LogoLight() {
+
+}
+
 export function Logo({
     size,
     href,
     className,
     variant = 'default',
-}: {
-    variant?: 'default' | 'icon',
-    size?: 'sm' | 'lg' | 'xl' | '2xl';
-    href?: string;
-    className?: string;
-}) {
+    theme = 'auto',
+}: Props) {
     const logo = (
         <div
             className={cn(
@@ -71,7 +79,10 @@ export function Logo({
                         width="145.29" 
                         height="78.354" 
                         viewBox="0 0 145.29 78.354"
-                        className="w-full h-auto dark:hidden"
+                        className={cn(
+                            'w-full h-auto',
+                            theme === 'auto' ? 'dark:hidden' : (theme !== 'light' && 'hidden')
+                        )}
                     >
                         <g id="Group_1377" data-name="Group 1377" transform="translate(0)">
                             <path id="Path_885" data-name="Path 885" d="M80.664,59.008a6.663,6.663,0,0,1-.159-1.541c-.006-.5.022-.993.056-1.487a20.31,20.31,0,0,1,2.705-8.488A13.118,13.118,0,0,1,87.514,43a7.745,7.745,0,0,1,6.009-1.066.191.191,0,0,1,0,.368l0,0A10.833,10.833,0,0,0,88.9,44.863a18.447,18.447,0,0,0-3.181,4.1A47.879,47.879,0,0,0,83.244,53.8c-.386.839-.754,1.695-1.125,2.559-.2.43-.363.868-.554,1.306l-.267.659c-.09.213-.178.459-.24.633l-.025.07a.193.193,0,0,1-.248.114A.2.2,0,0,1,80.664,59.008Z" transform="translate(-3.081 -5.835)" fill="#2b304a"/>
@@ -97,7 +108,10 @@ export function Logo({
                         width="145.29" 
                         height="78.354" 
                         viewBox="0 0 145.29 78.354"
-                        className="w-full h-auto hidden dark:block"
+                        className={cn(
+                            'w-full h-auto',
+                            theme === 'auto' ? 'hidden dark:hidden' : (theme !== 'dark' && 'hidden')
+                        )}
                     >
                         <g id="Group_1378" data-name="Group 1378" transform="translate(0)">
                             <path id="Path_885" data-name="Path 885" d="M80.664,59.008a6.663,6.663,0,0,1-.159-1.541c-.006-.5.022-.993.056-1.487a20.31,20.31,0,0,1,2.705-8.488A13.118,13.118,0,0,1,87.514,43a7.745,7.745,0,0,1,6.009-1.066.191.191,0,0,1,0,.368l0,0A10.833,10.833,0,0,0,88.9,44.863a18.447,18.447,0,0,0-3.181,4.1A47.879,47.879,0,0,0,83.244,53.8c-.386.839-.754,1.695-1.125,2.559-.2.43-.363.868-.554,1.306l-.267.659c-.09.213-.178.459-.24.633l-.025.07a.193.193,0,0,1-.248.114A.2.2,0,0,1,80.664,59.008Z" transform="translate(-3.081 -5.835)" fill="#ffffff"/>
