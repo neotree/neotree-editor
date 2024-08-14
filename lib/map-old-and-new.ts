@@ -120,7 +120,10 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 title3: s.title3,
                 text1: s.text1,
                 text2: s.text2,
-                item: s.items,
+                image1: s.image1,
+                image2: s.image2,
+                image3: s.image3,
+                items: s.items,
                 fields: s.fields,
                 // items: (s.items as any[]).map(s => ({
                 //     confidential: s.confidential,
