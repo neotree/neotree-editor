@@ -17,7 +17,7 @@ export async function _countPendingDeletion(): Promise<{ errors?: string[]; tota
         const res = await db.select({ count: count(), }).from(pendingDeletion);
         return { total: res[0]?.count || 0, };
     } catch(e: any) {
-        logger.log('_countPendingDeletion ERROR', e.message);
+        logger.error('_countPendingDeletion ERROR', e.message);
         return { total: 0, errors: [e.message], };
     }
 }
@@ -57,7 +57,7 @@ export async function _countDrafts(): Promise<{
         
         return { ...data, };
     } catch(e: any) {
-        logger.log('_countDrafts ERROR', e.message);
+        logger.error('_countDrafts ERROR', e.message);
         return { ...data, errors: [e.message], };
     }
 }

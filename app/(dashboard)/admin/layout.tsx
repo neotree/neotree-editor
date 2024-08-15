@@ -17,7 +17,7 @@ export default async function AdminPageLayout({ children }: {
 
     if (!user) redirect('/login');
 
-    if (sys.data.hide_admin_page === 'yes') redirect('/not-found');
+    // if (sys.data.hide_admin_page === 'yes') redirect('/not-found');
 
     return (
         <>

@@ -6,6 +6,8 @@ import { _getFullUser } from "@/databases/queries/users";
 
 export async function GET(req: NextRequest) {
 	try {
+        logger.log(`[GET]: ${req.url}`);
+        
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });

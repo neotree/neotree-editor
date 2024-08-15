@@ -8,6 +8,8 @@ import { _createUsers, _updateUsers } from "@/databases/mutations/users";
 
 export async function POST(req: NextRequest) {
 	try {
+        logger.log(`[POST]: ${req.url}`);
+        
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });

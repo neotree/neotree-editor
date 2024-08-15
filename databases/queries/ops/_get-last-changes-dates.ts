@@ -92,7 +92,7 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
             }, 
         };
     } catch(e: any) {
-        logger.log('_getDatesWhenUpdatesWereMade ERROR', e.message);
+        logger.error('_getDatesWhenUpdatesWereMade ERROR', e.message);
         return { data: defaultChangesDates, errors: [e.message], };
     }
 }

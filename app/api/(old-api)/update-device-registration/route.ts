@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
 
+        logger.log(`[POST]: ${req.url}`, body);
+
         const res = await _saveDevices({
             data: [body],
             returnSaved: true,
