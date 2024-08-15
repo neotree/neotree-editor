@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
 
-        logger.error('[APP ERROR]: ', body);
+        logger.appError(body);
 
 		return NextResponse.json({ success: true, });
 	} catch(e: any) {

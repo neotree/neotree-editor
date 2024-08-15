@@ -17,12 +17,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import ucFirst from "@/lib/ucFirst";
 import { Separator } from "@/components/ui/separator";
 
 type Props = {
     _getLogs: typeof getLogs;
 };
+
+const options = [
+    { label: 'Errors', value: 'errors' }, 
+    {label: 'Logs', value: 'logs', },
+    {label: 'App Errors', value: 'app_errors', },
+];
 
 export function Content({
     _getLogs,
@@ -76,9 +81,9 @@ export function Content({
                         </SelectTrigger>
                         <SelectContent>
                         <SelectGroup>
-                            {['errors', 'logs'].map(type => (
-                                <SelectItem key={type} value={type}>
-                                    {ucFirst(type)}
+                            {options.map(o => (
+                                <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
                                 </SelectItem>
                             ))}
                             </SelectGroup>
