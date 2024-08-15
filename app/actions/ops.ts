@@ -56,7 +56,7 @@ export async function getEditorDetails(): Promise<{
             info: editorInfo.data,
         };
     } catch(e: any) {
-        logger.log('getEditorDetails ERROR', e.message);
+        logger.error('getEditorDetails ERROR', e.message);
         return {
             errors: [e.message, ...errors],
             pendingDeletion: 0,

@@ -480,7 +480,7 @@ export async function copyScripts(params?: {
 
         return response;
     } catch(e: any) {
-        logger.log('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
+        logger.error('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
         return { errors: e.response?.data?.errors || [e.message], success: false, info, };
     }
 }
@@ -540,7 +540,7 @@ export async function copyScreens(params?: {
             errors: errors.length ? errors : undefined, 
         };
     } catch(e: any) {
-        logger.log('copyScreens ERROR', e.message);
+        logger.error('copyScreens ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
     }
 }
@@ -600,7 +600,7 @@ export async function copyDiagnoses(params?: {
             errors: errors.length ? errors : undefined, 
         };
     } catch(e: any) {
-        logger.log('copyDiagnoses ERROR', e.message);
+        logger.error('copyDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
     }
 }
