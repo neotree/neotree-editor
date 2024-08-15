@@ -9,7 +9,7 @@ import logger from "@/lib/logger";
 export async function getLogs({ date, type = 'logs', endDate }: {
     date: Date
     endDate?: null | Date,
-    type?: 'errors' | 'logs',
+    type?: 'errors' | 'logs' | 'app_errors',
 }) {
     const response: {
         data: string[];
