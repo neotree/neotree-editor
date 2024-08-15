@@ -24,6 +24,8 @@ export function TopBar({}: Props) {
         mode, 
         sys,
         shouldPublishData,
+        isAdmin, 
+        isSuperUser,
         setMode,
         publishData: _publishData, 
         discardDrafts: _discardDrafts 
@@ -88,6 +90,7 @@ export function TopBar({}: Props) {
     }, [_discardDrafts, alert, router]);
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
+    const canSwitchModes = isAdmin || isSuperUser;
 
     return (
         <>
@@ -101,6 +104,7 @@ export function TopBar({}: Props) {
                         href="#"
                         className={cn(
                             usePlainBg ? 'text-primary' : 'text-primary',
+                            !canSwitchModes && 'hidden',
                         )}
                         onClick={e => {
                             e.preventDefault();
@@ -127,8 +131,7 @@ export function TopBar({}: Props) {
                             </Button>
 
                             <Button
-                                variant="secondary"
-                                className="h-auto text-xs px-4 py-1 dark:bg-secondary-foreground dark:text-secondary dark:hover:bg-secondary-foreground/90"
+                                className="h-auto text-xs px-4 py-1"
                                 onClick={() => confirm(publishData, {
                                     title: 'Publish data',
                                     message: 'Are you sure you want to publish data?',

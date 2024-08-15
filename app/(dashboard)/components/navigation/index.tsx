@@ -13,9 +13,9 @@ type Props = {
 export function DashboardNavigation(props: Props) {
     const { sys, isAdmin, isSuperUser } = useAppContext();
 
-    const showTopBar = useMemo(() => (isAdmin || isSuperUser), [isAdmin, isSuperUser]);
-    const showSidebar = useMemo(() => sys.data.use_sidebar_menu === 'yes', [sys.data.use_sidebar_menu]);
-    const showThemeToggle = useMemo(() => sys.data.hide_theme_toggle !== 'yes', [sys.data.hide_theme_toggle]);
+    const showTopBar = true;
+    const showSidebar = sys.data.use_sidebar_menu === 'yes';
+    const showThemeToggle = sys.data.hide_theme_toggle !== 'yes';
 
     if (!props.user) return null;
 

@@ -10,7 +10,7 @@ import { AlertModal } from "@/components/modals/alert";
 import { AppContextProvider } from "@/contexts/app";
 import { getSys } from "@/app/actions/sys";
 import { getSites } from "@/app/actions/sites";
-import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
+import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
 
@@ -49,7 +49,7 @@ export default async function RootLayout({
         sys,
     ] = await Promise.all([
         opsActions.getEditorDetails(),
-        getAuthenticatedUser(),
+        getAuthenticatedUserWithRoles(),
         opsActions.getMode(),
         getSys(),
     ]);
@@ -68,10 +68,10 @@ export default async function RootLayout({
                             {...opsActions}
                             {...sysActions}
                             {...editorDetails}
+                            {...authenticatedUser}
                             sys={sys}
-                            mode={mode || 'view'}
+                            mode={((!authenticatedUser.isAdmin && !authenticatedUser.isSuperUser) ? 'view' : mode) || 'view'}
                             getSites={getSites}
-                            authenticatedUser={authenticatedUser}
                         >
                             {children}
 

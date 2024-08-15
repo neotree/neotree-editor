@@ -21,3 +21,27 @@ export async function getAuthenticatedUser() {
         return null;
     }
 }
+
+export async function getAuthenticatedUserWithRoles() {
+    try {
+        const user = await getAuthenticatedUser();
+
+        const isAdmin = user?.role === 'admin';
+        const isSuperUser = user?.role === 'super_user';
+        const isDefaultUser = !isAdmin && !isSuperUser;
+
+        return {
+            isAdmin,
+            isSuperUser,
+            isDefaultUser,
+            authenticatedUser: user,
+        };
+    } catch(e) {
+        return {
+            isAdmin: false,
+            isSuperUser: false,
+            isDefaultUser: false,
+            user: null,
+        };
+    }
+}

@@ -23,7 +23,7 @@ export function Header({
     showTopBar, 
     showThemeToggle, 
 }: Props) {
-    const { sys } = useAppContext();
+    const { sys, info } = useAppContext();
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
 
@@ -64,7 +64,7 @@ export function Header({
                         justify-center
                         z-[1]
                     `,
-                    usePlainBg ? 'bg-primary-foreground dark:bg-background' : 'bg-primary dark:bg-background',
+                    usePlainBg ? 'bg-primary-foreground dark:bg-background' : 'bg-primary text-primary-foreground dark:bg-background',
                     !!showTopBar && 'top-8',
                 )}
             >
@@ -86,6 +86,12 @@ export function Header({
                     <div className="my-auto">
                         <Logo size="sm" href="/" theme="dark" />
                     </div>
+
+                    {!!info && (
+                        <div className="my-auto">
+                            v{info.dataVersion}
+                        </div>
+                    )}
 
                     <div className="ml-auto" />
 
