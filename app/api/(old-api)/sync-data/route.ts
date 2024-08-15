@@ -20,8 +20,8 @@ export async function GET(req: NextRequest) {
 
         if (errors) return NextResponse.json({ errors, });
 
-        const withDeleted = true;
-        const returnDraftsIfExist = false;
+        const withDeleted = false;
+        const returnDraftsIfExist = true;
 
         const [
             hospitals,

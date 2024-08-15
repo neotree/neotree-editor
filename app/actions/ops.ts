@@ -22,16 +22,22 @@ import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
 import { _clearPendingDeletion } from '@/databases/mutations/ops';
 import * as opsQueries from '@/databases/queries/ops';
+import { _saveEditorInfo } from '@/databases/mutations/editor-info';
+import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
 export async function getEditorDetails(): Promise<{
     errors?: string[];
     shouldPublishData: boolean;
     pendingDeletion: number;
     drafts: typeof opsQueries.defaultCountDraftsData;
+    info: GetEditorInfoResults['data'];
 }> {
     const errors: string[] = [];
     let shouldPublishData = false;
     try {
+        const editorInfo = await _getEditorInfo();
+        editorInfo.errors?.forEach(e => errors.push(e));
+
         const pendingDeletion = await opsQueries._countPendingDeletion();
         pendingDeletion.errors?.forEach(e => errors.push(e));
 
@@ -47,6 +53,7 @@ export async function getEditorDetails(): Promise<{
             drafts,
             errors: errors.length ? errors : undefined,
             shouldPublishData,
+            info: editorInfo.data,
         };
     } catch(e: any) {
         logger.log('getEditorDetails ERROR', e.message);
@@ -55,6 +62,7 @@ export async function getEditorDetails(): Promise<{
             pendingDeletion: 0,
             drafts: opsQueries.defaultCountDraftsData,
             shouldPublishData,
+            info: null,
         };
     }
 }
@@ -126,6 +134,12 @@ export async function publishData() {
             results.success = false;
             results.errors = [...(results.errors || []), ...publishDiagnoses.errors];
         }
+
+        await _saveEditorInfo({ 
+            increaseVersion: results.success, 
+            broadcastAction: true, 
+            data: { lastPublishDate: new Date(), },
+        });
 
         socket.emit('data_changed', 'publish_data');
     } catch(e: any) {
