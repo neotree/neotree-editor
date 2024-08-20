@@ -28,7 +28,7 @@
             <p class="text-lg font-bold">Hi ${e}</p>
             <p>${a}</p>
         `}}({name:e.displayName})})))}return!0}let P=(0,r.j)("e3b5e0f3bf52df374364240f2245074b5ed484f1",k);async function k(...e){try{await (0,x.isAllowed)("create_users");let a=await f(...e);for(let a of e[0])try{let e=await (0,h.n)({userId:a.userId,hoursValid:1});await (0,m.Y)({toEmail:a.email,...function({token:e,name:a}){let t=`Welcome to Neotree.
-Use this link, to activate your account:`,r=`https://webeditor-dev.neotree.org/authorize/${e}`;return{subject:"Welcome to Neotree",textMessage:[`Hi ${a},
+Use this link, to activate your account:`,r=`http://localhost:85/authorize/${e}`;return{subject:"Welcome to Neotree",textMessage:[`Hi ${a},
 `,t+"\n",r,"Note that this link expires in 1 hour and can only be used once.","If you haven&apos;t requested this email, there&apos;s nothing to worry about - you can safely ignore it."].join("\n"),htmlMessage:`
             <p class="text-lg font-bold">Hi ${a}</p>
             <p>${t}</p>
@@ -196,7 +196,7 @@ Use this link, to activate your account:`,r=`https://webeditor-dev.neotree.org/a
 
                         <div style="display:flex;align-items:center;justify-content:flex-end;">
                             <span>&copy;&nbsp;</span>
-                            <a style="color:${l.primary.DEFAULT};" href="https://webeditor-dev.neotree.org">Neotree</a>
+                            <a style="color:${l.primary.DEFAULT};" href="http://localhost:85">Neotree</a>
                         </div>
                     </div>
                 </div>
