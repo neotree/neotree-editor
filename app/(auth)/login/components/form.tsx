@@ -1,25 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner"
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { sendAuthCode } from "@/app/actions/send-auth-code";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-    InputOTP,
-    InputOTPGroup,
-    InputOTPSlot,
-} from "@/components/ui/input-otp"
-import { cn } from "@/lib/utils";
+import { isEmailRegistered } from "@/app/actions/users";
 import { SendCode } from "./send-code";
 import { SignIn } from "./sign-in";
 
 type Props = {
     sendAuthCode: typeof sendAuthCode;
+    isEmailRegistered: typeof isEmailRegistered;
 };
 
 export function Form({ sendAuthCode }: Props) {
@@ -32,6 +22,7 @@ export function Form({ sendAuthCode }: Props) {
                 <SendCode 
                     email={email}
                     sendAuthCode={sendAuthCode}
+                    isEmailRegistered={isEmailRegistered}
                     onAuthCode={({ email }) => {
                         setEmail(email);
                         setShow('signInForm');

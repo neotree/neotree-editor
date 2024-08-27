@@ -10,7 +10,7 @@ import { getAuthLinkEmail } from '@/mailer/get-auth-link-email';
 export async function sendAuthLink({ userIdOrEmail, tokenId }: {
     userIdOrEmail: string;
     tokenId?: number;
-}) {
+}): Promise<{ errors?: string[]; tokenId?: null | number; }>  {
     try {
         const user = await _getUser(userIdOrEmail);
 
@@ -39,8 +39,8 @@ export async function sendAuthLink({ userIdOrEmail, tokenId }: {
         }
 
         return { tokenId: newTokenId, };
-    } catch(e) {
+    } catch(e: any) {
         logger.error('sendAuthLink ERROR', e);
-        throw e;
+        return { errors: [e.message], };
     }
 }

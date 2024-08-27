@@ -28,8 +28,8 @@ export function SignIn({ email, onSendCode, }: Props) {
     const router = useRouter();
 
     const [loading, setLoading] = useState(false);
-    const [showCodeInput, setShowCodeInput] = useState(true);
-    const [showPasswordInput, setShowPasswordInput] = useState(false);
+    const [showCodeInput, setShowCodeInput] = useState(false);
+    const [showPasswordInput, setShowPasswordInput] = useState(true);
 
     const {
         watch,

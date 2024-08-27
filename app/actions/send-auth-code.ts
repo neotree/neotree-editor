@@ -10,7 +10,7 @@ import { _getToken } from '@/databases/queries/tokens';
 export async function sendAuthCode({ email, tokenId }: {
     email: string;
     tokenId?: number;
-}) {
+}): Promise<{ errors?: string[]; tokenId?: number; }> {
     try {
         if (!email) throw new Error('Email address not provided');
 
@@ -35,8 +35,8 @@ export async function sendAuthCode({ email, tokenId }: {
         });
 
         return { tokenId: token.id, };
-    } catch(e) {
+    } catch(e: any) {
         logger.error('sendAuthCode ERROR', e);
-        throw e;
+        return { errors: [e.message], };
     }
 }
