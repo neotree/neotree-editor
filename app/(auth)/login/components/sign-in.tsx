@@ -55,8 +55,9 @@ export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Prop
             setLoading(true);
             const res = await signIn('credentials', { ...data, email, redirect: false, })
             if (res?.ok) {
-                revalidatePath('/', 'layout');
-                router.replace('/');
+                // revalidatePath('/', 'layout');
+                // router.replace('/');
+                window.location.href = '/';
             } else {
                 throw new Error(res?.error || 'Failed to sign in');
             }
