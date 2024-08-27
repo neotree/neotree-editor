@@ -14,7 +14,7 @@ type Props = {
     revalidatePath: typeof revalidatePath;
 };
 
-export function Form({ sendAuthCode, revalidatePath }: Props) {
+export function Form({ sendAuthCode, revalidatePath, isEmailRegistered }: Props) {
     const [show, setShow] = useState<'sendCodeForm' | 'signInForm'>('sendCodeForm');
     const [email, setEmail] = useState('');
 
