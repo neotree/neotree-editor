@@ -5,7 +5,7 @@ import { useState } from "react";
 import { revalidatePath } from "@/app/actions/ops";
 import { sendAuthCode } from "@/app/actions/send-auth-code";
 import { isEmailRegistered } from "@/app/actions/users";
-import { SendCode } from "./send-code";
+import { VerifyEmail } from "./verify-email";
 import { SignIn } from "./sign-in";
 
 type Props = {
@@ -21,7 +21,7 @@ export function Form({ sendAuthCode, revalidatePath, isEmailRegistered }: Props)
     return (
         <>
             {(show === 'sendCodeForm') && (
-                <SendCode 
+                <VerifyEmail 
                     email={email}
                     sendAuthCode={sendAuthCode}
                     isEmailRegistered={isEmailRegistered}

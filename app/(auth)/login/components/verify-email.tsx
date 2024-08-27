@@ -17,7 +17,7 @@ type Props = {
     onAuthCode: (params: { email: string; }) => void;
 };
 
-export function SendCode({ email, sendAuthCode, onAuthCode, isEmailRegistered }: Props) {
+export function VerifyEmail({ email, sendAuthCode, onAuthCode, isEmailRegistered }: Props) {
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
