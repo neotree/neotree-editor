@@ -1,12 +1,10 @@
 import { sendAuthCode } from "@/app/actions/send-auth-code";
 import { isEmailRegistered } from "@/app/actions/users";
-import { revalidatePath, test } from "@/app/actions/ops";
+import { revalidatePath } from "@/app/actions/ops";
 import { Title } from "@/components/title";
 import { Form } from "./components/form";
 
-export default async function SignInPage({ searchParams: { shouldFail }, }: { searchParams: { [key: string]: string; } }) {
-    await test({ shouldFail: shouldFail === '1', });
-
+export default async function SignInPage() {
     return (
         <>
             <Title>Sign in</Title>
