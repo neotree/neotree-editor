@@ -27,8 +27,6 @@ export function Header({
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
 
-    console.log(user);
-
     return (
         <>
             <div className={cn('h-16', !!showTopBar && 'h-24')} />

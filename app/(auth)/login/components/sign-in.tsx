@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner"
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
+import { revalidatePath } from "@/app/actions/ops";
 import { sendAuthCode } from "@/app/actions/send-auth-code";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,10 +20,12 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 
 type Props = {
     email: string;
+    sendAuthCode: typeof sendAuthCode;
     onSendCode: () => void;
+    revalidatePath: typeof revalidatePath;
 };
 
-export function SignIn({ email, onSendCode, }: Props) {
+export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Props) {
     const { alert } = useAlertModal();
     
     const router = useRouter();
@@ -52,6 +55,7 @@ export function SignIn({ email, onSendCode, }: Props) {
             setLoading(true);
             const res = await signIn('credentials', { ...data, email, redirect: false, })
             if (res?.ok) {
+                revalidatePath('/', 'layout');
                 router.replace('/');
             } else {
                 throw new Error(res?.error || 'Failed to sign in');
@@ -149,6 +153,7 @@ export function SignIn({ email, onSendCode, }: Props) {
                                     if (showPasswordInput) {
                                         setShowPasswordInput(false);
                                         setShowCodeInput(true);
+                                        sendAuthCode({ email });
                                     } else {
                                         setShowPasswordInput(true);
                                         setShowCodeInput(false);
@@ -156,7 +161,7 @@ export function SignIn({ email, onSendCode, }: Props) {
                                 }
                             }}
                         >
-                            {showPasswordInput ? 'Sign in with code' : 'Sign in with password'}
+                            {showPasswordInput ? 'Email me a sign in code' : 'Sign in with password'}
                         </a>
 
                         {showCodeInput && (
