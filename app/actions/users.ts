@@ -21,7 +21,9 @@ import { isAllowed } from "./is-allowed";
 
 export async function isEmailRegistered(email: string): Promise<{ errors?: string[]; yes: boolean; }>  {
     try {
+        logger.log('isEmailRegistered');
         const user = await _getUser(email);
+        logger.log('isEmailRegistered: ', !!user);
         return { yes: !!user, }
     } catch(e: any) {
         logger.error('getUser ERROR:', e);
