@@ -37,11 +37,15 @@ export function SendCode({ email, sendAuthCode, onAuthCode, isEmailRegistered }:
             // const { tokenId, errors } = await sendAuthCode({ email });
             const { yes: emailIsRegistered, errors } = await isEmailRegistered(email);
 
-            if (errors?.length) throw new Error(errors.join(', '));
-
-            if (!emailIsRegistered) throw new Error('Email address not registered, are you sure that address is typed correctly?');
-
-            onAuthCode({ email });
+            if (errors?.length || !emailIsRegistered) {
+                alert({
+                    title: 'Error',
+                    message: errors?.join?.(', ') || 'Email address not registered, are you sure that address is typed correctly?',
+                    variant: 'error',
+                });
+            } else {
+                onAuthCode({ email });
+            }
         } catch(e: any) {
             alert({
                 title: 'Error',
