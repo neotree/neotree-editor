@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { sendAuthCode } from "@/app/actions/send-auth-code";
+import { isEmailRegistered } from "@/app/actions/users";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -11,10 +12,11 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 type Props = {
     email?: string;
     sendAuthCode: typeof sendAuthCode;
-    onAuthCode: (params: { tokenId: number; email: string; }) => void;
+    isEmailRegistered: typeof isEmailRegistered;
+    onAuthCode: (params: { email: string; }) => void;
 };
 
-export function SendCode({ email, sendAuthCode, onAuthCode }: Props) {
+export function SendCode({ email, sendAuthCode, onAuthCode, isEmailRegistered }: Props) {
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
@@ -32,8 +34,14 @@ export function SendCode({ email, sendAuthCode, onAuthCode }: Props) {
     const onSubmit = handleSubmit(async ({ email }) => {
         try {
             setLoading(true);
-            const { tokenId } = await sendAuthCode({ email });
-            onAuthCode({ tokenId, email });
+            // const { tokenId, errors } = await sendAuthCode({ email });
+            const { yes: emailIsRegistered, errors } = await isEmailRegistered(email);
+
+            if (errors?.length) throw new Error(errors.join(', '));
+
+            if (!emailIsRegistered) throw new Error('Email address not registered, are you sure that address is typed correctly?');
+
+            onAuthCode({ email });
         } catch(e: any) {
             alert({
                 title: 'Error',
@@ -72,7 +80,7 @@ export function SendCode({ email, sendAuthCode, onAuthCode }: Props) {
                         disabled={loading}
                         className="w-full"
                     >
-                        {loading ? 'Please wait...' : 'Send verification code'}
+                        {loading ? 'Please wait...' : 'Continue'}
                     </Button>
                 </div>
             </form>

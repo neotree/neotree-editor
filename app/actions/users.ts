@@ -19,6 +19,16 @@ import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
 import { _addUserToken } from "@/databases/mutations/tokens";
 import { isAllowed } from "./is-allowed";
 
+export async function isEmailRegistered(email: string): Promise<{ errors?: string[]; yes: boolean; }>  {
+    try {
+        const user = await _getUser(email);
+        return { yes: !!user, }
+    } catch(e: any) {
+        logger.error('getUser ERROR:', e);
+        return { errors: [e.message], yes: false, };
+    }
+}
+
 export async function getUser(params: GetUserParams) {
     try {
         await isAllowed('get_user');
