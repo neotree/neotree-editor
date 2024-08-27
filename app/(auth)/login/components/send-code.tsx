@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import axios from "axios";
 
 import { sendAuthCode } from "@/app/actions/send-auth-code";
 import { isEmailRegistered } from "@/app/actions/users";
@@ -35,7 +36,9 @@ export function SendCode({ email, sendAuthCode, onAuthCode, isEmailRegistered }:
         try {
             setLoading(true);
             // const { tokenId, errors } = await sendAuthCode({ email });
-            const { yes: emailIsRegistered, errors } = await isEmailRegistered(email);
+            // const { yes: emailIsRegistered, errors } = await isEmailRegistered(email);
+            const res: any = await axios.get('/api/users/is-email-registered?email='+email);
+            const { errors, yes: emailIsRegistered } = res.data;
 
             if (errors?.length || !emailIsRegistered) {
                 alert({
