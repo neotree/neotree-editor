@@ -25,12 +25,6 @@ import * as opsQueries from '@/databases/queries/ops';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
-export async function test(params?: { email?: string; shouldFail?: boolean; }) {
-    logger.log('test...');
-    if (params?.shouldFail) throw new Error('Some error');
-    return 'ok';
-}
-
 export async function getEditorDetails(): Promise<{
     errors?: string[];
     shouldPublishData: boolean;
