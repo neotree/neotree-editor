@@ -32,4 +32,5 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'yesno',
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
+    'edliz_summary_table',
 ]);
