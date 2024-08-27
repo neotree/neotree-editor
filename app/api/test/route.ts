@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
         if (reqQuery.email) {
             const user = await _getUser(reqQuery.email as string);
-            data = { user  };
+            data.user = { userId: user?.userId, id: user?.id,  };
         }
 
 		return NextResponse.json({ status: 'ok', data, });
