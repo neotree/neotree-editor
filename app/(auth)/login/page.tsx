@@ -1,6 +1,5 @@
 import { sendAuthCode } from "@/app/actions/send-auth-code";
-import { isEmailRegistered } from "@/app/actions/users";
-import { revalidatePath } from "@/app/actions/ops";
+import { isEmailRegistered, setPassword } from "@/app/actions/users";
 import { Title } from "@/components/title";
 import { Form } from "./components/form";
 
@@ -11,7 +10,7 @@ export default async function SignInPage() {
             <Form 
                 sendAuthCode={sendAuthCode}
                 isEmailRegistered={isEmailRegistered}
-                revalidatePath={revalidatePath}
+                setPassword={setPassword}
             />
         </>
     );

@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner"
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
-import { revalidatePath } from "@/app/actions/ops";
 import { sendAuthCode } from "@/app/actions/send-auth-code";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,15 +16,17 @@ import {
 } from "@/components/ui/input-otp"
 import { cn } from "@/lib/utils";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { setPassword } from "@/app/actions/users";
 
 type Props = {
     email: string;
+    shouldSetPassword: boolean;
+    setPassword: typeof setPassword;
     sendAuthCode: typeof sendAuthCode;
     onSendCode: () => void;
-    revalidatePath: typeof revalidatePath;
 };
 
-export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Props) {
+export function SignIn({ email, onSendCode, sendAuthCode, setPassword, shouldSetPassword }: Props) {
     const { alert } = useAlertModal();
     
     const router = useRouter();
@@ -45,6 +46,7 @@ export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Prop
             email,
             code: '',
             password: '',
+            passwordConfirm: '',
         },
     });
 
@@ -53,7 +55,15 @@ export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Prop
     const onSubmit = handleSubmit(async (data) => {
         try {
             setLoading(true);
-            const res = await signIn('credentials', { ...data, email, redirect: false, })
+
+            if (shouldSetPassword) {
+                const res: any = await axios.post('/api/users/set-password', { ...data, email, });
+                const { errors } = res.data;
+                if (errors?.length) throw new Error(errors.join(', '));
+            }
+
+            const res = await signIn('credentials', { ...data, email, redirect: false, });
+
             if (res?.ok) {
                 // revalidatePath('/', 'layout');
                 // router.replace('/');
@@ -130,6 +140,19 @@ export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Prop
                     />
                 </div>
 
+                {!!shouldSetPassword && (
+                    <div className={cn(showPasswordInput ? '' : 'hidden')}>
+                        <Input 
+                            type="password"
+                            placeholder="Confirm password"
+                            {...register('passwordConfirm', { 
+                                required: true, 
+                                disabled: loading,
+                            })}
+                        />
+                    </div>
+                )}
+
                 <div className="flex flex-col gap-y-2">
                     <Button
                         type="submit"
@@ -139,7 +162,7 @@ export function SignIn({ email, onSendCode, sendAuthCode, revalidatePath }: Prop
                         {loading ? 'Please wait...' : 'Sign in'}
                     </Button>
 
-                    <div className="flex flex-col items-end gap-y-1">
+                    <div className={cn('flex flex-col items-end gap-y-1', shouldSetPassword && 'hidden')}>
                         <a
                             href="#"
                             className={cn(

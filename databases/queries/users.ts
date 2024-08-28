@@ -40,7 +40,7 @@ export async function _searchUsers(searchValue: string) {
 
 export async function _getUser(params: GetUserParams) {
     const where = uuid.validate(params) ? eq(users.userId, params) : eq(users.email, params);
-    return await db.query.users.findFirst({
+    const res = await db.query.users.findFirst({
         where: and(
             where,
             isNull(users.deletedAt),
@@ -59,8 +59,11 @@ export async function _getUser(params: GetUserParams) {
             role: true,
             createdAt: true,
             lastLoginDate: true,
+            password: true,
         },
     });
+
+    return { ...res, isActive: !!res?.password, };
 }
 
 export async function _getUserMini(params: GetUserParams) {
