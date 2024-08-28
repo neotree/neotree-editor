@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { v4 } from "uuid";
+import { v4, validate as validateUUID } from "uuid";
 import bcrypt from 'bcrypt';
 
 import db from "../pg/drizzle";
@@ -41,7 +41,8 @@ export async function _createUsers(
     const insertData: typeof users.$inferInsert[] = [];
     
     for(const u of data) {
-        const password = await bcrypt.hash(u.password || v4(), 12);
+        const salt = await bcrypt.genSalt(10);
+        const password = await bcrypt.hash(u.password || v4(), salt);
         insertData.push({
             ...u,
             password,
@@ -87,13 +88,15 @@ export async function _updateUsers(
 
     for(const { userId, data: u,  } of data) {
         try {
+            const where = validateUUID(userId) ? eq(users.userId, userId) : eq(users.email, userId);
+            
             delete u.id;
             delete u.createdAt;
             delete u.updatedAt;
             delete u.email;
             delete u.userId;
 
-            await db.update(users).set(u).where(eq(users.userId, userId));
+            await db.update(users).set(u).where(where);
             const user = !opts?.returnUpdated ? undefined : await _getUser(userId);
             results.push({ userId, user, });
         } catch(e: any) {

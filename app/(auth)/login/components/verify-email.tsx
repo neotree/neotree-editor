@@ -14,10 +14,10 @@ type Props = {
     email?: string;
     sendAuthCode: typeof sendAuthCode;
     isEmailRegistered: typeof isEmailRegistered;
-    onAuthCode: (params: { email: string; }) => void;
+    onEmailVerified: (params: { email: string; isActive: boolean; }) => void;
 };
 
-export function VerifyEmail({ email, sendAuthCode, onAuthCode, isEmailRegistered }: Props) {
+export function VerifyEmail({ email, sendAuthCode, onEmailVerified, isEmailRegistered }: Props) {
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
@@ -38,7 +38,9 @@ export function VerifyEmail({ email, sendAuthCode, onAuthCode, isEmailRegistered
             // const { tokenId, errors } = await sendAuthCode({ email });
             // const { yes: emailIsRegistered, errors } = await isEmailRegistered(email);
             const res: any = await axios.get('/api/users/is-email-registered?email='+email);
-            const { errors, yes: emailIsRegistered } = res.data;
+            const { errors, yes: emailIsRegistered, isActive } = res.data;
+
+            console.log(res)
 
             if (errors?.length || !emailIsRegistered) {
                 alert({
@@ -47,7 +49,7 @@ export function VerifyEmail({ email, sendAuthCode, onAuthCode, isEmailRegistered
                     variant: 'error',
                 });
             } else {
-                onAuthCode({ email });
+                onEmailVerified({ email, isActive: !!isActive, });
             }
         } catch(e: any) {
             alert({

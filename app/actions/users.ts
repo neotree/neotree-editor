@@ -1,5 +1,7 @@
 'use server';
 
+import bcrypt from 'bcrypt';
+
 import { 
     _deleteUsers, 
     _createUsers,
@@ -19,10 +21,10 @@ import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
 import { _addUserToken } from "@/databases/mutations/tokens";
 import { isAllowed } from "./is-allowed";
 
-export async function isEmailRegistered(email: string): Promise<{ errors?: string[]; yes: boolean; }>  {
+export async function isEmailRegistered(email: string): Promise<{ errors?: string[]; yes: boolean; isActive?: boolean; }>  {
     try {
         const user = await _getUser(email);
-        return { yes: !!user, }
+        return { yes: !!user, isActive: !!user?.isActive, }
     } catch(e: any) {
         logger.error('getUser ERROR:', e);
         return { errors: [e.message], yes: false, };
@@ -127,5 +129,35 @@ export const updateUsers: typeof _updateUsers = async (...args) => {
     } catch(e) {
         logger.error('updateUsers ERROR', e);
         throw e;
+    }
+};
+
+export const setPassword = async (params: { 
+    email: string, 
+    password: string; 
+    passwordConfirm: string; 
+}): Promise<{
+    errors?: string[];
+    success: boolean;
+}> => {
+    try {
+        if (!params.password) throw new Error('Missing: password');
+        if (!params.email) throw new Error('Missing: email');
+
+        if (params.password.length < 6) throw new Error('Password is too short: min 6 characters');
+
+        if (params.password !== params.passwordConfirm) throw new Error('Password confirmation does not match!');
+
+        const salt = await bcrypt.genSalt(10);
+        const password = await bcrypt.hash(params.password, salt);
+
+        const res = await _updateUsers([{ userId: params.email, data: { password, } }]);
+
+        if (res.filter(u => u.error).length) throw new Error(res.filter(u => u.error).map(u => u.error).join(', '));
+
+        return { success: true, };
+    } catch(e: any) {
+        logger.error('setPassword ERROR', e);
+        return { success: false, errors: [e.message], };
     }
 };
