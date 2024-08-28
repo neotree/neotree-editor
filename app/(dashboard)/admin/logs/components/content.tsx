@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from "react";
+import { useFormState } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 import { CopyBlock, dracula } from "react-code-blocks";
 
 import { getLogs } from "@/app/actions/logs";
@@ -32,8 +33,12 @@ const options = [
 export function Content({
     _getLogs,
 }: Props) {
+    const [{ data: logs, errors: getLogsErrors }, onGetLogs] = useFormState(
+        async (_: Awaited<ReturnType<typeof _getLogs>>, params: Parameters<typeof _getLogs>[0]) => await _getLogs(params), 
+        { data: [], }
+    );
+
     const [loading, setLoading] = useState(false);
-    const [logs, setLogs] = useState<Awaited<ReturnType<typeof _getLogs>>['data']>([]);
     const [form, setForm] = useState<Parameters<typeof _getLogs>[0]>({
         date: null!,
         endDate: null!,
@@ -45,22 +50,21 @@ export function Content({
     const getLogs = useCallback(async () => {
         try {
             setLoading(true);
-
-            const { errors, data, } = await _getLogs(form);
-            
-            if (errors?.length) {
-                alert({
-                    title: 'Error',
-                    message: 'Failed to load logs: ' + (errors.join(', ')),
-                    variant: 'error',
-                });
-            }
-
-            setLogs(data);
+            await onGetLogs(form);
         } finally {
             setLoading(false);
         }
-    }, [_getLogs, alert, form]);
+    }, [onGetLogs, form]);
+
+    useEffect(() => {
+        if (getLogsErrors?.length) {
+            alert({
+                title: 'Error',
+                message: 'Failed to load logs: ' + (getLogsErrors.join(', ')),
+                variant: 'error',
+            });
+        }
+    }, [getLogsErrors, alert]);
 
     return (
         <>
