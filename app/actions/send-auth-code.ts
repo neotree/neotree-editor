@@ -24,14 +24,14 @@ export async function sendAuthCode({ email, tokenId }: {
 
         if (!token) {
             token = await mutations._addUserToken({
-                userId: user.userId,
+                userId: user.userId!,
                 hoursValid: 1,
             });
         }
 
         await sendMail({
-            toEmail: user.email,
-            ...getAuthCodeEmail({ name: user.displayName, token: token.token, }),
+            toEmail: user.email!,
+            ...getAuthCodeEmail({ name: user.displayName!, token: token.token, }),
         });
 
         return { tokenId: token.id, };

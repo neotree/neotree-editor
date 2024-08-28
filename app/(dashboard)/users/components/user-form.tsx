@@ -94,12 +94,12 @@ export function UserForm({
                 .then(u => {
                     setUser(u);
                     if (u) {
-                        setValue('userId', u.userId);
-                        setValue('email', u.email);
-                        setValue('displayName', u.displayName);
+                        setValue('userId', u.userId || '');
+                        setValue('email', u.email || '');
+                        setValue('displayName', u.displayName || '');
                         setValue('firstName', u.firstName || '');
                         setValue('lastName', u.lastName || '');
-                        setValue('role', u.role);
+                        setValue('role', u.role || 'user');
                         setValue('avatar', u.avatar || '');
                         setValue('avatar_sm', u.avatar_sm || '');
                         setValue('avatar_md', u.avatar_md || '');
