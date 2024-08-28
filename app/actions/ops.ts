@@ -1,7 +1,5 @@
 'use server';
 
-import { cookies } from 'next/headers';
-import { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 import { revalidatePath as _revalidatePath } from "next/cache";
 
 import socket from '@/lib/socket';
@@ -44,7 +42,7 @@ export async function getEditorDetails(): Promise<{
         const { errors: draftsErrors, ...drafts } = await opsQueries._countDrafts();
         draftsErrors?.forEach(e => errors.push(e));
 
-        const mode = await getMode();
+        const mode = 'development';
 
         shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total);
 
@@ -174,40 +172,5 @@ export async function discardDrafts() {
         logger.error('publishData ERROR', e.message);
     } finally {
         return results;
-    }
-}
-
-export async function getCookie<ValueType = string>(value: string) {
-    const cookieStore = cookies();
-    const data = cookieStore.get(value);
-    return (data?.value || null) as null | ValueType;
-}
-
-export async function setCookie(params: ResponseCookie) {
-    cookies().set(params);
-}
-
-export async function getMode() {
-    let mode: Mode = 'view';
-    try {
-        const currentMode = await getCookie<Mode>('mode');
-        if (!currentMode) {
-            await setCookie({ name: 'mode', value: mode, });
-        } else {
-            mode = currentMode;
-        }
-    } catch(e: any) {
-        logger.error('getMode ERROR', e.message);
-    } finally {
-        return mode;
-    }
-}
-
-export async function setMode(mode: Mode) {
-    try {
-        await setCookie({ name: 'mode', value: mode, });
-        socket.emit('mode_changed', mode);
-    } catch(e: any) {
-        logger.error('setMode ERROR', e.message);
     }
 }

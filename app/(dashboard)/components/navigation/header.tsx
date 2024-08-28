@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from "react";
+import { useMount } from "react-use";
+
 import { Logo } from "@/components/logo";
 import { Content } from "@/components/content";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -23,9 +26,15 @@ export function Header({
     showTopBar, 
     showThemeToggle, 
 }: Props) {
+    const [mounted, setMounted] = useState(false);
+    
     const { sys, info } = useAppContext();
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
+
+    useMount(() => { setMounted(true); });
+
+    if (!mounted) return null;
 
     return (
         <>
