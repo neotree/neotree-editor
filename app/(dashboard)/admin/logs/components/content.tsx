@@ -35,8 +35,11 @@ export function Content({
 }: Props) {
     const [{ data: logs, errors: getLogsErrors }, onGetLogs] = useFormState(
         async (_: Awaited<ReturnType<typeof _getLogs>>, params: Parameters<typeof _getLogs>[0]) => await _getLogs(params), 
-        { data: [], }
+        { data: [], },
+        '/admin/logs'
     );
+
+    console.log(logs, _getLogs);
 
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState<Parameters<typeof _getLogs>[0]>({
