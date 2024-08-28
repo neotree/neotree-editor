@@ -63,7 +63,7 @@ export function Content({
         } finally {
             setLoading(false);
         }
-    }, [_getLogs, alert, form]);
+    }, [alert, form]);
 
     return (
         <>
