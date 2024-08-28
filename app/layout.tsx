@@ -14,8 +14,10 @@ import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
 
-import "./globals.css";
+import "@/app/globals.css";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import cookies from "@/lib/js-cookie";
+import { Mode } from "@/types";
 
 const roboto = Roboto({
     subsets: ['latin'],
@@ -45,12 +47,10 @@ export default async function RootLayout({
     const [
         editorDetails,
         authenticatedUser,
-        mode,
         sys,
     ] = await Promise.all([
         opsActions.getEditorDetails(),
         getAuthenticatedUserWithRoles(),
-        opsActions.getMode(),
         getSys(),
     ]);
 
@@ -70,7 +70,6 @@ export default async function RootLayout({
                             {...editorDetails}
                             {...authenticatedUser}
                             sys={sys}
-                            mode={((!authenticatedUser.isAdmin && !authenticatedUser.isSuperUser) ? 'view' : mode) || 'view'}
                             getSites={getSites}
                         >
                             {children}
