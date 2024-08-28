@@ -25,14 +25,14 @@ export async function sendAuthLink({ userIdOrEmail, tokenId }: {
 
             if (!token) {
                 token = await mutations._addUserToken({
-                    userId: user.userId,
+                    userId: user.userId!,
                     hoursValid: 1,
                 });
             }
 
             await sendMail({
-                toEmail: user.email,
-                ...getAuthLinkEmail({ name: user.displayName, token: token.token, }),
+                toEmail: user.email!,
+                ...getAuthLinkEmail({ name: user.displayName!, token: token.token, }),
             });
 
             newTokenId = token.id;
