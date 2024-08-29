@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -38,7 +39,11 @@ export function useScriptsTable({
 
             setLoading(true);
 
-            const res = await deleteScripts({ scriptsIds, broadcastAction: true, });
+            // const res = await deleteScripts({ scriptsIds, broadcastAction: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.delete('/api/scripts?data='+JSON.stringify({ scriptsIds, broadcastAction: true, }));
+            const res = response.data as Awaited<ReturnType<typeof deleteScripts>>;
 
             if (res.errors?.length) {
                 alert({
@@ -83,7 +88,10 @@ export function useScriptsTable({
 
         setScripts(prev => ({ ...prev, data: sorted, }));
         
-        await saveScripts({ data: payload, broadcastAction: true, });
+        // await saveScripts({ data: payload, broadcastAction: true, });
+
+        // TODO: Replace this with server action
+        await axios.post('/api/scripts/save', { data: payload, broadcastAction: true, });
 
         router.refresh();
     }, [saveScripts, scripts, router]);
@@ -98,10 +106,17 @@ export function useScriptsTable({
     
                 setLoading(true);
     
-                const res = await copyScripts({ 
+                // const res = await copyScripts({ 
+                //     scriptsIds, 
+                //     broadcastAction: true,
+                // });
+
+                // TODO: Replace this with server action
+                const response = await axios.post('/api/scripts/copy', { 
                     scriptsIds, 
                     broadcastAction: true,
                 });
+                const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
     
                 if (res.errors?.length) throw new Error(res.errors.join(', '));
     

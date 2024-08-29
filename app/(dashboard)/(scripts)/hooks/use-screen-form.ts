@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { isEmpty } from "@/lib/isEmpty";
@@ -74,7 +75,7 @@ export function useScreenForm({
             exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
             skippable: isEmpty(formData?.skippable) ? false : formData?.skippable,
             confidential: isEmpty(formData?.confidential) ? false : formData?.confidential,
-            printable: isEmpty(formData?.printable) ? true : formData?.printable,
+            printable: (isEmpty(formData?.printable) ? null : formData?.printable!) as boolean,
             prePopulate: formData?.prePopulate || [],
             fields: formData?.fields || [],
             items: formData?.items || [],
@@ -106,7 +107,11 @@ export function useScreenForm({
 
             if (!payloadData.scriptId) throw new Error('Screen is missing script reference!');
 
-            const res = await saveScreens({ data: [payloadData], broadcastAction: true, });
+            // const res = await saveScreens({ data: [payloadData], broadcastAction: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/screens/save', { data: [payloadData], broadcastAction: true, });
+            const res = response.data as Awaited<ReturnType<typeof saveScreens>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 

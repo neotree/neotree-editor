@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { saveDiagnoses } from "@/app/actions/scripts";
+import { saveScreens } from "@/app/actions/scripts";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -12,11 +12,11 @@ export async function POST(req: NextRequest) {
             
         const body = await req.json();
         
-        const data = await saveDiagnoses(body);
+        const data = await saveScreens(body);
 
         return NextResponse.json(data);
     } catch(e: any) {
-        logger.log('/api/diagnoses/save', e);
+        logger.log('/api/screens/save', e);
         return NextResponse.json({ errors: [e.message], });
     }
 }

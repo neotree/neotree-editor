@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 import { DiagnosisFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -71,7 +72,11 @@ export function useDiagnosisForm({
 
             if (!payloadData.scriptId) throw new Error('Diagnosis is missing script reference!');
 
-            const res = await saveDiagnoses({ data: [payloadData], broadcastAction: true, });
+            // const res = await saveDiagnoses({ data: [payloadData], broadcastAction: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/diagnoses/save', { data: [payloadData], broadcastAction: true, });
+            const res = response.data as Awaited<ReturnType<typeof saveDiagnoses>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 

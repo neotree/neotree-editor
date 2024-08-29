@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { defaultNuidSearchFields } from "@/constants/fields";
@@ -59,7 +60,11 @@ export function useScriptForm(params: UseScriptFormParams) {
     const onSubmit = handleSubmit(async data => {
         setLoading(true);
 
-        const res = await saveScripts({ data: [data], broadcastAction: true, });
+        // const res = await saveScripts({ data: [data], broadcastAction: true, });
+
+        // TODO: Replace this with server action
+        const response = await axios.post('/api/scripts/save', { data: [data], broadcastAction: true, });
+        const res = response.data as Awaited<ReturnType<typeof saveScripts>>;
 
         if (res.errors?.length) {
             alert({

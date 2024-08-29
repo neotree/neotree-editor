@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import axios from "axios";
 
 import {
     Select,
@@ -20,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
-import { Input } from "@/components/ui/input";
 
 export function CopyDiagnosesModal({ 
     open, 
@@ -57,8 +57,14 @@ export function CopyDiagnosesModal({
 
     const loadScripts = useCallback(async () => {
         try {
-            const res = await getScripts({ returnDraftsIfExist: true, });
+            // const res = await getScripts({ returnDraftsIfExist: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.get('/api/scripts?data='+JSON.stringify({ returnDraftsIfExist: true, }));
+            const res = response.data as Awaited<ReturnType<typeof getScripts>>;
+
             if (res.errors?.length) throw new Error(res.errors.join(', '));
+
             setScripts(res);
         } catch(e: any) {
             alert({
@@ -78,11 +84,19 @@ export function CopyDiagnosesModal({
 
             setLoading(true);
 
-            const res = await copyDiagnoses({ 
+            // const res = await copyDiagnoses({ 
+            //     diagnosesIds,
+            //     toScriptsIds: [data.scriptId], 
+            //     broadcastAction: true,
+            // });
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/diagnoses/copy', { 
                 diagnosesIds,
                 toScriptsIds: [data.scriptId], 
                 broadcastAction: true,
             });
+            const res = response.data as Awaited<ReturnType<typeof copyDiagnoses>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 

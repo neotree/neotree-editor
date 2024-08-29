@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Plus, Trash } from "lucide-react";
 import { useMeasure } from "react-use";
 import queryString from "query-string";
+import axios from "axios";
 
 import { Button } from "@/components/ui/button";
 import { ScriptImage } from "@/types";
@@ -23,7 +24,12 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
     const { uploadFile } = useScriptsContext();
 
     const onUpload = useCallback(async (formData: FormData) => {
-        const { file, errors } = await uploadFile(formData);
+        // const { file, errors } = await uploadFile(formData);
+
+        // TODO: Replace this with server action
+        const response = await axios.post('/api/files/upload', formData);
+        const { file, errors } = response.data as Awaited<ReturnType<typeof uploadFile>>;
+
         if (errors?.length) {
             throw new Error(errors.join(', '));
         } else if (file) {

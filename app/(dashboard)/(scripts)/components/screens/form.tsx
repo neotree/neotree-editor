@@ -206,6 +206,7 @@ export function ScreenForm({
                             if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
                                 setValue('items', [], { shouldDirty: true, });
                             }
+                            if (value === 'management') setValue('printable', false);
                         }}
                     >
                         <SelectTrigger>

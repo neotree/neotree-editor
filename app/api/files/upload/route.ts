@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { saveDiagnoses } from "@/app/actions/scripts";
+import { uploadFile } from "@/app/actions/files";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -10,13 +10,15 @@ export async function POST(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
             
-        const body = await req.json();
+        const formData = await req.formData();
         
-        const data = await saveDiagnoses(body);
+        const data = await uploadFile(formData);
+
+        // const data: Awaited<ReturnType<typeof uploadFile>> = { success: false, file: null!, errors: ['Testing'] };
 
         return NextResponse.json(data);
     } catch(e: any) {
-        logger.log('/api/diagnoses/save', e);
+        logger.log('/api/files/upload', e);
         return NextResponse.json({ errors: [e.message], });
     }
 }
