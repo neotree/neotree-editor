@@ -504,7 +504,7 @@ export const screens = pgTable(
         minValue: integer('min_value'),
         maxValue: integer('max_value'),
         exportable: boolean('exportable').notNull().default(true),
-        printable: boolean('printable').notNull().default(true),
+        printable: boolean('printable'),
         skippable: boolean('skippable').notNull().default(false),
         confidential: boolean('confidential').notNull().default(false),
         prePopulate: jsonb('pre_populate').default('[]').notNull(),
