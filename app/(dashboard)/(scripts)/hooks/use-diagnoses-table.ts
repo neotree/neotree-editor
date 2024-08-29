@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -38,7 +39,11 @@ export function useDiagnosesTable({
 
             setLoading(true);
 
-            const res = await deleteDiagnoses({ diagnosesIds, broadcastAction: true, });
+            // const res = await deleteDiagnoses({ diagnosesIds, broadcastAction: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.delete('/api/diagnoses?data='+JSON.stringify({ diagnosesIds, broadcastAction: true, }));
+            const res = response.data as Awaited<ReturnType<typeof deleteDiagnoses>>;
 
             if (res.errors?.length) {
                 alert({
@@ -83,7 +88,10 @@ export function useDiagnosesTable({
 
         setDiagnoses(prev => ({ ...prev, data: sorted, }));
         
-        await saveDiagnoses({ data: payload, broadcastAction: true, });
+        // await saveDiagnoses({ data: payload, broadcastAction: true, });
+
+        // TODO: Replace this with server action
+        await axios.post('/api/diagnoses/save', { data: payload, broadcastAction: true, });
 
         router.refresh();
     }, [saveDiagnoses, diagnoses, router]);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import axios from "axios";
 
 import {
     Select,
@@ -66,8 +67,14 @@ export function ScriptsImportModal({
 
     const loadSites = useCallback(async () => {
         try {
-            const res = await getSites({ types: ['webeditor'], });
+            // const res = await getSites({ types: ['webeditor'], });
+
+            // TODO: Replace this with server action
+            const response = await axios.get('/api/sites?data='+JSON.stringify({ types: ['webeditor'], }));
+            const res = response.data as Awaited<ReturnType<typeof getSites>>;
+
             if (res.errors?.length) throw new Error(res.errors.join(', '));
+
             setSites(res);
         } catch(e: any) {
             alert({
@@ -89,12 +96,21 @@ export function ScriptsImportModal({
 
             setLoading(true);
 
-            const res = await copyScripts({ 
+            // const res = await copyScripts({ 
+            //     fromRemoteSiteId: data.siteId, 
+            //     scriptsIds: [data.scriptId], 
+            //     overWriteScriptWithId: overWriteScriptWithId || routeParams.scriptId as string,
+            //     broadcastAction: true,
+            // });
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/scripts/copy', { 
                 fromRemoteSiteId: data.siteId, 
                 scriptsIds: [data.scriptId], 
                 overWriteScriptWithId: overWriteScriptWithId || routeParams.scriptId as string,
                 broadcastAction: true,
             });
+            const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 

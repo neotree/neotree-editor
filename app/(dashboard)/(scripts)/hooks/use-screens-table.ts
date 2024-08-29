@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -38,7 +39,11 @@ export function useScreensTable({
 
             setLoading(true);
 
-            const res = await deleteScreens({ screensIds, broadcastAction: true, });
+            // const res = await deleteScreens({ screensIds, broadcastAction: true, });
+
+            // TODO: Replace this with server action
+            const response = await axios.delete('/api/screens?data='+JSON.stringify({ screensIds, broadcastAction: true, }));
+            const res = response.data as Awaited<ReturnType<typeof deleteScreens>>;
 
             if (res.errors?.length) {
                 alert({
@@ -83,7 +88,10 @@ export function useScreensTable({
 
         setScreens(prev => ({ ...prev, data: sorted, }));
         
-        await saveScreens({ data: payload, broadcastAction: true, });
+        // await saveScreens({ data: payload, broadcastAction: true, });
+
+        // TODO: Replace this with server action
+        await axios.post('/api/screens/save', { data: payload, broadcastAction: true, });
 
         router.refresh();
     }, [saveScreens, screens, router]);
