@@ -508,7 +508,7 @@ export async function copyScreens(params?: {
 
         if (shouldConfirmCopyingAll && !confirmCopyAll) throw new Error('You&apos;re about to copy all the screens, please confirm this action!');
 
-        const screens = await queries._getScreens({ scriptsIds: fromScriptsIds, screensIds, });
+        const screens = await queries._getScreens({ scriptsIds: fromScriptsIds, screensIds, returnDraftsIfExist: true, });
         if (screens.errors?.length) throw new Error(screens.errors.join(', '));
 
         if (!toScriptsIds.length) {
@@ -568,7 +568,7 @@ export async function copyDiagnoses(params?: {
 
         if (shouldConfirmCopyingAll && !confirmCopyAll) throw new Error('You&apos;re about to copy all the diagnoses, please confirm this action!');
 
-        const diagnoses = await queries._getDiagnoses({ scriptsIds: fromScriptsIds, diagnosesIds, });
+        const diagnoses = await queries._getDiagnoses({ scriptsIds: fromScriptsIds, diagnosesIds, returnDraftsIfExist: true, });
         if (diagnoses.errors?.length) throw new Error(diagnoses.errors.join(', '));
 
         if (!toScriptsIds.length) {

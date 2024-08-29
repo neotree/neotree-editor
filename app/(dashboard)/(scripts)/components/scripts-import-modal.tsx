@@ -24,6 +24,7 @@ import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export function ScriptsImportModal({ 
     open, 
@@ -38,6 +39,8 @@ export function ScriptsImportModal({
 }) {
     const router = useRouter();
     const routeParams = useParams();
+
+    overWriteScriptWithId = overWriteScriptWithId || (routeParams.scriptId as string);
 
     const { getSites } = useAppContext();
     const { copyScripts } = useScriptsContext();
@@ -57,7 +60,7 @@ export function ScriptsImportModal({
         defaultValues: {
             siteId: '',
             scriptId: '',
-            confirmed: false,
+            confirmed: overWriteScriptWithId ? false : true,
         },
     });
 
@@ -99,7 +102,7 @@ export function ScriptsImportModal({
             // const res = await copyScripts({ 
             //     fromRemoteSiteId: data.siteId, 
             //     scriptsIds: [data.scriptId], 
-            //     overWriteScriptWithId: overWriteScriptWithId || routeParams.scriptId as string,
+            //     overWriteScriptWithId: overWriteScriptWithId,
             //     broadcastAction: true,
             // });
 
@@ -107,7 +110,7 @@ export function ScriptsImportModal({
             const response = await axios.post('/api/scripts/copy', { 
                 fromRemoteSiteId: data.siteId, 
                 scriptsIds: [data.scriptId], 
-                overWriteScriptWithId: overWriteScriptWithId || routeParams.scriptId as string,
+                overWriteScriptWithId: overWriteScriptWithId,
                 broadcastAction: true,
             });
             const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
@@ -210,7 +213,7 @@ export function ScriptsImportModal({
                         {!!errors.scriptId?.message && <div className="text-xs text-danger mt-1">{errors.scriptId.message}</div>}
                     </div>
 
-                    <div className="flex gap-x-2">
+                    <div className={cn("flex gap-x-2", !overWriteScriptWithId && 'hidden')}>
                         <Checkbox 
                             name="confirmed"
                             id="confirmed"

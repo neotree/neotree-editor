@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
@@ -28,7 +28,10 @@ export async function _deleteScripts(
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the scripts, please confirm this action!');
 
         // delete drafts
-        await db.delete(scriptsDrafts).where(inArray(scriptsDrafts.scriptDraftId, scriptsIds));
+        await db.delete(scriptsDrafts).where(or(
+            inArray(scriptsDrafts.scriptId, scriptsIds),
+            inArray(scriptsDrafts.scriptDraftId, scriptsIds)
+        ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
         const scriptsToDelete = await db

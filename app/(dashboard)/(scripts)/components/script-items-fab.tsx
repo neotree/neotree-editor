@@ -37,6 +37,7 @@ export function ScriptItemsFab({ disabled }: {
                     fixed
                     bottom-5
                     right-10
+                    z-[1]
                 "
             >
                 <DropdownMenu>
