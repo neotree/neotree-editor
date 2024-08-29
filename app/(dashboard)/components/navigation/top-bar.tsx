@@ -114,7 +114,7 @@ export function TopBar({}: Props) {
                         Switch to <b>{mode === 'development' ? 'view' : 'development'}</b> mode
                     </a>
 
-                    {shouldPublishData && (isSuperUser || isAdmin) && (
+                    {(mode === 'development') && shouldPublishData && (isSuperUser || isAdmin) && (
                         <>
                             <Button
                                 variant="destructive"
