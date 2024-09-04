@@ -4,34 +4,36 @@ import { v4 } from "uuid";
 import socket  from '@/lib/socket';
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { scripts } from "@/databases/pg/schema";
+import { scripts, screensDrafts, diagnosesDrafts } from "@/databases/pg/schema";
 import { _saveScriptsHistory } from "./_scripts_history";
+import { _publishScreens } from "./_screens_publish";
+import { _publishDiagnoses } from "./_diagnoses_publish";
 
 export async function _publishScripts() {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
 
     try {
         const drafts = await db.query.scriptsDrafts.findMany();
-        let insertData = drafts.filter(c => !c.scriptId).map(s => ({
+        let inserts = drafts.filter(c => !c.scriptId).map(s => ({
             ...s,
             scriptId: s.data.scriptId || v4(),
             data: { ...s.data, scriptId: s.data.scriptId || v4(), },
         }));
-        let updateData = drafts.filter(c => c.scriptId);
+        let updates = drafts.filter(c => c.scriptId);
 
         const errors: string[] = [];
         const processedScripts: { scriptId: string; errors?: string[]; }[] = []
 
-        if (updateData.length) {
+        if (updates.length) {
             // we'll use data before to compare changes
             let dataBefore: typeof scripts.$inferSelect[] = [];
-            if (updateData.filter(c => c.scriptId).length) {
+            if (updates.filter(c => c.scriptId).length) {
                 dataBefore = await db.query.scripts.findMany({
-                    where: inArray(scripts.scriptId, updateData.filter(c => c.scriptId).map(c => c.scriptId!))
+                    where: inArray(scripts.scriptId, updates.filter(c => c.scriptId).map(c => c.scriptId!))
                 });
             }
 
-            for(const { scriptId: _scriptId, data: c } of updateData) {
+            for(const { scriptId: _scriptId, data: c } of updates) {
                 const scriptId = _scriptId!;
 
                 const { scriptId: __scriptId, id, oldScriptId, createdAt, updatedAt, deletedAt, ...payload } = c;
@@ -48,35 +50,46 @@ export async function _publishScripts() {
                 processedScripts.push({ scriptId, });
             }
 
-            await _saveScriptsHistory({ drafts: insertData, previous: dataBefore, });
+            await _saveScriptsHistory({ drafts: updates, previous: dataBefore, });
         }
 
-        if (insertData.length) {
+        if (inserts.length) {
             let dataBefore: typeof scripts.$inferSelect[] = [];
-            if (insertData.filter(c => c.scriptId).length) {
+            if (inserts.filter(c => c.scriptId).length) {
                 dataBefore = await db.query.scripts.findMany({
-                    where: inArray(scripts.scriptId, insertData.filter(c => c.scriptId).map(c => c.scriptId!))
+                    where: inArray(scripts.scriptId, inserts.filter(c => c.scriptId).map(c => c.scriptId!))
                 });
             }
 
-            // await db.insert(scripts).values(insertData);
+            const insertData = inserts.map(s => ({
+                ...s.data,
+                scriptId: s.scriptDraftId,
+            }));
 
-            // const inserted = await _getScripts({ scriptIds: insertData.map(c => c.scriptId!), });
+            await db.insert(scripts).values(insertData);
 
-            // for(const { scriptId } of inserted.data) {
-            //     const draft = insertData.filter(s => s.data.scriptId === scriptId)[0];
-            //     await db.update(screensDrafts).set({ scriptId }).where(eq(screensDrafts.scriptDraftId, draft.scriptDraftId));
-            //     await db.update(diagnosesDrafts).set({ scriptId }).where(eq(diagnosesDrafts.scriptDraftId, draft.scriptDraftId));
-            // }
+            for(const { scriptId } of insertData) {
+                processedScripts.push({ scriptId, });
+
+                await db.update(screensDrafts).set({ scriptId }).where(or(
+                    eq(screensDrafts.scriptId, scriptId),
+                    eq(screensDrafts.scriptDraftId, scriptId)
+                ));
+
+                await db.update(diagnosesDrafts).set({ scriptId }).where(or(
+                    eq(screensDrafts.scriptId, scriptId),
+                    eq(screensDrafts.scriptDraftId, scriptId)
+                ));
+            }
         }
 
-        // if (processedScripts.length) {
-        //     const publishScreens = await _publishScreens({ scriptsIds: processedScripts.map(s => s.scriptId) });
-        //     if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
+        if (processedScripts.length) {
+            const publishScreens = await _publishScreens({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
 
-        //     const publishDiagnoses = await _publishDiagnoses({ scriptsIds: processedScripts.map(s => s.scriptId) });
-        //     if (publishScreens.errors) throw new Error(publishDiagnoses.errors.join(', '));
-        // }
+            const publishDiagnoses = await _publishDiagnoses({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(', '));
+        }
 
         results.success = true;
     } catch(e: any) {
