@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { Content } from "@/components/content";
 import { useAppContext } from "@/contexts/app";
@@ -34,7 +35,13 @@ export function TopBar({}: Props) {
     const publishData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await _publishData();
+
+            // const res = await _publishData();
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/ops/publish-data');
+            const res = response.data as Awaited<ReturnType<typeof _publishData>>;
+
             if (res.errors) {
                 alert({
                     variant: 'error',
@@ -63,7 +70,13 @@ export function TopBar({}: Props) {
     const discardDrafts = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await _discardDrafts();
+
+            // const res = await _discardDrafts();
+
+            // TODO: Replace this with server action
+            const response = await axios.post('/api/ops/discard-drafts');
+            const res = response.data as Awaited<ReturnType<typeof _discardDrafts>>;
+
             if (res.errors) {
                 alert({
                     variant: 'error',
