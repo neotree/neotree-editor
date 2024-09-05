@@ -1,5 +1,6 @@
 import logger from "@/lib/logger";
 import { _getDevice } from "@/databases/queries/devices";
+import { _getDatesWhenUpdatesWereMade } from "@/databases/queries/ops";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { _saveDevices } from "@/databases/mutations/devices";
 
@@ -29,6 +30,14 @@ export async function getDevice(deviceId: string) {
             device = res.inserted[0];
         }
 
+        const lastUpdates = await _getDatesWhenUpdatesWereMade();
+        
+        const dates = Object.values(lastUpdates.data).filter(d => d).map(d => new Date(d!).getTime());
+
+        let last_backup_date = info.data?.lastPublishDate;
+
+        if (dates.length) last_backup_date = new Date(Math.max(...dates));
+
 		return { 
             device: {
                 id: device?.id,
@@ -43,7 +52,7 @@ export async function getDevice(deviceId: string) {
                 id: info.data?.id,
                 version: info.data?.dataVersion,
                 should_track_usage: false,
-                last_backup_date: info.data?.lastPublishDate,
+                last_backup_date,
             }, 
         };
 	} catch(e: any) {
