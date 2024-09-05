@@ -671,7 +671,7 @@ export function ScreenForm({
                 >Cancel</Button>
 
                 <Button 
-                    disabled={!formIsDirty || disabled}
+                    disabled={disabled}
                     onClick={() => save()}
                 >
                     Save Draft

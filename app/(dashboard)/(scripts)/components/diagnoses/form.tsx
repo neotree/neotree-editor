@@ -155,7 +155,7 @@ export function DiagnosisForm(props: Props) {
                 >Cancel</Button>
 
                 <Button 
-                    disabled={!formIsDirty || disabled}
+                    disabled={disabled}
                     onClick={() => save()}
                 >
                     Save Draft
