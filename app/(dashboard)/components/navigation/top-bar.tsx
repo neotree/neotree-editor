@@ -49,12 +49,13 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
-                alert({
-                    variant: 'success',
-                    title: 'Success',
-                    message: 'Data published successfully!',
-                });
+                window.location.reload();
+                // router.refresh();
+                // alert({
+                //     variant: 'success',
+                //     title: 'Success',
+                //     message: 'Data published successfully!',
+                // });
             }
         } catch(e: any) {
             alert({
@@ -84,12 +85,13 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
-                alert({
-                    variant: 'success',
-                    title: 'Success',
-                    message: 'Data discarded successfully!',
-                });
+                window.location.reload();
+                // router.refresh();
+                // alert({
+                //     variant: 'success',
+                //     title: 'Success',
+                //     message: 'Data discarded successfully!',
+                // });
             }
         } catch(e: any) {
             alert({
@@ -122,6 +124,7 @@ export function TopBar({}: Props) {
                         onClick={e => {
                             e.preventDefault();
                             setMode(mode === 'development' ? 'view' : 'development');
+                            setTimeout(() => window.location.reload(), 0);
                         }}
                     >
                         Switch to <b>{mode === 'development' ? 'view' : 'development'}</b> mode
