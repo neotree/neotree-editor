@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { scriptTypes } from "@/constants";
+import { useAppContext } from "@/contexts/app";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
 import { ScriptItemsFab } from "./script-items-fab";
@@ -34,7 +35,6 @@ export function ScriptForm(props: Props) {
     const form = useScriptForm(props);
     const {
         formData,
-        formIsDirty,
         hospitals,
         loading,
         disabled,
@@ -46,6 +46,8 @@ export function ScriptForm(props: Props) {
         getDefaultNuidSearchFields,
         onSubmit,
     } = form;
+
+    const { mode } = useAppContext();
 
     const type = watch('type');
     const hospitalId = watch('hospitalId');
@@ -188,7 +190,7 @@ export function ScriptForm(props: Props) {
 
                     <Button
                         onClick={() => onSubmit()}
-                        disabled={!formIsDirty}
+                        disabled={disabled}
                     >
                         Save draft
                     </Button>
