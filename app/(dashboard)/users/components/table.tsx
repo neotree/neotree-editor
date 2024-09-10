@@ -4,6 +4,7 @@ import { useCallback, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { CheckCircle } from "lucide-react";
 import moment from "moment";
+import axios from "axios";
 
 import { 
     getUsers, 
@@ -74,13 +75,24 @@ export function UsersTable({
     ) => {
         setLoading(true);
 
-        const users = await _getUsers({
+        // const users = await _getUsers({
+        //     ...searchParams.parsed,
+        //     roles: searchParams.parsed.role ? [searchParams.parsed.role] : undefined,
+        //     page: 1,
+        //     limit: initialData.limit,
+        //     ...opts,
+        // });
+
+        // TODO: replace with server action
+        const res = await axios.get('/api/users?data=' + JSON.stringify({
             ...searchParams.parsed,
             roles: searchParams.parsed.role ? [searchParams.parsed.role] : undefined,
             page: 1,
             limit: initialData.limit,
             ...opts,
-        });
+        }));
+
+        const users = res.data as Awaited<ReturnType<typeof _getUsers>>;
 
         if (users.error) {
             toast.error(users.error);
@@ -100,8 +112,14 @@ export function UsersTable({
             (async () => {
                 try {
                     setLoading(true);
-                    await deleteUsers(userIds);
+
+                    // await deleteUsers(userIds);
+
+                    // TODO: replace with server action
+                    await axios.delete('/api/users?data=' + JSON.stringify(userIds));
+
                     await getUsers();
+
                     cb?.();
                 } catch(e: any) {
                     toast.error(e.message);
