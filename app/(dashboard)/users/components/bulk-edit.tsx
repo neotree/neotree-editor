@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import axios from "axios";
 
 import {
     Sheet,
@@ -71,7 +72,11 @@ export function BulkEdit({
                 setSubmitting(true);
     
                 if (userIds.length) {
-                    await updateUsers(userIds.map(userId => ({ userId, data, })));
+                    // await updateUsers(userIds.map(userId => ({ userId, data, })));
+
+                    // TODO: replace with server action
+                    await axios.post('/api/users/update', { data: userIds.map(userId => ({ userId, data, })), });
+                    
                     if (onSaveSuccess) await onSaveSuccess();
                 }
     

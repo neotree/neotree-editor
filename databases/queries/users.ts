@@ -113,7 +113,7 @@ async function __getUsers({
 }: GetUsersParams) {
     page = Math.max(0, page);
 
-    const conditions: SQL[] = [];
+    const conditions: SQL[] = [isNull(users.deletedAt)];
 
     if (userIds?.length) conditions.push(inArray(users.userId, userIds));
 

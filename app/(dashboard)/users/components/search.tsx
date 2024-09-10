@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useMeasure } from 'react-use';
+import axios from "axios";
 
 import { searchUsers } from "@/app/actions/users";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,13 @@ export function Search({ searchUsers, onDelete, }: Props) {
         try {
             if (searchValue || (searchResults?.searchValue !== searchValue)) {
                 setLoading(true);
-                const res = await searchUsers({ searchValue, limit: 5, ...params });
+
+                // const res = await searchUsers({ searchValue, limit: 5, ...params });
+
+                // TODO: replace with server action
+                const response = await axios.get('/api/users/search?data=' + JSON.stringify({ searchValue, limit: 5, ...params }));
+                const res = response.data as Awaited<ReturnType<typeof searchUsers>>;
+
                 if (res.error) {
                     toast.error(res.error);
                 } else {

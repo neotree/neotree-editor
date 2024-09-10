@@ -4,6 +4,7 @@ import { MenuIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
+import axios from "axios";
 
 import {
     Sheet,
@@ -123,10 +124,18 @@ export function UserForm({
                 setSubmitting(true);
     
                 if (updateUserId) {
-                    await updateUsers([{ userId: updateUserId, data }]);
+                    // await updateUsers([{ userId: updateUserId, data }]);
+
+                    // TODO: replace with server action
+                    await axios.post('/api/users/update', { data: [{ userId: updateUserId, data }], });
+
                     if (onSaveSuccess) await onSaveSuccess();
                 } else {
-                    await createUsers([data]);
+                    // await createUsers([data]);
+
+                    // TODO: replace with server action
+                    await axios.post('/api/users/add', { data: [data], });
+
                     if (onSaveSuccess) await onSaveSuccess();
                 }
     
@@ -157,6 +166,8 @@ export function UserForm({
 
     return (
         <>
+            {submitting && <Loader overlay />}
+            
             <Sheet
                 open={open || !!parsed.userId}
                 onOpenChange={() => {
