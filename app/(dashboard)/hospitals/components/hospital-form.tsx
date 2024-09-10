@@ -4,6 +4,7 @@ import { MenuIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
+import axios from 'axios';
 
 import {
     Sheet,
@@ -93,10 +94,18 @@ export function HospitalForm({
                 setSubmitting(true);
     
                 if (updateHospitalId) {
-                    await updateHospitals([{ hospitalId: updateHospitalId, data }]);
+                    // await updateHospitals([{ hospitalId: updateHospitalId, data }]);
+
+                    // TODO: Replace with server actions
+                    await axios.post('/api/hospitals/update', { data: [{ hospitalId: updateHospitalId, data }], });
+
                     if (onSaveSuccess) await onSaveSuccess();
                 } else {
-                    await createHospitals([data]);
+                    // await createHospitals([data]);
+
+                    // TODO: Replace with server actions
+                    await axios.post('/api/hospitals/add', { data: [data], });
+
                     if (onSaveSuccess) await onSaveSuccess();
                 }
     
@@ -124,6 +133,8 @@ export function HospitalForm({
 
     return (
         <>
+            {submitting && <Loader overlay />}
+            
             <Sheet
                 open={open || !!parsed.hospitalId}
                 onOpenChange={() => {

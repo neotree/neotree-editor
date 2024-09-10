@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useMeasure } from 'react-use';
+import axios from 'axios';
 
 import { searchHospitals } from "@/app/actions/_hospitals";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,12 @@ export function Search({ searchHospitals, onDelete, }: Props) {
         try {
             if (searchValue || (searchResults?.searchValue !== searchValue)) {
                 setLoading(true);
-                const res = await searchHospitals({ searchValue, limit: 5, ...params });
+                // const res = await searchHospitals({ searchValue, limit: 5, ...params });
+
+                // TODO: Replace with server actions
+                const response = await axios.get('/api/hospitals?data=' + JSON.stringify({ searchValue, limit: 5, ...params }));
+                const res = response.data as Awaited<ReturnType<typeof searchHospitals>>;
+
                 if (res.error) {
                     toast.error(res.error);
                 } else {
