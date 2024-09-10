@@ -15,9 +15,9 @@ import {
     GetUserParams, 
 } from "@/databases/queries/users";
 import logger from "@/lib/logger";
-import { sendMail } from "@/mailer";
-import { getUserDeletedEmail } from "@/mailer/get-user-deleted-email";
-import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
+// import { sendMail } from "@/mailer";
+// import { getUserDeletedEmail } from "@/mailer/get-user-deleted-email";
+// import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
 import { _addUserToken } from "@/databases/mutations/tokens";
 import { isAllowed } from "./is-allowed";
 
@@ -87,10 +87,10 @@ export async function deleteUsers(userIds: string[]) {
     if (userIds.length) {
         const { data: users } = await _getUsers({ userIds, });
         await _deleteUsers(userIds);
-        await Promise.all(users.filter(u => u.activationDate).map(u => sendMail({
-            toEmail: u.email,
-            ...getUserDeletedEmail({ name: u.displayName, }),
-        })));
+        // await Promise.all(users.filter(u => u.activationDate).map(u => sendMail({
+        //     toEmail: u.email,
+        //     ...getUserDeletedEmail({ name: u.displayName, }),
+        // })));
     }
 
     return true;
@@ -107,10 +107,10 @@ export const createUsers: typeof _createUsers = async (...args) => {
                     userId: u.userId,
                     hoursValid: 1,
                 });
-                await sendMail({
-                    toEmail: u.email,
-                    ...getUserOnboardingEmail({ name: u.displayName, token: token.token, }),
-                });
+                // await sendMail({
+                //     toEmail: u.email,
+                //     ...getUserOnboardingEmail({ name: u.displayName, token: token.token, }),
+                // });
             } catch(e) {
                 // do nothing
             }
