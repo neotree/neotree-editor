@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import axios from 'axios';
 
 import { 
     getHospitals, 
@@ -59,13 +60,23 @@ export function HospitalsTable({
     ) => {
         setLoading(true);
 
-        const hospitals = await _getHospitals({
+        // const hospitals = await _getHospitals({
+        //     ...searchParams.parsed,
+        //     roles: searchParams.parsed.role ? [searchParams.parsed.role] : undefined,
+        //     page: 1,
+        //     limit: initialData.limit,
+        //     ...opts,
+        // });
+
+        // TODO: Replace with server actions
+        const response = await axios.get('/api/hospitals?data=' + JSON.stringify({
             ...searchParams.parsed,
             roles: searchParams.parsed.role ? [searchParams.parsed.role] : undefined,
             page: 1,
             limit: initialData.limit,
             ...opts,
-        });
+        }));
+        const hospitals = response.data as Awaited<ReturnType<typeof _getHospitals>>;
 
         if (hospitals.error) {
             toast.error(hospitals.error);
@@ -85,7 +96,12 @@ export function HospitalsTable({
             (async () => {
                 try {
                     setLoading(true);
-                    await deleteHospitals(hospitalIds);
+
+                    // await deleteHospitals(hospitalIds);
+
+                    // TODO: Replace with server actions
+                    await axios.delete('/api/hospitals?data=' + JSON.stringify(hospitalIds));
+
                     await getHospitals();
                     cb?.();
                 } catch(e: any) {
