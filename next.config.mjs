@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
-    distDir: 'build',
+    // distDir: 'build',
     images: {
         domains: [
             'localhost',

@@ -9,8 +9,8 @@
         "lint": "next lint",
         "db:studio": "npx drizzle-kit studio",
         "db:push": "npx drizzle-kit push",
-        "prestart:stage": "yarn",
-        "prestart:production": "yarn",
+        "prestart:stage": "yarn && yarn build",
+        "prestart:production": "yarn && yarn build",
         "start:stage": "pm2 start pm2.stage.json",
         "start:production": "pm2 start pm2.production.json",
         "tsx": "tsx $1"
