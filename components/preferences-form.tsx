@@ -69,8 +69,8 @@ export function PreferencesForm({
     const fontWeight = watch('fontWeight');
     const fontStyle = watch('fontStyle');
     const textColor = watch('textColor');
-    const backgroundColor = watch('backgroundColor');
-    const highlight = watch('highlight');
+    // const backgroundColor = watch('backgroundColor');
+    // const highlight = watch('highlight');
 
     const onSubmit = handleSubmit(onSave);
 
@@ -165,7 +165,7 @@ export function PreferencesForm({
                             </div>
                         </div>
 
-                        <div>
+                        {/* <div>
                             <div className="flex flex-col gap-2">
                                 {!!backgroundColor[id] && (
                                     <div className="flex gap-x-2 items-center">
@@ -192,7 +192,7 @@ export function PreferencesForm({
                                     <Label secondary htmlFor={`defaultBgColor.${id}`}>Default background color</Label>
                                 </div>
                             </div>
-                        </div>
+                        </div> */}
 
                         <div className="flex gap-4 flex-wrap">
                             <div className="flex gap-x-2">
@@ -226,7 +226,7 @@ export function PreferencesForm({
                                 <Label secondary htmlFor="italic">Italic</Label>
                             </div>
 
-                            <div className="flex gap-x-2">
+                            {/* <div className="flex gap-x-2">
                                 <Checkbox 
                                     name="highlight"
                                     id="highlight"
@@ -235,7 +235,7 @@ export function PreferencesForm({
                                     onCheckedChange={() => setValue('highlight', { ...highlight, [id]: highlight[id] ? undefined! : true }, { shouldDirty: true, })}
                                 />
                                 <Label secondary htmlFor="highlight">Highlight</Label>
-                            </div>
+                            </div> */}
                         </div>
                     </div>
 
