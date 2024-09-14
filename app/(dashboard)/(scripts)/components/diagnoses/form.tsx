@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
+import { PreferencesForm } from "@/components/preferences-form";
 import { useDiagnosisForm, UseDiagnosisFormParams } from "../../hooks/use-diagnosis-form";
 import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
@@ -37,6 +38,7 @@ export function DiagnosisForm(props: Props) {
     const image1 = watch('image1');
     const image2 = watch('image2');
     const image3 = watch('image3');
+    const preferences = watch('preferences');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -84,6 +86,13 @@ export function DiagnosisForm(props: Props) {
                         name="description"
                         noRing={false}
                     />
+                    <PreferencesForm 
+                        id="description"
+                        title="Description"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                    />
                 </div>
 
                 <div>
@@ -130,6 +139,13 @@ export function DiagnosisForm(props: Props) {
                                         name={`text${i}`}
                                         noRing={false}
                                         rows={5}
+                                    />
+                                    <PreferencesForm 
+                                        id={text as unknown as string}
+                                        title={`Text ${i+1}`}
+                                        disabled={disabled}
+                                        data={preferences}
+                                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                                     />
                                 </div>
 

@@ -7,6 +7,7 @@ import axios from "axios";
 import { DiagnosisFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { defaultPreferences } from "@/constants";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
@@ -45,6 +46,7 @@ export function useDiagnosisForm({
             image1: formData?.image1 || null,
             image2: formData?.image2 || null,
             image3: formData?.image3 || null,
+            preferences: formData?.preferences || defaultPreferences,
         } satisfies DiagnosisFormDataType;
     }, [formData, scriptId]);
 
