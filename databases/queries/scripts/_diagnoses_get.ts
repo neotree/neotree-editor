@@ -4,7 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { diagnoses, diagnosesDrafts, pendingDeletion, scripts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { DiagnosisSymptom, ScriptImage } from "@/types";
+import { DiagnosisSymptom, Preferences, ScriptImage } from "@/types";
 
 export type GetDiagnosesParams = {
     diagnosesIds?: string[];
@@ -17,6 +17,7 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
     symptoms: DiagnosisSymptom[];
+    preferences: Preferences;
     image1: null | ScriptImage;
     image2: null | ScriptImage;
     image3: null | ScriptImage;
