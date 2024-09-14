@@ -11,8 +11,8 @@
         "db:push": "npx drizzle-kit push",
         "prestart:stage": "yarn && yarn build",
         "prestart:production": "yarn && yarn build",
-        "start:stage": "pm2 start pm2.stage.json",
-        "start:production": "pm2 start pm2.production.json",
+        "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
+        "start:production": "NODE_ENV=production pm2 start pm2.production.json",
         "tsx": "tsx $1"
     },
     "dependencies": {
