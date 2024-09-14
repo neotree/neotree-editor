@@ -201,7 +201,7 @@ export function PreferencesForm({
                                     id="bold"
                                     disabled={disabled}
                                     checked={fontWeight[id] === 'bold'}
-                                    onCheckedChange={() => setValue('fontWeight', { ...fontWeight, [id]: fontWeight[id] ? undefined! : "bold" }, { shouldDirty: true, })}
+                                    onCheckedChange={() => setValue(`fontWeight.${id}`, fontWeight[id] ? undefined! : "bold", { shouldDirty: true, })}
                                 />
                                 <Label secondary htmlFor="bold">Bold</Label>
                             </div>
@@ -220,7 +220,7 @@ export function PreferencesForm({
                                             value.push('italic');
                                         }
                                         if (!value.length) value = undefined!;
-                                        setValue('fontStyle', { ...fontStyle, [id]: value, }, { shouldDirty: true, })
+                                        setValue(`fontStyle.${id}`, value, { shouldDirty: true, })
                                     }}
                                 />
                                 <Label secondary htmlFor="italic">Italic</Label>
@@ -232,7 +232,7 @@ export function PreferencesForm({
                                     id="highlight"
                                     disabled={disabled}
                                     checked={highlight[id]}
-                                    onCheckedChange={() => setValue('highlight', { ...highlight, [id]: highlight[id] ? undefined! : true }, { shouldDirty: true, })}
+                                    onCheckedChange={() => setValue(`fontStyle.${id}`, highlight[id] ? undefined! : true, { shouldDirty: true, })}
                                 />
                                 <Label secondary htmlFor="highlight">Highlight</Label>
                             </div> */}
