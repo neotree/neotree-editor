@@ -1,12 +1,8 @@
 {
     "script": "server/index.js",
-    "name": "neotree_webeditor_stage",
     "watch": true,
-    "ignore_watch": [
-        ".next",
-        "logs",
-        "node_modules"
-    ],
+    "ignore_watch": ["logs", "/build/cache", "/build/static/webpack"],
+    "name": "neotree_webeditor_stage",
     "watch_options": {
         "followSymlinks": false
     }

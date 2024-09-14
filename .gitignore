@@ -14,9 +14,9 @@
 /out/
 
 # production
-/build
-# /build/cache
-# /build/static/webpack
+# /build
+/build/cache
+/build/static/webpack
 
 # misc
 .DS_Store
