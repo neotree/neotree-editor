@@ -1,5 +1,15 @@
 import { getScreenWithDraft } from "@/app/actions/_screens";
 import { getScriptWithDraft } from "@/app/actions/_scripts";
+import { Preferences } from "@/types";
+
+export const defaultPreferences = { 
+    fontSize: {}, 
+    fontWeight: {}, 
+    fontStyle: {}, 
+    textColor: {}, 
+    backgroundColor: {}, 
+    highlight: {},
+} as Preferences;
 
 export const scriptsPageTabs = [
     { value: 'screens', label: 'Screens', },

@@ -4,7 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, hospitals, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { ScriptField } from "@/types";
+import { ScriptField, Preferences } from "@/types";
 
 export type GetScriptsParams = {
     scriptsIds?: string[];
@@ -16,6 +16,7 @@ export type ScriptType = typeof scripts.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
     nuidSearchFields: ScriptField[];
+    preferences: Preferences;
     hospitalName: string;
 };
 

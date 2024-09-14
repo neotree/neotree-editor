@@ -22,6 +22,7 @@ import {
     scriptTypeEnum,
     screenTypeEnum,
 } from "./_utils";
+import { defaultPreferences } from "@/constants";
 
 export * from './_utils';
 
@@ -284,6 +285,7 @@ export const configKeys = pgTable(
         label: text('label').notNull().unique(),
         summary: text('summary').notNull(),
         source: text('source').default('editor'),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -373,6 +375,7 @@ export const scripts = pgTable(
         exportable: boolean('exportable').notNull().default(true),
         nuidSearchEnabled: boolean('nuid_search_enabled').notNull().default(false),
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -510,6 +513,7 @@ export const screens = pgTable(
         prePopulate: jsonb('pre_populate').default('[]').notNull(),
         fields: jsonb('fields').default('[]').notNull(),
         items: jsonb('items').default('[]').notNull(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -624,6 +628,7 @@ export const diagnoses = pgTable(
         image1: jsonb('image1'),
         image2: jsonb('image2'),
         image3: jsonb('image3'),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),

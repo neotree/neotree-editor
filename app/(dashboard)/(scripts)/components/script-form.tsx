@@ -23,6 +23,7 @@ import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
 import { Title } from "./title";
 import { ScriptItemsFab } from "./script-items-fab";
 import { useScriptForm } from "../hooks/use-script-form";
+import { PreferencesForm } from "@/components/preferences-form";
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -54,6 +55,7 @@ export function ScriptForm(props: Props) {
     const exportable = watch('exportable');
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
+    const preferences = watch('preferences');
 
     return (
         <>
@@ -124,6 +126,13 @@ export function ScriptForm(props: Props) {
                             placeholder="Title"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                         />
+                        <PreferencesForm 
+                            id="title"
+                            title="Title"
+                            disabled={disabled}
+                            data={preferences}
+                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        />
                     </div>
 
                     <div>
@@ -133,6 +142,13 @@ export function ScriptForm(props: Props) {
                             placeholder="Print title"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                         />
+                        <PreferencesForm 
+                            id="printTitle"
+                            title="Print title"
+                            disabled={disabled}
+                            data={preferences}
+                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        />
                     </div>
 
                     <div>
@@ -141,6 +157,13 @@ export function ScriptForm(props: Props) {
                             {...register('description', { disabled, })}
                             placeholder="Description"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        />
+                        <PreferencesForm 
+                            id="description"
+                            title="Description"
+                            disabled={disabled}
+                            data={preferences}
+                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                         />
                     </div>
 

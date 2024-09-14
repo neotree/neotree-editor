@@ -7,7 +7,7 @@ import axios from "axios";
 
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { defaultNuidSearchFields } from "@/constants/fields";
-import { scriptTypes } from "@/constants";
+import { defaultPreferences, scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
@@ -37,6 +37,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
         nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
         nuidSearchFields: (formData?.nuidSearchFields || []),
+        preferences: (formData?.preferences || defaultPreferences),
     } satisfies ScriptFormDataType), [formData]);
 
     const form = useForm({

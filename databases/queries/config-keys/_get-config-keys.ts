@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { configKeys, configKeysDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { Preferences } from "@/types";
 
 export type GetConfigKeysParams = {
     configKeysIds?: string[];
@@ -15,6 +16,7 @@ export type GetConfigKeysResults = {
     data: (typeof configKeys.$inferSelect & {
         isDraft: boolean;
         isDeleted: boolean;
+        preferences: Preferences;
     })[];
     errors?: string[];
 };
