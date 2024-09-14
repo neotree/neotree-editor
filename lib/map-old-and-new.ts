@@ -19,6 +19,7 @@ export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
             updatedAt: s.updatedAt,
             position: s.position,
             id: s.id,
+            preferences: s.preferences,
         },
     };
 }
@@ -55,6 +56,7 @@ export function mapNewDiagnosisToOld(s: typeof diagnoses.$inferSelect) {
             key: s.key,
             severity_order: s.severityOrder,
             symptoms: s.symptoms,
+            preferences: s.preferences,
         },
     };
 }
@@ -132,6 +134,7 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 positiveLabel: s.positiveLabel,
                 timerValue: s.timerValue,
             },
+            preferences: s.preferences,
         },
     };
 }
@@ -183,6 +186,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 maxTimeKey: f.maxTimeKey,
                 values: f.values,
             })),
+            preferences: s.preferences,
         },
     };
 }

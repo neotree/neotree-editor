@@ -132,6 +132,7 @@ export function ScriptForm(props: Props) {
                             disabled={disabled}
                             data={preferences}
                             onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                            hide
                         />
                     </div>
 
@@ -148,6 +149,7 @@ export function ScriptForm(props: Props) {
                             disabled={disabled}
                             data={preferences}
                             onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                            hide
                         />
                     </div>
 
@@ -164,6 +166,7 @@ export function ScriptForm(props: Props) {
                             disabled={disabled}
                             data={preferences}
                             onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                            hide
                         />
                     </div>
 

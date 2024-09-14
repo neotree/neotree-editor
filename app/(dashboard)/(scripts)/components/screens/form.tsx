@@ -35,6 +35,7 @@ import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
 import { Separator } from "@/components/ui/separator";
 import edlizSummaryData from "@/constants/edliz-summary-table";
 import { ScriptItem } from "@/types";
+import { PreferencesForm } from "@/components/preferences-form";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { getScreenDataType } from "../../utils";
@@ -84,6 +85,7 @@ export function ScreenForm({
     const image1 = watch('image1');
     const image2 = watch('image2');
     const image3 = watch('image3');
+    const preferences = watch('preferences');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -294,6 +296,14 @@ export function ScreenForm({
                         name="title"
                         noRing={false}
                     />
+                    <PreferencesForm 
+                        id="title"
+                        title="Title"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        hide
+                    />
                 </div>
 
                 {isDiagnosisScreen && (
@@ -305,6 +315,14 @@ export function ScreenForm({
                                 name="title2"
                                 noRing={false}
                             />
+                            <PreferencesForm 
+                                id="title2"
+                                title="Title 2"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                hide
+                            />
                         </div>
 
                         <div>
@@ -313,6 +331,14 @@ export function ScreenForm({
                                 {...register('title3', { disabled, required: true, })}
                                 name="title3"
                                 noRing={false}
+                            />
+                            <PreferencesForm 
+                                id="title3"
+                                title="Title 3"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                hide
                             />
                         </div>
 
@@ -323,6 +349,14 @@ export function ScreenForm({
                                 name="previewTitle"
                                 noRing={false}
                             />
+                            <PreferencesForm 
+                                id="previewTitle"
+                                title="Preview title"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                hide
+                            />
                         </div>
 
                         <div>
@@ -331,6 +365,14 @@ export function ScreenForm({
                                 {...register('previewPrintTitle', { disabled, required: true })}
                                 name="previewPrintTitle"
                                 noRing={false}
+                            />
+                            <PreferencesForm 
+                                id="previewPrintTitle"
+                                title="Preview print title"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                hide
                             />
                         </div>
                     </>
@@ -343,6 +385,14 @@ export function ScreenForm({
                         name="sectionTitle"
                         noRing={false}
                     />
+                    <PreferencesForm 
+                        id="sectionTitle"
+                        title="Print section title"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        hide
+                    />
                 </div>
 
                 <div>
@@ -351,6 +401,13 @@ export function ScreenForm({
                         {...register('actionText', { disabled, })}
                         name="actionText"
                         noRing={false}
+                    />
+                    <PreferencesForm 
+                        id="actionText"
+                        title="Action"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                     />
                 </div>
 
@@ -361,6 +418,13 @@ export function ScreenForm({
                         name="contentText"
                         noRing={false}
                         rows={5}
+                    />
+                    <PreferencesForm 
+                        id="contentText"
+                        title="Content"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                     />
                 </div>
 
@@ -394,6 +458,14 @@ export function ScreenForm({
                                             name={`title${i}`}
                                             noRing={false}
                                         />
+                                        <PreferencesForm 
+                                            id={title as unknown as string}
+                                            title={`Title ${i+1}`}
+                                            disabled={disabled}
+                                            data={preferences}
+                                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                            hide
+                                        />
                                     </div>
 
                                     <div className="flex gap-x-4">
@@ -404,6 +476,13 @@ export function ScreenForm({
                                                 name={`text${i}`}
                                                 noRing={false}
                                                 rows={5}
+                                            />
+                                            <PreferencesForm 
+                                                id={text as unknown as string}
+                                                title={`Text ${i+1}`}
+                                                disabled={disabled}
+                                                data={preferences}
+                                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                                             />
                                         </div>
 
@@ -529,6 +608,13 @@ export function ScreenForm({
                         noRing={false}
                         rows={5}
                     />
+                    <PreferencesForm 
+                        id="instructions"
+                        title="Instructions"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                    />
                 </div>
 
                 {isDiagnosisScreen && (
@@ -541,6 +627,13 @@ export function ScreenForm({
                                 noRing={false}
                                 rows={5}
                             />
+                            <PreferencesForm 
+                                id="instructions2"
+                                title="Instructions 2"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                            />
                         </div>
 
                         <div>
@@ -550,6 +643,13 @@ export function ScreenForm({
                                 name="instructions3"
                                 noRing={false}
                                 rows={5}
+                            />
+                            <PreferencesForm 
+                                id="instructions3"
+                                title="Instructions 3"
+                                disabled={disabled}
+                                data={preferences}
+                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                             />
                         </div>
 
@@ -562,6 +662,13 @@ export function ScreenForm({
                                     noRing={false}
                                     rows={5}
                                 />
+                                <PreferencesForm 
+                                    id="hcwDiagnosesInstructions"
+                                    title="HCW diagnoses instructions"
+                                    disabled={disabled}
+                                    data={preferences}
+                                    onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                />
                             </div>
 
                             <div>
@@ -571,6 +678,13 @@ export function ScreenForm({
                                     name="suggestedDiagnosesInstructions"
                                     noRing={false}
                                     rows={5}
+                                />
+                                <PreferencesForm 
+                                    id="suggestedDiagnosesInstructions"
+                                    title="Suggested diagnoses instructions"
+                                    disabled={disabled}
+                                    data={preferences}
+                                    onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                                 />
                             </div>
                         </div>
@@ -584,6 +698,13 @@ export function ScreenForm({
                         name="notes"
                         noRing={false}
                         rows={5}
+                    />
+                    <PreferencesForm 
+                        id="notes"
+                        title="Notes"
+                        disabled={disabled}
+                        data={preferences}
+                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                     />
                 </div>
 

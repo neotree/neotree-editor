@@ -1,4 +1,6 @@
 {
+  "/(dashboard)/(scripts)/script/[scriptId]/page": "app/(dashboard)/(scripts)/script/[scriptId]/page.js",
+  "/(dashboard)/(scripts)/script/[scriptId]/diagnosis/[diagnosisId]/page": "app/(dashboard)/(scripts)/script/[scriptId]/diagnosis/[diagnosisId]/page.js",
   "/(dashboard)/(scripts)/page": "app/(dashboard)/(scripts)/page.js",
-  "/(dashboard)/(scripts)/script/[scriptId]/page": "app/(dashboard)/(scripts)/script/[scriptId]/page.js"
+  "/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/page": "app/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/page.js"
 }

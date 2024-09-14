@@ -8,6 +8,7 @@ import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { defaultPreferences } from "@/constants";
 
 export type UseScreenFormParams = {
     scriptId: string;
@@ -79,6 +80,7 @@ export function useScreenForm({
             prePopulate: formData?.prePopulate || [],
             fields: formData?.fields || [],
             items: formData?.items || [],
+            preferences: formData?.preferences || defaultPreferences,
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 
