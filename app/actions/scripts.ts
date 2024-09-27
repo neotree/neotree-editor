@@ -398,11 +398,11 @@ export async function saveScriptsWithItems({ data }: {
             info.scripts++;
 
             const saveScreens = await saveScriptScreens({ scriptId, screens, });
-            saveScreens.errors?.forEach(e => errors.push(e));
+            // saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
 
             const saveDiagnoses = await saveScriptDiagnoses({ scriptId, diagnoses, });
-            saveDiagnoses.errors?.forEach(e => errors.push(e));
+            // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
         }
 
