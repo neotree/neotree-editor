@@ -231,7 +231,7 @@ export async function saveScriptScreens({
                 }],
             });
 
-            res.errors?.forEach(e => errors.push(e));
+            res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
 
             if (!res.errors?.length) saved++;
         }
@@ -292,7 +292,7 @@ export async function saveScriptDiagnoses({
                 }],
             });
 
-            res.errors?.forEach(e => errors.push(e));
+            res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
 
             if (!res.errors?.length) saved++;
         }
