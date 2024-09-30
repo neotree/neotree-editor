@@ -98,6 +98,7 @@ export function ScriptForm(props: Props) {
                             name="hospital"
                             disabled={disabled}
                             onValueChange={value => {
+                                value = value === 'none' ? null! : value;
                                 setValue('hospitalId', value || null, { shouldDirty: true, });
                             }}
                         >
@@ -107,7 +108,7 @@ export function ScriptForm(props: Props) {
                             <SelectContent>
                             <SelectGroup>
                                 {/* <SelectLabel>Hospitals</SelectLabel> */}
-                                <SelectItem value="">No hospital</SelectItem>
+                                <SelectItem value="none">No hospital</SelectItem>
                                 {hospitals.map(h => (
                                     <SelectItem key={h.hospitalId} value={h.hospitalId}>
                                         {h.name}
