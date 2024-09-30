@@ -106,7 +106,8 @@ export function ScriptForm(props: Props) {
                             </SelectTrigger>
                             <SelectContent>
                             <SelectGroup>
-                                <SelectLabel>Hospitals</SelectLabel>
+                                {/* <SelectLabel>Hospitals</SelectLabel> */}
+                                <SelectItem value="">No hospital</SelectItem>
                                 {hospitals.map(h => (
                                     <SelectItem key={h.hospitalId} value={h.hospitalId}>
                                         {h.name}
