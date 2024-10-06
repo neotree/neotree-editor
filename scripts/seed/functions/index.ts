@@ -164,7 +164,7 @@ export async function seedSites() {
             {
                 name: 'Zimbabwe WebEditor DEV',
                 type: 'webeditor',
-                link: 'https://zim-dev-webeditor.neotree.org:10243',
+                link: 'https://zim-dev-webeditor.neotree.org',
                 apiKey: '',
             },
             {
