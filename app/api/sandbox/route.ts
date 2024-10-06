@@ -62,7 +62,6 @@ export async function GET(req: NextRequest) {
                 diagnosesDrafts: diagnosesDraftsArr.length,
             },
             success: true, 
-            z: matched[0],
         });
 	} catch(e: any) {
 		logger.error('[GET] /api/sandbox', e);
