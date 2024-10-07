@@ -77,7 +77,8 @@ export function useScreensTable({
             const s = screens.data[oldIndex];
             let position = s.position;
             if (oldIndex !== newIndex) {
-                position = newIndex + 1;
+                // position = newIndex + 1;
+                position = screens.data[newIndex].position;
                 payload.push({ screenId: s.screenId, position, });
             }
             return {
