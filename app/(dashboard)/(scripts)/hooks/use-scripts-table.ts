@@ -77,7 +77,8 @@ export function useScriptsTable({
             const s = scripts.data[oldIndex];
             let position = s.position;
             if (oldIndex !== newIndex) {
-                position = newIndex + 1;
+                // position = newIndex + 1;
+                position = scripts.data[newIndex].position;
                 payload.push({ scriptId: s.scriptId, position, });
             }
             return {

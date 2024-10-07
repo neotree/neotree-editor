@@ -77,7 +77,8 @@ export function useDiagnosesTable({
             const s = diagnoses.data[oldIndex];
             let position = s.position;
             if (oldIndex !== newIndex) {
-                position = newIndex + 1;
+                // position = newIndex + 1;
+                position = diagnoses.data[newIndex].position;
                 payload.push({ diagnosisId: s.diagnosisId, position, });
             }
             return {

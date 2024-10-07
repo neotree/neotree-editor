@@ -462,7 +462,11 @@ export async function copyScripts(params?: {
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
 
                 const res = await axiosClient.post('/scripts/with-items?', {
-                    data: scripts.data,
+                    data: scripts.data.map(s => ({
+                        ...s,
+                        hospitalId: undefined!,
+                        hospitalName: undefined!,
+                    })),
                 });
 
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
@@ -471,6 +475,8 @@ export async function copyScripts(params?: {
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
+                        hospitalId: undefined!,
+                        hospitalName: undefined!,
                     })),
                 });
             }

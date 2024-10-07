@@ -29,8 +29,6 @@ export function ScreensTable(props: Props) {
 
     const { sys, viewOnly } = useAppContext();
 
-    console.log(screens);
-
     return (
         <>
             {loading && <Loader overlay />}
