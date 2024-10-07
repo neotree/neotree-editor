@@ -33,17 +33,8 @@ export function Item<P = {}>({
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
-    const isFormScreen = screenType === 'form';
     const isChecklistScreen = screenType === 'checklist';
-    const isManagementScreen = screenType === 'management';
-    const isZwEdlizScreen = screenType === 'zw_edliz_summary_table';
-    const isMwEdlizScreen = screenType === 'mwi_edliz_summary_table';
-    const isEdlizScreen = isZwEdlizScreen || isMwEdlizScreen;
-    const isYesNoScreen = screenType === 'yesno';
-    const isTimerScreen = screenType === 'timer';
     const isMultiSelectScreen = screenType === 'multi_select';
-    const isSingleSelectScreen = screenType === 'single_select';
-    const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
