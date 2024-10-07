@@ -18,7 +18,7 @@ import { _deleteAllScriptsDrafts, } from '@/databases/mutations/scripts-drafts';
 import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-drafts';
 import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
-import { _clearPendingDeletion } from '@/databases/mutations/ops';
+import { _clearPendingDeletion, _processPendingDeletion } from '@/databases/mutations/ops';
 import * as opsQueries from '@/databases/queries/ops';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
@@ -112,6 +112,7 @@ export async function publishData() {
         const publishScripts = await _publishScripts();
         const publishScreens = await _publishScreens();
         const publishDiagnoses = await _publishDiagnoses();
+        const processPendingDeletion = await _processPendingDeletion();
         
         if (publishConfigKeys.errors) {
             results.success = false;
@@ -131,6 +132,11 @@ export async function publishData() {
         if (publishDiagnoses.errors) {
             results.success = false;
             results.errors = [...(results.errors || []), ...publishDiagnoses.errors];
+        }
+
+        if (processPendingDeletion.errors) {
+            results.success = false;
+            results.errors = [...(results.errors || []), ...processPendingDeletion.errors];
         }
 
         await _saveEditorInfo({ 
