@@ -8,6 +8,7 @@ import { ScriptField, Preferences } from "@/types";
 
 export type GetScriptsParams = {
     scriptsIds?: string[];
+    hospitalIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
 };
@@ -29,10 +30,17 @@ export async function _getScripts(
     params?: GetScriptsParams
 ): Promise<GetScriptsResults> {
     try {
-        let { scriptsIds = [], returnDraftsIfExist, } = { ...params };
+        let { 
+            scriptsIds = [], 
+            hospitalIds = [],
+            returnDraftsIfExist, 
+        } = { ...params };
 
-        scriptsIds = scriptsIds.filter(s => uuid.validate(s));
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
+        scriptsIds = scriptsIds.filter(s => uuid.validate(s));
+
+        const oldHospitalIds = hospitalIds.filter(s => !uuid.validate(s));
+        hospitalIds = hospitalIds.filter(s => uuid.validate(s));
 
         if (oldScriptsIds.length) {
             const res = await db.query.scripts.findMany({
@@ -42,6 +50,17 @@ export async function _getScripts(
             oldScriptsIds.forEach(oldScriptId => {
                 const s = res.filter(s => s.oldScriptId === oldScriptId)[0];
                 scriptsIds.push(s?.scriptId || uuid.v4());
+            });
+        }
+
+        if (oldHospitalIds.length) {
+            const res = await db.query.hospitals.findMany({
+                where: inArray(hospitals.oldHospitalId, oldHospitalIds),
+                columns: { hospitalId: true, oldHospitalId: true, },
+            });
+            oldHospitalIds.forEach(oldHospitalId => {
+                const s = res.filter(s => s.oldHospitalId === oldHospitalId)[0];
+                hospitalIds.push(s?.hospitalId || uuid.v4());
             });
         }
         
@@ -57,7 +76,12 @@ export async function _getScripts(
                 !scriptsIds?.length ? undefined : inArray(scriptsDrafts.scriptDraftId, scriptsIds),
             ));
 
-        const drafts = draftsRes.map(s => ({ ...s.scriptDraft, }));
+        const drafts = draftsRes
+            .filter(s => {
+                if (!hospitalIds.length) return true;
+                return hospitalIds.includes(s.scriptDraft.data.hospitalId || uuid.v4());
+            })
+            .map(s => ({ ...s.scriptDraft, }));
 
         // published scripts conditions
         const publishedRes = await db
@@ -75,6 +99,7 @@ export async function _getScripts(
                 isNull(pendingDeletion),
                 !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
+                !hospitalIds.length ? undefined : inArray(scripts.hospitalId, hospitalIds),
             ));
 
         const published = publishedRes.map(s => ({

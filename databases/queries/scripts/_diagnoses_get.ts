@@ -38,8 +38,8 @@ export async function _getDiagnoses(
             returnDraftsIfExist, 
         } = { ...params };
 
-        diagnosesIds = diagnosesIds.filter(s => uuid.validate(s));
         const oldDiagnosesIds = diagnosesIds.filter(s => !uuid.validate(s));
+        diagnosesIds = diagnosesIds.filter(s => uuid.validate(s));
 
         if (oldDiagnosesIds.length) {
             const res = await db.query.diagnoses.findMany({

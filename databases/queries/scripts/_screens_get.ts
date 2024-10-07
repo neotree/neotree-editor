@@ -40,8 +40,8 @@ export async function _getScreens(
             returnDraftsIfExist, 
         } = { ...params };
 
-        screensIds = screensIds.filter(s => uuid.validate(s));
         const oldScreensIds = screensIds.filter(s => !uuid.validate(s));
+        screensIds = screensIds.filter(s => uuid.validate(s));
 
         if (oldScreensIds.length) {
             const res = await db.query.screens.findMany({

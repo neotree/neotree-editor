@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
         const deviceId = req.nextUrl.searchParams.get('deviceId');
+        const hospitalId = req.nextUrl.searchParams.get('hospitalId');
 
         const { device, info: webeditorInfo, errors } = await getDevice(deviceId!);
 
@@ -28,15 +29,19 @@ export async function GET(req: NextRequest) {
         const [
             hospitals,
             getScripts,
-            getScreens,
-            getDiagnoses,
             getConfigKeys,
         ] = await Promise.all([
             _getHospitals(),
-            _getScripts({ withDeleted, returnDraftsIfExist, }),
-            _getScreens({ withDeleted, returnDraftsIfExist, }),
-            _getDiagnoses({ withDeleted, returnDraftsIfExist, }),
+            _getScripts({ withDeleted, returnDraftsIfExist, hospitalIds: hospitalId ? [hospitalId] : undefined, }),
             _getConfigKeys({ withDeleted, returnDraftsIfExist, }),
+        ]);
+
+        const [
+            getScreens,
+            getDiagnoses,
+        ] = await Promise.all([
+            !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
         ]);
 
         // config keys
