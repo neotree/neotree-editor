@@ -311,7 +311,7 @@ export function ScreenForm({
                         <div>
                             <Label secondary htmlFor="title2">Title 2 *</Label>
                             <Input
-                                {...register('title2', { disabled, required: true, })}
+                                {...register('title2', { disabled, required: false, })}
                                 name="title2"
                                 noRing={false}
                             />
@@ -328,7 +328,7 @@ export function ScreenForm({
                         <div>
                             <Label secondary htmlFor="title3">Title 3 *</Label>
                             <Input
-                                {...register('title3', { disabled, required: true, })}
+                                {...register('title3', { disabled, required: false, })}
                                 name="title3"
                                 noRing={false}
                             />
@@ -345,7 +345,7 @@ export function ScreenForm({
                         <div>
                             <Label secondary htmlFor="previewTitle">Preview title *</Label>
                             <Input
-                                {...register('previewTitle', { disabled, required: true })}
+                                {...register('previewTitle', { disabled, required: false })}
                                 name="previewTitle"
                                 noRing={false}
                             />
@@ -362,7 +362,7 @@ export function ScreenForm({
                         <div>
                             <Label secondary htmlFor="previewPrintTitle">Preview print title *</Label>
                             <Input
-                                {...register('previewPrintTitle', { disabled, required: true })}
+                                {...register('previewPrintTitle', { disabled, required: false })}
                                 name="previewPrintTitle"
                                 noRing={false}
                             />
@@ -381,7 +381,7 @@ export function ScreenForm({
                 <div>
                     <Label secondary htmlFor="sectionTitle">Print section title *</Label>
                     <Input
-                        {...register('sectionTitle', { disabled, required: true, })}
+                        {...register('sectionTitle', { disabled, required: false, })}
                         name="sectionTitle"
                         noRing={false}
                     />

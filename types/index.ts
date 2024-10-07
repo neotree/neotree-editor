@@ -18,6 +18,14 @@ export type ScriptItem = {
     itemId: string;
     subType: string;
     type: string;
+    exclusive: boolean;
+    confidential: boolean;
+    checked: boolean;
+    enterValueManually?: boolean;
+    severity_order: string;
+    summary: string;
+    key: string;
+    dataType: null | string;
 };
 
 export type ScriptField = {

@@ -9,6 +9,7 @@ import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,21 @@ export function Item<P = {}>({
     disabled: disabledProp,
     ...extraProps
 }: Props & P) {
+    const screenType = form.getValues('type');
+    const isDiagnosisScreen = screenType === 'diagnosis';
+    const isProgressScreen = screenType === 'progress';
+    const isFormScreen = screenType === 'form';
+    const isChecklistScreen = screenType === 'checklist';
+    const isManagementScreen = screenType === 'management';
+    const isZwEdlizScreen = screenType === 'zw_edliz_summary_table';
+    const isMwEdlizScreen = screenType === 'mwi_edliz_summary_table';
+    const isEdlizScreen = isZwEdlizScreen || isMwEdlizScreen;
+    const isYesNoScreen = screenType === 'yesno';
+    const isTimerScreen = screenType === 'timer';
+    const isMultiSelectScreen = screenType === 'multi_select';
+    const isSingleSelectScreen = screenType === 'single_select';
+    const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
+
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
     const [open, setOpen] = useState(false);
@@ -41,21 +57,50 @@ export function Item<P = {}>({
             position: item?.position || 1,
             subType: item?.subType || '',
             type: item?.type || '',
+            exclusive: item?.exclusive || false,
+            confidential: item?.confidential || false,
+            checked: item?.checked || false,
+            enterValueManually: item?.enterValueManually || false,
+            severity_order: item?.severity_order || '',
+            summary: item?.summary || '',
+            key: item?.key || '',
+            dataType: (() => {
+                switch (screenType) {
+                    //   case 'list':
+                    //     return 'void';
+                    case 'checklist':
+                        return 'boolean';
+                    case 'single_select':
+                        return 'id';
+                    case 'diagnosis':
+                        return 'diagnosis';
+                    default:
+                        return null;
+                }
+            })(),
             ...item
         } satisfies ItemType;
-    }, [item]);
+    }, [item, screenType]);
 
     const {
         reset: resetForm,
         watch,
         register,
         handleSubmit,
+        setValue,
     } = useForm({
         defaultValues: getDefaultValues(),
     });
 
     const id = watch('id');
     const label = watch('label');
+    const key = watch('key');
+    const enterValueManually = watch('enterValueManually');
+    const confidential = watch('confidential');
+    const exclusive = watch('exclusive');
+    const checked = watch('checked');
+
+    const keyHasError = key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
@@ -75,7 +120,7 @@ export function Item<P = {}>({
         <>
             <Modal
                 open={open}
-                title={item ? 'New item' : 'Edit item'}
+                title={!item ? 'New item' : 'Edit item'}
                 trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
                     setOpen(open);
@@ -105,24 +150,141 @@ export function Item<P = {}>({
                 )}
             >
                 <div className="flex flex-col gap-y-5">
-                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
-                        <div>
-                            <Label error={!disabled && !id} htmlFor="id">ID *</Label>
-                            <Input
-                                {...register('id', { disabled, required: true, })}
-                                name="id"
-                                error={!disabled && !id}
-                            />
-                        </div>
+                    <div className="flex flex-col gap-y-5">
+                        {(() => {
+                            if (isChecklistScreen) {
+                                return (
+                                    <>
+                                        <div>
+                                            <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                                            <Input
+                                                {...register('label', { disabled, required: true, })}
+                                                name="label"
+                                                error={!disabled && !label}
+                                            />
+                                        </div>
 
-                        <div className="flex-1">
-                            <Label error={!disabled && !label} htmlFor="label">Label *</Label>
-                            <Input
-                                {...register('label', { disabled, required: true, })}
-                                name="label"
-                                error={!disabled && !label}
-                            />
-                        </div>
+                                        <div>
+                                            <Label error={!disabled && (!key || keyHasError)} htmlFor="key">Key *</Label>
+                                            <Input
+                                                {...register('key', { disabled, required: true, })}
+                                                name="key"
+                                                error={!disabled && (!key || keyHasError)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label htmlFor="summary">Summary</Label>
+                                            <Input
+                                                {...register('summary', { disabled, required: false, })}
+                                                name="summary"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center space-x-2">
+                                            <Switch 
+                                                id="confidential" 
+                                                checked={confidential}
+                                                disabled={disabled}
+                                                onCheckedChange={checked => setValue('confidential', checked, { shouldDirty: true, })}
+                                            />
+                                            <Label secondary htmlFor="confidential">Confidential</Label>
+                                        </div>
+
+                                        <div className="flex items-center space-x-2">
+                                            <Switch 
+                                                id="exclusive" 
+                                                checked={exclusive}
+                                                disabled={disabled}
+                                                onCheckedChange={checked => setValue('exclusive', checked, { shouldDirty: true, })}
+                                            />
+                                            <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
+                                        </div>
+                                    </>
+                                );
+                            } else if (isProgressScreen) {
+                                return (
+                                    <>
+                                        <div>
+                                            <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                                            <Input
+                                                {...register('label', { disabled, required: true, })}
+                                                name="label"
+                                                error={!disabled && !label}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center space-x-2">
+                                            <Switch 
+                                                id="checked" 
+                                                checked={checked}
+                                                disabled={disabled}
+                                                onCheckedChange={checked => setValue('checked', checked, { shouldDirty: true, })}
+                                            />
+                                            <Label secondary htmlFor="checked">Mark as checked</Label>
+                                        </div>
+                                    </>
+                                );
+                            } else {
+                                return (
+                                    <>
+                                        <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                                            <div>
+                                                <Label error={!disabled && !id} htmlFor="id">ID *</Label>
+                                                <Input
+                                                    {...register('id', { disabled, required: true, })}
+                                                    name="id"
+                                                    error={!disabled && !id}
+                                                />
+                                            </div>
+
+                                            <div className="flex-1">
+                                                <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                                                <Input
+                                                    {...register('label', { disabled, required: true, })}
+                                                    name="label"
+                                                    error={!disabled && !label}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {(isMultiSelectScreen || isDiagnosisScreen) && (
+                                            <>
+                                                {isDiagnosisScreen && (
+                                                    <div>
+                                                        <Label htmlFor="severity_order">Severity Order</Label>
+                                                        <Input
+                                                            {...register('severity_order', { disabled, required: false, })}
+                                                            name="severity_order"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch 
+                                                        id="exclusive" 
+                                                        checked={exclusive}
+                                                        disabled={disabled}
+                                                        onCheckedChange={checked => setValue('exclusive', checked, { shouldDirty: true, })}
+                                                    />
+                                                    <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
+                                                </div>
+
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch 
+                                                        id="enterValueManually" 
+                                                        checked={enterValueManually}
+                                                        disabled={disabled}
+                                                        onCheckedChange={checked => setValue('enterValueManually', checked, { shouldDirty: true, })}
+                                                    />
+                                                    <Label secondary htmlFor="enterValueManually">Enter value manually if selected</Label>
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                );
+                            }
+                        })()}
                     </div>
                 </div>
             </Modal>
