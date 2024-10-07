@@ -26,6 +26,9 @@ export function Items({
     form,
     disabled,
 }: Props) {
+    const screenType = form.getValues('type');
+    const isDiagnosisScreen = screenType === 'diagnosis';
+
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
@@ -126,6 +129,9 @@ export function Items({
                     {
                         name: 'Label',
                     },
+                    ...(!isDiagnosisScreen ? [] : [{
+                        name: 'Severity order',
+                    }]),
                     {
                         name: 'Action',
                         align: 'right',
@@ -193,6 +199,7 @@ export function Items({
                 data={items.map(f => [
                     f.id,
                     f.label,
+                    isDiagnosisScreen ? f.severity_order : '',
                     '',
                 ])}
             />

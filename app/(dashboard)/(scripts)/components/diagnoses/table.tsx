@@ -84,6 +84,9 @@ export function DiagnosesTable(props: Props) {
                             name: 'Description',
                         },
                         {
+                            name: 'Severity order',
+                        },
+                        {
                             name: 'Version',
                             align: 'right',
                             cellClassName: cn('w-[100px]', sys.data.hide_data_table_version === 'yes' && 'hidden'),
@@ -125,6 +128,7 @@ export function DiagnosesTable(props: Props) {
                         s.position,
                         s.name,
                         s.description,
+                        s.severityOrder || '',
                         s.version,
                         '',
                     ])}
