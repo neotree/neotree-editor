@@ -10,7 +10,7 @@ import { getDevice } from "../get-device-registration/get-device";
 
 export async function GET(req: NextRequest) {
 	try {
-        logger.log(`[GET]: ${req.url}`);
+        logger.log(`[GET - start]: ${req.url}`);
 
         const isAuthorised = await isAuthenticated();
 
@@ -60,6 +60,8 @@ export async function GET(req: NextRequest) {
         // diagnoses
         const diagnoses = getDiagnoses.data.filter(s => !s.isDeleted).map(s => mapNewDiagnosisToOld(s));
         const deletedDiagnoses = getDiagnoses.data.filter(s => s.isDeleted).map(s => mapNewDiagnosisToOld(s));
+
+        logger.log(`[GET - finish]: ${req.url}`);
 
 		return NextResponse.json({
             device,
