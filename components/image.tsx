@@ -25,12 +25,23 @@ export function Image({
         _style.height = aspectRatio.imageHeight;
     }
 
+    // return (
+    //     <NextImage 
+    //         {...props}
+    //         width={width}
+    //         height={height}
+    //         sizes={sizes}
+    //         style={{
+    //             ..._style,
+    //             ...props.style,
+    //         }}
+    //     />
+    // );
+
     return (
-        <NextImage 
+        <img 
             {...props}
-            width={width}
-            height={height}
-            sizes={sizes}
+            src={props.src as string}
             style={{
                 ..._style,
                 ...props.style,
