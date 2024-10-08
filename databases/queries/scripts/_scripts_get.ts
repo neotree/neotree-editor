@@ -93,7 +93,10 @@ export async function _getScripts(
             .from(scripts)
             .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
             .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scripts.scriptId))
-            .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
+            .leftJoin(hospitals, and(
+                eq(hospitals.hospitalId, scripts.hospitalId),
+                isNull(hospitals.deletedAt)
+            ))
             .where(and(
                 isNull(scripts.deletedAt),
                 isNull(pendingDeletion),
@@ -126,7 +129,11 @@ export async function _getScripts(
             } as GetScriptsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId));
+            .filter(s => !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId))
+            .map(s => ({
+                ...s,
+                hospitalId: s.hospitalName ? s.hospitalId : null,
+            }));
 
         return  { 
             data: responseData,
@@ -177,7 +184,10 @@ export async function _getScript(
                 hospitalName: hospitals.name,
             })
             .from(scripts)
-            .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
+            .leftJoin(hospitals, and(
+                eq(hospitals.hospitalId, scripts.hospitalId),
+                isNull(hospitals.deletedAt)
+            ))
             .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
             .leftJoin(scriptsDrafts, eq(scripts.scriptId, scriptsDrafts.scriptDraftId))
             .where(and(
@@ -200,6 +210,7 @@ export async function _getScript(
             ...data,
             isDraft: false,
             isDeleted: false,
+            hospitalId: data.hospitalName ? data.hospitalId : null,
         };
 
         if (!responseData) return { data: null, };
