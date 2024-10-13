@@ -1,19 +1,14 @@
 import axios from "axios";
 
-import logger from "@/lib/logger";
-import { _getSiteApiKey } from "@/databases/queries/sites";
+export async function getSiteAxiosClient(params: {
+    baseURL: string;
+    apiKey: string;
+}) {
+    let siteLink = params.baseURL;
+    let apiKey = params.apiKey;
 
-export async function getSiteAxiosClient(siteId: string) {
-    if (!siteId) throw new Error('AXIOS init error: missing siteId');
-
-    const res = await _getSiteApiKey(siteId);
-
-    if (res.errors?.length) throw new Error('AXIOS init error: ' + res.errors.join(', '));
-
-    if (!res.data) throw new Error('AXIOS init error: site not found');
-
-    const siteLink = res.data.link;
-    const apiKey = res.data.apiKey;
+    if (!siteLink) throw new Error('MISSING: link');
+    if (!apiKey) throw new Error('MISSING: apiKey');
 
     const axiosClient = axios.create({
         baseURL: `${siteLink}/api`,
@@ -23,7 +18,6 @@ export async function getSiteAxiosClient(siteId: string) {
         if (config.headers) {
             config.headers['x-api-key'] = apiKey;
         }
-        logger.log(`AXIOS [${config.method}]`, [`${siteLink}/api`, config.url].join(''));
         return config;
     });
     

@@ -1,17 +1,20 @@
 import { Content } from '@/components/content';
-import { getSites } from '@/app/actions/sites';
+import * as sitesActions from '@/app/actions/sites';
 import { Sites } from './components/sites';
 
 export default async function GeneralSettingsPage() {
     const [
         sites,
     ] = await Promise.all([
-        getSites()
+        sitesActions.getSites()
     ]);
 
     return (
         <>
-            <Sites sites={sites} />
+            <Sites 
+                {...sitesActions}
+                sites={sites} 
+            />
             
             <Content>
                 

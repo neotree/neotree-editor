@@ -8,7 +8,7 @@ import * as queries from "@/databases/queries/scripts";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
-import { getSiteAxiosClient } from "@/lib/axios";
+import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
 
 // DIAGNOSES

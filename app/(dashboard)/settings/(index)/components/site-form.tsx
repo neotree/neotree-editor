@@ -8,6 +8,8 @@ import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload } from "lucide-r
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 
+import * as sitesActions from '@/app/actions/sites';
+import { getSiteAxiosClient } from '@/lib/axios';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,17 +29,18 @@ import { getSites } from "@/app/actions/sites";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Separator } from "@/components/ui/separator";
 import { Modal } from "@/components/modal";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Input, } from "@/components/ui/input";
 import { Label, } from "@/components/ui/label";
 
-type Props = {
+type Props = typeof sitesActions & {
     sites: Awaited<ReturnType<typeof getSites>>['data'];
 };
 
-export function SiteForm({ sites }: Props) {
+export function SiteForm({ sites, saveSites }: Props) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const searchParamsObj= useMemo(() => queryString.parse(searchParams.toString() || ''), [searchParams]);
@@ -53,14 +56,18 @@ export function SiteForm({ sites }: Props) {
         handleSubmit,
     } = useForm({
         defaultValues: {
+            id: site?.id || undefined,
             name: site?.name || '',
             link: site?.link || '',
             type: site?.type || 'webeditor',
             siteId: site?.siteId || uuidv4(),
+            env: site?.env || 'stage',
+            apiKey: site?.apiKey || '',
         },
     });
 
     const { confirm } = useConfirmModal();
+    const { alert } = useAlertModal();
 
     const onCloseEditModal = useCallback(() => {
         router.push(`/settings?${queryString.stringify({
@@ -70,7 +77,49 @@ export function SiteForm({ sites }: Props) {
     }, [searchParamsObj, router.push]);
 
     const onSave = handleSubmit(async (data) => {
+        try {
+            setSaving(true);
 
+            data.link = data.link || '';
+            if (data.link[data.link.length - 1] === '') data.link = data.link.substring(0, data.link.length - 1);
+
+            if (!data.link) throw new Error('Missing: link');
+
+            const axios = await getSiteAxiosClient({
+                baseURL: data.link,
+                apiKey: data.apiKey,
+            });
+
+            let linkIsValid = true;
+            try {
+                const ping = await axios.get('/sites/ping');
+                linkIsValid = ping.data?.data === 'pong';
+            } catch(e: any) {
+                linkIsValid = false;
+            }
+
+            if (!linkIsValid) throw new Error('Could not validate site link');
+
+            const res = await saveSites([data]);
+
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
+            
+            router.refresh();
+
+            alert({
+                variant: 'success',
+                message: 'Site was saved successfully!',
+                onClose: onCloseEditModal,
+            });
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                variant: 'error',
+                message: 'Failed to site: '+ e.message,
+            });
+        } finally {
+            setSaving(false);
+        }
     });
 
     useEffect(() => {
@@ -78,6 +127,7 @@ export function SiteForm({ sites }: Props) {
     }, [searchParamsObj.editSiteId, site, onCloseEditModal]);
 
     const type = watch('type');
+    const env = watch('env');
 
     return (
         <>
@@ -113,26 +163,52 @@ export function SiteForm({ sites }: Props) {
                 )}
             >
                 <div className="flex flex-col gap-y-5">
-                    <div>
-                        <Label htmlFor="type">Type *</Label>
-                        <Select
-                            value={type || ''}
-                            disabled={saving}
-                            name="type"
-                            onValueChange={(v: typeof type) => {
-                                setValue('type', v);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            <SelectGroup>
-                                <SelectItem value="webeditor">webeditor</SelectItem>
-                                <SelectItem value="nodeapi">nodeapi</SelectItem>
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
+                    <div className="flex [&>*]:flex-1 gap-x-2">
+                        <div>
+                            <Label htmlFor="type">Type *</Label>
+                            <Select
+                                value={type || ''}
+                                disabled={saving}
+                                name="type"
+                                onValueChange={(v: typeof type) => {
+                                    setValue('type', v);
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="webeditor">webeditor</SelectItem>
+                                    <SelectItem value="nodeapi">nodeapi</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <Label htmlFor="env">Environment *</Label>
+                            <Select
+                                value={env || ''}
+                                disabled={saving}
+                                name="env"
+                                onValueChange={(v: typeof env) => {
+                                    setValue('env', v);
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select environment" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="production">production</SelectItem>
+                                    <SelectItem value="stage">stage</SelectItem>
+                                    <SelectItem value="development">development</SelectItem>
+                                    <SelectItem value="demo">demo</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div>
