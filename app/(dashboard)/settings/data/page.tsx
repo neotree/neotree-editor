@@ -6,9 +6,10 @@ import * as configKeysActions from '@/app/actions/config-keys';
 import * as sessionsActions from '@/app/actions/sessions';
 import { Content } from '@/components/content';
 import { Button } from '@/components/ui/button';
-import { StatsCard } from './components/stats-card';
+import { Title } from "@/components/title";
+import { StatsCard } from '../components/stats-card';
 
-export default async function GeneralAdminPage() {
+export default async function DataSettingsPage() {
     const [
         countSessions,
         countScripts,
@@ -25,6 +26,8 @@ export default async function GeneralAdminPage() {
 
     return (
         <>
+            <Title>Data Settings</Title>
+            
             <Content>
                 <StatsCard 
                     mainCount={countSessions.total}
