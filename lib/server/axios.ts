@@ -24,7 +24,7 @@ export async function getSiteAxiosClient(siteId: string, site?: {
     }
 
     const axiosClient = axios.create({
-        baseURL: `${siteLink}/api`,
+        baseURL: siteLink,
     });
     
     axiosClient.interceptors.request.use(async config => {
