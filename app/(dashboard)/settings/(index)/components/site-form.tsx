@@ -1,21 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload } from "lucide-react"
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 import * as sitesActions from '@/app/actions/sites';
 import { getSiteAxiosClient } from '@/lib/axios';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
     Select,
     SelectContent,
@@ -26,7 +19,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { getSites } from "@/app/actions/sites";
-import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -85,14 +77,14 @@ export function SiteForm({ sites, saveSites }: Props) {
 
             if (!data.link) throw new Error('Missing: link');
 
-            const axios = await getSiteAxiosClient({
+            const axiosClient = await getSiteAxiosClient({
                 baseURL: data.link,
                 apiKey: data.apiKey,
             });
 
             let linkIsValid = true;
             try {
-                const ping = await axios.get('/api/ping');
+                const ping = await axiosClient.get('/api/ping');
                 linkIsValid = ping.data?.data === 'pong';
             } catch(e: any) {
                 linkIsValid = false;
@@ -100,9 +92,14 @@ export function SiteForm({ sites, saveSites }: Props) {
 
             if (!linkIsValid) throw new Error('Could not validate site link');
 
-            const res = await saveSites([data]);
+            // TODO: Replace with server action
+            const res = await axios.post<Awaited<ReturnType<typeof saveSites>>>('/api/sites/save', [data]);
+            const errors = res.data?.errors;
 
-            if (res.errors?.length) throw new Error(res.errors.join(', '));
+            // const res = await saveSites([data]);
+            // const errors = res?.errors;
+
+            if (errors?.length) throw new Error(errors.join(', '));
             
             router.refresh();
 

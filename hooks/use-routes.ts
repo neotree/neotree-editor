@@ -33,13 +33,13 @@ export function useRoutes() {
             id: v4(),
             hidden: isDefaultUser,
         },
-        // {
-        //     label: 'Settings',
-        //     href: '/settings',
-        //     isActive: pathname.substring(0, 9) === '/settings/',
-        //     id: v4(),
-        //     hidden: !isSuperUser,
-        // },
+        {
+            label: 'Settings',
+            href: '/settings',
+            isActive: pathname.substring(0, 9) === '/settings/',
+            id: v4(),
+            hidden: !isSuperUser,
+        },
     ]
         .filter(route => !route.hidden)
         .map(route => ({
