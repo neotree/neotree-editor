@@ -104,7 +104,7 @@ export function SettingsHeader({ user }: Props) {
                 )}
             </div>
 
-            <Separator className="my-5" />
+            <Separator className="my-0" />
         </>
     );
 }

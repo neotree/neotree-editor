@@ -1,0 +1,157 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import queryString from "query-string";
+import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload } from "lucide-react"
+import { useForm } from "react-hook-form";
+import { v4 as uuidv4 } from "uuid";
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { getSites } from "@/app/actions/sites";
+import { DataTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
+import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { Separator } from "@/components/ui/separator";
+import { Modal } from "@/components/modal";
+import { DialogClose, } from "@/components/ui/dialog";
+import { Input, } from "@/components/ui/input";
+import { Label, } from "@/components/ui/label";
+
+type Props = {
+    sites: Awaited<ReturnType<typeof getSites>>['data'];
+};
+
+export function SiteForm({ sites }: Props) {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const searchParamsObj= useMemo(() => queryString.parse(searchParams.toString() || ''), [searchParams]);
+
+    const site = useMemo(() => sites.filter(s => s.siteId === searchParamsObj.editSiteId)[0], [sites, searchParamsObj.editSiteId]);
+
+    const [saving, setSaving] = useState(false);
+
+    const {
+        watch,
+        register,
+        setValue,
+        handleSubmit,
+    } = useForm({
+        defaultValues: {
+            name: site?.name || '',
+            link: site?.link || '',
+            type: site?.type || 'webeditor',
+            siteId: site?.siteId || uuidv4(),
+        },
+    });
+
+    const { confirm } = useConfirmModal();
+
+    const onCloseEditModal = useCallback(() => {
+        router.push(`/settings?${queryString.stringify({
+            ...searchParamsObj,
+            editSiteId: undefined,
+        })}`);
+    }, [searchParamsObj, router.push]);
+
+    const onSave = handleSubmit(async (data) => {
+
+    });
+
+    useEffect(() => {
+        if (searchParamsObj.editSiteId && !site) onCloseEditModal();
+    }, [searchParamsObj.editSiteId, site, onCloseEditModal]);
+
+    const type = watch('type');
+
+    return (
+        <>
+            <Modal
+                open={!!searchParamsObj.editSiteId}
+                onOpenChange={open => {
+                    if (!open) onCloseEditModal();
+                }}
+                title="Import script"
+                actions={(
+                    <>
+                        <span className="text-xs text-danger">* Required</span>
+
+                        <div className="flex-1" />
+
+                        <DialogClose asChild>
+                            <Button
+                                variant="ghost"
+                                disabled={saving}
+                                onClick={() => onCloseEditModal()}
+                            >
+                                Cancel
+                            </Button>
+                        </DialogClose>
+
+                        <Button
+                            onClick={() => onSave()}
+                            disabled={saving}
+                        >
+                            Save
+                        </Button>
+                    </>
+                )}
+            >
+                <div className="flex flex-col gap-y-5">
+                    <div>
+                        <Label htmlFor="type">Type *</Label>
+                        <Select
+                            value={type || ''}
+                            disabled={saving}
+                            name="type"
+                            onValueChange={(v: typeof type) => {
+                                setValue('type', v);
+                            }}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectGroup>
+                                <SelectItem value="webeditor">webeditor</SelectItem>
+                                <SelectItem value="nodeapi">nodeapi</SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="name">Name *</Label>
+                        <Input 
+                            {...register('name', { disabled: saving, required: true, })}
+                            placeholder="Site name"
+                        />
+                    </div>
+
+                    <div>
+                        <Label htmlFor="link">Link *</Label>
+                        <Input 
+                            {...register('link', { disabled: saving, required: true, })}
+                            placeholder="Site link"
+                        />
+                    </div>
+                </div>
+            </Modal>
+        </>
+    );
+}

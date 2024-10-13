@@ -9,7 +9,7 @@ import { ConfirmModal } from "@/components/modals/confirm";
 import { AlertModal } from "@/components/modals/alert";
 import { AppContextProvider } from "@/contexts/app";
 import { getSys } from "@/app/actions/sys";
-import { getSites } from "@/app/actions/sites";
+import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
@@ -70,7 +70,7 @@ export default async function RootLayout({
                             {...editorDetails}
                             {...authenticatedUser}
                             sys={sys}
-                            getSites={getSites}
+                            getSites={getSitesWithoutConfidentialData}
                         >
                             {children}
 

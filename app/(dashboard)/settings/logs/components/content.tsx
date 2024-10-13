@@ -77,6 +77,7 @@ export function Content({
                         onValueChange={value => {
                             const type = value as typeof form.type;
                             setForm(prev => ({ ...prev, type, }));
+                            setLogs([]);
                         }}
                     >
                         <SelectTrigger>
