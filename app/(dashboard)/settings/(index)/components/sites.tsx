@@ -4,24 +4,26 @@ import Link from "next/link";
 import { MoreVertical, Trash, Edit } from "lucide-react"
 import { useSearchParams } from "next/navigation";
 
+import * as sitesActions from '@/app/actions/sites';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getSites } from "@/app/actions/sites";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Separator } from "@/components/ui/separator";
 import { SiteForm } from "./site-form";
 
-type Props = {
-    sites: Awaited<ReturnType<typeof getSites>>;
+type Props = typeof sitesActions & {
+    sites: Awaited<ReturnType<typeof sitesActions.getSites>>;
 };
 
-export function Sites({ sites }: Props) {
+export function Sites(props: Props) {
+    const { sites } = props;
+
     const searchParams = useSearchParams();
     const editSiteId = searchParams.get('editSiteId');
 
@@ -46,6 +48,12 @@ export function Sites({ sites }: Props) {
                     {
                         name: 'Type',
                         align: 'right',
+
+                    },
+                    {
+                        name: 'env',
+                        align: 'right',
+                        tdClassName: 'w-[100px]',
 
                     },
                     {
@@ -98,6 +106,7 @@ export function Sites({ sites }: Props) {
                 data={sites.data.map(site => [
                     site.name,
                     site.type,
+                    site.env,
                     '',
                 ])}
             />
@@ -106,6 +115,7 @@ export function Sites({ sites }: Props) {
 
             {!!editSiteId && (
                 <SiteForm 
+                    {...props}
                     sites={sites.data}
                 />
             )}
