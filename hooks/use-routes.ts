@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/app";
 
 export function useRoutes() {
     const pathname = usePathname();
-    const { isDefaultUser, sys } = useAppContext();
+    const { isDefaultUser, isSuperUser, sys } = useAppContext();
 
     return [
         {
@@ -13,34 +13,37 @@ export function useRoutes() {
             href: '/',
             isActive: pathname.substring(0, 8) === '/script/',
             id: v4(),
+            hidden: false,
         },
         {
             label: 'Configuration',
             href: '/configuration',
             id: v4(),
+            hidden: false,
         },
-        ...(isDefaultUser ? [] : [
-            {
-                label: 'Users',
-                href: '/users',
-                id: v4(),
-            }
-        ]),
         {
             label: 'Hospitals',
             href: '/hospitals',
             id: v4(),
+            hidden: false,
         },
-        ...((isDefaultUser || (sys.data.hide_admin_page === 'yes')) ? [] : [
-            {
-                label: 'Admin',
-                href: '/admin',
-                isActive: pathname.substring(0, 7) === '/admin/',
-                id: v4(),
-            }
-        ]),
-    ].map(route => ({
-        ...route,
-        isActive: route.isActive || (pathname === route.href),
-    }));
+        {
+            label: 'Users',
+            href: '/users',
+            id: v4(),
+            hidden: isDefaultUser,
+        },
+        {
+            label: 'Settings',
+            href: '/settings',
+            isActive: pathname.substring(0, 9) === '/settings/',
+            id: v4(),
+            hidden: !isSuperUser,
+        },
+    ]
+        .filter(route => !route.hidden)
+        .map(route => ({
+            ...route,
+            isActive: route.isActive || (pathname === route.href),
+        }));
 }
