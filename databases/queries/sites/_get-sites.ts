@@ -1,60 +1,45 @@
-import { and, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { sites } from "@/databases/pg/schema";
+import { sites, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import getLocalSites from "./local-sites";
-
-export type SiteType = {
-    name: typeof sites.$inferSelect['name'];
-    type: typeof sites.$inferSelect['type'];
-    siteId: typeof sites.$inferSelect['siteId'];
-    link: typeof sites.$inferSelect['link'];
-}
 
 export type GetSitesParams = {
-    types?: typeof sites.$inferSelect['type'][];
+    sitesIds?: string[];
 };
 
 export type GetSitesResults = {
-    data: SiteType[];
+    data: typeof sites.$inferSelect[];
     errors?: string[];
 };
 
-export async function _getSites(params?: GetSitesParams): Promise<GetSitesResults> {
+export async function _getSites(
+    params?: GetSitesParams
+): Promise<GetSitesResults> {
     try {
-        const { types = [], } = { ...params };
+        const { sitesIds: _sitesIds, } = { ...params };
 
-        const where = [
-            ...(!types.length ? [] : [inArray(sites.type, types)]),
+        let sitesIds = _sitesIds || [];
+
+        const whereSitesIds = !sitesIds?.length ? 
+            undefined 
+            : 
+            inArray(sites.siteId, sitesIds.filter(id => uuid.validate(id)));
+
+        const whereSites = [
+            isNull(sites.deletedAt),
+            whereSitesIds,
         ];
 
-        const res = await db.query.sites.findMany({
-            where: !where.length ? undefined : and(...where),
-            columns: {
-                siteId: true,
-                type: true,
-                name: true,
-                link: true,
-            },
-        });
+        const res = await db
+            .select({
+                site: sites,
+            })
+            .from(sites)
+            .where(!whereSites.length ? undefined : and(...whereSites));
 
-        const localSites = getLocalSites();
-        const devSites = [];
-        if (process.env.NODE_ENV !== 'production') {
-            if (types.includes('webeditor')) {
-                devSites.push(localSites.webeditor);
-            }
-
-            if (types.includes('nodeapi')) {
-                devSites.push(localSites.nodeapi);
-            }
-        }
-
-        const data = [
-            ...devSites,
-            ...res,
-        ] as typeof res;
+        const data = res.map(s => s.site);
 
         return  { 
             data,
@@ -64,3 +49,36 @@ export async function _getSites(params?: GetSitesParams): Promise<GetSitesResult
         return { data: [], errors: [e.message], };
     }
 }
+
+export type GetSiteResults = {
+    data?: null | typeof sites.$inferSelect;
+    errors?: string[];
+};
+
+export async function _getSite(
+    params: {
+        siteId: string,
+    },
+): Promise<GetSiteResults> {
+    const { siteId, } = { ...params };
+
+    try {
+        if (!siteId) throw new Error('Missing siteId');
+
+        const whereSiteId = uuid.validate(siteId) ? eq(sites.siteId, siteId) : undefined;
+
+        const data = await db.query.sites.findFirst({
+            where: and(
+                isNull(sites.deletedAt),
+                whereSiteId,
+            ),
+        });
+
+        return  { 
+            data, 
+        };
+    } catch(e: any) {
+        logger.error('_getSite ERROR', e.message);
+        return { errors: [e.message], };
+    }
+} 

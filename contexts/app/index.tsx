@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMount } from "react-use";
 
 import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
-import { getSites } from "@/app/actions/sites";
+import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import * as sysActions from "@/app/actions/sys";
 import * as opsActions from "@/app/actions/ops";
 import { getMode, setMode } from '@/lib/mode';
@@ -29,7 +29,7 @@ type AppContextProviderProps = Omit<typeof opsActions, 'setMode' | 'getMode'> &
     Awaited<ReturnType<typeof getAuthenticatedUserWithRoles>> &
     {
         sys: Awaited<ReturnType<typeof sysActions.getSys>>;
-        getSites: typeof getSites;
+        getSites: typeof getSitesWithoutConfidentialData;
     };
 
 export function AppContextProvider({ 

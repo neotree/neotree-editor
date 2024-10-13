@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { getSites } from "@/app/actions/sites";
+import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 
 export async function GET(req: NextRequest) {
 	try {
@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof getSites>[0];
+        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof getSitesWithoutConfidentialData>[0];
 
-        const res = await getSites(params);
+        const res = await getSitesWithoutConfidentialData(params);
 
 		return NextResponse.json(res);
 	} catch(e: any) {
