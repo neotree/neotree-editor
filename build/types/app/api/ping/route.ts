@@ -1,8 +1,8 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/sites/ping/route.ts
-import * as entry from '../../../../../../app/api/sites/ping/route.js'
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/ping/route.ts
+import * as entry from '../../../../../app/api/ping/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../../app/api/sites/ping/route.js')
+type TEntry = typeof import('../../../../../app/api/ping/route.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{

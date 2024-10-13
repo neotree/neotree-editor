@@ -92,7 +92,7 @@ export function SiteForm({ sites, saveSites }: Props) {
 
             let linkIsValid = true;
             try {
-                const ping = await axios.get('/sites/ping');
+                const ping = await axios.get('/ping');
                 linkIsValid = ping.data?.data === 'pong';
             } catch(e: any) {
                 linkIsValid = false;
