@@ -20,37 +20,39 @@ import { Separator } from "@/components/ui/separator";
 
 const navItems = [
     {
-        label: 'Dashboard',
-        href: '/admin',
-        section: 'dashboard',
-    },
-    {
-        label: 'Emails',
-        href: '/admin/emails',
-        section: 'emails',
-    },
-    {
-        label: 'System',
-        href: '/admin/sys',
-        section: 'sys',
+        label: 'General',
+        title: 'General Settings',
+        href: '/settings',
+        section: 'general',
     },
     {
         label: 'Logs',
-        href: '/admin/logs',
+        href: '/settings/logs',
         section: 'logs',
     },
     {
         label: 'App',
-        href: '/admin/app',
+        href: '/settings/app',
         section: 'app',
     },
+    // {
+    //     label: 'System',
+    //     title: 'System Settings',
+    //     href: '/settings/sys',
+    //     section: 'sys',
+    // },
+    // {
+    //     label: 'Data',
+    //     href: '/settings/data',
+    //     section: 'data',
+    // },
 ];
 
 type Props = {
     user: IAppContext['authenticatedUser'];
 };
 
-export function AdminHeader({ user }: Props) {
+export function SettingsHeader({ user }: Props) {
     const pathname = usePathname();
 
     const activeItem = useMemo(() => {
@@ -62,7 +64,7 @@ export function AdminHeader({ user }: Props) {
         <>
             <div className="flex gap-x-2 p-4">
                 <div className="text-2xl">
-                    {`${activeItem.label}`}
+                    {`${activeItem.title || activeItem.label}`}
                 </div>
 
                 <div className="flex-1" />
