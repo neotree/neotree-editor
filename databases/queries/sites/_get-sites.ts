@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -37,7 +37,8 @@ export async function _getSites(
                 site: sites,
             })
             .from(sites)
-            .where(!whereSites.length ? undefined : and(...whereSites));
+            .where(!whereSites.length ? undefined : and(...whereSites))
+            .orderBy(asc(sites.id));
 
         const data = res.map(s => s.site);
 
