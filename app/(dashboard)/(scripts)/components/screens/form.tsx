@@ -446,7 +446,11 @@ export function ScreenForm({
                                 'text3',
                                 image3,
                             ],
-                        ].map(([title, text, imageValue], i) => {
+                        ].map((keys, i) => {
+                            const title = keys[0] as 'title1' | 'title2' | 'title3';
+                            const text = keys[1] as 'text1' | 'text2' | 'text3';
+                            const imageValue = keys[2];
+
                             const image = `image${i + 1}` as Parameters<typeof register>[0];
                             
                             return (
@@ -454,8 +458,8 @@ export function ScreenForm({
                                     <div>
                                         <Label secondary htmlFor={`imageTextFields.${i}.title`}>Title {i+1}</Label>
                                         <Input
-                                            {...register(title as Parameters<typeof register>[0], { disabled, })}
-                                            name={`title${i}`}
+                                            {...register(title, { disabled, })}
+                                            name={title}
                                             noRing={false}
                                         />
                                         <PreferencesForm 
@@ -472,8 +476,8 @@ export function ScreenForm({
                                         <div className="flex-1">
                                             <Label htmlFor={`imageTextFields.${i}.text`}>Text {i+1}</Label>
                                             <Textarea 
-                                                {...register(text as Parameters<typeof register>[0], { disabled })}
-                                                name={`text${i}`}
+                                                {...register(text, { disabled })}
+                                                name={text}
                                                 noRing={false}
                                                 rows={5}
                                             />
