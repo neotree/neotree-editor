@@ -11,7 +11,7 @@ export async function getSiteAxiosClient(params: {
     if (!apiKey) throw new Error('MISSING: apiKey');
 
     const axiosClient = axios.create({
-        baseURL: `${siteLink}/api`,
+        baseURL: siteLink,
     });
     
     axiosClient.interceptors.request.use(async config => {

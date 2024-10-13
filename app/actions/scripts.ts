@@ -444,7 +444,7 @@ export async function copyScripts(params?: {
         if (fromRemoteSiteId) {
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const res = await axiosClient.get('/scripts/with-items?' + queryString.stringify({ 
+            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({ 
                 scriptsIds: JSON.stringify(scriptsIds), 
             }));
 
@@ -461,7 +461,7 @@ export async function copyScripts(params?: {
             if (toRemoteSiteId) {
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
 
-                const res = await axiosClient.post('/scripts/with-items?', {
+                const res = await axiosClient.post('/api/scripts/with-items?', {
                     data: scripts.data.map(s => ({
                         ...s,
                         hospitalId: undefined!,
