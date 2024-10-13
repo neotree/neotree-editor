@@ -8,7 +8,6 @@ import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 
 import * as sitesActions from '@/app/actions/sites';
-import { getSiteAxiosClient } from '@/lib/axios';
 import {
     Select,
     SelectContent,
@@ -77,18 +76,12 @@ export function SiteForm({ sites, saveSites }: Props) {
 
             if (!data.link) throw new Error('Missing: link');
 
-            const axiosClient = await getSiteAxiosClient({
-                baseURL: data.link,
+            const validate = await axios.post<{ linkIsValid: boolean; }>('/api/sites/validate-link', {
+                link: data.link,
                 apiKey: data.apiKey,
             });
 
-            let linkIsValid = true;
-            try {
-                const ping = await axiosClient.get('/api/ping');
-                linkIsValid = ping.data?.data === 'pong';
-            } catch(e: any) {
-                linkIsValid = false;
-            }
+            const linkIsValid = validate.data?.linkIsValid;
 
             if (!linkIsValid) throw new Error('Could not validate site link');
 
