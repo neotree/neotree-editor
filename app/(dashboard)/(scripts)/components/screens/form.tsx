@@ -473,7 +473,7 @@ export function ScreenForm({
                                             <Label htmlFor={`imageTextFields.${i}.text`}>Text {i+1}</Label>
                                             <Textarea 
                                                 {...register(text as Parameters<typeof register>[0], { disabled })}
-                                                name={`text${i}`}
+                                                name={`text${i + 1}`}
                                                 noRing={false}
                                                 rows={5}
                                             />
