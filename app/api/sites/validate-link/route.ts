@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
             const ping = await axiosClient.get('/api/ping');
             linkIsValid = ping.data?.data === 'pong';
         } catch(e: any) {
+            logger.log(`[AXIOS] ${link}/api/ping`, e);
             linkIsValid = false;
         }
 
