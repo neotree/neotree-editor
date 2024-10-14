@@ -472,7 +472,7 @@ export const screens = pgTable(
         previewPrintTitle: text('preview_print_title').notNull().default(''),
         condition: text('condition').notNull().default(''),
         skipToCondition: text('skip_to_condition').notNull().default(''),
-        skipToScreenId: uuid('skip_to_screen_id'),
+        skipToScreenId: text('skip_to_screen_id'),
         epicId: text('epic_id').notNull().default(''),
         storyId: text('story_id').notNull().default(''),
         refId: text('ref_id').notNull().default(''),
