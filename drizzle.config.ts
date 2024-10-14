@@ -1,5 +1,7 @@
-import 'dotenv/config';
+import { config as dotEnvConfig } from 'dotenv';
 import type { Config } from 'drizzle-kit';
+
+dotEnvConfig({ path: '.env.development', });
 
 export default {
     schema: './databases/pg/schema/index.ts',
