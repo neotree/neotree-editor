@@ -74,6 +74,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
         data: {
             skippable: s.skippable,
             condition: s.condition,
+            skipToCondition: s.skipToCondition,
+            skipToScreenId: s.skipToScreenId,
             epicId: s.epicId,
             storyId: s.storyId,
             refId: s.refId,
