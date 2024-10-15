@@ -4,6 +4,7 @@ import { useCallback, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 
+import { listScreens } from "@/app/actions/scripts";
 import {
     Select,
     SelectContent,
@@ -48,12 +49,14 @@ type Props = {
     scriptId: string;
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
+    screens: Awaited<ReturnType<typeof listScreens>>['data'];
 };
 
 export function ScreenForm({
     formData,
     scriptId,
     countDiagnosesScreens,
+    screens,
 }: Props) {
     const router = useRouter();
     
@@ -86,6 +89,7 @@ export function ScreenForm({
     const image2 = watch('image2');
     const image3 = watch('image3');
     const preferences = watch('preferences');
+    const skipToScreenId = watch('skipToScreenId');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -247,6 +251,50 @@ export function ScreenForm({
                         noRing={false}
                     />
                     <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
+                </div>
+
+                <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:items-baseline">
+                    <div className="flex-1">
+                        <Label secondary htmlFor="skipToCondition">Skip to screen conditional expression</Label>
+                        <Input
+                            {...register('skipToCondition', { disabled, })}
+                            name="skipToCondition"
+                            noRing={false}
+                        />
+                        <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
+                    </div>
+
+                    <div className="min-w-[300px]">
+                        <Label secondary htmlFor="skipToScreenId">Skip to screen</Label>
+                        <Select
+                            value={skipToScreenId}
+                            name="skipToScreenId"
+                            onValueChange={val => {
+                                setValue('skipToScreenId', val === 'none' ? '' : val);
+                            }}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select screen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectGroup>
+                                <SelectItem value="none">None</SelectItem>
+                                {screens.map(s => (
+                                    <SelectItem key={s.screenId} value={s.oldScreenId || s.screenId}>
+                                        <div 
+                                            dangerouslySetInnerHTML={{ 
+                                                __html: [
+                                                    s.title,
+                                                    `<span class="opacity-50">${s.type}</span>`,
+                                                ].join(' - '),
+                                            }}
+                                        />
+                                    </SelectItem>
+                                ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <Title>Properties</Title>

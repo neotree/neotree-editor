@@ -32,6 +32,16 @@ export const getScreens: typeof queries._getScreens = async (...args) => {
     }
 };
 
+export const listScreens: typeof queries._listScreens = async (...args) => {
+    try {
+        await isAllowed();
+        return await queries._listScreens(...args);
+    } catch(e: any) {
+        logger.error('listScreens ERROR', e.message);
+        return { errors: [e.message], data: [], };
+    }
+};
+
 export const getScreen: typeof queries._getScreen = async (...args) => {
     await isAllowed();
     return await queries._getScreen(...args);

@@ -989,6 +989,9 @@ video {
 .min-w-\[var\(--radix-select-trigger-width\)\] {
   min-width: var(--radix-select-trigger-width);
 }
+.min-w-\[300px\] {
+  min-width: 300px;
+}
 .max-w-60 {
   max-width: 15rem;
 }
@@ -2464,6 +2467,10 @@ body,
 
   .sm\:items-center {
     align-items: center;
+  }
+
+  .sm\:items-baseline {
+    align-items: baseline;
   }
 
   .sm\:justify-end {
