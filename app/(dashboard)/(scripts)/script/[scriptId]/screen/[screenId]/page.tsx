@@ -1,4 +1,4 @@
-import { getScreen, getScript } from "@/app/actions/scripts";
+import { getScreen, getScript, listScreens } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
 import { ScreenForm } from "../../../../components/screens/form";
@@ -10,9 +10,10 @@ type Props = {
 };
 
 export default async function Screens({ params: { screenId, scriptId } }: Props) {
-    const [screen, script] = await Promise.all([
+    const [screen, script, screens] = await Promise.all([
         getScreen({ screenId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
+        listScreens({ scriptsIds: [scriptId], }),
     ]);
 
     if (!script.data) {
@@ -46,6 +47,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
                 <ScreenForm 
                     scriptId={scriptId}
                     formData={screen.data} 
+                    screens={screens.data}
                 />
             </PageContainer>
         </>

@@ -39,6 +39,8 @@ export function useScreenForm({
             previewTitle: formData?.previewTitle || '',
             previewPrintTitle: formData?.previewPrintTitle || '',
             condition: formData?.condition || '',
+            skipToCondition: formData?.skipToCondition || '',
+            skipToScreenId: formData?.skipToScreenId || '',
             epicId: formData?.epicId || '',
             storyId: formData?.storyId || '',
             refId: formData?.refId || '',
