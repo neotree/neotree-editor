@@ -200,3 +200,121 @@ export async function _getScreen(
         return { errors: [e.message], };
     }
 } 
+
+export type ListScreensResults = {
+    data: {
+        type: typeof screens.$inferInsert['type'];
+        title: string;
+        screenId: string;
+        oldScreenId?: string;
+        position: number;
+        isDraft: boolean;
+        isDeleted: boolean;
+    }[];
+    errors?: string[];
+};
+
+export async function _listScreens(
+    params?: GetScreensParams
+): Promise<ListScreensResults> {
+    try {
+        let { 
+            scriptsIds: scriptsIds = [],
+            screensIds: screensIds = [], 
+            returnDraftsIfExist, 
+        } = { ...params };
+
+        const oldScreensIds = screensIds.filter(s => !uuid.validate(s));
+        screensIds = screensIds.filter(s => uuid.validate(s));
+
+        if (oldScreensIds.length) {
+            const res = await db.query.screens.findMany({
+                where: inArray(screens.oldScreenId, oldScreensIds),
+                columns: { screenId: true, oldScreenId: true, },
+            });
+            oldScreensIds.forEach(oldScreenId => {
+                const s = res.filter(s => s.oldScreenId === oldScreenId)[0];
+                screensIds.push(s?.screenId || uuid.v4());
+            });
+        }
+
+        scriptsIds = scriptsIds.filter(s => uuid.validate(s));
+        const _oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
+
+        if (_oldScriptsIds.length) {
+            const res = await db.query.scripts.findMany({
+                where: inArray(scripts.oldScriptId, _oldScriptsIds),
+                columns: { scriptId: true, oldScriptId: true, },
+            });
+            _oldScriptsIds.forEach(oldScriptId => {
+                const s = res.filter(s => s.oldScriptId === oldScriptId)[0];
+                scriptsIds.push(s?.scriptId || uuid.v4());
+            });
+        }
+        
+        // unpublished screens conditions
+        const drafts = !returnDraftsIfExist ? [] : await db.query.screensDrafts.findMany({
+            where: and(
+                !scriptsIds?.length ? undefined : or(
+                    inArray(screensDrafts.scriptId, scriptsIds),
+                    inArray(screensDrafts.scriptDraftId, scriptsIds)
+                ),
+                !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds)
+            ),
+        });
+
+        // published screens conditions
+        const publishedRes = await db
+            .select({
+                screen: {
+                    title: screens.title,
+                    screenId: screens.screenId,
+                    oldScreenId: screens.oldScreenId,
+                    position: screens.position,
+                    type: screens.type,
+                },
+                pendingDeletion: pendingDeletion,
+            })
+            .from(screens)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+            .leftJoin(screensDrafts, eq(screensDrafts.screenId, screens.screenId))
+            .where(and(
+                isNull(screens.deletedAt),
+                isNull(pendingDeletion),
+                !returnDraftsIfExist ? undefined : isNull(screensDrafts.screenId),
+                !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds),
+                !screensIds?.length ? undefined : inArray(screens.screenId, screensIds),
+            ));
+
+        const published = publishedRes.map(s => s.screen);
+
+        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
+            where: inArray(pendingDeletion.screenId, published.map(s => s.screenId)),
+            columns: { screenId: true, },
+        });
+
+        const responseData = [
+            ...published.map(s => ({
+                ...s,
+                isDraft: false,
+                isDeleted: false,
+            } as ListScreensResults['data'][0])),
+
+            ...drafts.map((s => ({
+                ...s.data,
+                isDraft: true,
+                isDeleted: false,
+            } as ListScreensResults['data'][0])))
+        ]
+            .sort((a, b) => a.position - b.position)
+            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
+
+        return  { 
+            data: responseData,
+        };
+    } catch(e: any) {
+        logger.error('_listScreens ERROR', e.message);
+        return { data: [], errors: [e.message], };
+    }
+}
+
