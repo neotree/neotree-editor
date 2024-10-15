@@ -1,5 +1,5 @@
 import { Title } from "@/components/title";
-import { countScreens, getScript } from "@/app/actions/scripts";
+import { countScreens, getScript, listScreens } from "@/app/actions/scripts";
 import { Alert } from "@/components/alert";
 import { ScreenForm } from "../../../components/screens/form";
 import { PageContainer } from "../../../components/page-container";
@@ -13,9 +13,11 @@ export default async function NewScreenPage({ params: { scriptId, } }: Props) {
     const [
         script,
         countDiagnosesScreens,
+        screens,
     ] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
         countScreens({ types: ['diagnosis'], scriptsIds: [scriptId], }),
+        listScreens({ scriptsIds: [scriptId], }),
     ]);
 
     if (countDiagnosesScreens?.errors?.length) {
@@ -47,6 +49,7 @@ export default async function NewScreenPage({ params: { scriptId, } }: Props) {
                 backLink={`/script/${scriptId}?section=screens`}
             >
                 <ScreenForm 
+                    screens={screens.data}
                     scriptId={scriptId} 
                     countDiagnosesScreens={countDiagnosesScreens.data.allPublished || countDiagnosesScreens.data.allDrafts}
                 />

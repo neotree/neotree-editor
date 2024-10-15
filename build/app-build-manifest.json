@@ -1,19 +1,19 @@
 {
   "pages": {
-    "/(dashboard)/settings/(index)/page": [
+    "/(dashboard)/(scripts)/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/settings/(index)/page.js"
+      "static/chunks/app/(dashboard)/(scripts)/page.js"
     ],
-    "/(dashboard)/settings/layout": [
+    "/(dashboard)/(scripts)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/settings/layout.js"
+      "static/chunks/app/(dashboard)/(scripts)/layout.js"
     ],
-    "/(dashboard)/settings/loading": [
+    "/(dashboard)/(scripts)/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/settings/loading.js"
+      "static/chunks/app/(dashboard)/(scripts)/loading.js"
     ],
     "/(dashboard)/layout": [
       "static/chunks/webpack.js",
@@ -35,21 +35,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/not-found.js"
-    ],
-    "/(dashboard)/(scripts)/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/page.js"
-    ],
-    "/(dashboard)/(scripts)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/layout.js"
-    ],
-    "/(dashboard)/(scripts)/loading": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/(scripts)/loading.js"
     ],
     "/(dashboard)/(scripts)/script/[scriptId]/page": [
       "static/chunks/webpack.js",
@@ -80,6 +65,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/screen/loading.js"
+    ],
+    "/(dashboard)/(scripts)/script/[scriptId]/new-screen/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/new-screen/page.js"
+    ],
+    "/(dashboard)/(scripts)/script/[scriptId]/new-screen/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/new-screen/loading.js"
     ]
   }
 }

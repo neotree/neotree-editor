@@ -1,8 +1,8 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/sites/validate-link/route.ts
-import * as entry from '../../../../../../app/api/sites/validate-link/route.js'
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/ops/discard-drafts/route.ts
+import * as entry from '../../../../../../app/api/ops/discard-drafts/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../../app/api/sites/validate-link/route.js')
+type TEntry = typeof import('../../../../../../app/api/ops/discard-drafts/route.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
