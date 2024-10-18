@@ -7,6 +7,8 @@ import logger from "@/lib/logger";
 
 export type GetSitesParams = {
     sitesIds?: string[];
+    types?: typeof sites.$inferSelect['type'][];
+    envs?: typeof sites.$inferSelect['env'][];
 };
 
 export type GetSitesResults = {
@@ -18,7 +20,7 @@ export async function _getSites(
     params?: GetSitesParams
 ): Promise<GetSitesResults> {
     try {
-        const { sitesIds: _sitesIds, } = { ...params };
+        const { sitesIds: _sitesIds, types = [], envs = [] } = { ...params };
 
         let sitesIds = _sitesIds || [];
 
@@ -30,6 +32,8 @@ export async function _getSites(
         const whereSites = [
             isNull(sites.deletedAt),
             whereSitesIds,
+            !types.length ? undefined : inArray(sites.type, types),
+            !envs.length ? undefined : inArray(sites.env, envs),
         ];
 
         const res = await db
