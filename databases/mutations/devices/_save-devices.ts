@@ -5,6 +5,7 @@ import db from '@/databases/pg/drizzle';
 import { devices } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getUniqueDeviceHash } from '@/databases/queries/devices';
+import { DeviceDetails } from '@/types';
 
 export type SaveDevicesData = Omit<typeof devices.$inferInsert, 'deviceHash'> & {
     deviceHash?: string;
@@ -12,7 +13,9 @@ export type SaveDevicesData = Omit<typeof devices.$inferInsert, 'deviceHash'> & 
 
 export type SaveDevicesResponse = { 
     success: boolean;
-    inserted: typeof devices.$inferSelect[];
+    inserted: (Omit<typeof devices.$inferSelect, 'details'> & {
+        details: DeviceDetails;
+    })[];
     errors?: string[]; 
 };
 
@@ -41,7 +44,11 @@ export async function _saveDevices({ data, returnSaved, }: {
                     eq(devices.deviceId, deviceId)
                 ));
                 if (returnSaved) {
-                    response.inserted = await q.returning();
+                    const inserted = await q.returning();
+                    response.inserted = inserted.map(d => ({
+                        ...d,
+                        details: d.details as DeviceDetails,
+                    }));
                 } else {
                     await q.execute();
                 }
@@ -60,7 +67,11 @@ export async function _saveDevices({ data, returnSaved, }: {
 
             const q = db.insert(devices).values(_insertData);
             if (returnSaved) {
-                response.inserted = await q.returning();
+                const inserted = await q.returning();
+                response.inserted = inserted.map(d => ({
+                    ...d,
+                    details: d.details as DeviceDetails,
+                }));
             } else {
                 await q.execute();
             }

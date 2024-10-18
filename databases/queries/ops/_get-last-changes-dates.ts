@@ -25,11 +25,13 @@ export const defaultChangesDates = {
     scriptsDrafts: null as null | Date ,
     pendingDeletion: null as null | Date,
     lastPublished: null as null | Date,
+    latestChangesDate: null as null | Date,
 };
 
 export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof defaultChangesDates; errors?: string[]; }> {
     try {
-        const editor = await db.query.editorInfo.findFirst();
+        const editorInfo = await db.query.editorInfo.findFirst();
+        const { lastPublishDate } = { ...editorInfo };
 
         const configKeysDraftsRes = await db
             .select({ configKeysDrafts: configKeysDrafts.updatedAt, })
@@ -76,19 +78,32 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
             .from(pendingDeletion).orderBy(desc(pendingDeletion.createdAt))
             .limit(1);
 
+        const data = {
+            ...defaultChangesDates,
+            ...configKeysDraftsRes[0],
+            ...diagnosesDraftsRes[0],
+            ...screensDraftsRes[0],
+            ...scriptsDraftsRes[0],
+            ...configKeysRes[0],
+            ...diagnosesRes[0],
+            ...screensRes[0],
+            ...scriptsRes[0],
+            ...pendingDeletionRes[0],
+            lastPublished: lastPublishDate || null,
+        };
+
+        const dates = [
+            lastPublishDate ? new Date(lastPublishDate).getTime() : null!,
+            ...Object.values(data).filter(d => d).map(d => new Date(d!).getTime()),
+        ].filter(d => d);
+
+        let latestChangesDate = lastPublishDate!;
+        if (dates.length) latestChangesDate = new Date(Math.max(...dates));
+
         return { 
             data: {
-                ...defaultChangesDates,
-                ...configKeysDraftsRes[0],
-                ...diagnosesDraftsRes[0],
-                ...screensDraftsRes[0],
-                ...scriptsDraftsRes[0],
-                ...configKeysRes[0],
-                ...diagnosesRes[0],
-                ...screensRes[0],
-                ...scriptsRes[0],
-                ...pendingDeletionRes[0],
-                lastPublished: editor?.lastPublishDate || null,
+                ...data,
+                latestChangesDate,
             }, 
         };
     } catch(e: any) {
