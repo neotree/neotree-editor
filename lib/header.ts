@@ -3,6 +3,9 @@ import { headers } from 'next/headers'
 export function getHeaders() {
     const headersList = headers();
 
+    const apiKey = headersList.get('x-api-key');
+    const bearerToken = headersList.get('x-bearer-token');
+
     const url = headersList.get('x-url');
     const host = headersList.get('x-next-url-host');
     const href = headersList.get('x-next-url-href');
@@ -21,6 +24,8 @@ export function getHeaders() {
     const longitude = headersList.get('x-geo-longitude');
     
     return {
+        apiKey,
+        bearerToken,
         url: url || '',
         host: host || '',
         href: href || '',

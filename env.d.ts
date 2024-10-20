@@ -18,5 +18,6 @@ namespace NodeJS {
         NEXT_PUBLIC_APP_NAME: string;
         NEXT_PUBLIC_APP_URL: string;
         NEXTAUTH_SECRET: string;
+        JWT_SECRET: string;
     }
 }

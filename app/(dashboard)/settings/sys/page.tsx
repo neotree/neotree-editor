@@ -1,6 +1,6 @@
 import { Title } from "@/components/title";
-import { Content } from "./components/content";
 import { updateSys } from "@/app/actions/sys";
+import { Content } from "./components/content";
 
 export default async function SystemSettingsPage() {
     return (

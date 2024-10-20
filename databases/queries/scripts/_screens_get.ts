@@ -203,11 +203,12 @@ export async function _getScreen(
 
 export type ListScreensResults = {
     data: {
-        type: typeof screens.$inferInsert['type'];
-        title: string;
-        screenId: string;
-        oldScreenId?: string;
-        position: number;
+        type: typeof screens.$inferSelect['type'];
+        refId: typeof screens.$inferSelect['refId'];
+        title: typeof screens.$inferSelect['title'];
+        screenId: typeof screens.$inferSelect['screenId'];
+        oldScreenId: typeof screens.$inferSelect['oldScreenId'];
+        position: typeof screens.$inferSelect['position'];
         isDraft: boolean;
         isDeleted: boolean;
     }[];
@@ -272,6 +273,7 @@ export async function _listScreens(
                     oldScreenId: screens.oldScreenId,
                     position: screens.position,
                     type: screens.type,
+                    refId: screens.refId,
                 },
                 pendingDeletion: pendingDeletion,
             })
