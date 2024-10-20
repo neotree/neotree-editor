@@ -1,5 +1,4 @@
 {
-  "/api/app/auth/verify-email/route": "app/api/app/auth/verify-email/route.js",
   "/api/app/device/[deviceId]/route": "app/api/app/device/[deviceId]/route.js",
   "/api/hospitals/route": "app/api/hospitals/route.js",
   "/(dashboard)/(scripts)/page": "app/(dashboard)/(scripts)/page.js",
