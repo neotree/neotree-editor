@@ -87,7 +87,7 @@ export async function _getUserMini(params: GetUserParams) {
 
 export async function _getFullUser(params: GetUserParams) {
     const where = uuid.validate(params) ? eq(users.userId, params) : eq(users.email, params);
-    return await db.query.users.findFirst({
+    return db.query.users.findFirst({
         where: and(
             where,
             isNull(users.deletedAt),

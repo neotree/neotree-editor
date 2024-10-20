@@ -121,7 +121,7 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
             (latestChangesDate && appLastSyncDate && (latestChangesDate.getTime() > appLastSyncDate.getTime()))
         );
 
-        if (!shouldFetchData) {
+        if (shouldFetchData) {
             const configKeys = await _getConfigKeys({ returnDraftsIfExist: true, });
             const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: true, });
 
