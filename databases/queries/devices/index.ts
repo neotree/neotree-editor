@@ -4,6 +4,7 @@ import db from "@/databases/pg/drizzle";
 import { devices } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { generateDeviceHash } from '@/lib/generate-device-hash';
+import { DeviceDetails } from "@/types";
 
 export async function _isDeviceHashUnique(hash: string) {
     const [{ count: exists }] = await db.select({ count: count(), }).from(devices).where(eq(devices.deviceHash, hash));
@@ -24,8 +25,8 @@ export type GetDevicesParams = {
 };
 
 export type GetDevicesResults = {
-    data: (typeof devices.$inferSelect & {
-
+    data: (Omit<typeof devices.$inferSelect, 'details'> & {
+        details: DeviceDetails;
     })[];
     errors?: string[];
 };
@@ -48,7 +49,12 @@ export async function _getDevices(params?: GetDevicesParams): Promise<GetDevices
             where: !where.length ? undefined : and(...where),
         });
 
-        return  { data };
+        return  { 
+            data: data.map(d => ({
+                ...d,
+                details: d.details as DeviceDetails,
+            })),
+        };
     } catch(e: any) {
         logger.error('_getDevices ERROR', e.message);
         return { data: [], errors: [e.message], };
@@ -56,7 +62,9 @@ export async function _getDevices(params?: GetDevicesParams): Promise<GetDevices
 }
 
 export type GetDeviceResults = {
-    data: null | typeof devices.$inferSelect;
+    data: null | (Omit<typeof devices.$inferSelect, 'details'> & {
+        details: DeviceDetails;
+    });
     errors?: string[];
 };
 
@@ -82,7 +90,12 @@ export async function _getDevice(params?: {
             where: or(...where),
         });
 
-        return  { data: data || null, };
+        return  { 
+            data: !data ? null : {
+                ...data,
+                details: data.details as DeviceDetails,
+            }, 
+        };
     } catch(e: any) {
         logger.error('_getDevices ERROR', e.message);
         return { data: null, errors: [e.message], };

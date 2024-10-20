@@ -284,8 +284,9 @@ export function ScreenForm({
                                         <div 
                                             dangerouslySetInnerHTML={{ 
                                                 __html: [
+                                                    s.position,
                                                     s.title,
-                                                    `<span class="opacity-50">${s.type}</span>`,
+                                                    `<span class="opacity-50">${s.refId || ''}</span>`,
                                                 ].join(' - '),
                                             }}
                                         />
@@ -319,9 +320,9 @@ export function ScreenForm({
                     </div>
 
                     <div>
-                        <Label secondary htmlFor="refId">Ref</Label>
+                        <Label secondary htmlFor="refId">Ref *</Label>
                         <Input
-                            {...register('refId', { disabled, })}
+                            {...register('refId', { disabled, required: true, })}
                             name="refId"
                             noRing={false}
                         />

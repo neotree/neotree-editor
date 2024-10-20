@@ -63,6 +63,8 @@ export async function _getUser(params: GetUserParams) {
         },
     });
 
+    if (!res) return null;
+
     return { ...res, isActive: !!res?.password, };
 }
 

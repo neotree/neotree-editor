@@ -2,6 +2,10 @@ export * from './permissions';
 
 export type Mode = 'view' | 'development';
 
+export type DeviceDetails = {
+    scripts_count: number;
+};
+
 export type Preferences = {
     fontSize: { [key: string]: undefined | 'default' | 'xs' | 'sm' | 'lg' | 'xl'; };
     fontWeight: { [key: string]: undefined | 'bold'; };
