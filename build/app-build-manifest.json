@@ -36,15 +36,35 @@
       "static/chunks/main-app.js",
       "static/chunks/app/not-found.js"
     ],
-    "/(auth)/login/page": [
+    "/(dashboard)/(scripts)/script/[scriptId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/page.js"
     ],
-    "/(auth)/layout": [
+    "/(dashboard)/(scripts)/script/[scriptId]/loading": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/layout.js"
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/loading.js"
+    ],
+    "/(dashboard)/(scripts)/script/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/loading.js"
+    ],
+    "/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/page.js"
+    ],
+    "/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/screen/[screenId]/loading.js"
+    ],
+    "/(dashboard)/(scripts)/script/[scriptId]/screen/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/(scripts)/script/[scriptId]/screen/loading.js"
     ]
   }
 }

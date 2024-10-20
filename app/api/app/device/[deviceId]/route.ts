@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getDatesWhenUpdatesWereMade } from "@/databases/queries/ops";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
-import {
-    GetScriptsResults,
-    GetScreensResults,
-    GetDiagnosesResults,
-} from '@/databases/queries/scripts';
-import { GetConfigKeysResults } from '@/databases/queries/config-keys';
+import { _getConfigKeys, GetConfigKeysResults } from '@/databases/queries/config-keys';
 import { _getDevice } from "@/databases/queries/devices";
 import { _saveDevices } from "@/databases/mutations/devices";
+import { getScriptsWithItems } from "@/app/actions/scripts";
+import { getHeaders } from "@/lib/header";
 
 interface IParams {
     params: {
@@ -28,15 +26,14 @@ type ReqBody = {
 };
 
 const data = {
+    newData: false,
     deviceId: '',
     deviceHash: '',
     deviceScriptsCount: 0,
     dataVersion: 0,
     lastPublishDate: null! as Date,
     latestChangesDate: null! as Date,
-    scripts: [] as GetScriptsResults['data'],
-    screens: [] as GetScreensResults['data'],
-    diagnoses: [] as GetDiagnosesResults['data'],
+    scripts: [] as Awaited<ReturnType<typeof getScriptsWithItems>>['data'],
     configKeys: [] as GetConfigKeysResults['data'],
 };
 
@@ -49,6 +46,28 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], data: responseData, });
+
+        const { bearerToken } = getHeaders();
+
+        let isLoggedIn = false;
+        if (bearerToken) {
+            const authenticated = await new Promise<null | { email: string; userId: string; }>((resolve, reject) => {
+                jwt.verify(bearerToken, process.env.JWT_SECRET || '', (e, data) => {
+                    if (e) {
+                        reject(e);
+                    } else if (data) {
+                        const info = data as jwt.JwtPayload;
+                        resolve({
+                            email: info.email as string,
+                            userId: info.userId as string,
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+            isLoggedIn = !!authenticated;
+        }
 
         const {
             lastSyncDate,
@@ -95,7 +114,7 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
 
         responseData.latestChangesDate = latestChangesDate!;
 
-        const shouldFetchData = !!hospitalId && (
+        const shouldFetchData = !!hospitalId && isLoggedIn && (
             forceSync ||
             !lastSyncDate ||
             (editorInfo.dataVersion !== dataVersion) ||
@@ -103,7 +122,12 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
         );
 
         if (!shouldFetchData) {
-            
+            const configKeys = await _getConfigKeys({ returnDraftsIfExist: true, });
+            const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: true, });
+
+            responseData.configKeys = configKeys.data;
+            responseData.scripts = scripts.data;
+            responseData.newData = true;
         }
 
         return NextResponse.json({
