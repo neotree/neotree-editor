@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
         const shouldFetchData = !!hospitalId && isLoggedIn && (
             forceSync ||
             !lastSyncDate ||
-            (editorInfo.dataVersion !== dataVersion) ||
+            (`${editorInfo.dataVersion}` !== `${dataVersion}`) ||
             (latestChangesDate && appLastSyncDate && (latestChangesDate.getTime() > appLastSyncDate.getTime()))
         );
 
