@@ -95,7 +95,7 @@ export function ScriptsImportModal({
         try {
             if (!data.siteId) throw new Error('Please select a site!');
             if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (!data.confirmed) throw new Error('Please confirm that you want to override this script!');
+            if (!data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
 
             setLoading(true);
 
@@ -221,7 +221,7 @@ export function ScriptsImportModal({
                             checked={confirmed}
                             onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
                         />
-                        <Label secondary htmlFor="exportable">Confirm that you want to override this script</Label>
+                        <Label secondary htmlFor="exportable">Confirm that you want to overwrite this script</Label>
                     </div>
                 </div>
             </Modal>
