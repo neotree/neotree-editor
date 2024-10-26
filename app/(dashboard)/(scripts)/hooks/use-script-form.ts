@@ -26,19 +26,21 @@ export function useScriptForm(params: UseScriptFormParams) {
     const [loading, setLoading] = useState(false);
     const { saveScripts, } = useScriptsContext();
 
-    const getDefaultFormValues = useCallback(() => ({
-        position: formData?.position || undefined,
-        scriptId: formData?.scriptId || undefined,
-        type: formData?.type || scriptTypes[0].value,
-        title: formData?.title || '',
-        printTitle: formData?.printTitle || '',
-        description: formData?.description || '',
-        hospitalId: formData?.hospitalId || null,
-        exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
-        nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
-        nuidSearchFields: (formData?.nuidSearchFields || []),
-        preferences: (formData?.preferences || defaultPreferences),
-    } satisfies ScriptFormDataType), [formData]);
+    const getDefaultFormValues = useCallback(() => {
+        return {
+            position: formData?.position || undefined,
+            scriptId: formData?.scriptId || undefined,
+            type: (formData?.type || scriptTypes[0].value) as ScriptFormDataType['type'],
+            title: formData?.title || '',
+            printTitle: formData?.printTitle || '',
+            description: formData?.description || '',
+            hospitalId: formData?.hospitalId || null,
+            exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
+            nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
+            nuidSearchFields: (formData?.nuidSearchFields || []),
+            preferences: (formData?.preferences || defaultPreferences),
+        } satisfies ScriptFormDataType;
+    }, [formData]);
 
     const form = useForm({
         defaultValues: getDefaultFormValues(),
