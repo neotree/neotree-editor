@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useMeasure } from 'react-use';
 
-import { searchScripts } from "@/app/actions/_scripts";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSearchParams } from "@/hooks/use-search-params";
@@ -23,7 +22,7 @@ export function DataTableSearch({
 
     const [openPopover, setOpenPopover] = useState(false);
     const [searching, setSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<Awaited<ReturnType<typeof searchScripts>>>();
+    const [searchResults, setSearchResults] = useState<any>();
 
     const { watch, register, handleSubmit, } = useForm({
         defaultValues: {

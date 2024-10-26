@@ -1,5 +1,4 @@
-import { getScreenWithDraft } from "@/app/actions/_screens";
-import { getScriptWithDraft } from "@/app/actions/_scripts";
+import { ScreenType, ScriptType } from "@/databases/queries/scripts";
 import { Preferences } from "@/types";
 
 export const defaultPreferences = { 
@@ -20,7 +19,7 @@ export const scriptTypes = [
     { label: 'Admission', value: 'admission', },
     { label: 'Discharge', value: 'discharge', },
     { label: 'Neolab', value: 'neolab', },
-] as { label: string; value: Awaited<ReturnType<typeof getScriptWithDraft>>['type']; }[];
+] as { label: string; value: ScriptType['type'] }[];
 
 export const screenTypes = [
     { value: 'checklist', label: 'Checklist' },
@@ -35,7 +34,7 @@ export const screenTypes = [
     { value: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { value: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
     { value: 'diagnosis', label: 'Diagnosis' },
-] as { label: string; value: Awaited<ReturnType<typeof getScreenWithDraft>>['type']; }[];
+] as { label: string; value: ScreenType['type'] }[];
 
 export const SymptomTypes = [
     { value: 'risk', label: 'Risk factor', },
