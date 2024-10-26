@@ -2527,10 +2527,6 @@ body,
 
 @media (min-width: 768px) {
 
-  .md\:ml-auto {
-    margin-left: auto;
-  }
-
   .md\:mr-auto {
     margin-right: auto;
   }
