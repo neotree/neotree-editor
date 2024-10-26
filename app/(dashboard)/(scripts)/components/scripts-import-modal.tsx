@@ -221,7 +221,7 @@ export function ScriptsImportModal({
                             checked={confirmed}
                             onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
                         />
-                        <Label secondary htmlFor="exportable">Confirm that you want to overwrite this script</Label>
+                        <Label secondary htmlFor="confirmed">Confirm that you want to overwrite this script</Label>
                     </div>
                 </div>
             </Modal>

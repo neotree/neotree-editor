@@ -1,8 +1,8 @@
-import { eq, inArray, isNotNull, or } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { screens, screensDrafts } from "@/databases/pg/schema";
+import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema";
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
 
@@ -92,6 +92,60 @@ export async function _publishScreens(opts?: {
             }
 
             await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
+        }
+
+        await db.delete(screensDrafts);
+
+        let deleted = await db.query.pendingDeletion.findMany({
+            where: isNotNull(pendingDeletion.screenId),
+            columns: { screenId: true, },
+            with: {
+                screen: {
+                    columns: {
+                        version: true,
+                        scriptId: true,
+                    },
+                },
+            },
+        });
+
+        deleted = deleted.filter(c => c.screen);
+
+        if (deleted.length) {
+            const deletedAt = new Date();
+
+            await db.update(screens)
+                .set({ deletedAt, })
+                .where(inArray(screens.screenId, deleted.map(c => c.screenId!)));
+
+            await db.insert(screensHistory).values(deleted.map(c => ({
+                version: c.screen!.version,
+                screenId: c.screenId!,
+                scriptId: c.screen!.scriptId,
+                changes: {
+                    action: 'delete_screen',
+                    description: 'Delete screen',
+                    oldValues: [{ deletedAt: null, }],
+                    newValues: [{ deletedAt, }],
+                },
+            })));
+        }
+
+        await db.delete(pendingDeletion).where(or(
+            isNotNull(pendingDeletion.screenId),
+            isNotNull(pendingDeletion.screenDraftId),
+        ));
+
+        const published = [
+            // ...inserts.map(c => c.screenId! || c.screenDraftId),
+            ...updates.map(c => c.screenId!),
+            ...deleted.map(c => c.screenId!),
+        ];
+
+        if (published.length) {
+            await db.update(screens)
+                .set({ version: sql`${screens.version} + 1`, }).
+                where(inArray(screens.screenId, published));
         }
 
         results.success = true;

@@ -6,8 +6,10 @@ declare global {
 
 const isProd = process.env.NODE_ENV === 'production';
 
+const dbLogging = !isProd && (`${process.env.DB_LOGGING}` === 'true');
+
 const prismadb = globalThis.prisma || new PrismaClient({
-    log: isProd ? undefined : ['query', 'info', 'warn', 'error'],
+    log: dbLogging ? ['query', 'info', 'warn', 'error'] : undefined,
 });
 
 if (process.env.NODE_ENV !== 'production') globalThis.prisma = prismadb;

@@ -4,22 +4,14 @@ import { revalidatePath as _revalidatePath } from "next/cache";
 
 import socket from '@/lib/socket';
 import logger from '@/lib/logger';
-import { _publishScripts } from '@/databases/mutations/_scripts';
-import { _publishConfigKeys } from '@/databases/mutations/_config-keys';
 import { isAllowed } from './is-allowed';
-import { _publishScreens } from '@/databases/mutations/screens';
 import { Mode } from '@/types';
-import { _countConfigKeysDrafts,  } from '@/databases/queries/_config-keys-drafts';
-import { _countScreensDrafts, } from '@/databases/queries/screens-drafts';
-import { _countScriptsDrafts, } from '@/databases/queries/scripts-drafts';
-import { _deleteAllConfigKeysDrafts,  } from '@/databases/mutations/_config-keys-drafts';
-import { _deleteAllScreensDrafts, } from '@/databases/mutations/screens-drafts';
-import { _deleteAllScriptsDrafts, } from '@/databases/mutations/scripts-drafts';
-import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-drafts';
-import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
-import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
 import { _clearPendingDeletion, _processPendingDeletion } from '@/databases/mutations/ops';
 import * as opsQueries from '@/databases/queries/ops';
+import * as scriptsQueries from '@/databases/queries/scripts';
+import * as scriptsMutations from '@/databases/mutations/scripts';
+import * as configKeysMutations from '@/databases/mutations/config-keys';
+import * as configKeysQueries from '@/databases/queries/config-keys';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
@@ -72,16 +64,16 @@ export const revalidatePath = async (
 
 export const countAllDrafts = async () => {
     try {
-        const configKeys = await _countConfigKeysDrafts();
-        const screens = await _countScreensDrafts();
-        const scripts = await _countScriptsDrafts();
-        const diagnoses = await _countDiagnosesDrafts();
+        const configKeys = await configKeysQueries._countConfigKeys();
+        const screens = await scriptsQueries._countScreens();
+        const scripts = await scriptsQueries._countScripts();
+        const diagnoses = await scriptsQueries._countDiagnoses();
 
         return {
-            configKeys,
-            screens,
-            scripts,
-            diagnoses,
+            configKeys: configKeys.data.allDrafts,
+            screens: screens.data.allDrafts,
+            scripts: scripts.data.allDrafts,
+            diagnoses: diagnoses.data.allDrafts,
         };
     } catch(e: any) {
         logger.error('countAllDrafts ERROR', e.message);
@@ -108,10 +100,10 @@ export async function publishData() {
             'update_screens',
         ]);
 
-        const publishConfigKeys = await _publishConfigKeys();
-        const publishScripts = await _publishScripts();
-        const publishScreens = await _publishScreens();
-        const publishDiagnoses = await _publishDiagnoses();
+        const publishConfigKeys = await configKeysMutations._publishConfigKeys();
+        const publishScripts = await scriptsMutations._publishScripts();
+        const publishScreens = await scriptsMutations._publishScreens();
+        const publishDiagnoses = await scriptsMutations._publishDiagnoses();
         const processPendingDeletion = await _processPendingDeletion();
         
         if (publishConfigKeys.errors) {
@@ -165,10 +157,10 @@ export async function discardDrafts() {
             'delete_screens',
         ]);
 
-         await _deleteAllConfigKeysDrafts();
-         await _deleteAllScriptsDrafts();
-         await _deleteAllScreensDrafts();
-         await _deleteAllDiagnosesDrafts();
+         await configKeysMutations._deleteAllConfigKeysDrafts();
+         await scriptsMutations._deleteAllScriptsDrafts();
+         await scriptsMutations._deleteAllScreensDrafts();
+         await scriptsMutations._deleteAllDiagnosesDrafts();
          await _clearPendingDeletion();
 
         socket.emit('data_changed', 'discard_drafts');
