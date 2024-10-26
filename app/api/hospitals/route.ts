@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { deleteHospitals, getHospitals } from "@/app/actions/_hospitals";
+import { deleteHospitals, getHospitals } from "@/app/actions/hospitals";
 
 export async function GET(req: NextRequest) {
 	try {
