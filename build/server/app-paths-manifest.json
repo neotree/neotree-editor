@@ -1,3 +1,7 @@
 {
-  "/api/ops/files/route": "app/api/ops/files/route.js"
+  "/api/hospitals/route": "app/api/hospitals/route.js",
+  "/(dashboard)/hospitals/page": "app/(dashboard)/hospitals/page.js",
+  "/(dashboard)/users/page": "app/(dashboard)/users/page.js",
+  "/(dashboard)/settings/(index)/page": "app/(dashboard)/settings/(index)/page.js",
+  "/(dashboard)/(scripts)/page": "app/(dashboard)/(scripts)/page.js"
 }
