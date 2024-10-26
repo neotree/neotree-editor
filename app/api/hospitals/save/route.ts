@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(data);
     } catch(e: any) {
-        logger.log('/api/hospitals/add', e);
+        logger.log('/api/hospitals/save', e);
         return NextResponse.json({ errors: [e.message], });
     }
 }

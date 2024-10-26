@@ -2,10 +2,8 @@ import {
     getHospitals, 
     deleteHospitals, 
     getHospital, 
-    updateHospitals, 
-    createHospitals,
-    searchHospitals,
-} from "@/app/actions/_hospitals";
+    saveHospitals, 
+} from "@/app/actions/hospitals";
 import { Content } from "@/components/content";
 import { Title } from "@/components/title";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,10 +16,7 @@ type Props = {
 
 export default async function Hospitals({ searchParams: { page } }: Props) {
     const [hospitals] = await Promise.all([
-        getHospitals({ 
-            limit: 25,
-            page: page ? Number(page) : undefined,
-        }),
+        getHospitals(),
     ]);
 
     return (
@@ -29,12 +24,12 @@ export default async function Hospitals({ searchParams: { page } }: Props) {
             <Title>Hospitals</Title>
 
             <Content>
-                {hospitals.error ? (
+                {hospitals.errors?.length ? (
                     <Card
                         className="border-danger bg-danger/20 text-center"
                     >
                         <CardContent>
-                            <div className="text-danger">{hospitals.error}</div>
+                            <div className="text-danger">{hospitals.errors.join(', ')}</div>
                         </CardContent>
                     </Card>
                 ) : (
@@ -45,9 +40,7 @@ export default async function Hospitals({ searchParams: { page } }: Props) {
                                 getHospitals={getHospitals}
                                 deleteHospitals={deleteHospitals}
                                 getHospital={getHospital}
-                                updateHospitals={updateHospitals}
-                                createHospitals={createHospitals}
-                                searchHospitals={searchHospitals}
+                                saveHospitals={saveHospitals}
                             />
                         </CardContent>
                     </Card>

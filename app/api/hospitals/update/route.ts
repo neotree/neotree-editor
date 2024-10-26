@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { updateHospitals } from "@/app/actions/_hospitals";
+import { saveHospitals } from "@/app/actions/hospitals";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
             
         const body = await req.json();
         
-        const data = await updateHospitals(body.data);
+        const data = await saveHospitals(body.data);
 
         return NextResponse.json(data);
     } catch(e: any) {

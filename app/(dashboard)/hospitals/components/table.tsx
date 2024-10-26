@@ -3,33 +3,29 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import axios from 'axios';
+import { Plus } from 'lucide-react';
 
 import { 
     getHospitals, 
     deleteHospitals, 
     getHospital, 
-    updateHospitals, 
-    createHospitals,
-    searchHospitals,
-} from "@/app/actions/_hospitals";
+    saveHospitals
+} from "@/app/actions/hospitals";
 import { DataTable } from "@/components/data-table";
-import { Pagination } from "@/components/pagination";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Loader } from "@/components/loader";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { HospitalAction } from "./action";
 import { HospitalForm } from "./hospital-form";
-import { Header } from "./header";
 
 type Props = {
     hospitals: Awaited<ReturnType<typeof getHospitals>>;
     getHospitals: typeof getHospitals;
     deleteHospitals: typeof deleteHospitals;
     getHospital: typeof getHospital;
-    updateHospitals: typeof updateHospitals;
-    createHospitals: typeof createHospitals;
-    searchHospitals: typeof searchHospitals;
+    saveHospitals: typeof saveHospitals;
 };
 
 export function HospitalsTable({ 
@@ -37,9 +33,7 @@ export function HospitalsTable({
     getHospitals: _getHospitals, 
     deleteHospitals, 
     getHospital,
-    updateHospitals,
-    createHospitals,
-    searchHospitals,
+    saveHospitals,
 }: Props) {
     const searchParams = useSearchParams();
     
@@ -71,21 +65,19 @@ export function HospitalsTable({
         // TODO: Replace with server actions
         const response = await axios.get('/api/hospitals?data=' + JSON.stringify({
             ...searchParams.parsed,
-            roles: searchParams.parsed.role ? [searchParams.parsed.role] : undefined,
-            page: 1,
-            limit: initialData.limit,
-            ...opts,
         }));
         const hospitals = response.data as Awaited<ReturnType<typeof _getHospitals>>;
 
-        if (hospitals.error) {
-            toast.error(hospitals.error);
+        const error = hospitals.errors?.join?.(', ');
+
+        if (error) {
+            toast.error(error);
         } else {
             setHospitals(hospitals);
             setSelectedIndexes([]);
         }
 
-        cb?.(hospitals.error, hospitals);
+        cb?.(error, hospitals);
 
         setLoading(false);
     }, [_getHospitals, searchParams, initialData]);
@@ -97,10 +89,14 @@ export function HospitalsTable({
                 try {
                     setLoading(true);
 
+                    const payload: Parameters<typeof deleteHospitals>[0] = {
+                        hospitalsIds: hospitalIds,
+                    };
+
                     // await deleteHospitals(hospitalIds);
 
                     // TODO: Replace with server actions
-                    await axios.delete('/api/hospitals?data=' + JSON.stringify(hospitalIds));
+                    await axios.delete('/api/hospitals?data=' + JSON.stringify(payload));
 
                     await getHospitals();
                     cb?.();
@@ -123,8 +119,7 @@ export function HospitalsTable({
         <HospitalForm 
             open={showHospitalForm}
             getHospital={getHospital}
-            updateHospitals={updateHospitals}
-            createHospitals={createHospitals}
+            saveHospitals={saveHospitals}
             onSaveSuccess={getHospitals}
             onClose={() => setShowHospitalForm(false)}
         />
@@ -132,17 +127,6 @@ export function HospitalsTable({
 
     return (
         <div className="flex flex-col">
-            <Header 
-                hospitals={hospitals}
-                selected={selectedIndexes.map(i => hospitals.data[i].hospitalId)}
-                onDelete={onDelete}
-                getHospitals={getHospitals}
-                searchHospitals={searchHospitals}
-                toggleHospitalForm={() => setShowHospitalForm(prev => !prev)}
-            />
-
-            <Separator />
-
             <DataTable
                 selectable
                 // sortable
@@ -152,6 +136,20 @@ export function HospitalsTable({
                 //         data: sorted.map(({ oldIndex, }) => prev.data[oldIndex]),
                 //     };
                 // })}
+                title="Hospitals"
+                search={{
+                    inputPlaceholder: 'Search hospitals',
+                }}
+                headerActions={(
+                    <Button
+                        variant="outline"
+                        className="w-auto h-auto border-primary text-primary"
+                        onClick={() => setShowHospitalForm(prev => !prev)}
+                    >
+                        <Plus className="w-4 h-4 mr-1" />
+                        <span>New Hospital</span>
+                    </Button>
+                )}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
                 columns={[
@@ -181,22 +179,6 @@ export function HospitalsTable({
                     ];
                 })}
             />
-
-            <Separator />
-
-            <div className="p-2">
-                <Pagination
-                    currentPage={hospitals.page}
-                    totalPages={hospitals.totalPages}
-                    disabled={loading}
-                    limit={hospitals.limit || hospitals.totalRows}
-                    totalRows={hospitals.totalRows}
-                    collectionName="hospitals"
-                    onPaginate={page => getHospitals({ page }, (e, rslts) => !e && searchParams.push({ page: rslts?.page || hospitals.page, }))}
-                    hideControls={false}
-                    hideSummary={false}
-                />
-            </div>
 
             {hospitalForm}
 
