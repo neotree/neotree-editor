@@ -17,6 +17,15 @@ export type DeleteDiagnosesResponse = {
     errors?: string[]; 
 };
 
+export async function _deleteAllDiagnosesDrafts(): Promise<boolean> {
+    try {
+        await db.delete(diagnosesDrafts);
+        return true;
+    } catch(e: any) {
+        throw e;
+    }
+}
+
 export async function _deleteDiagnoses(
     { 
         diagnosesIds = [], 

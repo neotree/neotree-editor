@@ -15,6 +15,15 @@ export type DeleteConfigKeysResponse = {
     errors?: string[]; 
 };
 
+export async function _deleteAllConfigKeysDrafts(): Promise<boolean> {
+    try {
+        await db.delete(configKeysDrafts);
+        return true;
+    } catch(e: any) {
+        throw e;
+    }
+}
+
 export async function _deleteConfigKeys(
     { configKeysIds: configKeysIdsParam, broadcastAction, }: DeleteConfigKeysData,
 ) {
