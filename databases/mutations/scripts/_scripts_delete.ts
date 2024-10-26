@@ -18,6 +18,15 @@ export type DeleteScriptsResponse = {
     errors?: string[]; 
 };
 
+export async function _deleteAllScriptsDrafts(): Promise<boolean> {
+    try {
+        await db.delete(scriptsDrafts);
+        return true;
+    } catch(e: any) {
+        throw e;
+    }
+}
+
 export async function _deleteScripts(
     { scriptsIds = [], broadcastAction, confirmDeleteAll, }: DeleteScriptsData,
 ) {

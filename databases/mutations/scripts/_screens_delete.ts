@@ -17,6 +17,15 @@ export type DeleteScreensResponse = {
     errors?: string[]; 
 };
 
+export async function _deleteAllScreensDrafts(): Promise<boolean> {
+    try {
+        await db.delete(screensDrafts);
+        return true;
+    } catch(e: any) {
+        throw e;
+    }
+}
+
 export async function _deleteScreens(
     { 
         screensIds = [], 

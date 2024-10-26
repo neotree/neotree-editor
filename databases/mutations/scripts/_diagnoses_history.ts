@@ -20,7 +20,7 @@ export async function _saveDiagnosesHistory({ previous, drafts, }: {
             if (c?.data?.version === 1) {
                 changeHistoryData.changes = {
                     action: 'create_diagnosis',
-                    dediagnosision: 'Create diagnosis',
+                    description: 'Create diagnosis',
                     oldValues: [],
                     newValues: [],
                 };
@@ -44,7 +44,7 @@ export async function _saveDiagnosesHistory({ previous, drafts, }: {
 
                 changeHistoryData.changes = {
                     action: 'update_diagnosis',
-                    dediagnosision: 'Update diagnosis',
+                    description: 'Update diagnosis',
                     oldValues,
                     newValues,
                 };

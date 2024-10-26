@@ -9,11 +9,13 @@ declare global {
 
 const isProd = process.env.NODE_ENV === 'production';
 
+const dbLogging = !isProd && (`${process.env.DB_LOGGING}` === 'true');
+
 export function dbInit() {
     const client = postgres(process.env.POSTGRES_DB_URL!);
     const db = postgresDrizzle(client, { 
         schema, 
-        logger: !isProd, 
+        logger: dbLogging, 
     });
     return db;
 }
