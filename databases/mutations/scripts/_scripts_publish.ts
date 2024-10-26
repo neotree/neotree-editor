@@ -1,10 +1,9 @@
-import { and, asc, eq, inArray, isNotNull, isNull, notInArray, or } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { v4 } from "uuid";
 
-import socket  from '@/lib/socket';
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { scripts, screensDrafts, diagnosesDrafts } from "@/databases/pg/schema";
+import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts } from "@/databases/pg/schema";
 import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
@@ -89,6 +88,58 @@ export async function _publishScripts() {
 
             const publishDiagnoses = await _publishDiagnoses({ scriptsIds: processedScripts.map(s => s.scriptId) });
             if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(', '));
+        }
+
+        let deleted = await db.query.pendingDeletion.findMany({
+            where: isNotNull(pendingDeletion.scriptId),
+            columns: { scriptId: true, },
+            with: {
+                script: {
+                    columns: {
+                        version: true,
+                    },
+                },
+            },
+        });
+
+        await db.delete(scriptsDrafts);
+
+        deleted = deleted.filter(c => c.script);
+
+        if (deleted.length) {
+            const deletedAt = new Date();
+
+            await db.update(scripts)
+                .set({ deletedAt, })
+                .where(inArray(scripts.scriptId, deleted.map(c => c.scriptId!)));
+
+            await db.insert(scriptsHistory).values(deleted.map(c => ({
+                version: c.script!.version,
+                scriptId: c.scriptId!,
+                changes: {
+                    action: 'delete_config_key',
+                    description: 'Delete config key',
+                    oldValues: [{ deletedAt: null, }],
+                    newValues: [{ deletedAt, }],
+                },
+            })));
+        }
+
+        await db.delete(pendingDeletion).where(or(
+            isNotNull(pendingDeletion.scriptId),
+            isNotNull(pendingDeletion.scriptDraftId),
+        ));
+
+        const published = [
+            // ...inserts.map(c => c.scriptId! || c.scriptDraftId),
+            ...updates.map(c => c.scriptId!),
+            ...deleted.map(c => c.scriptId!),
+        ];
+
+        if (published.length) {
+            await db.update(scripts)
+                .set({ version: sql`${scripts.version} + 1`, }).
+                where(inArray(scripts.scriptId, published));
         }
 
         results.success = true;

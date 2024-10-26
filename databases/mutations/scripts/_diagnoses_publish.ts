@@ -1,8 +1,8 @@
-import { eq, inArray, isNotNull, or } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { diagnoses, diagnosesDrafts } from "@/databases/pg/schema";
+import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@/databases/pg/schema";
 import { _saveDiagnosesHistory } from "./_diagnoses_history";
 import { v4 } from "uuid";
 
@@ -92,6 +92,60 @@ export async function _publishDiagnoses(opts?: {
             }
 
             await _saveDiagnosesHistory({ drafts: inserts, previous: dataBefore, });
+        }
+
+        await db.delete(diagnosesDrafts);
+
+        let deleted = await db.query.pendingDeletion.findMany({
+            where: isNotNull(pendingDeletion.diagnosisId),
+            columns: { diagnosisId: true, },
+            with: {
+                diagnosis: {
+                    columns: {
+                        version: true,
+                        scriptId: true,
+                    },
+                },
+            },
+        });
+
+        deleted = deleted.filter(c => c.diagnosis);
+
+        if (deleted.length) {
+            const deletedAt = new Date();
+
+            await db.update(diagnoses)
+                .set({ deletedAt, })
+                .where(inArray(diagnoses.diagnosisId, deleted.map(c => c.diagnosisId!)));
+
+            await db.insert(diagnosesHistory).values(deleted.map(c => ({
+                version: c.diagnosis!.version,
+                diagnosisId: c.diagnosisId!,
+                scriptId: c.diagnosis!.scriptId,
+                changes: {
+                    action: 'delete_diagnosis',
+                    description: 'Delete diagnosis',
+                    oldValues: [{ deletedAt: null, }],
+                    newValues: [{ deletedAt, }],
+                },
+            })));
+        }
+
+        await db.delete(pendingDeletion).where(or(
+            isNotNull(pendingDeletion.diagnosisId),
+            isNotNull(pendingDeletion.diagnosisDraftId),
+        ));
+
+        const published = [
+            // ...inserts.map(c => c.diagnosisId! || c.diagnosisDraftId),
+            ...updates.map(c => c.diagnosisId!),
+            ...deleted.map(c => c.diagnosisId!),
+        ];
+
+        if (published.length) {
+            await db.update(diagnoses)
+                .set({ version: sql`${diagnoses.version} + 1`, }).
+                where(inArray(diagnoses.diagnosisId, published));
         }
 
         results.success = true;

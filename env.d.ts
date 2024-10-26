@@ -3,7 +3,8 @@ namespace NodeJS {
         NODE_ENV: string;
         NEOTREE_ENV: string;
         HOSTNAME: string;
-        DEBUG:string;
+        DEBUG:boolean;
+        DB_LOGGING:boolean;
         PORT: string;
         POSTGRES_DB_URL: string;
         SESSION_POSTGRES_DB_URL: string;

@@ -5,9 +5,9 @@ import { revalidatePath as _revalidatePath } from "next/cache";
 import socket from '@/lib/socket';
 import logger from '@/lib/logger';
 import { _publishScripts } from '@/databases/mutations/_scripts';
-import { _publishConfigKeys } from '@/databases/mutations/_config-keys';
+// import { _publishConfigKeys } from '@/databases/mutations/_config-keys';
 import { isAllowed } from './is-allowed';
-import { _publishScreens } from '@/databases/mutations/screens';
+// import { _publishScreens } from '@/databases/mutations/screens';
 import { Mode } from '@/types';
 import { _countConfigKeysDrafts,  } from '@/databases/queries/_config-keys-drafts';
 import { _countScreensDrafts, } from '@/databases/queries/screens-drafts';
@@ -16,10 +16,12 @@ import { _deleteAllConfigKeysDrafts,  } from '@/databases/mutations/_config-keys
 import { _deleteAllScreensDrafts, } from '@/databases/mutations/screens-drafts';
 import { _deleteAllScriptsDrafts, } from '@/databases/mutations/scripts-drafts';
 import { _deleteAllDiagnosesDrafts } from '@/databases/mutations/diagnoses-drafts';
-import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
+// import { _publishDiagnoses } from '@/databases/mutations/diagnoses';
 import { _countDiagnosesDrafts } from '@/databases/queries/diagnoses-drafts';
 import { _clearPendingDeletion, _processPendingDeletion } from '@/databases/mutations/ops';
 import * as opsQueries from '@/databases/queries/ops';
+import * as scriptsMutations from '@/databases/mutations/scripts';
+import * as configKeysMutations from '@/databases/mutations/config-keys';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
@@ -108,10 +110,10 @@ export async function publishData() {
             'update_screens',
         ]);
 
-        const publishConfigKeys = await _publishConfigKeys();
-        const publishScripts = await _publishScripts();
-        const publishScreens = await _publishScreens();
-        const publishDiagnoses = await _publishDiagnoses();
+        const publishConfigKeys = await configKeysMutations._publishConfigKeys();
+        const publishScripts = await scriptsMutations._publishScripts();
+        const publishScreens = await scriptsMutations._publishScreens();
+        const publishDiagnoses = await scriptsMutations._publishDiagnoses();
         const processPendingDeletion = await _processPendingDeletion();
         
         if (publishConfigKeys.errors) {

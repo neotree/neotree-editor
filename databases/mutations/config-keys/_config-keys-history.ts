@@ -1,31 +1,30 @@
 import db from "@/databases/pg/drizzle";
 import logger from "@/lib/logger";
-import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema";
+import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema";
 
-export async function _saveScreensHistory({ previous, drafts, }: {
-    drafts: typeof screensDrafts.$inferSelect[];
-    previous: typeof screens.$inferSelect[];
+export async function _saveConfigKeysHistory({ previous, drafts, }: {
+    drafts: typeof configKeysDrafts.$inferSelect[];
+    previous: typeof configKeys.$inferSelect[];
 }) {
     try {
-        const insertData: typeof screensHistory.$inferInsert[] = [];
+        const insertData: typeof configKeysHistory.$inferInsert[] = [];
 
         for(const c of drafts) {
-            const changeHistoryData: typeof screensHistory.$inferInsert = {
+            const changeHistoryData: typeof configKeysHistory.$inferInsert = {
                 version: c?.data?.version || 1,
-                screenId: c?.data?.screenId!,
-                scriptId: c?.data?.scriptId,
+                configKeyId: c?.data?.configKeyId!,
                 changes: {},
             };
 
             if (c?.data?.version === 1) {
                 changeHistoryData.changes = {
-                    action: 'create_screen',
-                    description: 'Create screen',
+                    action: 'create_config_key',
+                    deconfigKeyion: 'Create config key',
                     oldValues: [],
                     newValues: [],
                 };
             } else {
-                const prev = previous.filter(prevC => prevC.screenId === c?.data?.screenId)[0];
+                const prev = previous.filter(prevC => prevC.configKeyId === c?.data?.configKeyId)[0];
 
                 const oldValues: any[] = [];
                 const newValues: any[] = [];
@@ -43,8 +42,8 @@ export async function _saveScreensHistory({ previous, drafts, }: {
                     });
 
                 changeHistoryData.changes = {
-                    action: 'update_screen',
-                    description: 'Update screen',
+                    action: 'update_config_key',
+                    description: 'Update config key',
                     oldValues,
                     newValues,
                 };
@@ -53,7 +52,7 @@ export async function _saveScreensHistory({ previous, drafts, }: {
             insertData.push(changeHistoryData);
         }
 
-        await db.insert(screensHistory).values(insertData);
+        await db.insert(configKeysHistory).values(insertData);
     } catch(e: any) {
         logger.error(e.message);
     }
