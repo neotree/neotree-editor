@@ -17,7 +17,7 @@ export default async function NewScreenPage({ params: { scriptId, } }: Props) {
     ] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
         countScreens({ types: ['diagnosis'], scriptsIds: [scriptId], }),
-        listScreens({ scriptsIds: [scriptId], }),
+        listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
     ]);
 
     if (countDiagnosesScreens?.errors?.length) {

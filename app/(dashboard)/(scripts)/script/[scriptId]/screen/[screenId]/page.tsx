@@ -13,7 +13,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
     const [screen, script, screens] = await Promise.all([
         getScreen({ screenId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
-        listScreens({ scriptsIds: [scriptId], }),
+        listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
     ]);
 
     if (!script.data) {
