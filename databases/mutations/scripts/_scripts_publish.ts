@@ -76,8 +76,8 @@ export async function _publishScripts() {
                 ));
 
                 await db.update(diagnosesDrafts).set({ scriptId }).where(or(
-                    eq(screensDrafts.scriptId, scriptId),
-                    eq(screensDrafts.scriptDraftId, scriptId)
+                    eq(diagnosesDrafts.scriptId, scriptId),
+                    eq(diagnosesDrafts.scriptDraftId, scriptId)
                 ));
             }
         }
