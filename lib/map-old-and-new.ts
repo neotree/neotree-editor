@@ -45,9 +45,18 @@ export function mapNewDiagnosisToOld(s: typeof diagnoses.$inferSelect) {
             scriptId: s.oldScriptId || s.scriptId,
             script_id: s.oldScriptId || s.scriptId,
             position: s.position,
-            image1: s.image1,
-            image2: s.image2,
-            image3: s.image3,
+            image1: !s.image1 ? null : {
+                ...s.image1,
+                data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
+            },
+            image2: !s.image2 ? null : {
+                ...s.image2,
+                data: (s.image2 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image2,
+            },
+            image3: !s.image3 ? null : {
+                ...s.image3,
+                data: (s.image3 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
+            },
             text1: s.text1,
             text2: s.text2,
             text3: s.text3,
@@ -124,9 +133,18 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 title3: s.title3,
                 text1: s.text1,
                 text2: s.text2,
-                image1: s.image1,
-                image2: s.image2,
-                image3: s.image3,
+                image1: !s.image1 ? null : {
+                    ...s.image1,
+                    data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
+                },
+                image2: !s.image2 ? null : {
+                    ...s.image2,
+                    data: (s.image2 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image2,
+                },
+                image3: !s.image3 ? null : {
+                    ...s.image3,
+                    data: (s.image3 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
+                },
                 items: s.items,
                 fields: s.fields,
                 multiplier: s.multiplier,
