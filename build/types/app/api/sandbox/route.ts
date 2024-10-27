@@ -1,4 +1,4 @@
-// File: /Users/lafarai/Werq/BWS/NeoTree/neotree-webeditor/app/api/sandbox/route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor-master/app/api/sandbox/route.ts
 import * as entry from '../../../../../app/api/sandbox/route.js'
 import type { NextRequest } from 'next/server.js'
 

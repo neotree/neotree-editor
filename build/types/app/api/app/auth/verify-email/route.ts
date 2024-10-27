@@ -1,4 +1,4 @@
-// File: /Users/lafarai/Werq/BWS/NeoTree/neotree-webeditor/app/api/app/auth/verify-email/route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor-master/app/api/app/auth/verify-email/route.ts
 import * as entry from '../../../../../../../app/api/app/auth/verify-email/route.js'
 import type { NextRequest } from 'next/server.js'
 
