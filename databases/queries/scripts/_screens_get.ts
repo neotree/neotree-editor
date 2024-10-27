@@ -309,7 +309,11 @@ export async function _listScreens(
             } as ListScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
+            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId))
+            .map((s, i) => ({
+                ...s,
+                position: i + 1,
+            }));
 
         return  { 
             data: responseData,
