@@ -416,6 +416,7 @@ export const scriptsDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').notNull().unique().defaultRandom(),
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
+        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'cascade', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[]; }>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),

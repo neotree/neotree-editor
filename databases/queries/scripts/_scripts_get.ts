@@ -68,20 +68,17 @@ export async function _getScripts(
         const draftsRes = !returnDraftsIfExist ? [] : await db
             .select({
                 scriptDraft: scriptsDrafts,
-                // hospitalName: hospitals.name,
+                hospitalName: hospitals.name,
             })
             .from(scriptsDrafts)
-            // .leftJoin(hospitals, eq(sql`${hospitals.hospitalId}::text`, sql`${scriptsDrafts.data}->>'hospitalId'`))
+            .leftJoin(hospitals, eq(hospitals.hospitalId, scriptsDrafts.hospitalId))
             .where(and(
                 !scriptsIds?.length ? undefined : inArray(scriptsDrafts.scriptDraftId, scriptsIds),
+                !hospitalIds.length ? undefined : inArray(scriptsDrafts.hospitalId, hospitalIds),
             ));
 
         const drafts = draftsRes
-            .filter(s => {
-                if (!hospitalIds.length) return true;
-                return hospitalIds.includes(s.scriptDraft.data.hospitalId || uuid.v4());
-            })
-            .map(s => ({ ...s.scriptDraft, }));
+            .map(s => ({ ...s.scriptDraft, hospitalName: s.hospitalName, }));
 
         // published scripts conditions
         const publishedRes = await db
@@ -124,6 +121,7 @@ export async function _getScripts(
 
             ...drafts.map((s => ({
                 ...s.data,
+                hospitalName: s.hospitalName,
                 isDraft: true,
                 isDeleted: false,
             } as GetScriptsResults['data'][0])))
