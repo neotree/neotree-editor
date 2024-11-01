@@ -50,6 +50,7 @@ export async function _saveScripts({ data, broadcastAction, }: {
                             .set({
                                 data,
                                 position: data.position,
+                                hospitalId: data.hospitalId,
                             }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
                     } else {
                         let position = item.position || published?.position;
@@ -79,6 +80,7 @@ export async function _saveScripts({ data, broadcastAction, }: {
                             data,
                             scriptDraftId: scriptId,
                             position: data.position,
+                            hospitalId: data.hospitalId,
                             scriptId: published?.scriptId,
                         });
                     }
