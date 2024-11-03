@@ -10,6 +10,7 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
+import { isValidUrl } from "@/lib/urls";
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
@@ -463,6 +464,41 @@ export async function copyScripts(params?: {
             if (resData.errors) return { success: false, errors: resData.errors, info, };
 
             scripts = resData;
+
+            console.log('axiosClient', res.config.baseURL)
+
+            scripts.data.forEach(({ screens, diagnoses }, i) => {
+                const getImageUrl = (suffix: string) => {
+                    let host = res.config.baseURL || '';
+                    if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
+                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length); 
+                    return [host, suffix].filter(s => s).join('/');
+                };
+
+                screens.forEach((d, j) => {
+                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
+                        scripts.data[i].screens[j].image1!.data = getImageUrl(d.image1.data);
+                    }
+                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
+                        scripts.data[i].screens[j].image2!.data = getImageUrl(d.image2.data);
+                    }
+                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
+                        scripts.data[i].screens[j].image3!.data = getImageUrl(d.image3.data);
+                    }
+                });
+
+                diagnoses.forEach((d, j) => {
+                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
+                        scripts.data[i].diagnoses[j].image1!.data = getImageUrl(d.image1.data);
+                    }
+                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
+                        scripts.data[i].diagnoses[j].image2!.data = getImageUrl(d.image2.data);
+                    }
+                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
+                        scripts.data[i].diagnoses[j].image3!.data = getImageUrl(d.image3.data);
+                    }
+                });
+            });
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> = { success: true, info, };
