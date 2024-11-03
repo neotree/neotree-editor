@@ -19,6 +19,7 @@ export type ImageFieldProps = {
 };
 
 export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
+    console.log('image', image);
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     const { confirm } = useConfirmModal();
     const { uploadFile } = useScriptsContext();
