@@ -7,6 +7,7 @@ import { _getConfigKeys, } from "@/databases/queries/config-keys";
 import { _getHospitals, } from "@/databases/queries/hospitals";
 import { mapNewConfigKeysToOld, mapNewDiagnosisToOld, mapNewScreenToOld, mapNewScriptToOld } from '@/lib/map-old-and-new';
 import { getDevice } from "../get-device-registration/get-device";
+import { isValidUrl } from "@/lib/urls";
 
 export async function GET(req: NextRequest) {
 	try {
@@ -43,6 +44,37 @@ export async function GET(req: NextRequest) {
             !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
             !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
         ]);
+
+        const getImageUrl = (suffix: string) => {
+            let host = process.env.NEXT_PUBLIC_APP_URL || '';
+            if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
+            if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length); 
+            return [host, suffix].filter(s => s).join('/');
+        };
+
+        getScreens.data.forEach((d, j) => {
+            if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
+                getScreens.data[j].image1!.data = getImageUrl(d.image1.data);
+            }
+            if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
+                getScreens.data[j].image2!.data = getImageUrl(d.image2.data);
+            }
+            if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
+                getScreens.data[j].image3!.data = getImageUrl(d.image3.data);
+            }
+        });
+
+        getDiagnoses.data.forEach((d, j) => {
+            if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
+                getDiagnoses.data[j].image1!.data = getImageUrl(d.image1.data);
+            }
+            if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
+                getDiagnoses.data[j].image2!.data = getImageUrl(d.image2.data);
+            }
+            if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
+                getDiagnoses.data[j].image3!.data = getImageUrl(d.image3.data);
+            }
+        });
 
         // config keys
         const configKeys = getConfigKeys.data.filter(s => !s.isDeleted).map(s => mapNewConfigKeysToOld(s));
