@@ -126,10 +126,7 @@ export function DiagnosisForm(props: Props) {
                         'text3',
                         image3,
                     ],
-                ].map((keys, i) => {
-                    const text = keys[1] as 'text1' | 'text2' | 'text3';
-                    const imageValue = keys[2];
-
+                ].map(([text, imageValue], i) => {
                     const image = `image${i + 1}` as Parameters<typeof register>[0];
                     
                     return (
@@ -138,8 +135,8 @@ export function DiagnosisForm(props: Props) {
                                 <div className="flex-1">
                                     <Label htmlFor={`imageTextFields.${i}.text`}>Text {i+1}</Label>
                                     <Textarea 
-                                        {...register(text, { disabled })}
-                                        name={text}
+                                        {...register(text as Parameters<typeof register>[0], { disabled })}
+                                        name={`text${i+1}`}
                                         noRing={false}
                                         rows={5}
                                     />
