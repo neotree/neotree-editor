@@ -15,6 +15,12 @@ export type Preferences = {
     highlight: { [key: string]: undefined | boolean; };
 };
 
+export type PrintSection = {
+    sectionId: string;
+    title: string;
+    screensIds: string[];
+};
+
 export type ScriptItem = {
     id: string;
     label: string;

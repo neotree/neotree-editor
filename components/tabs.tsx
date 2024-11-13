@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from "next/navigation";
+import queryString from "query-string";
 
 import {
     Tabs as UiTabs,
@@ -9,8 +11,6 @@ import {
     TabsList,
     TabsTrigger,
 } from "@/components/ui/tabs"
-import { useSearchParams } from '@/hooks/use-search-params';
-import queryString from 'query-string';
 
 export function Tabs({ 
     options: tabs, 
@@ -28,8 +28,9 @@ export function Tabs({
     const [scrollPosition, setScrollPosition] = useState(0);
 
     const searchParams = useSearchParams();
+    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
 
-    const section = useMemo(() => !searchParamsKey ? null : searchParams.parsed[searchParamsKey], [searchParams.parsed, searchParamsKey]);
+    const section = useMemo(() => !searchParamsKey ? null : searchParamsObj[searchParamsKey], [searchParamsObj, searchParamsKey]);
     const activeTab = useMemo(() => tabs.filter(t => t.value === section)[0]?.value || tabs[0].value, [section, tabs]);
     const useLink = useMemo(() => !!searchParamsKey, [searchParamsKey]);
 
@@ -61,7 +62,7 @@ export function Tabs({
                             {!useLink ? t.label : (
                                 <Link 
                                     href={`?${queryString.stringify({
-                                        ...searchParams.parsed,
+                                        ...searchParamsObj,
                                         [searchParamsKey!]: t.value,
                                     })}`}
                                 >{t.label}</Link>

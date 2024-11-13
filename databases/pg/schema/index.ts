@@ -376,6 +376,7 @@ export const scripts = pgTable(
         nuidSearchEnabled: boolean('nuid_search_enabled').notNull().default(false),
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        printSections: jsonb('print_sections').default('[]').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
