@@ -39,6 +39,7 @@ export function useScriptForm(params: UseScriptFormParams) {
             nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
             nuidSearchFields: (formData?.nuidSearchFields || []),
             preferences: (formData?.preferences || defaultPreferences),
+            printSections: (formData?.printSections || []),
         } satisfies ScriptFormDataType;
     }, [formData]);
 

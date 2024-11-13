@@ -1,3 +1,10 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+import { useAlertModal } from '@/hooks/use-alert-modal';
+import { Loader } from '@/components/loader';
 import * as scriptsActions from '@/app/actions/scripts';
 import { ScreensTable } from './table';
 
@@ -5,13 +12,33 @@ type Props = {
     scriptId: string;
 };
 
-export default async function Screens({ scriptId }: Props) {
-    const [screens] = await Promise.all([
-        scriptsActions.getScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
-    ]);
+export default function Screens({ scriptId }: Props) {
+    const [loading, setLoading] = useState(false);
+    const [screens, setScreens] = useState<Awaited<ReturnType<typeof scriptsActions.getScreens>>>({ data: [], });
+
+    const { alert } = useAlertModal();
+
+    useEffect(() => {
+        (async () => {
+            try {
+                setLoading(true);
+                const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
+                setScreens(res.data);
+            } catch(e: any) {
+                alert({
+                    title: "",
+                    message: e.message,
+                });
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [alert, scriptId]);
 
     return (
         <>
+            {loading && <Loader overlay />}
+
             <ScreensTable 
                 screens={screens}
             />

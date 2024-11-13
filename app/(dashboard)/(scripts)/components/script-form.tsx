@@ -1,5 +1,10 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
+import clsx from 'clsx';
+
+import { Tabs } from '@/components/tabs';
+import { scriptsPageTabs } from '@/constants';
 import {
     Select,
     SelectContent,
@@ -24,6 +29,9 @@ import { Title } from "./title";
 import { ScriptItemsFab } from "./script-items-fab";
 import { useScriptForm } from "../hooks/use-script-form";
 import { PreferencesForm } from "@/components/preferences-form";
+import Screens from './screens';
+import Diagnoses from './diagnoses';
+import { PrintSections } from './print-sections';
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -31,6 +39,9 @@ type Props = {
 };
 
 export function ScriptForm(props: Props) {
+    const searchParams = useSearchParams();
+    const section = searchParams.get('section');
+
     const { onCancelScriptForm } = useScriptsContext();
 
     const form = useScriptForm(props);
@@ -224,6 +235,38 @@ export function ScriptForm(props: Props) {
                     </Button>
                 </div>
             </div>
+
+            {!!props.formData && (
+                <div 
+                    className={clsx(
+                        'flex flex-col gap-y-4 mt-10',
+                    )}
+                >
+                    <Tabs 
+                        options={scriptsPageTabs}
+                        searchParamsKey="section"
+                    />
+
+                    {(!section || (section === 'screens')) && (
+                        <Screens 
+                            scriptId={props.formData.scriptId!} 
+                        />
+                    )}
+
+                    {section === 'diagnoses' && (
+                        <Diagnoses 
+                            scriptId={props.formData.scriptId!} 
+                        />
+                    )}
+
+                    {section === 'print' && (
+                        <PrintSections 
+                            disabled={disabled}
+                            form={form}
+                        />
+                    )}
+                </div>
+            )}
         </>
     );
 }
