@@ -13,6 +13,7 @@ export const defaultPreferences = {
 export const scriptsPageTabs = [
     { value: 'screens', label: 'Screens', },
     { value: 'diagnoses', label: 'Diagnoses', },
+    { value: 'print', label: 'Print', },
 ];
 
 export const scriptTypes = [
