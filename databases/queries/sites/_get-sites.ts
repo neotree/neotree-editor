@@ -30,6 +30,13 @@ export async function _getSites(
             : 
             inArray(sites.siteId, sitesIds.filter(id => uuid.validate(id)));
 
+        if (links.length) {
+            [...links].forEach(link => {
+                links.push(link.replace('http:', 'https:'));
+                links.push(link.replace('https', 'http'));
+            });
+        }
+
         const whereSites = [
             isNull(sites.deletedAt),
             whereSitesIds,
