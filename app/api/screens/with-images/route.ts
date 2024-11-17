@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 		return NextResponse.json({ data: screens, });
 	} catch(e: any) {
 		logger.error('[GET] /api/screens/with-images', e.message);
-		return NextResponse.json({ errors: ['Internal Error'] });
+		return NextResponse.json({ errors: ['Internal Error'], info: e.message, });
 	}
 }
 

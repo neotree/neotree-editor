@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 		return NextResponse.json({ data: diagnoses, });
 	} catch(e: any) {
 		logger.error('[GET] /api/diagnoses/with-images', e.message);
-		return NextResponse.json({ errors: ['Internal Error'] });
+		return NextResponse.json({ errors: ['Internal Error'], info: e.message, });
 	}
 }
 
