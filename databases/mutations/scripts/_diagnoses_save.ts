@@ -12,6 +12,7 @@ export type SaveDiagnosesData = Partial<DiagnosisType>;
 export type SaveDiagnosesResponse = { 
     success: boolean; 
     errors?: string[]; 
+    info?: any;
 };
 
 export async function _saveDiagnoses({ data, broadcastAction, }: {
@@ -20,9 +21,10 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
 
-    try {
-        const errors = [];
+    const errors = [];
+    const info: any = {};
 
+    try {
         let index = 0;
         for (const { diagnosisId: itemDiagnosisId, ...item } of data) {
             try {
@@ -75,6 +77,8 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                             position,
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
+                        info.data = data;
+
                         if (data.scriptId) {
                             const scriptDraft = await db.query.scriptsDrafts.findFirst({
                                 where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
@@ -86,7 +90,28 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                                 columns: { scriptId: true, },
                             });
 
+                            info.scriptDraft = scriptDraft;
+                            info.publishedScript= publishedScript;
+
                             if (scriptDraft || publishedScript) {
+                                info.insertValues = {
+                                    data,
+                                    scriptId: publishedScript?.scriptId,
+                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    diagnosisDraftId: diagnosisId,
+                                    position: data.position,
+                                    diagnosisId: published?.diagnosisId,
+                                };
+
+                                info.insertSQL = db.insert(diagnosesDrafts).values({
+                                    data,
+                                    scriptId: publishedScript?.scriptId,
+                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    diagnosisDraftId: diagnosisId,
+                                    position: data.position,
+                                    diagnosisId: published?.diagnosisId,
+                                }).toSQL();
+
                                 await db.insert(diagnosesDrafts).values({
                                     data,
                                     scriptId: publishedScript?.scriptId,
@@ -110,12 +135,14 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
 
         if (errors.length) {
             response.errors = errors;
+            response.info = info;
         } else {
             response.success = true;
         }
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
+        response.info = info;
         logger.error('_saveDiagnoses ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_diagnoses');
