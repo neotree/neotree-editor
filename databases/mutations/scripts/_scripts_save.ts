@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, Query } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -12,6 +12,7 @@ export type SaveScriptsData = Partial<ScriptType>;
 export type SaveScriptsResponse = { 
     success: boolean; 
     errors?: string[]; 
+    info?: { query?: Query; };
 };
 
 export async function _saveScripts({ data, broadcastAction, }: {
@@ -20,9 +21,10 @@ export async function _saveScripts({ data, broadcastAction, }: {
 }) {
     const response: SaveScriptsResponse = { success: false, };
 
-    try {
-        const errors = [];
+    const errors = [];
+    const info: SaveScriptsResponse['info'] = {};
 
+    try {
         let index = 0;
         for (const { scriptId: itemScriptId, ...item } of data) {
             try {
@@ -45,13 +47,17 @@ export async function _saveScripts({ data, broadcastAction, }: {
                             ...item,
                         } as typeof draft.data;
                         
-                        await db
+                        const q = db
                             .update(scriptsDrafts)
                             .set({
                                 data,
                                 position: data.position,
                                 hospitalId: data.hospitalId,
                             }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
+
+                        info.query = q.toSQL();
+
+                        await q.execute();
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
@@ -76,13 +82,17 @@ export async function _saveScripts({ data, broadcastAction, }: {
                             position,
                         } as typeof scriptsDrafts.$inferInsert['data'];
 
-                        await db.insert(scriptsDrafts).values({
+                        const q = db.insert(scriptsDrafts).values({
                             data,
                             scriptDraftId: scriptId,
                             position: data.position,
                             hospitalId: data.hospitalId,
                             scriptId: published?.scriptId,
                         });
+
+                        info.query = q.toSQL();
+
+                        await q.execute();
                     }
                 }
             } catch(e: any) {
@@ -92,12 +102,14 @@ export async function _saveScripts({ data, broadcastAction, }: {
 
         if (errors.length) {
             response.errors = errors;
+            response.info = info;
         } else {
             response.success = true;
         }
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
+        response.info = info;
         logger.error('_saveScripts ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_scripts');

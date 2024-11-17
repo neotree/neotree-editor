@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, Query } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -12,7 +12,7 @@ export type SaveDiagnosesData = Partial<DiagnosisType>;
 export type SaveDiagnosesResponse = { 
     success: boolean; 
     errors?: string[]; 
-    info?: any;
+    info?: { query?: Query; };
 };
 
 export async function _saveDiagnoses({ data, broadcastAction, }: {
@@ -22,7 +22,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
     const response: SaveDiagnosesResponse = { success: false, };
 
     const errors = [];
-    const info: any = {};
+    const info: SaveDiagnosesResponse['info'] = {};
 
     try {
         let index = 0;
@@ -47,12 +47,16 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                             ...item,
                         } as typeof draft.data;
                         
-                        await db
+                        const q = db
                             .update(diagnosesDrafts)
                             .set({
                                 data,
                                 position: data.position,
                             }).where(eq(diagnosesDrafts.diagnosisDraftId, diagnosisId));
+
+                        info.query = q.toSQL();
+
+                        await q.execute();
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
@@ -77,8 +81,6 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                             position,
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
-                        info.data = data;
-
                         if (data.scriptId) {
                             const scriptDraft = await db.query.scriptsDrafts.findFirst({
                                 where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
@@ -90,29 +92,8 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                                 columns: { scriptId: true, },
                             });
 
-                            info.scriptDraft = scriptDraft;
-                            info.publishedScript= publishedScript;
-
                             if (scriptDraft || publishedScript) {
-                                info.insertValues = {
-                                    data,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
-                                    diagnosisDraftId: diagnosisId,
-                                    position: data.position,
-                                    diagnosisId: published?.diagnosisId,
-                                };
-
-                                info.insertSQL = db.insert(diagnosesDrafts).values({
-                                    data,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
-                                    diagnosisDraftId: diagnosisId,
-                                    position: data.position,
-                                    diagnosisId: published?.diagnosisId,
-                                }).toSQL();
-
-                                await db.insert(diagnosesDrafts).values({
+                                const q = db.insert(diagnosesDrafts).values({
                                     data,
                                     scriptId: publishedScript?.scriptId,
                                     scriptDraftId: scriptDraft?.scriptDraftId,
@@ -120,6 +101,10 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
                                 });
+
+                                info.query = q.toSQL();
+
+                                await q.execute();
                             } else {
                                 errors.push(`Could not save diagnosis ${index}: ${data.name}, because script was not found`);
                             }
