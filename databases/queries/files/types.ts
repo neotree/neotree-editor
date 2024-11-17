@@ -18,7 +18,7 @@ export type GetFileDetailsResponse = {
 
 export type GetFullFileResponse = {
     errors?: string[];
-    file: null | FullFile;
+    data: null | FullFile;
 };
 
 export type GetFilesParams = {
