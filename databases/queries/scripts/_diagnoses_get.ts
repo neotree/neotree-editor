@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -11,6 +11,7 @@ export type GetDiagnosesParams = {
     scriptsIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    withImagesOnly?: boolean;
 };
 
 export type DiagnosisType = typeof diagnoses.$inferSelect & {
@@ -36,6 +37,7 @@ export async function _getDiagnoses(
             scriptsIds: scriptsIds = [],
             diagnosesIds: diagnosesIds = [], 
             returnDraftsIfExist, 
+            withImagesOnly,
         } = { ...params };
 
         const oldDiagnosesIds = diagnosesIds.filter(s => !uuid.validate(s));
@@ -92,6 +94,11 @@ export async function _getDiagnoses(
                 !returnDraftsIfExist ? undefined : isNull(diagnosesDrafts.diagnosisId),
                 !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds),
                 !diagnosesIds?.length ? undefined : inArray(diagnoses.diagnosisId, diagnosesIds),
+                !withImagesOnly ? undefined : or(
+                    isNotNull(diagnoses.image1),
+                    isNotNull(diagnoses.image2),
+                    isNotNull(diagnoses.image3)
+                ),diagnoses
             ));
 
         const published = publishedRes.map(s => s.diagnosis);
