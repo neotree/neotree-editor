@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
-import { isAuthenticated } from "@/app/actions/is-authenticated";
+// import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { uploadFileFromSite } from "@/app/actions/files";
 
 export async function POST(req: NextRequest) {
