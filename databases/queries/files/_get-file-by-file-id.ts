@@ -11,10 +11,10 @@ export async function _getFullFileByFileId(fileId: string): Promise<GetFullFileR
             where: eq(files.fileId, fileId),
         });
 
-        return  { file: file || null, };
+        return  { data: file || null, };
     } catch(e: any) {
         logger.error('_getFiles ERROR', e.message);
-        return  { errors: [e.message], file: null, };
+        return  { errors: [e.message], data: null, };
     }
 }
 

@@ -26,7 +26,7 @@ export async function GET(_: Request, { params: { fileId } }: IParams) {
 	try {
 		if (!fileId) return new NextResponse(null, { status: 400, statusText: "Bad Request" });
 
-        const { file, errors } = await _getFullFileByFileId(fileId);
+        const { data: file, errors } = await _getFullFileByFileId(fileId);
 
         if (errors?.length) return new NextResponse(null, { status: 400, statusText: errors.join(', ') });
 

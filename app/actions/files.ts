@@ -71,7 +71,6 @@ export type UploadFileFromSiteResponse = {
         fileId: string; 
     }; 
     errors?: string[];
-    info?: any;
 };
 
 export type UploadloadFileFromSiteParams = { 
@@ -115,19 +114,19 @@ export async function uploadFileFromSite({
 
         if (downloadedFile.errors) throw new Error(downloadedFile.errors.join(', '));
 
-        if (!downloadedFile.file) return { info: downloadedFile, errors: ['File not found'], data: null, };
+        if (!downloadedFile.data) return { errors: ['File not found'], data: null, };
 
         await _saveFile(
             {
                 fileId,
-                data: downloadedFile.file.data,
-                filename: downloadedFile.file.filename,
-                size: downloadedFile.file.size,
-                contentType: downloadedFile.file.contentType,
-                metadata: { ...(downloadedFile.file.metadata as object) },
+                data: downloadedFile.data.data,
+                filename: downloadedFile.data.filename,
+                size: downloadedFile.data.size,
+                contentType: downloadedFile.data.contentType,
+                metadata: { ...(downloadedFile.data.metadata as object) },
             },
         );
-        let q = queryString.stringify({ ...(downloadedFile.file.metadata as object) });
+        let q = queryString.stringify({ ...(downloadedFile.data.metadata as object) });
         q = !q ? '' : `?${q}`;
 
         return {
