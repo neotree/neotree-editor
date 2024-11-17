@@ -9,6 +9,7 @@ export type GetSitesParams = {
     sitesIds?: string[];
     types?: typeof sites.$inferSelect['type'][];
     envs?: typeof sites.$inferSelect['env'][];
+    links?: typeof sites.$inferSelect['link'][];
 };
 
 export type GetSitesResults = {
@@ -20,7 +21,7 @@ export async function _getSites(
     params?: GetSitesParams
 ): Promise<GetSitesResults> {
     try {
-        const { sitesIds: _sitesIds, types = [], envs = [] } = { ...params };
+        const { sitesIds: _sitesIds, types = [], envs = [], links = [], } = { ...params };
 
         let sitesIds = _sitesIds || [];
 
@@ -34,6 +35,7 @@ export async function _getSites(
             whereSitesIds,
             !types.length ? undefined : inArray(sites.type, types),
             !envs.length ? undefined : inArray(sites.env, envs),
+            !links.length ? undefined : inArray(sites.link, links),
         ];
 
         const res = await db
