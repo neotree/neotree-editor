@@ -11,6 +11,7 @@ import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
+import { processImage } from "@/lib/process-image";
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
@@ -232,6 +233,19 @@ export async function saveScriptScreens({
 
             const screenId = v4();
 
+            if (s.image1) { 
+                const res = await processImage(s.image1);
+                s.image1 = res.image;
+            }
+            if (s.image2) { 
+                const res = await processImage(s.image2);
+                s.image2 = res.image;
+            }
+            if (s.image3) { 
+                const res = await processImage(s.image3);
+                s.image3 = res.image;
+            }
+
             const res = await saveScreens({
                 data: [{
                     ...s,
@@ -292,6 +306,23 @@ export async function saveScriptDiagnoses({
             } = diagnosis;
 
             const diagnosisId = v4();
+
+            try {
+                if (d.image1) { 
+                    const res = await processImage(d.image1);
+                    d.image1 = res.image;
+                }
+                if (d.image2) { 
+                    const res = await processImage(d.image2);
+                    d.image2 = res.image;
+                }
+                if (d.image3) { 
+                    const res = await processImage(d.image3);
+                    d.image3 = res.image;
+                }
+            } catch(e: any) {
+                logger.error('process image', e.message);
+            }
 
             const res = await saveDiagnoses({
                 data: [{
