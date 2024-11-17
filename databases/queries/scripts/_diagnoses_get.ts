@@ -98,7 +98,7 @@ export async function _getDiagnoses(
                     isNotNull(diagnoses.image1),
                     isNotNull(diagnoses.image2),
                     isNotNull(diagnoses.image3)
-                ),diagnoses
+                ),
             ));
 
         const published = publishedRes.map(s => s.diagnosis);

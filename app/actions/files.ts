@@ -66,8 +66,12 @@ export async function uploadFile(
 }
 
 export type UploadFileFromSiteResponse = { 
-    data: null | { fileURL: string; fileId: string; }; 
-    errors?: string[] 
+    data: null | { 
+        fileURL: string; 
+        fileId: string; 
+    }; 
+    errors?: string[];
+    info?: any;
 };
 
 export type UploadloadFileFromSiteParams = { 
@@ -111,7 +115,7 @@ export async function uploadFileFromSite({
 
         if (downloadedFile.errors) throw new Error(downloadedFile.errors.join(', '));
 
-        if (!downloadedFile.file) return { errors: ['File not found'], data: null, };
+        if (!downloadedFile.file) return { info: downloadedFile, errors: ['File not found'], data: null, };
 
         await _saveFile(
             {
