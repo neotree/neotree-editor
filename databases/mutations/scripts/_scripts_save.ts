@@ -55,17 +55,17 @@ export async function _saveScripts({ data, broadcastAction, }: {
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const confKey = await db.query.scripts.findFirst({
+                            const script = await db.query.scripts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scripts.position),
                             });
 
-                            const confKeyDraft = await db.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scriptsDrafts.position),
                             });
 
-                            position = Math.max(0, confKey?.position || 0, confKeyDraft?.position || 0) + 1;
+                            position = Math.max(0, script?.position || 0, scriptDraft?.position || 0) + 1;
                         }
 
                         const data = {

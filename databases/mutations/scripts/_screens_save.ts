@@ -54,17 +54,17 @@ export async function _saveScreens({ data, broadcastAction, }: {
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const confKey = await db.query.screens.findFirst({
+                            const screen = await db.query.screens.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screens.position),
                             });
 
-                            const confKeyDraft = await db.query.screensDrafts.findFirst({
+                            const screenDraft = await db.query.screensDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screensDrafts.position),
                             });
 
-                            position = Math.max(0, confKey?.position || 0, confKeyDraft?.position || 0) + 1;
+                            position = Math.max(0, screen?.position || 0, screenDraft?.position || 0) + 1;
                         }
 
                         const data = {
