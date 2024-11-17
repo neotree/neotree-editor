@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, Query } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -12,6 +12,7 @@ export type SaveScreensData = Partial<ScreenType>;
 export type SaveScreensResponse = { 
     success: boolean; 
     errors?: string[]; 
+    info?: { query?: Query; };
 };
 
 export async function _saveScreens({ data, broadcastAction, }: {
@@ -20,9 +21,10 @@ export async function _saveScreens({ data, broadcastAction, }: {
 }) {
     const response: SaveScreensResponse = { success: false, };
 
-    try {
-        const errors = [];
+    const errors = [];
+    const info: SaveScreensResponse['info'] = {};
 
+    try {
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
             try {
@@ -45,12 +47,16 @@ export async function _saveScreens({ data, broadcastAction, }: {
                             ...item,
                         } as typeof draft.data;
                         
-                        await db
+                        const q = db
                             .update(screensDrafts)
                             .set({
                                 data,
                                 position: data.position,
                             }).where(eq(screensDrafts.screenDraftId, screenId));
+
+                        info.query = q.toSQL();
+
+                        await q.execute();
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
@@ -87,7 +93,7 @@ export async function _saveScreens({ data, broadcastAction, }: {
                             });
 
                             if (scriptDraft || publishedScript) {
-                                await db.insert(screensDrafts).values({
+                                const q = db.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
                                     scriptId: publishedScript?.scriptId,
@@ -96,6 +102,10 @@ export async function _saveScreens({ data, broadcastAction, }: {
                                     position: data.position,
                                     screenId: published?.screenId,
                                 });
+
+                                info.query = q.toSQL();
+
+                                await q.execute();
                             } else {
                                 errors.push(`Could not save screen ${index}: ${data.title}, because script was not found`);
                             }
@@ -111,12 +121,14 @@ export async function _saveScreens({ data, broadcastAction, }: {
 
         if (errors.length) {
             response.errors = errors;
+            response.info = info;
         } else {
             response.success = true;
         }
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
+        response.info = info;
         logger.error('_saveScreens ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_screens');
