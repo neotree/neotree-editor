@@ -145,7 +145,7 @@ export function Symptom<P = {}>({
                         <Label htmlFor="weight">Weight </Label>
                         <Input
                             {...register('weight', { disabled, })}
-                            name="label"
+                            name="weight"
                             type="number"
                         />
                         <span className="text-xs text-muted-foreground">Must be in the range: 0.0 - 1.0 (<b>default 1.0</b>)</span>
@@ -155,7 +155,7 @@ export function Symptom<P = {}>({
                         <Label htmlFor="expression">Sign/Risk expression </Label>
                         <Input
                             {...register('expression', { disabled, })}
-                            name="label"
+                            name="expression"
                         />
                         <span className="text-xs text-muted-foreground">Example: <b>($key = true and $key2 = false) or $key3 = &apos;HD&apos;</b></span>
                     </div>
