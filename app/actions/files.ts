@@ -132,7 +132,7 @@ export async function uploadFileFromSite({
         return {
             data: {
                 fileId,
-                fileURL: [process.env.NEXT_PUBLIC_APP_URL, `/files/${fileId}${q}`].join(''),
+                fileURL: [site.link, `/files/${fileId}${q}`].join(''),
             },
         };
     } catch(e: any) {
