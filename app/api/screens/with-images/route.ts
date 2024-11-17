@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isNotNull, or } from "drizzle-orm";
 
-import { isAuthenticated } from "@/app/actions/is-authenticated";
 import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { screens as screensTable } from "@/databases/pg/schema";
-import { _saveFile } from "@/databases/mutations/files";
+import { isAuthenticated } from "@/app/actions/is-authenticated";
+import { getScreens } from "@/app/actions/scripts";
 
 export async function GET(req: NextRequest) {
 	try {
@@ -13,18 +10,16 @@ export async function GET(req: NextRequest) {
 
         // if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-		const screens = await db.query.screens.findMany({
-            where: or(
-                isNotNull(screensTable.image1),
-                isNotNull(screensTable.image2),
-                isNotNull(screensTable.image3)
-            ),
+        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof getScreens>[0];
+
+        const res = await getScreens({
+            withImagesOnly: true,
+            ...params,
         });
 
-		return NextResponse.json({ data: screens, });
+		return NextResponse.json(res);
 	} catch(e: any) {
 		logger.error('[GET] /api/screens/with-images', e.message);
-		return NextResponse.json({ errors: ['Internal Error'], info: e.message, });
+		return NextResponse.json({ errors: ['Internal Error'] });
 	}
 }
-

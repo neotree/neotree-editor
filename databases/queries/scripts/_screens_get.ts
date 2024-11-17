@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -11,6 +11,7 @@ export type GetScreensParams = {
     scriptsIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    withImagesOnly?: boolean;
 };
 
 export type ScreenType = typeof screens.$inferSelect & {
@@ -38,6 +39,7 @@ export async function _getScreens(
             scriptsIds: scriptsIds = [],
             screensIds: screensIds = [], 
             returnDraftsIfExist, 
+            withImagesOnly,
         } = { ...params };
 
         const oldScreensIds = screensIds.filter(s => !uuid.validate(s));
@@ -94,6 +96,11 @@ export async function _getScreens(
                 !returnDraftsIfExist ? undefined : isNull(screensDrafts.screenId),
                 !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds),
                 !screensIds?.length ? undefined : inArray(screens.screenId, screensIds),
+                !withImagesOnly ? undefined : or(
+                    isNotNull(screens.image1),
+                    isNotNull(screens.image2),
+                    isNotNull(screens.image3)
+                ),
             ));
 
         const published = publishedRes.map(s => s.screen);
