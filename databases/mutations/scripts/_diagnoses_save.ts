@@ -54,17 +54,17 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const confKey = await db.query.diagnoses.findFirst({
+                            const diagnosis = await db.query.diagnoses.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnoses.position),
                             });
 
-                            const confKeyDraft = await db.query.diagnosesDrafts.findFirst({
+                            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnosesDrafts.position),
                             });
 
-                            position = Math.max(0, confKey?.position || 0, confKeyDraft?.position || 0) + 1;
+                            position = Math.max(0, diagnosis?.position || 0, diagnosisDraft?.position || 0) + 1;
                         }
 
                         const data = {
