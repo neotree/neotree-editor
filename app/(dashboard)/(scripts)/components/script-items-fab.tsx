@@ -66,6 +66,12 @@ export function ScriptItemsFab({ disabled }: {
                                 New diagnosis
                             </Link>
                         </DropdownMenuItem>
+
+                        <DropdownMenuItem asChild>
+                            <Link href={`/script/${scriptId}?addPrintSection=1&section=print`}>
+                                New print section
+                            </Link>
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
