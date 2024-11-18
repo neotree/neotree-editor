@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, Edit, Eye, Plus, Edit2 } from "lucide-react"
+import { MoreVertical, Trash, ChevronDown } from "lucide-react"
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
+import { useMeasure } from "react-use";
 
 import { listScreens } from "@/app/actions/scripts";
 import {
@@ -14,156 +14,36 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
     Sheet,
     SheetClose,
     SheetContent,
     SheetDescription,
     SheetHeader,
     SheetTitle,
-    SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { PrintSection } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAlertModal } from "@/hooks/use-alert-modal";
-import { useScriptForm } from "../hooks/use-script-form";
 import { Loader } from "@/components/loader";
+import clsx from "clsx";
 
-type Props = {
-    disabled?: boolean;
-    form: ReturnType<typeof useScriptForm>;
-};
-
-export function PrintSections({
-    disabled,
-    form: {
-        watch,
-        setValue,
-    },
-}: Props) {
-    const sections = watch('printSections');
-
-    const searchParams = useSearchParams();
-    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { printSectionId } = searchParamsObj;
-
-    const onDelete = useCallback((sectionId: string) => {
-        setValue('printSections', sections.filter(s => s.sectionId !== sectionId));
-    }, [sections, setValue]);
-
-    return (
-        <>
-            <Form
-                disabled={disabled}
-                section={sections.filter(s => s.sectionId === printSectionId)[0]}
-                onChange={section => !printSectionId ? 
-                    setValue('printSections', [...sections, section])
-                    :
-                    setValue('printSections', sections.map(s => {
-                        if (s.sectionId !== section.sectionId) return s;
-                        return { ...s, ...section, };
-                    }))
-                }
-            />
-
-            <DataTable 
-                headerActions={(
-                    <>
-                        <Button
-                            asChild
-                            variant="outline"
-                        >
-                            <Link
-                                href={`?${queryString.stringify({ 
-                                    ...searchParamsObj,
-                                    addPrintSection: 1,
-                                })}`}
-                            >
-                                Add print section
-                                <Plus className="w-4 h-4 ml-2" />
-                            </Link>
-                        </Button>
-                    </>
-                )}
-                columns={[
-                    {
-                        name: 'Print section title',
-                    },
-                    {
-                        name: '',
-                        align: 'right',
-                        cellRenderer({ rowIndex }) {
-                            const section = sections[rowIndex];
-
-                            if (!section) return null;
-
-                            return (
-                                <>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="p-0 h-auto w-auto transition-colors rounded-full hover:text-primary hover:bg-transparent"
-                                            >
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-
-                                        <DropdownMenuContent>
-                                            <DropdownMenuItem 
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`?${queryString.stringify({ ...searchParamsObj, printSectionId: section.sectionId, })}`}
-                                                >
-                                                    <>
-                                                        {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
-                                                    </>
-                                                </Link>
-                                            </DropdownMenuItem>
-
-                                            {!disabled && (
-                                                <DropdownMenuItem
-                                                    onClick={() => onDelete(section.sectionId)}
-                                                    className="text-danger focus:bg-danger focus:text-danger-foreground"
-                                                >
-                                                    <Trash className="mr-2 h-4 w-4" />
-                                                    <span>Delete</span>
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </>
-                            );
-                        },
-                    }
-                ]}
-                data={sections.map(s => [
-                    s.title,
-                ])}
-            />
-        </>
-    );
-}
-
-function Form({ disabled, section, onChange }: {
+export function PrintForm({ disabled, section, onChange }: {
     disabled?: boolean;
     section?: PrintSection;
     onChange: (section: PrintSection) => void;
 }) {
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
+    const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -208,9 +88,9 @@ function Form({ disabled, section, onChange }: {
             addPrintSection: undefined, 
         })}`);
 
-        const scrollPos = containerRef.current?.getBoundingClientRect()?.top || 0;
+        const scrollPos = containerDiv?.top || 0;
         setTimeout(() => window.scrollTo({ top: scrollPos, }), 500);
-    }, [searchParamsObj, router.push]);
+    }, [searchParamsObj, containerDiv, router.push]);
 
     useEffect(() => {
         (async () => {
@@ -237,7 +117,7 @@ function Form({ disabled, section, onChange }: {
     if (loading) return <Loader overlay />;
 
     return (
-        <div ref={containerRef}>
+        <div ref={containerDivRef}>
             <Sheet
                 open={open}
                 onOpenChange={open => {
@@ -254,7 +134,7 @@ function Form({ disabled, section, onChange }: {
                         <SheetDescription className="hidden"></SheetDescription>
                     </SheetHeader>
 
-                    <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
+                    <div ref={contentDivRef} className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
                         <div className="px-4">
                             <Label secondary htmlFor="scriptPrintSectionTitle">Title *</Label>
                             <Input
@@ -268,38 +148,61 @@ function Form({ disabled, section, onChange }: {
                         <div className="px-4">
                             <Label secondary>Screens</Label>
 
-                            <Select
-                                value=""
-                                name="screenId"
-                                onValueChange={val => {
-                                    if (val) setSelected(prev => [...prev, val])
-                                }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select screen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                <SelectGroup>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {screens.map(s => {
-                                        const disabled = selected.includes(s.screenId);
-                                        return (
-                                            <SelectItem key={s.screenId} disabled={disabled} value={s.oldScreenId || s.screenId}>
-                                                <div 
-                                                    dangerouslySetInnerHTML={{ 
-                                                        __html: [
-                                                            s.position,
-                                                            s.title,
-                                                            `<span class="opacity-50">${s.refId || ''}</span>`,
-                                                        ].join(' - '),
-                                                    }}
-                                                />
-                                            </SelectItem>
-                                        );
-                                    })}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                    >
+                                        Select screens
+                                        <ChevronDown className="w-4 h-4 ml-auto" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent 
+                                    className="px-0 py-0 w-full max-h-72 flex flex-col"
+                                    style={{ width: contentDiv.width, }}
+                                >
+                                    <div className="flex-1 overflow-y-auto">
+                                        {screens.map(s => {
+                                            const value = s.oldScreenId || s.screenId;
+                                            const checked = selected.includes(value);
+                                            return (
+                                                <Fragment key={s.screenId}>
+                                                    <div 
+                                                        className={clsx(
+                                                            'px-4 flex items-center gap-x-2 hover:bg-primary/10',
+                                                            checked && 'bg-primary/10',
+                                                        )}
+                                                    >
+                                                        <Checkbox 
+                                                            name={value}
+                                                            id={value}
+                                                            disabled={disabled}
+                                                            checked={checked}
+                                                            onCheckedChange={() => {
+                                                                setSelected(prev => checked ? prev.filter(v => v !== value) : [...prev, value]);
+                                                            }}
+                                                        />
+                                                        <Label 
+                                                            className="w-full py-2"
+                                                            secondary 
+                                                            htmlFor={value} 
+                                                            dangerouslySetInnerHTML={{ 
+                                                                __html: [
+                                                                    s.position,
+                                                                    s.title,
+                                                                    `<span class="opacity-50">${s.refId || ''}</span>`,
+                                                                ].join(' - '),
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <Separator />
+                                                </Fragment>
+                                            );
+                                        })}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
 
                         <div>
