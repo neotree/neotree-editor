@@ -233,17 +233,21 @@ export async function saveScriptScreens({
 
             const screenId = v4();
 
-            if (s.image1) { 
-                const res = await processImage(s.image1);
-                s.image1 = res.image;
-            }
-            if (s.image2) { 
-                const res = await processImage(s.image2);
-                s.image2 = res.image;
-            }
-            if (s.image3) { 
-                const res = await processImage(s.image3);
-                s.image3 = res.image;
+            try {
+                if (s.image1) { 
+                    const res = await processImage(s.image1);
+                    s.image1 = res.image;
+                }
+                if (s.image2) { 
+                    const res = await processImage(s.image2);
+                    s.image2 = res.image;
+                }
+                if (s.image3) { 
+                    const res = await processImage(s.image3);
+                    s.image3 = res.image;
+                }
+            } catch(e: any) {
+                logger.error('process image', e.message);
             }
 
             const res = await saveScreens({
