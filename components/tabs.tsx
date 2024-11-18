@@ -47,6 +47,7 @@ export function Tabs({
         <div ref={containerRef}>
             <UiTabs 
                 defaultValue={activeTab} 
+                value={activeTab}
                 className="w-full [&>div]:w-full"
                 onValueChange={onChange}
             >

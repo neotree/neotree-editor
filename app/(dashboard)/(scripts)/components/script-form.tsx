@@ -31,7 +31,7 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
-import { PrintSections } from './print-sections';
+import { PrintSections } from './print';
 
 type Props = {
     formData?: ScriptFormDataType;
