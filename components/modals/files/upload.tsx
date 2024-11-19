@@ -16,11 +16,13 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { uploadFile } from "@/app/actions/files";
 import { useFiles } from "@/hooks/use-files";
 
+type Uploaded = NonNullable<Awaited<ReturnType<typeof uploadFile>>['data']>;
+
 type Props = {
     type?: string;
     fileDetails?: { [key: string]: any; };
     inputProps?: React.HTMLProps<HTMLInputElement>;
-    onUpload?: (data: Awaited<ReturnType<typeof uploadFile>>) => void;
+    onUpload?: (uploaded: Uploaded[]) => void;
 };
 
 type FileState = { 
@@ -38,10 +40,9 @@ export function UploadForm({
     fileDetails,
     onUpload,
 }: Props) {
-    const { getFiles } = useFiles();
+    const { getFiles, closeModal } = useFiles();
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     
-    const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<FileState[]>([]);
     const [uploading, setUploading] = useState(false);
 
@@ -51,31 +52,49 @@ export function UploadForm({
         const queue = inputProps?.multiple ? files : [files[0]];
         try {
             setUploading(true);
+
+            let errors: string[] = [];
+            const uploaded: Uploaded[] = [];
+
             for (const { file, metadata, fileId } of queue) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('fileId', fileId || v4());
-                formData.append('filename', file.name);
-                formData.append('contentType', file.type);
-                formData.append('size', `${file.size}`);
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('fileId', fileId || v4());
+                    formData.append('filename', file.name);
+                    formData.append('contentType', file.type);
+                    formData.append('size', `${file.size}`);
 
-                formData.append('metadata', JSON.stringify({ ...metadata }));
-                
-                if (fileDetails) {
-                    Object.keys(fileDetails).forEach(key => {
-                        const value = fileDetails[key] as any;
-                        formData.append(key, JSON.stringify(value))
-                    });
+                    formData.append('metadata', JSON.stringify({ ...metadata }));
+                    
+                    if (fileDetails) {
+                        Object.keys(fileDetails).forEach(key => {
+                            const value = fileDetails[key] as any;
+                            formData.append(key, JSON.stringify(value))
+                        });
+                    }
+
+                    const response = await axios.post<Awaited<ReturnType<typeof uploadFile>>>('/api/files/upload', formData);
+                    const res = response.data;
+
+                    if (res.errors) throw new Error(`Failed to upload ${file.name}: ${errors.join(', \n')}`);
+
+                    if (res.data) uploaded.push(res.data);
+                } catch(e: any) {
+                    errors = [...errors, e.message];
                 }
-
-                const response = await axios.post<Awaited<ReturnType<typeof uploadFile>>>('/api/files/upload', formData);
-                const res = response.data;
-
-                await getFiles();
-
-                onUpload?.(res);
             }
-            setOpen(false);
+
+            if (errors.length) throw new Error(errors.join(', '));
+
+            if (uploaded.length) {
+                onUpload?.(uploaded);
+                useFiles.setState(prev => ({
+                    ...prev,
+                    files: [...uploaded, ...prev.files],
+                }));
+            }
+
             setFiles([]);
             alert({
                 title: 'Success',
@@ -85,7 +104,7 @@ export function UploadForm({
         } catch(e: any) {
             alert({
                 title: 'Error',
-                message: `Failed to upload file${queue.length > 1 ? 's' : ''}: ${e.message}`,
+                message: e.message,
                 variant: 'error',
             });
         } finally {
@@ -230,7 +249,7 @@ export function UploadForm({
 
                 <Button
                     variant="ghost"
-                    onClick={() => setOpen(false)}
+                    onClick={() => closeModal()}
                 >
                     Cancel
                 </Button>

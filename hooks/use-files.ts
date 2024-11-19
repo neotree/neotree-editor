@@ -11,12 +11,14 @@ type GetFilesOptions = Parameters<typeof _getFiles>[0] & {
 export type FilesStore = {
     isModalOpen: boolean;
     loading: boolean;
-    latestResults: null | Omit<Awaited<ReturnType<typeof _getFiles>>, 'data' | 'errors'>;
     files: Awaited<ReturnType<typeof _getFiles>>['data'];
-    page: number;
-    limit: number;
     siteId: string;
     unhandledErrors: string[];
+    lastFilesQueryDate: null | Date;
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalRows: number;
     getFiles: (options?: GetFilesOptions) => Promise<void>;
     openModal: () => void;
     closeModal: () => void;
@@ -27,30 +29,30 @@ export const useFiles = create<FilesStore>((set, getStore) => {
         try {
             const opts = { ...options };
 
-            if (opts.siteId !== getStore().siteId) {
-                opts.page = 1;
-            }
-
             set({ loading: true, unhandledErrors: [], });
 
             const res = await axios.get<Awaited<ReturnType<typeof _getFiles>>>(`/api/files?data=${JSON.stringify({
-                ...opts
+                ...opts,
+                limit: opts.limit || getStore().limit,
+                page: opts.page || getStore().page,
             })}`);
-            const { data, errors, ...latestResults } = res.data;
+            const { data, errors, totalPages, totalRows, page } = res.data;
 
             if (errors?.length) {
                 set({ unhandledErrors: errors, });
             } else {
                 let files = [...getStore().files, ...data];
+                files = files.filter((f, i) => i === files.map(f => f.fileId).indexOf(f.fileId));
 
                 if (opts.siteId && (opts.siteId !== getStore().siteId)) files = data;
 
                 set({ 
                     files,
+                    totalPages, 
+                    totalRows, 
+                    page,
                     siteId: opts.siteId || getStore().siteId, 
-                    limit: opts.limit || getStore().limit, 
-                    page: opts.page || getStore().page, 
-                    latestResults: latestResults,
+                    lastFilesQueryDate: data.length ? new Date() : null,
                 });
             }
         } catch(e: any) {
@@ -63,16 +65,18 @@ export const useFiles = create<FilesStore>((set, getStore) => {
     return {
         isModalOpen: false,
         loading: false,
-        page: 1,
-        limit: 25,
         siteId: '',
         files: [],
         unhandledErrors: [],
-        latestResults: null,
+        lastFilesQueryDate: null,
+        page: 1,
+        limit: 15,
+        totalPages: 1,
+        totalRows: 0,
         getFiles,
         openModal: () => {
             set({ isModalOpen: true, });
-            if (!getStore().latestResults) getFiles();
+            if (!getStore().lastFilesQueryDate) getFiles();
         },
         closeModal: () => set({ isModalOpen: false, }),
     };

@@ -31,6 +31,8 @@ export type GetFilesParams = {
     page?: number;
     searchValue?: string;
     archived?: boolean;
+    uploadDateGTE?: string | Date;
+    uploadDateLTE?: string | Date;
 };
 
 export type GetFilesResults = {

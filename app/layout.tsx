@@ -17,8 +17,6 @@ import * as sysActions from "@/app/actions/sys";
 
 import "@/app/globals.css";
 import { SocketEventsListener } from "@/components/socket-events-listener";
-import cookies from "@/lib/js-cookie";
-import { Mode } from "@/types";
 
 const roboto = Roboto({
     subsets: ['latin'],
