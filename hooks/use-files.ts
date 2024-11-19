@@ -4,11 +4,21 @@ import axios from "axios";
 import { getFiles as _getFiles } from "@/app/actions/files";
 import { getSites as _getSites } from "@/app/actions/sites";
 
-type GetFilesOptions = Parameters<typeof _getFiles>[0] & {
-    siteId?: string;
+type SelectOptions = {
+    selectMultiple: boolean;
+    onSelectFiles: null | ((files: Awaited<ReturnType<typeof _getFiles>>['data']) => void);
 };
 
-export type FilesStore = {
+type GetFilesOptions = Parameters<typeof _getFiles>[0] & {
+    siteId?: string;
+    reset?: boolean;
+};
+
+type OpenModalOptions = Partial<SelectOptions> & {
+    
+};
+
+export type FilesStore = SelectOptions & {
     isModalOpen: boolean;
     loading: boolean;
     files: Awaited<ReturnType<typeof _getFiles>>['data'];
@@ -20,14 +30,18 @@ export type FilesStore = {
     totalPages: number;
     totalRows: number;
     getFiles: (options?: GetFilesOptions) => Promise<void>;
-    openModal: () => void;
+    openModal: (options?: OpenModalOptions) => void;
     closeModal: () => void;
 };
 
 export const useFiles = create<FilesStore>((set, getStore) => {
     const getFiles: FilesStore['getFiles'] = async (options) => {
         try {
-            const opts = { ...options };
+            const { reset, ...opts } = { ...options };
+
+            if (reset) {
+                opts.page = 1;
+            }
 
             set({ loading: true, unhandledErrors: [], });
 
@@ -41,7 +55,7 @@ export const useFiles = create<FilesStore>((set, getStore) => {
             if (errors?.length) {
                 set({ unhandledErrors: errors, });
             } else {
-                let files = [...getStore().files, ...data];
+                let files = reset ? data : [...getStore().files, ...data];
                 files = files.filter((f, i) => i === files.map(f => f.fileId).indexOf(f.fileId));
 
                 if (opts.siteId && (opts.siteId !== getStore().siteId)) files = data;
@@ -73,9 +87,14 @@ export const useFiles = create<FilesStore>((set, getStore) => {
         limit: 15,
         totalPages: 1,
         totalRows: 0,
+        onSelectFiles: null,
+        selectMultiple: false,
         getFiles,
-        openModal: () => {
-            set({ isModalOpen: true, });
+        openModal(options) {
+            set({ 
+                onSelectFiles: options?.onSelectFiles || null, 
+                isModalOpen: true, 
+            });
             if (!getStore().lastFilesQueryDate) getFiles();
         },
         closeModal: () => set({ isModalOpen: false, }),

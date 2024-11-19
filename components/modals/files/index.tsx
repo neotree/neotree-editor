@@ -62,7 +62,7 @@ export function FilesModal() {
                         onEvent: {
                             callback() {
                                 if (lastFilesQueryDate) {
-                                    getFiles({ uploadDateGTE: lastFilesQueryDate.toUTCString(), });
+                                    getFiles({ reset: true, });
                                 }
                             },
                         },
@@ -119,6 +119,7 @@ export function FilesModal() {
                                                             height={meta.height || meta.h}
                                                             alt={file.filename}
                                                             src={file.url}
+                                                            file={file}
                                                         />
                                                     </div>
                                                 </CardContent>
