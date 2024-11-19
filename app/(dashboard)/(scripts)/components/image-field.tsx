@@ -11,6 +11,7 @@ import { UploadModal } from "@/components/upload-modal";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Image } from "@/components/image";
+import { useFiles } from "@/hooks/use-files";
 
 export type ImageFieldProps = {
     image: null | ScriptImage;
@@ -19,6 +20,8 @@ export type ImageFieldProps = {
 };
 
 export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
+    const filesState = useFiles();
+
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     const { confirm } = useConfirmModal();
     const { uploadFile } = useScriptsContext();
@@ -28,7 +31,7 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
 
         // TODO: Replace this with server action
         const response = await axios.post('/api/files/upload', formData);
-        const { file, errors } = response.data as Awaited<ReturnType<typeof uploadFile>>;
+        const { data: file, errors } = response.data as Awaited<ReturnType<typeof uploadFile>>;
 
         if (errors?.length) {
             throw new Error(errors.join(', '));
@@ -62,7 +65,16 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                 </div>
 
                 <div className="flex items-center justify-center gap-x-4">
-                    <UploadModal 
+                    <Button
+                        size="icon"
+                        className="w-8 h-8 rounded-full"
+                        disabled={disabled}
+                        onClick={() => filesState.openModal()}
+                    >
+                        <Plus className="h-4 w-4" />
+                    </Button>
+
+                    {/* <UploadModal 
                         type="image/*"
                         onUpload={onUpload}
                     >
@@ -75,7 +87,7 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                                 <Plus className="h-4 w-4" />
                             </Button>
                         </DialogTrigger>
-                    </UploadModal>
+                    </UploadModal> */}
 
                     {!!image && (
                         <Button

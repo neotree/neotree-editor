@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner"
 import { ConfirmModal } from "@/components/modals/confirm";
 import { AlertModal } from "@/components/modals/alert";
+import { FilesModal } from "@/components/modals/files";
 import { AppContextProvider } from "@/contexts/app";
 import { getSys } from "@/app/actions/sys";
 import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
@@ -95,6 +96,7 @@ export default async function RootLayout({
                         <Toaster />
                         <ConfirmModal />
                         <AlertModal />
+                        <FilesModal />
                     </ThemeProvider>
                 </AuthContextProvider>
             </body>

@@ -1,8 +1,11 @@
 import { files } from "@/databases/pg/schema";
 
-export type FullFile = typeof files.$inferSelect;
+export type FullFile = typeof files.$inferSelect & {
+    url: string;
+};
 
 export type FileDetails = {
+    url: string;
     fileId: typeof files.$inferSelect['fileId'];
     filename: typeof files.$inferSelect['filename'],
     size: typeof files.$inferSelect['size'],
@@ -13,7 +16,7 @@ export type FileDetails = {
 
 export type GetFileDetailsResponse = {
     errors?: string[];
-    file: null | FileDetails;
+    data: null | FileDetails;
 };
 
 export type GetFullFileResponse = {
