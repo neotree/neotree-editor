@@ -3,7 +3,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
-import { _getFileByFileId, _getFullFileByFileId } from "@/databases/queries/files";
+import { _getFileByFileId, _getFiles, _getFullFileByFileId } from "@/databases/queries/files";
 import logger from "@/lib/logger";
 import { parseJSON } from "@/lib/parse-json";
 import { parseNumber } from "@/lib/parseNumber";
@@ -12,11 +12,13 @@ import { getSiteAxiosClient } from "@/lib/axios";
 import queryString from "query-string";
 import { _getSites } from "@/databases/queries/sites";
 
+export const getFiles: typeof _getFiles = _getFiles;
+
 export async function uploadFile(
     formData: FormData,
     opts?: SaveFileOptions,
 ): Promise<Awaited<ReturnType<typeof _saveFile>>> {
-    let response: Awaited<ReturnType<typeof _saveFile>> = { success: false, file: null, };
+    let response: Awaited<ReturnType<typeof _saveFile>> = { success: false, data: null, };
 
     try {
         await isAllowed(['upload_files']);
@@ -98,8 +100,8 @@ export async function uploadFileFromSite({
 
         if (fileExists.errors) throw new Error(fileExists.errors.join(', '));
 
-        if (fileExists?.file) {
-            let q = queryString.stringify({ ...fileExists.file.metadata });
+        if (fileExists?.data) {
+            let q = queryString.stringify({ ...fileExists.data.metadata });
             q = !q ? '' : `?${q}`;
             return {
                 data: {

@@ -15,15 +15,17 @@ export type SaveFileData = typeof files.$inferInsert & {
     metadata: object;
 };
 
+export type SaveFileResponse = { 
+    data: null | FileDetails;
+    success: boolean; 
+    errors?: string[]; 
+};
+
 export async function _saveFile(
     data: SaveFileData,
     opts?: SaveFileOptions
-) {
-    const response: { 
-        file: null | FileDetails;
-        success: boolean; 
-        errors?: string[]; 
-    } = { success: false, file: null, };
+): Promise<SaveFileResponse> {
+    const response: SaveFileResponse= { success: false, data: null, };
 
     try {
         if (!data.fileId) throw new Error('Missing fileId');
@@ -37,7 +39,7 @@ export async function _saveFile(
         if (!file) throw new Error('Failed to upload file');
 
         response.success = true;
-        response.file = file.file;
+        response.data = file.data;
 
         if (opts?.broadcastAction) socket.emit('data_changed', 'upload_file');
     } catch(e: any) {

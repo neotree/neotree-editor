@@ -4,6 +4,7 @@ import db from "@/databases/pg/drizzle";
 import { files } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { GetFullFileResponse, GetFileDetailsResponse, FileDetails } from "./types";
+import { getAppUrl } from "@/lib/urls";
 
 export async function _getFullFileByFileId(fileId: string): Promise<GetFullFileResponse> {
     try {
@@ -11,7 +12,12 @@ export async function _getFullFileByFileId(fileId: string): Promise<GetFullFileR
             where: eq(files.fileId, fileId),
         });
 
-        return  { data: file || null, };
+        const data = !file ? null : {
+            ...file,
+            url: getAppUrl(`/files/${file.fileId}`),
+        };
+
+        return  { data, };
     } catch(e: any) {
         logger.error('_getFiles ERROR', e.message);
         return  { errors: [e.message], data: null, };
@@ -32,9 +38,14 @@ export async function _getFileByFileId(fileId: string): Promise<GetFileDetailsRe
             },
         });
 
-        return  { file: (file as FileDetails) || null, };
+        const data = !file ? null : {
+            ...file,
+            url: getAppUrl(`/files/${file.fileId}`),
+        } as FileDetails;
+
+        return  { data, };
     } catch(e: any) {
         logger.error('_getFiles ERROR', e.message);
-        return  { errors: [e.message], file: null, };
+        return  { errors: [e.message], data: null, };
     }
 }

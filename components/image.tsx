@@ -1,8 +1,8 @@
-import NextImage, { ImageProps } from 'next/image';
+import NextImage, { ImageProps as NextImageProps } from 'next/image';
 
 import { getContainerImageSize } from '@/lib/image';
 
-type Props = ImageProps & {
+export type ImageProps = NextImageProps & {
     containerWidth?: number;
     width?: number;
     height?: number;
@@ -13,7 +13,7 @@ export function Image({
     height = 0,
     containerWidth,
     ...props
-}: Props) {
+}: ImageProps) {
     let sizes: ImageProps['sizes'] = props.sizes || '100vw';
     let _style: ImageProps['style'] = { width: '100%', height: 'auto', };
 

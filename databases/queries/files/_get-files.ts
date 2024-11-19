@@ -4,6 +4,7 @@ import db from "@/databases/pg/drizzle";
 import { files } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { isEmpty } from "@/lib/isEmpty";
+import { getAppUrl } from "@/lib/urls";
 import { FileDetails, GetFilesParams, GetFilesResults } from "./types";
 
 export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResults> {
@@ -38,7 +39,7 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
 
         const offset = isEmpty(limit) ? undefined : Math.max(0, (page - 1) * limit!);
 
-        const data = await db.query.files.findMany({
+        const res = await db.query.files.findMany({
             where: !where.length ? undefined : and(...where),
             limit,
             offset,
@@ -52,8 +53,13 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
             },
         });
 
+        const data = res.map(f => ({
+            ...f,
+            url: getAppUrl(`/files/${f.fileId}`),
+        })) as FileDetails[];
+
         return  { 
-            data: data as FileDetails[],
+            data,
             searchValue,
             totalPages,
             totalRows, 
