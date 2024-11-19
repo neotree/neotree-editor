@@ -41,7 +41,7 @@ export async function _saveFile(
         response.success = true;
         response.data = file.data;
 
-        if (opts?.broadcastAction) socket.emit('data_changed', 'upload_file');
+        if (file.data && opts?.broadcastAction !== false) socket.emit('file_uploaded');
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];

@@ -1,4 +1,4 @@
-import { and, count, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, gte, lte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { files } from "@/databases/pg/schema";
@@ -15,6 +15,8 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
             searchValue,
             limit,
             page: pageParam = 1,
+            uploadDateGTE,
+            uploadDateLTE,
         } = { ...params };
 
         let page = Math.max(0, pageParam);
@@ -24,6 +26,10 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
             archived ? isNotNull(files.deletedAt) : isNull(files.deletedAt),
             ...(!filesIds?.length ? [] : [inArray(files.fileId, filesIds)]),
             ...(!search ? [] : [sql`LOWER(screens.name) like LOWER(${search})`]),
+            !uploadDateGTE ? undefined : gte(files.createdAt, 
+                typeof uploadDateGTE === 'string' ? new Date(uploadDateGTE) : uploadDateGTE),
+            !uploadDateLTE ? undefined : lte(files.createdAt, 
+                typeof uploadDateLTE === 'string' ? new Date(uploadDateLTE) : uploadDateLTE),
         ];
 
         const countQuery = db.select({ count: count(), }).from(files);
@@ -43,6 +49,7 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
             where: !where.length ? undefined : and(...where),
             limit,
             offset,
+            orderBy: desc(files.createdAt),
             columns: {
                 fileId: true,
                 contentType: true,

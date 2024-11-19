@@ -42,7 +42,7 @@ export function Image(props: ImageProps) {
                     hideCloseButton
                     className="px-0 py-0 flex flex-col w-full max-w-xl max-h-[80%]"
                 >
-                    <DialogHeader className="hidden">
+                    <DialogHeader className="p-0 m-0 h-0 overflow-hidden">
                         <DialogTitle>{''}</DialogTitle>
                         <DialogDescription>{''}</DialogDescription>
                     </DialogHeader>
