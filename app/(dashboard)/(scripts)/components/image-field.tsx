@@ -1,15 +1,10 @@
-import { useCallback } from "react";
 import { Plus, Trash } from "lucide-react";
 import { useMeasure } from "react-use";
 import queryString from "query-string";
-import axios from "axios";
 
 import { Button } from "@/components/ui/button";
 import { ScriptImage } from "@/types";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
-import { UploadModal } from "@/components/upload-modal";
-import { DialogTrigger } from "@/components/ui/dialog";
-import { useScriptsContext } from "@/contexts/scripts";
 import { Image } from "@/components/image";
 import { useFiles } from "@/hooks/use-files";
 
@@ -24,29 +19,6 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
 
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     const { confirm } = useConfirmModal();
-    const { uploadFile } = useScriptsContext();
-
-    const onUpload = useCallback(async (formData: FormData) => {
-        // const { file, errors } = await uploadFile(formData);
-
-        // TODO: Replace this with server action
-        const response = await axios.post('/api/files/upload', formData);
-        const { data: file, errors } = response.data as Awaited<ReturnType<typeof uploadFile>>;
-
-        if (errors?.length) {
-            throw new Error(errors.join(', '));
-        } else if (file) {
-            let q = queryString.stringify({ ...file.metadata });
-            q = q ? `?${q}` : '';
-            onChange({
-                data: [process.env.NEXT_PUBLIC_APP_URL, `/files/${file.fileId}${q}`].join(''),
-                fileId: file.fileId,
-                filename: file.filename!,
-                size: file.size!,
-                contentType: file.contentType!,
-            });
-        }
-    }, [uploadFile, onChange]);
 
     const q = `${image?.data || ''}`.split('?').filter((_, i) => i).join('');
     const { width, height } = queryString.parse(q);
@@ -69,25 +41,20 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                         size="icon"
                         className="w-8 h-8 rounded-full"
                         disabled={disabled}
-                        onClick={() => filesState.openModal()}
+                        onClick={() => filesState.openModal({
+                            onSelectFiles([file]) {
+                                onChange({
+                                    data: file.url,
+                                    fileId: file.fileId,
+                                    filename: file.filename!,
+                                    size: file.size!,
+                                    contentType: file.contentType!,
+                                });
+                            },
+                        })}
                     >
                         <Plus className="h-4 w-4" />
                     </Button>
-
-                    {/* <UploadModal 
-                        type="image/*"
-                        onUpload={onUpload}
-                    >
-                        <DialogTrigger asChild>
-                            <Button
-                                size="icon"
-                                className="w-8 h-8 rounded-full"
-                                disabled={disabled}
-                            >
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        </DialogTrigger>
-                    </UploadModal> */}
 
                     {!!image && (
                         <Button

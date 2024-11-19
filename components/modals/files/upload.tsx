@@ -40,7 +40,7 @@ export function UploadForm({
     fileDetails,
     onUpload,
 }: Props) {
-    const { getFiles, closeModal } = useFiles();
+    const { closeModal } = useFiles();
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     
     const [files, setFiles] = useState<FileState[]>([]);
@@ -89,10 +89,6 @@ export function UploadForm({
 
             if (uploaded.length) {
                 onUpload?.(uploaded);
-                useFiles.setState(prev => ({
-                    ...prev,
-                    files: [...uploaded, ...prev.files],
-                }));
             }
 
             setFiles([]);
@@ -110,7 +106,7 @@ export function UploadForm({
         } finally {
             setUploading(false);
         }
-    }, [onUpload, alert, getFiles, files, inputProps?.multiple, fileDetails]);
+    }, [onUpload, alert, files, inputProps?.multiple, fileDetails]);
 
     const onInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
