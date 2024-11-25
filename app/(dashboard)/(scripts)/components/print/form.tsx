@@ -188,9 +188,8 @@ export function PrintForm({ disabled, section, onChange }: {
                                                             onCheckedChange={() => {
                                                                 setSelected(prev => checked ? prev.filter(v => v !== s.screenId) : [...prev, s.screenId]);
                                                             }}
-                                                        >
-                                                            {getScreenLabel(s)}
-                                                        </DropdownMenuCheckboxItem>
+                                                            dangerouslySetInnerHTML={{ __html: getScreenLabel(s), }}
+                                                        />
                                                     );
                                                 })}
                                             </div>
