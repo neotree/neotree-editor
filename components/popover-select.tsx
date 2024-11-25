@@ -38,8 +38,6 @@ export function PopoverSelect({
     defaultValues,
     onChange,
 }: PopoverSelectProps) {
-    const [isAllSelected, setIsAllSelected] = useState(false);
-
     const value = useMemo(() => {
         if (!valueProp.length) valueProp = defaultValues || [];
         valueProp = valueProp.filter(v => v);
@@ -100,8 +98,6 @@ export function PopoverSelect({
                     {options.map(o => {
                         let checked = !!selected[o.value];
                         if (o.value === allOption.value) checked = Object.values(selected).length === options.length;
-
-                        console.log(Object.values(selected).length, options.length);
 
                         return (
                             <Label 
