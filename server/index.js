@@ -29,6 +29,7 @@ app.prepare().then(() => {
         socket.on('data_changed', (...args) => onEvent('data_changed', ...args));
         socket.on('mode_changed', (...args) => onEvent('mode_changed', ...args));
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
+        socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
     });
 
     httpServer

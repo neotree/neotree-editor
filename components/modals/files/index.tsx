@@ -10,16 +10,18 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from '@/components/ui/card';
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { useFiles } from "@/hooks/use-files";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SocketEventsListener } from "@/components/socket-events-listener";
+import { Pagination } from "@/components/pagination";
 import { Errors } from "./errors";
 import { UploadForm } from "./upload";
 import { Image } from "./image";
+import { cn } from "@/lib/utils";
 
 const tabs = [
     {
@@ -33,14 +35,40 @@ const tabs = [
 ];
 
 export function FilesModal() {
-    const { isModalOpen, latestResults, loading, files, closeModal } = useFiles();
+    const { 
+        isModalOpen, 
+        loading, 
+        files, 
+        lastFilesQueryDate, 
+        page,
+        totalPages,
+        totalRows,
+        limit,
+        closeModal, 
+        getFiles 
+    } = useFiles();
     const [activeTab, setActiveTab] = useState(tabs[0].value);
 
-    if (!latestResults && loading) return <Loader overlay />;
+    if (!lastFilesQueryDate && loading) return <Loader overlay />;
 
     return (
         <>
             {loading && <Loader overlay />}
+
+            <SocketEventsListener 
+                events={[
+                    {
+                        name: 'file_uploaded',
+                        onEvent: {
+                            callback() {
+                                if (lastFilesQueryDate) {
+                                    getFiles({ reset: true, });
+                                }
+                            },
+                        },
+                    },
+                ]}
+            />
 
             <Dialog
                 open={isModalOpen}
@@ -50,6 +78,11 @@ export function FilesModal() {
                     hideCloseButton
                     className="px-0 py-0 max-w-3xl max-h-[80%] flex flex-col"
                 >
+                    <DialogHeader className="p-0 m-0 h-0 overflow-hidden">
+                        <DialogTitle>{''}</DialogTitle>
+                        <DialogDescription>{''}</DialogDescription>
+                    </DialogHeader>
+
                     <Tabs
                         className="w-full [&>div]:w-full"
                         value={activeTab}
@@ -86,6 +119,7 @@ export function FilesModal() {
                                                             height={meta.height || meta.h}
                                                             alt={file.filename}
                                                             src={file.url}
+                                                            file={file}
                                                         />
                                                     </div>
                                                 </CardContent>
@@ -94,8 +128,32 @@ export function FilesModal() {
                                     })}
                                 </div>
 
-                                <DialogFooter>
+                                <DialogFooter className="px-4 py-2 flex flex-row items-center">
+                                    <span
+                                        className={cn(
+                                            'text-xs text-muted-foreground',
+                                        )}
+                                    >Showing {files.length} of {totalRows} files</span>
 
+                                    <div className="flex-1" />
+
+                                    <div>
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            disabled={loading}
+                                            limit={limit}
+                                            totalRows={totalRows}
+                                            collectionName="Files"
+                                            onPaginate={page => getFiles({ page })}
+                                            hideControls={false}
+                                            hideSummary={true}
+                                            hideNumbers={true}
+                                            nextLabel="More"
+                                            prevLabel=""
+                                            hidePrev
+                                        />
+                                    </div>
                                 </DialogFooter>
                             </>
                         )}

@@ -1,3 +1,8 @@
+export type DataResponse<DataType = any> = {
+    errors?: string[];
+    data: DataType;
+};
+
 export * from './permissions';
 
 export type Mode = 'view' | 'development';
