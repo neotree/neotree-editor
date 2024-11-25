@@ -1,4 +1,5 @@
 {
-  "/ops/screens/page": "app/ops/screens/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/(dashboard)/(scripts)/page": "app/(dashboard)/(scripts)/page.js",
+  "/(dashboard)/(scripts)/script/[scriptId]/page": "app/(dashboard)/(scripts)/script/[scriptId]/page.js"
 }
