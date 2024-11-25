@@ -19,6 +19,11 @@ type Props = {
     collectionName?: string;
     hideControls?: boolean;
     hideSummary?: boolean;
+    hideNumbers?: boolean;
+    nextLabel?: string;
+    prevLabel?: string;
+    hideNext?: boolean;
+    hidePrev?: boolean;
     classes?: {
         pageNumber?: string;
     },
@@ -94,7 +99,7 @@ function getButtons(props: Props) {
     const arr = [
         {
             id: 'first',
-            label: 'Previous',
+            label: props.prevLabel !== undefined ? props.prevLabel : 'Previous',
             disabled: currentPage < 2,
             isPrev: true,
             isNext: false,
@@ -128,7 +133,7 @@ function getButtons(props: Props) {
     });
     arr.push({
         id: 'last',
-        label: 'Next',
+        label: props.nextLabel !== undefined ? props.nextLabel : 'Next',
         disabled: totalPages === currentPage,
         isPrev: false,
         isNext: true,
@@ -148,6 +153,9 @@ function PaginationComponent(props: Props) {
         collectionName = 'results',
         hideControls,
         hideSummary,
+        hideNumbers,
+        hideNext,
+        hidePrev,
         classes,
     } = props;
 
@@ -184,7 +192,10 @@ function PaginationComponent(props: Props) {
                                     const onClick = () => !_disabled && btn.onClick();
 
                                     if (btn.isPrev) {
+                                        if (hidePrev) return null;
+
                                         _disabled = _disabled || (currentPage === 1);
+
                                         return (
                                             <PaginationPrevious 
                                                 href="#" 
@@ -196,9 +207,13 @@ function PaginationComponent(props: Props) {
                                                     e.preventDefault();
                                                     onClick();
                                                 }}
-                                            />
+                                            >
+                                                <span>{btn.label}</span>
+                                            </PaginationPrevious>
                                         );
                                     } else if (btn.isEllipsis) {
+                                        if (hideNumbers) return null;
+
                                         return (
                                             <PaginationEllipsis 
                                                 className={cn(
@@ -209,7 +224,10 @@ function PaginationComponent(props: Props) {
                                             />
                                         );
                                     } else if (btn.isNext) {
+                                        if (hideNext) return null;
+                                        
                                         _disabled = _disabled || (currentPage === totalPages);
+
                                         return (
                                             <PaginationNext 
                                                 href="#" 
@@ -221,9 +239,13 @@ function PaginationComponent(props: Props) {
                                                     e.preventDefault();
                                                     onClick();
                                                 }}
-                                            />
+                                            >
+                                                <span>{btn.label}</span>
+                                            </PaginationNext>
                                         );
                                     } else {
+                                        if (hideNumbers) return null;
+
                                         return (
                                             <PaginationLink 
                                                 href="#"
