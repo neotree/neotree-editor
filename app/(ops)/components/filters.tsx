@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Props } from "./types";
 import { useFilters } from "./use-filters";
 
@@ -28,10 +29,10 @@ export function Filters({
     return (
         <div ref={contentDivRef}>
             <div className="flex flex-col gap-y-6">
-            <div>
+                <div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-full">
+                            <Button disabled variant="outline" className="w-full">
                                 {!filters.scriptsTypes.length ? 'Select script types' : (
                                     filters.scriptsTypes.length > 1 ? 
                                         `${filters.scriptsTypes.length} script types`
@@ -72,7 +73,7 @@ export function Filters({
                 <div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-full">
+                            <Button disabled variant="outline" className="w-full">
                                 {!filters.screensTypes.length ? 'Select screen types' : (
                                     filters.screensTypes.length > 1 ? 
                                         `${filters.screensTypes.length} screen types`
@@ -108,6 +109,17 @@ export function Filters({
                             </div>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                </div>
+
+                <div>
+                    <Label htmlFor="withImagesOnly" className="flex items-center">
+                        <Checkbox 
+                            id="withImagesOnly"
+                            checked={filters.withImagesOnly}
+                            onCheckedChange={() => setFilters({ withImagesOnly: !filters.withImagesOnly, })}
+                        />&nbsp;
+                        With images only
+                    </Label>
                 </div>
             </div>
         </div>
