@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { screens, screensDrafts, pendingDeletion, scripts } from "@/databases/pg/schema";
+import { screens, screensDrafts, pendingDeletion, scripts, hospitals } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { ScriptField, ScriptItem, ScriptImage, Preferences } from "@/types";
 
@@ -25,6 +25,7 @@ export type ScreenType = typeof screens.$inferSelect & {
     image2: null | ScriptImage;
     image3: null | ScriptImage;
     scriptTitle?: string;
+    hospitalName?: string;
 };
 
 export type GetScreensResults = {
@@ -89,12 +90,20 @@ export async function _getScreens(
                 pendingDeletion: pendingDeletion,
                 script: {
                     title: scripts.title,
+                    hospitalId: scripts.hospitalId,
+                },
+                hospital: {
+                    name: hospitals.name,
                 },
             })
             .from(screens)
             .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
             .leftJoin(screensDrafts, eq(screensDrafts.screenId, screens.screenId))
             .leftJoin(scripts, eq(scripts.scriptId, screens.scriptId))
+            .leftJoin(hospitals, and(
+                eq(scripts.scriptId, screens.scriptId),
+                eq(scripts.hospitalId, hospitals.hospitalId)
+            ))
             .where(and(
                 isNull(screens.deletedAt),
                 isNull(pendingDeletion),
@@ -111,6 +120,7 @@ export async function _getScreens(
         const published = publishedRes.map(s => ({
             ...s.screen,
             scriptTitle: s.script?.title || '',
+            hospitalName: s.hospital?.name || '',
         }));
 
         const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
@@ -136,6 +146,7 @@ export async function _getScreens(
             .map(s => ({
                 ...s,
                 scriptTitle: s.scriptTitle || '',
+                hospitalName: s.hospitalName || '',
             }));
 
         return  { 

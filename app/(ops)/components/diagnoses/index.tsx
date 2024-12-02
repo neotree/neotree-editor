@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 import {
     DropdownMenu,
@@ -74,8 +75,15 @@ export function Diagnoses(props: Props) {
             <DataTable 
                 columns={[
                     {
-                        name: '',
-                        cellClassName: 'hidden',
+                        name: 'Screen',
+                        cellClassName: 'w-10',
+                        cellRenderer({ value }) {
+                            return (
+                                <Link target="_blank" href={`${value}`}>
+                                    <ExternalLink className="text-primary w-4 h-4" />
+                                </Link>
+                            );
+                        },
                     },
                     ...columns.map(_key => {
                         const key = _key as keyof typeof diagnoses.data[0];
@@ -94,6 +102,15 @@ export function Diagnoses(props: Props) {
                                 if (key === 'image2') image = diagnosis.image2;
                                 if (key === 'image3') image = diagnosis.image3;
 
+                                if (key === 'scriptTitle') {
+                                    return (
+                                        <Link target="_blank" href={`/script/${diagnosis.scriptId}`} className="flex items-center text-primary">
+                                            <ExternalLink className="text-gray-400 w-4 h-4" />&nbsp;
+                                            {value}
+                                        </Link>
+                                    );
+                                }
+
                                 if (image) {
                                     return (
                                         <div className="w-10 h-10">
@@ -109,7 +126,7 @@ export function Diagnoses(props: Props) {
                 ]}
                 data={diagnoses.data.map(s => {
                     return [
-                        '',
+                        `/script/${s.scriptId}/diagnosis/${s.diagnosisId}`,
                         ...columns.map(_key => {
                             const key = _key as keyof typeof diagnoses.data[0];
                             const value = s[key];

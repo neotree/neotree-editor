@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 import {
     DropdownMenu,
@@ -74,8 +75,15 @@ export function Screens(props: Props) {
             <DataTable 
                 columns={[
                     {
-                        name: '',
-                        cellClassName: 'hidden',
+                        name: 'Screen',
+                        cellClassName: 'w-10',
+                        cellRenderer({ value }) {
+                            return (
+                                <Link target="_blank" href={`${value}`}>
+                                    <ExternalLink className="text-primary w-4 h-4" />
+                                </Link>
+                            );
+                        },
                     },
                     ...columns.map(_key => {
                         const key = _key as keyof typeof screens.data[0];
@@ -102,6 +110,15 @@ export function Screens(props: Props) {
                                     );
                                 };
 
+                                if (key === 'scriptTitle') {
+                                    return (
+                                        <Link target="_blank" href={`/script/${screen.scriptId}`} className="flex items-center text-primary">
+                                            <ExternalLink className="text-gray-400 w-4 h-4" />&nbsp;
+                                            {value}
+                                        </Link>
+                                    );
+                                }
+
                                 return value;
                             },
                         } as TableColumn;
@@ -109,7 +126,7 @@ export function Screens(props: Props) {
                 ]}
                 data={screens.data.map(s => {
                     return [
-                        '',
+                        `/script/${s.scriptId}/screen/${s.screenId}`,
                         ...columns.map(_key => {
                             const key = _key as keyof typeof screens.data[0];
                             const value = s[key];

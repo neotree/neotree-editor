@@ -15,10 +15,10 @@ export function useFilters(props: Props) {
     const [scriptsColumns, setScriptsColumns] = useState<(keyof ScriptType)[]>(['title']);
 
     const [screens, setScreens] = useState<{ data: ScreenType[], }>({ data: [], });
-    const [screensColumns, setScreensColumns] = useState<(keyof ScreenType)[]>(['title', 'image1', 'image2', 'image3', 'scriptTitle']);
+    const [screensColumns, setScreensColumns] = useState<(keyof ScreenType)[]>(['title', 'image1', 'image2', 'image3', 'scriptTitle', 'hospitalName']);
 
     const [diagnoses, setDiagnoses] = useState<{ data: DiagnosisType[], }>({ data: [], });
-    const [diagnosesColumns, setDiagnosesColumns] = useState<(keyof DiagnosisType)[]>(['name', 'image1', 'image2', 'image3']);
+    const [diagnosesColumns, setDiagnosesColumns] = useState<(keyof DiagnosisType)[]>(['name', 'image1', 'image2', 'image3', 'scriptTitle', 'hospitalName']);
 
     const [filters, _setFilters] = useState<FiltersType>({
         screensIds: [],
