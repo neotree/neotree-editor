@@ -4,6 +4,11 @@ export const nuidSearchOptions = [
 	{ value: 'twinSearches', label: 'Found in twin searches', },
 ];
 
+export const PERIOD_FIELD_FORMATS = [
+  { label: 'Days & hours', value: 'days_hours', },
+  { label: 'Years & Months', value: 'years_months', },
+];
+
 export const DefaultValueType = {
     COMPUTE: 'compute',
     DATE_NOW: 'date_now',

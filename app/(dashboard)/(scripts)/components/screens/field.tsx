@@ -16,7 +16,7 @@ import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { FieldTypes, nuidSearchOptions } from "@/constants/fields";
+import { FieldTypes, nuidSearchOptions, PERIOD_FIELD_FORMATS } from "@/constants/fields";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -52,7 +52,9 @@ export function Field<P = {}>({
     const [showForm, setShowForm] = useState(!!field);
     const [open, setOpen] = useState(false);
 
-    const { getDefaultValues } = useField(field);
+    const { getDefaultValues } = useField(!field ? undefined : {
+        ...field,
+    });
 
     const {
         reset: resetForm,
@@ -66,6 +68,7 @@ export function Field<P = {}>({
     });
 
     const type = watch('type');
+    const format = watch('format');
     const key = watch('key');
     const label = watch('label');
     const optional = watch('optional');
@@ -288,6 +291,34 @@ export function Field<P = {}>({
                                         <span className="text-xs text-muted-foreground">Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or SUBTRACT($key1,$key2...)</span>
                                     </div>
                                 </>
+                            )}
+
+                            {isPeriodField && (
+                                <div>
+                                    <Label htmlFor="periodFormart">Format</Label>
+                                    <Select
+                                        value={format}
+                                        required
+                                        name="format"
+                                        onValueChange={value => {
+                                            setValue('format', value || 'days_hours', { shouldDirty: true, });
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                        <SelectGroup>
+                                            <SelectLabel>Formats</SelectLabel>
+                                            {PERIOD_FIELD_FORMATS.map(t => (
+                                                <SelectItem key={t.value} value={t.value}>
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             )}
 
                             {isNumberField && (
