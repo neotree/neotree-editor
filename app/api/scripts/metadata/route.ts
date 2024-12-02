@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { getScriptsMetadata, GetScriptsMetadataParams } from "@/app/actions/scripts";
+import { getScriptsMetadata } from "@/app/actions/scripts";
+import { GetScriptsMetadataParams } from "@/databases/queries/scripts";
 
 export async function GET(req: NextRequest) {
 	try {
