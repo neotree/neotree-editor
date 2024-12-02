@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { diagnoses, diagnosesDrafts, pendingDeletion, scripts, } from "@/databases/pg/schema";
+import { diagnoses, diagnosesDrafts, hospitals, pendingDeletion, scripts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { DiagnosisSymptom, Preferences, ScriptImage } from "@/types";
 
@@ -22,6 +22,8 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     image1: null | ScriptImage;
     image2: null | ScriptImage;
     image3: null | ScriptImage;
+    scriptTitle?: string;
+    hospitalName?: string;
 };
 
 export type GetDiagnosesResults = {
@@ -84,10 +86,22 @@ export async function _getDiagnoses(
             .select({
                 diagnosis: diagnoses,
                 pendingDeletion: pendingDeletion,
+                script: {
+                    title: scripts.title,
+                    hospitalId: scripts.hospitalId,
+                },
+                hospital: {
+                    name: hospitals.name,
+                },
             })
             .from(diagnoses)
             .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
             .leftJoin(diagnosesDrafts, eq(diagnosesDrafts.diagnosisId, diagnoses.diagnosisId))
+            .leftJoin(scripts, eq(scripts.scriptId, diagnoses.scriptId))
+            .leftJoin(hospitals, and(
+                eq(scripts.scriptId, diagnoses.scriptId),
+                eq(scripts.hospitalId, hospitals.hospitalId)
+            ))
             .where(and(
                 isNull(diagnoses.deletedAt),
                 isNull(pendingDeletion),
@@ -101,7 +115,11 @@ export async function _getDiagnoses(
                 ),
             ));
 
-        const published = publishedRes.map(s => s.diagnosis);
+        const published = publishedRes.map(s => ({
+            ...s.diagnosis,
+            scriptTitle: s.script?.title || '',
+            hospitalName: s.hospital?.name || '',
+        }));
 
         const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
             where: inArray(pendingDeletion.diagnosisId, published.map(s => s.diagnosisId)),
@@ -122,7 +140,12 @@ export async function _getDiagnoses(
             } as GetDiagnosesResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.diagnosisId).includes(s.diagnosisId));
+            .filter(s => !inPendingDeletion.map(s => s.diagnosisId).includes(s.diagnosisId))
+            .map(s => ({
+                ...s,
+                scriptTitle: s.scriptTitle || '',
+                hospitalName: s.hospitalName || '',
+            }));
 
         return  { 
             data: responseData,
