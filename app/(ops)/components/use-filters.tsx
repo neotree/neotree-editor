@@ -10,9 +10,15 @@ import { Props, FiltersType } from "./types";
 export function useFilters(props: Props) {
     const [dataInitialised, setDataInitialised] = useState(false);
     const [loading, setLoading] = useState(false);
+
     const [scripts, setScripts] = useState<{ data: ScriptType[], }>({ data: [], });
+    const [scriptsColumns, setScriptsColumns] = useState<(keyof ScriptType)[]>(['title']);
+
     const [screens, setScreens] = useState<{ data: ScreenType[], }>({ data: [], });
+    const [screensColumns, setScreensColumns] = useState<(keyof ScreenType)[]>(['title', 'image1', 'image2', 'image3', 'scriptTitle']);
+
     const [diagnoses, setDiagnoses] = useState<{ data: DiagnosisType[], }>({ data: [], });
+    const [diagnosesColumns, setDiagnosesColumns] = useState<(keyof DiagnosisType)[]>(['name', 'image1', 'image2', 'image3']);
 
     const [filters, _setFilters] = useState<FiltersType>({
         screensIds: [],
@@ -21,7 +27,7 @@ export function useFilters(props: Props) {
         scriptsIds: [],
         screensTypes: [],
         scriptsTypes: [],
-        withImagesOnly: false,
+        withImagesOnly: true,
         draftsOnly: false,
         
     });
@@ -130,6 +136,7 @@ export function useFilters(props: Props) {
     }, [props.dataType, loadDiagnoses, loadScreens, loadScripts]);
     
     return {
+        ...props,
         loading,
         scripts,
         screens,
@@ -137,6 +144,12 @@ export function useFilters(props: Props) {
         filters,
         canLoadData,
         dataInitialised,
+        scriptsColumns,
+        screensColumns,
+        diagnosesColumns,
+        setScriptsColumns,
+        setScreensColumns,
+        setDiagnosesColumns,
         loadData,
         setLoading,
         setScripts,

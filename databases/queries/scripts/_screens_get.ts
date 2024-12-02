@@ -24,6 +24,7 @@ export type ScreenType = typeof screens.$inferSelect & {
     image1: null | ScriptImage;
     image2: null | ScriptImage;
     image3: null | ScriptImage;
+    scriptTitle?: string;
 };
 
 export type GetScreensResults = {
@@ -86,10 +87,14 @@ export async function _getScreens(
             .select({
                 screen: screens,
                 pendingDeletion: pendingDeletion,
+                script: {
+                    title: scripts.title,
+                },
             })
             .from(screens)
             .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
             .leftJoin(screensDrafts, eq(screensDrafts.screenId, screens.screenId))
+            .leftJoin(scripts, eq(scripts.scriptId, screens.scriptId))
             .where(and(
                 isNull(screens.deletedAt),
                 isNull(pendingDeletion),
@@ -103,7 +108,10 @@ export async function _getScreens(
                 ),
             ));
 
-        const published = publishedRes.map(s => s.screen);
+        const published = publishedRes.map(s => ({
+            ...s.screen,
+            scriptTitle: s.script?.title || '',
+        }));
 
         const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
             where: inArray(pendingDeletion.screenId, published.map(s => s.screenId)),
@@ -124,7 +132,11 @@ export async function _getScreens(
             } as GetScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
+            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId))
+            .map(s => ({
+                ...s,
+                scriptTitle: s.scriptTitle || '',
+            }));
 
         return  { 
             data: responseData,
