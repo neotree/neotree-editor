@@ -16,6 +16,7 @@ export type GetScriptsMetadataResponse = {
         title: string;
         hospitalName: string;
         screens: {
+            screenId: string;
             type: typeof screens.$inferSelect['type'];
             title: string;
             ref: string;
@@ -151,6 +152,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                     }
 
                     return {
+                        screenId: screen.screenId,
                         type: screen.type,
                         title: screen.title,
                         ref: screen.refId,
