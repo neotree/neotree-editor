@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload } from "lucide-react"
+import { MoreVertical, Trash, Edit, Copy, CopyPlus, Eye, Upload, ExternalLink } from "lucide-react"
 
 import {
     DropdownMenu,
@@ -72,6 +72,15 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                             <Copy className="mr-2 h-4 w-4" />
                             Copy ID
                         </Clipboard>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                        asChild
+                    >
+                        <Link target="_blank" href={`/scripts/${item.scriptId}/metadata`}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            View metadata
+                        </Link>
                     </DropdownMenuItem>
 
                     {!disabled && (

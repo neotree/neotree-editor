@@ -13,6 +13,10 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 
+export type * from '@/databases/queries/scripts';
+
+export const getScriptsMetadata = queries._getScriptsMetadata;
+
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
     try {

@@ -6,3 +6,5 @@ export * from './_screens_get';
 
 export * from './_diagnoses_count';
 export * from './_diagnoses_get';
+
+export * from './_get_scripts_metadata';
