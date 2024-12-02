@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
@@ -46,6 +46,24 @@ const navItems = [
     //     href: '/settings/data',
     //     section: 'data',
     // },
+    // {
+    //     label: 'Raw scripts',
+    //     href: '/scripts',
+    //     section: 'raw-scripts',
+    //     openInNewTab: true,
+    // },
+    {
+        label: 'Raw screens',
+        href: '/screens',
+        section: 'raw-screens',
+        openInNewTab: true,
+    },
+    {
+        label: 'Raw diagnoses',
+        href: '/diagnoses',
+        section: 'raw-diagnoses',
+        openInNewTab: true,
+    },
 ];
 
 type Props = {
@@ -92,8 +110,17 @@ export function SettingsHeader({ user }: Props) {
                                                 activeItem.section === item.section && 'bg-primary text-primary-foreground',
                                             )}
                                         >
-                                            <Link href={item.href}>
+                                            <Link 
+                                                href={item.href}
+                                                target={item.openInNewTab ? '_blank' : undefined}
+                                            >
                                                 {item.label}
+                                                {!!item.openInNewTab && (
+                                                    <>
+                                                        &nbsp;
+                                                        <ExternalLink className="ml-auto text-primary h-4 w-4" />
+                                                    </>
+                                                )}
                                             </Link>
                                         </DropdownMenuItem>
                                     ))}
