@@ -20,6 +20,7 @@ type Props = {
     userName: string;
     isActivated: boolean;
     onDelete: () => void;
+    onResetPasswords: () => void;
 };
 
 export function UserAction({ 
@@ -28,6 +29,7 @@ export function UserAction({
     userName, 
     isActivated, 
     onDelete, 
+    onResetPasswords,
 }: Props) {
     const session = useSession();
 
@@ -61,6 +63,13 @@ export function UserAction({
                         disabled={isActivated}
                     >
                         Send activation code
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                        onClick={onResetPasswords}
+                        className="text-danger focus:bg-danger focus:text-danger-foreground"
+                    >
+                        Reset password
                     </DropdownMenuItem>
 
                     <DropdownMenuSeparator />

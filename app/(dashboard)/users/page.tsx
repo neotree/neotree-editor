@@ -5,6 +5,7 @@ import {
     updateUsers, 
     createUsers,
     searchUsers,
+    resetUsersPasswords,
 } from "@/app/actions/users";
 import { getRoles } from "@/app/actions/roles";
 import { Content } from "@/components/content";
@@ -53,6 +54,7 @@ export default async function Users({ searchParams: { page, role, status } }: Pr
                                 updateUsers={updateUsers}
                                 createUsers={createUsers}
                                 searchUsers={searchUsers}
+                                resetUsersPasswords={resetUsersPasswords}
                             />
                         </CardContent>
                     </Card>
