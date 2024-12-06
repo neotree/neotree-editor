@@ -6,6 +6,7 @@ import {
     _deleteUsers, 
     _createUsers,
     _updateUsers,
+    _resetUsersPasswords,
 } from '@/databases/mutations/users';
 import { 
     _getFullUser, 
@@ -20,6 +21,8 @@ import logger from "@/lib/logger";
 // import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
 import { _addUserToken } from "@/databases/mutations/tokens";
 import { isAllowed } from "./is-allowed";
+
+export const resetUsersPasswords = _resetUsersPasswords;
 
 export async function isEmailRegistered(email: string): Promise<{ errors?: string[]; yes: boolean; isActive?: boolean; }>  {
     try {

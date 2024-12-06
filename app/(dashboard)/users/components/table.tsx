@@ -13,6 +13,7 @@ import {
     updateUsers, 
     createUsers,
     searchUsers,
+    resetUsersPasswords,
 } from "@/app/actions/users";
 import {
     Tooltip,
@@ -43,6 +44,7 @@ type Props = {
     updateUsers: typeof updateUsers;
     createUsers: typeof createUsers;
     searchUsers: typeof searchUsers;
+    resetUsersPasswords: typeof resetUsersPasswords;
 };
 
 export function UsersTable({ 
@@ -54,6 +56,7 @@ export function UsersTable({
     updateUsers,
     createUsers,
     searchUsers,
+    resetUsersPasswords,
 }: Props) {
     const searchParams = useSearchParams();
     const { mode } = useAppContext();
@@ -135,6 +138,38 @@ export function UsersTable({
             danger: true,
         });
     }, [confirm, deleteUsers, getUsers, users]);
+
+    const onResetPasswords = useCallback((usersIds: string[], cb?: () => void) => {
+        const names = users.data.filter(u => usersIds.includes(u.userId)).map(u => u.displayName);
+        confirm(() => {
+            (async () => {
+                try {
+                    setLoading(true);
+
+                    // await resetUsersPasswords(userIds);
+
+                    // TODO: replace with server action
+                    await axios.post('/api/users/reset-passwords', {
+                        usersIds,
+                    });
+
+                    toast.success('Passwords reset successful!')
+
+                    cb?.();
+                } catch(e: any) {
+                    toast.error(e.message);
+                } finally {
+                    setLoading(false);
+                }
+            })();
+        }, {
+            title: 'Reset ' + (names.length > 1 ? 'users passwords' : 'user password'),
+            message: `<p>Are you sure you want to reset users passwords:</p> ${names.map(n => `<div class="font-bold text-danger">${n}</div>`).join('')}`,
+            negativeLabel: 'Cancel',
+            positiveLabel: 'Reset',
+            danger: true,
+        });
+    }, [confirm, resetUsersPasswords, users]);
 
     const userForm = (searchParams.parsed.userId || showUserForm) ? (
         <UserForm 
@@ -228,6 +263,7 @@ export function UsersTable({
                                     userName={u.displayName}
                                     isActivated={!!u.activationDate}
                                     onDelete={() => onDelete([u.userId])}
+                                    onResetPasswords={() => onResetPasswords([u.userId])}
                                 />
                             );
                         },

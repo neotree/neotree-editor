@@ -6,9 +6,21 @@ import db from "../pg/drizzle";
 import { users } from "../pg/schema";
 import { _getUser, _getUsers } from '../queries/users';
 
-export async function _deleteUsers(userIds: string[]) {
+export async function _resetUsersPasswords(usersIds: string[]) {
+    for (const userId of usersIds) {
+        await db
+            .update(users)
+            .set({ 
+                password: '',
+            })
+            .where(eq(users.userId, userId));
+    }
+    return true;
+}
+
+export async function _deleteUsers(usersIds: string[]) {
     // clear user's personal information, but keep the user as it is linked to some actions they performed
-    for (const userId of userIds) {
+    for (const userId of usersIds) {
         const deletedAt = new Date();
         await db
             .update(users)
