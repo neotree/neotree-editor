@@ -16,7 +16,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Search } from "./search";
 
 type Props = {
     users: Awaited<ReturnType<typeof getUsers>>;
