@@ -12,7 +12,6 @@ export type SaveDiagnosesData = Partial<DiagnosisType>;
 export type SaveDiagnosesResponse = { 
     success: boolean; 
     errors?: string[]; 
-    info?: { query?: Query; };
 };
 
 export async function _saveDiagnoses({ data, broadcastAction, }: {
@@ -22,7 +21,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
     const response: SaveDiagnosesResponse = { success: false, };
 
     const errors = [];
-    const info: SaveDiagnosesResponse['info'] = {};
+    let sqlInfo: { [key: string]: Query; } = {};
 
     try {
         let index = 0;
@@ -33,13 +32,21 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemDiagnosisId ? null : await db.query.diagnosesDrafts.findFirst({
+                    const getDiagnosisDraftQuery = db.query.diagnosesDrafts.findFirst({
                         where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
                     });
 
-                    const published = (draft || !itemDiagnosisId) ? null : await db.query.diagnoses.findFirst({
+                    sqlInfo[`${diagnosisId} - getDiagnosisDraftQuery`] = getDiagnosisDraftQuery.toSQL();
+
+                    const draft = !itemDiagnosisId ? null : await getDiagnosisDraftQuery.execute();
+
+                    const getPublishedDiagnosisQuery = db.query.diagnoses.findFirst({
                         where: eq(diagnoses.diagnosisId, diagnosisId),
                     });
+
+                    sqlInfo[`${diagnosisId} - getPublishedDiagnosisQuery`] = getPublishedDiagnosisQuery.toSQL();
+
+                    const published = (draft || !itemDiagnosisId) ? null : await getPublishedDiagnosisQuery.execute();
 
                     if (draft) {
                         const data = {
@@ -54,7 +61,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                                 position: data.position,
                             }).where(eq(diagnosesDrafts.diagnosisDraftId, diagnosisId));
 
-                        info.query = q.toSQL();
+                        sqlInfo[`${diagnosisId} - updateDiagnosisDraft`] = q.toSQL();
 
                         await q.execute();
                     } else {
@@ -102,7 +109,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                                     diagnosisId: published?.diagnosisId,
                                 });
 
-                                info.query = q.toSQL();
+                                sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();
 
                                 await q.execute();
                             } else {
@@ -115,19 +122,18 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
                 }
             } catch(e: any) {
                 errors.push(e.message);
+                logger.error('saveDiagnosis SQL (FAILED)', JSON.stringify(sqlInfo));
             }
         }
 
         if (errors.length) {
             response.errors = errors;
-            response.info = info;
         } else {
             response.success = true;
         }
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
-        response.info = info;
         logger.error('_saveDiagnoses ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_diagnoses');
