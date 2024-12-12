@@ -245,10 +245,11 @@ export function ScreenForm({
 
                 <div>
                     <Label secondary htmlFor="condition">Conditional expression</Label>
-                    <Input
+                    <Textarea
                         {...register('condition', { disabled, })}
                         name="condition"
                         noRing={false}
+                        rows={5}
                     />
                     <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
                 </div>
