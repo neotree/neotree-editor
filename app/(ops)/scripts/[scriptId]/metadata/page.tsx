@@ -1,4 +1,5 @@
 import { getScriptsMetadata } from "@/app/actions/scripts";
+import { ScriptMetaActions } from './components/actions';
 
 type Props = {
     params: {
@@ -32,6 +33,8 @@ export default async function OpsScripyPage({ params: { scriptId }, }: Props) {
                     4
                 )}
             </pre>
+
+            <ScriptMetaActions data={scriptsMeta.data} />
         </>
     );
 }
