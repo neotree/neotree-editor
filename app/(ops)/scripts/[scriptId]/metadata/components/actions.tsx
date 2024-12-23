@@ -24,6 +24,8 @@ export function ScriptMetaActions({ data }: {
                 Key: string;
                 Label: string;
                 'Data Type': string;
+                'Value': string;
+                'Value Label': string;
             }[];
 
             script.screens.forEach(screen => {
@@ -37,6 +39,8 @@ export function ScriptMetaActions({ data }: {
                         Key: f.key,
                         Label: f.label,
                         'Data Type': f.dataType || '',
+                        'Value': `${f.value || ''}`,
+                        'Value Label': `${f.valueLabel || ''}`,
                     });
                 });
             });
