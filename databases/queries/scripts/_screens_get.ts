@@ -225,6 +225,14 @@ export async function _getScreen(
 
         const data = (draft?.data || published) as GetScreenResults['data'];
 
+        if (data?.type === 'mwi_edliz_summary_table') {
+            data.items = edlizSummaryData.mwi_edliz_summary_table as ScriptItem[];
+        }
+
+        if (data?.type === 'zw_edliz_summary_table') {
+            data.items = edlizSummaryData.zw_edliz_summary_table as ScriptItem[];
+        }
+
         responseData = !data ? null : {
             ...data,
             isDraft: false,
