@@ -454,12 +454,14 @@ export function Field<P = {}>({
                                         <div className="flex-1 flex flex-col gap-y-5">
                                             <div>
                                                 <Label>Min time</Label>
-                                                <DateTimePicker 
-                                                    disabled={disabled || (minTime === 'time_now')}
-                                                    type="time"
-                                                    value={minTime}
-                                                    onChange={({ time }) => setValue('minTime', time || '', { shouldDirty: true, })}
-                                                />
+                                                {minTime === 'time_now' ? <Input disabled type="time" /> :  (
+                                                    <DateTimePicker 
+                                                        disabled={disabled}
+                                                        type="time"
+                                                        value={minTime}
+                                                        onChange={({ time }) => setValue('minTime', time || '', { shouldDirty: true, })}
+                                                    />
+                                                )}
                                             </div>
                                             
                                             <div className="flex-1 flex items-center space-x-2">
@@ -476,12 +478,14 @@ export function Field<P = {}>({
                                         <div className="flex-1 flex flex-col gap-y-5">
                                             <div>
                                                 <Label>Max time</Label>
-                                                <DateTimePicker 
-                                                    disabled={disabled || (maxTime === 'time_now')}
-                                                    type="time"
-                                                    value={maxTime}
-                                                    onChange={({ time }) => setValue('maxTime', time || '', { shouldDirty: true, })}
-                                                />
+                                                {maxTime === 'time_now' ? <Input disabled type="time" /> : (
+                                                    <DateTimePicker 
+                                                        disabled={disabled}
+                                                        type="time"
+                                                        value={maxTime}
+                                                        onChange={({ time }) => setValue('maxTime', time || '', { shouldDirty: true, })}
+                                                    />
+                                                )}
                                             </div>
 
                                             <div className="flex-1 flex items-center space-x-2">

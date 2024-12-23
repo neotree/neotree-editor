@@ -108,7 +108,6 @@ export function ScreenForm({
                                 setValue('items', [], { shouldDirty: true, });
                                 if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
                                     const items = edlizSummaryData[value] as ScriptItem[]; 
-                                    console.log(items);
                                     setValue('items', items, { shouldDirty: true, });
                                 }
                             }}
