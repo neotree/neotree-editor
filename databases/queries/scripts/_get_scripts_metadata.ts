@@ -26,6 +26,8 @@ export type GetScriptsMetadataResponse = {
                 key: string;
                 type: string;
                 dataType: string | null;
+                value: any;
+                valueLabel: null | string;
             }[];
         }[];
     }[],
@@ -110,12 +112,20 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         label: screen.label,
                         key: screen.key,
                         type: screen.type,
-                        dataType: (() => {
+                        ...(() => {
                             switch(screen.type) {
                                 case 'single_select':
-                                    return 'single_select_option';
+                                    return {
+                                        dataType: 'single_select_option',
+                                        value: null,
+                                        valueLabel: null,
+                                    };
                                 default:
-                                    return screen.dataType;
+                                    return {
+                                        dataType: screen.dataType,
+                                        value: null,
+                                        valueLabel: null,
+                                    };
                             }
                         })(),
                     }];
@@ -129,17 +139,37 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             fields = [];
                             break;
 
+                        case 'yesno':
+                            fields = [
+                                { value: 'true', label: screen.positiveLabel || 'Yes', },
+                                { value: 'false', label: screen.negativeLabel || 'Yes', },
+                            ].map(o => {
+                                return {
+                                    label: screen.label,
+                                    key: screen.key,
+                                    type: screen.type,
+                                    dataType: 'boolean',
+                                    value: o.value,
+                                    valueLabel: o.label,
+                                };
+                            });
+                            break;
+
                         case 'diagnosis':
                             fields = items.map(item => ({
+                                value: item.id,
+                                valueLabel: item.label,
                                 label: item.label,
                                 key: item.id,
                                 type: screen.type,
-                                dataType: null,
+                                dataType: 'diagnosis',
                             }));
                             break;
 
                         case 'checklist':
                             fields = items.map(item => ({
+                                value: item.id,
+                                valueLabel: item.label,
                                 label: item.label,
                                 key: item.key,
                                 type: screen.type,
@@ -148,8 +178,35 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             break;
 
                         case 'form':
-                            fields = screenFields.map(f => {
+                            const formFields = screenFields.map(f => {
                                 let dataType = f.dataType;
+
+                                switch(f.type) {
+                                    case 'datetime':
+                                        dataType = 'datetime';
+                                        break;
+                                    case 'date':
+                                        dataType = 'date';
+                                        break;
+                                    case 'time':
+                                        dataType = 'time';
+                                        break;
+                                    case 'dropdown':
+                                        dataType = 'dropdown';
+                                        break;
+                                    case 'number':
+                                        dataType = 'number';
+                                        break;
+                                    case 'text':
+                                        dataType = 'string';
+                                        if (
+                                            (`${f.key}`.toLowerCase() === 'uid') ||
+                                            `${f.key}`.toLowerCase().includes('nuid')
+                                        ) dataType = 'uid';
+                                        break;
+                                    default:
+                                        dataType = f.dataType;
+                                }
 
                                 if (f.type === 'dropdown') {
                                     const opts = (f.values || '').split('\n')
@@ -157,24 +214,32 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         .filter((v: any) => v)
                                         .map((v: any) => {
                                             v = v.split(',');
-                                            return { value: v[0], label: v[1], };
+                                            return { value: v[0] as string, label: v[1] as string, };
                                         });
-
-                                    dataType = 'dropdown';
+                                    return opts.map(o => {
+                                        return {
+                                            label: f.label,
+                                            key: f.key,
+                                            type: f.type,
+                                            dataType: 'dropdown',
+                                            value: o.value,
+                                            valueLabel: o.label,
+                                        };
+                                    });
                                 }
 
-                                if (
-                                    (`${f.key}`.toLowerCase() === 'uid') ||
-                                    `${f.key}`.toLowerCase().includes('nuid')
-                                ) dataType = 'uid';
-
-                                return {
+                                return [{
                                     label: f.label,
                                     key: f.key,
                                     type: f.type,
                                     dataType,
-                                };
+                                    value: null,
+                                    valueLabel: null,
+                                }];
                             });
+                            fields = formFields.reduce((acc, f) => {
+                                return [...acc, ...f];
+                            }, [] as typeof fields);
                             break;
 
                         case 'multi_select':
@@ -183,6 +248,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 key: item.id,
                                 type: screen.type,
                                 dataType: 'multi_select_option',
+                                value: item.id,
+                                valueLabel: item.label,
                             }));
                             break;
                         default: 
