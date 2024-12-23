@@ -153,6 +153,12 @@ const edlizSummaryData = {
             id: 'ARF3',
         },
         {
+            label: 'Suspected or confirmed sepsis in a twin”',
+            type: 'Antenatal risk factors',
+            subType: '',
+            id: 'ARF4',
+        },
+        {
             label: 'Temperature <35.5 or >37.5',
             type: 'Symptoms and Signs of Sepsis',
             subType: '',
@@ -164,36 +170,36 @@ const edlizSummaryData = {
             subType: '',
             id: 'SSS2',
         },
-        {
-            label: 'Grunting ',
-            type: 'Symptoms and Signs of Sepsis',
-            subType: '',
-            id: 'SSS3',
-        },
-        {
-            label: 'nasal flaring',
-            type: 'Symptoms and Signs of Sepsis',
-            subType: '',
-            id: 'SSS4',
-        },
-        {
-            label: 'fast breathing',
-            type: 'Symptoms and Signs of Sepsis',
-            subType: '',
-            id: 'SSS5',
-        },
+        // {
+        //     label: 'Grunting ',
+        //     type: 'Symptoms and Signs of Sepsis',
+        //     subType: '',
+        //     id: 'SSS3',
+        // },
+        // {
+        //     label: 'nasal flaring',
+        //     type: 'Symptoms and Signs of Sepsis',
+        //     subType: '',
+        //     id: 'SSS4',
+        // },
+        // {
+        //     label: 'fast breathing',
+        //     type: 'Symptoms and Signs of Sepsis',
+        //     subType: '',
+        //     id: 'SSS5',
+        // },
         {
             label: 'chest indrawing',
             type: 'Symptoms and Signs of Sepsis',
             subType: '',
             id: 'SSS6',
         },
-        {
-            label: 'Crepitations in the lungs',
-            type: 'Symptoms and Signs of Sepsis',
-            subType: '',
-            id: 'SSS7',
-        },
+        // {
+        //     label: 'Crepitations in the lungs',
+        //     type: 'Symptoms and Signs of Sepsis',
+        //     subType: '',
+        //     id: 'SSS7',
+        // },
         {
             label: 'Umbilical redness extending to the periumbilical skin or umbilicus draining pus',
             type: 'Symptoms and Signs of Sepsis',
@@ -211,6 +217,12 @@ const edlizSummaryData = {
             type: 'Symptoms and Signs of Sepsis',
             subType: '',
             id: 'SSS10',
+        },
+        {
+            label: 'Painful joint/swelling, reduced movement and irritability if these parts are handled',
+            type: 'Symptoms and Signs of Sepsis',
+            subType: '',
+            id: 'SSS11',
         },
         {
             label: 'Drowsiness',
@@ -241,6 +253,12 @@ const edlizSummaryData = {
             type: 'Signs/symptoms of meningitis',
             subType: '',
             id: 'SM5',
+        },
+        {
+            label: 'Apnoeic episode',
+            type: 'Signs/symptoms of meningitis',
+            subType: '',
+            id: 'SM6',
         },
         {
             label: 'Cold hands and feet',
