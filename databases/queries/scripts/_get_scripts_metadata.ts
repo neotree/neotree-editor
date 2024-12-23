@@ -25,6 +25,7 @@ export type GetScriptsMetadataResponse = {
                 label: string;
                 key: string;
                 type: string;
+                dataType: string | null;
             }[];
         }[];
     }[],
@@ -103,10 +104,20 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];
 
-                    let fields: GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'] = [{
+                    let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0] & {
+                        dataType: string | null;
+                    })[] = [{
                         label: screen.label,
                         key: screen.key,
                         type: screen.type,
+                        dataType: (() => {
+                            switch(screen.type) {
+                                case 'single_select':
+                                    return 'single_select_option';
+                                default:
+                                    return screen.dataType;
+                            }
+                        })(),
                     }];
 
                     switch(screen.type) {
@@ -121,8 +132,9 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'diagnosis':
                             fields = items.map(item => ({
                                 label: item.label,
-                                key: item.label,
+                                key: item.id,
                                 type: screen.type,
+                                dataType: null,
                             }));
                             break;
 
@@ -131,11 +143,14 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 label: item.label,
                                 key: item.key,
                                 type: screen.type,
+                                dataType: null,
                             }));
                             break;
 
                         case 'form':
                             fields = screenFields.map(f => {
+                                let dataType = f.dataType;
+
                                 if (f.type === 'dropdown') {
                                     const opts = (f.values || '').split('\n')
                                         .map((v = '') => v.trim())
@@ -144,11 +159,20 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                             v = v.split(',');
                                             return { value: v[0], label: v[1], };
                                         });
+
+                                    dataType = 'dropdown';
                                 }
+
+                                if (
+                                    (`${f.key}`.toLowerCase() === 'uid') ||
+                                    `${f.key}`.toLowerCase().includes('nuid')
+                                ) dataType = 'uid';
+
                                 return {
                                     label: f.label,
                                     key: f.key,
                                     type: f.type,
+                                    dataType,
                                 };
                             });
                             break;
@@ -158,6 +182,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 label: item.label,
                                 key: item.id,
                                 type: screen.type,
+                                dataType: 'multi_select_option',
                             }));
                             break;
                         default: 

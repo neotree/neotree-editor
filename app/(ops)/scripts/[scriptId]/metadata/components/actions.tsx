@@ -23,6 +23,7 @@ export function ScriptMetaActions({ data }: {
                 'Screen Type': string;
                 Key: string;
                 Label: string;
+                'Data Type': string;
             }[];
 
             script.screens.forEach(screen => {
@@ -35,6 +36,7 @@ export function ScriptMetaActions({ data }: {
                         'Screen Type': screen.type || '',
                         Key: f.key,
                         Label: f.label,
+                        'Data Type': f.dataType || '',
                     });
                 });
             });
