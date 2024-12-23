@@ -1514,21 +1514,21 @@
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/json.js": {
-    "id": 11584,
+    "id": 73261,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_json.65a5b38ee9bb0974.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_json.e6ef29c40fc0da2e.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/json5.js": {
     "id": 50497,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_json5.06c4316b62fc9cee.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_json5.0ea39a997a6388ac.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/jsonp.js": {
     "id": 99623,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_jsonp.443f6a8b64a7e3b5.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_jsonp.1f7a0dfed62ec081.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/jsstacktrace.js": {
