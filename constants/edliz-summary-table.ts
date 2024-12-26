@@ -281,4 +281,26 @@ const edlizSummaryData = {
     ],
 };
 
+const { types, subTypes } = Object.keys(edlizSummaryData).reduce((acc, key) => {
+    const items = edlizSummaryData[key as keyof typeof edlizSummaryData];
+    items.forEach(item => { 
+        if (item.type) acc.types[item.type] = item.type; 
+        if (item.subType) acc.subTypes[item.subType] = item.subType; 
+    });
+    return acc;
+}, { types: {}, subTypes: {}, } as {
+    types: { [key: string]: string; };
+    subTypes: { [key: string]: string; };
+});
+
+export const edlizSummaryItemTypes = Object.keys(types).map(value => ({
+    value,
+    label: types[value],
+}));
+
+export const edlizSummaryItemSubTypes = Object.keys(subTypes).map(value => ({
+    value,
+    label: subTypes[value],
+}));
+
 export default edlizSummaryData;

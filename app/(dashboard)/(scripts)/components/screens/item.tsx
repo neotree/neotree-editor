@@ -12,20 +12,32 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { edlizSummaryItemSubTypes } from '@/constants/edliz-summary-table';
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
     disabled?: boolean;
+    form: ReturnType<typeof useScreenForm>;
+    itemType?: string;
     item?: {
         index: number;
         data: ItemType,
     };
-    form: ReturnType<typeof useScreenForm>;
 };
 
 export function Item<P = {}>({
     children,
     item: itemProp,
+    itemType,
     form,
     disabled: disabledProp,
     ...extraProps
@@ -35,6 +47,7 @@ export function Item<P = {}>({
     const isProgressScreen = screenType === 'progress';
     const isChecklistScreen = screenType === 'checklist';
     const isMultiSelectScreen = screenType === 'multi_select';
+    const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
@@ -47,7 +60,7 @@ export function Item<P = {}>({
             label: item?.label || '',
             position: item?.position || 1,
             subType: item?.subType || '',
-            type: item?.type || '',
+            type: item?.type || itemType || '',
             exclusive: item?.exclusive || false,
             confidential: item?.confidential || false,
             checked: item?.checked || false,
@@ -71,7 +84,7 @@ export function Item<P = {}>({
             })(),
             ...item
         } satisfies ItemType;
-    }, [item, screenType]);
+    }, [item, screenType, itemType]);
 
     const {
         reset: resetForm,
@@ -84,6 +97,7 @@ export function Item<P = {}>({
     });
 
     const id = watch('id');
+    const subType = watch('subType');
     const label = watch('label');
     const key = watch('key');
     const enterValueManually = watch('enterValueManually');
@@ -271,6 +285,36 @@ export function Item<P = {}>({
                                                     <Label secondary htmlFor="enterValueManually">Enter value manually if selected</Label>
                                                 </div>
                                             </>
+                                        )}
+
+                                        {isEdlizSummaryScreen && (
+                                            <div>
+                                                <Label htmlFor="subType">Sub type</Label>
+                                                <div>
+                                                    <Select
+                                                        value={subType || ''}
+                                                        disabled={disabled}
+                                                        name="subType"
+                                                        onValueChange={value => {
+                                                            setValue('subType', value, { shouldDirty: true, });
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select sub type" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                        <SelectGroup>
+                                                            <SelectLabel>Sub types</SelectLabel>
+                                                            {edlizSummaryItemSubTypes.map(s => (
+                                                                <SelectItem key={s.value} value={s.value}>
+                                                                    {s.label}
+                                                                </SelectItem>
+                                                            ))}
+                                                            </SelectGroup>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
                                         )}
                                     </>
                                 );
