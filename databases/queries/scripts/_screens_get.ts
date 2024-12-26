@@ -1,6 +1,5 @@
 import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
-import edlizSummaryData from "@/constants/edliz-summary-table";
 
 import db from "@/databases/pg/drizzle";
 import { screens, screensDrafts, pendingDeletion, scripts, hospitals } from "@/databases/pg/schema";
@@ -143,22 +142,7 @@ export async function _getScreens(
             } as GetScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId))
-            .map(s => {
-                if (s.type === 'mwi_edliz_summary_table') {
-                    s.items = edlizSummaryData.mwi_edliz_summary_table as ScriptItem[];
-                }
-
-                if (s.type === 'zw_edliz_summary_table') {
-                    s.items = edlizSummaryData.zw_edliz_summary_table as ScriptItem[];
-                }
-
-                return {
-                    ...s,
-                    scriptTitle: s.scriptTitle || '',
-                    hospitalName: s.hospitalName || '',
-                };
-            });
+            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
 
         return  { 
             data: responseData,
@@ -224,14 +208,6 @@ export async function _getScreen(
         draft = returnDraftIfExists ? published?.draft : undefined;
 
         const data = (draft?.data || published) as GetScreenResults['data'];
-
-        if (data?.type === 'mwi_edliz_summary_table') {
-            data.items = edlizSummaryData.mwi_edliz_summary_table as ScriptItem[];
-        }
-
-        if (data?.type === 'zw_edliz_summary_table') {
-            data.items = edlizSummaryData.zw_edliz_summary_table as ScriptItem[];
-        }
 
         responseData = !data ? null : {
             ...data,

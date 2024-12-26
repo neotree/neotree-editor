@@ -3,7 +3,6 @@ import { and, inArray, isNull } from "drizzle-orm";
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals } from "@/databases/pg/schema";
 import { ScriptField, ScriptItem } from "@/types";
-import edlizSummaryData from "@/constants/edliz-summary-table";
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -73,22 +72,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 ...s,
                 ...(returnDraftsIfExist && s.draft ? s.draft.data : null),
                 screens: s.screens
-                    .map(screen => {
-                        const s = {
-                            ...screen,
-                            ...(returnDraftsIfExist && screen.draft ? screen.draft.data : null),
-                        };
-
-                        if (s.type === 'mwi_edliz_summary_table') {
-                            s.items = edlizSummaryData.mwi_edliz_summary_table as ScriptItem[];
-                        }
-        
-                        if (s.type === 'zw_edliz_summary_table') {
-                            s.items = edlizSummaryData.zw_edliz_summary_table as ScriptItem[];
-                        }
-
-                        return s;
-                    })
                     .sort((a, b) => a.position - b.position),
             }))
             .sort((a, b) => a.position - b.position);
