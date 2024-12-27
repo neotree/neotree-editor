@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
 
@@ -21,12 +21,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { edlizSummaryItemSubTypes } from '@/constants/edliz-summary-table';
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
+    types?: { value: string; label: string; }[];
+    subTypes?: { value: string; label: string; }[];
     itemType?: string;
     item?: {
         index: number;
@@ -40,6 +41,8 @@ export function Item<P = {}>({
     itemType,
     form,
     disabled: disabledProp,
+    types = [],
+    subTypes = [],
     ...extraProps
 }: Props & P) {
     const screenType = form.getValues('type');
@@ -52,6 +55,13 @@ export function Item<P = {}>({
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
     const [open, setOpen] = useState(false);
+    const [isCustomType, setIsCustomType] = useState(false);
+    const [isCustomSubType, setIsCustomSubType] = useState(false);
+
+    useEffect(() => {
+        setIsCustomType(!types.length);
+        setIsCustomSubType(!subTypes.length);
+    }, [open, types, subTypes]);
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -68,6 +78,7 @@ export function Item<P = {}>({
             severity_order: item?.severity_order || '',
             summary: item?.summary || '',
             key: item?.key || '',
+            score: item?.score || ('' as unknown as number),
             dataType: (() => {
                 switch (screenType) {
                     //   case 'list':
@@ -98,6 +109,7 @@ export function Item<P = {}>({
 
     const id = watch('id');
     const subType = watch('subType');
+    const type = watch('type');
     const label = watch('label');
     const key = watch('key');
     const enterValueManually = watch('enterValueManually');
@@ -113,7 +125,10 @@ export function Item<P = {}>({
         if (!isEmpty(itemIndex) && item) {
             form.setValue('items', form.getValues('items').map((f, i) => ({
                 ...f,
-                ...(i === itemIndex ? data : null),
+                ...(i !== itemIndex ? null : {
+                    ...data,
+                    score: data.score ? Number(data.score) : null,
+                }),
             })));
         } else {
             form.setValue('items', [...form.getValues('items'), data], { shouldDirty: true, })
@@ -288,33 +303,113 @@ export function Item<P = {}>({
                                         )}
 
                                         {isEdlizSummaryScreen && (
-                                            <div>
-                                                <Label htmlFor="subType">Sub type</Label>
+                                            <>
                                                 <div>
-                                                    <Select
-                                                        value={subType || ''}
-                                                        disabled={disabled}
-                                                        name="subType"
-                                                        onValueChange={value => {
-                                                            setValue('subType', value, { shouldDirty: true, });
-                                                        }}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select sub type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                        <SelectGroup>
-                                                            <SelectLabel>Sub types</SelectLabel>
-                                                            {edlizSummaryItemSubTypes.map(s => (
-                                                                <SelectItem key={s.value} value={s.value}>
-                                                                    {s.label}
-                                                                </SelectItem>
-                                                            ))}
-                                                            </SelectGroup>
-                                                        </SelectContent>
-                                                    </Select>
+                                                    <Label htmlFor="type">Type</Label>
+                                                    <div>
+                                                        {isCustomType ? (
+                                                            <Input
+                                                                {...register('type', { disabled, required: true, })}
+                                                                name="type"
+                                                                error={!disabled && !type}
+                                                            />
+                                                        ) : (
+                                                            <Select
+                                                                value={type || ''}
+                                                                disabled={disabled}
+                                                                name="type"
+                                                                onValueChange={value => {
+                                                                    setValue('type', value, { shouldDirty: true, });
+                                                                }}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                <SelectGroup>
+                                                                    <SelectLabel>Types</SelectLabel>
+                                                                    {types.map(s => (
+                                                                        <SelectItem key={s.value} value={s.value}>
+                                                                            {s.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                    </SelectGroup>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )}
+                                                        {!!types.length && (
+                                                            <a
+                                                                href="#"
+                                                                onClick={e => {
+                                                                    e.preventDefault();
+                                                                    setValue('type', isCustomType ? itemType || item?.type || '' : '', { shouldDirty: true, });
+                                                                    setIsCustomType(prev => !prev);
+                                                                }}
+                                                                className="text-xs text-primary"
+                                                            >
+                                                                {isCustomType ? 'Select existing type' : 'Add new type'}
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
+
+                                                <div>
+                                                    <Label htmlFor="subType">Sub type</Label>
+                                                    <div>
+                                                        {isCustomSubType ? (
+                                                            <Input
+                                                                {...register('subType', { disabled, required: false, })}
+                                                                name="subType"
+                                                            />
+                                                        ) : (
+                                                            <Select
+                                                                value={subType || ''}
+                                                                disabled={disabled}
+                                                                name="subType"
+                                                                onValueChange={value => {
+                                                                    setValue('subType', value, { shouldDirty: true, });
+                                                                }}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select sub type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                <SelectGroup>
+                                                                    <SelectLabel>Sub types</SelectLabel>
+                                                                    {subTypes.map(s => (
+                                                                        <SelectItem key={s.value} value={s.value}>
+                                                                            {s.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                    </SelectGroup>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )}
+                                                        {!!subTypes.length && (
+                                                            <a
+                                                                href="#"
+                                                                onClick={e => {
+                                                                    e.preventDefault();
+                                                                    setValue('subType', isCustomSubType ? item?.subType || '' : '', { shouldDirty: true, });
+                                                                    setIsCustomSubType(prev => !prev);
+                                                                }}
+                                                                className="text-xs text-primary"
+                                                            >
+                                                                {isCustomSubType ? 'Select existing sub type' : 'Add new sub type'}
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <Label htmlFor="label">Score</Label>
+                                                    <Input
+                                                        {...register('score', { disabled, required: false, })}
+                                                        name="score"
+                                                        type="number"
+                                                    />
+                                                </div>
+                                            </>
                                         )}
                                     </>
                                 );

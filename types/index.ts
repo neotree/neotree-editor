@@ -41,6 +41,7 @@ export type ScriptItem = {
     summary: string;
     key: string;
     dataType: null | string;
+    score: null | number;
 };
 
 export type ScriptField = {
