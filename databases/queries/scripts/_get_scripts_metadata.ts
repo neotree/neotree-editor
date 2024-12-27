@@ -97,12 +97,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         type: screen.type,
                         ...(() => {
                             switch(screen.type) {
-                                case 'single_select':
-                                    return {
-                                        dataType: 'single_select_option',
-                                        value: null,
-                                        valueLabel: null,
-                                    };
                                 default:
                                     return {
                                         dataType: screen.dataType,
@@ -225,10 +219,21 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             }, [] as typeof fields);
                             break;
 
+                        case 'single_select':
+                            fields = items.map(item => ({
+                                label: screen.label,
+                                key: screen.key,
+                                type: screen.type,
+                                dataType: 'single_select_option',
+                                value: item.id,
+                                valueLabel: item.label,
+                            }));
+                            break;
+
                         case 'multi_select':
                             fields = items.map(item => ({
-                                label: item.label,
-                                key: item.id,
+                                label: screen.label,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'multi_select_option',
                                 value: item.id,
