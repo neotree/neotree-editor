@@ -6,15 +6,15 @@ import logger from "@/lib/logger";
 import { generateDeviceHash } from '@/lib/generate-device-hash';
 import { DeviceDetails } from "@/types";
 
-export async function _isDeviceHashUnique(hash: string) {
-    const [{ count: exists }] = await db.select({ count: count(), }).from(devices).where(eq(devices.deviceHash, hash));
-    return !exists;
+export async function deviceHashExists(hash: string) {
+    const [{ count: n }] = await db.select({ count: count(), }).from(devices).where(eq(devices.deviceHash, hash));
+    return !!n;
 } 
 
 export async function _getUniqueDeviceHash(deviceId: string, length = 4) {
     let hash = generateDeviceHash(deviceId, length);
-    const isUnique = await _isDeviceHashUnique(hash);
-    if (isUnique) hash = await generateDeviceHash(deviceId, length);
+    const hashExists = await deviceHashExists(hash);
+    if (hashExists) hash = await generateDeviceHash(deviceId, length);
     return hash;
 } 
 
