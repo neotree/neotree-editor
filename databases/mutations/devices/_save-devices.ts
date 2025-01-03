@@ -1,4 +1,4 @@
-import { count, eq, inArray, or, SQL, } from 'drizzle-orm';
+import { count, eq, inArray, or, } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
@@ -16,7 +16,6 @@ export type SaveDevicesResponse = {
     inserted: (Omit<typeof devices.$inferSelect, 'details'> & {
         details: DeviceDetails;
     })[];
-    sql?: SQL[];
     errors?: string[]; 
 };
 
@@ -25,7 +24,6 @@ export async function _saveDevices({ data, returnSaved, }: {
     returnSaved?: boolean;
 }) {
     const response: SaveDevicesResponse = { success: false, inserted: [], };
-    let sql: SQL[] = [];
 
     try {
         const devicesIds = data.map(d => d.deviceId).filter(s => s);
@@ -45,8 +43,6 @@ export async function _saveDevices({ data, returnSaved, }: {
                 const q = db.update(devices).set(item).where(or(
                     eq(devices.deviceId, deviceId)
                 ));
-
-                sql.push(q.getSQL());
 
                 if (returnSaved) {
                     const inserted = await q.returning();
@@ -72,8 +68,6 @@ export async function _saveDevices({ data, returnSaved, }: {
 
             const q = db.insert(devices).values(_insertData);
 
-            sql.push(q.getSQL());
-
             if (returnSaved) {
                 const inserted = await q.returning();
                 response.inserted = inserted.map(d => ({
@@ -96,7 +90,6 @@ export async function _saveDevices({ data, returnSaved, }: {
         logger.error('_saveDevices ERROR', e.message);
     } finally {
         if (!response?.errors?.length) socket.emit('data_changed', 'save_devices');
-        if (response.errors?.length) response.sql = sql;
         return response;
     }
 }
