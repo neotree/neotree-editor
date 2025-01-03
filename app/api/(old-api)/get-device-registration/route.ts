@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
 
         const deviceId = req.nextUrl.searchParams.get('deviceId');
 
-        const res = await getDevice(deviceId!);
+        if (!deviceId) return NextResponse.json({ deviceId, errors: ['Missing deviceId'], });
+
+        const res = await getDevice(deviceId);
 
         if (res.errors?.length) return NextResponse.json({ errors: res.errors, });
 
