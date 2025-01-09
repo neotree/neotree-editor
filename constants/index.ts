@@ -14,6 +14,7 @@ export const scriptsPageTabs = [
     { value: 'screens', label: 'Screens', },
     { value: 'diagnoses', label: 'Diagnoses', },
     { value: 'print', label: 'Print', },
+    { value: 'drugs-library', label: 'Drugs library', },
 ];
 
 export const scriptTypes = [
