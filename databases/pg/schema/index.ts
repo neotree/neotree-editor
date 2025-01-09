@@ -403,6 +403,7 @@ export const scriptsRelations = relations(scripts, ({ many, one }) => ({
     diagnosesDrafts: many(diagnosesDrafts),
     diagnosesHistory: many(diagnosesHistory),
     history: many(scriptsHistory),
+    drugsLibrary: many(drugsLibrary),
     draft: one(scriptsDrafts, {
         fields: [scripts.scriptId],
         references: [scriptsDrafts.scriptId],
@@ -780,5 +781,30 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     configKeyDraft: one(configKeysDrafts, {
         fields: [pendingDeletion.configKeyId],
         references: [configKeysDrafts.configKeyDraftId],
+    }),
+}));
+
+// DRUGS LIBRARY
+export const drugsLibrary = pgTable('nt_drugs_library', {
+    id: serial('id').primaryKey(),
+    itemId: uuid('item_id').notNull().unique().defaultRandom(),
+    scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
+    scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
+    drug: text('drug').notNull().default(''),
+    minGestation: integer('min_gestation'),
+    maxGestation: integer('max_gestation'),
+    minWeight: integer('min_weight'),
+    maxWeight: integer('max_weight'),
+    dayOfLife: text('day_of_life').notNull().default(''),
+    dosageText: text('dosage_text').notNull().default(''),
+    managementText: text('management_text').notNull().default(''),
+    gestationKey: text('gestation_key').notNull().default(''),
+    weightKey: text('weight_key').notNull().default(''),
+});
+
+export const drugsLibraryRelations = relations(drugsLibrary, ({ one }) => ({
+    script: one(scripts, {
+        fields: [drugsLibrary.scriptId],
+        references: [scripts.scriptId],
     }),
 }));
