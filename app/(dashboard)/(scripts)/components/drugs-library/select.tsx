@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, PlusIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -21,10 +21,18 @@ import { DrugsLibraryForm } from './form';
 type Props = {
     disabled?: boolean;
     scriptId: string;
+    selected?: string[];
+    unselectable?: string[];
     onChange: (selected: string[]) => void;
 };
 
-export function SelectDrug({ scriptId, disabled, onChange }: Props) {
+export function SelectDrug({ 
+    scriptId, 
+    disabled, 
+    selected: selectedProp, 
+    unselectable = [],
+    onChange 
+}: Props) {
     const { 
         loading, 
         drugs, 
@@ -34,7 +42,9 @@ export function SelectDrug({ scriptId, disabled, onChange }: Props) {
         saveDrugs 
     } = useDrugsLibrary(scriptId!);
 
-    const [selected, setSelected] = useState<string[]>([]);
+    const [selected, setSelected] = useState<string[]>(selectedProp || []);
+
+    useEffect(() => { setSelected(selectedProp || []); }, [selectedProp]);
 
     return (
         <>
@@ -66,7 +76,11 @@ export function SelectDrug({ scriptId, disabled, onChange }: Props) {
                         <SelectGroup>
                             <SelectLabel>Screen types</SelectLabel>
                             {drugs.map(item => (
-                                <SelectItem key={item.itemId} value={item.itemId!}>
+                                <SelectItem 
+                                    key={item.itemId} 
+                                    value={item.itemId!}
+                                    disabled={unselectable.includes(item.itemId!)}
+                                >
                                     {item.drug}
                                 </SelectItem>
                             ))}

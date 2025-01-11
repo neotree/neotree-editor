@@ -39,9 +39,20 @@ export function Item<P = {}>({
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
     const onSave = useCallback(() => {
-        
+        if (selected) {
+            if (itemProp?.index === undefined) {
+                form.setValue('drugs', [...form.getValues('drugs'), selected], { shouldDirty: true, })
+            } else {
+                form.setValue('drugs', form.getValues('drugs').map((f, i) => ({
+                    ...f,
+                    ...(i !== itemProp.index ? null : {
+                        ...selected,
+                    }),
+                })));
+            }
+        }
         setOpen(false);
-    }, [selected]);
+    }, [selected, itemProp]);
 
     return (
         <>
@@ -81,9 +92,22 @@ export function Item<P = {}>({
                         <SelectDrug 
                             scriptId={scriptId}
                             disabled={disabled}
-                            onChange={([id]) => setSelected(!id ? null : {
-                                id,
-                            })}
+                            selected={selected?.id ? [selected.id] : []}
+                            unselectable={form.getValues('drugs').map(item => item.id).filter(s => s !== selected?.id!)}
+                            onChange={([id]) => {
+                                let position = form.getValues('drugs').length ? 
+                                    1 
+                                    : 
+                                    (Math.max(...form.getValues('drugs').map(s => s.position)) + 1);
+
+                                if (itemProp?.data) position = itemProp.data.position;
+
+                                setSelected(!id ? null : {
+                                    ...itemProp?.data,
+                                    id,
+                                    position,
+                                })
+                            }}
                         />
                     </div>
                 </div>

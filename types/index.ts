@@ -28,6 +28,7 @@ export type PrintSection = {
 
 export type DrugField = {
     id: string;
+    position: number;
 };
 
 export type ScriptItem = {

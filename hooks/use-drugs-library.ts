@@ -1,31 +1,82 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
+import { create } from "zustand";
 
-import { saveScriptsDrugs } from "@/app/actions/scripts";
+import { saveScriptsDrugs, getScriptsMetadata } from "@/app/actions/scripts";
+import { useAlertModal } from "@/hooks/use-alert-modal";
 
-type Drug = Parameters<typeof saveScriptsDrugs>[0]['data'][0]
+type Drug = Parameters<typeof saveScriptsDrugs>[0]['data'][0];
+
+export type DrugsLibraryState = {
+    initialised: boolean;
+    loading: boolean;
+    keys: string[];
+    drugs: Drug[];
+};
+
+const defaultState: DrugsLibraryState = {
+    initialised: false,
+    loading: false,
+    keys: [],
+    drugs: [],
+};
+
+const useDrugsLibraryState = create<DrugsLibraryState>(set => {
+    return defaultState;
+});
+
+export function resetDrugsLibraryState() {
+    useDrugsLibraryState.setState(defaultState);
+}
 
 export function useDrugsLibrary(scriptId: string) {
-    const initialised = useRef(false);
-    const [loading, setLoading] = useState(false);
-    const [drugs, setDrugs] = useState<Drug[]>([]);
+    const state = useDrugsLibraryState();
+    const { drugs, } = state;
 
     const searchParams = useSearchParams();
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId } = searchParamsObj;
 
+    const { alert } = useAlertModal();
+
+    const getScriptKeys = useCallback(async () => {
+        try {
+            const res = await axios.get<Awaited<ReturnType<typeof getScriptsMetadata>>>('/api/scripts/metadata?data='+JSON.stringify({ scriptsIds: [scriptId], }));
+            const { data, errors } = res.data;
+
+            if (errors?.length) throw new Error(errors.join(', '));
+
+            const keys = data.reduce((acc, item) => {
+                item.screens.forEach(s => s.fields.forEach(f => {
+                    if (f.key) {
+                        acc[f.key.toLowerCase()] = f.key;
+                    }
+                }));
+                return acc;
+            }, {} as { [key: string]: string; })
+
+            useDrugsLibraryState.setState({ keys: Object.values(keys), });
+        } catch(e: any) {
+            alert({
+                title: '',
+                message: 'Error: ' + e.message,
+                variant: 'error',
+            });
+        }
+    }, [scriptId, open, alert]);
+
     const getDrugs = useCallback(async () => {
         try {
-            setLoading(true);
+            useDrugsLibraryState.setState({ loading: true, });
             const res = await axios.get<Awaited<ReturnType<typeof saveScriptsDrugs>>>(
                 '/api/scripts/drugs-library?data=' + JSON.stringify({ scriptsIds: [scriptId], }),
             );
             if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
-            setDrugs(res.data.data as Drug[]);
+            useDrugsLibraryState.setState({ drugs: res.data.data as Drug[], });
         } catch(e: any) {
             alert({
                 title: 'Error',
@@ -33,14 +84,16 @@ export function useDrugsLibrary(scriptId: string) {
                 variant: 'error',
             });
         } finally {
-            setLoading(false);
+            useDrugsLibraryState.setState({ loading: false, });
         }
     }, [alert, scriptId]);
 
     const deleteDrugs = useCallback(async (ids: string[]) => {
         try {
-            setLoading(true);
-            setDrugs(prev => prev.filter(item => !ids.includes(item.itemId!)));
+            useDrugsLibraryState.setState(prev => ({ 
+                loading: true,
+                drugs: prev.drugs.filter(item => !ids.includes(item.itemId!)), 
+            }));
             const res = await axios.delete<Awaited<ReturnType<typeof saveScriptsDrugs>>>(
                 '/api/scripts/drugs-library?data=' + JSON.stringify({ itemsIds: ids, }),
             );
@@ -57,25 +110,28 @@ export function useDrugsLibrary(scriptId: string) {
                 variant: 'error',
             });
         } finally {
-            setLoading(false);
+            useDrugsLibraryState.setState({ loading: false, });
         }
     }, [alert]);
 
     const saveDrugs = useCallback(async (item?: Drug) => {
         try {
-            setLoading(true);
+            useDrugsLibraryState.setState({ loading: true, });
 
             let updated = drugs;
-            setDrugs(prev => {
+            useDrugsLibraryState.setState(prev => {
                 if (!itemId && item) {
-                    updated = [...prev, item];
+                    updated = [...prev.drugs, item];
                 } else {
-                    updated = prev.map(s => s.itemId !== item?.itemId ? s : {
+                    updated = prev.drugs.map(s => s.itemId !== item?.itemId ? s : {
                         ...s,
                         ...item,
                     });
                 }
-                return updated;
+                return {
+                    loading: true,
+                    drugs: updated,
+                };
             });
 
             const payload: Parameters<typeof saveScriptsDrugs>[0] = {
@@ -104,23 +160,31 @@ export function useDrugsLibrary(scriptId: string) {
                 variant: 'error',
             });
         } finally {
-            setLoading(false);
+            useDrugsLibraryState.setState({ loading: false, });
         }
     }, [drugs, itemId]);
 
     useEffect(() => {
-        if (!initialised.current) getDrugs();
-        initialised.current = true;
-    }, [getDrugs]);
+        if (!useDrugsLibraryState.getState().initialised) {
+            getScriptKeys();
+            getDrugs();
+            useDrugsLibraryState.setState({ initialised: true, });
+        }
+    }, [getDrugs, getScriptKeys]);
+
+    const resetState = useCallback(() => {
+        useDrugsLibraryState.setState(defaultState);
+    }, []);
 
     return {
-        loading,
-        drugs,
+        ...state,
         selectedItemId: itemId,
         addLink: `?${queryString.stringify({ ...searchParamsObj, addDrug: 1, })}`,
         editLink: (itemId: string) => `?${queryString.stringify({ ...searchParamsObj, itemId, })}`,
         getDrugs,
         deleteDrugs,
         saveDrugs,
+        resetState,
+        getScriptKeys,
     };
 }
