@@ -26,6 +26,11 @@ export type PrintSection = {
     screensIds: string[];
 };
 
+export type DrugField = {
+    id: string;
+    position: number;
+};
+
 export type ScriptItem = {
     id: string;
     label: string;

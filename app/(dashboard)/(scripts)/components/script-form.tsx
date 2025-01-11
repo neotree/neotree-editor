@@ -270,7 +270,7 @@ export function ScriptForm(props: Props) {
                     {section === 'drugs-library' && (
                         <DrugsLibrary 
                             disabled={disabled}
-                            form={form}
+                            scriptId={form.getValues('scriptId')!}
                         />
                     )}
                 </div>

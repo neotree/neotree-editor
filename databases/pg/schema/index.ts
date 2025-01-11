@@ -519,6 +519,7 @@ export const screens = pgTable(
         fields: jsonb('fields').default('[]').notNull(),
         items: jsonb('items').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        drugs: jsonb('drugs').default('[]').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
