@@ -4,7 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { screens, screensDrafts, pendingDeletion, scripts, hospitals } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { ScriptField, ScriptItem, ScriptImage, Preferences } from "@/types";
+import { DrugField, ScriptField, ScriptItem, ScriptImage, Preferences } from "@/types";
 
 export type GetScreensParams = {
     screensIds?: string[];
@@ -19,6 +19,7 @@ export type ScreenType = typeof screens.$inferSelect & {
     isDeleted: boolean;
     fields: ScriptField[];
     items: ScriptItem[];
+    drugs: DrugField[];
     prePopulate: string[];
     preferences: Preferences;
     image1: null | ScriptImage;

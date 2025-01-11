@@ -30,6 +30,7 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'progress',
     'timer',
     'yesno',
+    'drugs',
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
     'edliz_summary_table',

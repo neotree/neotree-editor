@@ -33,6 +33,7 @@ export const screenTypes = [
     { value: 'progress', label: 'Progress' },
     { value: 'timer', label: 'Timer' },
     { value: 'yesno', label: 'Yes/No' },
+    { value: 'drugs', label: 'Drug, Fluid and Feeds' },
     { value: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { value: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
     { value: 'diagnosis', label: 'Diagnosis' },
