@@ -74,7 +74,7 @@ export function SelectDrug({
                         </SelectTrigger>
                         <SelectContent>
                         <SelectGroup>
-                            <SelectLabel>Screen types</SelectLabel>
+                            <SelectLabel>Drugs</SelectLabel>
                             {drugs.map(item => (
                                 <SelectItem 
                                     key={item.itemId} 
