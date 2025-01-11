@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
 import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
 
@@ -14,6 +14,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { ItemsBottomActions } from "./items-bottom-actions";
 import { Item } from "./item";
 
@@ -26,18 +27,27 @@ export function Drugs({
     form,
     disabled,
 }: Props) {
-    const screenType = form.getValues('type');
-
+    const { drugs } = useDrugsLibrary(form.getValues('scriptId'));
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
-    const items = form.watch('items');
+    const screenDrugs = form.watch('drugs');
+
+    const items = useMemo(() => {
+        return screenDrugs.map(item => {
+            const data = drugs.filter(d => d.itemId === item.id)[0];
+            return {
+                ...item,
+                data: data as typeof data | null,
+            };
+        });
+    }, [screenDrugs, drugs]);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
-        const data = arrayMoveImmutable([...items], oldIndex, newIndex);
+        const sorted = arrayMoveImmutable([...items], oldIndex, newIndex);
         form.setValue(
-            'items',
-            data.map((s, i) => ({
+            'drugs',
+            sorted.map(({ data, ...s }, i) => ({
                 ...s,
                 position: i + 1,
             })),
@@ -46,12 +56,12 @@ export function Drugs({
     }, [form, items]);
 
     const onDelete = useCallback((indexes: number[]) => {
-        const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold text-danger">${s.label}</div>`).join('');
+        const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold text-danger">${s?.data?.drug}</div>`).join('');
         confirm(() => {
             const data = items.filter((_, i) => !indexes.includes(i));
             form.setValue(
-                'items',
-                data.map((s, i) => ({
+                'drugs',
+                data.map(({ data, ...s }, i) => ({
                     ...s,
                     position: i + 1,
                 })),
@@ -67,7 +77,7 @@ export function Drugs({
     }, [form, items, confirm]);
 
     const onCopy = useCallback((indexes: number[]) => {
-        const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold">${s.label}</div>`).join('');
+        const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold">${s?.data?.drug}</div>`).join('');
         confirm(() => {
             const data = [
                 ...items,
@@ -77,8 +87,8 @@ export function Drugs({
                 })),
             ];
             form.setValue(
-                'items',
-                data.map((s, i) => ({
+                'drugs',
+                data.map(({ data, ...s }, i) => ({
                     ...s,
                     position: i + 1,
                 })),
@@ -124,10 +134,13 @@ export function Drugs({
                 )}
                 columns={[
                     {
-                        name: 'Key',
+                        name: 'Drug',
                     },
                     {
-                        name: 'Label',
+                        name: 'Dosage',
+                    },
+                    {
+                        name: 'Management',
                     },
                     {
                         name: 'Action',
@@ -194,9 +207,10 @@ export function Drugs({
                     },
                 ]}
                 data={items.map(f => [
+                    f.data?.drug || '',
+                    f.data?.dosageText || '',
+                    f.data?.managementText || '',
                     f.id,
-                    f.label,
-                    '',
                 ])}
             />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -11,6 +11,7 @@ import { defaultPreferences, scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { resetDrugsLibraryState } from "@/hooks/use-drugs-library";
 
 export type UseScriptFormParams = {
     formData?: ScriptFormDataType;
@@ -25,6 +26,12 @@ export function useScriptForm(params: UseScriptFormParams) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const { saveScripts, } = useScriptsContext();
+
+    useEffect(() => {
+        return () => {
+            resetDrugsLibraryState();
+        };
+    }, []);
 
     const getDefaultFormValues = useCallback(() => {
         return {

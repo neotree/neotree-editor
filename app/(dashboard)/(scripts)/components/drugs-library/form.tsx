@@ -1,19 +1,14 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, ChevronDown } from "lucide-react"
-import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
-import clsx from "clsx";
 
-import { getScriptsMetadata, saveScriptsDrugs } from "@/app/actions/scripts";
 import {
     Select,
     SelectContent,
     SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
@@ -25,18 +20,13 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator"
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
+import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-library";
 
-type Item = Parameters<typeof saveScriptsDrugs>[0]['data'][0]
-
-const getDefaultForm = (item?: Item) => ({
+const getDefaultForm = (item?: DrugsLibraryState['drugs'][0]) => ({
     itemId: `${item?.itemId || uuidv4()}`,
     drug: `${item?.drug || ''}`,
     minGestation: `${item?.minGestation || ''}`,
@@ -52,27 +42,23 @@ const getDefaultForm = (item?: Item) => ({
 
 export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     disabled?: boolean;
-    item?: Item;
+    item?: DrugsLibraryState['drugs'][0];
     floating?: boolean;
-    onChange: (item: Item) => void;
+    onChange: (item: DrugsLibraryState['drugs'][0]) => void;
 }) {
-    const screensInitialised = useRef(false);
-
     const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
     const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(getDefaultForm(item));
-    const [keys, setKeys] = useState<string[]>([]);
-
-    const { alert } = useAlertModal();
 
     const router = useRouter();
     const { scriptId } = useParams();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId, addDrug } = searchParamsObj;
+
+    const { keys, loading } = useDrugsLibrary(scriptId as string);
 
     useEffect(() => {
         setOpen(!!itemId || !!addDrug);
@@ -106,42 +92,6 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
         const scrollPos = containerDiv?.top || 0;
         setTimeout(() => window.scrollTo({ top: scrollPos, }), 500);
     }, [searchParamsObj, containerDiv, router.push]);
-
-    const loadScreens = useCallback(async () => {
-        if (!screensInitialised.current && open) {
-            try {
-                setLoading(true);
-
-                const res = await axios.get<Awaited<ReturnType<typeof getScriptsMetadata>>>('/api/scripts/metadata?data='+JSON.stringify({ scriptsIds: [scriptId], }));
-                const { data, errors } = res.data;
-
-                if (errors?.length) throw new Error(errors.join(', '));
-
-                screensInitialised.current = true;
-
-                const keys = data.reduce((acc, item) => {
-                    item.screens.forEach(s => s.fields.forEach(f => {
-                        if (f.key) {
-                            acc[f.key.toLowerCase()] = f.key;
-                        }
-                    }));
-                    return acc;
-                }, {} as { [key: string]: string; })
-
-                setKeys(Object.values(keys));
-            } catch(e: any) {
-                alert({
-                    title: '',
-                    message: 'Error: ' + e.message,
-                    variant: 'error',
-                });
-            } finally {
-                setLoading(false);
-            }
-        }
-    }, [scriptId, open, alert]);
-
-    useEffect(() => { loadScreens(); }, [open, loadScreens]);
 
     const isFormComplete = useCallback(() => {
         return !!(
