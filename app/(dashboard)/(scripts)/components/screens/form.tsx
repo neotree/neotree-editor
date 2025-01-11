@@ -43,6 +43,7 @@ import { getScreenDataType } from "../../utils";
 import { ImageField } from "../image-field";
 import { Fields } from "./fields";
 import { Items } from "./items";
+import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
 
 type Props = {
@@ -188,6 +189,7 @@ export function ScreenForm({
     const isMultiSelectScreen = type === 'multi_select';
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
+    const isDrugsScreen = type === 'drugs';
 
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
@@ -875,6 +877,17 @@ export function ScreenForm({
                     <Separator className="my-20" />
                     
                     <Items 
+                        form={form}
+                        disabled={disabled}
+                    />
+                </>
+            )}
+
+            {isDrugsScreen && (
+                <>
+                    <Separator className="my-20" />
+                    
+                    <Drugs 
                         form={form}
                         disabled={disabled}
                     />

@@ -82,6 +82,7 @@ export function useScreenForm({
             prePopulate: formData?.prePopulate || [],
             fields: formData?.fields || [],
             items: formData?.items || [],
+            drugs: formData?.drugs || [],
             preferences: formData?.preferences || defaultPreferences,
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);

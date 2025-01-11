@@ -1,19 +1,14 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, ChevronDown } from "lucide-react"
-import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
-import clsx from "clsx";
 
-import { getScriptsMetadata, saveScriptsDrugs } from "@/app/actions/scripts";
 import {
     Select,
     SelectContent,
     SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
@@ -25,18 +20,13 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator"
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
+import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-library";
 
-type Item = Parameters<typeof saveScriptsDrugs>[0]['data'][0]
-
-const getDefaultForm = (item?: Item) => ({
+const getDefaultForm = (item?: DrugsLibraryState['drugs'][0]) => ({
     itemId: `${item?.itemId || uuidv4()}`,
     drug: `${item?.drug || ''}`,
     minGestation: `${item?.minGestation || ''}`,
@@ -50,28 +40,25 @@ const getDefaultForm = (item?: Item) => ({
     weightKey: `${item?.weightKey || ''}`,
 });
 
-export function DrugsLibraryForm({ disabled, item, onChange }: {
+export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     disabled?: boolean;
-    item?: Item;
-    onChange: (item: Item) => void;
+    item?: DrugsLibraryState['drugs'][0];
+    floating?: boolean;
+    onChange: (item: DrugsLibraryState['drugs'][0]) => void;
 }) {
-    const screensInitialised = useRef(false);
-
     const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
     const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(getDefaultForm(item));
-    const [keys, setKeys] = useState<string[]>([]);
-
-    const { alert } = useAlertModal();
 
     const router = useRouter();
     const { scriptId } = useParams();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId, addDrug } = searchParamsObj;
+
+    const { keys, loading } = useDrugsLibrary(scriptId as string);
 
     useEffect(() => {
         setOpen(!!itemId || !!addDrug);
@@ -106,42 +93,6 @@ export function DrugsLibraryForm({ disabled, item, onChange }: {
         setTimeout(() => window.scrollTo({ top: scrollPos, }), 500);
     }, [searchParamsObj, containerDiv, router.push]);
 
-    const loadScreens = useCallback(async () => {
-        if (!screensInitialised.current && open) {
-            try {
-                setLoading(true);
-
-                const res = await axios.get<Awaited<ReturnType<typeof getScriptsMetadata>>>('/api/scripts/metadata?data='+JSON.stringify({ scriptsIds: [scriptId], }));
-                const { data, errors } = res.data;
-
-                if (errors?.length) throw new Error(errors.join(', '));
-
-                screensInitialised.current = true;
-
-                const keys = data.reduce((acc, item) => {
-                    item.screens.forEach(s => s.fields.forEach(f => {
-                        if (f.key) {
-                            acc[f.key.toLowerCase()] = f.key;
-                        }
-                    }));
-                    return acc;
-                }, {} as { [key: string]: string; })
-
-                setKeys(Object.values(keys));
-            } catch(e: any) {
-                alert({
-                    title: '',
-                    message: 'Error: ' + e.message,
-                    variant: 'error',
-                });
-            } finally {
-                setLoading(false);
-            }
-        }
-    }, [scriptId, open, alert]);
-
-    useEffect(() => { loadScreens(); }, [open, loadScreens]);
-
     const isFormComplete = useCallback(() => {
         return !!(
             form.drug && 
@@ -162,220 +113,235 @@ export function DrugsLibraryForm({ disabled, item, onChange }: {
             disabled;
     }, [isFormComplete, loading, disabled]);
 
+    const formComponent = (
+        <div className="flex flex-col gap-y-4">
+            <div className="">
+                <Label secondary htmlFor="drug">Drug *</Label>
+                <Input
+                    name="drug"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.drug}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, drug: e.target.value, }))}
+                />
+            </div>
+
+            <div className="flex gap-x-2">
+                <div className="flex-1">
+                    <Label secondary htmlFor="minGestation">Min Gestation (weeks) *</Label>
+                    <Input
+                        name="minGestation"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.minGestation}
+                        type="number"
+                        disabled={disabled}
+                        onChange={e => {
+                            const minGestation = e.target.value;
+                            let maxGestation = form.maxGestation;
+
+                            if (!minGestation) maxGestation = '';
+
+                            setForm(prev => ({ 
+                                ...prev, 
+                                minGestation, 
+                                maxGestation,
+                            }));
+                        }}
+                    />
+                </div>
+
+                <div className="flex-1">
+                    <Label 
+                        secondary 
+                        htmlFor="maxGestation"
+                        error={Number(form.minGestation || '0') > Number(form.maxGestation || '0')}
+                    >Max Gestation (weeks) *</Label>
+                    <Input
+                        name="maxGestation"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.maxGestation}
+                        type="number"
+                        disabled={disabled || !form.minGestation}
+                        min={form.minGestation}
+                        error={Number(form.minGestation || '0') > Number(form.maxGestation || '0')}
+                        onChange={e => setForm(prev => ({ ...prev, maxGestation: e.target.value, }))}
+                    />
+                </div>
+            </div>
+
+            <div className="">
+                <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
+                <Select
+                    value={form.gestationKey || ''}
+                    required
+                    name="gestationKey"
+                    disabled={disabled}
+                    onValueChange={value => {
+                        setForm(prev => ({ ...prev, gestationKey: value || '', }));
+                    }}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select gestation key" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            {keys.map(key => (
+                                <SelectItem key={key} value={key}>
+                                    {key}
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="flex gap-x-2">
+                <div className="flex-1">
+                    <Label secondary htmlFor="minWeight">Min Weight (weeks) *</Label>
+                    <Input
+                        name="minWeight"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.minWeight}
+                        type="number"
+                        disabled={disabled}
+                        onChange={e => {
+                            const minWeight = e.target.value;
+                            let maxWeight = form.maxWeight;
+
+                            if (!minWeight) maxWeight = '';
+
+                            setForm(prev => ({ 
+                                ...prev, 
+                                minWeight, 
+                                maxWeight,
+                            }));
+                        }}
+                    />
+                </div>
+
+                <div className="flex-1">
+                    <Label 
+                        secondary 
+                        htmlFor="maxWeight"
+                        error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
+                    >Max Weight (weeks) *</Label>
+                    <Input
+                        name="maxWeight"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.maxWeight}
+                        type="number"
+                        disabled={disabled || !form.minWeight}
+                        min={form.minWeight}
+                        error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
+                        onChange={e => setForm(prev => ({ ...prev, maxWeight: e.target.value, }))}
+                    />
+                </div>
+            </div>
+
+            <div className="">
+                <Label secondary htmlFor="gestationKey">Weight Key *</Label>
+                <Select
+                    value={form.weightKey || ''}
+                    required
+                    name="weightKey"
+                    disabled={disabled}
+                    onValueChange={value => {
+                        setForm(prev => ({ ...prev, weightKey: value || '', }));
+                    }}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select gestation key" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            {keys.map(key => (
+                                <SelectItem key={key} value={key}>
+                                    {key}
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="">
+                <Label secondary htmlFor="managementText">Management text *</Label>
+                <Input
+                    name="managementText"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.managementText}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, managementText: e.target.value, }))}
+                />
+            </div>
+
+            <div className="">
+                <Label secondary htmlFor="weight">Dosage text *</Label>
+                <Input
+                    name="dosageText"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.dosageText}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, dosageText: e.target.value, }))}
+                />
+            </div>
+        </div>
+    );
+
     return (
         <>
             {loading && <Loader overlay />}
 
             <div ref={containerDivRef}>
-                <Sheet
-                    open={open}
-                    onOpenChange={open => {
-                        if (!open) onClose();
-                    }}
-                >
-                    <SheetContent
-                        hideCloseButton
-                        side="right"
-                        className="p-0 m-0 flex flex-col w-full max-w-full sm:max-w-[80%] md:max-w-[80%] lg:max-w-[50%]"
+                {floating === false ? formComponent : (
+                    <Sheet
+                        open={open}
+                        onOpenChange={open => {
+                            if (!open) onClose();
+                        }}
                     >
-                        <SheetHeader className="flex flex-row items-center py-2 px-4 border-b border-b-border text-left sm:text-left">
-                            <SheetTitle>{addDrug ? 'Add' : ''}{itemId ? 'Edit' : ''} drug</SheetTitle>
-                            <SheetDescription className="hidden"></SheetDescription>
-                        </SheetHeader>
+                        <SheetContent
+                            hideCloseButton
+                            side="right"
+                            className="p-0 m-0 flex flex-col w-full max-w-full sm:max-w-[80%] md:max-w-[80%] lg:max-w-[50%]"
+                        >
+                            <SheetHeader className="flex flex-row items-center py-2 px-4 border-b border-b-border text-left sm:text-left">
+                                <SheetTitle>{addDrug ? 'Add' : ''}{itemId ? 'Edit' : ''} drug</SheetTitle>
+                                <SheetDescription className="hidden"></SheetDescription>
+                            </SheetHeader>
 
-                        <div ref={contentDivRef} className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-                            <div className="px-4">
-                                <Label secondary htmlFor="drug">Drug *</Label>
-                                <Input
-                                    name="drug"
-                                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                    value={form.drug}
-                                    onChange={e => setForm(prev => ({ ...prev, drug: e.target.value, }))}
-                                />
-                            </div>
-
-                            <div className="px-4 flex gap-x-2">
-                                <div className="flex-1">
-                                    <Label secondary htmlFor="minGestation">Min Gestation (weeks) *</Label>
-                                    <Input
-                                        name="minGestation"
-                                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                        value={form.minGestation}
-                                        type="number"
-                                        onChange={e => {
-                                            const minGestation = e.target.value;
-                                            let maxGestation = form.maxGestation;
-
-                                            if (!minGestation) maxGestation = '';
-
-                                            setForm(prev => ({ 
-                                                ...prev, 
-                                                minGestation, 
-                                                maxGestation,
-                                            }));
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="flex-1">
-                                    <Label 
-                                        secondary 
-                                        htmlFor="maxGestation"
-                                        error={Number(form.minGestation || '0') > Number(form.maxGestation || '0')}
-                                    >Max Gestation (weeks) *</Label>
-                                    <Input
-                                        name="maxGestation"
-                                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                        value={form.maxGestation}
-                                        type="number"
-                                        disabled={!form.minGestation}
-                                        min={form.minGestation}
-                                        error={Number(form.minGestation || '0') > Number(form.maxGestation || '0')}
-                                        onChange={e => setForm(prev => ({ ...prev, maxGestation: e.target.value, }))}
-                                    />
+                            <div ref={contentDivRef} className="flex-1 py-2 px-0 overflow-y-auto">
+                                <div className="px-4">
+                                    {formComponent}
                                 </div>
                             </div>
 
-                            <div className="px-4">
-                                <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
-                                <Select
-                                    value={form.gestationKey || ''}
-                                    required
-                                    name="gestationKey"
-                                    disabled={disabled}
-                                    onValueChange={value => {
-                                        setForm(prev => ({ ...prev, gestationKey: value || '', }));
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select gestation key" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {keys.map(key => (
-                                                <SelectItem key={key} value={key}>
-                                                    {key}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
+                            <div className="border-t border-t-border px-4 py-2 flex gap-x-2">
+                                <span className="text-danger text-xs my-auto">* Required</span>
+
+                                <div className="ml-auto" />
+
+                                <SheetClose asChild>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => {}}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </SheetClose>
+
+                                <SheetClose asChild>
+                                    <Button
+                                        onClick={() => onSave()}
+                                        disabled={isSaveButtonDisabled()}
+                                    >
+                                        Save
+                                    </Button>
+                                </SheetClose>
                             </div>
-
-                            <div className="px-4 flex gap-x-2">
-                                <div className="flex-1">
-                                    <Label secondary htmlFor="minWeight">Min Weight (weeks) *</Label>
-                                    <Input
-                                        name="minWeight"
-                                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                        value={form.minWeight}
-                                        type="number"
-                                        onChange={e => {
-                                            const minWeight = e.target.value;
-                                            let maxWeight = form.maxWeight;
-
-                                            if (!minWeight) maxWeight = '';
-
-                                            setForm(prev => ({ 
-                                                ...prev, 
-                                                minWeight, 
-                                                maxWeight,
-                                            }));
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="flex-1">
-                                    <Label 
-                                        secondary 
-                                        htmlFor="maxWeight"
-                                        error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
-                                    >Max Weight (weeks) *</Label>
-                                    <Input
-                                        name="maxWeight"
-                                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                        value={form.maxWeight}
-                                        type="number"
-                                        disabled={!form.minWeight}
-                                        min={form.minWeight}
-                                        error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
-                                        onChange={e => setForm(prev => ({ ...prev, maxWeight: e.target.value, }))}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="px-4">
-                                <Label secondary htmlFor="gestationKey">Weight Key *</Label>
-                                <Select
-                                    value={form.weightKey || ''}
-                                    required
-                                    name="weightKey"
-                                    disabled={disabled}
-                                    onValueChange={value => {
-                                        setForm(prev => ({ ...prev, weightKey: value || '', }));
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select gestation key" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {keys.map(key => (
-                                                <SelectItem key={key} value={key}>
-                                                    {key}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="px-4">
-                                <Label secondary htmlFor="managementText">Management text *</Label>
-                                <Input
-                                    name="managementText"
-                                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                    value={form.managementText}
-                                    onChange={e => setForm(prev => ({ ...prev, managementText: e.target.value, }))}
-                                />
-                            </div>
-
-                            <div className="px-4">
-                                <Label secondary htmlFor="weight">Dosage text *</Label>
-                                <Input
-                                    name="dosageText"
-                                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                    value={form.dosageText}
-                                    onChange={e => setForm(prev => ({ ...prev, dosageText: e.target.value, }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="border-t border-t-border px-4 py-2 flex gap-x-2">
-                            <span className="text-danger text-xs my-auto">* Required</span>
-
-                            <div className="ml-auto" />
-
-                            <SheetClose asChild>
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => {}}
-                                >
-                                    Cancel
-                                </Button>
-                            </SheetClose>
-
-                            <SheetClose asChild>
-                                <Button
-                                    onClick={() => onSave()}
-                                    disabled={isSaveButtonDisabled()}
-                                >
-                                    Save
-                                </Button>
-                            </SheetClose>
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                        </SheetContent>
+                    </Sheet>
+                )}
             </div>
         </>
     );
