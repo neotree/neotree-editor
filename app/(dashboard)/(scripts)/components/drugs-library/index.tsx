@@ -1,17 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react"
-import { v4 as uuidv4 } from "uuid";
-import axios from "axios";
+import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
-import { saveScriptsDrugs } from "@/app/actions/scripts";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,122 +16,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import { useScriptForm } from "../../hooks/use-script-form";
+import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { DrugsLibraryForm } from "./form";
 
 type Props = {
     disabled?: boolean;
-    form: ReturnType<typeof useScriptForm>;
+    scriptId: string;
 };
 
-type Drug = Parameters<typeof saveScriptsDrugs>[0]['data'][0]
-
-export function DrugsLibrary({ disabled, form }: Props) {
-    const initialised = useRef(false);
-    const scriptId = form.watch('scriptId');
+export function DrugsLibrary({ disabled, scriptId }: Props) {
     const { confirm } = useConfirmModal();
-    const { alert } = useAlertModal();
 
-    const [loading, setLoading] = useState(false);
-    const [drugs, setDrugs] = useState<Drug[]>([]);
-    const searchParams = useSearchParams();
-    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { itemId } = searchParamsObj;
+    // const searchParams = useSearchParams();
+    // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
 
-    const getDrugs = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await axios.get<Awaited<ReturnType<typeof saveScriptsDrugs>>>(
-                '/api/scripts/drugs-library?data=' + JSON.stringify({ scriptsIds: [scriptId], }),
-            );
-            if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
-            setDrugs(res.data.data as Drug[]);
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: e.message,
-                variant: 'error',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [alert, scriptId]);
-
-    useEffect(() => {
-        if (!initialised.current) getDrugs();
-        initialised.current = true;
-    }, [getDrugs])
-
-    const deleteDrugs = useCallback(async (ids: string[]) => {
-        try {
-            setLoading(true);
-            setDrugs(prev => prev.filter(item => !ids.includes(item.itemId!)));
-            const res = await axios.delete<Awaited<ReturnType<typeof saveScriptsDrugs>>>(
-                '/api/scripts/drugs-library?data=' + JSON.stringify({ itemsIds: ids, }),
-            );
-            if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
-            alert({
-                title: '',
-                message: 'Drug deleted successfully!',
-                variant: 'success',
-            });
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: e.message,
-                variant: 'error',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [alert]);
-
-    const saveDrugs = useCallback(async (item?: Drug) => {
-        try {
-            setLoading(true);
-
-            let updated = drugs;
-            setDrugs(prev => {
-                if (!itemId && item) {
-                    updated = [...prev, item];
-                } else {
-                    updated = prev.map(s => s.itemId !== item?.itemId ? s : {
-                        ...s,
-                        ...item,
-                    });
-                }
-                return updated;
-            });
-
-            const payload: Parameters<typeof saveScriptsDrugs>[0] = {
-                data: item ? [item] : updated,
-                returnSaved: true,
-            };
-            
-            const res = await axios.post<Awaited<ReturnType<typeof saveScriptsDrugs>>>(
-                '/api/scripts/drugs-library',
-                payload,
-            );
-
-            if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
-
-            await getDrugs();
-
-            alert({
-                title: '',
-                message: `Drug${item ? '' : 's'} saved successfully!`,
-                variant: 'success',
-            });
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: e.message,
-                variant: 'error',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [drugs, itemId]);
+    const { 
+        drugs, 
+        loading, 
+        addLink,
+        selectedItemId: itemId, 
+        editLink,
+        saveDrugs, 
+        deleteDrugs 
+    } = useDrugsLibrary(scriptId!);
 
     return (
         <>
@@ -154,12 +57,7 @@ export function DrugsLibrary({ disabled, form }: Props) {
                             asChild
                             variant="outline"
                         >
-                            <Link
-                                href={`?${queryString.stringify({ 
-                                    ...searchParamsObj,
-                                    addDrug: 1,
-                                })}`}
-                            >
+                            <Link href={addLink}>
                                 Add drug
                                 <Plus className="w-4 h-4 ml-2" />
                             </Link>
@@ -201,9 +99,7 @@ export function DrugsLibrary({ disabled, form }: Props) {
                                             <DropdownMenuItem 
                                                 asChild
                                             >
-                                                <Link
-                                                    href={`?${queryString.stringify({ ...searchParamsObj, itemId: item.itemId, })}`}
-                                                >
+                                                <Link href={editLink(`${itemId}`)}>
                                                     <>
                                                         {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
                                                     </>
