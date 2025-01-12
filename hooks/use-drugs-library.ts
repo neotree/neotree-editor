@@ -45,7 +45,7 @@ export function useDrugsLibrary(scriptId: string) {
 
     const getScriptKeys = useCallback(async () => {
         try {
-            const res = await axios.get<Awaited<ReturnType<typeof getScriptsMetadata>>>('/api/scripts/metadata?data='+JSON.stringify({ scriptsIds: [scriptId], }));
+            const res = await axios.get<Awaited<ReturnType<typeof getScriptsMetadata>>>('/api/scripts/metadata?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }));
             const { data, errors } = res.data;
 
             if (errors?.length) throw new Error(errors.join(', '));
