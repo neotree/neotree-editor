@@ -1,7 +1,7 @@
 import { and, inArray, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, screens, hospitals } from "@/databases/pg/schema";
+import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
 import { ScriptField, ScriptItem } from "@/types";
 
 export type GetScriptsMetadataParams = {
@@ -50,13 +50,24 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
         const whereScriptsIds = !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds);
         const whereHospitalsIds = !hospitalsIds.length ? undefined : inArray(scripts.hospitalId, hospitalsIds);
 
-        const where = [
-            whereScriptsIds,
-            whereHospitalsIds,
-        ];
+        const unpublisedScriptsRes = await db.query.scriptsDrafts.findMany({
+            where: and(
+                whereHospitalsIds,
+                !scriptsIds.length ? undefined : and(
+                    inArray(scriptsDrafts.scriptDraftId, scriptsIds),
+                    isNull(scriptsDrafts.scriptId),
+                ),
+            ),
+            with: {
+                screensDrafts: true,
+            }
+        });
 
-        let scriptsRes = await db.query.scripts.findMany({
-            where: where.length ? and(...where) : undefined,
+        const publishedScriptsRes = !returnDraftsIfExist ? [] : await db.query.scripts.findMany({
+            where: and(
+                whereScriptsIds,
+                whereHospitalsIds,
+            ),
             with: {
                 draft: !returnDraftsIfExist ? undefined : true,
                 screens: {
@@ -67,18 +78,33 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             },
         });
 
-        scriptsRes = scriptsRes
-            .map(s => ({
-                ...s,
-                ...(returnDraftsIfExist && s.draft ? s.draft.data : null),
-                screens: s.screens
-                    .sort((a, b) => a.position - b.position),
-            }))
+        const publishedScripts = publishedScriptsRes.map(s => ({
+            ...s,
+            ...(returnDraftsIfExist && s.draft ? s.draft.data : null),
+            screens: s.screens
+                .sort((a, b) => a.position - b.position),
+        }));
+
+        const unpublisedScripts = unpublisedScriptsRes.map(s => {
+            return {
+                ...s.data,
+                scriptId: s.scriptDraftId,
+                screens: s.screensDrafts.map(screenDraft => ({
+                    ...screenDraft.data,
+                    screenId: screenDraft.screenDraftId,
+                }))
+            }
+        }) as typeof publishedScripts;
+
+        const scriptsFound = [
+            ...publishedScripts,
+            ...unpublisedScripts,
+        ]
             .sort((a, b) => a.position - b.position);
 
         const data: GetScriptsMetadataResponse['data'] = [];
 
-        scriptsRes.forEach(script => {
+        scriptsFound.forEach(script => {
             const hospital = hospitalsArr.filter(h => h.hospitalId === script.hospitalId)[0];
 
             data.push({
