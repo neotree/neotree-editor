@@ -13,12 +13,6 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 
-export const getScriptsDrugsLibrary = queries._getScriptsDrugsLibrary;
-
-export const saveScriptsDrugs = mutations._saveScriptsDrugs;
-
-export const deleteScriptsDrugs = mutations._deleteScriptsDrugs;
-
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
 // DIAGNOSES
