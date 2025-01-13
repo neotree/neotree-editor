@@ -27,7 +27,7 @@ export type PrintSection = {
 };
 
 export type DrugField = {
-    id: string;
+    key: string;
     position: number;
 };
 
