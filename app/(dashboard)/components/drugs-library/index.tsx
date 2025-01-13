@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
 import {
@@ -21,10 +22,9 @@ import { DrugsLibraryForm } from "./form";
 
 type Props = {
     disabled?: boolean;
-    scriptId: string;
 };
 
-export function DrugsLibrary({ disabled, scriptId }: Props) {
+export function DrugsLibrary({ disabled }: Props) {
     const { confirm } = useConfirmModal();
 
     // const searchParams = useSearchParams();
@@ -38,7 +38,7 @@ export function DrugsLibrary({ disabled, scriptId }: Props) {
         editLink,
         saveDrugs, 
         deleteDrugs 
-    } = useDrugsLibrary(scriptId!);
+    } = useDrugsLibrary();
 
     return (
         <>
@@ -64,15 +64,21 @@ export function DrugsLibrary({ disabled, scriptId }: Props) {
                         </Button>
                     </>
                 )}
+                getRowOptions={({ rowIndex }) => {
+                    const s = drugs[rowIndex];
+                    return !s ? {} : {
+                        className: cn(s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                    };
+                }}
                 columns={[
                     {
                         name: 'Drug',
                     },
                     {
-                        name: 'Dosage text',
+                        name: 'Key',
                     },
                     {
-                        name: 'Management text',
+                        name: 'Dosage text',
                     },
                     {
                         name: '',
@@ -130,8 +136,8 @@ export function DrugsLibrary({ disabled, scriptId }: Props) {
                 ]}
                 data={drugs.map(item => [
                     item.drug || '',
+                    item.key || '',
                     item.dosageText || '',
-                    item.managementText || '',
                     item.itemId!,
                 ])}
             />

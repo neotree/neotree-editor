@@ -1,12 +1,12 @@
 import { isNotNull, and, isNull, inArray } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { configKeys, diagnoses, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
+import { configKeys, diagnoses, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 
 export async function _clearPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary',
     broadcastAction?: boolean;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
@@ -14,6 +14,7 @@ export async function _clearPendingDeletion(params?: {
 
         const where = [
             items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
+            items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
             items === 'scripts' ? and(
                 isNotNull(pendingDeletion.scriptId),
                 isNull(pendingDeletion.screenId),
@@ -35,7 +36,7 @@ export async function _clearPendingDeletion(params?: {
 }
 
 export async function _processPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary',
     broadcastAction?: boolean;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
@@ -49,6 +50,16 @@ export async function _processPendingDeletion(params?: {
             await db.update(configKeys)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(configKeys.configKeyId, _configKeys.map(c => c.configKeyId!)));
+        }
+
+        const _drugsLibraryItems = await db.query.pendingDeletion.findMany({
+            where: items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
+        });
+
+        if (_drugsLibraryItems.length) {
+            await db.update(drugsLibrary)
+                .set({ deletedAt: new Date(), })
+                .where(inArray(drugsLibrary.itemId, _drugsLibraryItems.map(c => c.drugsLibraryItemId!)));
         }
 
         const _scripts = await db.query.pendingDeletion.findMany({

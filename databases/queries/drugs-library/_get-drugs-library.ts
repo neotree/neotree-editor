@@ -1,0 +1,161 @@
+import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import * as uuid from "uuid";
+
+import db from "@/databases/pg/drizzle";
+import { drugsLibrary, drugsLibraryDrafts, pendingDeletion, } from "@/databases/pg/schema";
+import logger from "@/lib/logger";
+import { Preferences } from "@/types";
+
+export type GetDrugsLibraryItemsParams = {
+    itemsIds?: string[];
+    returnDraftsIfExist?: boolean;
+    withDeleted?: boolean;
+};
+
+export type GetDrugsLibraryItemsResults = {
+    data: (typeof drugsLibrary.$inferSelect & {
+        isDraft: boolean;
+        isDeleted: boolean;
+        preferences: Preferences;
+    })[];
+    errors?: string[];
+};
+
+export async function _getDrugsLibraryItems(
+    params?: GetDrugsLibraryItemsParams
+): Promise<GetDrugsLibraryItemsResults> {
+    try {
+        const { itemsIds: _itemsIds, returnDraftsIfExist, } = { ...params };
+
+        let itemsIds = _itemsIds || [];
+        
+        // unpublished drugsLibrary conditions
+        const whereDrugsLibraryItemsDraftsIds = !itemsIds?.length ? 
+            undefined 
+            : 
+            inArray(drugsLibraryDrafts.itemDraftId, itemsIds.map(id => uuid.validate(id) ? id : uuid.v4()));
+        const whereDrugsLibraryItemsDrafts = [
+            ...(!whereDrugsLibraryItemsDraftsIds ? [] : [whereDrugsLibraryItemsDraftsIds]),
+        ];
+        const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
+            where: and(...whereDrugsLibraryItemsDrafts),
+        });
+        itemsIds = itemsIds.filter(id => !drafts.map(d => d.itemDraftId).includes(id));
+
+        // published drugsLibrary conditions
+        const whereDrugsLibraryItemsIdsNotIn = !drafts.length ? undefined : notInArray(drugsLibrary.itemId, drafts.map(d => d.itemDraftId));
+        const whereDrugsLibraryItemsIds = !itemsIds?.length ? 
+            undefined 
+            : 
+            inArray(drugsLibrary.itemId, itemsIds.filter(id => uuid.validate(id)));
+
+        const whereDrugsLibraryItems = [
+            isNull(drugsLibrary.deletedAt),
+            isNull(pendingDeletion),
+            whereDrugsLibraryItemsIdsNotIn,
+        ];
+
+        const publishedRes = await db
+            .select({
+                drugsLibraryItem: drugsLibrary,
+                pendingDeletion: pendingDeletion,
+            })
+            .from(drugsLibrary)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.drugsLibraryItemId, drugsLibrary.itemId))
+            .where(!whereDrugsLibraryItems.length ? undefined : and(...whereDrugsLibraryItems));
+
+        const published = publishedRes.map(s => s.drugsLibraryItem);
+
+        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
+            where: inArray(pendingDeletion.drugsLibraryItemId, published.map(s => s.itemId)),
+            columns: { drugsLibraryItemId: true, },
+        });
+
+        const responseData = [
+            ...published.map(s => ({
+                ...s,
+                isDraft: false,
+                isDeleted: false,
+            } as GetDrugsLibraryItemsResults['data'][0])),
+
+            ...drafts.map((s => ({
+                ...s.data,
+                isDraft: true,
+                isDeleted: false,
+            } as GetDrugsLibraryItemsResults['data'][0])))
+        ]
+            .sort((a, b) => a.position - b.position)
+            .filter(s => !inPendingDeletion.map(s => s.drugsLibraryItemId).includes(s.itemId));
+
+        return  { 
+            data: responseData,
+        };
+    } catch(e: any) {
+        logger.error('_getDrugsLibraryItems ERROR', e.message);
+        return { data: [], errors: [e.message], };
+    }
+}
+
+export type GetDrugsLibraryItemResults = {
+    data?: null | typeof drugsLibrary.$inferSelect & {
+        isDraft: boolean;
+        isDeleted: boolean;
+    };
+    errors?: string[];
+};
+
+export async function _getDrugsLibraryItem(
+    params: {
+        itemId: string,
+        returnDraftIfExists?: boolean;
+    },
+): Promise<GetDrugsLibraryItemResults> {
+    const { itemId, returnDraftIfExists, } = { ...params };
+
+    try {
+        if (!itemId) throw new Error('Missing itemId');
+
+        const whereDrugsLibraryItemId = uuid.validate(itemId) ? eq(drugsLibrary.itemId, itemId) : undefined;
+        const whereDrugsLibraryItemDraftId = !whereDrugsLibraryItemId ? undefined : eq(drugsLibraryDrafts.itemDraftId, itemId);
+
+        let draft = (returnDraftIfExists && whereDrugsLibraryItemDraftId) ? await db.query.drugsLibraryDrafts.findFirst({
+            where: whereDrugsLibraryItemId,
+        }) : undefined;
+
+        let responseData = !draft ? null : {
+            ...draft.data,
+            isDraft: false,
+            isDeleted: false,
+        } as GetDrugsLibraryItemResults['data'];
+
+        if (responseData) return { data: responseData, };
+
+        const published = await db.query.drugsLibrary.findFirst({
+            where: and(
+                isNull(drugsLibrary.deletedAt),
+            ),
+            with: {
+                draft: true,
+            },
+        });
+
+        draft = returnDraftIfExists ? published?.draft : undefined;
+
+        const data = (draft?.data || published) as GetDrugsLibraryItemResults['data'];
+
+        responseData = !data ? null : {
+            ...data,
+            isDraft: false,
+            isDeleted: false,
+        };
+
+        if (!responseData) return { data: null, };
+
+        return  { 
+            data: responseData, 
+        };
+    } catch(e: any) {
+        logger.error('_getDrugsLibraryItem ERROR', e.message);
+        return { errors: [e.message], };
+    }
+} 
