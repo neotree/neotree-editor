@@ -10,6 +10,3 @@ export * from './_screens_publish';
 export * from './_diagnoses_save';
 export * from './_diagnoses_delete';
 export * from './_diagnoses_publish';
-
-export * from './_scripts_save_drugs';
-export * from './_scripts_delete_drugs';
