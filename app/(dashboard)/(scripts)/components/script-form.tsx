@@ -32,7 +32,7 @@ import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
 import { PrintSections } from './print';
-import { DrugsLibrary } from './drugs-library';
+import { DrugsLibrary } from '../../components/drugs-library';
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -270,7 +270,6 @@ export function ScriptForm(props: Props) {
                     {section === 'drugs-library' && (
                         <DrugsLibrary 
                             disabled={disabled}
-                            scriptId={form.getValues('scriptId')!}
                         />
                     )}
                 </div>

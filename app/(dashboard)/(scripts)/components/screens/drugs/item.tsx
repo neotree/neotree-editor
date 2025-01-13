@@ -6,7 +6,7 @@ import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SelectDrug } from '../../drugs-library/select';
+import { SelectDrug } from '../../../../components/drugs-library/select';
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -90,7 +90,6 @@ export function Item<P = {}>({
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         <SelectDrug 
-                            scriptId={scriptId}
                             disabled={disabled}
                             selected={selected?.id ? [selected.id] : []}
                             unselectable={form.getValues('drugs').map(item => item.id).filter(s => s !== selected?.id!)}

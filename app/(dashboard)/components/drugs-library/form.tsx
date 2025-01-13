@@ -5,14 +5,6 @@ import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
 
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import {
     Sheet,
     SheetClose,
     SheetContent,
@@ -53,12 +45,11 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const [form, setForm] = useState(getDefaultForm(item));
 
     const router = useRouter();
-    const { scriptId } = useParams();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId, addDrug } = searchParamsObj;
 
-    const { keys, loading } = useDrugsLibrary(scriptId as string);
+    const { keys, loading } = useDrugsLibrary();
 
     useEffect(() => {
         setOpen(!!itemId || !!addDrug);
@@ -71,13 +62,12 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const onSave = useCallback(() => {
         onChange({
             ...form,
-            scriptId: scriptId as string,
             minWeight: Number(form.minWeight),
             maxWeight: Number(form.maxWeight),
             minGestation: Number(form.minGestation),
             maxGestation: Number(form.maxGestation),
         });
-    }, [form, scriptId, item, onChange]);
+    }, [form, item, onChange]);
 
     const onClose = useCallback(() => {
         setOpen(false);
@@ -171,28 +161,13 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="">
                 <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
-                <Select
-                    value={form.gestationKey || ''}
-                    required
+                <Input
                     name="gestationKey"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.gestationKey}
                     disabled={disabled}
-                    onValueChange={value => {
-                        setForm(prev => ({ ...prev, gestationKey: value || '', }));
-                    }}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select gestation key" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                            {keys.map(key => (
-                                <SelectItem key={key} value={key}>
-                                    {key}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
+                    onChange={e => setForm(prev => ({ ...prev, gestationKey: e.target.value, }))}
+                />
             </div>
 
             <div className="flex gap-x-2">
@@ -239,29 +214,14 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div className="">
-                <Label secondary htmlFor="gestationKey">Weight Key *</Label>
-                <Select
-                    value={form.weightKey || ''}
-                    required
+                <Label secondary htmlFor="weightKey">Weight Key *</Label>
+                <Input
                     name="weightKey"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.weightKey}
                     disabled={disabled}
-                    onValueChange={value => {
-                        setForm(prev => ({ ...prev, weightKey: value || '', }));
-                    }}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select gestation key" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                            {keys.map(key => (
-                                <SelectItem key={key} value={key}>
-                                    {key}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
+                    onChange={e => setForm(prev => ({ ...prev, weightKey: e.target.value, }))}
+                />
             </div>
 
             <div className="">

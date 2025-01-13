@@ -6,7 +6,8 @@ import {
     diagnosesDrafts,
     screensDrafts,
     scriptsDrafts ,
-    pendingDeletion
+    pendingDeletion,
+    drugsLibraryDrafts
 } from '@/databases/pg/schema';
 import db from '../../pg/drizzle';
 
@@ -27,6 +28,7 @@ export const defaultCountDraftsData = {
     screens: 0,
     diagnoses: 0,
     configKeys: 0,
+    drugsLibraryItems: 0,
     total: 0,
 };
 
@@ -35,6 +37,7 @@ export async function _countDrafts(): Promise<{
     screens: number;
     diagnoses: number;
     configKeys: number;
+    drugsLibraryItems: number;
     total: number;
     errors?: string[];
 }> {
@@ -53,7 +56,10 @@ export async function _countDrafts(): Promise<{
         const configKeys = await db.select({ count: count(), }).from(configKeysDrafts);
         data.configKeys = configKeys[0]?.count || 0;
 
-        data.total = data.configKeys + data.diagnoses + data.screens + data.scripts;
+        const drugsLibraryItems = await db.select({ count: count(), }).from(drugsLibraryDrafts);
+        data.drugsLibraryItems = drugsLibraryItems[0]?.count || 0;
+
+        data.total = data.configKeys + data.diagnoses + data.screens + data.scripts + data.drugsLibraryItems;
         
         return { ...data, };
     } catch(e: any) {

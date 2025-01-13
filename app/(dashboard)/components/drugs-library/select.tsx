@@ -20,14 +20,12 @@ import { DrugsLibraryForm } from './form';
 
 type Props = {
     disabled?: boolean;
-    scriptId: string;
     selected?: string[];
     unselectable?: string[];
     onChange: (selected: string[]) => void;
 };
 
 export function SelectDrug({ 
-    scriptId, 
     disabled, 
     selected: selectedProp, 
     unselectable = [],
@@ -40,7 +38,7 @@ export function SelectDrug({
         addLink, 
         editLink,
         saveDrugs 
-    } = useDrugsLibrary(scriptId!);
+    } = useDrugsLibrary();
 
     const [selected, setSelected] = useState<string[]>(selectedProp || []);
 
