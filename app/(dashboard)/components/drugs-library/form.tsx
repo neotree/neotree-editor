@@ -26,11 +26,20 @@ const getDefaultForm = (item?: DrugsLibraryState['drugs'][0]) => ({
     maxGestation: `${item?.maxGestation || ''}`,
     minWeight: `${item?.minWeight || ''}`,
     maxWeight: `${item?.maxWeight || ''}`,
+    minAge: `${item?.minAge || ''}`,
+    maxAge: `${item?.maxAge || ''}`,
+    dosage: `${item?.dosage || ''}`,
+    dosageMultiplier: `${item?.dosageMultiplier || ''}`,
     dayOfLife: `${item?.dayOfLife || ''}`,
     dosageText: `${item?.dosageText || ''}`,
     managementText: `${item?.managementText || ''}`,
     gestationKey: `${item?.gestationKey || ''}`,
     weightKey: `${item?.weightKey || ''}`,
+    diagnosisKey: `${item?.diagnosisKey || ''}`,
+    administrationFrequency: `${item?.administrationFrequency || ''}`,
+    drugUnit: `${item?.drugUnit || ''}`,
+    routeOfAdministration: `${item?.routeOfAdministration || ''}`,
+    ageKey: `${item?.ageKey || ''}`,
 });
 
 export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
@@ -63,10 +72,14 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const onSave = useCallback(() => {
         onChange({
             ...form,
-            minWeight: Number(form.minWeight),
-            maxWeight: Number(form.maxWeight),
-            minGestation: Number(form.minGestation),
-            maxGestation: Number(form.maxGestation),
+            minWeight: !form.minWeight ? null : Number(form.minWeight),
+            maxWeight: !form.maxWeight ? null : Number(form.maxWeight),
+            minGestation: !form.minGestation ? null : Number(form.minGestation),
+            maxGestation: !form.maxGestation ? null : Number(form.maxGestation),
+            minAge: !form.minAge ? null : Number(form.minAge),
+            maxAge: !form.maxAge ? null : Number(form.maxAge),
+            dosage: !form.dosage ? null : Number(form.dosage),
+            dosageMultiplier: !form.dosageMultiplier ? null : Number(form.dosageMultiplier),
         });
     }, [form, item, onChange]);
 
@@ -92,10 +105,18 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             form.minGestation &&
             form.maxWeight && 
             form.maxGestation &&
+            form.minAge &&
+            form.maxAge &&
             form.managementText &&
             form.dosageText &&
+            form.diagnosisKey &&
+            form.administrationFrequency &&
+            form.drugUnit &&
+            form.routeOfAdministration &&
+            form.ageKey &&
             Number(form.minGestation || '0') <= Number(form.maxGestation || '0') &&
-            Number(form.minWeight || '0') <= Number(form.maxWeight || '0')
+            Number(form.minWeight || '0') <= Number(form.maxWeight || '0') &&
+            Number(form.minAge || '0') <= Number(form.maxAge || '0')
         );
     }, [form]);
 
@@ -107,7 +128,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
     const formComponent = (
         <div className="flex flex-col gap-y-4">
-            <div className="">
+            <div>
                 <Label secondary htmlFor="drug">Drug *</Label>
                 <Input
                     name="drug"
@@ -118,7 +139,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 />
             </div>
 
-            <div className="">
+            <div>
                 <Label secondary htmlFor="key">Key *</Label>
                 <Input
                     name="key"
@@ -126,6 +147,28 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     value={form.key}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, key: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="diagnosisKey">Diagnosis Key *</Label>
+                <Input
+                    name="gestationKey"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.diagnosisKey}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, diagnosisKey: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
+                <Input
+                    name="gestationKey"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.gestationKey}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, gestationKey: e.target.value, }))}
                 />
             </div>
 
@@ -172,14 +215,14 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 </div>
             </div>
 
-            <div className="">
-                <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
+            <div>
+                <Label secondary htmlFor="weightKey">Weight Key *</Label>
                 <Input
-                    name="gestationKey"
+                    name="weightKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                    value={form.gestationKey}
+                    value={form.weightKey}
                     disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, gestationKey: e.target.value, }))}
+                    onChange={e => setForm(prev => ({ ...prev, weightKey: e.target.value, }))}
                 />
             </div>
 
@@ -226,29 +269,73 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 </div>
             </div>
 
-            <div className="">
-                <Label secondary htmlFor="weightKey">Weight Key *</Label>
+            <div>
+                <Label secondary htmlFor="ageKey">Day of Life (Age) Key *</Label>
                 <Input
-                    name="weightKey"
+                    name="ageKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                    value={form.weightKey}
+                    value={form.ageKey}
                     disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, weightKey: e.target.value, }))}
+                    onChange={e => setForm(prev => ({ ...prev, ageKey: e.target.value, }))}
                 />
             </div>
 
-            <div className="">
-                <Label secondary htmlFor="managementText">Management text *</Label>
+            <div className="flex gap-x-2">
+                <div className="flex-1">
+                    <Label secondary htmlFor="minAge">Min Day of Life (Age - days) *</Label>
+                    <Input
+                        name="minAge"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.minAge}
+                        type="number"
+                        disabled={disabled}
+                        onChange={e => {
+                            const minAge = e.target.value;
+                            let maxAge = form.maxAge;
+
+                            if (!minAge) maxAge = '';
+
+                            setForm(prev => ({ 
+                                ...prev, 
+                                minAge, 
+                                maxAge,
+                            }));
+                        }}
+                    />
+                </div>
+
+                <div className="flex-1">
+                    <Label 
+                        secondary 
+                        htmlFor="maxAge"
+                        error={Number(form.minAge || '0') > Number(form.maxAge || '0')}
+                    >Max Day of Life (Age - days) *</Label>
+                    <Input
+                        name="maxAge"
+                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                        value={form.maxAge}
+                        type="number"
+                        disabled={disabled || !form.minAge}
+                        min={form.minAge}
+                        error={Number(form.minAge || '0') > Number(form.maxAge || '0')}
+                        onChange={e => setForm(prev => ({ ...prev, maxAge: e.target.value, }))}
+                    />
+                </div>
+            </div>
+
+            <div>
+                <Label secondary htmlFor="dosageMultiplier">Drug Dose Multiplier *</Label>
                 <Input
-                    name="managementText"
+                    name="dosageMultiplier"
+                    type="number"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                    value={form.managementText}
+                    value={form.dosageMultiplier}
                     disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, managementText: e.target.value, }))}
+                    onChange={e => setForm(prev => ({ ...prev, dosageMultiplier: e.target.value, }))}
                 />
             </div>
 
-            <div className="">
+            <div>
                 <Label secondary htmlFor="weight">Dosage text *</Label>
                 <Input
                     name="dosageText"
@@ -256,6 +343,50 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     value={form.dosageText}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, dosageText: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="administrationFrequency">Administration Frequency *</Label>
+                <Input
+                    name="administrationFrequency"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.administrationFrequency}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, administrationFrequency: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="drugUnit">Drug Unit *</Label>
+                <Input
+                    name="drugUnit"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.drugUnit}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, drugUnit: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="routeOfAdministration">Route of Administration *</Label>
+                <Input
+                    name="routeOfAdministration"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.routeOfAdministration}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, routeOfAdministration: e.target.value, }))}
+                />
+            </div>
+
+            <div>
+                <Label secondary htmlFor="managementText">Management text *</Label>
+                <Input
+                    name="managementText"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.managementText}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, managementText: e.target.value, }))}
                 />
             </div>
         </div>
