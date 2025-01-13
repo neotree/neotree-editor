@@ -35,7 +35,7 @@ export function Drugs({
 
     const items = useMemo(() => {
         return screenDrugs.map(item => {
-            const data = drugs.filter(d => d.itemId === item.id)[0];
+            const data = drugs.filter(d => d.key === item.key)[0];
             return {
                 ...item,
                 data: data as typeof data | null,
@@ -137,10 +137,10 @@ export function Drugs({
                         name: 'Drug',
                     },
                     {
-                        name: 'Dosage',
+                        name: 'Key',
                     },
                     {
-                        name: 'Management',
+                        name: 'Dosage',
                     },
                     {
                         name: 'Action',
@@ -208,9 +208,9 @@ export function Drugs({
                 ]}
                 data={items.map(f => [
                     f.data?.drug || '',
+                    f.key || '',
                     f.data?.dosageText || '',
-                    f.data?.managementText || '',
-                    f.id,
+                    f.key,
                 ])}
             />
 

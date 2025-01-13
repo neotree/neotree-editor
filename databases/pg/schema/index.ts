@@ -726,6 +726,7 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
 export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
+    key: text('key').notNull().unique(),
     drug: text('drug').notNull().default(''),
     minGestation: integer('min_gestation'),
     maxGestation: integer('max_gestation'),
