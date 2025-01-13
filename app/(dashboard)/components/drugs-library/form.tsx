@@ -20,6 +20,7 @@ import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-libra
 
 const getDefaultForm = (item?: DrugsLibraryState['drugs'][0]) => ({
     itemId: `${item?.itemId || uuidv4()}`,
+    key: `${item?.key || ''}`,
     drug: `${item?.drug || ''}`,
     minGestation: `${item?.minGestation || ''}`,
     maxGestation: `${item?.maxGestation || ''}`,
@@ -85,6 +86,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
     const isFormComplete = useCallback(() => {
         return !!(
+            form.key &&
             form.drug && 
             form.minWeight && 
             form.minGestation &&
@@ -113,6 +115,17 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     value={form.drug}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, drug: e.target.value, }))}
+                />
+            </div>
+
+            <div className="">
+                <Label secondary htmlFor="key">Key *</Label>
+                <Input
+                    name="key"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.key}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, key: e.target.value, }))}
                 />
             </div>
 

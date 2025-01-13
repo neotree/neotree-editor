@@ -75,9 +75,9 @@ export function SelectDrug({
                             <SelectLabel>Drugs</SelectLabel>
                             {drugs.map(item => (
                                 <SelectItem 
-                                    key={item.itemId} 
-                                    value={item.itemId!}
-                                    disabled={unselectable.includes(item.itemId!)}
+                                    key={item.key} 
+                                    value={item.key!}
+                                    disabled={unselectable.includes(item.key!)}
                                 >
                                     {item.drug}
                                 </SelectItem>
@@ -111,7 +111,7 @@ export function SelectDrug({
                         <DrugsLibraryForm 
                             disabled={true}
                             floating={false}
-                            item={drugs.filter(item => item.itemId === selected[0])[0]}
+                            item={drugs.filter(item => item.key === selected[0])[0]}
                             onChange={saveDrugs}
                         />
                     </div>

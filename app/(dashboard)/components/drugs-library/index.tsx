@@ -75,10 +75,10 @@ export function DrugsLibrary({ disabled }: Props) {
                         name: 'Drug',
                     },
                     {
-                        name: 'Dosage text',
+                        name: 'Key',
                     },
                     {
-                        name: 'Management text',
+                        name: 'Dosage text',
                     },
                     {
                         name: '',
@@ -136,8 +136,8 @@ export function DrugsLibrary({ disabled }: Props) {
                 ]}
                 data={drugs.map(item => [
                     item.drug || '',
+                    item.key || '',
                     item.dosageText || '',
-                    item.managementText || '',
                     item.itemId!,
                 ])}
             />
