@@ -12,6 +12,8 @@ import * as scriptsQueries from '@/databases/queries/scripts';
 import * as scriptsMutations from '@/databases/mutations/scripts';
 import * as configKeysMutations from '@/databases/mutations/config-keys';
 import * as configKeysQueries from '@/databases/queries/config-keys';
+import * as drugsLibraryMutations from '@/databases/mutations/drugs-library';
+import * as drugsLibraryQueries from '@/databases/queries/drugs-library';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
@@ -65,12 +67,14 @@ export const revalidatePath = async (
 export const countAllDrafts = async () => {
     try {
         const configKeys = await configKeysQueries._countConfigKeys();
+        const drugsLibraryItems = await drugsLibraryQueries._countDrugsLibraryItems();
         const screens = await scriptsQueries._countScreens();
         const scripts = await scriptsQueries._countScripts();
         const diagnoses = await scriptsQueries._countDiagnoses();
 
         return {
             configKeys: configKeys.data.allDrafts,
+            drugsLibrary: drugsLibraryItems.data.allDrafts,
             screens: screens.data.allDrafts,
             scripts: scripts.data.allDrafts,
             diagnoses: diagnoses.data.allDrafts,
@@ -101,6 +105,7 @@ export async function publishData() {
         ]);
 
         const publishConfigKeys = await configKeysMutations._publishConfigKeys();
+        const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems();
         const publishScripts = await scriptsMutations._publishScripts();
         const publishScreens = await scriptsMutations._publishScreens();
         const publishDiagnoses = await scriptsMutations._publishDiagnoses();
@@ -109,6 +114,11 @@ export async function publishData() {
         if (publishConfigKeys.errors) {
             results.success = false;
             results.errors = [...(results.errors || []), ...publishConfigKeys.errors];
+        }
+
+        if (publishDrugsLibraryItems.errors) {
+            results.success = false;
+            results.errors = [...(results.errors || []), ...publishDrugsLibraryItems.errors];
         }
 
         if (publishScripts.errors) {
@@ -158,6 +168,7 @@ export async function discardDrafts() {
         ]);
 
          await configKeysMutations._deleteAllConfigKeysDrafts();
+         await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts();
          await scriptsMutations._deleteAllScriptsDrafts();
          await scriptsMutations._deleteAllScreensDrafts();
          await scriptsMutations._deleteAllDiagnosesDrafts();

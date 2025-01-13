@@ -722,6 +722,82 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
     }),
 }));
 
+// DRUGS LIBRARY
+export const drugsLibrary = pgTable('nt_drugs_library', {
+    id: serial('id').primaryKey(),
+    itemId: uuid('item_id').notNull().unique().defaultRandom(),
+    drug: text('drug').notNull().default(''),
+    minGestation: integer('min_gestation'),
+    maxGestation: integer('max_gestation'),
+    minWeight: integer('min_weight'),
+    maxWeight: integer('max_weight'),
+    dayOfLife: text('day_of_life').notNull().default(''),
+    dosageText: text('dosage_text').notNull().default(''),
+    managementText: text('management_text').notNull().default(''),
+    gestationKey: text('gestation_key').notNull().default(''),
+    weightKey: text('weight_key').notNull().default(''),
+    position: integer('position').notNull(),
+    condition: text('condition').notNull().default(''),
+    version: integer('version').notNull(),
+
+    publishDate: timestamp('publish_date').defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
+    deletedAt: timestamp('deleted_at'),
+});
+
+export const drugsLibraryRelations = relations(drugsLibrary, ({ many, one }) => ({
+    history: many(drugsLibraryHistory),
+    draft: one(drugsLibraryDrafts, {
+        fields: [drugsLibrary.itemId],
+        references: [drugsLibraryDrafts.itemId],
+    }),
+}));
+
+// DRUGS LIBRARY DRAFTS
+export const drugsLibraryDrafts = pgTable(
+    'nt_drugs_library_drafts', 
+    {
+        id: serial('id').primaryKey(),
+        itemDraftId: uuid('item_draft_id').notNull().unique().defaultRandom(),
+        itemId: uuid('item_id').references(() => drugsLibrary.itemId, { onDelete: 'cascade', }),
+        position: integer('position').notNull(),
+        data: jsonb('data').$type<typeof drugsLibrary.$inferInsert>().notNull(),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
+    },
+);
+
+export const drugsLibraryDraftsRelations = relations(drugsLibraryDrafts, ({ one }) => ({
+    item: one(drugsLibrary, {
+        fields: [drugsLibraryDrafts.itemId],
+        references: [drugsLibrary.itemId],
+    }),
+}));
+
+// DRUGS LIBRARY HISTORY
+export const drugsLibraryHistory = pgTable(
+    'nt_drugs_library_history', 
+    {
+        id: serial('id').primaryKey(),
+        version: integer('version').notNull(),
+        itemId: uuid('item_id').references(() => drugsLibrary.itemId, { onDelete: 'cascade', }).notNull(),
+        restoreKey: uuid('restore_key'),
+        changes: jsonb('data').default([]),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+);
+
+export const drugsLibraryHistoryRelations = relations(drugsLibraryHistory, ({ one }) => ({
+    item: one(drugsLibrary, {
+        fields: [drugsLibraryHistory.itemId],
+        references: [drugsLibrary.itemId],
+    }),
+}));
+
+
 // PENDING DELETION
 export const pendingDeletion = pgTable(
     'nt_pending_deletion', 
@@ -733,10 +809,12 @@ export const pendingDeletion = pgTable(
         diagnosisId: uuid('diagnosis_id').references(() => diagnoses.diagnosisId, { onDelete: 'cascade', }),
         diagnosisScriptId: uuid('diagnosis_script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade', }),
+        drugsLibraryItemId: uuid('drugs_library_item_id').references(() => drugsLibrary.itemId, { onDelete: 'cascade', }),
         scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
         screenDraftId: uuid('screen_draft_id').references(() => screensDrafts.screenDraftId, { onDelete: 'cascade', }),
         diagnosisDraftId: uuid('diagnosis_draft_id').references(() => diagnosesDrafts.diagnosisDraftId, { onDelete: 'cascade', }),
         configKeyDraftId: uuid('config_key_draft_id').references(() => configKeysDrafts.configKeyDraftId, { onDelete: 'cascade', }),
+        drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
@@ -767,6 +845,10 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.configKeyId],
         references: [configKeys.configKeyId],
     }),
+    drugsLibraryItem: one(drugsLibrary, {
+        fields: [pendingDeletion.drugsLibraryItemId],
+        references: [drugsLibrary.itemId],
+    }),
     scriptDraft: one(scriptsDrafts, {
         fields: [pendingDeletion.scriptId],
         references: [scriptsDrafts.scriptDraftId],
@@ -783,29 +865,8 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.configKeyId],
         references: [configKeysDrafts.configKeyDraftId],
     }),
-}));
-
-// DRUGS LIBRARY
-export const drugsLibrary = pgTable('nt_drugs_library', {
-    id: serial('id').primaryKey(),
-    itemId: uuid('item_id').notNull().unique().defaultRandom(),
-    scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
-    scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
-    drug: text('drug').notNull().default(''),
-    minGestation: integer('min_gestation'),
-    maxGestation: integer('max_gestation'),
-    minWeight: integer('min_weight'),
-    maxWeight: integer('max_weight'),
-    dayOfLife: text('day_of_life').notNull().default(''),
-    dosageText: text('dosage_text').notNull().default(''),
-    managementText: text('management_text').notNull().default(''),
-    gestationKey: text('gestation_key').notNull().default(''),
-    weightKey: text('weight_key').notNull().default(''),
-});
-
-export const drugsLibraryRelations = relations(drugsLibrary, ({ one }) => ({
-    script: one(scripts, {
-        fields: [drugsLibrary.scriptId],
-        references: [scripts.scriptId],
+    drugsLibraryItemDraft: one(drugsLibraryDrafts, {
+        fields: [pendingDeletion.drugsLibraryItemDraftId],
+        references: [drugsLibraryDrafts.itemDraftId],
     }),
 }));

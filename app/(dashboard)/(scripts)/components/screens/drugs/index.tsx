@@ -27,7 +27,7 @@ export function Drugs({
     form,
     disabled,
 }: Props) {
-    const { drugs } = useDrugsLibrary(form.getValues('scriptId'));
+    const { drugs } = useDrugsLibrary();
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
