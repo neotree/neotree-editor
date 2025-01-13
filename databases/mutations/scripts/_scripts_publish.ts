@@ -3,7 +3,7 @@ import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts, drugsLibrary } from "@/databases/pg/schema";
+import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts } from "@/databases/pg/schema";
 import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
@@ -85,16 +85,6 @@ export async function _publishScripts() {
                     eq(diagnosesDrafts.scriptDraftId, scriptId)
                 ));
             }
-        }
-
-        for (const scriptId of scriptsIdsAndScriptsDraftsIds) {
-            await db.update(drugsLibrary).set({
-                scriptDraftId: null,
-                scriptId,
-            }).where(or(
-                eq(drugsLibrary.scriptId, scriptId),
-                eq(drugsLibrary.scriptDraftId, scriptId)
-            ));
         }
 
         if (processedScripts.length) {
