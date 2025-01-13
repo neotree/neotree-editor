@@ -79,6 +79,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                             itemDraftId: itemId,
                             position: data.position,
                             itemId: published?.itemId,
+                            key: data.key,
                         });
                     }
                 }
