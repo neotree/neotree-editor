@@ -8,6 +8,7 @@ import { Preferences } from "@/types";
 
 export type GetDrugsLibraryItemsParams = {
     itemsIds?: string[];
+    keys?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
 };
@@ -25,24 +26,35 @@ export async function _getDrugsLibraryItems(
     params?: GetDrugsLibraryItemsParams
 ): Promise<GetDrugsLibraryItemsResults> {
     try {
-        const { itemsIds: _itemsIds, returnDraftsIfExist, } = { ...params };
+        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist, } = { ...params };
 
         let itemsIds = _itemsIds || [];
+        let keys = _keys || [];
         
         // unpublished drugsLibrary conditions
+        const whereDrugsLibraryItemsDraftsKeys = !keys?.length ? 
+            undefined 
+            : 
+            inArray(drugsLibraryDrafts.key, keys);
         const whereDrugsLibraryItemsDraftsIds = !itemsIds?.length ? 
             undefined 
             : 
             inArray(drugsLibraryDrafts.itemDraftId, itemsIds.map(id => uuid.validate(id) ? id : uuid.v4()));
         const whereDrugsLibraryItemsDrafts = [
+            ...(!whereDrugsLibraryItemsDraftsKeys ? [] : [whereDrugsLibraryItemsDraftsKeys]),
             ...(!whereDrugsLibraryItemsDraftsIds ? [] : [whereDrugsLibraryItemsDraftsIds]),
         ];
         const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
             where: and(...whereDrugsLibraryItemsDrafts),
         });
         itemsIds = itemsIds.filter(id => !drafts.map(d => d.itemDraftId).includes(id));
+        keys = keys.filter(key => !drafts.map(d => d.key).includes(key));
 
         // published drugsLibrary conditions
+        const whereDrugsLibraryItemsKeys = !keys?.length ? 
+            undefined 
+            : 
+            inArray(drugsLibrary.key, keys);
         const whereDrugsLibraryItemsIdsNotIn = !drafts.length ? undefined : notInArray(drugsLibrary.itemId, drafts.map(d => d.itemDraftId));
         const whereDrugsLibraryItemsIds = !itemsIds?.length ? 
             undefined 
@@ -53,6 +65,8 @@ export async function _getDrugsLibraryItems(
             isNull(drugsLibrary.deletedAt),
             isNull(pendingDeletion),
             whereDrugsLibraryItemsIdsNotIn,
+            whereDrugsLibraryItemsIds,
+            whereDrugsLibraryItemsKeys,
         ];
 
         const publishedRes = await db
