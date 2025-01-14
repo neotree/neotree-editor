@@ -114,6 +114,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             form.drugUnit &&
             form.routeOfAdministration &&
             form.ageKey &&
+            form.dosage &&
             Number(form.minGestation || '0') <= Number(form.maxGestation || '0') &&
             Number(form.minWeight || '0') <= Number(form.maxWeight || '0') &&
             Number(form.minAge || '0') <= Number(form.maxAge || '0')
@@ -282,7 +283,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="flex gap-x-2">
                 <div className="flex-1">
-                    <Label secondary htmlFor="minAge">Min Day of Life (Age - days) *</Label>
+                    <Label secondary htmlFor="minAge">Min Day of Life (Age - hours) *</Label>
                     <Input
                         name="minAge"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -309,7 +310,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         secondary 
                         htmlFor="maxAge"
                         error={Number(form.minAge || '0') > Number(form.maxAge || '0')}
-                    >Max Day of Life (Age - days) *</Label>
+                    >Max Day of Life (Age - hours) *</Label>
                     <Input
                         name="maxAge"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -321,6 +322,18 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         onChange={e => setForm(prev => ({ ...prev, maxAge: e.target.value, }))}
                     />
                 </div>
+            </div>
+
+            <div>
+                <Label secondary htmlFor="dosage">Dose *</Label>
+                <Input
+                    name="dosage"
+                    type="number"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.dosage}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, dosage: e.target.value, }))}
+                />
             </div>
 
             <div>
