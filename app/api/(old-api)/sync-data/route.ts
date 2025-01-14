@@ -6,8 +6,9 @@ import { _getScripts, _getScreens, _getDiagnoses, } from "@/databases/queries/sc
 import { _getConfigKeys, } from "@/databases/queries/config-keys";
 import { _getHospitals, } from "@/databases/queries/hospitals";
 import { mapNewConfigKeysToOld, mapNewDiagnosisToOld, mapNewScreenToOld, mapNewScriptToOld } from '@/lib/map-old-and-new';
-import { getDevice } from "../get-device-registration/get-device";
 import { isValidUrl } from "@/lib/urls";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
+import { getDevice } from "../get-device-registration/get-device";
 
 export async function GET(req: NextRequest) {
 	try {
@@ -31,10 +32,12 @@ export async function GET(req: NextRequest) {
             hospitals,
             getScripts,
             getConfigKeys,
+            getDrugsLibrary,
         ] = await Promise.all([
             _getHospitals(),
             _getScripts({ withDeleted, returnDraftsIfExist, hospitalIds: hospitalId ? [hospitalId] : undefined, }),
             _getConfigKeys({ withDeleted, returnDraftsIfExist, }),
+            _getDrugsLibraryItems({ withDeleted, returnDraftsIfExist, }),
         ]);
 
         const [
@@ -80,6 +83,10 @@ export async function GET(req: NextRequest) {
         const configKeys = getConfigKeys.data.filter(s => !s.isDeleted).map(s => mapNewConfigKeysToOld(s));
         const deletedConfigKeys = getConfigKeys.data.filter(s => s.isDeleted).map(s => mapNewConfigKeysToOld(s));
 
+        // drugs library
+        const drugsLibrary = getDrugsLibrary.data.filter(s => !s.isDeleted);
+        const deletedDrugsLibrary = getDrugsLibrary.data.filter(s => s.isDeleted);
+
         // scripts
         const scripts = getScripts.data.filter(s => !s.isDeleted).map(s => {
             const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
@@ -105,6 +112,8 @@ export async function GET(req: NextRequest) {
             webeditorInfo,
             configKeys,
             deletedConfigKeys,
+            drugsLibrary,
+            deletedDrugsLibrary,
             deletedDiagnoses,
             deletedScreens,
             deletedScripts,
