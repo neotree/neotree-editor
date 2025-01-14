@@ -12,6 +12,7 @@ export type GetScreensParams = {
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
     withImagesOnly?: boolean;
+    types?: (typeof screens.$inferSelect)['type'][];
 };
 
 export type ScreenType = typeof screens.$inferSelect & {
@@ -41,6 +42,7 @@ export async function _getScreens(
         let { 
             scriptsIds: scriptsIds = [],
             screensIds: screensIds = [], 
+            types = [],
             returnDraftsIfExist, 
             withImagesOnly,
         } = { ...params };
@@ -80,7 +82,8 @@ export async function _getScreens(
                     inArray(screensDrafts.scriptId, scriptsIds),
                     inArray(screensDrafts.scriptDraftId, scriptsIds)
                 ),
-                !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds)
+                !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
+                !types?.length ? undefined : inArray(screensDrafts.type, types)
             ),
         });
 
@@ -111,6 +114,7 @@ export async function _getScreens(
                 !returnDraftsIfExist ? undefined : isNull(screensDrafts.screenId),
                 !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds),
                 !screensIds?.length ? undefined : inArray(screens.screenId, screensIds),
+                !types?.length ? undefined : inArray(screens.type, types),
                 !withImagesOnly ? undefined : or(
                     isNotNull(screens.image1),
                     isNotNull(screens.image2),

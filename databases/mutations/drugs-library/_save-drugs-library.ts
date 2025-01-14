@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { drugsLibrary, drugsLibraryDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
@@ -101,4 +102,26 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_drugs_library_items');
         return response;
     }
+}
+
+export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastAction, }: {
+    data: SaveDrugsLibraryItemsData[],
+    broadcastAction?: boolean,
+}) {
+    try {
+        const keys = data.map(item => item.key!).filter(key => key);
+        
+        if (keys.length) {
+            const existing = await _getDrugsLibraryItems({ keys });
+
+            data = data.filter(item => !existing.data.map(d => d.key).includes(item.key!));
+
+            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
+        }
+
+        return { success: true, };
+    } catch(e: any) {
+        logger.error('_saveDrugsLibraryItemsIfKeysNotExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    } 
 }

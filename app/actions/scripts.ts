@@ -5,6 +5,7 @@ import queryString from "query-string";
 
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
+import * as drugsLibraryMutations from "@/databases/mutations/drugs-library";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
@@ -166,6 +167,7 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
     const data: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
         screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][],
         diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][]
+        drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][]
     })[] = [];
     const errors: string[] = [];
 	try {
@@ -177,6 +179,7 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
         for (const s of scripts.data) {
             const screens = await queries._getScreens({ scriptsIds: [s.scriptId], returnDraftsIfExist, });
             const diagnoses = await queries._getDiagnoses({ scriptsIds: [s.scriptId], returnDraftsIfExist, });
+            const drugsLibrary = await queries._getScriptsDrugsLibrary({ scriptsIds: [s.scriptId], returnDraftsIfExist, });
 
             screens.errors?.forEach(e => errors.push(e));
             diagnoses.errors?.forEach(e => errors.push(e));
@@ -185,6 +188,7 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
                 ...s,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
+                drugsLibrary: drugsLibrary.data,
             });
         }
 
@@ -378,7 +382,7 @@ export async function deleteScriptsItems({ scriptsIds, }: {
     }
 }
 
-const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, };
+const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, drugsLibrary: 0, };
 
 export async function saveScriptsWithItems({ data }: {
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
@@ -418,6 +422,7 @@ export async function saveScriptsWithItems({ data }: {
                 id,
                 screens = [], 
                 diagnoses = [], 
+                drugsLibrary = [],
                 publishDate,
                 createdAt,
                 updatedAt,
@@ -452,6 +457,12 @@ export async function saveScriptsWithItems({ data }: {
             const saveDiagnoses = await saveScriptDiagnoses({ scriptId, diagnoses, });
             // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
+
+            if (drugsLibrary.length) {
+                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ data: drugsLibrary, });
+                // saveDrugsLibrary.errors?.forEach(e => errors.push(e));
+                info.drugsLibrary += drugsLibrary.length;
+            }
         }
 
         if (errors.length) return { success: false, errors, info, };
