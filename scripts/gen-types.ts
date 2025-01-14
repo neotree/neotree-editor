@@ -59,6 +59,13 @@ const schemas: { [key: string]: ZodTypeAny; } = {
     ConfigKeyDraftInsert: createInsertSchema(schema.configKeysDrafts),
     ConfigKeyHistoryItemSelect: createSelectSchema(schema.configKeysHistory),
     ConfigKeyHistoryItemInsert: createInsertSchema(schema.configKeysHistory),
+
+    DrugsLibraryItemSelect: createSelectSchema(schema.drugsLibrary),
+    DrugsLibraryItemInsert: createInsertSchema(schema.drugsLibrary),
+    DrugsLibraryItemDraftSelect: createSelectSchema(schema.drugsLibraryDrafts),
+    DrugsLibraryItemDraftInsert: createInsertSchema(schema.drugsLibraryDrafts),
+    DrugsLibraryItemHistoryItemSelect: createSelectSchema(schema.drugsLibraryHistory),
+    DrugsLibraryItemHistoryItemInsert: createInsertSchema(schema.drugsLibraryHistory),
     
     ScriptSelect: createSelectSchema(schema.scripts),
     ScriptInsert: createInsertSchema(schema.scripts),

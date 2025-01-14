@@ -372,6 +372,110 @@ export type ConfigKeyHistoryItemInsert = {
     createdAt?: Date | undefined;
 };
 
+export type DrugsLibraryItemSelect = {
+    id: number;
+    itemId: string;
+    key: string;
+    drug: string;
+    minGestation: number | null;
+    maxGestation: number | null;
+    minWeight: number | null;
+    maxWeight: number | null;
+    minAge: number | null;
+    maxAge: number | null;
+    dosage: number | null;
+    dosageMultiplier: number | null;
+    dayOfLife: string;
+    dosageText: string;
+    managementText: string;
+    gestationKey: string;
+    weightKey: string;
+    diagnosisKey: string;
+    ageKey: string;
+    administrationFrequency: string;
+    drugUnit: string;
+    routeOfAdministration: string;
+    position: number;
+    condition: string;
+    version: number;
+    publishDate: Date;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+};
+
+export type DrugsLibraryItemInsert = {
+    id?: number | undefined;
+    itemId?: string | undefined;
+    key: string;
+    drug?: string | undefined;
+    minGestation?: (number | null) | undefined;
+    maxGestation?: (number | null) | undefined;
+    minWeight?: (number | null) | undefined;
+    maxWeight?: (number | null) | undefined;
+    minAge?: (number | null) | undefined;
+    maxAge?: (number | null) | undefined;
+    dosage?: (number | null) | undefined;
+    dosageMultiplier?: (number | null) | undefined;
+    dayOfLife?: string | undefined;
+    dosageText?: string | undefined;
+    managementText?: string | undefined;
+    gestationKey?: string | undefined;
+    weightKey?: string | undefined;
+    diagnosisKey?: string | undefined;
+    ageKey?: string | undefined;
+    administrationFrequency?: string | undefined;
+    drugUnit?: string | undefined;
+    routeOfAdministration?: string | undefined;
+    position: number;
+    condition?: string | undefined;
+    version: number;
+    publishDate?: Date | undefined;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
+    deletedAt?: (Date | null) | undefined;
+};
+
+export type DrugsLibraryItemDraftSelect = {
+    id: number;
+    itemDraftId: string;
+    itemId: string | null;
+    key: string;
+    position: number;
+    data: DrugsLibraryItemDraftSelect;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type DrugsLibraryItemDraftInsert = {
+    id?: number | undefined;
+    itemDraftId?: string | undefined;
+    itemId?: (string | null) | undefined;
+    key: string;
+    position: number;
+    data: DrugsLibraryItemDraftInsert;
+    createdAt?: Date | undefined;
+    updatedAt?: Date | undefined;
+};
+
+export type DrugsLibraryItemHistoryItemSelect = {
+    id: number;
+    version: number;
+    itemId: string;
+    restoreKey: string | null;
+    changes: DrugsLibraryItemHistoryItemSelect | null;
+    createdAt: Date;
+};
+
+export type DrugsLibraryItemHistoryItemInsert = {
+    id?: number | undefined;
+    version: number;
+    itemId: string;
+    restoreKey?: (string | null) | undefined;
+    changes?: (DrugsLibraryItemHistoryItemInsert | null) | undefined;
+    createdAt?: Date | undefined;
+};
+
 export type ScriptSelect = {
     id: number;
     scriptId: string;
@@ -388,6 +492,7 @@ export type ScriptSelect = {
     nuidSearchEnabled: boolean;
     nuidSearchFields: ScriptSelect;
     preferences: ScriptSelect;
+    printSections: ScriptSelect;
     publishDate: Date;
     createdAt: Date;
     updatedAt: Date;
@@ -410,6 +515,7 @@ export type ScriptInsert = {
     nuidSearchEnabled?: boolean | undefined;
     nuidSearchFields?: ScriptInsert | undefined;
     preferences?: ScriptInsert | undefined;
+    printSections?: ScriptInsert | undefined;
     publishDate?: Date | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
@@ -421,6 +527,7 @@ export type ScriptDraftSelect = {
     scriptDraftId: string;
     scriptId: string | null;
     position: number;
+    hospitalId: string | null;
     data: ScriptDraftSelect;
     createdAt: Date;
     updatedAt: Date;
@@ -431,6 +538,7 @@ export type ScriptDraftInsert = {
     scriptDraftId?: string | undefined;
     scriptId?: (string | null) | undefined;
     position: number;
+    hospitalId?: (string | null) | undefined;
     data: ScriptDraftInsert;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
@@ -461,7 +569,7 @@ export type ScreenSelect = {
     oldScriptId: string | null;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
     position: number;
     source: string | null;
     sectionTitle: string;
@@ -513,6 +621,7 @@ export type ScreenSelect = {
     fields: ScreenSelect;
     items: ScreenSelect;
     preferences: ScreenSelect;
+    drugs: ScreenSelect;
     publishDate: Date;
     createdAt: Date;
     updatedAt: Date;
@@ -526,7 +635,7 @@ export type ScreenInsert = {
     oldScriptId?: (string | null) | undefined;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
     position: number;
     source?: (string | null) | undefined;
     sectionTitle: string;
@@ -578,6 +687,7 @@ export type ScreenInsert = {
     fields?: ScreenInsert | undefined;
     items?: ScreenInsert | undefined;
     preferences?: ScreenInsert | undefined;
+    drugs?: ScreenInsert | undefined;
     publishDate?: Date | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
@@ -590,7 +700,7 @@ export type ScreenDraftSelect = {
     screenId: string | null;
     scriptId: string | null;
     scriptDraftId: string | null;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
     position: number;
     data: ScreenDraftSelect;
     createdAt: Date;
@@ -603,7 +713,7 @@ export type ScreenDraftInsert = {
     screenId?: (string | null) | undefined;
     scriptId?: (string | null) | undefined;
     scriptDraftId?: (string | null) | undefined;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
     position: number;
     data: ScreenDraftInsert;
     createdAt?: Date | undefined;
@@ -740,10 +850,12 @@ export type PendingDeletionItemSelect = {
     diagnosisId: string | null;
     diagnosisScriptId: string | null;
     configKeyId: string | null;
+    drugsLibraryItemId: string | null;
     scriptDraftId: string | null;
     screenDraftId: string | null;
     diagnosisDraftId: string | null;
     configKeyDraftId: string | null;
+    drugsLibraryItemDraftId: string | null;
     createdAt: Date;
 };
 
@@ -755,9 +867,11 @@ export type PendingDeletionItemInsert = {
     diagnosisId?: (string | null) | undefined;
     diagnosisScriptId?: (string | null) | undefined;
     configKeyId?: (string | null) | undefined;
+    drugsLibraryItemId?: (string | null) | undefined;
     scriptDraftId?: (string | null) | undefined;
     screenDraftId?: (string | null) | undefined;
     diagnosisDraftId?: (string | null) | undefined;
     configKeyDraftId?: (string | null) | undefined;
+    drugsLibraryItemDraftId?: (string | null) | undefined;
     createdAt?: Date | undefined;
 };
