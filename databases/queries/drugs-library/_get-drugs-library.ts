@@ -49,8 +49,9 @@ export async function _getDrugsLibraryItems(
             where: and(...whereDrugsLibraryItemsDrafts),
         });
 
-        itemsIds = itemsIds.filter(id => drafts.map(d => d.itemDraftId).includes(id) ? uuid.v4() : id);
-        keys = keys.filter(key => drafts.map(d => d.key).includes(key) ? uuid.v4() : key);
+        const itemDraftsIds = drafts.map(d => d.itemDraftId);
+        itemsIds = itemsIds.map(id => itemDraftsIds.includes(id) ? uuid.v4() : id);
+        keys = keys.map(key => drafts.map(d => d.key).includes(key) ? uuid.v4() : key);
 
         // published drugsLibrary conditions
         const whereDrugsLibraryItemsKeys = !keys?.length ? 
@@ -68,6 +69,7 @@ export async function _getDrugsLibraryItems(
             isNull(pendingDeletion),
             whereDrugsLibraryItemsIds,
             whereDrugsLibraryItemsKeys,
+            !itemDraftsIds.length ? undefined : notInArray(drugsLibrary.itemId, itemDraftsIds),
         ];
 
         const publishedRes = await db
