@@ -35,7 +35,11 @@ export async function _getScriptsDrugsLibrary(
             }, {} as { [key: string]: string; })
         );
 
-        return await _getDrugsLibraryItems({ keys });
+        return await _getDrugsLibraryItems({ 
+            keys,
+            returnDraftsIfExist: params?.returnDraftsIfExist,
+            withDeleted: params?.withDeleted,
+        });
     } catch(e: any) {
         logger.error('_getScriptsDrugsLibrary ERROR', e.message);
         return { data: [], errors: [e.message], };
