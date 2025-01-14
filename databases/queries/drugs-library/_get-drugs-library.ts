@@ -28,7 +28,7 @@ export async function _getDrugsLibraryItems(
     try {
         const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist, } = { ...params };
 
-        let itemsIds = _itemsIds || [];
+        let itemsIds = (_itemsIds || []).map(id => uuid.validate(id) ? id : uuid.v4());
         let keys = _keys || [];
         
         // unpublished drugsLibrary conditions
@@ -39,32 +39,33 @@ export async function _getDrugsLibraryItems(
         const whereDrugsLibraryItemsDraftsIds = !itemsIds?.length ? 
             undefined 
             : 
-            inArray(drugsLibraryDrafts.itemDraftId, itemsIds.map(id => uuid.validate(id) ? id : uuid.v4()));
+            inArray(drugsLibraryDrafts.itemDraftId, itemsIds);
         const whereDrugsLibraryItemsDrafts = [
             ...(!whereDrugsLibraryItemsDraftsKeys ? [] : [whereDrugsLibraryItemsDraftsKeys]),
             ...(!whereDrugsLibraryItemsDraftsIds ? [] : [whereDrugsLibraryItemsDraftsIds]),
         ];
+
         const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
             where: and(...whereDrugsLibraryItemsDrafts),
         });
-        itemsIds = itemsIds.filter(id => !drafts.map(d => d.itemDraftId).includes(id));
-        keys = keys.filter(key => !drafts.map(d => d.key).includes(key));
+
+        itemsIds = itemsIds.filter(id => drafts.map(d => d.itemDraftId).includes(id) ? uuid.v4() : id);
+        keys = keys.filter(key => drafts.map(d => d.key).includes(key) ? uuid.v4() : key);
 
         // published drugsLibrary conditions
         const whereDrugsLibraryItemsKeys = !keys?.length ? 
             undefined 
             : 
             inArray(drugsLibrary.key, keys);
-        const whereDrugsLibraryItemsIdsNotIn = !drafts.length ? undefined : notInArray(drugsLibrary.itemId, drafts.map(d => d.itemDraftId));
-        const whereDrugsLibraryItemsIds = !itemsIds?.length ? 
+        
+            const whereDrugsLibraryItemsIds = !itemsIds?.length ? 
             undefined 
             : 
-            inArray(drugsLibrary.itemId, itemsIds.filter(id => uuid.validate(id)));
+            inArray(drugsLibrary.itemId, itemsIds);
 
         const whereDrugsLibraryItems = [
             isNull(drugsLibrary.deletedAt),
             isNull(pendingDeletion),
-            whereDrugsLibraryItemsIdsNotIn,
             whereDrugsLibraryItemsIds,
             whereDrugsLibraryItemsKeys,
         ];

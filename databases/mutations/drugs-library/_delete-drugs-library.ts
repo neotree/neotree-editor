@@ -33,7 +33,7 @@ export async function _deleteDrugsLibraryItems(
     const response: DeleteDrugsLibraryItemsResponse = { success: false, };
 
     try {
-        const itemsIds = itemsIdsParam;
+        const itemsIds = itemsIdsParam || [];
 
         if (itemsIds.length) {
             const drugsLibraryItems = await _getDrugsLibraryItems({ itemsIds, returnDraftsIfExist: true, });

@@ -8,6 +8,7 @@ import { create } from "zustand";
 
 import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems } from "@/app/actions/drugs-library";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
@@ -63,6 +64,17 @@ export function useDrugsLibrary() {
             useDrugsLibraryState.setState({ loading: false, });
         }
     }, [alert]);
+    
+    useSocketEventsListener({
+        events: [
+            {
+                name: 'data_changed',
+                onEvent: {
+                    callback: () => getDrugs(),
+                },
+            },
+        ],
+    });
 
     const deleteDrugs = useCallback(async (ids: string[]) => {
         try {
