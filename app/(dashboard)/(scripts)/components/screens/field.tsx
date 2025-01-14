@@ -368,18 +368,22 @@ export function Field<P = {}>({
                                                     disabled={disabled || (minDate === 'date_now')}
                                                     type="datetime"
                                                     value={minDate}
-                                                    onChange={({ date }) => setValue('minDate', date?.toISOString() || '', { shouldDirty: true, })}
+                                                    onChange={({ date }) => {
+                                                        let _minDate = date?.toISOString() || '';
+                                                        if (minDate === 'date_now') _minDate = minDate;
+                                                        setValue('minDate', _minDate, { shouldDirty: true, });
+                                                    }}
                                                 />
                                             </div>
-                                            
+
                                             <div className="flex-1 flex items-center space-x-2">
                                                 <Checkbox 
-                                                    id="minDate" 
+                                                    id="minDateCurrent" 
                                                     disabled={disabled}
                                                     checked={minDate === 'date_now'}
                                                     onCheckedChange={checked => setValue('minDate', checked ? 'date_now' : '', { shouldDirty: true, })}
                                                 />
-                                                <Label htmlFor="minDate">Current date</Label>
+                                                <Label htmlFor="minDateCurrent">Current date</Label>
                                             </div>
 
                                             <div>
@@ -399,18 +403,22 @@ export function Field<P = {}>({
                                                     disabled={disabled || (maxDate === 'date_now')}
                                                     type="datetime"
                                                     value={maxDate}
-                                                    onChange={({ date }) => setValue('maxDate', date?.toISOString() || '', { shouldDirty: true, })}
+                                                    onChange={({ date }) => {
+                                                        let _maxDate = date?.toISOString() || '';
+                                                        if (maxDate === 'date_now') _maxDate = maxDate;
+                                                        setValue('maxDate', _maxDate, { shouldDirty: true, });
+                                                    }}
                                                 />
                                             </div>
 
                                             <div className="flex-1 flex items-center space-x-2">
                                                 <Checkbox 
-                                                    id="maxDate" 
+                                                    id="maxDateCurrent" 
                                                     disabled={disabled}
                                                     checked={maxDate === 'date_now'}
                                                     onCheckedChange={checked => setValue('maxDate', checked ? 'date_now' : '', { shouldDirty: true, })}
                                                 />
-                                                <Label htmlFor="maxDate">Current date</Label>
+                                                <Label htmlFor="maxDateCurrent">Current date</Label>
                                             </div>
 
                                             <div>
