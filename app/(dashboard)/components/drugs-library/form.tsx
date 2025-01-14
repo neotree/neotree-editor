@@ -228,7 +228,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="flex gap-x-2">
                 <div className="flex-1">
-                    <Label secondary htmlFor="minWeight">Min Weight (weeks) *</Label>
+                    <Label secondary htmlFor="minWeight">Min Weight (grams) *</Label>
                     <Input
                         name="minWeight"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -255,7 +255,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         secondary 
                         htmlFor="maxWeight"
                         error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
-                    >Max Weight (weeks) *</Label>
+                    >Max Weight (grams) *</Label>
                     <Input
                         name="maxWeight"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"

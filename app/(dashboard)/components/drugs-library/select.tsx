@@ -68,7 +68,7 @@ export function SelectDrug({
                         }}
                     >
                         <SelectTrigger>
-                            <SelectValue placeholder="Select drug from libray" />
+                            <SelectValue placeholder="Select drug from library" />
                         </SelectTrigger>
                         <SelectContent>
                         <SelectGroup>

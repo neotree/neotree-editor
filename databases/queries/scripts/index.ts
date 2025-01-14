@@ -8,3 +8,5 @@ export * from './_diagnoses_count';
 export * from './_diagnoses_get';
 
 export * from './_get_scripts_metadata';
+
+export * from './_scripts_get _drugs_library';

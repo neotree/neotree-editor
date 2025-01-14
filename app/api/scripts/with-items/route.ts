@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _getScripts, _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
 import { getScriptsWithItems, saveScriptsWithItems } from "@/app/actions/scripts";
 
 export async function POST(req: NextRequest) {
@@ -32,7 +31,12 @@ export async function GET(req: NextRequest) {
         const scriptsIdsJSON = req.nextUrl.searchParams.get('scriptsIds');
         const scriptsIds = !scriptsIdsJSON ? undefined : JSON.parse(scriptsIdsJSON);
 
-        const { errors, data } = await getScriptsWithItems({ scriptsIds, });
+		const dataJSON = JSON.parse(req.nextUrl.searchParams.get('data') || '{}');
+
+        const { errors, data } = await getScriptsWithItems({ 
+			...dataJSON, 
+			scriptsIds: scriptsIds || dataJSON.scriptsIds, 
+		});
 
         if (errors?.length) return NextResponse.json({ errors, }, { status: 200, });
 
