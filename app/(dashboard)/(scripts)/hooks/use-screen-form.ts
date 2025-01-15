@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
@@ -21,6 +21,7 @@ export function useScreenForm({
 }: UseScreenFormParams) {
     const router = useRouter();
 
+    const mounted = useRef(false);
     const [saving, setSaving] = useState(false);
 
     const { saveScreens } = useScriptsContext();
@@ -90,6 +91,14 @@ export function useScreenForm({
     const form = useForm({
         defaultValues: getDefaultValues(),
     });
+
+    useEffect(() => {
+        if (mounted.current) {
+            form.reset(getDefaultValues());
+        } else {
+            mounted.current = true;
+        }
+    }, [formData?.drugs, form.reset, getDefaultValues]);
 
     const {
         formState: { dirtyFields, },

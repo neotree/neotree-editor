@@ -6,6 +6,8 @@ import db from '@/databases/pg/drizzle';
 import { drugsLibrary, drugsLibraryDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
+import { _saveScreens } from '@/databases/mutations/scripts';
+import { _getScreens } from '@/databases/queries/scripts';
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
@@ -22,6 +24,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
 
     try {
         const errors = [];
+        const keys: { old: string; new: string; }[] = [];
 
         let index = 0;
         for (const { itemId: _itemId, ...item } of data) {
@@ -29,6 +32,8 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                 index++;
 
                 const itemId = _itemId || uuid.v4();
+                let oldKey = '';
+                let newKey = item.key || '';
 
                 if (!errors.length) {
                     const draft = !_itemId ? null : await db.query.drugsLibraryDrafts.findFirst({
@@ -40,6 +45,8 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                     });
 
                     if (draft) {
+                        oldKey = draft.data.key;
+
                         const data = {
                             ...draft.data,
                             ...item,
@@ -52,7 +59,10 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                                 position: data.position,
                             }).where(eq(drugsLibraryDrafts.itemDraftId, itemId));
                     } else {
+                        oldKey = published?.key || '';
+
                         let position = item.position || published?.position;
+
                         if (!position) {
                             const confKey = await db.query.drugsLibrary.findFirst({
                                 columns: { position: true, },
@@ -83,10 +93,35 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                             key: data.key,
                         });
                     }
+
+                    if (oldKey && newKey && (oldKey !== newKey)) keys.push({ old: oldKey, new: newKey, });
                 }
             } catch(e: any) {
                 errors.push(e.message);
             }
+        }
+
+        if (keys.length) {
+            const screens = await _getScreens({
+                types: ['drugs'],
+                returnDraftsIfExist: true,
+            });
+
+            const updatedScreens: typeof screens.data = [];
+            screens.data.forEach(screen => {
+                let isUpdated = false;
+                const drugs = screen.drugs.map(d => {
+                    if (keys.map(key => key.old).includes(d.key)) {
+                        const key = keys.filter(key => key.old === d.key).map(key => key.new)[0];
+                        d = { ...d, key };
+                        isUpdated = true;
+                    }
+                    return d;
+                });
+                if (isUpdated) updatedScreens.push({ ...screen, drugs });
+            });
+
+            if (updatedScreens.length) await _saveScreens({ data: updatedScreens, });
         }
 
         if (errors.length) {
