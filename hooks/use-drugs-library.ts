@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
 import { create } from "zustand";
@@ -40,6 +40,7 @@ export function useDrugsLibrary() {
     const state = useDrugsLibraryState();
     const { drugs, } = state;
 
+    const router = useRouter();
     const searchParams = useSearchParams();
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId } = searchParamsObj;
@@ -70,7 +71,10 @@ export function useDrugsLibrary() {
             {
                 name: 'data_changed',
                 onEvent: {
-                    callback: () => getDrugs(),
+                    callback: async () => {
+                        await getDrugs();
+                        router.refresh();
+                    },
                 },
             },
         ],
@@ -82,10 +86,15 @@ export function useDrugsLibrary() {
                 loading: true,
                 drugs: prev.drugs.filter(item => !ids.includes(item.itemId!)), 
             }));
+
             const res = await axios.delete<Awaited<ReturnType<typeof deleteDrugsLibraryItems>>>(
                 '/api/drugs-library?data=' + JSON.stringify({ itemsIds: ids, }),
             );
+
             if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
+
+            router.refresh();
+
             alert({
                 title: '',
                 message: 'Drug deleted successfully!',
@@ -100,7 +109,7 @@ export function useDrugsLibrary() {
         } finally {
             useDrugsLibraryState.setState({ loading: false, });
         }
-    }, [alert]);
+    }, [alert, router.refresh]);
 
     const saveDrugs = useCallback(async (item?: Drug) => {
         try {
@@ -124,6 +133,7 @@ export function useDrugsLibrary() {
 
             const payload: Parameters<typeof saveDrugsLibraryItems>[0] = {
                 data: item ? [item] : updated,
+                broadcastAction: true,
             };
             
             const res = await axios.post<Awaited<ReturnType<typeof saveDrugsLibraryItems>>>(
@@ -134,6 +144,8 @@ export function useDrugsLibrary() {
             if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
 
             await getDrugs();
+
+            router.refresh();
 
             alert({
                 title: '',
@@ -149,7 +161,7 @@ export function useDrugsLibrary() {
         } finally {
             useDrugsLibraryState.setState({ loading: false, });
         }
-    }, [drugs, itemId]);
+    }, [drugs, itemId, router.refresh]);
 
     useEffect(() => {
         if (!useDrugsLibraryState.getState().initialised) {
