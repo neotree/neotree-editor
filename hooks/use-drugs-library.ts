@@ -43,7 +43,11 @@ export function useDrugsLibrary() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { itemId } = searchParamsObj;
+    const { itemId: itemIdParam } = searchParamsObj;
+
+    const itemId = useMemo(() => {
+        return drugs.filter(d => (d.itemId === itemIdParam) || (d.key === itemIdParam))[0]?.itemId;
+    }, [itemIdParam, drugs]);
 
     const { alert } = useAlertModal();
 
