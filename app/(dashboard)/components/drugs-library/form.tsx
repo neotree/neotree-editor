@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/loader";
 import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-library";
@@ -22,14 +23,14 @@ const getDefaultForm = (item?: DrugsLibraryState['drugs'][0]) => ({
     itemId: `${item?.itemId || uuidv4()}`,
     key: `${item?.key || ''}`,
     drug: `${item?.drug || ''}`,
-    minGestation: `${item?.minGestation || ''}`,
-    maxGestation: `${item?.maxGestation || ''}`,
-    minWeight: `${item?.minWeight || ''}`,
-    maxWeight: `${item?.maxWeight || ''}`,
-    minAge: `${item?.minAge || ''}`,
-    maxAge: `${item?.maxAge || ''}`,
-    dosage: `${item?.dosage || ''}`,
-    dosageMultiplier: `${item?.dosageMultiplier || ''}`,
+    minGestation: `${item?.minGestation === null ? '' : item?.minGestation}`,
+    maxGestation: `${item?.maxGestation === null ? '' : item?.maxGestation}`,
+    minWeight: `${item?.minWeight === null ? '' : item?.minWeight}`,
+    maxWeight: `${item?.maxWeight === null ? '' : item?.maxWeight}`,
+    minAge: `${item?.minAge === null ? '' : item?.minAge}`,
+    maxAge: `${item?.maxAge === null ? '' : item?.maxAge}`,
+    dosage: `${item?.dosage === null ? '' : item?.dosage}`,
+    dosageMultiplier: `${item?.dosageMultiplier === null ? '' : item?.dosageMultiplier}`,
     dayOfLife: `${item?.dayOfLife || ''}`,
     dosageText: `${item?.dosageText || ''}`,
     managementText: `${item?.managementText || ''}`,
@@ -153,13 +154,15 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div>
                 <Label secondary htmlFor="diagnosisKey">Diagnosis Key *</Label>
-                <Input
+                <Textarea
+                    rows={3}
                     name="gestationKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.diagnosisKey}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, diagnosisKey: e.target.value, }))}
                 />
+                <span className="opacity-80 text-xs">e.g NSep,Premature,Dehyd</span>
             </div>
 
             <div>
