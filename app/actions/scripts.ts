@@ -459,7 +459,17 @@ export async function saveScriptsWithItems({ data }: {
             info.diagnoses += saveDiagnoses.saved;
 
             if (drugsLibrary.length) {
-                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ data: drugsLibrary, });
+                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
+                    data: drugsLibrary.map(item => ({
+                        ...item,
+                        createdAt: undefined!,
+                        updatedAt: undefined!,
+                        deletedAt: undefined!,
+                        publishDate: undefined!,
+                        id: undefined!,
+                        position: undefined,
+                    })), 
+                });
                 // saveDrugsLibrary.errors?.forEach(e => errors.push(e));
                 info.drugsLibrary += drugsLibrary.length;
             }
