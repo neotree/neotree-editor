@@ -369,7 +369,7 @@ export function Field<P = {}>({
                                                     type="datetime"
                                                     value={minDate}
                                                     onChange={({ date }) => {
-                                                        let _minDate = date?.toISOString() || '';
+                                                        let _minDate = date?.toISOString?.() || '';
                                                         if (minDate === 'date_now') _minDate = minDate;
                                                         setValue('minDate', _minDate, { shouldDirty: true, });
                                                     }}
@@ -404,7 +404,7 @@ export function Field<P = {}>({
                                                     type="datetime"
                                                     value={maxDate}
                                                     onChange={({ date }) => {
-                                                        let _maxDate = date?.toISOString() || '';
+                                                        let _maxDate = date?.toISOString?.() || '';
                                                         if (maxDate === 'date_now') _maxDate = maxDate;
                                                         setValue('maxDate', _maxDate, { shouldDirty: true, });
                                                     }}
