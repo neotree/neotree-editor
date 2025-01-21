@@ -6,7 +6,7 @@ import queryString from "query-string";
 import axios from "axios";
 import { create } from "zustand";
 
-import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems } from "@/app/actions/drugs-library";
+import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems, copyDrugsLibraryItems } from "@/app/actions/drugs-library";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
 
@@ -167,6 +167,42 @@ export function useDrugsLibrary() {
         }
     }, [drugs, itemId, router.refresh]);
 
+    const copyDrugs = useCallback(async (itemsIds: string[]) => {
+        try {
+            useDrugsLibraryState.setState({ loading: true, });
+
+            const payload: Parameters<typeof copyDrugsLibraryItems>[0] = {
+                data: itemsIds.map(itemId => ({ itemId, })),
+                broadcastAction: true,
+            };
+            
+            const res = await axios.post<Awaited<ReturnType<typeof saveDrugsLibraryItems>>>(
+                '/api/drugs-library/copy',
+                payload,
+            );
+
+            if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
+
+            await getDrugs();
+
+            router.refresh();
+
+            alert({
+                title: '',
+                message: `Drug${(itemsIds.length < 2) ? '' : 's'} copied successfully!`,
+                variant: 'success',
+            });
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+        } finally {
+            useDrugsLibraryState.setState({ loading: false, });
+        }
+    }, [router.refresh]);
+
     useEffect(() => {
         if (!useDrugsLibraryState.getState().initialised) {
             getDrugs();
@@ -186,5 +222,6 @@ export function useDrugsLibrary() {
         getDrugs,
         deleteDrugs,
         saveDrugs,
+        copyDrugs,
     };
 }

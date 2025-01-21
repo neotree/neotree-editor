@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
-import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react";
+import { MoreVertical, Trash, Edit, Eye, Plus, CopyIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
@@ -37,7 +37,8 @@ export function DrugsLibrary({ disabled }: Props) {
         selectedItemId: itemId, 
         editLink,
         saveDrugs, 
-        deleteDrugs 
+        deleteDrugs,
+        copyDrugs,
     } = useDrugsLibrary();
 
     return (
@@ -111,6 +112,21 @@ export function DrugsLibrary({ disabled }: Props) {
                                                     </>
                                                 </Link>
                                             </DropdownMenuItem>
+
+                                            {!disabled && (
+                                                <DropdownMenuItem 
+                                                    onClick={() => confirm(() => copyDrugs([item.itemId!]), {
+                                                        title: 'Copy drug',
+                                                        message: `Are you sure you want to copy drug?<br /> <b>${item.drug}</b>`,
+                                                        positiveLabel: 'Yes, copy',
+                                                        negativeLabel: 'Cancel',
+                                                    })}
+                                                >
+                                                    <>
+                                                        <CopyIcon className="mr-2 h-4 w-4" /> Copy
+                                                    </>
+                                                </DropdownMenuItem>
+                                            )}
 
                                             {!disabled && (
                                                 <DropdownMenuItem

@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -15,6 +15,81 @@ export type SaveDrugsLibraryItemsResponse = {
     success: boolean; 
     errors?: string[]; 
 };
+
+const getUniqueKey = async (key: string, tries = 1, ogKey = '') => {
+    const [{ count: draftsCount }] = await db.select({
+        count: count(),
+    }).from(drugsLibraryDrafts).where(eq(drugsLibraryDrafts.key, key));
+
+    const [{ count: publishedCount }] = await db.select({
+        count: count(),
+    }).from(drugsLibrary).where(eq(drugsLibrary.key, key));
+
+    if (publishedCount || draftsCount) return await getUniqueKey(`${ogKey || key}-${tries + 1}`, tries + 1, ogKey || key);
+
+    return key;
+}
+
+export async function _copyDrugsLibraryItems({ data, ...params }: {
+    data: { itemId: string; }[],
+    broadcastAction?: boolean,
+}): Promise<SaveDrugsLibraryItemsResponse> {
+    const response: SaveDrugsLibraryItemsResponse = { success: false, };
+
+    try {
+        const { data: originalItems } = await _getDrugsLibraryItems({ itemsIds: data.map(item => item.itemId), });
+        const itemsToCopy: typeof originalItems = [];
+
+        for (const item of originalItems) {
+            const lastDraftPosition = await db.query.drugsLibraryDrafts.findFirst({
+                orderBy: desc(drugsLibraryDrafts.position),
+                columns: { position: true, }
+            });
+
+            const lastPublishedPosition = await db.query.drugsLibrary.findFirst({
+                orderBy: desc(drugsLibrary.position),
+                columns: { position: true, }
+            });
+
+            const position = Math.max(lastDraftPosition?.position || 0, lastPublishedPosition?.position || 0, 0) + 1;
+
+            const key = await getUniqueKey(item.key);
+            itemsToCopy.push({
+                ...item,
+                key,
+                itemId: uuid.v4(),
+                position,
+            });
+        }
+
+        return await _saveDrugsLibraryItems({ data: itemsToCopy, ...params, });
+    } catch(e: any) {
+        logger.error('_copyDrugsLibraryItems ERROR', e.message);
+        return { success: false, errors: [e.message], };
+    }
+}
+
+export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastAction, }: {
+    data: SaveDrugsLibraryItemsData[],
+    broadcastAction?: boolean,
+}) {
+    try {
+        const keys = data.map(item => item.key!).filter(key => key);
+        
+        if (keys.length) {
+            const existing = await _getDrugsLibraryItems({ keys });
+
+            data = data.filter(item => !existing.data.map(d => d.key).includes(item.key!));
+
+            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
+        }
+
+        return { success: true, };
+    } catch(e: any) {
+        logger.error('_saveDrugsLibraryItemsIfKeysNotExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    } 
+}
 
 export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
     data: SaveDrugsLibraryItemsData[],
@@ -137,26 +212,4 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_drugs_library_items');
         return response;
     }
-}
-
-export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastAction, }: {
-    data: SaveDrugsLibraryItemsData[],
-    broadcastAction?: boolean,
-}) {
-    try {
-        const keys = data.map(item => item.key!).filter(key => key);
-        
-        if (keys.length) {
-            const existing = await _getDrugsLibraryItems({ keys });
-
-            data = data.filter(item => !existing.data.map(d => d.key).includes(item.key!));
-
-            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
-        }
-
-        return { success: true, };
-    } catch(e: any) {
-        logger.error('_saveDrugsLibraryItemsIfKeysNotExist ERROR', e.message);
-        return { errors: [e.message], success: false, };
-    } 
 }
