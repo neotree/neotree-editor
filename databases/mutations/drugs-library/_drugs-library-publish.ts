@@ -130,7 +130,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     } catch(e: any) {
         results.success = false;
         results.errors = [e.message];
-        logger.error('_publishDrugsLibraryItems ERROR', e);
+        logger.error('_publishDrugsLibraryItems ERROR', e.message);
     } finally {
         return results;
     }
