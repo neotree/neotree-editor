@@ -462,6 +462,7 @@ export async function saveScriptsWithItems({ data }: {
                 const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
                     data: drugsLibrary.map(item => ({
                         ...item,
+                        itemId: v4(), 
                         createdAt: undefined!,
                         updatedAt: undefined!,
                         deletedAt: undefined!,
