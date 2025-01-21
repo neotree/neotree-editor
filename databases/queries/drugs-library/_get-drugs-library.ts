@@ -26,7 +26,7 @@ export async function _getDrugsLibraryItems(
     params?: GetDrugsLibraryItemsParams
 ): Promise<GetDrugsLibraryItemsResults> {
     try {
-        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist, } = { ...params };
+        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist = true, } = { ...params };
 
         let itemsIds = (_itemsIds || []).map(id => uuid.validate(id) ? id : uuid.v4());
         let keys = _keys || [];
