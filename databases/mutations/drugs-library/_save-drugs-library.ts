@@ -41,24 +41,12 @@ export async function _copyDrugsLibraryItems({ data, ...params }: {
         const itemsToCopy: typeof originalItems = [];
 
         for (const item of originalItems) {
-            const lastDraftPosition = await db.query.drugsLibraryDrafts.findFirst({
-                orderBy: desc(drugsLibraryDrafts.position),
-                columns: { position: true, }
-            });
-
-            const lastPublishedPosition = await db.query.drugsLibrary.findFirst({
-                orderBy: desc(drugsLibrary.position),
-                columns: { position: true, }
-            });
-
-            const position = Math.max(lastDraftPosition?.position || 0, lastPublishedPosition?.position || 0, 0) + 1;
-
             const key = await getUniqueKey(item.key);
             itemsToCopy.push({
                 ...item,
                 key,
                 itemId: uuid.v4(),
-                position,
+                position: undefined!,
                 createdAt: undefined!,
                 updatedAt: undefined!,
                 deletedAt: undefined!,
