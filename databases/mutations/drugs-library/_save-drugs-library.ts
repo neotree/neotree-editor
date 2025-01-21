@@ -59,6 +59,11 @@ export async function _copyDrugsLibraryItems({ data, ...params }: {
                 key,
                 itemId: uuid.v4(),
                 position,
+                createdAt: undefined!,
+                updatedAt: undefined!,
+                deletedAt: undefined!,
+                publishDate: undefined!,
+                id: undefined!,
             });
         }
 
