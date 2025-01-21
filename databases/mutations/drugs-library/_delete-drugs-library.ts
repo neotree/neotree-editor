@@ -41,7 +41,9 @@ export async function _deleteDrugsLibraryItems(
             // delete drafts
             await db.delete(drugsLibraryDrafts).where(inArray(drugsLibraryDrafts.itemDraftId, itemsIds));
 
-            const pendingDeletionInsertData = drugsLibraryItems.data.filter(s => !s.isDraft);
+            const pendingDeletionInsertData = drugsLibraryItems.data.filter(s => !s.isDraft).map(s => ({
+                drugsLibraryItemId: s.itemId,
+            }));
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
             const screens = await _getScreens({
