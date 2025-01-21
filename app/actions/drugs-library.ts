@@ -1,9 +1,28 @@
 'use server';
 
-import { _saveDrugsLibraryItems, _deleteDrugsLibraryItems } from "@/databases/mutations/drugs-library";
-import { _getDrugsLibraryItem, _getDrugsLibraryItems, _countDrugsLibraryItems, _defaultDrugsLibraryItemsCount } from "@/databases/queries/drugs-library";
+import { 
+    _saveDrugsLibraryItems, 
+    _deleteDrugsLibraryItems,
+    _copyDrugsLibraryItems 
+} from "@/databases/mutations/drugs-library";
+import { 
+    _getDrugsLibraryItem, 
+    _getDrugsLibraryItems, 
+    _countDrugsLibraryItems, 
+    _defaultDrugsLibraryItemsCount 
+} from "@/databases/queries/drugs-library";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+
+export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async (...args) => {
+    try {
+        await isAllowed();
+        return await _copyDrugsLibraryItems(...args);
+    } catch(e: any) {
+        logger.error('copyDrugsLibraryItems ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+};
 
 export const deleteDrugsLibraryItems: typeof _deleteDrugsLibraryItems = async (...args) => {
     try {
