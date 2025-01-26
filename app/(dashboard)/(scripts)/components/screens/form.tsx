@@ -19,6 +19,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,7 +190,7 @@ export function ScreenForm({
     const isMultiSelectScreen = type === 'multi_select';
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
-    const isDrugsScreen = type === 'drugs';
+    const isDrugsScreen = (type === 'drugs') || (type === 'fluids'); // || (type === 'feeds')
 
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
@@ -890,6 +891,11 @@ export function ScreenForm({
                     <Drugs 
                         form={form}
                         disabled={disabled}
+                        type={(() => {
+                            let val: GetDrugsLibraryItemsResults['data'][0]['type'] = 'drug';
+                            if (type === 'fluids') return 'fluid';
+                            return val;
+                        })()}
                     />
                 </>
             )}

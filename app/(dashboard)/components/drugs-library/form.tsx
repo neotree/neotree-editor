@@ -28,6 +28,7 @@ import { Loader } from "@/components/loader";
 import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-library";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import ucFirst from "@/lib/ucFirst";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -37,9 +38,9 @@ const types: { value: NonNullable<ItemType['type']>, label: string; }[] = [
     // { value: 'feed', label: 'Feed', },
 ];
 
-const getDefaultForm = (item?: ItemType) => ({
+const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     itemId: `${item?.itemId || uuidv4()}`,
-    type: `${item?.type || 'drug'}`,
+    type: `${item?.type || type}`,
     key: `${item?.key || ''}`,
     drug: `${item?.drug || ''}`,
     minGestation: `${item?.minGestation === null ? '' : item?.minGestation}`,
@@ -71,28 +72,30 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     floating?: boolean;
     onChange: (item: DrugsLibraryState['drugs'][0]) => void;
 }) {
-    const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
-    const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
-
-    const [open, setOpen] = useState(false);
-    const [form, setForm] = useState(getDefaultForm(item));
-
     const router = useRouter();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const { itemId, addItem } = searchParamsObj;
+
+    const newItemType = addItem as ItemType['type']; 
+
+    const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
+    const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
+
+    const [open, setOpen] = useState(false);
+    const [form, setForm] = useState(getDefaultForm(item, newItemType));
 
     const { keys, loading } = useDrugsLibrary();
 
     const { confirm } = useConfirmModal();
 
     useEffect(() => {
-        setOpen(!!itemId || !!addItem);
-    }, [itemId, addItem]);
+        setOpen(!!itemId || !!newItemType);
+    }, [itemId, newItemType]);
 
     useEffect(() => {
-        setForm(getDefaultForm(item));
-    }, [item]);
+        setForm(getDefaultForm(item, newItemType));
+    }, [item, newItemType]);
 
     const onSave = useCallback(() => {
         onChange({
@@ -113,7 +116,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
     const onClose = useCallback(() => {
         setOpen(false);
-        setForm(getDefaultForm())
+        setForm(getDefaultForm(undefined, newItemType))
 
         router.push(`?${queryString.stringify({ 
             ...searchParamsObj, 
@@ -170,7 +173,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             isFluid,
             isFormComplete, 
         };
-    }, [form, addItem]);
+    }, [form, newItemType]);
 
     const isSaveButtonDisabled = useCallback(() => {
         return !isFormComplete ||
@@ -188,7 +191,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     name="type"
                     disabled={disabled}
                     onValueChange={type => {
-                        const defaultForm = getDefaultForm(item?.type === type ? item : undefined);
+                        const defaultForm = getDefaultForm(item?.type === type ? item : undefined, newItemType);
                         const fn = () => setForm(prev => {
                             return { 
                                 ...prev, 
@@ -197,6 +200,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                                 hourlyFeedMultiplier: defaultForm.hourlyFeedMultiplier,
                                 condition: defaultForm.condition,
                                 diagnosisKey: defaultForm.diagnosisKey,
+                                drugUnit: defaultForm.drugUnit,
                             };
                         });
 
@@ -227,7 +231,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 </Select>
             </div>
             <div>
-                <Label secondary htmlFor="drug">Drug *</Label>
+                <Label secondary htmlFor="drug">{ucFirst(form.type)} *</Label>
                 <Input
                     name="drug"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -569,7 +573,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                             className="p-0 m-0 flex flex-col w-full max-w-full sm:max-w-[80%] md:max-w-[80%] lg:max-w-[50%]"
                         >
                             <SheetHeader className="flex flex-row items-center py-2 px-4 border-b border-b-border text-left sm:text-left">
-                                <SheetTitle>{addItem ? 'Add' : ''}{itemId ? 'Edit' : ''} {item?.type || addItem}</SheetTitle>
+                                <SheetTitle>{newItemType ? 'Add' : ''}{itemId ? 'Edit' : ''} {item?.type || newItemType}</SheetTitle>
                                 <SheetDescription className="hidden"></SheetDescription>
                             </SheetHeader>
 
