@@ -16,6 +16,13 @@ export function useRoutes() {
             hidden: false,
         },
         {
+            label: 'Drugs & Fluids Library',
+            href: '/drugs-fluids-and-feeds',
+            isActive: pathname.substring(0, 24) === '/drugs-fluids-and-feeds/',
+            id: v4(),
+            hidden: false,
+        },
+        {
             label: 'Configuration',
             href: '/configuration',
             id: v4(),

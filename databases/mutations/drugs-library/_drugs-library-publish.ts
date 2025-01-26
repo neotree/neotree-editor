@@ -93,20 +93,30 @@ export async function _publishDrugsLibraryItems(opts?: {
         if (deleted.length) {
             const deletedAt = new Date();
 
-            await db.update(drugsLibrary)
-                .set({ deletedAt, })
-                .where(inArray(drugsLibrary.itemId, deleted.map(c => c.drugsLibraryItemId!)));
+            const deletedArr = await db.update(drugsLibrary)
+                .set({ 
+                    deletedAt,
+                    key: sql`CONCAT(${drugsLibrary.key}, '-', date_part('epoch', now()))`, // make the unique key available for use
+                })
+                .where(inArray(drugsLibrary.itemId, deleted.map(c => c.drugsLibraryItemId!)))
+                .returning();
 
-            await db.insert(drugsLibraryHistory).values(deleted.map(c => ({
-                version: c.drugsLibraryItem!.version,
-                itemId: c.drugsLibraryItemId!,
-                changes: {
-                    action: 'delete_drugs_library_item',
-                    description: 'Delete drugs library item',
-                    oldValues: [{ deletedAt: null, }],
-                    newValues: [{ deletedAt, }],
-                },
-            })));
+            await db.insert(drugsLibraryHistory).values(deletedArr.map(c => {
+                const oldKeyArr = c.key.split('-');
+                if (oldKeyArr.length > 2) oldKeyArr.pop();
+                const oldKey = oldKeyArr.join('-');
+
+                return {
+                    version: c.version,
+                    itemId: c.itemId!,
+                    changes: {
+                        action: 'delete_drugs_library_item',
+                        description: 'Delete drugs library item',
+                        oldValues: [{ deletedAt: null, key: oldKey, }],
+                        newValues: [{ deletedAt, key: c.key, }],
+                    },
+                };
+            }));
         }
 
         await db.delete(pendingDeletion).where(or(

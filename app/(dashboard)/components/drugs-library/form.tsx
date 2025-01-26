@@ -58,13 +58,13 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const router = useRouter();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { itemId, addDrug } = searchParamsObj;
+    const { itemId, addItem } = searchParamsObj;
 
     const { keys, loading } = useDrugsLibrary();
 
     useEffect(() => {
-        setOpen(!!itemId || !!addDrug);
-    }, [itemId, addDrug]);
+        setOpen(!!itemId || !!addItem);
+    }, [itemId, addItem]);
 
     useEffect(() => {
         setForm(getDefaultForm(item));
@@ -91,7 +91,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
         router.push(`?${queryString.stringify({ 
             ...searchParamsObj, 
             itemId: undefined, 
-            addDrug: undefined, 
+            addItem: undefined, 
         })}`);
 
         const scrollPos = containerDiv?.top || 0;
@@ -426,7 +426,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                             className="p-0 m-0 flex flex-col w-full max-w-full sm:max-w-[80%] md:max-w-[80%] lg:max-w-[50%]"
                         >
                             <SheetHeader className="flex flex-row items-center py-2 px-4 border-b border-b-border text-left sm:text-left">
-                                <SheetTitle>{addDrug ? 'Add' : ''}{itemId ? 'Edit' : ''} drug</SheetTitle>
+                                <SheetTitle>{addItem ? 'Add' : ''}{itemId ? 'Edit' : ''} drug</SheetTitle>
                                 <SheetDescription className="hidden"></SheetDescription>
                             </SheetHeader>
 

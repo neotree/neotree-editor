@@ -26,10 +26,10 @@ export function MobileMenu() {
             <Sheet>
                 <SheetTrigger asChild>
                     <Button
-                        className="md:hidden"
+                        className="lg:hidden"
                         variant="ghost"
                     >
-                        <MenuIcon className="h-6 w-6" />
+                        <MenuIcon className="h-6 w-6 hover:text-primary-foreground" />
                     </Button>
                 </SheetTrigger>
 

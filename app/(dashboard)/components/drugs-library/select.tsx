@@ -98,7 +98,7 @@ export function SelectDrug({
                         </Link>
                     )}
                     <Link 
-                        href={addLink}
+                        href={addLink('drug')}
                         className="flex items-center justify-center gap-x-1 opacity-70 hover:opacity-100"
                     >
                         <PlusIcon className="size-4" />

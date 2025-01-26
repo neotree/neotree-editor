@@ -18,7 +18,7 @@ export function HeaderDesktopMenu() {
 
     return (
         <>
-            <div className="hidden md:flex">
+            <div className="hidden lg:flex">
                 {routes.map((route, i) => {
                     const isActive = route.isActive;
 
