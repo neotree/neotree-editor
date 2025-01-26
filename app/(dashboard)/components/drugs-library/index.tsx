@@ -72,7 +72,11 @@ export function DrugsLibrary({}: Props) {
                 }}
                 columns={[
                     {
-                        name: 'Drug',
+                        name: 'Drug / Fluid',
+                    },
+                    {
+                        name: 'Type',
+                        tdClassName: 'w-[80px]',
                     },
                     {
                         name: 'Key',
@@ -151,6 +155,7 @@ export function DrugsLibrary({}: Props) {
                 ]}
                 data={drugs.map(item => [
                     item.drug || '',
+                    item.type || '',
                     item.key || '',
                     item.dosageText || '',
                     item.itemId!,
