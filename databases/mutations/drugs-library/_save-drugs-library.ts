@@ -171,13 +171,14 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
 
         if (keys.length) {
             const screens = await _getScreens({
-                types: ['drugs'],
+                types: ['drugs', 'fluids', 'feeds'],
                 returnDraftsIfExist: true,
             });
 
             const updatedScreens: typeof screens.data = [];
             screens.data.forEach(screen => {
                 let isUpdated = false;
+
                 const drugs = screen.drugs.map(d => {
                     if (keys.map(key => key.old).includes(d.key)) {
                         const key = keys.filter(key => key.old === d.key).map(key => key.new)[0];
@@ -186,7 +187,26 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                     }
                     return d;
                 });
-                if (isUpdated) updatedScreens.push({ ...screen, drugs });
+
+                const fluids = screen.fluids.map(d => {
+                    if (keys.map(key => key.old).includes(d.key)) {
+                        const key = keys.filter(key => key.old === d.key).map(key => key.new)[0];
+                        d = { ...d, key };
+                        isUpdated = true;
+                    }
+                    return d;
+                });
+
+                const feeds = screen.feeds.map(d => {
+                    if (keys.map(key => key.old).includes(d.key)) {
+                        const key = keys.filter(key => key.old === d.key).map(key => key.new)[0];
+                        d = { ...d, key };
+                        isUpdated = true;
+                    }
+                    return d;
+                });
+                
+                if (isUpdated) updatedScreens.push({ ...screen, drugs, fluids, feeds, });
             });
 
             if (updatedScreens.length) await _saveScreens({ data: updatedScreens, });

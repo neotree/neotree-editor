@@ -84,6 +84,8 @@ export function useScreenForm({
             fields: formData?.fields || [],
             items: formData?.items || [],
             drugs: formData?.drugs || [],
+            feeds: formData?.feeds || [],
+            fluids: formData?.fluids || [],
             preferences: formData?.preferences || defaultPreferences,
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
@@ -98,7 +100,7 @@ export function useScreenForm({
         } else {
             mounted.current = true;
         }
-    }, [formData?.drugs, form.reset, getDefaultValues]);
+    }, [formData?.drugs, formData?.feeds, formData?.fluids, form.reset, getDefaultValues]);
 
     const {
         formState: { dirtyFields, },

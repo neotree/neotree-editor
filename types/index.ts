@@ -31,6 +31,10 @@ export type DrugField = {
     position: number;
 };
 
+export type FluidField = DrugField;
+
+export type FeedField = DrugField;
+
 export type ScriptItem = {
     id: string;
     label: string;

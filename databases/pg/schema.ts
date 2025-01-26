@@ -49,10 +49,15 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'timer',
     'yesno',
     'drugs',
+    'fluids',
+    'feeds',
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
     'edliz_summary_table',
 ]);
+
+// DRUG TYPE ENUM
+export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
@@ -548,6 +553,8 @@ export const screens = pgTable(
         items: jsonb('items').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         drugs: jsonb('drugs').default('[]').notNull(),
+        fluids: jsonb('fluids').default('[]').notNull(),
+        feeds: jsonb('feeds').default('[]').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -749,9 +756,6 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
         references: [scripts.scriptId],
     }),
 }));
-
-// DRUG TYPE ENUM
-export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 
 // DRUGS LIBRARY
 export const drugsLibrary = pgTable('nt_drugs_library', {
