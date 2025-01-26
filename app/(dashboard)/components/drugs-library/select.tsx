@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, PlusIcon } from "lucide-react";
 import Link from "next/link";
 
+import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { Loader } from "@/components/loader";
 import {
@@ -17,11 +18,13 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DrugsLibraryForm } from './form';
+import ucFirst from "@/lib/ucFirst";
 
 type Props = {
     disabled?: boolean;
     selected?: string[];
     unselectable?: string[];
+    type: GetDrugsLibraryItemsResults['data'][0]['type'];
     onChange: (selected: string[]) => void;
 };
 
@@ -29,16 +32,19 @@ export function SelectDrug({
     disabled, 
     selected: selectedProp, 
     unselectable = [],
+    type = 'drug',
     onChange 
 }: Props) {
     const { 
         loading, 
-        drugs, 
+        drugs: allDrugs, 
         selectedItemId: itemId, 
         addLink, 
         editLink,
         saveDrugs 
     } = useDrugsLibrary();
+
+    const drugs = useMemo(() => allDrugs.filter(d => d.type === type), [allDrugs, type]);
 
     const [selected, setSelected] = useState<string[]>(selectedProp || []);
 
@@ -56,7 +62,7 @@ export function SelectDrug({
 
             <div className="flex flex-col gap-y-4">
                 <div>
-                    <Label htmlFor="drug">Select drug *</Label>
+                    <Label htmlFor="drug">Select {type} *</Label>
                     <Select
                         value={selected[0] || ''}
                         disabled={disabled}
@@ -72,7 +78,7 @@ export function SelectDrug({
                         </SelectTrigger>
                         <SelectContent>
                         <SelectGroup>
-                            <SelectLabel>Drugs</SelectLabel>
+                            <SelectLabel>{ucFirst(type)}s</SelectLabel>
                             {drugs.map(item => (
                                 <SelectItem 
                                     key={item.key} 
@@ -94,15 +100,15 @@ export function SelectDrug({
                             className="flex items-center text-primary justify-center gap-x-1 opacity-70 hover:opacity-100"
                         >
                             <Pencil className="size-4" />
-                            <span>Edit selected drug</span>
+                            <span>Edit selected {type}</span>
                         </Link>
                     )}
                     <Link 
-                        href={addLink('drug')}
+                        href={addLink(type)}
                         className="flex items-center justify-center gap-x-1 opacity-70 hover:opacity-100"
                     >
                         <PlusIcon className="size-4" />
-                        <span>Add drug to library</span>
+                        <span>Add {type} to library</span>
                     </Link>
                 </div>
 
