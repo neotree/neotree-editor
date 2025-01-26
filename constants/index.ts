@@ -1,6 +1,8 @@
 import { ScreenType, ScriptType } from "@/databases/queries/scripts";
 import { Preferences } from "@/types";
 
+export const CONDITIONAL_EXP_EXAMPLE = "Example: ($key = true and $key2 = false) or $key3 = 'HD'";
+
 export const defaultPreferences = { 
     fontSize: {}, 
     fontWeight: {}, 
@@ -14,7 +16,6 @@ export const scriptsPageTabs = [
     { value: 'screens', label: 'Screens', },
     { value: 'diagnoses', label: 'Diagnoses', },
     { value: 'print', label: 'Print', },
-    { value: 'drugs-library', label: 'Drugs library', },
 ];
 
 export const scriptTypes = [
@@ -33,7 +34,9 @@ export const screenTypes = [
     { value: 'progress', label: 'Progress' },
     { value: 'timer', label: 'Timer' },
     { value: 'yesno', label: 'Yes/No' },
-    { value: 'drugs', label: 'Drug, Fluid and Feeds' },
+    { value: 'drugs', label: 'Drugs' },
+    { value: 'fluids', label: 'Fluids' },
+    // { value: 'feeds', label: 'Feeds' },
     { value: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { value: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
     { value: 'diagnosis', label: 'Diagnosis' },

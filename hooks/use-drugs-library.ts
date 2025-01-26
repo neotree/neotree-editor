@@ -217,7 +217,7 @@ export function useDrugsLibrary() {
     return {
         ...state,
         selectedItemId: itemId,
-        addLink: `?${queryString.stringify({ ...searchParamsObj, addDrug: 1, })}`,
+        addLink: (type: string) => `?${queryString.stringify({ ...searchParamsObj, addItem: type, })}`,
         editLink: (itemId: string) => `?${queryString.stringify({ ...searchParamsObj, itemId, })}`,
         getDrugs,
         deleteDrugs,

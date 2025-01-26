@@ -1,10 +1,12 @@
 import { relations, sql } from "drizzle-orm";
 import { 
     boolean,
+    customType,
     doublePrecision,
     index,
     integer, 
     jsonb, 
+    pgEnum,
     pgTable, 
     serial, 
     text, 
@@ -14,18 +16,48 @@ import {
 import { v4 as uuidv4 } from "uuid";
 
 import { ScriptField } from "@/types";
-import { 
-    bytea,
-    mailerServiceEnum,
-    roleNameEnum,
-    siteTypeEnum,
-    siteEnvEnum,
-    scriptTypeEnum,
-    screenTypeEnum,
-} from "./_utils";
 import { defaultPreferences } from "@/constants";
 
-export * from './_utils';
+export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
+    dataType() {
+        return "bytea";
+    },
+});
+
+// MAILER SETTINGS ENUM
+export const mailerServiceEnum = pgEnum('mailer_service', ['gmail', 'smtp']);
+
+// ROLES
+export const roleNameEnum = pgEnum('role_name', ['user', 'admin', 'super_user']);
+
+// SITES
+export const siteTypeEnum = pgEnum('site_type', ['nodeapi', 'webeditor']);
+export const siteEnvEnum = pgEnum('site_env', ['production', 'stage', 'development', 'demo']);
+
+// SCRIPT TYPES ENUM
+export const scriptTypeEnum = pgEnum('script_type', ['admission', 'discharge', 'neolab']);
+
+// SCREEN TYPES ENUM
+export const screenTypeEnum = pgEnum('screen_type', [
+    'diagnosis',
+    'checklist',
+    'form',
+    'management',
+    'multi_select',
+    'single_select',
+    'progress',
+    'timer',
+    'yesno',
+    'drugs',
+    'fluids',
+    'feeds',
+    'zw_edliz_summary_table',
+    'mwi_edliz_summary_table',
+    'edliz_summary_table',
+]);
+
+// DRUG TYPE ENUM
+export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
@@ -521,6 +553,8 @@ export const screens = pgTable(
         items: jsonb('items').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         drugs: jsonb('drugs').default('[]').notNull(),
+        fluids: jsonb('fluids').default('[]').notNull(),
+        feeds: jsonb('feeds').default('[]').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -728,6 +762,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
     key: text('key').notNull().unique(),
+    type: drugTypeEnum('type').notNull().default('drug'),
     drug: text('drug').notNull().default(''),
     minGestation: doublePrecision('min_gestation'),
     maxGestation: doublePrecision('max_gestation'),
@@ -735,6 +770,8 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     maxWeight: doublePrecision('max_weight'),
     minAge: doublePrecision('min_age'),
     maxAge: doublePrecision('max_age'),
+    hourlyFeed: doublePrecision('hourly_feed'),
+    hourlyFeedMultiplier: doublePrecision('hourly_feed_multiplier'),
     dosage: doublePrecision('dosage'),
     dosageMultiplier: doublePrecision('dosage_multiplier'),
     dayOfLife: text('day_of_life').notNull().default(''),

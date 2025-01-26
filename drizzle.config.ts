@@ -4,7 +4,7 @@ import type { Config } from 'drizzle-kit';
 dotEnvConfig({ path: '.env.development', });
 
 export default {
-    schema: './databases/pg/schema/index.ts',
+    schema: './databases/pg/schema.ts',
     out: './databases/pg/migrations',
     dialect: 'postgresql',
     dbCredentials: {
