@@ -46,7 +46,7 @@ export function ScriptMetaActions({ data }: {
             });
 
             const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, script.title);
+            XLSX.utils.book_append_sheet(workbook, worksheet, `${script.title || ''}`.substring(0, 31));
         });
 
         XLSX.writeFile(workbook, "metadata.xlsx");
