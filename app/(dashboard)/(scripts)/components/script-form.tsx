@@ -10,7 +10,6 @@ import {
     SelectContent,
     SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
@@ -32,7 +31,6 @@ import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
 import { PrintSections } from './print';
-import { DrugsLibrary } from '../../components/drugs-library';
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -264,12 +262,6 @@ export function ScriptForm(props: Props) {
                         <PrintSections 
                             disabled={disabled}
                             form={form}
-                        />
-                    )}
-
-                    {section === 'drugs-library' && (
-                        <DrugsLibrary 
-                            disabled={disabled}
                         />
                     )}
                 </div>

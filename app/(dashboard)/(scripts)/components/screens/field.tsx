@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -204,7 +205,7 @@ export function Field<P = {}>({
                                     name="condition"
                                     noRing={false}
                                 />
-                                <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
+                                <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                             </div>
                         </>
 

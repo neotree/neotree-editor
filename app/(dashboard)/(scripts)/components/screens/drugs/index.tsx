@@ -15,23 +15,59 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
+import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
 import { ItemsBottomActions } from "./items-bottom-actions";
 import { Item } from "./item";
 
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
+    type: GetDrugsLibraryItemsResults['data'][0]['type'];
 };
 
 export function Drugs({
     form,
     disabled,
+    type,
 }: Props) {
-    const { drugs } = useDrugsLibrary();
+    const { drugs: allDrugs } = useDrugsLibrary();
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
-    const screenDrugs = form.watch('drugs');
+    const drugs = useMemo(() => allDrugs.filter(d => d.type === type), [allDrugs, type]);
+
+    const drugsField = form.watch('drugs');
+    const fluidsField = form.watch('fluids');
+    const feedsField = form.watch('feeds');
+
+    const itemTypeInfo = useMemo(() => {
+        let screenDrugs = drugsField;
+        let formKey: 'drugs' | 'feeds' | 'fluids' = 'drugs';
+        let title = 'Drugs';
+
+        if (type === 'feed') {
+            screenDrugs = feedsField;
+            formKey = 'feeds';
+            title = 'Feeds';
+        } else if (type === 'fluid') {
+            screenDrugs = fluidsField;
+            formKey = 'fluids';
+            title = 'Fluids';
+        } 
+
+        return { 
+            screenDrugs, 
+            formKey, 
+            title, 
+            type,
+        };
+    }, [type, drugsField, fluidsField, feedsField]);
+
+    const { 
+        screenDrugs, 
+        formKey, 
+        title, 
+    } = itemTypeInfo;
 
     const items = useMemo(() => {
         return screenDrugs.map(item => {
@@ -43,29 +79,33 @@ export function Drugs({
         });
     }, [screenDrugs, drugs]);
 
+    const setValue = useCallback((data: typeof screenDrugs) => {
+        form.setValue(
+            formKey,
+            data,
+            { shouldDirty: true, }
+        );
+    }, [form.setValue, formKey]);
+
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const sorted = arrayMoveImmutable([...items], oldIndex, newIndex);
-        form.setValue(
-            'drugs',
+        setValue(
             sorted.map(({ data, ...s }, i) => ({
                 ...s,
                 position: i + 1,
             })),
-            { shouldDirty: true, }
         );
-    }, [form, items]);
+    }, [setValue, items]);
 
     const onDelete = useCallback((indexes: number[]) => {
         const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold text-danger">${s?.data?.drug}</div>`).join('');
         confirm(() => {
             const data = items.filter((_, i) => !indexes.includes(i));
-            form.setValue(
-                'drugs',
+            setValue(
                 data.map(({ data, ...s }, i) => ({
                     ...s,
                     position: i + 1,
                 })),
-                { shouldDirty: true, }
             );
             setSelectedIndexes([]);
         }, {
@@ -74,7 +114,7 @@ export function Drugs({
             danger: true,
             positiveLabel: 'Delete',
         });
-    }, [form, items, confirm]);
+    }, [setValue, items, confirm]);
 
     const onCopy = useCallback((indexes: number[]) => {
         const labels = items.filter((_, i) => indexes.includes(i)).map(s => `<div class="font-bold">${s?.data?.drug}</div>`).join('');
@@ -86,13 +126,11 @@ export function Drugs({
                     position: items.length + 1 + i,
                 })),
             ];
-            form.setValue(
-                'drugs',
+            setValue(
                 data.map(({ data, ...s }, i) => ({
                     ...s,
                     position: i + 1,
                 })),
-                { shouldDirty: true, }
             );
             setSelectedIndexes([]);
         }, {
@@ -100,32 +138,34 @@ export function Drugs({
             message: `<p>Are you sure you want to duplicate ${indexes.length > 1 ? `${indexes.length} items: ` : 'item: '}</p> ${labels}`,
             positiveLabel: 'Duplicate',
         })
-    }, [form, items, confirm]);
+    }, [setValue, items, confirm]);
 
     return (
         <>
             <DataTable 
-                title="Drugs"
+                title={title}
                 sortable={!disabled}
                 selectable={!disabled}
                 onSort={onSort}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
-                noDataMessage="No drugs to display."
+                noDataMessage={`No ${formKey} to display.`}
                 search={{
-                    inputPlaceholder: 'Search drugs',
+                    inputPlaceholder: `Search ${formKey}`,
                 }}
                 headerActions={(
                     <>
                         <Item
                             form={form}
                             disabled={disabled}
+                            itemType={type}
+                            itemTypeInfo={itemTypeInfo}
                         >
                             {!disabled && (
                                 <DialogTrigger asChild>
                                     <Button className="text-primary border-primary" variant="outline">
                                         <Plus className="h-4 w-4 mr-1" />
-                                        Add drug
+                                        Add {type}
                                     </Button>
                                 </DialogTrigger>
                             )}
@@ -134,7 +174,11 @@ export function Drugs({
                 )}
                 columns={[
                     {
-                        name: 'Drug',
+                        name: 'Drug / Fluid',
+                    },
+                    {
+                        name: 'Type',
+                        cellClassName: 'w-[80px]',
                     },
                     {
                         name: 'Key',
@@ -165,6 +209,7 @@ export function Drugs({
                                             <Item 
                                                 disabled={disabled} 
                                                 form={form}
+                                                itemTypeInfo={itemTypeInfo}
                                                 item={{
                                                     data: item,
                                                     index: rowIndex,
@@ -208,6 +253,7 @@ export function Drugs({
                 ]}
                 data={items.map(f => [
                     f.data?.drug || '',
+                    f.data?.type || '',
                     f.key || '',
                     f.data?.dosageText || '',
                     f.key,

@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { useScreenForm } from "../../../hooks/use-screen-form";
-import { DrugField, ScriptItem as ItemType } from "@/types";
+import { DrugField } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
 import { SelectDrug } from '../../../../components/drugs-library/select';
 
 type Props = {
@@ -14,7 +15,11 @@ type Props = {
     form: ReturnType<typeof useScreenForm>;
     types?: { value: string; label: string; }[];
     subTypes?: { value: string; label: string; }[];
-    itemType?: string;
+    itemTypeInfo: {
+        type: GetDrugsLibraryItemsResults['data'][0]['type'];
+        formKey: 'drugs' | 'feeds' | 'fluids';
+        title: string;
+    };
     item?: {
         index: number;
         data: DrugField,
@@ -24,7 +29,7 @@ type Props = {
 export function Item<P = {}>({
     children,
     item: itemProp,
-    itemType,
+    itemTypeInfo: { formKey, type, },
     form,
     disabled: disabledProp,
     types = [],
@@ -41,9 +46,9 @@ export function Item<P = {}>({
     const onSave = useCallback(() => {
         if (selected) {
             if (itemProp?.index === undefined) {
-                form.setValue('drugs', [...form.getValues('drugs'), selected], { shouldDirty: true, })
+                form.setValue(formKey, [...form.getValues(formKey), selected], { shouldDirty: true, })
             } else {
-                form.setValue('drugs', form.getValues('drugs').map((f, i) => ({
+                form.setValue(formKey, form.getValues(formKey).map((f, i) => ({
                     ...f,
                     ...(i !== itemProp.index ? null : {
                         ...selected,
@@ -52,13 +57,13 @@ export function Item<P = {}>({
             }
         }
         setOpen(false);
-    }, [selected, itemProp]);
+    }, [selected, itemProp, formKey]);
 
     return (
         <>
             <Modal
                 open={open}
-                title="Select drug"
+                title={`Select ${formKey}`}
                 trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
                     setSelected(itemProp?.data || null);
@@ -90,14 +95,15 @@ export function Item<P = {}>({
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         <SelectDrug 
+                            type={type}
                             disabled={disabled}
                             selected={selected?.key ? [selected.key] : []}
-                            unselectable={form.getValues('drugs').map(item => item.key).filter(s => s !== selected?.key!)}
+                            unselectable={form.getValues(formKey).map(item => item.key).filter(s => s !== selected?.key!)}
                             onChange={([key]) => {
-                                let position = form.getValues('drugs').length ? 
+                                let position = form.getValues(formKey).length ? 
                                     1 
                                     : 
-                                    (Math.max(...form.getValues('drugs').map(s => s.position)) + 1);
+                                    (Math.max(...form.getValues(formKey).map(s => s.position)) + 1);
 
                                 if (itemProp?.data) position = itemProp.data.position;
 

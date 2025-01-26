@@ -18,14 +18,15 @@ import {
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
+import { useAppContext } from "@/contexts/app";
 import { DrugsLibraryForm } from "./form";
+import { Add } from "./add";
 
-type Props = {
-    disabled?: boolean;
-};
+type Props = {};
 
-export function DrugsLibrary({ disabled }: Props) {
+export function DrugsLibrary({}: Props) {
     const { confirm } = useConfirmModal();
+    const { viewOnly } = useAppContext();
 
     // const searchParams = useSearchParams();
     // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
@@ -41,6 +42,8 @@ export function DrugsLibrary({ disabled }: Props) {
         copyDrugs,
     } = useDrugsLibrary();
 
+    const disabled = useMemo(() => viewOnly, [viewOnly]);
+
     return (
         <>
             {loading && <Loader overlay />}
@@ -52,17 +55,13 @@ export function DrugsLibrary({ disabled }: Props) {
             />
 
             <DataTable 
+                title="Drugs & Fluids Library"
                 headerActions={(
                     <>
-                        <Button
-                            asChild
-                            variant="outline"
-                        >
-                            <Link href={addLink}>
-                                Add drug
-                                <Plus className="w-4 h-4 ml-2" />
-                            </Link>
-                        </Button>
+                        <Add 
+                            addDrugLink={addLink('drug')}
+                            addFluidLink={addLink('fluid')}
+                        />
                     </>
                 )}
                 getRowOptions={({ rowIndex }) => {
@@ -73,7 +72,11 @@ export function DrugsLibrary({ disabled }: Props) {
                 }}
                 columns={[
                     {
-                        name: 'Drug',
+                        name: 'Drug / Fluid',
+                    },
+                    {
+                        name: 'Type',
+                        tdClassName: 'w-[80px]',
                     },
                     {
                         name: 'Key',
@@ -152,6 +155,7 @@ export function DrugsLibrary({ disabled }: Props) {
                 ]}
                 data={drugs.map(item => [
                     item.drug || '',
+                    item.type || '',
                     item.key || '',
                     item.dosageText || '',
                     item.itemId!,

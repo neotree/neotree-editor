@@ -146,6 +146,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                     data: (s.image3 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
                 },
                 drugs: s.drugs,
+                fluids: s.fluids,
+                feeds: s.feeds,
                 items: s.items,
                 fields: s.fields,
                 multiplier: s.multiplier,
