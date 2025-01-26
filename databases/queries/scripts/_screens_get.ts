@@ -21,6 +21,8 @@ export type ScreenType = typeof screens.$inferSelect & {
     fields: ScriptField[];
     items: ScriptItem[];
     drugs: DrugField[];
+    fluids: DrugField[];
+    feeds: DrugField[];
     prePopulate: string[];
     preferences: Preferences;
     image1: null | ScriptImage;

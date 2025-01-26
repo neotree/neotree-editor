@@ -20,7 +20,7 @@ export async function _getScriptsDrugsLibrary(
         const scripts = await _getScripts(params);
 
         const screens = await _getScreens({
-            types: ['drugs'],
+            types: ['drugs', 'feeds', 'fluids'],
             scriptsIds: scripts.data.map(s => s.scriptId),
             returnDraftsIfExist: params?.returnDraftsIfExist,
             withDeleted: params?.withDeleted,
@@ -28,7 +28,8 @@ export async function _getScriptsDrugsLibrary(
 
         const keys = Object.keys(
             screens.data.reduce((acc, s) => {
-                s.drugs.forEach(d => {
+                const items = [...s.drugs, ...s.fluids, ...s.feeds];
+                items.forEach(d => {
                     acc[d.key] = d.key;
                 });
                 return acc;
