@@ -1,6 +1,8 @@
 import { ScreenType, ScriptType } from "@/databases/queries/scripts";
 import { Preferences } from "@/types";
 
+export const CONDITIONAL_EXP_EXAMPLE = "Example: ($key = true and $key2 = false) or $key3 = 'HD'";
+
 export const defaultPreferences = { 
     fontSize: {}, 
     fontWeight: {}, 

@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
 import { DiagnosisSymptom } from "@/types";
-import { SymptomTypes } from '@/constants';
+import { SymptomTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
 
@@ -157,7 +157,7 @@ export function Symptom<P = {}>({
                             {...register('expression', { disabled, })}
                             name="expression"
                         />
-                        <span className="text-xs text-muted-foreground">Example: <b>($key = true and $key2 = false) or $key3 = &apos;HD&apos;</b></span>
+                        <span className="text-xs text-muted-foreground">Example: <b>{CONDITIONAL_EXP_EXAMPLE}</b></span>
                     </div>
 
                     <Title>Print</Title>

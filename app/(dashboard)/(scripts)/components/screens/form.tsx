@@ -29,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
 import { ScreenFormDataType } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
-import { screenTypes } from '@/constants';
+import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
@@ -252,7 +252,7 @@ export function ScreenForm({
                         noRing={false}
                         rows={5}
                     />
-                    <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
+                    <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                 </div>
 
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:items-baseline">
@@ -263,7 +263,7 @@ export function ScreenForm({
                             name="skipToCondition"
                             noRing={false}
                         />
-                        <span className="text-xs text-muted-foreground">Example: ($key = true and $key2 = false) or $key3 = &apos;HD&apos;</span>
+                        <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                     </div>
 
                     <div className="min-w-[300px]">
