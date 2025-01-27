@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _saveScreens } from '@/databases/mutations/scripts';
 import { _getScreens } from '@/databases/queries/scripts';
+import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
@@ -93,6 +94,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
     try {
         const errors = [];
         const keys: { old: string; new: string; }[] = [];
+        const removeReferences: string[] = [];
 
         let index = 0;
         for (const { itemId: _itemId, ...item } of data) {
@@ -102,6 +104,9 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                 const itemId = _itemId || uuid.v4();
                 let oldKey = '';
                 let newKey = item.key || '';
+
+                let oldType: null | typeof drugsLibrary.$inferSelect['type'] = null;
+                let newType: null | typeof drugsLibrary.$inferSelect['type'] = item.type || null;
 
                 if (!errors.length) {
                     const draft = !_itemId ? null : await db.query.drugsLibraryDrafts.findFirst({
@@ -114,6 +119,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
 
                     if (draft) {
                         oldKey = draft.data.key;
+                        oldType = draft.data.type || null;
 
                         const data = {
                             ...draft.data,
@@ -128,6 +134,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                             }).where(eq(drugsLibraryDrafts.itemDraftId, itemId));
                     } else {
                         oldKey = published?.key || '';
+                        oldType = published?.type || null!;
 
                         let position = item.position || published?.position;
 
@@ -163,11 +170,17 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                     }
 
                     if (oldKey && newKey && (oldKey !== newKey)) keys.push({ old: oldKey, new: newKey, });
+                    if (oldType && newType && (oldType !== newType)) {
+                        if (oldKey) removeReferences.push(oldKey);
+                        // if (newKey) removeReferences.push(newKey);
+                    }
                 }
             } catch(e: any) {
                 errors.push(e.message);
             }
         }
+
+        if (removeReferences.length) await _removeDrugLibraryItemsReferences({ keys: removeReferences, });
 
         if (keys.length) {
             const screens = await _getScreens({

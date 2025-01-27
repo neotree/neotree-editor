@@ -7,6 +7,7 @@ import { _getScreens } from '@/databases/queries/scripts';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _saveScreens } from '@/databases/mutations/scripts';
+import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
@@ -46,25 +47,7 @@ export async function _deleteDrugsLibraryItems(
             }));
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
-            const screens = await _getScreens({
-                types: ['drugs', 'fluids', 'feeds'],
-                returnDraftsIfExist: true,
-            });
-
-            const updated: typeof screens.data = [];
-            screens.data.forEach(screen => {
-                const keys = drugsLibraryItems.data.map(d => d.key);
-
-                const drugs = screen.drugs.filter(d => !keys.includes(d.key));
-                const fluids = screen.fluids.filter(d => !keys.includes(d.key));
-                const feeds = screen.feeds.filter(d => !keys.includes(d.key));
-
-                if (drugs.length !== screen.drugs.length) updated.push({ ...screen, drugs });
-                if (fluids.length !== screen.fluids.length) updated.push({ ...screen, fluids });
-                if (feeds.length !== screen.feeds.length) updated.push({ ...screen, feeds });
-            });
-
-            if (updated.length) await _saveScreens({ data: updated, });
+            await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), });
         }
 
         response.success = true;

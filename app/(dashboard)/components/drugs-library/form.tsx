@@ -70,7 +70,9 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     disabled?: boolean;
     item?: DrugsLibraryState['drugs'][0];
     floating?: boolean;
-    onChange: (item: DrugsLibraryState['drugs'][0]) => void;
+    onChange: (
+        item: DrugsLibraryState['drugs'][0],
+    ) => void;
 }) {
     const router = useRouter();
     const searchParams = useSearchParams(); 
@@ -98,20 +100,40 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     }, [item, newItemType]);
 
     const onSave = useCallback(() => {
-        onChange({
-            ...form,
-            minWeight: !form.minWeight ? null : Number(form.minWeight),
-            maxWeight: !form.maxWeight ? null : Number(form.maxWeight),
-            minGestation: !form.minGestation ? null : Number(form.minGestation),
-            maxGestation: !form.maxGestation ? null : Number(form.maxGestation),
-            hourlyFeed: !form.hourlyFeed ? null : Number(form.hourlyFeed),
-            hourlyFeedMultiplier: !form.hourlyFeedMultiplier ? null : Number(form.hourlyFeedMultiplier),
-            minAge: !form.minAge ? null : Number(form.minAge),
-            maxAge: !form.maxAge ? null : Number(form.maxAge),
-            dosage: !form.dosage ? null : Number(form.dosage),
-            dosageMultiplier: !form.dosageMultiplier ? null : Number(form.dosageMultiplier),
-            type: form.type as ItemType['type'],
-        });
+        const fn = () => {
+            onChange(
+                {
+                    ...form,
+                    minWeight: !form.minWeight ? null : Number(form.minWeight),
+                    maxWeight: !form.maxWeight ? null : Number(form.maxWeight),
+                    minGestation: !form.minGestation ? null : Number(form.minGestation),
+                    maxGestation: !form.maxGestation ? null : Number(form.maxGestation),
+                    hourlyFeed: !form.hourlyFeed ? null : Number(form.hourlyFeed),
+                    hourlyFeedMultiplier: !form.hourlyFeedMultiplier ? null : Number(form.hourlyFeedMultiplier),
+                    minAge: !form.minAge ? null : Number(form.minAge),
+                    maxAge: !form.maxAge ? null : Number(form.maxAge),
+                    dosage: !form.dosage ? null : Number(form.dosage),
+                    dosageMultiplier: !form.dosageMultiplier ? null : Number(form.dosageMultiplier),
+                    type: form.type as ItemType['type'],
+                }, 
+            );
+            setOpen(false);
+        };
+
+        if (!item || (form.key === item?.key)) {
+            fn();
+        } else {
+            confirm(fn, {
+                danger: true,
+                title: `Confirm key change`,
+                message: `
+                    <p class="text-xl">Are you sure you want to change key?</p>
+                    <p>All references to the old key (${item.key}) will also be updated to: ${form.key}</p>
+                `,
+                positiveLabel: 'Yes, keep changes',
+                negativeLabel: 'No, do not save',
+            });
+        }
     }, [form, item, onChange]);
 
     const onClose = useCallback(() => {
@@ -152,8 +174,6 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             Number(form.minGestation || '0') <= Number(form.maxGestation || '0') &&
             Number(form.minWeight || '0') <= Number(form.maxWeight || '0') &&
             Number(form.minAge || '0') <= Number(form.maxAge || '0') && 
-            Number(form.hourlyFeed || '0') <= Number(form.hourlyFeed || '0') &&
-            Number(form.hourlyFeedMultiplier || '0') <= Number(form.hourlyFeedMultiplier || '0') && 
 
             (isDrug ? (
                 form.diagnosisKey
@@ -209,7 +229,10 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                             title: `Confirm type change`,
                             message: `
                                 <p class="text-xl">Are you sure you want to change type?</p>
-                                <p>Some fields will be cleared as they do not apply on all types!</p>
+                                <ol style="list-style:auto;margin:10px;">
+                                    <li>Some fields will be cleared as they do not apply on all types!</li>
+                                    <li>All references to this ${form.type} will be removed.</li>
+                                </ol>
                             `,
                             positiveLabel: 'Yes, change type',
                             negativeLabel: 'No, keep the current type',
@@ -597,14 +620,12 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                                     </Button>
                                 </SheetClose>
 
-                                <SheetClose asChild>
-                                    <Button
-                                        onClick={() => onSave()}
-                                        disabled={isSaveButtonDisabled()}
-                                    >
-                                        Save
-                                    </Button>
-                                </SheetClose>
+                                <Button
+                                    onClick={() => onSave()}
+                                    disabled={isSaveButtonDisabled()}
+                                >
+                                    Save
+                                </Button>
                             </div>
                         </SheetContent>
                     </Sheet>
