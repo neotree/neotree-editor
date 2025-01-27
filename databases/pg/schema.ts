@@ -810,6 +810,7 @@ export const drugsLibraryDrafts = pgTable(
         itemDraftId: uuid('item_draft_id').notNull().unique().defaultRandom(),
         itemId: uuid('item_id').references(() => drugsLibrary.itemId, { onDelete: 'cascade', }),
         key: text('key').notNull(),
+        type: drugTypeEnum('type').notNull().default('drug'),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof drugsLibrary.$inferInsert>().notNull(),
 
