@@ -119,14 +119,26 @@ export function useDrugsLibrary() {
         try {
             useDrugsLibraryState.setState({ loading: true, });
 
+            const removeReferences: string[] = [];
+            const updateReferences: { old: string; new: string; }[] = [];
+
             let updated = drugs;
             useDrugsLibraryState.setState(prev => {
                 if (!itemId && item) {
                     updated = [...prev.drugs, item];
                 } else {
-                    updated = prev.drugs.map(s => s.itemId !== item?.itemId ? s : {
-                        ...s,
-                        ...item,
+                    updated = prev.drugs.map(s => {
+                        if (s.itemId !== item?.itemId) return s;
+
+                        if (item) {
+                            if (s.key !== item.key) updateReferences.push({ old: s.key!, new: item.key!, });
+                            if (s.type !== item.type) removeReferences.push(s.key!);
+                        }
+
+                        return {
+                            ...s,
+                            ...item,
+                        };
                     });
                 }
                 return {
@@ -134,6 +146,9 @@ export function useDrugsLibrary() {
                     drugs: updated,
                 };
             });
+
+            // TODO: removeReferences??
+            // TODO: updateReferences??
 
             const payload: Parameters<typeof saveDrugsLibraryItems>[0] = {
                 data: item ? [item] : updated,

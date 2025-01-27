@@ -3,7 +3,8 @@
 import { 
     _saveDrugsLibraryItems, 
     _deleteDrugsLibraryItems,
-    _copyDrugsLibraryItems 
+    _copyDrugsLibraryItems,
+    _removeDrugLibraryItemsReferences 
 } from "@/databases/mutations/drugs-library";
 import { 
     _getDrugsLibraryItem, 
@@ -64,7 +65,17 @@ export const saveDrugsLibraryItems: typeof _saveDrugsLibraryItems = async (...ar
         await isAllowed();
         return await _saveDrugsLibraryItems(...args);
     } catch(e: any) {
-        logger.error('getSys ERROR', e.message);
+        logger.error('saveDrugsLibraryItems ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
+    }
+};
+
+export const removeDrugLibraryItemsReferences: typeof _removeDrugLibraryItemsReferences = async (...args) => {
+    try {
+        await isAllowed();
+        return await _removeDrugLibraryItemsReferences(...args);
+    } catch(e: any) {
+        logger.error('removeDrugLibraryItemsReferences ERROR', e.message);
+        return { errors: [e.message], data: { success: false }, };
     }
 };
