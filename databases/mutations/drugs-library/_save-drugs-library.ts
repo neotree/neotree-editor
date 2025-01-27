@@ -166,6 +166,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                             position: data.position,
                             itemId: published?.itemId,
                             key: data.key,
+                            type: data.type,
                         });
                     }
 
