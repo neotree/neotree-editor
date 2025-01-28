@@ -52,7 +52,7 @@ const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     dosage: `${item?.dosage === null ? '' : item?.dosage}`,
     dosageMultiplier: `${item?.dosageMultiplier === null ? '' : item?.dosageMultiplier}`,
     hourlyFeed: `${item?.hourlyFeed === null ? '' : item?.hourlyFeed}`,
-    hourlyFeedMultiplier: `${item?.hourlyFeedMultiplier === null ? '' : item?.hourlyFeedMultiplier}`,
+    hourlyFeedDivider: `${item?.hourlyFeedDivider === null ? '' : item?.hourlyFeedDivider}`,
     dayOfLife: `${item?.dayOfLife || ''}`,
     dosageText: `${item?.dosageText || ''}`,
     managementText: `${item?.managementText || ''}`,
@@ -109,7 +109,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     minGestation: !form.minGestation ? null : Number(form.minGestation),
                     maxGestation: !form.maxGestation ? null : Number(form.maxGestation),
                     hourlyFeed: !form.hourlyFeed ? null : Number(form.hourlyFeed),
-                    hourlyFeedMultiplier: !form.hourlyFeedMultiplier ? null : Number(form.hourlyFeedMultiplier),
+                    hourlyFeedDivider: !form.hourlyFeedDivider ? null : Number(form.hourlyFeedDivider),
                     minAge: !form.minAge ? null : Number(form.minAge),
                     maxAge: !form.maxAge ? null : Number(form.maxAge),
                     dosage: !form.dosage ? null : Number(form.dosage),
@@ -182,9 +182,9 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             (isFluid ? (
                 form.condition &&
                 form.hourlyFeed &&
-                form.hourlyFeedMultiplier &&
+                form.hourlyFeedDivider &&
                 Number(form.hourlyFeed || '0') <= Number(form.hourlyFeed || '0') &&
-                Number(form.hourlyFeedMultiplier || '0') <= Number(form.hourlyFeedMultiplier || '0')
+                Number(form.hourlyFeedDivider || '0') <= Number(form.hourlyFeedDivider || '0')
             ) : true)
         );
 
@@ -217,7 +217,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                                 ...prev, 
                                 type, 
                                 hourlyFeed: defaultForm.hourlyFeed,
-                                hourlyFeedMultiplier: defaultForm.hourlyFeedMultiplier,
+                                hourlyFeedDivider: defaultForm.hourlyFeedDivider,
                                 condition: defaultForm.condition,
                                 diagnosisKey: defaultForm.diagnosisKey,
                                 drugUnit: defaultForm.drugUnit,
@@ -483,14 +483,14 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         </div>
 
                         <div className="flex-1">
-                            <Label secondary htmlFor="hourlyFeed">Hourly feed multiplier *</Label>
+                            <Label secondary htmlFor="hourlyFeedDivider">Hourly feed divider *</Label>
                             <Input
-                                name="hourlyFeedMultiplier"
+                                name="hourlyFeedDivider"
                                 className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                                value={form.hourlyFeedMultiplier}
+                                value={form.hourlyFeedDivider}
                                 type="number"
                                 disabled={disabled}
-                                onChange={e => setForm(prev => ({ ...prev, hourlyFeedMultiplier: e.target.value, }))}
+                                onChange={e => setForm(prev => ({ ...prev, hourlyFeedDivider: e.target.value, }))}
                             />
                         </div>
                     </div>
