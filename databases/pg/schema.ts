@@ -771,7 +771,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     minAge: doublePrecision('min_age'),
     maxAge: doublePrecision('max_age'),
     hourlyFeed: doublePrecision('hourly_feed'),
-    hourlyFeedMultiplier: doublePrecision('hourly_feed_multiplier'),
+    hourlyFeedDivider: doublePrecision('hourly_feed_divider'),
     dosage: doublePrecision('dosage'),
     dosageMultiplier: doublePrecision('dosage_multiplier'),
     dayOfLife: text('day_of_life').notNull().default(''),
