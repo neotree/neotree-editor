@@ -498,7 +498,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             )}
 
             <div>
-                <Label secondary htmlFor="dosage">Dose (e.g. {isFluid ? 'ml/kg' : 'mg/kg'}) *</Label>
+                <Label secondary htmlFor="dosage">Dose (e.g. {isFluid ? 'ml/kg/24hrs' : 'mg/kg'}) *</Label>
                 <Input
                     name="dosage"
                     type="number"
