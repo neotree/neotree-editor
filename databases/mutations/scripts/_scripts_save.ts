@@ -20,7 +20,6 @@ export async function _saveScripts({ data, broadcastAction, }: {
     broadcastAction?: boolean,
 }) {
     const response: SaveScriptsResponse = { success: false, };
-
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
 
