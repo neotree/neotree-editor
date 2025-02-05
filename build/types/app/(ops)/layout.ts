@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor-master/app/(ops)/layout.tsx
+// File: /home/morris/Documents/NEOTREE/REPOS/neotree-editor/app/(ops)/layout.tsx
 import * as entry from '../../../../app/(ops)/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
