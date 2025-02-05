@@ -85,3 +85,24 @@ export function diagnosisToDraftInsertData<AdditionalDiagnosisFields = {}>(s: Di
 
     return data;
 }
+
+export function removeHexCharacters(value: any): any {
+    if (typeof value === 'string') {
+        // Remove hexadecimal characters (e.g., 0x1A, 0xFF) from the string
+        return value.replace(/0x[0-9A-Fa-f]+/g, '');
+    } else if (Array.isArray(value)) {
+        // Recursively process each element in the array
+        return value.map(removeHexCharacters);
+    } else if (typeof value === 'object' && value !== null) {
+        // Recursively process each property in the object
+        const result: { [key: string]: any } = {};
+        for (const key in value) {
+            if (value.hasOwnProperty(key)) {
+                result[key] = removeHexCharacters(value[key]);
+            }
+        }
+        return result;
+    }
+    // Return the value as is if it's not a string, array, or object
+    return value;
+}

@@ -6,6 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
+import { removeHexCharacters } from '../../utils'
 
 export type SaveScreensData = Partial<ScreenType>;
 
@@ -20,7 +21,7 @@ export async function _saveScreens({ data, broadcastAction, }: {
     broadcastAction?: boolean,
 }) {
     const response: SaveScreensResponse = { success: false, };
-
+    data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
 
