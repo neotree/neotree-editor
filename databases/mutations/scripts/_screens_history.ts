@@ -1,6 +1,7 @@
 import db from "@/databases/pg/drizzle";
 import logger from "@/lib/logger";
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema";
+import { removeHexCharacters } from '../../utils'
 
 export async function _saveScreensHistory({ previous, drafts, }: {
     drafts: typeof screensDrafts.$inferSelect[];
@@ -34,7 +35,7 @@ export async function _saveScreensHistory({ previous, drafts, }: {
                     .filter(key => !['version', 'draft'].includes(key))
                     .forEach(_key => {
                         const key = _key as unknown as keyof typeof c.data;
-                        const newValue = c.data[key];
+                        const newValue = removeHexCharacters(c.data[key]);
                         const oldValue = ({ ...prev })[key as keyof typeof prev];
                         if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
                             oldValues.push({ [key]: oldValue, });
