@@ -35,7 +35,7 @@ export const siteTypeEnum = pgEnum('site_type', ['nodeapi', 'webeditor']);
 export const siteEnvEnum = pgEnum('site_env', ['production', 'stage', 'development', 'demo']);
 
 // SCRIPT TYPES ENUM
-export const scriptTypeEnum = pgEnum('script_type', ['admission', 'discharge', 'neolab']);
+export const scriptTypeEnum = pgEnum('script_type', ['admission', 'discharge', 'neolab','drecord']);
 
 // SCREEN TYPES ENUM
 export const screenTypeEnum = pgEnum('screen_type', [
@@ -54,6 +54,7 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
     'edliz_summary_table',
+    'repeat'
 ]);
 
 // DRUG TYPE ENUM

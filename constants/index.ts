@@ -22,6 +22,7 @@ export const scriptTypes = [
     { label: 'Admission', value: 'admission', },
     { label: 'Discharge', value: 'discharge', },
     { label: 'Neolab', value: 'neolab', },
+    {label: 'Daily Record',value:'drecord'}
 ] as { label: string; value: ScriptType['type'] }[];
 
 export const screenTypes = [
