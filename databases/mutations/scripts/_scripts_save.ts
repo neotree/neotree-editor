@@ -6,6 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ScriptType } from '../../queries/scripts/_scripts_get';
+import { removeHexCharacters } from '../../utils'
 
 export type SaveScriptsData = Partial<ScriptType>;
 
@@ -20,9 +21,9 @@ export async function _saveScripts({ data, broadcastAction, }: {
     broadcastAction?: boolean,
 }) {
     const response: SaveScriptsResponse = { success: false, };
-
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
+     data = removeHexCharacters(data)
 
     try {
         let index = 0;

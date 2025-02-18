@@ -6,6 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
+import { removeHexCharacters } from '../../utils'
 
 export type SaveDiagnosesData = Partial<DiagnosisType>;
 
@@ -19,7 +20,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
     broadcastAction?: boolean,
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
-
+    data = removeHexCharacters(data)
     const errors = [];
     let sqlInfo: { [key: string]: Query; } = {};
 
