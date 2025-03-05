@@ -2,7 +2,8 @@
     "name": "neotree-webeditor",
     "version": "0.1.0",
     "private": true,
-    "scripts": {
+     "packageManager": "yarn@1.22.22",
+     "scripts": {
         "start": "node server/index.js",
         "dev": "node server/index.js",
         "build": "next build",
