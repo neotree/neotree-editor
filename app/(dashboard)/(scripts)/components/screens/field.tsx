@@ -82,6 +82,7 @@ export function Field<P = {}>({
     const prePopulate = watch('prePopulate');
     const defaultValue = watch('defaultValue');
     const values = watch('values');
+    const editable = watch('editable');
 
     const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
 
@@ -585,6 +586,22 @@ export function Field<P = {}>({
                                 </div>
 
                                 <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
+                            </div>
+                        </>
+                        <>
+                            <Title>Editable</Title>
+                            <div>
+                                <div className="flex-1 flex items-center space-x-2">
+                                    <Checkbox 
+                                        id="editable" 
+                                        disabled={disabled}
+                                        checked={editable}
+                                        onCheckedChange={() => setValue('editable', !editable, { shouldDirty: true, })}
+                                    />
+                                    <Label htmlFor="editable">Editable</Label>
+                                </div>
+
+                                <span className="text-muted-foreground text-xs">If not checked,values on a form field,if auto populated will be read only.</span>
                             </div>
                         </>
                     </div>

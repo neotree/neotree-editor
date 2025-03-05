@@ -87,6 +87,8 @@ export function useScreenForm({
             feeds: formData?.feeds || [],
             fluids: formData?.fluids || [],
             preferences: formData?.preferences || defaultPreferences,
+            repeatable:  (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
+            collectionName:  formData?.collectionName || '',
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 

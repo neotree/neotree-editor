@@ -92,6 +92,7 @@ export function ScreenForm({
     const image3 = watch('image3');
     const preferences = watch('preferences');
     const skipToScreenId = watch('skipToScreenId');
+    const repeatable = watch('repeatable');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -191,7 +192,6 @@ export function ScreenForm({
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
     const isDrugsScreen = (type === 'drugs') || (type === 'fluids'); // || (type === 'feeds')
-    const isDynamicForm = type=== 'dynamic_form';
 
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
@@ -866,7 +866,27 @@ export function ScreenForm({
             {isFormScreen && (
                 <>
                     <Separator className="my-20" />
-
+                    <>
+                        <div className="flex-1 flex items-center space-x-2">
+                            <Switch 
+                                id="repeatable" 
+                                checked={repeatable}
+                                disabled={disabled}
+                                onCheckedChange={checked => setValue('repeatable', checked, { shouldDirty: true, })}
+                            />
+                            <Label secondary htmlFor="repeatable">Repeatable Form?</Label>
+                        </div>
+                    </>
+                    {repeatable && (
+                         <div>
+                         <Label secondary htmlFor="collectionName">Collection Name</Label>
+                         <Input
+                             {...register('collectionName', { disabled, })}
+                             name="collectionName"
+                             noRing={false}
+                         />
+                     </div>
+                    )}
                     <Fields 
                         form={form}
                         disabled={disabled}
