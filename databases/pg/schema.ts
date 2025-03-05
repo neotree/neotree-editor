@@ -405,7 +405,7 @@ export const scripts = pgTable(
         title: text('title').notNull(),
         printTitle: text('print_title').notNull(),
         description: text('description').notNull().default(''),
-        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'cascade', }),
+        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         exportable: boolean('exportable').notNull().default(true),
         nuidSearchEnabled: boolean('nuid_search_enabled').notNull().default(false),
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
@@ -452,7 +452,7 @@ export const scriptsDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').notNull().unique().defaultRandom(),
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
-        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'cascade', }),
+        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[]; }>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
