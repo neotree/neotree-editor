@@ -355,7 +355,7 @@ export function ScreenForm({
                         disabled={disabled}
                         data={preferences}
                         onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                        hide
+                        hide={false}
                     />
                 </div>
 
@@ -374,7 +374,7 @@ export function ScreenForm({
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -391,7 +391,7 @@ export function ScreenForm({
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -408,7 +408,7 @@ export function ScreenForm({
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -425,7 +425,7 @@ export function ScreenForm({
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
                     </>
@@ -444,7 +444,7 @@ export function ScreenForm({
                         disabled={disabled}
                         data={preferences}
                         onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                        hide
+                        hide={false}
                     />
                 </div>
 
