@@ -54,7 +54,7 @@ export const DefaultValueType = {
     { name: 'yesno', label: 'Yes/No' },
     { name: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { name: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
-    {name:'repeat',label:'Repeat'}
+    {name:'dynamic_form',label:'Dynamic Form'}
   ];
   
   export const SymptomTypes = [

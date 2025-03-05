@@ -569,7 +569,7 @@ export type ScreenSelect = {
     oldScriptId: string | null;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "repeat";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     source: string | null;
     sectionTitle: string;
@@ -635,7 +635,7 @@ export type ScreenInsert = {
     oldScriptId?: (string | null) | undefined;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "repeat";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     source?: (string | null) | undefined;
     sectionTitle: string;
@@ -700,7 +700,7 @@ export type ScreenDraftSelect = {
     screenId: string | null;
     scriptId: string | null;
     scriptDraftId: string | null;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "repeat";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     data: ScreenDraftSelect;
     createdAt: Date;
@@ -713,7 +713,7 @@ export type ScreenDraftInsert = {
     screenId?: (string | null) | undefined;
     scriptId?: (string | null) | undefined;
     scriptDraftId?: (string | null) | undefined;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "repeat";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     data: ScreenDraftInsert;
     createdAt?: Date | undefined;

@@ -191,6 +191,7 @@ export function ScreenForm({
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
     const isDrugsScreen = (type === 'drugs') || (type === 'fluids'); // || (type === 'feeds')
+    const isDynamicForm = type=== 'dynamic_form';
 
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
