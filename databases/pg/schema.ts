@@ -54,7 +54,7 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
     'edliz_summary_table',
-    'repeat'
+    'dynamic_form'
 ]);
 
 // DRUG TYPE ENUM
