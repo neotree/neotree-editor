@@ -556,6 +556,7 @@ export const screens = pgTable(
         drugs: jsonb('drugs').default('[]').notNull(),
         fluids: jsonb('fluids').default('[]').notNull(),
         feeds: jsonb('feeds').default('[]').notNull(),
+        reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -759,6 +760,8 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
 }));
 
 // DRUGS LIBRARY
+export const drugsLibraryItemValidationType = pgEnum('dff_item_validation_type', ['default', 'condition']);
+
 export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
@@ -787,6 +790,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     routeOfAdministration: text('route_of_administration').notNull().default(''),
     position: integer('position').notNull(),
     condition: text('condition').notNull().default(''),
+    validationType: drugsLibraryItemValidationType('validation_type').default('default'),
     version: integer('version').notNull(),
 
     publishDate: timestamp('publish_date').defaultNow().notNull(),
