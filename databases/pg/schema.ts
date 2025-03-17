@@ -556,6 +556,7 @@ export const screens = pgTable(
         drugs: jsonb('drugs').default('[]').notNull(),
         fluids: jsonb('fluids').default('[]').notNull(),
         feeds: jsonb('feeds').default('[]').notNull(),
+        reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
