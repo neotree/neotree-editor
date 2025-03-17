@@ -20,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,6 +65,7 @@ const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     drugUnit: `${item?.drugUnit || ''}`,
     routeOfAdministration: `${item?.routeOfAdministration || ''}`,
     ageKey: `${item?.ageKey || ''}`,
+    validationType: `${item?.validationType || 'default'}` as ItemType['validationType'],
 });
 
 export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
@@ -150,48 +152,58 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
         setTimeout(() => window.scrollTo({ top: scrollPos, }), 500);
     }, [searchParamsObj, containerDiv, router.push]);
 
-    const { isFormComplete, isDrug, isFluid, } = useMemo(() => {
+    const { isFormComplete, isDrug, isFluid, validateWithCondition, } = useMemo(() => {
         const isDrug = form.type === 'drug';
         const isFluid = form.type === 'fluid';
+        const validateWithCondition = form.validationType === 'condition';
 
         const isFormComplete = !!(
             form.type &&
             form.key &&
             form.drug && 
-            form.minWeight && 
-            form.minGestation &&
-            form.maxWeight && 
-            form.maxGestation &&
-            form.minAge &&
-            form.maxAge &&
             form.managementText &&
             form.dosageText &&
             form.administrationFrequency &&
             form.drugUnit &&
             form.routeOfAdministration &&
-            form.ageKey &&
             form.dosage &&
-            Number(form.minGestation || '0') <= Number(form.maxGestation || '0') &&
-            Number(form.minWeight || '0') <= Number(form.maxWeight || '0') &&
-            Number(form.minAge || '0') <= Number(form.maxAge || '0') && 
 
-            (isDrug ? (
-                form.diagnosisKey
-            ) : true) && 
+            validateWithCondition ? (
+                form.condition
+            ) : (
+                form.weightKey &&
+                form.minWeight && 
+                form.maxWeight && 
+                form.gestationKey &&
+                form.minGestation &&
+                form.maxGestation &&
+                form.ageKey &&
+                form.minAge &&
+                form.maxAge &&
 
-            (isFluid ? (
+                Number(form.minGestation || '0') <= Number(form.maxGestation || '0') &&
+                Number(form.minWeight || '0') <= Number(form.maxWeight || '0') &&
+                Number(form.minAge || '0') <= Number(form.maxAge || '0') && 
+
+                (!isDrug ? true : (
+                    form.diagnosisKey
+                ))
+            ) &&
+
+            (!isFluid ? true : (
                 form.condition &&
                 form.hourlyFeed &&
                 form.hourlyFeedDivider &&
                 Number(form.hourlyFeed || '0') <= Number(form.hourlyFeed || '0') &&
                 Number(form.hourlyFeedDivider || '0') <= Number(form.hourlyFeedDivider || '0')
-            ) : true)
+            ))
         );
 
         return { 
             isDrug,
             isFluid,
             isFormComplete, 
+            validateWithCondition,
         };
     }, [form, newItemType]);
 
@@ -275,9 +287,36 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 />
             </div>
 
-           {isDrug && (
+            <div>
+                <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''}</Label>
+                <Textarea
+                    rows={3}
+                    name="condition"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.condition}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, condition: e.target.value, }))}
+                />
+                <span className="font-bold opacity-50 text-xs">e.g {CONDITIONAL_EXP_EXAMPLE}</span>
+            </div>
+
+            <div className="flex gap-x-2">
+                <Checkbox 
+                    name="validationType"
+                    id="validationType"
+                    disabled={disabled}
+                    checked={form.validationType === 'condition'}
+                    onCheckedChange={checked => setForm(prev => ({ 
+                        ...prev, 
+                        validationType: prev.validationType === 'condition' ? 'default' : 'condition', 
+                    }))}
+                />
+                <Label secondary htmlFor="validationType">Validate with conditional expression only</Label>
+            </div>
+
+            {isDrug && (
                 <div>
-                    <Label secondary htmlFor="diagnosisKey">Diagnosis Key *</Label>
+                    <Label secondary htmlFor="diagnosisKey">Diagnosis Key {validateWithCondition ? '' : '*'}</Label>
                     <Textarea
                         rows={3}
                         name="gestationKey"
@@ -290,23 +329,8 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 </div>
            )}
 
-            {isFluid && (
-                <div>
-                    <Label secondary htmlFor="condition">Condition *</Label>
-                    <Textarea
-                        rows={3}
-                        name="condition"
-                        className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                        value={form.condition}
-                        disabled={disabled}
-                        onChange={e => setForm(prev => ({ ...prev, condition: e.target.value, }))}
-                    />
-                    <span className="font-bold opacity-50 text-xs">e.g {CONDITIONAL_EXP_EXAMPLE}</span>
-                </div>
-           )}
-
             <div>
-                <Label secondary htmlFor="gestationKey">Gestation Key *</Label>
+                <Label secondary htmlFor="gestationKey">Gestation Key {validateWithCondition ? '' : '*'}</Label>
                 <Input
                     name="gestationKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -318,7 +342,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="flex gap-x-2">
                 <div className="flex-1">
-                    <Label secondary htmlFor="minGestation">Min Gestation (weeks) *</Label>
+                    <Label secondary htmlFor="minGestation">Min Gestation (weeks) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="minGestation"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -345,7 +369,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         secondary 
                         htmlFor="maxGestation"
                         error={Number(form.minGestation || '0') > Number(form.maxGestation || '0')}
-                    >Max Gestation (weeks) *</Label>
+                    >Max Gestation (weeks) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="maxGestation"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -360,7 +384,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div>
-                <Label secondary htmlFor="weightKey">Weight Key *</Label>
+                <Label secondary htmlFor="weightKey">Weight Key {validateWithCondition ? '' : '*'}</Label>
                 <Input
                     name="weightKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -372,7 +396,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="flex gap-x-2">
                 <div className="flex-1">
-                    <Label secondary htmlFor="minWeight">Min Weight (grams) *</Label>
+                    <Label secondary htmlFor="minWeight">Min Weight (grams) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="minWeight"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -399,7 +423,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         secondary 
                         htmlFor="maxWeight"
                         error={Number(form.minWeight || '0') > Number(form.maxWeight || '0')}
-                    >Max Weight (grams) *</Label>
+                    >Max Weight (grams) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="maxWeight"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -414,7 +438,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div>
-                <Label secondary htmlFor="ageKey">Day of Life (Age) Key *</Label>
+                <Label secondary htmlFor="ageKey">Day of Life (Age) Key {validateWithCondition ? '' : '*'}</Label>
                 <Input
                     name="ageKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -426,7 +450,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div className="flex gap-x-2">
                 <div className="flex-1">
-                    <Label secondary htmlFor="minAge">Min Day of Life (Age - hours) *</Label>
+                    <Label secondary htmlFor="minAge">Min Day of Life (Age - hours) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="minAge"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
@@ -453,7 +477,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         secondary 
                         htmlFor="maxAge"
                         error={Number(form.minAge || '0') > Number(form.maxAge || '0')}
-                    >Max Day of Life (Age - hours) *</Label>
+                    >Max Day of Life (Age - hours) {validateWithCondition ? '' : '*'}</Label>
                     <Input
                         name="maxAge"
                         className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
