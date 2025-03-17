@@ -86,6 +86,7 @@ export function useScreenForm({
             drugs: formData?.drugs || [],
             feeds: formData?.feeds || [],
             fluids: formData?.fluids || [],
+            reasons: formData?.reasons || [],
             preferences: formData?.preferences || defaultPreferences,
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);

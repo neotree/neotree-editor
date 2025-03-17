@@ -46,6 +46,7 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { KeyValueTextarea } from "@/components/key-value-textarea";
 
 type Props = {
     scriptId: string;
@@ -92,6 +93,7 @@ export function ScreenForm({
     const image3 = watch('image3');
     const preferences = watch('preferences');
     const skipToScreenId = watch('skipToScreenId');
+    const reasons = watch('reasons');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -190,7 +192,8 @@ export function ScreenForm({
     const isMultiSelectScreen = type === 'multi_select';
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
-    const isDrugsScreen = (type === 'drugs') || (type === 'fluids'); // || (type === 'feeds')
+    const isDrugsScreen = type === 'drugs';
+    const isFluidsScreen = type === 'fluids';
     const isDynamicForm = type=== 'dynamic_form';
 
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
@@ -765,6 +768,20 @@ export function ScreenForm({
                     />
                 </div>
 
+                {(isDrugsScreen || isFluidsScreen) && (
+                    <div>
+                        <Label secondary htmlFor="reasons">Reasons for not administering {isFluidsScreen ? 'fluid' : 'drug'}</Label>
+                        <KeyValueTextarea
+                            name="reasons"
+                            noRing={false}
+                            rows={5}
+                            value={reasons}
+                            disabled={disabled}
+                            onChange={reasons => setValue('reasons', reasons, { shouldDirty: true, })}
+                        />
+                    </div>
+                )}
+
                 {canConfigureNuidSearch && (
                     <>
                         <Title>Neotree ID Search</Title>
@@ -885,7 +902,7 @@ export function ScreenForm({
                 </>
             )}
 
-            {isDrugsScreen && (
+            {(isDrugsScreen || isFluidsScreen) && (
                 <>
                     <Separator className="my-20" />
                     
