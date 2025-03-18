@@ -99,7 +99,10 @@ export function PrintForm({ disabled, section, onChange }: {
             try {
                 setLoading(true);
 
-                const res = await axios.get<Awaited<ReturnType<typeof listScreens>>>('/api/screens/list?data='+JSON.stringify({ scriptsIds: [scriptId], }));
+                const res = await axios.get<Awaited<ReturnType<typeof listScreens>>>('/api/screens/list?data='+JSON.stringify({ 
+                    returnDraftsIfExist: true,
+                    scriptsIds: [scriptId], 
+                }));
                 const { data, errors } = res.data;
 
                 if (errors?.length) throw new Error(errors.join(', '));
