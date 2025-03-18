@@ -204,7 +204,9 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
 export async function saveScriptScreens({ 
     screens, 
     scriptId, 
+    preserveScreensIds,
 }: {
+    preserveScreensIds?: boolean;
     scriptId: string;
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
 }): Promise<{ 
@@ -237,7 +239,8 @@ export async function saveScriptScreens({
                 ...s 
             } = screen;
 
-            const screenId = v4();
+            let screenId = v4();
+            if (preserveScreensIds && _ignoreScreenId) screenId = _ignoreScreenId;
 
             try {
                 if (s.image1) { 
@@ -283,7 +286,9 @@ export async function saveScriptScreens({
 export async function saveScriptDiagnoses({ 
     diagnoses, 
     scriptId, 
+    preserveDiagnosesIds,
 }: {
+    preserveDiagnosesIds?: boolean;
     scriptId: string;
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
 }): Promise<{ 
@@ -315,7 +320,8 @@ export async function saveScriptDiagnoses({
                 ...d
             } = diagnosis;
 
-            const diagnosisId = v4();
+            let diagnosisId = v4();
+            if (preserveDiagnosesIds && _ignoreDiagnosisId) diagnosisId = _ignoreDiagnosisId;
 
             try {
                 if (d.image1) { 
@@ -420,8 +426,8 @@ export async function saveScriptsWithItems({ data }: {
 
             const { 
                 id,
-                screens = [], 
-                diagnoses = [], 
+                screens: copiedScreens = [], 
+                diagnoses: copiedDiagnoses = [], 
                 drugsLibrary = [],
                 publishDate,
                 createdAt,
@@ -432,8 +438,24 @@ export async function saveScriptsWithItems({ data }: {
                 oldScriptId,
                 scriptId: _ignoreScriptId,
                 position,
+                printSections,
                 ...s 
             } = script;
+
+            const oldScreensIdsMap: { [key: string]: string; } = {};
+            const oldDiagnosesIdsMap: { [key: string]: string; } = {};
+
+            const screens = copiedScreens.map(s => {
+                const screenId = v4();
+                oldScreensIdsMap[s.screenId] = screenId;
+                return { ...s, screenId, };
+            });
+
+            const diagnoses = copiedDiagnoses.map(d => {
+                const diagnosisId = v4();
+                oldDiagnosesIdsMap[d.diagnosisId] = diagnosisId;
+                return { ...d, diagnosisId, };
+            });
 
             const scriptId = overWriteScript?.data?.scriptId || v4();
 
@@ -442,6 +464,10 @@ export async function saveScriptsWithItems({ data }: {
                     ...s,
                     scriptId,
                     version: 1,
+                    printSections: printSections.map(s => ({
+                        ...s,
+                        screensIds: s.screensIds.map(id => oldScreensIdsMap[id]).filter(id => id),
+                    })),
                 }],
             });
 
@@ -450,11 +476,11 @@ export async function saveScriptsWithItems({ data }: {
 
             info.scripts++;
 
-            const saveScreens = await saveScriptScreens({ scriptId, screens, });
+            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, });
             // saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
 
-            const saveDiagnoses = await saveScriptDiagnoses({ scriptId, diagnoses, });
+            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, });
             // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
