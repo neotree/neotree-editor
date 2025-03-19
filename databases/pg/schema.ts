@@ -562,6 +562,7 @@ export const screens = pgTable(
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
         deletedAt: timestamp('deleted_at'),
         collectionName: text('collection_name').notNull().default(''),
+        collectionLabel: text('collection_label').notNull().default(''),
         repeatable: boolean('repeatable'),
     },
     table => ({

@@ -89,6 +89,7 @@ export function useScreenForm({
             preferences: formData?.preferences || defaultPreferences,
             repeatable:  (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
             collectionName:  formData?.collectionName || '',
+            collectionLabel:  formData?.collectionLabel || ''
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 
