@@ -133,6 +133,9 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 title3: s.title3,
                 text1: s.text1,
                 text2: s.text2,
+                repeatable: s.repeatable,
+                collectionLabel: s.collectionLabel,
+                collectionName: s.collectionName,
                 image1: !s.image1 ? null : {
                     ...s.image1,
                     data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
