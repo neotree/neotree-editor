@@ -205,7 +205,7 @@ export function PrintForm({ disabled, section, onChange }: {
 
                             <div>
                                 <DataTable 
-                                    sortable
+                                    sortable={!disabled}
                                     onSort={(oldIndex: number, newIndex: number) => {
                                         const arr = arrayMoveImmutable(selected, oldIndex, newIndex);
                                         setSelected(arr);
