@@ -6,6 +6,7 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
 import clsx from "clsx";
+import { arrayMoveImmutable } from 'array-move';
 
 import { listScreens } from "@/app/actions/scripts";
 import {
@@ -204,10 +205,12 @@ export function PrintForm({ disabled, section, onChange }: {
 
                             <div>
                                 <DataTable 
+                                    sortable
+                                    onSort={(oldIndex: number, newIndex: number) => {
+                                        const arr = arrayMoveImmutable(selected, oldIndex, newIndex);
+                                        setSelected(arr);
+                                    }}
                                     columns={[
-                                        {
-                                            name: 'Position'
-                                        },
                                         {
                                             name: 'Screen title'
                                         },
@@ -247,12 +250,14 @@ export function PrintForm({ disabled, section, onChange }: {
                                             },
                                         },
                                     ]}
-                                    data={screens.filter(s => selected.includes(s.screenId)).map(s => [
-                                        s.position,
-                                        s.title,
-                                        s.refId,
-                                        s.screenId
-                                    ])}
+                                    data={selected
+                                        .map(screenId => screens.filter(s => s.screenId === screenId)[0])
+                                        .filter(s => s)
+                                        .map(s => [
+                                            s.title,
+                                            s.refId,
+                                            s.screenId
+                                        ])}
                                 />
                             </div>
                         </div>
