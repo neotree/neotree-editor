@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react"
+import { arrayMoveImmutable } from 'array-move';
 
 import {
     DropdownMenu,
@@ -53,6 +54,11 @@ export function PrintSections({
             />
 
             <DataTable 
+                sortable={!disabled}
+                onSort={(oldIndex: number, newIndex: number) => {
+                    const arr = arrayMoveImmutable(sections, oldIndex, newIndex);
+                    setValue('printSections', arr);
+                }}
                 headerActions={(
                     <>
                         <Button
