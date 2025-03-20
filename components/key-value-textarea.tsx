@@ -21,7 +21,8 @@ const valuePropToState = (valueProp: Props['value']) => valueProp.reduce((acc, i
 const stateToValueProp = (state = '', valueProp: Props['value'] = []) => {
     const items: KeyValue[] = [];
     state.split('\n').forEach(item => {
-        const [key, value] = item.trim().split(',');
+        // const [key, value] = item.trim().split(',');
+        const [key, value] = item.split(',');
         items.push({ key, value, });
     });
     return items.map(item => {
@@ -34,7 +35,7 @@ function validateState(_values: string) {
     const errors = [];
 
     const dropdownValues = !_values.length ? [] : (_values || '').split('\n')
-        .map((v = '') => v.trim())
+        // .map((v = '') => v.trim())
         // .filter(s => s)
         .map((value) => {
             const valueSplit = value.split(',');
