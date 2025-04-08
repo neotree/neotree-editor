@@ -4,9 +4,10 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScriptsIndexTabs } from '../components/index-tabs';
 import { DataKeysTable } from './components/table';
+import { GetDataKeysResponse } from '@/databases/queries/data-keys';
 
 export default async function DataKeysPage() { 
-    const res = await _fetch('/api/data-keys');
+    const res = await _fetch<GetDataKeysResponse>('/api/data-keys');
 
     return (
         <>
