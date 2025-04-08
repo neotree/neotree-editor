@@ -85,9 +85,23 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 const dataKey: DataKey = {
                     name: f.key,
                     label: f.label || '',
-                    dataType: f.dataType,
+                    dataType: f.type,
                 };
                 extractedKeys.push(dataKey);
+
+                switch(f.type) {
+                    case 'dropdown':
+                        (f.values || '').split('\n')
+                            .map((v = '') => v.trim())
+                            .filter((v: any) => v)
+                            .forEach((v: any) => {
+                                v = v.split(',');
+                                extractedKeys.push({ name: v[0], label: v[1], dataType: 'dropdown_option', });
+                            });
+                        break;
+                    default:
+                        //
+                }
             });
         });
 
@@ -104,10 +118,13 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
         });
 
         extractedKeys = extractedKeys
-            .map(key => ({
-                ...key,
-                label: key.label || '',
-            }))
+            .map(key => {
+                if (key.name === 'EDLIZSummaryTableScore') key.dataType = key.dataType || 'number';
+                return {
+                    ...key,
+                    label: key.label || '',
+                };
+            })
             .filter((key, i) => {
                 return (extractedKeys.map(key => key.name.toLowerCase()).indexOf(key.name.toLowerCase()) === i);
             });

@@ -3,9 +3,10 @@ import queryString from "query-string";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { GetDataKeysParams, _getDataKeys } from "@/databases/queries/data-keys";
+import { GetDataKeysParams, GetDataKeysResponse, _getDataKeys } from "@/databases/queries/data-keys";
 
 export async function GET(req: NextRequest) {
+	let res: GetDataKeysResponse = { data: [], };
 	try {
         const isAuthorised = await isAuthenticated();
 
@@ -13,12 +14,12 @@ export async function GET(req: NextRequest) {
 
         const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
 
-        const res = await _getDataKeys(params);
+        res = await _getDataKeys(params);
 
 		return NextResponse.json(res);
 	} catch(e: any) {
 		logger.error('[GET] /api/data-keys', e.message);
-		return NextResponse.json({ errors: ['Internal Error'] });
+		return NextResponse.json({ ...res, errors: ['Internal Error'] });
 	}
 }
 

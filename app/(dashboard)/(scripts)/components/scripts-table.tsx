@@ -63,9 +63,9 @@ export function ScriptsTable(props: Props) {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
-                    search={{
-                        inputPlaceholder: 'Search scripts',
-                    }}
+                    // search={{
+                    //     inputPlaceholder: 'Search scripts',
+                    // }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
                             <div>No scripts saved.</div>
