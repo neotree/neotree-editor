@@ -23,6 +23,8 @@ const roboto = Roboto({
     weight: ['100', '300', '400', '500', '700', '900'],
 }); 
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: "Neotree",
     description: "Neotree",

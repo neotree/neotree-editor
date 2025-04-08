@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScriptsTable } from "./components/scripts-table";
 import { ScriptsIndexTabs } from '../components/index-tabs';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ScriptsPage() { 
     const scripts = await serverActions.getScripts({ returnDraftsIfExist: true, });
 

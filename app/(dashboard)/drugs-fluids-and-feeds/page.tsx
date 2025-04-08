@@ -3,6 +3,8 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { DrugsLibrary } from '../components/drugs-library';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DrugsFluidsAndFeedsPage() { 
     return (
         <>
