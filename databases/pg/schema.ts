@@ -17,6 +17,9 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ScriptField } from "@/types";
 import { defaultPreferences } from "@/constants";
+import { DiagnosisSymptom, DrugField, FeedField, FluidField, Preferences, ScriptImage, ScriptItem } from "../types";
+
+export * from './_data-keys';
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {
@@ -526,9 +529,9 @@ export const screens = pgTable(
         text1: text('text1').notNull().default(''),
         text2: text('text2').notNull().default(''),
         text3: text('text3').notNull().default(''),
-        image1: jsonb('image1'),
-        image2: jsonb('image2'),
-        image3: jsonb('image3'),
+        image1: jsonb('image1').$type<ScriptImage | null>(),
+        image2: jsonb('image2').$type<ScriptImage | null>(),
+        image3: jsonb('image3').$type<ScriptImage | null>(),
         instructions: text('instructions').notNull().default(''),
         instructions2: text('instructions2').notNull().default(''),
         instructions3: text('instructions3').notNull().default(''),
@@ -549,13 +552,13 @@ export const screens = pgTable(
         printable: boolean('printable'),
         skippable: boolean('skippable').notNull().default(false),
         confidential: boolean('confidential').notNull().default(false),
-        prePopulate: jsonb('pre_populate').default('[]').notNull(),
-        fields: jsonb('fields').default('[]').notNull(),
-        items: jsonb('items').default('[]').notNull(),
-        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
-        drugs: jsonb('drugs').default('[]').notNull(),
-        fluids: jsonb('fluids').default('[]').notNull(),
-        feeds: jsonb('feeds').default('[]').notNull(),
+        prePopulate: jsonb('pre_populate').default('[]').$type<string[]>().notNull(),
+        fields: jsonb('fields').default('[]').$type<ScriptField[]>().notNull(),
+        items: jsonb('items').default('[]').$type<ScriptItem[]>().notNull(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
+        drugs: jsonb('drugs').default('[]').$type<DrugField[]>().notNull(),
+        fluids: jsonb('fluids').default('[]').$type<FluidField[]>().notNull(),
+        feeds: jsonb('feeds').default('[]').$type<FeedField[]>().notNull(),
         reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
@@ -664,14 +667,14 @@ export const diagnoses = pgTable(
         key: text('key').default(''),
         severityOrder: integer('severity_order'),
         expressionMeaning: text('expression_meaning').notNull().default(''),
-        symptoms: jsonb('symptoms').default('[]').notNull(),
+        symptoms: jsonb('symptoms').default('[]').$type<DiagnosisSymptom[]>().notNull(),
         text1: text('text1').notNull().default(''),
         text2: text('text2').notNull().default(''),
         text3: text('text3').notNull().default(''),
-        image1: jsonb('image1'),
-        image2: jsonb('image2'),
-        image3: jsonb('image3'),
-        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        image1: jsonb('image1').$type<null | ScriptImage>(),
+        image2: jsonb('image2').$type<null | ScriptImage>(),
+        image3: jsonb('image3').$type<null | ScriptImage>(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
