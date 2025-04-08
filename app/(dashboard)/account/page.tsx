@@ -1,6 +1,8 @@
 import { Content } from "@/components/content";
 import { Title } from "@/components/title";
 
+export const dynamic = 'force-dynamic';
+
 export default function AcountSettings() {
     return (
         <>
