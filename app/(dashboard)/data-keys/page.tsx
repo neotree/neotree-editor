@@ -6,6 +6,8 @@ import { ScriptsIndexTabs } from '../components/index-tabs';
 import { DataKeysTable } from './components/table';
 import { GetDataKeysResponse } from '@/databases/queries/data-keys';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DataKeysPage() { 
     const res = await _fetch<GetDataKeysResponse>('/api/data-keys');
 

@@ -8,6 +8,8 @@ type Props = {
     };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function SignInPage({ params: { token: _token } }: Props) {
     const [token] = await Promise.all([
         ...(isNaN(Number(_token)) ? [] : [getToken(Number(_token))]),

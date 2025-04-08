@@ -9,6 +9,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Screens({ params: { screenId, scriptId } }: Props) {
     const [screen, script, screens] = await Promise.all([
         getScreen({ screenId, returnDraftIfExists: true, }),

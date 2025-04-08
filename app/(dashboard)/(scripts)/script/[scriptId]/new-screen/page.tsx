@@ -9,6 +9,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewScreenPage({ params: { scriptId, } }: Props) {
     const [
         script,

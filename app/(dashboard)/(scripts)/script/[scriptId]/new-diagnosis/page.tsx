@@ -9,6 +9,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewDiagnosisPage({ params: { scriptId, } }: Props) {
     const [
         script,

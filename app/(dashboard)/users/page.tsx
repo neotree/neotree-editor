@@ -18,6 +18,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Users({ searchParams: { page, role, status } }: Props) {
     const [users, roles] = await Promise.all([
         getUsers({ 

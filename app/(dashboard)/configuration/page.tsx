@@ -8,6 +8,8 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfigKeysTable } from "./components/table";
 
+export const dynamic = 'force-dynamic';
+
 export default async function ConfigKeysPage() {
     const { user, yes: hasAccess, } = await canAccessPage();
 

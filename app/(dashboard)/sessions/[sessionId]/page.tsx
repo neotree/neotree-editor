@@ -10,6 +10,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function SessionsPage({ params: { sessionId, } }: Props) {
     const [session] = await Promise.all([
         getSession(Number(sessionId)),

@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Title } from "@/components/title";
 import { StatsCard } from '../components/stats-card';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DataSettingsPage() {
     const [
         countSessions,
