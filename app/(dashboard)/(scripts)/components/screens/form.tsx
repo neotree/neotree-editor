@@ -46,6 +46,7 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { KeyValueTextarea } from "@/components/key-value-textarea";
 
 type Props = {
     scriptId: string;
@@ -61,10 +62,8 @@ export function ScreenForm({
     screens,
 }: Props) {
     const router = useRouter();
-    
-    const [showForm, setShowForm] = useState(!!formData);
 
-    const { viewOnly } = useAppContext();
+    const [showForm, setShowForm] = useState(!!formData);
 
     const form = useScreenForm({
         formData,
@@ -92,6 +91,9 @@ export function ScreenForm({
     const image3 = watch('image3');
     const preferences = watch('preferences');
     const skipToScreenId = watch('skipToScreenId');
+    const reasons = watch('reasons');
+    const repeatable = watch('repeatable');
+    const collectionLabel = watch('collectionLabel');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -109,7 +111,7 @@ export function ScreenForm({
                                 setValue('type', value as typeof type, { shouldDirty: true, });
                                 setValue('items', [], { shouldDirty: true, });
                                 if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
-                                    const items = edlizSummaryData[value] as ScriptItem[]; 
+                                    const items = edlizSummaryData[value] as ScriptItem[];
                                     setValue('items', items, { shouldDirty: true, });
                                 }
                             }}
@@ -124,14 +126,14 @@ export function ScreenForm({
                                 }
                                 return (
                                     <div key={t.value} className="flex items-center space-x-2">
-                                        <RadioGroupItem 
-                                            value={t.value} 
-                                            id={t.value} 
+                                        <RadioGroupItem
+                                            value={t.value}
+                                            id={t.value}
                                             disabled={disabled}
                                         />
 
-                                        <Label 
-                                            secondary 
+                                        <Label
+                                            secondary
                                             htmlFor={t.value}
                                             aria-disabled={disabled}
                                             className={disabled ? 'opacity-70 cursor-not-allowed' : ''}
@@ -159,7 +161,7 @@ export function ScreenForm({
                             onClick={() => goToScriptPage()}
                         >Cancel</Button>
 
-                        <Button 
+                        <Button
                             disabled={!type && !formIsDirty || disabled}
                             onClick={() => {
                                 setValue('dataType', getScreenDataType(type));
@@ -190,8 +192,8 @@ export function ScreenForm({
     const isMultiSelectScreen = type === 'multi_select';
     const isSingleSelectScreen = type === 'single_select';
     const isSelectScreen = isMultiSelectScreen || isSingleSelectScreen;
-    const isDrugsScreen = (type === 'drugs') || (type === 'fluids'); // || (type === 'feeds')
-
+    const isDrugsScreen = type === 'drugs';
+    const isFluidsScreen = type === 'fluids';
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
 
@@ -221,13 +223,13 @@ export function ScreenForm({
                             <SelectValue placeholder="Select hospital" />
                         </SelectTrigger>
                         <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>Screen types</SelectLabel>
-                            {screenTypes.map(s => (
-                                <SelectItem key={s.value} value={s.value}>
-                                    {s.label}
-                                </SelectItem>
-                            ))}
+                            <SelectGroup>
+                                <SelectLabel>Screen types</SelectLabel>
+                                {screenTypes.map(s => (
+                                    <SelectItem key={s.value} value={s.value}>
+                                        {s.label}
+                                    </SelectItem>
+                                ))}
                             </SelectGroup>
                         </SelectContent>
                     </Select>
@@ -236,8 +238,8 @@ export function ScreenForm({
                 <Title>Flow control</Title>
 
                 <div className="flex-1 flex items-center space-x-2">
-                    <Switch 
-                        id="skippable" 
+                    <Switch
+                        id="skippable"
                         checked={skippable}
                         disabled={disabled}
                         onCheckedChange={checked => setValue('skippable', checked, { shouldDirty: true, })}
@@ -280,21 +282,21 @@ export function ScreenForm({
                                 <SelectValue placeholder="Select screen" />
                             </SelectTrigger>
                             <SelectContent>
-                            <SelectGroup>
-                                <SelectItem value="none">None</SelectItem>
-                                {screens.map(s => (
-                                    <SelectItem key={s.screenId} value={s.oldScreenId || s.screenId}>
-                                        <div 
-                                            dangerouslySetInnerHTML={{ 
-                                                __html: [
-                                                    s.position,
-                                                    s.title,
-                                                    `<span class="opacity-50">${s.refId || ''}</span>`,
-                                                ].join(' - '),
-                                            }}
-                                        />
-                                    </SelectItem>
-                                ))}
+                                <SelectGroup>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {screens.map(s => (
+                                        <SelectItem key={s.screenId} value={s.oldScreenId || s.screenId}>
+                                            <div
+                                                dangerouslySetInnerHTML={{
+                                                    __html: [
+                                                        s.position,
+                                                        s.title,
+                                                        `<span class="opacity-50">${s.refId || ''}</span>`,
+                                                    ].join(' - '),
+                                                }}
+                                            />
+                                        </SelectItem>
+                                    ))}
                                 </SelectGroup>
                             </SelectContent>
                         </Select>
@@ -348,13 +350,13 @@ export function ScreenForm({
                         name="title"
                         noRing={false}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="title"
                         title="Title"
                         disabled={disabled}
                         data={preferences}
                         onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                        hide
+                        hide={false}
                     />
                 </div>
 
@@ -367,13 +369,13 @@ export function ScreenForm({
                                 name="title2"
                                 noRing={false}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="title2"
                                 title="Title 2"
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -384,13 +386,13 @@ export function ScreenForm({
                                 name="title3"
                                 noRing={false}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="title3"
                                 title="Title 3"
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -401,13 +403,13 @@ export function ScreenForm({
                                 name="previewTitle"
                                 noRing={false}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="previewTitle"
                                 title="Preview title"
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
 
@@ -418,13 +420,13 @@ export function ScreenForm({
                                 name="previewPrintTitle"
                                 noRing={false}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="previewPrintTitle"
                                 title="Preview print title"
                                 disabled={disabled}
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                                hide
+                                hide={false}
                             />
                         </div>
                     </>
@@ -437,13 +439,13 @@ export function ScreenForm({
                         name="sectionTitle"
                         noRing={false}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="sectionTitle"
                         title="Print section title"
                         disabled={disabled}
                         data={preferences}
                         onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                        hide
+                        hide={false}
                     />
                 </div>
 
@@ -454,7 +456,7 @@ export function ScreenForm({
                         name="actionText"
                         noRing={false}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="actionText"
                         title="Action"
                         disabled={disabled}
@@ -471,7 +473,7 @@ export function ScreenForm({
                         noRing={false}
                         rows={5}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="contentText"
                         title="Content"
                         disabled={disabled}
@@ -504,19 +506,19 @@ export function ScreenForm({
                             const imageValue = keys[2];
 
                             const image = `image${i + 1}` as Parameters<typeof register>[0];
-                            
+
                             return (
                                 <Fragment key={`imageTextFields.${i}`}>
                                     <div>
-                                        <Label secondary htmlFor={`imageTextFields.${i}.title`}>Title {i+1}</Label>
+                                        <Label secondary htmlFor={`imageTextFields.${i}.title`}>Title {i + 1}</Label>
                                         <Input
                                             {...register(title, { disabled, })}
                                             name={title}
                                             noRing={false}
                                         />
-                                        <PreferencesForm 
+                                        <PreferencesForm
                                             id={title as unknown as string}
-                                            title={`Title ${i+1}`}
+                                            title={`Title ${i + 1}`}
                                             disabled={disabled}
                                             data={preferences}
                                             onSave={data => setValue('preferences', data, { shouldDirty: true, })}
@@ -526,23 +528,23 @@ export function ScreenForm({
 
                                     <div className="flex gap-x-4">
                                         <div className="flex-1">
-                                            <Label htmlFor={`imageTextFields.${i}.text`}>Text {i+1}</Label>
-                                            <Textarea 
+                                            <Label htmlFor={`imageTextFields.${i}.text`}>Text {i + 1}</Label>
+                                            <Textarea
                                                 {...register(text, { disabled })}
                                                 name={text}
                                                 noRing={false}
                                                 rows={5}
                                             />
-                                            <PreferencesForm 
+                                            <PreferencesForm
                                                 id={text as unknown as string}
-                                                title={`Text ${i+1}`}
+                                                title={`Text ${i + 1}`}
                                                 disabled={disabled}
                                                 data={preferences}
                                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                                             />
                                         </div>
 
-                                        <ImageField 
+                                        <ImageField
                                             disabled={disabled}
                                             image={imageValue as typeof image1}
                                             onChange={value => setValue(image, value, { shouldDirty: true, })}
@@ -645,8 +647,8 @@ export function ScreenForm({
                 {(isYesNoScreen || isTimerScreen || isSelectScreen) && (
                     <>
                         <div className="flex-1 flex items-center space-x-2">
-                            <Switch 
-                                id="confidential" 
+                            <Switch
+                                id="confidential"
                                 checked={confidential}
                                 disabled={disabled}
                                 onCheckedChange={checked => setValue('confidential', checked, { shouldDirty: true, })}
@@ -664,7 +666,7 @@ export function ScreenForm({
                         noRing={false}
                         rows={5}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="instructions"
                         title="Instructions"
                         disabled={disabled}
@@ -683,7 +685,7 @@ export function ScreenForm({
                                 noRing={false}
                                 rows={5}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="instructions2"
                                 title="Instructions 2"
                                 disabled={disabled}
@@ -700,7 +702,7 @@ export function ScreenForm({
                                 noRing={false}
                                 rows={5}
                             />
-                            <PreferencesForm 
+                            <PreferencesForm
                                 id="instructions3"
                                 title="Instructions 3"
                                 disabled={disabled}
@@ -718,7 +720,7 @@ export function ScreenForm({
                                     noRing={false}
                                     rows={5}
                                 />
-                                <PreferencesForm 
+                                <PreferencesForm
                                     id="hcwDiagnosesInstructions"
                                     title="HCW diagnoses instructions"
                                     disabled={disabled}
@@ -735,7 +737,7 @@ export function ScreenForm({
                                     noRing={false}
                                     rows={5}
                                 />
-                                <PreferencesForm 
+                                <PreferencesForm
                                     id="suggestedDiagnosesInstructions"
                                     title="Suggested diagnoses instructions"
                                     disabled={disabled}
@@ -755,7 +757,7 @@ export function ScreenForm({
                         noRing={false}
                         rows={5}
                     />
-                    <PreferencesForm 
+                    <PreferencesForm
                         id="notes"
                         title="Notes"
                         disabled={disabled}
@@ -764,10 +766,24 @@ export function ScreenForm({
                     />
                 </div>
 
+                {(isDrugsScreen || isFluidsScreen) && (
+                    <div>
+                        <Label secondary htmlFor="reasons">Reasons for not administering {isFluidsScreen ? 'fluid' : 'drug'}</Label>
+                        <KeyValueTextarea
+                            name="reasons"
+                            noRing={false}
+                            rows={5}
+                            value={reasons}
+                            disabled={disabled}
+                            onChange={reasons => setValue('reasons', reasons, { shouldDirty: true, })}
+                        />
+                    </div>
+                )}
+
                 {canConfigureNuidSearch && (
                     <>
                         <Title>Neotree ID Search</Title>
-                
+
                         <div className="flex flex-col gap-y-4">
                             {nuidSearchOptions.map(o => {
                                 const id = `prePopulate_${o.value}`;
@@ -776,7 +792,7 @@ export function ScreenForm({
 
                                 return (
                                     <div key={id} className="flex items-center space-x-2">
-                                        <Checkbox 
+                                        <Checkbox
                                             id={id}
                                             checked={checked}
                                             disabled={disabled}
@@ -821,8 +837,8 @@ export function ScreenForm({
 
                             <div>
                                 <div className="flex-1 flex items-center space-x-2">
-                                    <Checkbox 
-                                        id="printable" 
+                                    <Checkbox
+                                        id="printable"
                                         checked={printable}
                                         disabled={disabled}
                                         onCheckedChange={() => setValue('printable', !printable, { shouldDirty: true, })}
@@ -847,7 +863,7 @@ export function ScreenForm({
                     onClick={() => goToScriptPage()}
                 >Cancel</Button>
 
-                <Button 
+                <Button
                     disabled={disabled}
                     onClick={() => save()}
                 >
@@ -856,7 +872,7 @@ export function ScreenForm({
             </div>
 
             {isEdlizScreen && (
-                <EdlizSummary 
+                <EdlizSummary
                     form={form}
                     disabled={disabled}
                 />
@@ -864,31 +880,88 @@ export function ScreenForm({
 
             {isFormScreen && (
                 <>
+                    <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
+                        <div className="flex items-center justify-start gap-x-2 py-6 px-4">
+                            <Switch
+                                id="repeatable"
+                                checked={repeatable}
+                                disabled={disabled}
+                                onCheckedChange={checked => setValue('repeatable', checked, { shouldDirty: true, })}
+                            />
+                            <Label secondary htmlFor="repeatable">Repeatable Form</Label>
+                        </div>
+                    </div>
                     <Separator className="my-20" />
-
-                    <Fields 
+                    <Fields
                         form={form}
                         disabled={disabled}
                     />
+                    <Separator className="my-8" />
+                    {repeatable && (
+                        <div className="flex flex-col gap-y-5 [&>*]:px-4">
+                            <div className="flex flex-col gap-x-2">
+                                <Label secondary htmlFor="collectionName">Collection Name</Label>
+                                <Input
+                                    {...register('collectionName', { disabled, required: repeatable })}
+                                    name="collectionName"
+                                    noRing={false}
+                                    required={repeatable}
+                                    className="flex-col"
+
+                                />
+                            </div>
+                                <div className="flex flex-col gap-y-5">
+                                    <Label secondary htmlFor="collectionLabel">Collection Label</Label>
+                                    <Select
+                                        value={collectionLabel || ''}
+                                        required={repeatable}
+                                        name="collectionLabel"
+                                        disabled={disabled}
+                                        onValueChange={value => {
+                                            value = value === 'none' ? '': value;
+                                            setValue('collectionLabel', value || '', { shouldDirty: true, });
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Collection Label" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+
+                                                <SelectItem value="none">No Collection Label</SelectItem>
+                                                {form?.getValues()?.fields?.map(f => (
+                                                    <SelectItem key={f.key} value={f.key}>
+                                                        {f.key}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+
+
+                                </div>
+                                <Separator className="my-8" />
+                        </div>
+                    )}
                 </>
             )}
 
             {(isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen) && (
                 <>
                     <Separator className="my-20" />
-                    
-                    <Items 
+
+                    <Items
                         form={form}
                         disabled={disabled}
                     />
                 </>
             )}
 
-            {isDrugsScreen && (
+            {(isDrugsScreen || isFluidsScreen) && (
                 <>
                     <Separator className="my-20" />
-                    
-                    <Drugs 
+
+                    <Drugs
                         form={form}
                         disabled={disabled}
                         type={(() => {

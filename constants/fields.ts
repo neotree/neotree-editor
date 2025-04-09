@@ -85,6 +85,7 @@ export const defaultField = {
     minTimeKey: '',
     maxTimeKey: '',
     values: '',
+    editable:false
 };
 
 export const defaultNuidSearchFields = {
