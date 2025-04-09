@@ -35,7 +35,7 @@ export const siteTypeEnum = pgEnum('site_type', ['nodeapi', 'webeditor']);
 export const siteEnvEnum = pgEnum('site_env', ['production', 'stage', 'development', 'demo']);
 
 // SCRIPT TYPES ENUM
-export const scriptTypeEnum = pgEnum('script_type', ['admission', 'discharge', 'neolab']);
+export const scriptTypeEnum = pgEnum('script_type', ['admission', 'discharge', 'neolab','drecord']);
 
 // SCREEN TYPES ENUM
 export const screenTypeEnum = pgEnum('screen_type', [
@@ -54,6 +54,7 @@ export const screenTypeEnum = pgEnum('screen_type', [
     'zw_edliz_summary_table',
     'mwi_edliz_summary_table',
     'edliz_summary_table',
+    'dynamic_form'
 ]);
 
 // DRUG TYPE ENUM
@@ -404,7 +405,7 @@ export const scripts = pgTable(
         title: text('title').notNull(),
         printTitle: text('print_title').notNull(),
         description: text('description').notNull().default(''),
-        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'cascade', }),
+        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         exportable: boolean('exportable').notNull().default(true),
         nuidSearchEnabled: boolean('nuid_search_enabled').notNull().default(false),
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
@@ -451,7 +452,7 @@ export const scriptsDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').notNull().unique().defaultRandom(),
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
-        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'cascade', }),
+        hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[]; }>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -555,11 +556,15 @@ export const screens = pgTable(
         drugs: jsonb('drugs').default('[]').notNull(),
         fluids: jsonb('fluids').default('[]').notNull(),
         feeds: jsonb('feeds').default('[]').notNull(),
+        reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
         deletedAt: timestamp('deleted_at'),
+        collectionName: text('collection_name').notNull().default(''),
+        collectionLabel: text('collection_label').notNull().default(''),
+        repeatable: boolean('repeatable'),
     },
     table => ({
         searchIndex: index('screens_search_index')
@@ -758,6 +763,8 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
 }));
 
 // DRUGS LIBRARY
+export const drugsLibraryItemValidationType = pgEnum('dff_item_validation_type', ['default', 'condition']);
+
 export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
@@ -786,6 +793,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     routeOfAdministration: text('route_of_administration').notNull().default(''),
     position: integer('position').notNull(),
     condition: text('condition').notNull().default(''),
+    validationType: drugsLibraryItemValidationType('validation_type').default('default'),
     version: integer('version').notNull(),
 
     publishDate: timestamp('publish_date').defaultNow().notNull(),

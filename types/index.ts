@@ -79,6 +79,7 @@ export type ScriptField = {
     optional: boolean;
     printable: boolean;
     prePopulate: string[];
+    editable: boolean;
 };
 
 export type DiagnosisSymptom = {
@@ -111,7 +112,7 @@ export type ImageTextField = {
     };
 };
 
-export type ScriptType = 'admission' | 'discharge' | 'neolab';
+export type ScriptType = 'admission' | 'discharge' | 'neolab'|'drecord';
 
 export type Script = {
     id: number;

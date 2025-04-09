@@ -481,7 +481,7 @@ export type ScriptSelect = {
     scriptId: string;
     oldScriptId: string | null;
     version: number;
-    type: "admission" | "discharge" | "neolab";
+    type: "admission" | "discharge" | "neolab"|"drecord";
     position: number;
     source: string | null;
     title: string;
@@ -504,7 +504,7 @@ export type ScriptInsert = {
     scriptId?: string | undefined;
     oldScriptId?: (string | null) | undefined;
     version: number;
-    type?: ("admission" | "discharge" | "neolab") | undefined;
+    type?: ("admission" | "discharge" | "neolab"|"drecord") | undefined;
     position: number;
     source?: (string | null) | undefined;
     title: string;
@@ -635,7 +635,7 @@ export type ScreenInsert = {
     oldScriptId?: (string | null) | undefined;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table"
     position: number;
     source?: (string | null) | undefined;
     sectionTitle: string;

@@ -6,6 +6,7 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
 import clsx from "clsx";
+import { arrayMoveImmutable } from 'array-move';
 
 import { listScreens } from "@/app/actions/scripts";
 import {
@@ -99,7 +100,10 @@ export function PrintForm({ disabled, section, onChange }: {
             try {
                 setLoading(true);
 
-                const res = await axios.get<Awaited<ReturnType<typeof listScreens>>>('/api/screens/list?data='+JSON.stringify({ scriptsIds: [scriptId], }));
+                const res = await axios.get<Awaited<ReturnType<typeof listScreens>>>('/api/screens/list?data='+JSON.stringify({ 
+                    returnDraftsIfExist: true,
+                    scriptsIds: [scriptId], 
+                }));
                 const { data, errors } = res.data;
 
                 if (errors?.length) throw new Error(errors.join(', '));
@@ -201,10 +205,12 @@ export function PrintForm({ disabled, section, onChange }: {
 
                             <div>
                                 <DataTable 
+                                    sortable={!disabled}
+                                    onSort={(oldIndex: number, newIndex: number) => {
+                                        const arr = arrayMoveImmutable(selected, oldIndex, newIndex);
+                                        setSelected(arr);
+                                    }}
                                     columns={[
-                                        {
-                                            name: 'Position'
-                                        },
                                         {
                                             name: 'Screen title'
                                         },
@@ -244,12 +250,14 @@ export function PrintForm({ disabled, section, onChange }: {
                                             },
                                         },
                                     ]}
-                                    data={screens.filter(s => selected.includes(s.screenId)).map(s => [
-                                        s.position,
-                                        s.title,
-                                        s.refId,
-                                        s.screenId
-                                    ])}
+                                    data={selected
+                                        .map(screenId => screens.filter(s => s.screenId === screenId)[0])
+                                        .filter(s => s)
+                                        .map(s => [
+                                            s.title,
+                                            s.refId,
+                                            s.screenId
+                                        ])}
                                 />
                             </div>
                         </div>

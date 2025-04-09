@@ -179,7 +179,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: null,
                             }));
                             break;
-
+                    
                         case 'form':
                             const formFields = screenFields.map(f => {
                                 let dataType = f.dataType;

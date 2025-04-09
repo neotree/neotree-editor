@@ -88,21 +88,86 @@ export async function GET(req: NextRequest) {
         const deletedDrugsLibrary = getDrugsLibrary.data.filter(s => s.isDeleted);
 
         // scripts
-        const scripts = getScripts.data.filter(s => !s.isDeleted).map(s => {
-            const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
-            return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
-        });
+        const scriptIdToOldScriptId:  { [key: string]: null | string; } = {};
+        const scripts = (() => {
+            const _scripts = getScripts.data.filter(s => !s.isDeleted).map(s => {
+                const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
+                scriptIdToOldScriptId[s.scriptId] = s.oldScriptId || null;
+                return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
+            });
+            const obj = _scripts.reduce((acc, s) => {
+                acc[s.script_id] = acc[s.script_id] || [];
+                acc[s.script_id].push(s);
+                return acc;
+            }, {} as { [key: string]: (typeof _scripts[0])[]; });
+            
+            let sorted: (typeof _scripts[0])[] = [];
+
+            Object.values(obj).forEach(s => {
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                    ...s,
+                    position: i + 1,
+                    data: { ...s.data, position: i + 1, },
+                }))];
+            });
+
+            return sorted;
+        })();
         const deletedScripts = getScripts.data.filter(s => s.isDeleted).map(s => {
             const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
             return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
         });
 
         // screens
-        const screens = getScreens.data.filter(s => !s.isDeleted).map(s => mapNewScreenToOld(s));
+        const screens = (() => {
+            const _screens = getScreens.data.filter(s => !s.isDeleted).map(s => mapNewScreenToOld(({
+                ...s,
+                oldScriptId: scriptIdToOldScriptId[s.scriptId],
+            })));
+            const obj = _screens.reduce((acc, s) => {
+                acc[s.script_id] = acc[s.script_id] || [];
+                acc[s.script_id].push(s);
+                return acc;
+            }, {} as { [key: string]: (typeof _screens[0])[]; });
+            
+            let sorted: (typeof _screens[0])[] = [];
+
+            Object.values(obj).forEach(s => {
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                    ...s,
+                    position: i + 1,
+                    data: { ...s.data, position: i + 1, },
+                }))];
+            });
+
+            return sorted;
+        })();
         const deletedScreens = getScreens.data.filter(s => s.isDeleted).map(s => mapNewScreenToOld(s));
 
         // diagnoses
-        const diagnoses = getDiagnoses.data.filter(s => !s.isDeleted).map(s => mapNewDiagnosisToOld(s));
+        const diagnoses = (() => {
+            const _diagnoses = getDiagnoses.data.filter(s => !s.isDeleted).map(s => mapNewDiagnosisToOld({
+                ...s,
+                oldScriptId: scriptIdToOldScriptId[s.scriptId],
+            }));
+            const obj = _diagnoses.reduce((acc, s) => {
+                acc[s.script_id] = acc[s.script_id] || [];
+                acc[s.script_id].push(s);
+                return acc;
+            }, {} as { [key: string]: (typeof _diagnoses[0])[]; });
+            
+            let sorted: (typeof _diagnoses[0])[] = [];
+
+            Object.values(obj).forEach(s => {
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                    ...s,
+                    position: i + 1,
+                    data: { ...s.data, position: i + 1, },
+                }))];
+            });
+
+            return sorted;
+        })();
         const deletedDiagnoses = getDiagnoses.data.filter(s => s.isDeleted).map(s => mapNewDiagnosisToOld(s));
 
         logger.log(`[GET - finish]: ${req.url}`);
