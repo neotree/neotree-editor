@@ -11,8 +11,14 @@ export function useRoutes() {
         {
             label: 'Scripts',
             href: '/',
-            isActive: (pathname.substring(0, 8) === '/script/') || 
-                (pathname.substring(0, 10) === '/data-keys'),
+            isActive: (pathname.substring(0, 8) === '/script/'),
+            id: v4(),
+            hidden: false,
+        },
+        {
+            label: 'Data keys Library',
+            href: '/data-keys',
+            isActive: pathname.substring(0, 10) === '/data-keys',
             id: v4(),
             hidden: false,
         },

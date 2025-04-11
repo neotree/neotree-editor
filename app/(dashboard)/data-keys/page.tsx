@@ -1,24 +1,20 @@
-import { _fetch } from '@/lib/fetch';
 import { Title } from "@/components/title";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScriptsIndexTabs } from '../components/index-tabs';
+import { fetchDataKeys } from '@/app/actions/data-keys';
 import { DataKeysTable } from './components/table';
-import { GetDataKeysResponse } from '@/databases/queries/data-keys';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DataKeysPage() { 
-    const res = await _fetch<GetDataKeysResponse>('/api/data-keys');
+    const res = await fetchDataKeys();
 
     return (
         <>
             <Title>Data keys</Title>
 
             <Content>
-                <Card className="mb-20">
-                    <ScriptsIndexTabs tab="data-keys" />
-                    
+                <Card className="mb-20">                    
                     <CardContent className="p-0">
                         <DataKeysTable 
                             dataKeys={res.data}
