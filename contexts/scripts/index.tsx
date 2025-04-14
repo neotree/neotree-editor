@@ -7,6 +7,7 @@ import queryString from "query-string";
 import * as serverActions from '@/app/actions/scripts';
 import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
+import { fetchDataKeys } from "@/app/actions/data-keys";
 import { useSearchParams } from "@/hooks/use-search-params";
 
 export interface IScriptsContext extends  
@@ -22,8 +23,9 @@ type ScriptsContextProviderProps =
     typeof serverActions & 
     typeof filesActions &
     {
-        hospitals: Awaited<ReturnType<typeof getHospitals>>
+        hospitals: Awaited<ReturnType<typeof getHospitals>>;
         getHospitals: typeof getHospitals;
+        dataKeys: Awaited<ReturnType<typeof fetchDataKeys>>;
     };
 
 export function ScriptsContextProvider({ 

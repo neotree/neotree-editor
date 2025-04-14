@@ -9,6 +9,7 @@ import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-u
 import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import * as sysActions from "@/app/actions/sys";
 import * as opsActions from "@/app/actions/ops";
+import * as dataKeysActions from '@/app/actions/data-keys';
 import { getMode, setMode } from '@/lib/mode';
 import socket from "@/lib/socket";
 import { SocketEventsListener } from "@/components/socket-events-listener";
@@ -25,6 +26,7 @@ export const useAppContext = () => useContext(AppContext);
 
 type AppContextProviderProps = Omit<typeof opsActions, 'setMode' | 'getMode'> & 
     typeof sysActions &
+    typeof dataKeysActions &
     Awaited<ReturnType<typeof opsActions.getEditorDetails>> &
     Awaited<ReturnType<typeof getAuthenticatedUserWithRoles>> &
     {

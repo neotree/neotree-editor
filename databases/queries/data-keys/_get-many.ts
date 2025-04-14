@@ -1,4 +1,4 @@
-import { and, inArray, sql } from "drizzle-orm";
+import { and, asc, inArray, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -43,7 +43,8 @@ export async function _getDataKeys(params?: GetDataKeysParams): Promise<GetDataK
                 dataType: schema.dataKeys.dataType, 
             })
             .from(schema.dataKeys)
-            .where(where);
+            .where(where)
+            .orderBy(asc(schema.dataKeys.label));
 
         return { data, };
     } catch(e: any) {

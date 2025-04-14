@@ -40,8 +40,7 @@ export const screenTypes = [
     // { value: 'feeds', label: 'Feeds' },
     { value: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { value: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
-    { value: 'diagnosis', label: 'Diagnosis' },
-    { value: 'dynamic_form', label: 'Dynamic Form' },
+    { value: 'diagnosis', label: 'Diagnosis' }
 ] as { label: string; value: ScreenType['type'] }[];
 
 export const SymptomTypes = [

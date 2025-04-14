@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { SelectModal } from "@/components/select-modal";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
@@ -27,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { cn } from "@/lib/utils";
 import { isEmpty } from "@/lib/isEmpty";
+import { useScriptsContext } from "@/contexts/scripts";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
@@ -48,6 +50,8 @@ export function Field<P = {}>({
     disabled: disabledProp,
     ...extraProps
 }: Props & P) {
+    const { dataKeys } = useScriptsContext();
+
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
     const [showForm, setShowForm] = useState(!!field);
@@ -82,6 +86,7 @@ export function Field<P = {}>({
     const prePopulate = watch('prePopulate');
     const defaultValue = watch('defaultValue');
     const values = watch('values');
+    const editable = watch('editable');
 
     const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
 
@@ -213,12 +218,31 @@ export function Field<P = {}>({
                             <Title>Properties</Title>
 
                             <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
-                                <div>
+                                <div className="flex-1">
                                     <Label error={!disabled && !key} htmlFor="key">Key *</Label>
-                                    <Input
+                                    {/* <Input
                                         {...register('key', { disabled, required: true, })}
                                         name="key"
                                         error={!disabled && !key}
+                                    /> */}
+                                    <SelectModal 
+                                        selected={key}
+                                        error={!disabled && !key}
+                                        placeholder="Select key"
+                                        search={{
+                                            placeholder: 'Search data keys',
+                                        }}
+                                        options={dataKeys.data.map(o => ({
+                                            value: o.name,
+                                            label: o.name,
+                                            description: o.label || '',
+                                            caption: o.dataType || '',
+                                            disabled: type !== o.dataType,
+                                        }))}
+                                        onSelect={([key]) => {
+                                            setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
+                                            setValue('label', `${key?.description || ''}`, { shouldDirty: true, });
+                                        }}
                                     />
                                 </div>
 
@@ -585,6 +609,22 @@ export function Field<P = {}>({
                                 </div>
 
                                 <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
+                            </div>
+                        </>
+                        <>
+                            <Title>Editable</Title>
+                            <div>
+                                <div className="flex-1 flex items-center space-x-2">
+                                    <Checkbox 
+                                        id="editable" 
+                                        disabled={disabled}
+                                        checked={editable}
+                                        onCheckedChange={() => setValue('editable', !editable, { shouldDirty: true, })}
+                                    />
+                                    <Label htmlFor="editable">Editable</Label>
+                                </div>
+
+                                <span className="text-muted-foreground text-xs">If not checked,values on a form field,if auto populated will be read only.</span>
                             </div>
                         </>
                     </div>

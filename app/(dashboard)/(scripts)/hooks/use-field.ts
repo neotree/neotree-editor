@@ -33,6 +33,7 @@ export function useField(field?: ScriptField) {
             optional: field?.optional || false,
             printable: field?.printable || false,
             prePopulate: field?.prePopulate || [],
+            editable: field?.editable || false,
             ...field
         } satisfies ScriptField;
     }, [field]);

@@ -79,6 +79,7 @@ export type ScriptField = {
     optional: boolean;
     printable: boolean;
     prePopulate: string[];
+    editable: boolean;
 };
 
 export type DiagnosisSymptom = {

@@ -14,6 +14,7 @@ import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
+import * as dataKeysActions from '@/app/actions/data-keys';
 
 import "@/app/globals.css";
 import { SocketEventsListener } from "@/components/socket-events-listener";
@@ -70,6 +71,7 @@ export default async function RootLayout({
                             {...sysActions}
                             {...editorDetails}
                             {...authenticatedUser}
+                            {...dataKeysActions}
                             sys={sys}
                             getSites={getSitesWithoutConfidentialData}
                         >

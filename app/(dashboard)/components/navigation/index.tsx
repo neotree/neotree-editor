@@ -14,7 +14,7 @@ export function DashboardNavigation(props: Props) {
     const { sys, isAdmin, isSuperUser } = useAppContext();
 
     const showTopBar = true;
-    const showSidebar = sys.data.use_sidebar_menu === 'yes';
+    const showSidebar = true; // sys.data.use_sidebar_menu === 'yes';
     const showThemeToggle = sys.data.hide_theme_toggle !== 'yes';
 
     if (!props.user) return null;

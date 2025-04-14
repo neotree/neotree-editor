@@ -565,6 +565,9 @@ export const screens = pgTable(
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
         deletedAt: timestamp('deleted_at'),
+        collectionName: text('collection_name').notNull().default(''),
+        collectionLabel: text('collection_label').notNull().default(''),
+        repeatable: boolean('repeatable'),
     },
     table => ({
         searchIndex: index('screens_search_index')
