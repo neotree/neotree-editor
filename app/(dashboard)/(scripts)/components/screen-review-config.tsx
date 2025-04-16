@@ -374,7 +374,7 @@ export function Field({
                                             <div
                                                 dangerouslySetInnerHTML={{
                                                     __html: [
-                                                        s.position,
+                                                        (i+1),
                                                         s.title,
                                                         `<span class="opacity-50">${s.refId || ''}</span>`,
                                                     ].join(' - '),
