@@ -47,6 +47,9 @@ export function useScriptForm(params: UseScriptFormParams) {
             nuidSearchFields: (formData?.nuidSearchFields || []),
             preferences: (formData?.preferences || defaultPreferences),
             printSections: (formData?.printSections || []),
+            reviewConfigurations: (formData?.reviewConfigurations||[]),
+            reviewable: isEmpty(formData?.reviewable) ? false : formData?.reviewable,
+
         } satisfies ScriptFormDataType;
     }, [formData]);
 
@@ -63,6 +66,14 @@ export function useScriptForm(params: UseScriptFormParams) {
         if (!enabled) _fields = [];
         return _fields;
     }, [form, formData?.nuidSearchFields]);
+
+    const getDefaultScreenReviewConfigurations = useCallback(() => {
+        const fields = form.getValues('reviewConfigurations');
+        const enabled = form.getValues('reviewable');
+        let _fields = formData?.reviewConfigurations as unknown as typeof fields;
+        if (!enabled) _fields = [];
+        return _fields;
+    }, [form, formData?.reviewConfigurations]);
 
     const { handleSubmit, formState: { dirtyFields, }, } = form;
 
@@ -107,6 +118,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,
+        getDefaultScreenReviewConfigurations,
         onSubmit,
     };
 }

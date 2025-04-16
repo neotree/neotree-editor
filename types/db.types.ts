@@ -491,6 +491,8 @@ export type ScriptSelect = {
     exportable: boolean;
     nuidSearchEnabled: boolean;
     nuidSearchFields: ScriptSelect;
+    reviewConfigurations:ScriptSelect|undefined;
+    reviewable: boolean | undefined;
     preferences: ScriptSelect;
     printSections: ScriptSelect;
     publishDate: Date;
@@ -514,6 +516,8 @@ export type ScriptInsert = {
     exportable?: boolean | undefined;
     nuidSearchEnabled?: boolean | undefined;
     nuidSearchFields?: ScriptInsert | undefined;
+    reviewConfigurations?:ScriptSelect|undefined;
+    reviewable?: boolean | undefined;
     preferences?: ScriptInsert | undefined;
     printSections?: ScriptInsert | undefined;
     publishDate?: Date | undefined;
@@ -521,6 +525,7 @@ export type ScriptInsert = {
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
 };
+
 
 export type ScriptDraftSelect = {
     id: number;

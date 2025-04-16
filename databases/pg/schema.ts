@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
-import { ScriptField } from "@/types";
+import { ScreenReviewField, ScriptField } from "@/types";
 import { defaultPreferences } from "@/constants";
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
@@ -409,9 +409,10 @@ export const scripts = pgTable(
         exportable: boolean('exportable').notNull().default(true),
         nuidSearchEnabled: boolean('nuid_search_enabled').notNull().default(false),
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
+        reviewable: boolean('reviewable').notNull().default(false),
+        reviewConfigurations: jsonb('review_configurations').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         printSections: jsonb('print_sections').default('[]').notNull(),
-        
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -453,7 +454,9 @@ export const scriptsDrafts = pgTable(
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
-        data: jsonb('data').$type<typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[]; }>().notNull(),
+        data: jsonb('data').$type<typeof scripts.$inferInsert
+         & { nuidSearchFields: ScriptField[]; } 
+         &{ reviewConfigurations: ScreenReviewField[]; } >().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
