@@ -46,6 +46,13 @@ export function EdlizSummary({
     const { confirm } = useConfirmModal();
     const items = form.watch('items');
 
+    const [activeSection, setActiveSection] = useState<string | null>(null);
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
+    const [activeItem, setActiveItem] = useState<null | {
+        index: number;
+        data: typeof items[0];
+    }>(null);
+
     const sections = useMemo(() => {
         return items.reduce((acc, item, index) => {
             if (item.type) {
@@ -99,20 +106,30 @@ export function EdlizSummary({
     
     return (
         <>
+            <div>
+                <Item 
+                    {...getTypes()}
+                    open={showAddItemForm || !!activeItem}
+                    disabled={disabled} 
+                    form={form}
+                    item={activeItem || undefined}
+                    onClose={() => {
+                        setActiveItem(null);
+                        setShowAddItemForm(false);
+                    }}
+                />
+            </div>
+
             {!items.length && (
                 <div className="flex items-center justify-center p-8">
-                    <Item
-                        form={form}
-                        disabled={disabled}
-                        {...getTypes()}
+                    <Button 
+                        className="text-primary border-primary w-full" 
+                        variant="outline"
+                        onClick={() => setShowAddItemForm(true)}
                     >
-                        <DialogTrigger asChild>
-                            <Button className="text-primary border-primary" variant="outline">
-                                <Plus className="h-4 w-4 mr-1" />
-                                Add
-                            </Button>
-                        </DialogTrigger>
-                    </Item>
+                        <Plus className="h-4 w-4 mr-1" />
+                        New item
+                    </Button>
                 </div>
             )}
 
@@ -142,6 +159,13 @@ export function EdlizSummary({
                                                     </DialogTrigger>
                                                 </Item>
 
+                                                <EditSection
+                                                    form={form}
+                                                    title={key}
+                                                    open={activeSection === key}
+                                                    onOpenChange={open => !open && setActiveSection(null)}
+                                                />
+
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button 
@@ -155,20 +179,16 @@ export function EdlizSummary({
 
                                                     <DropdownMenuContent>
                                                         <DropdownMenuItem asChild>
-                                                            <EditSection
-                                                                form={form}
-                                                                title={key}
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                className="justify-start w-full"
+                                                                onClick={(e) => {
+                                                                    setTimeout(() => setActiveSection(key), 0);
+                                                                }} 
                                                             >
-                                                                {({ open, setOpen, ...props }) => (
-                                                                    <div 
-                                                                        {...props}
-                                                                        onClick={() => setOpen(true)} 
-                                                                    >
-                                                                        <Edit className="w-4 h-4 mr-2" />
-                                                                        <span>Edit section</span>
-                                                                    </div>
-                                                                )}
-                                                            </EditSection>
+                                                                <Edit className="w-4 h-4 mr-2" />
+                                                                <span>Edit section</span>
+                                                            </Button>
                                                         </DropdownMenuItem>
 
                                                         <DropdownMenuItem
@@ -222,22 +242,19 @@ export function EdlizSummary({
 
                                                         <DropdownMenuContent>
                                                             <DropdownMenuItem asChild>
-                                                                <Item 
-                                                                    disabled={disabled} 
-                                                                    form={form}
-                                                                    {...getTypes()}
-                                                                    item={{
-                                                                        data: item,
-                                                                        index: rowIndex,
+                                                                <Button 
+                                                                    variant="ghost"
+                                                                    className="justify-start w-full"
+                                                                    onClick={() => {
+                                                                        setTimeout(() => setActiveItem({
+                                                                            data: item,
+                                                                            index: rowIndex,
+                                                                        }), 0);
                                                                     }}
                                                                 >
-                                                                    <DialogTrigger 
-                                                                        className="w-full"
-                                                                    >
-                                                                        <Edit className="w-4 h-4 mr-2" />
-                                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                                    </DialogTrigger>
-                                                                </Item>
+                                                                    <Edit className="w-4 h-4 mr-2" />
+                                                                    <span>{disabled ? 'View' : 'Edit'}</span>
+                                                                </Button>
                                                             </DropdownMenuItem>
 
                                                             <DropdownMenuItem
@@ -275,25 +292,27 @@ export function EdlizSummary({
 }
 
 function EditSection({ 
-    children, 
+    open,
     title: titleProp, 
     form,
+    onOpenChange,
     ...props
 }: {
+    open: boolean;
     title: string;
-    children: (opts: { open: boolean; setOpen: (open: boolean) => void; }) => React.ReactNode;
     form: ReturnType<typeof useScreenForm>;
+    onOpenChange: (open: boolean) => void;
 }) {
-    const [open, setOpen] = useState(false);
+    // const [open, setOpen] = useState(false);
     const [title, setTitle] = useState(titleProp);
 
     return (
-        <>
-            {children({ open, setOpen, ...props })}
-            
+        <>            
             <Dialog
                 open={open}
-                onOpenChange={setOpen}
+                onOpenChange={open => {
+                    if (!open) onOpenChange?.(open);
+                }}
             >
                 <DialogContent className="p-0">
                     <DialogHeader className="px-4 py-4">
