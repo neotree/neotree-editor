@@ -35,6 +35,12 @@ export function Items({
 
     const items = form.watch('items');
 
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
+    const [activeItem, setActiveItem] = useState<null | {
+        index: number;
+        data: typeof items[0];
+    }>(null);
+
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...items], oldIndex, newIndex);
         form.setValue(
@@ -96,6 +102,19 @@ export function Items({
 
     return (
         <>
+            <div>
+                <Item 
+                    open={showAddItemForm || !!activeItem}
+                    disabled={disabled} 
+                    form={form}
+                    item={activeItem || undefined}
+                    onClose={() => {
+                        setActiveItem(null);
+                        setShowAddItemForm(false);
+                    }}
+                />
+            </div>
+
             <DataTable 
                 title="Items"
                 sortable={!disabled}
@@ -108,19 +127,16 @@ export function Items({
                 }}
                 headerActions={(isDiagnosisScreen || isChecklistScreen) && (
                     <>
-                        <Item
-                            form={form}
-                            disabled={disabled}
-                        >
-                            {disabled ? undefined : (
-                                <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary w-full" variant="outline">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        New item
-                                    </Button>
-                                </DialogTrigger>
-                            )}
-                        </Item>
+                        {disabled ? null : (
+                            <Button 
+                                className="text-primary border-primary w-full" 
+                                variant="outline"
+                                onClick={() => setShowAddItemForm(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New item
+                            </Button>
+                        )}
                     </>
                 )}
                 columns={[
@@ -153,21 +169,19 @@ export function Items({
 
                                     <DropdownMenuContent>
                                         <DropdownMenuItem asChild>
-                                            <Item 
-                                                disabled={disabled} 
-                                                form={form}
-                                                item={{
-                                                    data: item,
-                                                    index: rowIndex,
+                                            <Button 
+                                                variant="ghost"
+                                                className="justify-start w-full"
+                                                onClick={() => {
+                                                    setTimeout(() => setActiveItem({
+                                                        data: item,
+                                                        index: rowIndex,
+                                                    }), 0);
                                                 }}
                                             >
-                                                <DialogTrigger 
-                                                    className="w-full"
-                                                >
-                                                    <Edit className="w-4 h-4 mr-2" />
-                                                    <span>{disabled ? 'View' : 'Edit'}</span>
-                                                </DialogTrigger>
-                                            </Item>
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                <span>{disabled ? 'View' : 'Edit'}</span>
+                                            </Button>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuItem 

@@ -25,6 +25,7 @@ import { useScriptsContext } from "@/contexts/scripts";
 import { useScreenForm } from "../../hooks/use-screen-form";
 
 type Props = {
+    open?: boolean;
     children?: React.ReactElement;
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
@@ -35,6 +36,7 @@ type Props = {
         index: number;
         data: ItemType,
     };
+    onClose?: () => void;
 };
 
 export const Item = forwardRef((props: Props, ref) => {
@@ -46,26 +48,26 @@ export const Item = forwardRef((props: Props, ref) => {
         disabled,
         types,
         subTypes,
+        open: openProp,
+        onClose,
         ...triggerProps
     } = props;
+
+    const [isOpen, setIsOpen] = useState<undefined | boolean>(openProp);
+
+    useEffect(() => { setIsOpen(openProp); }, [openProp]);
 
     return (
         <>
             <dialog.Dialog
-                // open={open}
-                // onOpenChange={open => {
-                //     setOpen(open);
-                //     resetForm(getDefaultValues());
-                // }}
+                open={isOpen}
+                onOpenChange={open => {
+                    setIsOpen(open);
+                    if (!open) setTimeout(() => onClose?.(), 0);
+                }}
             >
-                {!children ? null : React.cloneElement(children, { 
-                    ...children.props,
-                    ...triggerProps,
-                    className: cn(children.props.className, (triggerProps as any)?.className),
-                })}
-
                 <dialog.DialogContent
-                    hideCloseButton
+                    // hideCloseButton
                     className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
                 >
                     <dialog.DialogHeader className="border-b border-b-border px-4 py-4">
@@ -73,7 +75,7 @@ export const Item = forwardRef((props: Props, ref) => {
                         <dialog.DialogDescription className="hidden">{''}</dialog.DialogDescription>
                     </dialog.DialogHeader>
 
-                    <Form {...props} />
+                    {isOpen && <Form {...props} />}
                 </dialog.DialogContent>
             </dialog.Dialog>
         </>
