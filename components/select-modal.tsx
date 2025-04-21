@@ -35,10 +35,12 @@ type Props = {
     search?: {
         placeholder?: string;
     };
+    header?: React.ReactNode;
     onSelect: (selected: Option[]) => void;
 };
 
 export function SelectModal({ 
+    header,
     placeholder,
     search,
     multiple = false,
@@ -116,14 +118,19 @@ export function SelectModal({
                     >
                         <DialogTitle className="hidden">{""}</DialogTitle>
                         <DialogDescription className="hidden">{""}</DialogDescription>
-                        {!search ? null : (
-                            <Input 
-                                type="search"
-                                placeholder={search.placeholder || ''}
-                                value={searchValue}
-                                onChange={e => setSearchValue(e.target.value)}
-                            />
-                        )}
+                        <div className="flex items-center gap-x-4">
+                            {!search ? null : (
+                                <div className="flex-1">
+                                    <Input 
+                                        type="search"
+                                        placeholder={search.placeholder || ''}
+                                        value={searchValue}
+                                        onChange={e => setSearchValue(e.target.value)}
+                                    />
+                                </div>
+                            )}
+                            {header}
+                        </div>
                     </DialogHeader>
 
                     <div className="flex-1 flex flex-col gap-y-1 overflow-y-auto px-4 py-2 overflow-x-hidden">

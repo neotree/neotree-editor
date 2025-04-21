@@ -23,6 +23,8 @@ import {
 import { SelectModal } from "@/components/select-modal";
 import { useScriptsContext } from "@/contexts/scripts";
 import { useScreenForm } from "../../hooks/use-screen-form";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FilterIcon } from "lucide-react";
 
 type Props = {
     open?: boolean;
@@ -217,6 +219,24 @@ function Form({
                     setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
                     setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
                 }}
+                header={(
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Button
+                                variant="ghost"
+                            >
+                                <FilterIcon className="size-4" />
+                                Filter
+                            </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent>
+                            <DropdownMenuItem>
+                                
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
             />
         );
     }
