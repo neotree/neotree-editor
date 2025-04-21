@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { 
+    json,
     pgTable, 
     serial, 
     text, 
@@ -14,6 +15,7 @@ export const dataKeys = pgTable('nt_data_keys', {
     name: text('name').notNull().unique(),
     label: text('label').default('').notNull(),
     dataType: text('data_type'),
+    parentKeys: json('parent_keys').default([]).$type<string[]>().notNull(),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),

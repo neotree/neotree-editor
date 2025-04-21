@@ -20,7 +20,12 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
 
         screens.forEach(s => {
             if (s.key) {
-                const dataKey: DataKey = { name: s.key, label: s.label || '', dataType: null, };
+                const dataKey: DataKey = { 
+                    name: s.key, 
+                    label: s.label || '', 
+                    dataType: null, 
+                    parentKeys: [], 
+                };
                 switch(s.type) {
                     case 'timer':
                         dataKey.dataType = 'timer';
@@ -48,6 +53,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                         name: key,
                         label: item.label || '',
                         dataType: null,
+                        parentKeys: !s.key ? [] : [s.key],
                     };
 
                     switch(s.type) {
@@ -86,6 +92,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                     name: f.key,
                     label: f.label || '',
                     dataType: f.type,
+                    parentKeys: !s.key ? [] : [s.key],
                 };
                 extractedKeys.push(dataKey);
 
@@ -96,7 +103,12 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                             .filter((v: any) => v)
                             .forEach((v: any) => {
                                 v = v.split(',');
-                                extractedKeys.push({ name: v[0], label: v[1], dataType: 'dropdown_option', });
+                                extractedKeys.push({ 
+                                    name: v[0], 
+                                    label: v[1], 
+                                    dataType: 'dropdown_option', 
+                                    parentKeys: !f.key ? [] : [f.key],
+                                });
                             });
                         break;
                     default:
@@ -106,7 +118,12 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
         });
 
         diagnoses.forEach(d => {
-            if (d.key) extractedKeys.push({ name: d.key, label: d.name, dataType: 'diagnosis', });
+            if (d.key) extractedKeys.push({ 
+                name: d.key, 
+                label: d.name, 
+                dataType: 'diagnosis', 
+                parentKeys: [],
+            });
             
             // d.symptoms.forEach(s => {
             //     if (s.name) data.push(s.name);
@@ -114,10 +131,46 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
         });
 
         drugsLibrary.forEach(d => {
-            if (d.key) extractedKeys.push({ name: d.key, label: d.drug, dataType: d.type, });
+            if (d.key) extractedKeys.push({ 
+                name: d.key, 
+                label: d.drug, 
+                dataType: d.type, 
+                parentKeys: [],
+            });
         });
 
+        for (const key of extractedKeys) {
+            let parentKeys = key.parentKeys || [];
+            extractedKeys
+                .filter(k => {
+                    const isMatch = k.name && key.name && (k.name.toLowerCase() === key.name.toLowerCase());
+                    return isMatch;
+                })
+                .forEach(k => {
+                    parentKeys = [...parentKeys, ...k.parentKeys];
+                });
+        }
+
         extractedKeys = extractedKeys
+            .map(key => {
+                let parentKeys = key.parentKeys || [];
+
+                extractedKeys
+                    .filter(k => {
+                        const isMatch = k.name && key.name && (k.name.toLowerCase() === key.name.toLowerCase());
+                        return isMatch;
+                    })
+                    .forEach(k => {
+                        parentKeys = [...parentKeys, ...k.parentKeys];
+                    });
+
+                return {
+                    ...key,
+                    parentKeys: parentKeys.filter((key, i) => {
+                        return (parentKeys.map(key => key.toLowerCase()).indexOf(key.toLowerCase()) === i);
+                    }),
+                };
+            })
             .map(key => {
                 if (key.name === 'EDLIZSummaryTableScore') key.dataType = key.dataType || 'number';
                 return {
