@@ -133,6 +133,7 @@ export function SelectModal({
                                 <Fragment key={o.value}>
                                     <Btn 
                                         onClick={() => {
+                                            if (o.disabled) return;
                                             if (o.isSelected) {
                                                 onSelect?.(selected.filter(s => s.value !== o.value));
                                             } else {
