@@ -8,6 +8,7 @@ export type DataKey = {
     name: typeof schema.dataKeys.$inferSelect['name'];
     label: typeof schema.dataKeys.$inferSelect['label'];
     dataType: typeof schema.dataKeys.$inferSelect['dataType'];
+    parentKeys: typeof schema.dataKeys.$inferSelect['parentKeys'];
 };
 
 export type GetDataKeysParams = {
@@ -41,6 +42,7 @@ export async function _getDataKeys(params?: GetDataKeysParams): Promise<GetDataK
                 name: schema.dataKeys.name, 
                 label: schema.dataKeys.label, 
                 dataType: schema.dataKeys.dataType, 
+                parentKeys: schema.dataKeys.parentKeys, 
             })
             .from(schema.dataKeys)
             .where(where)
