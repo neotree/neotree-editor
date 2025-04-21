@@ -231,15 +231,12 @@ export function EdlizSummary({
                                                                         index: rowIndex,
                                                                     }}
                                                                 >
-                                                                    {({ extraProps }) => (
-                                                                        <DialogTrigger 
-                                                                            {...extraProps}
-                                                                            className={cn(extraProps?.className, 'w-full')}
-                                                                        >
-                                                                            <Edit className="w-4 h-4 mr-2" />
-                                                                            <span>{disabled ? 'View' : 'Edit'}</span>
-                                                                        </DialogTrigger>
-                                                                    )}
+                                                                    <DialogTrigger 
+                                                                        className="w-full"
+                                                                    >
+                                                                        <Edit className="w-4 h-4 mr-2" />
+                                                                        <span>{disabled ? 'View' : 'Edit'}</span>
+                                                                    </DialogTrigger>
                                                                 </Item>
                                                             </DropdownMenuItem>
 

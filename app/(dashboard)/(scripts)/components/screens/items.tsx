@@ -28,6 +28,7 @@ export function Items({
 }: Props) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
+    const isChecklistScreen = screenType === 'checklist';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
@@ -105,15 +106,15 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                headerActions={(
+                headerActions={(isDiagnosisScreen || isChecklistScreen) && (
                     <>
                         <Item
                             form={form}
                             disabled={disabled}
                         >
-                            {!disabled && (
+                            {disabled ? undefined : (
                                 <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary" variant="outline">
+                                    <Button className="text-primary border-primary w-full" variant="outline">
                                         <Plus className="h-4 w-4 mr-1" />
                                         New item
                                     </Button>
@@ -160,15 +161,12 @@ export function Items({
                                                     index: rowIndex,
                                                 }}
                                             >
-                                                {({ extraProps }) => (
-                                                    <DialogTrigger 
-                                                        {...extraProps}
-                                                        className={cn(extraProps?.className, 'w-full')}
-                                                    >
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                    </DialogTrigger>
-                                                )}
+                                                <DialogTrigger 
+                                                    className="w-full"
+                                                >
+                                                    <Edit className="w-4 h-4 mr-2" />
+                                                    <span>{disabled ? 'View' : 'Edit'}</span>
+                                                </DialogTrigger>
                                             </Item>
                                         </DropdownMenuItem>
 
@@ -197,7 +195,7 @@ export function Items({
                     },
                 ]}
                 data={items.map(f => [
-                    f.id,
+                    f.key || f.id,
                     f.label,
                     isDiagnosisScreen ? f.severity_order : '',
                     '',

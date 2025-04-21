@@ -88,7 +88,9 @@ export function Field<P = {}>({
     const values = watch('values');
     const editable = watch('editable');
 
-    const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
+    const valuesErrors = useMemo(() => {
+        return [] as string[]; // return validateDropdownValues(values);
+    }, [values]);
 
     const isDateField = useMemo(() => (type === 'date') || (type === 'datetime'), [type]);
     const isTimeField = useMemo(() => type === 'time', [type]);
@@ -240,8 +242,17 @@ export function Field<P = {}>({
                                             disabled: type !== o.dataType,
                                         }))}
                                         onSelect={([key]) => {
+                                            const fullKey = dataKeys.data.find(k => k.name === key?.value);
+                                            const children = dataKeys.data
+                                                .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+
                                             setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
-                                            setValue('label', `${key?.description || ''}`, { shouldDirty: true, });
+                                            setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+
+                                            if (fullKey?.dataType === 'dropdown' && isDropdownField) {
+                                                const values = children.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
+                                                setValue('values', values || '', { shouldDirty: true, });
+                                            }
                                         }}
                                     />
                                 </div>
@@ -293,7 +304,7 @@ export function Field<P = {}>({
                                     <div>
                                         <Label htmlFor="values" className={cn(valuesErrors.length ? 'text-danger' : '')}>Values</Label>
                                         <Textarea
-                                            {...register('values', { disabled })}
+                                            {...register('values', { disabled: true, })}
                                             name="values"
                                             rows={5}
                                             noRing={false}

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
-import { useScreenForm } from "../../hooks/use-screen-form";
 import { ScriptItem as ItemType } from "@/types";
-import { DialogClose, } from "@/components/ui/dialog";
+import * as dialog from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,9 +20,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { SelectModal } from "@/components/select-modal";
+import { useScriptsContext } from "@/contexts/scripts";
+import { useScreenForm } from "../../hooks/use-screen-form";
 
 type Props = {
-    children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
+    children?: React.ReactElement;
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     types?: { value: string; label: string; }[];
@@ -35,7 +37,50 @@ type Props = {
     };
 };
 
-export function Item<P = {}>({
+export const Item = forwardRef((props: Props, ref) => {
+    const {
+        children,
+        item,
+        itemType,
+        form,
+        disabled,
+        types,
+        subTypes,
+        ...triggerProps
+    } = props;
+
+    return (
+        <>
+            <dialog.Dialog
+                // open={open}
+                // onOpenChange={open => {
+                //     setOpen(open);
+                //     resetForm(getDefaultValues());
+                // }}
+            >
+                {!children ? null : React.cloneElement(children, { 
+                    ...children.props,
+                    ...triggerProps,
+                    className: cn(children.props.className, (triggerProps as any)?.className),
+                })}
+
+                <dialog.DialogContent
+                    hideCloseButton
+                    className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
+                >
+                    <dialog.DialogHeader className="border-b border-b-border px-4 py-4">
+                        <dialog.DialogTitle>{!props.item?.data ? 'New item' : 'Edit item'}</dialog.DialogTitle>
+                        <dialog.DialogDescription className="hidden">{''}</dialog.DialogDescription>
+                    </dialog.DialogHeader>
+
+                    <Form {...props} />
+                </dialog.DialogContent>
+            </dialog.Dialog>
+        </>
+    );
+});
+
+function Form({
     children,
     item: itemProp,
     itemType,
@@ -43,8 +88,7 @@ export function Item<P = {}>({
     disabled: disabledProp,
     types = [],
     subTypes = [],
-    ...extraProps
-}: Props & P) {
+}: Props) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
@@ -53,6 +97,8 @@ export function Item<P = {}>({
     const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
+
+    const { dataKeys } = useScriptsContext();
 
     const [open, setOpen] = useState(false);
     const [isCustomType, setIsCustomType] = useState(false);
@@ -98,6 +144,7 @@ export function Item<P = {}>({
     }, [item, screenType, itemType]);
 
     const {
+        control,
         reset: resetForm,
         watch,
         register,
@@ -107,6 +154,7 @@ export function Item<P = {}>({
         defaultValues: getDefaultValues(),
     });
 
+    const itemId = watch('itemId');
     const id = watch('id');
     const subType = watch('subType');
     const type = watch('type');
@@ -117,9 +165,10 @@ export function Item<P = {}>({
     const exclusive = watch('exclusive');
     const checked = watch('checked');
 
-    const keyHasError = key && /[a-zA-Z0-9]+/.test(key) ? false : true;
+    const keyHasError = false; // key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
+    const isKeyDisabled = isChecklistScreen ? disabled : true;
 
     const onSave = handleSubmit(data => {
         if (!isEmpty(itemIndex) && item) {
@@ -136,39 +185,43 @@ export function Item<P = {}>({
         setOpen(false);
     });
 
+    const renderKeyComponent = ({ 
+        value: key, 
+        label = "Select key", 
+        variant = 'id',
+    }: {
+        value: string;
+        label?: string;
+        variant?: 'key' | 'id';
+    }) => {
+        const _type = isChecklistScreen ? 'checklist_option' : type;
+        return (
+            <SelectModal
+                selected={key}
+                disabled={isKeyDisabled}
+                error={isKeyDisabled ? undefined : !disabled && (!key || keyHasError)}
+                placeholder={label}
+                search={{
+                    placeholder: 'Search data keys',
+                }}
+                options={dataKeys.data.map(o => ({
+                    value: o.name,
+                    label: o.name,
+                    description: o.label || '',
+                    caption: o.dataType || '',
+                    disabled: _type !== o.dataType,
+                }))}
+                onSelect={([key]) => {
+                    setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
+                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+                }}
+            />
+        );
+    }
+
     return (
         <>
-            <Modal
-                open={open}
-                title={!item ? 'New item' : 'Edit item'}
-                trigger={typeof children === 'function' ? children({ extraProps }) : children}
-                onOpenChange={open => {
-                    setOpen(open);
-                    resetForm(getDefaultValues());
-                }}
-                actions={(
-                    <>
-                        <span className={cn('text-danger text-xs', disabled && 'hidden')}>* Required</span>
-
-                        <div className="flex-1" />
-
-                        <DialogClose asChild>
-                            <Button
-                                variant="ghost"
-                            >
-                                Cancel
-                            </Button>
-                        </DialogClose>
-
-                        <Button
-                            disabled={disabled}
-                            onClick={() => onSave()}
-                        >
-                            Save
-                        </Button>
-                    </>
-                )}
-            >
+            <div className="flex-1 flex flex-col overflow-y-auto px-4 py-2">
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         {(() => {
@@ -176,20 +229,27 @@ export function Item<P = {}>({
                                 return (
                                     <>
                                         <div>
+                                            <Label 
+                                                error={isKeyDisabled ? undefined : !disabled && (!key || keyHasError)} 
+                                                htmlFor="key"
+                                            >Key *</Label>
+                                            <Controller 
+                                                control={control}
+                                                name="key"
+                                                render={({ field: { value }, }) => renderKeyComponent({
+                                                    value,
+                                                    variant: 'key',
+                                                    label: 'Select key',
+                                                })}
+                                            />
+                                        </div>
+
+                                        <div>
                                             <Label error={!disabled && !label} htmlFor="label">Label *</Label>
                                             <Input
                                                 {...register('label', { disabled, required: true, })}
                                                 name="label"
                                                 error={!disabled && !label}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label error={!disabled && (!key || keyHasError)} htmlFor="key">Key *</Label>
-                                            <Input
-                                                {...register('key', { disabled, required: true, })}
-                                                name="key"
-                                                error={!disabled && (!key || keyHasError)}
                                             />
                                         </div>
 
@@ -250,11 +310,18 @@ export function Item<P = {}>({
                                     <>
                                         <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
                                             <div>
-                                                <Label error={!disabled && !id} htmlFor="id">ID *</Label>
-                                                <Input
-                                                    {...register('id', { disabled, required: true, })}
+                                                <Label 
+                                                    error={isKeyDisabled ? undefined : !disabled && !id} 
+                                                    htmlFor="id"
+                                                >ID *</Label>
+                                                <Controller 
+                                                    control={control}
                                                     name="id"
-                                                    error={!disabled && !id}
+                                                    render={({ field: { value }, }) => renderKeyComponent({
+                                                        value,
+                                                        variant: 'id',
+                                                        label: 'Select id',
+                                                    })}
                                                 />
                                             </div>
 
@@ -262,7 +329,7 @@ export function Item<P = {}>({
                                                 <Label error={!disabled && !label} htmlFor="label">Label *</Label>
                                                 <Input
                                                     {...register('label', { disabled, required: true, })}
-                                                    name="label"
+                                                    // name="label"
                                                     error={!disabled && !label}
                                                 />
                                             </div>
@@ -402,7 +469,7 @@ export function Item<P = {}>({
                                                 </div>
 
                                                 <div>
-                                                    <Label htmlFor="label">Score</Label>
+                                                    <Label htmlFor="score">Score</Label>
                                                     <Input
                                                         {...register('score', { disabled, required: false, })}
                                                         name="score"
@@ -417,7 +484,28 @@ export function Item<P = {}>({
                         })()}
                     </div>
                 </div>
-            </Modal>
+            </div>
+
+            <dialog.DialogFooter className="border-t border-t-border px-4 py-2 items-center w-full">
+                <span className={cn('text-danger text-xs', disabled && 'hidden')}>* Required</span>
+
+                <div className="flex-1" />
+
+                <dialog.DialogClose asChild>
+                    <Button
+                        variant="ghost"
+                    >
+                        Cancel
+                    </Button>
+                </dialog.DialogClose>
+
+                <Button
+                    disabled={disabled}
+                    onClick={() => onSave()}
+                >
+                    Save
+                </Button>
+            </dialog.DialogFooter>
         </>
     );
 }
