@@ -4,7 +4,7 @@ import { FilterIcon } from "lucide-react";
 import * as select from '@/components/ui/select';
 import { DataKey } from "@/databases/queries/data-keys";
 
-function getTypes(dataKeys: DataKey[]) {
+export function getDataKeysTypes(dataKeys: DataKey[]) {
     return Object
         .values(dataKeys
             .filter(k => k.dataType)
@@ -67,7 +67,7 @@ export function FilterDataKeysComponent({ dataKeys, onFilter: onFilterProp, }: F
                     <select.SelectItem value="all">
                         All types
                     </select.SelectItem>
-                    {getTypes(dataKeys).map(o => {
+                    {getDataKeysTypes(dataKeys).map(o => {
                         return (
                             <select.SelectItem
                                 key={o.value}
