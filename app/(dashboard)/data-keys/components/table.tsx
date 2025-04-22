@@ -1,14 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { PlusIcon } from "lucide-react";
+import { MoreVertical, PlusIcon } from "lucide-react";
 
+import * as ddMenu from '@/components/ui/dropdown-menu';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { DataKey } from "@/databases/queries/data-keys";
 import { Separator } from "@/components/ui/separator";
 import { DEFAULT_DATA_KEYS_SORT, SortDataKeysComponent, sortDataKeysFn } from '@/lib/data-keys-sort';
-import { DEFAULT_DATA_KEYS_FILTER, FilterDataKeysComponent, filterDataKeysFn, } from '@/lib/data-keys-filter';
+import { 
+    DEFAULT_DATA_KEYS_FILTER, 
+    FilterDataKeysComponent, 
+    filterDataKeysFn, 
+    getDataKeysTypes,
+} from '@/lib/data-keys-filter';
 import { DataKeyForm } from "./form";
 
 type Props = {
@@ -26,9 +32,13 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
 
     const [showAddForm, setShowAddForm] = useState(false);
     const [activeDataKey, setActiveDataKey] = useState<null | {
-        dataKey: DataKey;
+        dataKey: DataKey & {
+            children: DataKey[];
+        };
         index: number;
     }>(null);
+
+    const types = useMemo(() => getDataKeysTypes(dataKeysProp).map(k => k.value), [dataKeysProp]);
 
     useEffect(() => {
         setDataKeys(prev => {
@@ -74,12 +84,49 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                 name: '',
                 align: 'right',
                 cellClassName: 'w-10',
+                cellRenderer({ rowIndex }) {
+                    const dataKey = data.dataKeys[rowIndex];
+
+                    if (!dataKey) return null;
+
+                    return (
+                        <>
+                            <ddMenu.DropdownMenu>
+                                <ddMenu.DropdownMenuTrigger>
+                                    <MoreVertical className="size-4" />
+                                </ddMenu.DropdownMenuTrigger>
+
+                                <ddMenu.DropdownMenuContent>
+                                    <ddMenu.DropdownMenuItem
+                                        onClick={() => {
+                                            setTimeout(() => setActiveDataKey({
+                                                index: rowIndex,
+                                                dataKey: {
+                                                    ...dataKey,
+                                                    children: dataKeysProp
+                                                        .filter(k => {
+                                                            return (k.parentKeys || [])
+                                                                .map(k => (k || '').toLowerCase())
+                                                                .includes(dataKey.name.toLowerCase());
+                                                        }),
+                                                }
+                                            }), 0);
+                                        }}
+                                    >
+                                        Edit
+                                    </ddMenu.DropdownMenuItem>
+                                </ddMenu.DropdownMenuContent>
+                            </ddMenu.DropdownMenu>
+                        </>
+                    );
+                }
             },
         ],
         data: data.dataKeys.map(key => [
             (key.name || '').trim(),
             (key.label || key.name || '').trim(),
             (key.dataType || '').trim(),
+            '',
         ]),
     } satisfies DataTableProps;
 
@@ -92,6 +139,8 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                     setShowAddForm(false);
                     setActiveDataKey(null);
                 }}
+                types={types}
+                dataKeys={dataKeysProp}
             />
 
             <div>
