@@ -35,6 +35,16 @@ export const sortOpts = [
         label: 'Type (desc)',
         Icon: SortDesc,
     } as const,
+    {
+        value: 'createdAt.asc',
+        label: 'Date (asc)',
+        Icon: SortAsc,
+    } as const,
+    {
+        value: 'createdAt.desc',
+        label: 'Date (desc)',
+        Icon: SortDesc,
+    } as const,
 ];
 
 export const DEFAULT_DATA_KEYS_SORT = sortOpts[0].value;
@@ -94,16 +104,32 @@ export const sortDataKeysFn = (
         case 'type.asc':
             sorted = dataKeys.sort((key1, key2) => sortFn({
                 sortDirection: 'asc',
-                key1: (key1.dataType || key1.name || '').trim(),
-                key2: (key2.dataType || key2.name || '').trim(),
+                key1: (key1.dataType || '').trim(),
+                key2: (key2.dataType || '').trim(),
             }));
             break;
 
         case 'type.desc':
             sorted = dataKeys.sort((key1, key2) => sortFn({
                 sortDirection: 'desc',
-                key1: (key1.dataType || key1.name || '').trim(),
-                key2: (key2.dataType || key2.name || '').trim(),
+                key1: (key1.dataType || '').trim(),
+                key2: (key2.dataType || '').trim(),
+            }));
+            break;
+
+        case 'createdAt.asc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'asc',
+                key1: new Date(key1.createdAt || '').getTime().toString(),
+                key2: new Date(key2.createdAt || '').getTime().toString(),
+            }));
+            break;
+
+        case 'createdAt.desc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'desc',
+                key1: new Date(key1.createdAt || '').getTime().toString(),
+                key2: new Date(key2.createdAt || '').getTime().toString(),
             }));
             break;
             

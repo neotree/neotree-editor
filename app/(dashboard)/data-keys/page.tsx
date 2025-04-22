@@ -1,13 +1,13 @@
 import { Title } from "@/components/title";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
-import { fetchDataKeys } from '@/app/actions/data-keys';
+import * as actions from '@/app/actions/data-keys';
 import { DataKeysTable } from './components/table';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DataKeysPage() { 
-    const res = await fetchDataKeys();
+    const res = await actions.fetchDataKeys();
 
     return (
         <>
@@ -17,6 +17,7 @@ export default async function DataKeysPage() {
                 <Card className="mb-20">                    
                     <CardContent className="p-0">
                         <DataKeysTable 
+                            {...actions}
                             dataKeys={res.data}
                         />
                     </CardContent>

@@ -4,7 +4,10 @@ import { useRef, useState } from 'react';
 import { v4 } from 'uuid';
 import { Controller, useForm, UseFormReturn } from 'react-hook-form';
 import { ChevronDown, ChevronUp, PlusIcon, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
+import { Loader } from '@/components/loader';
+import * as actions from '@/app/actions/data-keys';
 import { Button } from '@/components/ui/button';
 import * as dialog from '@/components/ui/dialog';
 import * as select from '@/components/ui/select';
@@ -14,8 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { SelectModal } from '@/components/select-modal';
+import { _createDataKeys } from '@/databases/mutations/data-keys';
+import { useAlertModal } from '@/hooks/use-alert-modal';
 
-type Props = {
+type Props = typeof actions & {
     open: boolean;
     disabled?: boolean;
     types: string[];
@@ -68,12 +73,14 @@ function Form(props: Props) {
 
     const form = useForm({
         defaultValues: {
+            id: dataKey?.id || undefined,
             uuid: dataKey?.uuid || v4(),
             name: dataKey?.name || '',
             label: dataKey?.label || '',
             dataType: dataKey?.dataType || null,
             parentKeys: dataKey?.parentKeys || [],
             children: dataKey?.children || [],
+            createdAt: dataKey?.createdAt || undefined!,
         } satisfies DataKey & {
             children: DataKey[];
         },
@@ -88,16 +95,45 @@ function Form(props: Props) {
         watch,
     } = form;
 
-    const onSave = handleSubmit(async data => {
-        try {
-            onOpenChange(false);
-        } catch(e: any) {
+    const { alert } = useAlertModal();
+    const router = useRouter();
 
+    const onSave = handleSubmit(async ({ children, ...data }) => {
+        try {
+            setLoading(true);
+
+            await props.createDataKeys({
+                data: [data, ...children].filter(k => !k.id),
+            });
+
+            onOpenChange(false);
+            router.refresh();
+
+            window.alert('Data key created successfully!');
+
+            // alert({
+            //     message: "Data key created!",
+            //     variant: 'success',
+            //     onClose: () => {
+            //         onOpenChange(false);
+            //         router.refresh();
+            //     },
+            // });
+        } catch(e: any) {
+            window.alert(`ERROR: ${e.message || ''}`);
+            // alert({
+            //     title: 'Error',
+            //     message: e.message,
+            //     variant: 'error',
+            // });
+        } finally {
+            setLoading(false);
         }
     });
 
     const [visibleChildren, setVisible] = useState<Record<string, boolean>>({});
     const [showAddForm, setShowAddForm] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const name = watch('name');
     const dataType = watch('dataType');
@@ -119,6 +155,8 @@ function Form(props: Props) {
 
     return (
         <>
+            {loading && <Loader overlay />}
+
             <div ref={scrollableDiv} className="flex-1 flex flex-col gap-y-4 overflow-y-auto px-4 py-2">
                 <FormFields 
                     {...props}
