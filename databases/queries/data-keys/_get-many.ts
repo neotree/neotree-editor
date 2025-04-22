@@ -5,6 +5,7 @@ import db from "@/databases/pg/drizzle";
 import * as schema from "@/databases/pg/schema";
 
 export type DataKey = {
+    uuid: typeof schema.dataKeys.$inferSelect['uuid'];
     name: typeof schema.dataKeys.$inferSelect['name'];
     label: typeof schema.dataKeys.$inferSelect['label'];
     dataType: typeof schema.dataKeys.$inferSelect['dataType'];
@@ -39,6 +40,7 @@ export async function _getDataKeys(params?: GetDataKeysParams): Promise<GetDataK
 
         const data = await db
             .select({ 
+                uuid: schema.dataKeys.uuid, 
                 name: schema.dataKeys.name, 
                 label: schema.dataKeys.label, 
                 dataType: schema.dataKeys.dataType, 
