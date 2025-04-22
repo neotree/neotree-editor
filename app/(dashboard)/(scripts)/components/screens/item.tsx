@@ -69,7 +69,7 @@ export const Item = forwardRef((props: Props, ref) => {
                 }}
             >
                 <dialog.DialogContent
-                    // hideCloseButton
+                    hideCloseButton
                     className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
                 >
                     <dialog.DialogHeader className="border-b border-b-border px-4 py-4">
