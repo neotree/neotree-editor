@@ -83,14 +83,14 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
             {
                 name: '',
                 align: 'right',
-                cellClassName: 'w-10',
+                cellClassName: 'w-10 hidden', // TODO: unhide
                 cellRenderer({ rowIndex }) {
                     const dataKey = data.dataKeys[rowIndex];
 
                     if (!dataKey) return null;
 
                     return (
-                        <>
+                        <div>
                             <ddMenu.DropdownMenu>
                                 <ddMenu.DropdownMenuTrigger>
                                     <MoreVertical className="size-4" />
@@ -117,7 +117,7 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                                     </ddMenu.DropdownMenuItem>
                                 </ddMenu.DropdownMenuContent>
                             </ddMenu.DropdownMenu>
-                        </>
+                        </div>
                     );
                 }
             },
