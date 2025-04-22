@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreVertical, PlusIcon } from "lucide-react";
 
 import * as ddMenu from '@/components/ui/dropdown-menu';
@@ -15,19 +15,22 @@ import {
     filterDataKeysFn, 
     getDataKeysTypes,
 } from '@/lib/data-keys-filter';
+import * as actions from '@/app/actions/data-keys';
 import { DataKeyForm } from "./form";
 
-type Props = {
+type Props = typeof actions & {
     dataKeys: DataKey[];
 };
 
-export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
+export function DataKeysTable(props: Props) {
+    const containerDivRef = useRef<HTMLDivElement>(null);
+    const addBtnRef = useRef<HTMLButtonElement>(null);
     const [refresh, setRefresh] = useState(false);
 
     const [data, setDataKeys] = useState({
         sortValue: DEFAULT_DATA_KEYS_SORT,
         filter: DEFAULT_DATA_KEYS_FILTER,
-        dataKeys: dataKeysProp,
+        dataKeys: props.dataKeys,
     });
 
     const [showAddForm, setShowAddForm] = useState(false);
@@ -38,11 +41,11 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
         index: number;
     }>(null);
 
-    const types = useMemo(() => getDataKeysTypes(dataKeysProp).map(k => k.value), [dataKeysProp]);
+    const types = useMemo(() => getDataKeysTypes(props.dataKeys).map(k => k.value), [props.dataKeys]);
 
     useEffect(() => {
         setDataKeys(prev => {
-            let dataKeys = sortDataKeysFn(dataKeysProp, prev.sortValue);
+            let dataKeys = sortDataKeysFn(props.dataKeys, prev.sortValue);
             dataKeys = filterDataKeysFn(dataKeys, prev.filter);
 
             return {
@@ -50,7 +53,7 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                 dataKeys,
             };
         });
-    }, [dataKeysProp]);
+    }, [props.dataKeys]);
 
     const tableProps = {
         selectedIndexes: [],
@@ -103,7 +106,7 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                                                 index: rowIndex,
                                                 dataKey: {
                                                     ...dataKey,
-                                                    children: dataKeysProp
+                                                    children: props.dataKeys
                                                         .filter(k => {
                                                             return (k.parentKeys || [])
                                                                 .map(k => (k || '').toLowerCase())
@@ -133,6 +136,7 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
     return (
         <>
             <DataKeyForm 
+                {...props}
                 item={activeDataKey || undefined}
                 open={showAddForm || !!activeDataKey}
                 onOpenChange={() => {
@@ -140,10 +144,9 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                     setActiveDataKey(null);
                 }}
                 types={types}
-                dataKeys={dataKeysProp}
             />
 
-            <div>
+            <div ref={containerDivRef}>
                 <div className="flex py-6 px-4">
                     <div className="flex-1">
                         <h1 className="text-2xl">Data keys</h1>
@@ -160,7 +163,7 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                         />
 
                         <FilterDataKeysComponent 
-                            dataKeys={dataKeysProp}
+                            dataKeys={props.dataKeys}
                             onFilter={(dataKeys, filter) => {
                                 setRefresh(true);
                                 setDataKeys(prev => {
@@ -172,8 +175,12 @@ export function DataKeysTable({ dataKeys: dataKeysProp }: Props) {
                         />
 
                         <Button
+                            ref={addBtnRef}
                             variant="ghost"
-                            onClick={() => setShowAddForm(true)}
+                            onClick={() => {
+                                addBtnRef.current?.blur?.();
+                                setTimeout(() => setShowAddForm(true), 0);
+                            }}
                         >
                             <PlusIcon className="size-4" />
                             Add

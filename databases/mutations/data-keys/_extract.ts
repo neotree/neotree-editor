@@ -1,9 +1,11 @@
 import { count, eq, inArray, sql } from "drizzle-orm";
+import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import * as schema from "@/databases/pg/schema";
-import { DataKey } from "@/databases/queries/data-keys";
+
+type DataKey = typeof schema.dataKeys.$inferInsert;
 
 export type ExtractDataKeysResponse = {
     data: DataKey[];
@@ -21,6 +23,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
         screens.forEach(s => {
             if (s.key) {
                 const dataKey: DataKey = { 
+                    id: undefined,
+                    uuid: v4(),
                     name: s.key, 
                     label: s.label || '', 
                     dataType: null, 
@@ -50,6 +54,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 const key = item.id || item.key;
                 if (key) {
                     const dataKey: DataKey = {
+                        id: undefined,
+                        uuid: v4(),
                         name: key,
                         label: item.label || '',
                         dataType: null,
@@ -89,6 +95,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
 
             s.fields.forEach(f => {
                 const dataKey: DataKey = {
+                    id: undefined,
+                    uuid: v4(),
                     name: f.key,
                     label: f.label || '',
                     dataType: f.type,
@@ -104,6 +112,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                             .forEach((v: any) => {
                                 v = v.split(',');
                                 extractedKeys.push({ 
+                                    uuid: v4(),
+                                    id: undefined,
                                     name: v[0], 
                                     label: v[1], 
                                     dataType: 'dropdown_option', 
@@ -119,6 +129,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
 
         diagnoses.forEach(d => {
             if (d.key) extractedKeys.push({ 
+                id: undefined,
+                uuid: v4(),
                 name: d.key, 
                 label: d.name, 
                 dataType: 'diagnosis', 
@@ -131,7 +143,9 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
         });
 
         drugsLibrary.forEach(d => {
-            if (d.key) extractedKeys.push({ 
+            if (d.key) extractedKeys.push({
+                id: undefined,
+                uuid: v4(), 
                 name: d.key, 
                 label: d.drug, 
                 dataType: d.type, 
@@ -147,7 +161,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                     return isMatch;
                 })
                 .forEach(k => {
-                    parentKeys = [...parentKeys, ...k.parentKeys];
+                    parentKeys = [...parentKeys, ...k.parentKeys!];
                 });
         }
 
@@ -161,7 +175,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                         return isMatch;
                     })
                     .forEach(k => {
-                        parentKeys = [...parentKeys, ...k.parentKeys];
+                        parentKeys = [...parentKeys, ...k.parentKeys!];
                     });
 
                 return {
