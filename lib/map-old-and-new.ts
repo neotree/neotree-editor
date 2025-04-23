@@ -1,5 +1,5 @@
 import { configKeys, diagnoses, screens, scripts } from "@/databases/pg/schema";
-import { ScreenReviewField, ScriptField } from "@/types";
+import { Alias, ScreenReviewField, ScriptField } from "@/types";
 import { Label } from "@radix-ui/react-dropdown-menu";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
@@ -219,6 +219,12 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 label: rc.label,
                 screen: rc.screen
             })),
+            aliases: (s.aliases as Alias[]).map(al=>({
+                value: al.value,
+                key: al.key,
+                script: al.script
+            })),
+            lastAlias: s.lastAlias,
             preferences: s.preferences,
             printSections: s.printSections,
         },

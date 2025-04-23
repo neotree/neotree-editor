@@ -21,17 +21,40 @@ export const countScreens: typeof queries._countScreens = async (...args) => {
     try {
         await isAllowed();
         return await queries._countScreens(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('countScreens ERROR', e.message);
         return { errors: [e.message], data: queries._defaultScreensCount, };
     }
 };
 
 export const getScreens: typeof queries._getScreens = async (...args) => {
-    try {
+    try {     
         await isAllowed();
-        return await queries._getScreens(...args);
-    } catch(e: any) {
+        const scriptId = args[0]?.scriptsIds?.[0]||'';
+        const returnDraftIfExists = args[0]?.returnDraftsIfExist;
+        const aliases = await queries._getScriptAliases({scriptId,returnDraftIfExists})
+
+        console.log("....ALIASES.....",JSON.stringify(aliases))
+
+        const allScreens = await queries._getScreens(...args)
+        const excluded = ['management'
+            , 'mwi_edliz_summary_table'
+            , 'progress'
+            , 'zw_edliz_summary_table'
+            , 'diagnosis'
+            , 'drugs',
+            'fluids',
+            'feeds',
+        ];
+        
+    //   const filtered=   allScreens?.data.filter(d => !excluded.includes(d.type)).map(d => {
+           
+    //     })
+
+        const filtered=   allScreens?.data.filter(d => !excluded.includes(d.type))
+        
+        return allScreens
+    } catch (e: any) {
         logger.error('getScreens ERROR', e.message);
         return { errors: [e.message], data: [], };
     }
@@ -41,7 +64,7 @@ export const listScreens: typeof queries._listScreens = async (...args) => {
     try {
         await isAllowed();
         return await queries._listScreens(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('listScreens ERROR', e.message);
         return { errors: [e.message], data: [], };
     }
@@ -56,7 +79,7 @@ export const deleteScreens: typeof mutations._deleteScreens = async (...args) =>
     try {
         await isAllowed();
         return await mutations._deleteScreens(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
@@ -66,7 +89,7 @@ export const saveScreens: typeof mutations._saveScreens = async (...args) => {
     try {
         await isAllowed();
         return await mutations._saveScreens(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
@@ -77,7 +100,7 @@ export const countDiagnoses: typeof queries._countDiagnoses = async (...args) =>
     try {
         await isAllowed();
         return await queries._countDiagnoses(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('countDiagnoses ERROR', e.message);
         return { errors: [e.message], data: queries._defaultDiagnosesCount, };
     }
@@ -87,7 +110,7 @@ export const getDiagnoses: typeof queries._getDiagnoses = async (...args) => {
     try {
         await isAllowed();
         return await queries._getDiagnoses(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('getDiagnoses ERROR', e.message);
         return { errors: [e.message], data: [], };
     }
@@ -102,7 +125,7 @@ export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async (...args
     try {
         await isAllowed();
         return await mutations._deleteDiagnoses(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
@@ -112,7 +135,7 @@ export const saveDiagnoses: typeof mutations._saveDiagnoses = async (...args) =>
     try {
         await isAllowed();
         return await mutations._saveDiagnoses(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
@@ -123,7 +146,7 @@ export const countScripts: typeof queries._countScripts = async (...args) => {
     try {
         await isAllowed();
         return await queries._countScripts(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('countScripts ERROR', e.message);
         return { errors: [e.message], data: queries._defaultScriptsCount, };
     }
@@ -133,7 +156,7 @@ export const getScripts: typeof queries._getScripts = async (...args) => {
     try {
         await isAllowed();
         return await queries._getScripts(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('getScripts ERROR', e.message);
         return { errors: [e.message], data: [], };
     }
@@ -148,7 +171,7 @@ export const deleteScripts: typeof mutations._deleteScripts = async (...args) =>
     try {
         await isAllowed();
         return await mutations._deleteScripts(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('deleteScripts ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
@@ -158,19 +181,19 @@ export const saveScripts: typeof mutations._saveScripts = async (...args) => {
     try {
         await isAllowed();
         return await mutations._saveScripts(...args);
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
 };
-export async function getScriptsWithItems (params: Parameters<typeof queries._getScripts>[0]) {
+export async function getScriptsWithItems(params: Parameters<typeof queries._getScripts>[0]) {
     const data: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
         screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][],
         diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][]
         drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][]
     })[] = [];
     const errors: string[] = [];
-	try {
+    try {
         const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
         const scripts = await queries._getScripts({ ...params, returnDraftsIfExist });
 
@@ -195,22 +218,22 @@ export async function getScriptsWithItems (params: Parameters<typeof queries._ge
         if (errors.length) return { errors, data: [], };
 
         return { data, };
-	} catch(e: any) {
-		logger.error('getScriptsWithItems ERROR', e.message);
-		return { data: [], errors: [e.message], };
-	}
+    } catch (e: any) {
+        logger.error('getScriptsWithItems ERROR', e.message);
+        return { data: [], errors: [e.message], };
+    }
 }
 
-export async function saveScriptScreens({ 
-    screens, 
-    scriptId, 
+export async function saveScriptScreens({
+    screens,
+    scriptId,
     preserveScreensIds,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
-}): Promise<{ 
-    errors?: string[]; 
+}): Promise<{
+    errors?: string[];
     success: boolean;
     saved: number;
 }> {
@@ -223,7 +246,7 @@ export async function saveScriptScreens({
         if (!script.data) throw new Error('Script not found');
 
         for (const screen of screens) {
-            const { 
+            const {
                 id,
                 publishDate,
                 createdAt,
@@ -236,26 +259,26 @@ export async function saveScriptScreens({
                 screenId: _ignoreScreenId,
                 scriptId: _ignoreScriptId,
                 position,
-                ...s 
+                ...s
             } = screen;
 
             let screenId = v4();
             if (preserveScreensIds && _ignoreScreenId) screenId = _ignoreScreenId;
 
             try {
-                if (s.image1) { 
+                if (s.image1) {
                     const res = await processImage(s.image1);
                     s.image1 = res.image;
                 }
-                if (s.image2) { 
+                if (s.image2) {
                     const res = await processImage(s.image2);
                     s.image2 = res.image;
                 }
-                if (s.image3) { 
+                if (s.image3) {
                     const res = await processImage(s.image3);
                     s.image3 = res.image;
                 }
-            } catch(e: any) {
+            } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
@@ -277,22 +300,22 @@ export async function saveScriptScreens({
         if (errors.length) return { errors, saved, success: false, };
 
         return { saved, success: true, };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
         return { saved: 0, success: false, errors: [e.message], };
     }
 }
 
-export async function saveScriptDiagnoses({ 
-    diagnoses, 
-    scriptId, 
+export async function saveScriptDiagnoses({
+    diagnoses,
+    scriptId,
     preserveDiagnosesIds,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
-}): Promise<{ 
-    errors?: string[]; 
+}): Promise<{
+    errors?: string[];
     success: boolean;
     saved: number;
 }> {
@@ -305,7 +328,7 @@ export async function saveScriptDiagnoses({
         if (!script.data) throw new Error('Script not found');
 
         for (const diagnosis of diagnoses) {
-            const { 
+            const {
                 id,
                 publishDate,
                 createdAt,
@@ -324,19 +347,19 @@ export async function saveScriptDiagnoses({
             if (preserveDiagnosesIds && _ignoreDiagnosisId) diagnosisId = _ignoreDiagnosisId;
 
             try {
-                if (d.image1) { 
+                if (d.image1) {
                     const res = await processImage(d.image1);
                     d.image1 = res.image;
                 }
-                if (d.image2) { 
+                if (d.image2) {
                     const res = await processImage(d.image2);
                     d.image2 = res.image;
                 }
-                if (d.image3) { 
+                if (d.image3) {
                     const res = await processImage(d.image3);
                     d.image3 = res.image;
                 }
-            } catch(e: any) {
+            } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
@@ -358,7 +381,7 @@ export async function saveScriptDiagnoses({
         if (errors.length) return { errors, saved, success: false, };
 
         return { saved, success: true, };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
         return { saved: 0, success: false, errors: [e.message], };
     }
@@ -366,8 +389,8 @@ export async function saveScriptDiagnoses({
 
 export async function deleteScriptsItems({ scriptsIds, }: {
     scriptsIds: string[];
-}): Promise<{ 
-    errors?: string[]; 
+}): Promise<{
+    errors?: string[];
     success: boolean;
 }> {
     try {
@@ -382,7 +405,7 @@ export async function deleteScriptsItems({ scriptsIds, }: {
         if (errors.length) return { errors, success: false, };
 
         return { success: true, };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('deleteScriptsItems ERROR', e.message);
         return { success: false, errors: [e.message], };
     }
@@ -394,8 +417,8 @@ export async function saveScriptsWithItems({ data }: {
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
     })[];
-}): Promise<{ 
-    errors?: string[]; 
+}): Promise<{
+    errors?: string[];
     success: boolean;
     info: typeof saveScriptsWithItemsInfo,
 }> {
@@ -405,9 +428,9 @@ export async function saveScriptsWithItems({ data }: {
         const errors: string[] = [];
 
         for (const { overWriteScriptWithId, ...script } of data) {
-            const overWriteScript = !overWriteScriptWithId ? { data: null, } : await getScript({ 
-                scriptId: overWriteScriptWithId, 
-                returnDraftIfExists: true, 
+            const overWriteScript = !overWriteScriptWithId ? { data: null, } : await getScript({
+                scriptId: overWriteScriptWithId,
+                returnDraftIfExists: true,
             });
 
             overWriteScript.errors?.forEach(e => errors.push(e));
@@ -421,13 +444,13 @@ export async function saveScriptsWithItems({ data }: {
             if (overWriteScript?.data) {
                 const res = await deleteScriptsItems({ scriptsIds: [overWriteScript.data.scriptId], });
                 res.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                if (errors.length) continue;
             }
 
-            const { 
+            const {
                 id,
-                screens: copiedScreens = [], 
-                diagnoses: copiedDiagnoses = [], 
+                screens: copiedScreens = [],
+                diagnoses: copiedDiagnoses = [],
                 drugsLibrary = [],
                 publishDate,
                 createdAt,
@@ -439,7 +462,7 @@ export async function saveScriptsWithItems({ data }: {
                 scriptId: _ignoreScriptId,
                 position,
                 printSections,
-                ...s 
+                ...s
             } = script;
 
             const oldScreensIdsMap: { [key: string]: string; } = {};
@@ -485,17 +508,17 @@ export async function saveScriptsWithItems({ data }: {
             info.diagnoses += saveDiagnoses.saved;
 
             if (drugsLibrary.length) {
-                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
+                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({
                     data: drugsLibrary.map(item => ({
                         ...item,
-                        itemId: v4(), 
+                        itemId: v4(),
                         createdAt: undefined!,
                         updatedAt: undefined!,
                         deletedAt: undefined!,
                         publishDate: undefined!,
                         id: undefined!,
                         position: undefined,
-                    })), 
+                    })),
                 });
                 // saveDrugsLibrary.errors?.forEach(e => errors.push(e));
                 info.drugsLibrary += drugsLibrary.length;
@@ -505,9 +528,9 @@ export async function saveScriptsWithItems({ data }: {
         if (errors.length) return { success: false, errors, info, };
 
         return { success: true, info, };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('saveScriptsWithItems ERROR', e.message);
-		return { success: false, errors: [e.message], info, };
+        return { success: false, errors: [e.message], info, };
     }
 }
 
@@ -521,9 +544,9 @@ export async function copyScripts(params?: {
 }): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>>> {
     const info = { ...saveScriptsWithItemsInfo };
 
-    const { 
-        scriptsIds = [], 
-        confirmCopyAll, 
+    const {
+        scriptsIds = [],
+        confirmCopyAll,
         toRemoteSiteId,
         fromRemoteSiteId,
         broadcastAction,
@@ -540,8 +563,8 @@ export async function copyScripts(params?: {
         if (fromRemoteSiteId) {
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({ 
-                scriptsIds: JSON.stringify(scriptsIds), 
+            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
+                scriptsIds: JSON.stringify(scriptsIds),
             }));
 
             const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
@@ -556,7 +579,7 @@ export async function copyScripts(params?: {
                 const getImageUrl = (suffix: string) => {
                     let host = res.config.baseURL || '';
                     if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
-                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length); 
+                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length);
                     return [host, suffix].filter(s => s).join('/');
                 };
 
@@ -616,7 +639,7 @@ export async function copyScripts(params?: {
         if (broadcastAction && !response?.errors?.length) socket.emit('data_changed', 'copy_scripts');
 
         return response;
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
         return { errors: e.response?.data?.errors || [e.message], success: false, info, };
     }
@@ -653,7 +676,7 @@ export async function copyScreens(params?: {
                 ...acc,
                 [s.scriptId]: [...(acc[s.scriptId] || []), s],
             }), {} as { [key: string]: typeof screens.data; })
-    
+
             for (const scriptId of Object.keys(screensGroupedByScriptId)) {
                 const res = await saveScriptScreens({ scriptId, screens: screensGroupedByScriptId[scriptId], });
                 res.errors?.forEach(e => errors.push(e));
@@ -671,12 +694,12 @@ export async function copyScreens(params?: {
 
         if (broadcastAction && !errors.length) socket.emit('data_changed', 'copy_scripts');
 
-        return { 
+        return {
             copied,
-            success: !errors.length, 
-            errors: errors.length ? errors : undefined, 
+            success: !errors.length,
+            errors: errors.length ? errors : undefined,
         };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('copyScreens ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
     }
@@ -713,7 +736,7 @@ export async function copyDiagnoses(params?: {
                 ...acc,
                 [s.scriptId]: [...(acc[s.scriptId] || []), s],
             }), {} as { [key: string]: typeof diagnoses.data; })
-    
+
             for (const scriptId of Object.keys(diagnosesGroupedByScriptId)) {
                 const res = await saveScriptDiagnoses({ scriptId, diagnoses: diagnosesGroupedByScriptId[scriptId], });
                 res.errors?.forEach(e => errors.push(e));
@@ -731,13 +754,50 @@ export async function copyDiagnoses(params?: {
 
         if (broadcastAction && !errors.length) socket.emit('data_changed', 'copy_scripts');
 
-        return { 
+        return {
             copied,
-            success: !errors.length, 
-            errors: errors.length ? errors : undefined, 
+            success: !errors.length,
+            errors: errors.length ? errors : undefined,
         };
-    } catch(e: any) {
+    } catch (e: any) {
         logger.error('copyDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
     }
 }
+function getNextAlias(prev: string | null): string {
+    if (!prev || prev==='') return 'A';
+  
+    const match = prev.match(/^([A-Z]+)(\d*)$/);
+    if (!match) throw new Error('Invalid alias format');
+  
+    const [_, letters, numStr] = match;
+    const num = numStr ? parseInt(numStr, 10) : 0;
+  
+    // Convert letters to a number (base 26)
+    const toNumber = (s: string) => {
+      return s.split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 65), 0);
+    };
+  
+    // Convert a number to base 26 letters
+    const toLetters = (n: number): string => {
+      let str = '';
+      do {
+        str = String.fromCharCode((n % 26) + 65) + str;
+        n = Math.floor(n / 26) - 1;
+      } while (n >= 0);
+      return str;
+    };
+  
+    let nextLettersNum = toNumber(letters) + 1;
+    let nextLetters = toLetters(nextLettersNum);
+  
+    // Wrap from Z to A1, Z1 to A2, etc.
+    if (nextLetters.length > letters.length) {
+      nextLetters = 'A';
+      return nextLetters + (num + 1);
+    }
+  
+    return nextLetters + (numStr || '');
+  }
+  
+  
