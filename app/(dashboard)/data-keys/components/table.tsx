@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { DataKeyForm } from "./form";
 
 type Props = typeof actions & {
+    disabled?: boolean;
     dataKeys: DataKey[];
 };
 
@@ -61,7 +62,7 @@ export function DataKeysTable(props: Props) {
         });
     }, [props.dataKeys]);
 
-    const disabled = viewOnly;
+    const disabled = props.disabled || viewOnly;
 
     const tableProps = {
         selectedIndexes: [],
@@ -94,7 +95,7 @@ export function DataKeysTable(props: Props) {
             {
                 name: '',
                 align: 'right',
-                cellClassName: cn('w-10', disabled && 'hidden'),
+                cellClassName: cn('w-10'),
                 cellRenderer({ rowIndex }) {
                     const dataKey = data.dataKeys[rowIndex];
 
@@ -112,7 +113,7 @@ export function DataKeysTable(props: Props) {
                                         <Link
                                             href={`/data-keys/key/${dataKey.uuid}`}
                                         >
-                                            Edit
+                                            {disabled ? 'View' : 'Edit'}
                                         </Link>
                                     </ddMenu.DropdownMenuItem>
                                 </ddMenu.DropdownMenuContent>
