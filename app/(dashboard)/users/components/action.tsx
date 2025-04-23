@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { MoreVertical, Trash } from "lucide-react"
+import Link from "next/link";
 
 import {
     DropdownMenu,
@@ -54,9 +55,11 @@ export function UserAction({
                     <DropdownMenuSeparator />
 
                     <DropdownMenuItem 
-                        onClick={() => searchParams.push({ userId })}
+                        asChild
                     >
-                        Edit
+                        <Link href={`/users/edit/${userId}`}>
+                            Edit
+                        </Link>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem 

@@ -14,14 +14,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UsersTable } from "./components/table";
 
 type Props = {
-    params: { [key: string]: string; };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ [key: string]: string; }>;
+    searchParams: Promise<{
+        page?: string;
+        role?: string;
+        status?: string;
+        userId?: string;
+    }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Users({ searchParams: { page, role, status } }: Props) {
-    const [users, roles] = await Promise.all([
+export default async function Users({ searchParams }: Props) {
+    const { page, role, status, userId } = await searchParams;
+
+    const [users, roles, user] = await Promise.all([
         getUsers({ 
             limit: 25,
             page: page ? Number(page) : undefined, 
@@ -29,6 +36,7 @@ export default async function Users({ searchParams: { page, role, status } }: Pr
             status,
         }),
         getRoles(),
+        !userId ? null : await getUser(userId),
     ]);
 
     return (
@@ -48,6 +56,7 @@ export default async function Users({ searchParams: { page, role, status } }: Pr
                     <Card>
                         <CardContent className="p-0">
                             <UsersTable 
+                                user={user}
                                 users={users}
                                 roles={roles}
                                 getUsers={getUsers}
