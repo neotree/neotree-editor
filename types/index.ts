@@ -133,3 +133,8 @@ export type Script = {
     updatedAt: string;
     deletedAt: null | string;
 };
+
+export type ScreenReviewField = {
+    label: string;
+    screen:string;
+ }
