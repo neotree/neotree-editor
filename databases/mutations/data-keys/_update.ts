@@ -1,32 +1,36 @@
-import {} from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import socket from '@/lib/socket';
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys } from '@/databases/pg/schema';
 
-export type CreateDataKeysParams = {
-    data: typeof dataKeys.$inferInsert[];
+export type UpdateDataKeysParams = {
+    data: (Partial<Omit<typeof dataKeys.$inferSelect, 'uuid'>> & {
+        uuid: string;
+    })[];
     throwErrors?: boolean;
     broadcastAction?: boolean;
 };
 
-export type CreateDataKeysResponse = {
+export type UpdateDataKeysResponse = {
     errors?: string[];
     data: {
         success: boolean;
     };
 };
 
-export async function _createDataKeys({
+export async function _updateDataKeys({
     data,
     throwErrors,
     broadcastAction,
-}: CreateDataKeysParams): Promise<CreateDataKeysResponse> {
+}: UpdateDataKeysParams): Promise<UpdateDataKeysResponse> {
     try {
-        await db.insert(dataKeys).values(data);
+        for (const { updatedAt, createdAt, deletedAt, id, uuid, ...item } of data) {
+            await db.update(dataKeys).set(item).where(eq(dataKeys.uuid, uuid));
+        }
 
-        if (broadcastAction) socket.emit('data_changed', 'create_data_keys');
+        if (broadcastAction) socket.emit('data_changed', 'update_data_keys');
 
         return {
             data: {
@@ -34,7 +38,7 @@ export async function _createDataKeys({
             },
         };
     } catch(e: any) {
-        logger.error('_createDataKeys ERROR', e.message);
+        logger.error('_updateDataKeys ERROR', e.message);
 
         if (throwErrors) throw e;
 

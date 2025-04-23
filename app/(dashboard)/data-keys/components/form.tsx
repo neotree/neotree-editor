@@ -7,6 +7,7 @@ import { v4 } from 'uuid';
 import { Controller, useForm, UseFormReturn } from 'react-hook-form';
 import { ChevronDown, ChevronUp, PlusIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import axios from "axios";
 
 import { cn } from '@/lib/utils';
 import { getDataKeysTypes } from '@/lib/data-keys-filter';
@@ -20,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { SelectModal } from '@/components/select-modal';
-import { _createDataKeys } from '@/databases/mutations/data-keys';
+import { _createDataKeys, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 
@@ -113,22 +114,36 @@ function Form(props: Props) {
         try {
             setLoading(true);
 
-            await props.createDataKeys({
-                data: [data, ...children].filter(k => !k.id),
-            });
+            const keys = [data, ...children];
 
-            router.refresh();
+            const response = await axios.post('/api/data-keys/save', { 
+                data: {
+                    inserts: keys.filter(k => !k.id),
+                    updates: keys.filter(k => !!k.id),
+                }, 
+                broadcastAction: true, 
+            } satisfies SaveDataKeysParams);
+            const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
 
-            alert({
-                message: "Data key created!",
-                variant: 'success',
-                onClose: () => {
-                    onOpenChange?.(false);
-                    router.push('/data-keys?' + queryString.stringify({
-                        sort: data.id ? undefined : 'createdAt.desc',
-                    }));
-                },
-            });
+            if (res.errors?.length) {
+                alert({
+                    title: 'Error',
+                    message: res.errors.join(', '),
+                    variant: 'error',
+                });
+            } else {
+                router.refresh();
+                alert({
+                    message: "Data key created!",
+                    variant: 'success',
+                    onClose: () => {
+                        onOpenChange?.(false);
+                        router.push('/data-keys?' + queryString.stringify({
+                            sort: data.id ? undefined : 'createdAt.desc',
+                        }));
+                    },
+                });
+            }
         } catch(e: any) {
             alert({
                 title: 'Error',
