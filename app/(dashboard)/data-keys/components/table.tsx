@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreVertical, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import queryString from "query-string";
 
 import * as ddMenu from '@/components/ui/dropdown-menu';
 import { DataTable, DataTableProps } from "@/components/data-table";
@@ -15,11 +16,11 @@ import {
     DEFAULT_DATA_KEYS_FILTER, 
     FilterDataKeysComponent, 
     filterDataKeysFn, 
-    getDataKeysTypes,
 } from '@/lib/data-keys-filter';
 import * as actions from '@/app/actions/data-keys';
+import { useAppContext } from '@/contexts/app';
+import { cn } from "@/lib/utils";
 import { DataKeyForm } from "./form";
-import queryString from "query-string";
 
 type Props = typeof actions & {
     dataKeys: DataKey[];
@@ -32,6 +33,7 @@ export function DataKeysTable(props: Props) {
     const sortValue = (searchParamsObj.sort as typeof DEFAULT_DATA_KEYS_SORT) || DEFAULT_DATA_KEYS_SORT;
     
     const [refresh, setRefresh] = useState(false);
+    const { viewOnly, } = useAppContext();
 
     const [data, setDataKeys] = useState({
         sortValue: sortValue,
@@ -58,6 +60,8 @@ export function DataKeysTable(props: Props) {
             };
         });
     }, [props.dataKeys]);
+
+    const disabled = viewOnly;
 
     const tableProps = {
         selectedIndexes: [],
@@ -90,7 +94,7 @@ export function DataKeysTable(props: Props) {
             {
                 name: '',
                 align: 'right',
-                cellClassName: 'w-10',
+                cellClassName: cn('w-10', disabled && 'hidden'),
                 cellRenderer({ rowIndex }) {
                     const dataKey = data.dataKeys[rowIndex];
 
@@ -172,17 +176,21 @@ export function DataKeysTable(props: Props) {
                             }}
                         />
 
-                        <Button
-                            asChild
-                            variant="ghost"
-                        >
-                            <Link
-                                href="/data-keys/add"
-                            >
-                                <PlusIcon className="size-4" />
-                                Add
-                            </Link>
-                        </Button>
+                        {disabled ? null : (
+                            <>
+                                <Button
+                                    asChild
+                                    variant="ghost"
+                                >
+                                    <Link
+                                        href="/data-keys/add"
+                                    >
+                                        <PlusIcon className="size-4" />
+                                        Add
+                                    </Link>
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
 
