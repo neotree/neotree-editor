@@ -26,17 +26,21 @@ import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { useAppContext } from '@/contexts/app';
 
-type tDataKey = DataKey & {
-    children: DataKey[];
+type tDataKey = Omit<DataKey, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'> & {
+    id: undefined | number;
+};
+
+type FormData = tDataKey & {
+    children: tDataKey[];
 };
 
 type Props = typeof actions & {
     open?: boolean;
     disabled?: boolean;
     dataKeys: DataKey[];
-    dataKey?: tDataKey;
+    dataKey?: FormData;
     item?: {
-        dataKey: tDataKey;
+        dataKey: FormData;
         index: number
     };
     modal?: boolean;
@@ -91,11 +95,9 @@ function Form(props: Props) {
             label: dataKey?.label || '',
             dataType: dataKey?.dataType || null,
             parentKeys: dataKey?.parentKeys || [],
+            defaults: dataKey?.defaults || {},
             children: dataKey?.children || [],
-            createdAt: dataKey?.createdAt || undefined!,
-        } satisfies DataKey & {
-            children: DataKey[];
-        },
+        } satisfies FormData,
     });
 
     const {

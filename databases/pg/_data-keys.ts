@@ -16,6 +16,7 @@ export const dataKeys = pgTable('nt_data_keys', {
     label: text('label').default('').notNull(),
     dataType: text('data_type'),
     parentKeys: json('parent_keys').default([]).$type<string[]>().notNull(),
+    defaults: json('defaults').default({}).$type<Record<string, any>>().notNull(),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
