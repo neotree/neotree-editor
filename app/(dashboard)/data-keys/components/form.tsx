@@ -1,11 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import queryString from 'query-string';
 import { v4 } from 'uuid';
 import { Controller, useForm, UseFormReturn } from 'react-hook-form';
 import { ChevronDown, ChevronUp, PlusIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+import { cn } from '@/lib/utils';
+import { getDataKeysTypes } from '@/lib/data-keys-filter';
 import { Loader } from '@/components/loader';
 import * as actions from '@/app/actions/data-keys';
 import { Button } from '@/components/ui/button';
@@ -15,26 +19,31 @@ import { DataKey } from "@/databases/queries/data-keys";
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { SelectModal } from '@/components/select-modal';
 import { _createDataKeys } from '@/databases/mutations/data-keys';
 import { useAlertModal } from '@/hooks/use-alert-modal';
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
+
+type tDataKey = DataKey & {
+    children: DataKey[];
+};
 
 type Props = typeof actions & {
-    open: boolean;
+    open?: boolean;
     disabled?: boolean;
-    types: string[];
     dataKeys: DataKey[];
+    dataKey?: tDataKey;
     item?: {
-        dataKey: DataKey & {
-            children: DataKey[];
-        };
+        dataKey: tDataKey;
         index: number
     };
-    onOpenChange: (open: boolean) => void;
+    modal?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
 export function DataKeyForm(props: Props) {
+    if (props.modal !== true) return <Form {...props} />;
+
     return (
         <>
             <dialog.Dialog
@@ -61,15 +70,16 @@ export function DataKeyForm(props: Props) {
 
 function Form(props: Props) {
     const scrollableDiv = useRef<HTMLDivElement>(null);
+
     const { 
         item, 
-        types,
         dataKeys,
+        dataKey: dataKeyProp,
         disabled: disabledProp,
-        onOpenChange 
+        onOpenChange,
     } = props;
 
-    const { dataKey } = { ...item };
+    const dataKey = dataKeyProp || item?.dataKey;
 
     const form = useForm({
         defaultValues: {
@@ -95,6 +105,7 @@ function Form(props: Props) {
         watch,
     } = form;
 
+    const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
     const router = useRouter();
 
@@ -106,41 +117,37 @@ function Form(props: Props) {
                 data: [data, ...children].filter(k => !k.id),
             });
 
-            onOpenChange(false);
             router.refresh();
 
-            window.alert('Data key created successfully!');
-
-            // alert({
-            //     message: "Data key created!",
-            //     variant: 'success',
-            //     onClose: () => {
-            //         onOpenChange(false);
-            //         router.refresh();
-            //     },
-            // });
+            alert({
+                message: "Data key created!",
+                variant: 'success',
+                onClose: () => {
+                    onOpenChange?.(false);
+                    router.push('/data-keys?' + queryString.stringify({
+                        sort: data.id ? undefined : 'createdAt.desc',
+                    }));
+                },
+            });
         } catch(e: any) {
-            window.alert(`ERROR: ${e.message || ''}`);
-            // alert({
-            //     title: 'Error',
-            //     message: e.message,
-            //     variant: 'error',
-            // });
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
         } finally {
             setLoading(false);
         }
     });
 
     const [visibleChildren, setVisible] = useState<Record<string, boolean>>({});
-    const [showAddForm, setShowAddForm] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const name = watch('name');
     const dataType = watch('dataType');
     const children = watch('children');
 
-    const canDelete = !disabledProp && !!item;
-    const disabled = !!disabledProp || !!item;
+    const disabled = true; // !!disabledProp;
     const hasChildren = [
         'dropdown',
         'checklist',
@@ -152,6 +159,7 @@ function Form(props: Props) {
         'zw_edliz_summary_table_option',
         'mwi_edliz_summary_table_option',
     ].includes(dataType!);
+    const canAddOption = hasChildren && !disabledProp;
 
     return (
         <>
@@ -168,20 +176,11 @@ function Form(props: Props) {
                     <>
                         <div className="mt-2 flex items-center">
                             <h1 className="text-xl flex-1">Options</h1>
-                            {!showAddForm ? (
-                                <Button
-                                    variant="outline"
-                                    className="h-auto"
-                                    disabled={!canDelete}
-                                    onClick={() => setShowAddForm(true)}
-                                >
-                                    <PlusIcon className="size-4" />
-                                </Button>
-                            ) : (
-                                <div className="w-[100px]">
+                            {canAddOption && (
+                                <div className="w-[130px]">
                                     <SelectModal
                                         selected={[]}
-                                        placeholder="Select"
+                                        placeholder="Add option"
                                         search={{
                                             placeholder: 'Search data keys',
                                         }}
@@ -194,8 +193,7 @@ function Form(props: Props) {
                                         }))}
                                         onSelect={([key]) => {
                                             const _dataKey = dataKeys.find(k => k.name === key?.value);
-                                            setShowAddForm(false);
-                                            if (dataKey) {
+                                            if (_dataKey) {
                                                 const i = children.length;
                                                 const dataKey = { ..._dataKey!, parentKeys: [..._dataKey!.parentKeys, name], };
                                                 setValue(`children.${i}`, dataKey, { shouldDirty: true, });
@@ -216,6 +214,10 @@ function Form(props: Props) {
                         {children.map((child, i) => {
                             const childKey = `children.${i}`;
                             const isVisible = visibleChildren[childKey];
+                            const toggle = () => setVisible(prev => ({
+                                ...prev,
+                                [childKey]: !prev[childKey],
+                            }));
 
                             return (
                                 <Card key={child.uuid}>
@@ -223,24 +225,30 @@ function Form(props: Props) {
                                         <div className="flex items-center gap-x-2">
                                             <div className="flex-1">
                                                 <div 
+                                                    role="button"
                                                     className={cn(
                                                         'text-sm font-bold',
                                                         isVisible && 'hidden',
                                                     )}
+                                                    onClick={toggle}
                                                 >{child.label}</div>
                                             </div>
 
                                             <button
-                                                className="hidden" // TODO: unhide
+                                                className={cn(disabled && 'hidden')}
                                                 onClick={() => {
-                                                    const confirmed = confirm('Are you sure?');
-                                                    if (confirmed) {
-                                                        setValue(
+                                                    confirm(
+                                                        () => setValue(
                                                             'children',
                                                             children.filter((_, j) => j !== i),
                                                             { shouldDirty: true, },
-                                                        );
-                                                    }
+                                                        ),
+                                                        {
+                                                            title: 'Delete option',
+                                                            message: 'Are you sure?',
+                                                            danger: true,
+                                                        },
+                                                    );
                                                 }}
                                             >
                                                 <X className="size-4 opacity-40" />
@@ -248,10 +256,7 @@ function Form(props: Props) {
 
                                             <button
                                                 className="h-auto"
-                                                onClick={() => setVisible(prev => ({
-                                                    ...prev,
-                                                    [childKey]: !prev[childKey],
-                                                }))}
+                                                onClick={toggle}
                                             >
                                                 {!isVisible ? 
                                                     <ChevronDown className="size-4 opacity-40" />
@@ -282,29 +287,50 @@ function Form(props: Props) {
                 )}
             </div>
 
-            <dialog.DialogFooter className="border-t border-t-border px-4 py-2 items-center w-full">
-                <dialog.DialogClose asChild>
+            {props.modal ? (
+                <dialog.DialogFooter className="border-t border-t-border px-4 py-2 items-center w-full">
+                    <dialog.DialogClose asChild>
+                        <Button
+                            variant="ghost"
+                        >
+                            Cancel
+                        </Button>
+                    </dialog.DialogClose>
+
                     <Button
+                        onClick={onSave}
+                    >
+                        Save
+                    </Button>
+                </dialog.DialogFooter>
+            ) : (
+                <div className="flex items-center justify-end border-t border-t-border px-4 py-2 w-full gap-x-4">
+                    <Button
+                        asChild
                         variant="ghost"
                     >
-                        Cancel
+                        <Link
+                            href="/data-keys"
+                        >
+                            Cancel
+                        </Link>
                     </Button>
-                </dialog.DialogClose>
 
-                <Button
-                    onClick={onSave}
-                >
-                    Save
-                </Button>
-            </dialog.DialogFooter>
+                    <Button
+                        onClick={onSave}
+                    >
+                        Save
+                    </Button>
+                </div>
+            )}
         </>
     );
 }
 
 function FormFields({ 
-    types,
     disabled,
     childIndex,
+    dataKeys,
     form: {
         control,
         register,
@@ -314,6 +340,8 @@ function FormFields({
     form: UseFormReturn<NonNullable<Props['item']>['dataKey']>;
     disabled: boolean;
 }) {
+    const types = useMemo(() => getDataKeysTypes(dataKeys).map(k => k.value), [dataKeys]);
+
     const dataTypeKey = (childIndex === undefined ? 
         'dataType' 
         : 

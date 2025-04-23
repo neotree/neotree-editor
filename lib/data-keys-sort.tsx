@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SortAsc, SortDesc } from "lucide-react";
 
 import * as select from '@/components/ui/select';
@@ -146,11 +146,16 @@ export const sortDataKeysFn = (
 
 type SortDataKeysComponentProps = {
     dataKeys: DataKey[];
+    value?: typeof DEFAULT_DATA_KEYS_SORT;
     onSort: (data: DataKey[], sortValue: typeof DEFAULT_DATA_KEYS_SORT) => void;
 };
 
-export function SortDataKeysComponent({ dataKeys, onSort: onSortProp, }: SortDataKeysComponentProps) {
-    const [sort, setSort] = useState<typeof DEFAULT_DATA_KEYS_SORT>(DEFAULT_DATA_KEYS_SORT);
+const parseValue = (value?: typeof DEFAULT_DATA_KEYS_SORT) => {
+    return sortOpts.find(o => o.value === value)?.value || DEFAULT_DATA_KEYS_SORT;
+};
+
+export function SortDataKeysComponent({ dataKeys, value, onSort: onSortProp, }: SortDataKeysComponentProps) {
+    const [sort, setSort] = useState<typeof DEFAULT_DATA_KEYS_SORT>(parseValue(value));
 
     const onSort = useCallback((sortValue: typeof sort) => {
         const value = sortValue as typeof sort;
@@ -158,6 +163,8 @@ export function SortDataKeysComponent({ dataKeys, onSort: onSortProp, }: SortDat
         const sorted = sortDataKeysFn(dataKeys, value);
         onSortProp(sorted, value);
     }, [dataKeys, onSortProp]);
+
+    useEffect(() => { setSort(parseValue(value)); }, [value]);
     
     return (
         <>
