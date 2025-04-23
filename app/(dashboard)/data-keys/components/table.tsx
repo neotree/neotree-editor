@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreVertical, PlusIcon } from "lucide-react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import * as ddMenu from '@/components/ui/dropdown-menu';
 import { DataTable, DataTableProps } from "@/components/data-table";
@@ -17,18 +19,22 @@ import {
 } from '@/lib/data-keys-filter';
 import * as actions from '@/app/actions/data-keys';
 import { DataKeyForm } from "./form";
+import queryString from "query-string";
 
 type Props = typeof actions & {
     dataKeys: DataKey[];
 };
 
 export function DataKeysTable(props: Props) {
-    const containerDivRef = useRef<HTMLDivElement>(null);
-    const addBtnRef = useRef<HTMLButtonElement>(null);
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
+    const sortValue = (searchParamsObj.sort as typeof DEFAULT_DATA_KEYS_SORT) || DEFAULT_DATA_KEYS_SORT;
+    
     const [refresh, setRefresh] = useState(false);
 
     const [data, setDataKeys] = useState({
-        sortValue: DEFAULT_DATA_KEYS_SORT,
+        sortValue: sortValue,
         filter: DEFAULT_DATA_KEYS_FILTER,
         dataKeys: props.dataKeys,
     });
@@ -40,8 +46,6 @@ export function DataKeysTable(props: Props) {
         };
         index: number;
     }>(null);
-
-    const types = useMemo(() => getDataKeysTypes(props.dataKeys).map(k => k.value), [props.dataKeys]);
 
     useEffect(() => {
         setDataKeys(prev => {
@@ -86,7 +90,7 @@ export function DataKeysTable(props: Props) {
             {
                 name: '',
                 align: 'right',
-                cellClassName: 'w-10 hidden', // TODO: unhide
+                cellClassName: 'w-10',
                 cellRenderer({ rowIndex }) {
                     const dataKey = data.dataKeys[rowIndex];
 
@@ -100,23 +104,12 @@ export function DataKeysTable(props: Props) {
                                 </ddMenu.DropdownMenuTrigger>
 
                                 <ddMenu.DropdownMenuContent>
-                                    <ddMenu.DropdownMenuItem
-                                        onClick={() => {
-                                            setTimeout(() => setActiveDataKey({
-                                                index: rowIndex,
-                                                dataKey: {
-                                                    ...dataKey,
-                                                    children: props.dataKeys
-                                                        .filter(k => {
-                                                            return (k.parentKeys || [])
-                                                                .map(k => (k || '').toLowerCase())
-                                                                .includes(dataKey.name.toLowerCase());
-                                                        }),
-                                                }
-                                            }), 0);
-                                        }}
-                                    >
-                                        Edit
+                                    <ddMenu.DropdownMenuItem asChild>
+                                        <Link
+                                            href={`/data-keys/key/${dataKey.uuid}`}
+                                        >
+                                            Edit
+                                        </Link>
                                     </ddMenu.DropdownMenuItem>
                                 </ddMenu.DropdownMenuContent>
                             </ddMenu.DropdownMenu>
@@ -137,16 +130,16 @@ export function DataKeysTable(props: Props) {
         <>
             <DataKeyForm 
                 {...props}
+                modal
                 item={activeDataKey || undefined}
                 open={showAddForm || !!activeDataKey}
                 onOpenChange={() => {
                     setShowAddForm(false);
                     setActiveDataKey(null);
                 }}
-                types={types}
             />
 
-            <div ref={containerDivRef}>
+            <div>
                 <div className="flex py-6 px-4">
                     <div className="flex-1">
                         <h1 className="text-2xl">Data keys</h1>
@@ -154,11 +147,16 @@ export function DataKeysTable(props: Props) {
 
                     <div className="flex items-center gap-x-2">
                         <SortDataKeysComponent 
+                            value={sortValue}
                             dataKeys={data.dataKeys}
                             onSort={(dataKeys, sortValue) => {
                                 setRefresh(true);
                                 setDataKeys(prev => ({ ...prev, dataKeys, sortValue, }));
                                 setTimeout(() => setRefresh(false), 0);
+                                router.push('/data-keys?' + queryString.stringify({
+                                    ...searchParamsObj,
+                                    sort: sortValue,
+                                }));
                             }}
                         />
 
@@ -175,15 +173,15 @@ export function DataKeysTable(props: Props) {
                         />
 
                         <Button
-                            ref={addBtnRef}
+                            asChild
                             variant="ghost"
-                            onClick={() => {
-                                addBtnRef.current?.blur?.();
-                                setTimeout(() => setShowAddForm(true), 0);
-                            }}
                         >
-                            <PlusIcon className="size-4" />
-                            Add
+                            <Link
+                                href="/data-keys/add"
+                            >
+                                <PlusIcon className="size-4" />
+                                Add
+                            </Link>
                         </Button>
                     </div>
                 </div>
