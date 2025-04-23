@@ -2,6 +2,7 @@ import { Title } from "@/components/title";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import * as actions from '@/app/actions/data-keys';
+import { Alert } from "@/components/alert";
 import { DataKeyForm } from '../../components/form';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,16 @@ export default async function EditDataKeyPage({ params }: Props) {
     const res = await actions.fetchDataKeys();
 
     const dataKey = res.data.find(k => k.uuid === uuid);
+
+    if (!dataKey) {
+        return (
+            <Alert 
+                title="Not found"
+                message="Data key does not exist!"
+                redirectTo="/data-keys"
+            />
+        );
+    }
 
     return (
         <>
