@@ -24,6 +24,7 @@ import { SelectModal } from '@/components/select-modal';
 import { _createDataKeys, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAppContext } from '@/contexts/app';
 
 type tDataKey = DataKey & {
     children: DataKey[];
@@ -98,9 +99,9 @@ function Form(props: Props) {
     });
 
     const {
-        control,
-        formState,
-        getValues,
+        formState: {
+            isDirty,
+        },
         handleSubmit,
         setValue,
         watch,
@@ -109,6 +110,7 @@ function Form(props: Props) {
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
     const router = useRouter();
+    const { viewOnly, } = useAppContext();
 
     const onSave = handleSubmit(async ({ children, ...data }) => {
         try {
@@ -162,7 +164,7 @@ function Form(props: Props) {
     const dataType = watch('dataType');
     const children = watch('children');
 
-    const disabled = true; // !!disabledProp;
+    const disabled = viewOnly || !!disabledProp;
     const hasChildren = [
         'dropdown',
         'checklist',
@@ -194,6 +196,7 @@ function Form(props: Props) {
                             {canAddOption && (
                                 <div className="w-[130px]">
                                     <SelectModal
+                                        disabled={disabled}
                                         selected={[]}
                                         placeholder="Add option"
                                         search={{
@@ -332,6 +335,7 @@ function Form(props: Props) {
                     </Button>
 
                     <Button
+                        disabled={disabled || !isDirty}
                         onClick={onSave}
                     >
                         Save
