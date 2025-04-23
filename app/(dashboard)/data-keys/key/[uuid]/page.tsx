@@ -3,6 +3,7 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import * as actions from '@/app/actions/data-keys';
 import { Alert } from "@/components/alert";
+import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
 import { DataKeyForm } from '../../components/form';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,11 @@ type Props = {
 
 export default async function EditDataKeyPage({ params }: Props) { 
     const { uuid } = await params;
-    const res = await actions.fetchDataKeys();
+
+    const [res, { isSuperUser }] = await Promise.all([
+        actions.fetchDataKeys(),
+        getAuthenticatedUserWithRoles(),
+    ]);
 
     const dataKey = res.data.find(k => k.uuid === uuid);
 
@@ -42,6 +47,7 @@ export default async function EditDataKeyPage({ params }: Props) {
 
                         <DataKeyForm 
                             {...actions}
+                            disabled={!isSuperUser}
                             dataKeys={res.data}
                             dataKey={!dataKey ? undefined : {
                                 ...dataKey,
