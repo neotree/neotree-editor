@@ -41,6 +41,7 @@ export async function getUser(params: GetUserParams) {
         const user = await _getUser(params);
         return user || null;
     } catch(e) {
+        console.log('getUser XOXO', { params, }, e)
         logger.error('getUser ERROR:', e);
         return null;
     }

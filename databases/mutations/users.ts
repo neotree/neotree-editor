@@ -1,7 +1,8 @@
-import { eq, inArray } from "drizzle-orm";
-import { v4, validate as validateUUID } from "uuid";
+import { eq } from "drizzle-orm";
+import { v4 } from "uuid";
 import bcrypt from 'bcrypt';
 
+import { validEmailRegex } from "@/constants/email";
 import db from "../pg/drizzle";
 import { users } from "../pg/schema";
 import { _getUser, _getUsers } from '../queries/users';
@@ -98,15 +99,9 @@ export async function _updateUsers(
         error?: string; 
     })[] = [];
 
-    for(const { userId, data: u,  } of data) {
+    for(const { userId, data: { userId: _userId, deletedAt, id, createdAt, updatedAt, email, ...u },  } of data) {
         try {
-            const where = validateUUID(userId) ? eq(users.userId, userId) : eq(users.email, userId);
-            
-            delete u.id;
-            delete u.createdAt;
-            delete u.updatedAt;
-            delete u.email;
-            delete u.userId;
+            const where = validEmailRegex.test(userId) ? eq(users.email, userId) : eq(users.userId, userId);
 
             await db.update(users).set(u).where(where);
             const user = !opts?.returnUpdated ? undefined : await _getUser(userId);

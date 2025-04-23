@@ -28,11 +28,19 @@ export function Items({
 }: Props) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
+    const isChecklistScreen = screenType === 'checklist';
+    const isProgressScreen = screenType === 'progress';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
     const items = form.watch('items');
+
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
+    const [activeItem, setActiveItem] = useState<null | {
+        index: number;
+        data: typeof items[0];
+    }>(null);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...items], oldIndex, newIndex);
@@ -95,6 +103,19 @@ export function Items({
 
     return (
         <>
+            <div>
+                <Item 
+                    open={showAddItemForm || !!activeItem}
+                    disabled={disabled} 
+                    form={form}
+                    item={activeItem || undefined}
+                    onClose={() => {
+                        setActiveItem(null);
+                        setShowAddItemForm(false);
+                    }}
+                />
+            </div>
+
             <DataTable 
                 title="Items"
                 sortable={!disabled}
@@ -105,21 +126,18 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                headerActions={(
+                headerActions={(isDiagnosisScreen || isChecklistScreen || isProgressScreen) && (
                     <>
-                        <Item
-                            form={form}
-                            disabled={disabled}
-                        >
-                            {!disabled && (
-                                <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary" variant="outline">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        New item
-                                    </Button>
-                                </DialogTrigger>
-                            )}
-                        </Item>
+                        {disabled ? null : (
+                            <Button 
+                                className="text-primary border-primary w-full" 
+                                variant="outline"
+                                onClick={() => setShowAddItemForm(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New item
+                            </Button>
+                        )}
                     </>
                 )}
                 columns={[
@@ -152,24 +170,19 @@ export function Items({
 
                                     <DropdownMenuContent>
                                         <DropdownMenuItem asChild>
-                                            <Item 
-                                                disabled={disabled} 
-                                                form={form}
-                                                item={{
-                                                    data: item,
-                                                    index: rowIndex,
+                                            <Button 
+                                                variant="ghost"
+                                                className="justify-start w-full"
+                                                onClick={() => {
+                                                    setTimeout(() => setActiveItem({
+                                                        data: item,
+                                                        index: rowIndex,
+                                                    }), 0);
                                                 }}
                                             >
-                                                {({ extraProps }) => (
-                                                    <DialogTrigger 
-                                                        {...extraProps}
-                                                        className={cn(extraProps?.className, 'w-full')}
-                                                    >
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                    </DialogTrigger>
-                                                )}
-                                            </Item>
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                <span>{disabled ? 'View' : 'Edit'}</span>
+                                            </Button>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuItem 
@@ -197,7 +210,7 @@ export function Items({
                     },
                 ]}
                 data={items.map(f => [
-                    f.id,
+                    f.key || f.id,
                     f.label,
                     isDiagnosisScreen ? f.severity_order : '',
                     '',

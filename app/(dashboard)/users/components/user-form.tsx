@@ -38,6 +38,7 @@ import { validEmailRegex } from "@/constants/email";
 type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
 type Props = {
+    user?: Awaited<ReturnType<typeof getUser>>;
     open?: boolean;
     userId?: string;
     roles: Awaited<ReturnType<typeof getRoles>>;

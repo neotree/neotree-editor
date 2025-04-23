@@ -1,10 +1,11 @@
-import { eq, and, isNull, SQL, count, inArray, isNotNull, desc, sql, getTableColumns } from "drizzle-orm";
+import { eq, and, isNull, SQL, count, inArray, isNotNull, desc, sql, or } from "drizzle-orm";
 import * as uuid from 'uuid';
 
-import db from "../pg/drizzle";
-import { users } from "../pg/schema";
 import { isEmpty } from "@/lib/isEmpty";
 import logger from "@/lib/logger";
+import { validEmailRegex } from "@/constants/email";
+import db from "../pg/drizzle";
+import { users } from "../pg/schema";
 
 export type GetUserParams = string;
 
@@ -39,7 +40,8 @@ export async function _searchUsers(searchValue: string) {
 }
 
 export async function _getUser(params: GetUserParams) {
-    const where = uuid.validate(params) ? eq(users.userId, params) : eq(users.email, params);
+    const where = validEmailRegex.test(params) ? eq(users.email, params) : eq(users.userId, params);
+
     const res = await db.query.users.findFirst({
         where: and(
             where,
@@ -69,7 +71,7 @@ export async function _getUser(params: GetUserParams) {
 }
 
 export async function _getUserMini(params: GetUserParams) {
-    const where = uuid.validate(params) ? eq(users.userId, params) : eq(users.email, params);
+    const where = validEmailRegex.test(params) ? eq(users.email, params) : eq(users.userId, params);
     return await db.query.users.findFirst({
         where: and(
             where,
@@ -86,7 +88,7 @@ export async function _getUserMini(params: GetUserParams) {
 }
 
 export async function _getFullUser(params: GetUserParams) {
-    const where = uuid.validate(params) ? eq(users.userId, params) : eq(users.email, params);
+    const where = validEmailRegex.test(params) ? eq(users.email, params) : eq(users.userId, params);
     return db.query.users.findFirst({
         where: and(
             where,

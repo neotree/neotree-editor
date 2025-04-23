@@ -22,6 +22,10 @@ import type { DataTableProps, } from './types';
 import { FilterText } from "./filter-text";
 import { DataTableHeader } from './header';
 
+export { 
+    type DataTableProps, 
+};
+
 export const DataTable = (props: DataTableProps) => {
     const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, } = props;
 

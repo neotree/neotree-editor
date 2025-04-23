@@ -40,8 +40,6 @@ export function VerifyEmail({ email, sendAuthCode, onEmailVerified, isEmailRegis
             const res: any = await axios.get('/api/users/is-email-registered?email='+email);
             const { errors, yes: emailIsRegistered, isActive } = res.data;
 
-            console.log(res)
-
             if (errors?.length || !emailIsRegistered) {
                 alert({
                     title: 'Error',

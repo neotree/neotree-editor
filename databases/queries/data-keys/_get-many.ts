@@ -4,11 +4,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import * as schema from "@/databases/pg/schema";
 
-export type DataKey = {
-    name: typeof schema.dataKeys.$inferSelect['name'];
-    label: typeof schema.dataKeys.$inferSelect['label'];
-    dataType: typeof schema.dataKeys.$inferSelect['dataType'];
-};
+export type DataKey = typeof schema.dataKeys.$inferSelect;
 
 export type GetDataKeysParams = {
     key?: string | string[];
@@ -37,11 +33,7 @@ export async function _getDataKeys(params?: GetDataKeysParams): Promise<GetDataK
         );
 
         const data = await db
-            .select({ 
-                name: schema.dataKeys.name, 
-                label: schema.dataKeys.label, 
-                dataType: schema.dataKeys.dataType, 
-            })
+            .select()
             .from(schema.dataKeys)
             .where(where)
             .orderBy(asc(schema.dataKeys.label));
