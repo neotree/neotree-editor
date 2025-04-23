@@ -1,18 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
 import { Alert } from "@/components/alert";
+import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
 
 export default async function DataKeysLayout({ children }: Readonly<{
     children: React.ReactNode;
 }>) {
-    const [user] = await Promise.all([
+    const [{ authenticatedUser, isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
 
-    if (!user) redirect('/login');
+    if (!authenticatedUser) redirect('/login');
 
-    if (!user.isSuperUser) {
+    if (!isSuperUser) {
         return (
             <Alert 
                 title="Not allowed"
