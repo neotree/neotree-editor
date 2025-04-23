@@ -23,12 +23,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
-    DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
 import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
@@ -229,63 +223,6 @@ export function ScreenForm({
                     caption: o.dataType || '',
                     disabled: type !== o.dataType,
                 }))}
-                header={(
-                    <Popover
-                        modal
-                    >
-                        <PopoverTrigger>
-                            <Button
-                                variant="ghost"
-                            >
-                                <FilterIcon className="size-4" />
-                                Filter
-                            </Button>
-                        </PopoverTrigger>
-
-                        <PopoverContent className="p-2">
-                            <p className="text-sm font-bold mb-2">Sort</p>
-                            <RadioGroup>
-                                {[
-                                    {
-                                        value: 'key,asc',
-                                        label: 'Key (asc)',
-                                        Icon: SortAsc,
-                                    },
-                                    {
-                                        value: 'key,desc',
-                                        label: 'Key (desc)',
-                                        Icon: SortDesc,
-                                    },
-                                    {
-                                        value: 'label,asc',
-                                        label: 'Label (asc)',
-                                        Icon: SortAsc,
-                                    },
-                                    {
-                                        value: 'label,desc',
-                                        label: 'Label (desc)',
-                                        Icon: SortDesc,
-                                    },
-                                ].map(o => {
-                                    return (
-                                        <Label 
-                                            key={o.value} 
-                                            className="flex items-center space-x-2 py-2 px-2 rounded-md hover:bg-primary/10 transition-colors"
-                                        >
-                                            <RadioGroupItem
-                                                key={o.value}
-                                                id={o.value}
-                                                value={o.value}
-                                            />
-                                            <span className="flex-1">{o.label}</span>
-                                            <o.Icon className="size-4" />
-                                        </Label>
-                                    )
-                                })}
-                            </RadioGroup>
-                        </PopoverContent>
-                    </Popover>
-                )}
                 onSelect={([key]) => {
                     const fullKey = dataKeys.data.find(k => k.name === key?.value);
                     const children = dataKeys.data
