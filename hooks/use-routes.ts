@@ -20,7 +20,7 @@ export function useRoutes() {
             href: '/data-keys',
             isActive: pathname.substring(0, 10) === '/data-keys',
             id: v4(),
-            hidden: !isSuperUser,
+            hidden: false,
         },
         {
             label: 'Drugs & Fluids Library',
