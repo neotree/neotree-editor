@@ -29,6 +29,7 @@ export function Items({
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isChecklistScreen = screenType === 'checklist';
+    const isProgressScreen = screenType === 'progress';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
@@ -125,7 +126,7 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                headerActions={(isDiagnosisScreen || isChecklistScreen) && (
+                headerActions={(isDiagnosisScreen || isChecklistScreen || isProgressScreen) && (
                     <>
                         {disabled ? null : (
                             <Button 
