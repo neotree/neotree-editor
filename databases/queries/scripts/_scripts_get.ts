@@ -4,7 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, hospitals, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { ScriptField, Preferences, PrintSection,ScreenReviewField } from "@/types";
+import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
 
 export type GetScriptsParams = {
     scriptsIds?: string[];
@@ -18,6 +18,8 @@ export type ScriptType = typeof scripts.$inferSelect & {
     isDeleted: boolean;
     nuidSearchFields: ScriptField[];
     reviewConfigurations: ScreenReviewField[];
+    aliases: Alias[];
+    lastAlias:string;
     preferences: Preferences;
     printSections: PrintSection[];
     hospitalName: string;
@@ -149,6 +151,12 @@ export type GetScriptResults = {
     errors?: string[];
 };
 
+export type GetAliasResults = {
+    data?: null | Alias[];
+    lastAlias?: string;
+    errors?: string[];
+};
+
 export async function _getScript(
     params: {
         scriptId: string,
@@ -220,6 +228,87 @@ export async function _getScript(
         };
     } catch(e: any) {
         logger.error('_getScript ERROR', e.message);
+        return { errors: [e.message], };
+    }
+} 
+
+export async function _getScriptAliases(
+    params: {
+        scriptId: string,
+        returnDraftIfExists?: boolean;
+    },
+): Promise<GetAliasResults> {
+    const { scriptId, returnDraftIfExists, } = { ...params };
+
+    try {
+        if (!scriptId) throw new Error('Missing scriptId');
+
+        const whereScriptId = uuid.validate(scriptId) ? eq(scripts.scriptId, scriptId) : undefined;
+        const whereOldScriptId = !uuid.validate(scriptId) ? eq(scripts.oldScriptId, scriptId) : undefined;
+        const whereScriptDraftId = !whereScriptId ? undefined : eq(scriptsDrafts.scriptDraftId, scriptId);
+
+        let draft = (returnDraftIfExists && whereScriptDraftId) ? await db.query.scriptsDrafts.findFirst({
+            where: whereScriptDraftId,
+        }) : undefined;
+
+        let responseData = !draft ? null : {
+            ...draft.data,
+            isDraft: false,
+            isDeleted: false,
+        } as GetScriptResults['data'];
+
+        if (responseData) {
+            const { aliases, lastAlias } = responseData;
+            return { data: aliases,
+                lastAlias:lastAlias
+             };
+        }
+
+        const publishedRes = await db
+            .select({
+                script: scripts,
+                pendingDeletion,
+                draft: scriptsDrafts,
+                hospitalName: hospitals.name,
+            })
+            .from(scripts)
+            .leftJoin(hospitals, and(
+                eq(hospitals.hospitalId, scripts.hospitalId),
+                isNull(hospitals.deletedAt)
+            ))
+            .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
+            .leftJoin(scriptsDrafts, eq(scripts.scriptId, scriptsDrafts.scriptDraftId))
+            .where(and(
+                isNull(scripts.deletedAt),
+                isNull(pendingDeletion),
+                or(whereScriptId, whereOldScriptId),
+            ));
+
+        const published = !publishedRes[0] ? null : {
+            ...publishedRes[0].script,
+            draft: publishedRes[0].draft || undefined,
+            hospitalName: publishedRes[0].hospitalName || '',
+        };
+
+        draft = returnDraftIfExists ? published?.draft : undefined;
+
+        const data = (draft?.data || published) as GetScriptResults['data'];
+
+        responseData = !data ? null : {
+            ...data,
+            isDraft: false,
+            isDeleted: false,
+            hospitalId: data.hospitalName ? data.hospitalId : null,
+        };
+
+        if (!responseData) return { data: null, };
+        const { aliases, lastAlias } = responseData;
+        return  { 
+            data: aliases , 
+            lastAlias: lastAlias
+        };
+    } catch(e: any) {
+        logger.error('_getAliases ERROR', e.message);
         return { errors: [e.message], };
     }
 } 

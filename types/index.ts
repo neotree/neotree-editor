@@ -80,6 +80,7 @@ export type ScriptField = {
     printable: boolean;
     prePopulate: string[];
     editable: boolean;
+    alias: string;
 };
 
 export type DiagnosisSymptom = {
@@ -137,4 +138,10 @@ export type Script = {
 export type ScreenReviewField = {
     label: string;
     screen:string;
+ }
+
+ export type Alias = {
+    value: string;
+    key: string;
+    script:string;
  }
