@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MoreVertical, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
+import { TrashIcon } from "lucide-react";
+import axios from "axios";
 
+import { ActionsBar } from "@/components/actions-bar";
+import { Loader } from "@/components/loader";
 import * as ddMenu from '@/components/ui/dropdown-menu';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
@@ -20,6 +24,9 @@ import {
 import * as actions from '@/app/actions/data-keys';
 import { useAppContext } from '@/contexts/app';
 import { cn } from "@/lib/utils";
+import { DeleteDataKeysResponse, DeleteDataKeysParams, SaveDataKeysParams } from "@/databases/mutations/data-keys";
+import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataKeyForm } from "./form";
 
 type Props = typeof actions & {
@@ -29,6 +36,10 @@ type Props = typeof actions & {
 
 export function DataKeysTable(props: Props) {
     const router = useRouter();
+
+    const [loading, setLoading] = useState(false);
+    const [selected, setSelected] = useState<number[]>([]);
+
     const searchParams = useSearchParams();
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const sortValue = (searchParamsObj.sort as typeof DEFAULT_DATA_KEYS_SORT) || DEFAULT_DATA_KEYS_SORT;
@@ -51,6 +62,10 @@ export function DataKeysTable(props: Props) {
     }>(null);
 
     useEffect(() => {
+        setSelected([]);
+    }, [data]);
+
+    useEffect(() => {
         setDataKeys(prev => {
             let dataKeys = sortDataKeysFn(props.dataKeys, prev.sortValue);
             dataKeys = filterDataKeysFn(dataKeys, prev.filter);
@@ -62,16 +77,68 @@ export function DataKeysTable(props: Props) {
         });
     }, [props.dataKeys]);
 
+    const { confirm, } = useConfirmModal();
+    const { alert, } = useAlertModal();
+
+    const onDelete = useCallback(async (dataKeys: (DataKey & { children: DataKey[]; })[]) => {
+        try {
+            setLoading(true);
+
+            // TODO: Replace this with server action
+            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({ 
+                dataKeysIds: dataKeys.map(k => k.uuid), 
+                broadcastAction: true, 
+            } satisfies DeleteDataKeysParams));
+
+            const res = response.data;
+
+            if (res.errors?.length) throw new Error(res.errors[0]);
+
+            const children = dataKeys.reduce((acc: DataKey[], k) => [
+                ...acc, 
+                ...k.children.map(child => ({
+                    ...child,
+                    parentKeys: child.parentKeys.filter(parentKey => parentKey != k.name),
+                })),
+            ], []);
+
+            if (children.length) {
+                await axios.post('/api/data-keys/save', { 
+                    data: children, 
+                    broadcastAction: true, 
+                } satisfies SaveDataKeysParams);
+            }
+
+            setSelected([]);
+
+            router.refresh();
+
+            alert({
+                title: 'Success',
+                message: 'Scripts deleted successfully!',
+                variant: 'success',
+            });
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [router.refresh, alert, confirm]);
+
     const disabled = props.disabled || viewOnly;
 
     const tableProps = {
-        selectedIndexes: [],
-        onSelect: () => {},
+        selectedIndexes: selected,
         // title: Data keys,
-        selectable: false,
+        selectable: !disabled,
         sortable: false,
         loading: false,
         maxRows: undefined,
+        onSelect: setSelected,
         onSort: () => {},
         // search: {
         //     inputPlaceholder: 'Search data keys',
@@ -106,6 +173,8 @@ export function DataKeysTable(props: Props) {
 
                     if (!dataKey) return null;
 
+                    const children = props.dataKeys.filter(k => k.parentKeys.includes(dataKey.name));
+
                     return (
                         <div>
                             <ddMenu.DropdownMenu>
@@ -120,6 +189,23 @@ export function DataKeysTable(props: Props) {
                                         >
                                             {disabled ? 'View' : 'Edit'}
                                         </Link>
+                                    </ddMenu.DropdownMenuItem>
+
+                                    <ddMenu.DropdownMenuItem
+                                        className="text-destructive w-full hover:bg-destructive hover:text-destructive-foreground gap-x-2"
+                                        onClick={e => {
+                                            confirm(() => onDelete([{ ...dataKey, children, }]), {
+                                                title: 'Delete data key',
+                                                message: `Are you sure you want to delete data key: <b>${dataKey.name}</b>?`,
+                                                danger: true,
+                                                positiveLabel: 'Yes',
+                                            });
+                                        }}
+                                    >
+                                        <>
+                                            <TrashIcon className="text-destructive size-4" />
+                                            Delete
+                                        </>
                                     </ddMenu.DropdownMenuItem>
                                 </ddMenu.DropdownMenuContent>
                             </ddMenu.DropdownMenu>
@@ -138,6 +224,42 @@ export function DataKeysTable(props: Props) {
 
     return (
         <>
+            {loading && <Loader overlay />}
+
+            {!!selected.length && (
+                <ActionsBar>
+                    <Button
+                        variant="destructive"
+                        className="h-auto w-auto"
+                        onClick={() => {
+                            let keys = data.dataKeys.filter((_, i) => selected.includes(i)).map(k => ({
+                                ...k,
+                                children: [] as typeof k[],
+                            }));
+
+                            if (!keys.length) return;
+
+                            keys = keys.map(k => {
+                                const children = props.dataKeys.filter(k => k.parentKeys.includes(k.name)).filter(child => {
+                                    return !keys.map(k => k.name).includes(child.name);
+                                });
+                                return { ...k, children, };
+                            });
+
+                            confirm(() => onDelete(keys), {
+                                title: 'Delete data key',
+                                message: `Are you sure you want to delete selected key${keys.length > 1 ? 's' : ''} (${keys.length})?`,
+                                danger: true,
+                                positiveLabel: 'Yes',
+                            });
+                        }}
+                    >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        <span>{selected.length > 1 ? `Delete ${selected.length}` : 'Delete'}</span>
+                    </Button>
+                </ActionsBar>
+            )}
+
             <DataKeyForm 
                 {...props}
                 modal
@@ -150,12 +272,12 @@ export function DataKeysTable(props: Props) {
             />
 
             <div>
-                <div className="flex py-6 px-4">
-                    <div className="flex-1">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap py-6 px-4 gap-2">
+                    <div>
                         <h1 className="text-2xl">Data keys</h1>
                     </div>
 
-                    <div className="flex items-center gap-x-2">
+                    <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">
                         <SortDataKeysComponent 
                             value={sortValue}
                             dataKeys={data.dataKeys}

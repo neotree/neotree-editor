@@ -5,7 +5,7 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
-export type DeleteDataKeysData = {
+export type DeleteDataKeysParams = {
     dataKeysIds: string[];
     broadcastAction?: boolean;
 };
@@ -25,7 +25,7 @@ export async function _deleteAllDataKeysDrafts(): Promise<boolean> {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, }: DeleteDataKeysData,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 

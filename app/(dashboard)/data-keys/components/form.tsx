@@ -117,7 +117,13 @@ function Form(props: Props) {
         try {
             setLoading(true);
 
-            const keys = [data, ...children];
+            const keys = [
+                data, 
+                ...children.map(child => ({
+                    ...child,
+                    parentKeys: child.parentKeys.map(pk => pk === dataKey?.name ? data.name : pk),
+                })),
+            ];
 
             const response = await axios.post('/api/data-keys/save', { 
                 data: keys, 

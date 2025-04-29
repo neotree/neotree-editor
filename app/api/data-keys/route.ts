@@ -3,10 +3,11 @@ import queryString from "query-string";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { GetDataKeysParams, GetDataKeysResponse, _getDataKeys } from "@/databases/queries/data-keys";
+import { GetDataKeysParams, GetDataKeysResults, _getDataKeys } from "@/databases/queries/data-keys";
+import { _deleteDataKeys } from "@/databases/mutations/data-keys";
 
 export async function GET(req: NextRequest) {
-	let res: GetDataKeysResponse = { data: [], };
+	let res: GetDataKeysResults = { data: [], };
 	try {
         const isAuthorised = await isAuthenticated();
 
@@ -23,19 +24,19 @@ export async function GET(req: NextRequest) {
 	}
 }
 
-// export async function DELETE(req: NextRequest) {
-// 	try {
-//         const isAuthorised = await isAuthenticated();
+export async function DELETE(req: NextRequest) {
+	try {
+        const isAuthorised = await isAuthenticated();
 
-//         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
+        if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-//         const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof deleteConfigKeys>[0];
+        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
 
-//         const res = await deleteConfigKeys(params);
+        const res = await _deleteDataKeys(params);
 
-// 		return NextResponse.json(res);
-// 	} catch(e: any) {
-// 		logger.error('[GET] /api/config-keys', e.message);
-// 		return NextResponse.json({ errors: ['Internal Error'] });
-// 	}
-// }
+		return NextResponse.json(res);
+	} catch(e: any) {
+		logger.error('[DELETE] /api/data-keys', e.message);
+		return NextResponse.json({ errors: ['Internal Error'] });
+	}
+}
