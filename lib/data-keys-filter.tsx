@@ -26,13 +26,24 @@ export function getDataKeysTypes(dataKeys: DataKey[]) {
 
 export const DEFAULT_DATA_KEYS_FILTER = 'all';
 
+const statuses = [
+    { label: 'Published', value: 'published', },
+    { label: 'Drafts', value: 'drafts', },
+];
+
 export const filterDataKeysFn = (
     dataKeys: DataKey[], 
     filterValue = DEFAULT_DATA_KEYS_FILTER,
 ) => {
     return [...dataKeys]
         .filter(k => {
-            if (filterValue === 'all') return true;
+            if (filterValue === 'all') {
+                return true;
+            } else if (filterValue === statuses[0].value) {
+                return !k.isDraft;
+            } else if (filterValue === statuses[1].value) {
+                return !!k.isDraft;
+            }
             return k.dataType === filterValue;
         });
 };
@@ -65,20 +76,46 @@ export function FilterDataKeysComponent({ dataKeys, onFilter: onFilterProp, }: F
 
                 <select.SelectContent>
                     <select.SelectItem value="all">
-                        All types
+                        All keys
                     </select.SelectItem>
-                    {getDataKeysTypes(dataKeys).map(o => {
-                        return (
-                            <select.SelectItem
-                                key={o.value}
-                                value={o.value}
-                            >
-                                <div className="flex items-center gap-x-2">
-                                    <span>{o.label}</span>
-                                </div>
-                            </select.SelectItem>
-                        )
-                    })}
+
+                    <select.SelectSeparator />
+                
+                    <select.SelectGroup>
+                        <select.SelectLabel>Status</select.SelectLabel>
+
+                        {statuses.map(o => {
+                            return (
+                                <select.SelectItem
+                                    key={o.value}
+                                    value={o.value}
+                                >
+                                    <div className="flex items-center gap-x-2">
+                                        <span>{o.label}</span>
+                                    </div>
+                                </select.SelectItem>
+                            );
+                        })}
+                    </select.SelectGroup>
+
+                    <select.SelectSeparator />
+
+                    <select.SelectGroup>
+                        <select.SelectLabel>Types</select.SelectLabel>
+
+                        {getDataKeysTypes(dataKeys).map(o => {
+                            return (
+                                <select.SelectItem
+                                    key={o.value}
+                                    value={o.value}
+                                >
+                                    <div className="flex items-center gap-x-2">
+                                        <span>{o.label}</span>
+                                    </div>
+                                </select.SelectItem>
+                            );
+                        })}
+                    </select.SelectGroup>
                 </select.SelectContent>
             </select.Select>
         </>
