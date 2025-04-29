@@ -4,11 +4,12 @@ import { v4 } from "uuid";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import * as schema from "@/databases/pg/schema";
+import { _saveDataKeys } from "./_save";
 
 type DataKey = typeof schema.dataKeys.$inferInsert;
 
 export type ExtractDataKeysResponse = {
-    data: DataKey[];
+    data: { extracted: number; };
     errors?: string[];
 };
 
@@ -29,6 +30,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                     label: s.label || '', 
                     dataType: null, 
                     parentKeys: [], 
+                    version: 1,
                 };
                 switch(s.type) {
                     case 'timer':
@@ -60,6 +62,12 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                         label: item.label || '',
                         dataType: null,
                         parentKeys: !s.key ? [] : [s.key],
+                        version: 1,
+                        defaults: { 
+                            dataType: item.subType || undefined, 
+                            severity_order: item.severity_order || undefined, 
+                            score: item.score || undefined, 
+                        },
                     };
 
                     switch(s.type) {
@@ -93,7 +101,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 }
             });
 
-            s.fields.forEach(f => {
+            s.fields.forEach((f, i) => {
                 const dataKey: DataKey = {
                     id: undefined,
                     uuid: v4(),
@@ -101,6 +109,8 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                     label: f.label || '',
                     dataType: f.type,
                     parentKeys: !s.key ? [] : [s.key],
+                    version: 1,
+                    defaults: { dataType: f.dataType || undefined, },
                 };
                 extractedKeys.push(dataKey);
 
@@ -118,6 +128,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                                     label: v[1], 
                                     dataType: 'dropdown_option', 
                                     parentKeys: !f.key ? [] : [f.key],
+                                    version: 1,
                                 });
                             });
                         break;
@@ -135,6 +146,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 label: d.name, 
                 dataType: 'diagnosis', 
                 parentKeys: [],
+                version: 1,
             });
             
             // d.symptoms.forEach(s => {
@@ -150,6 +162,7 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 label: d.drug, 
                 dataType: d.type, 
                 parentKeys: [],
+                version: 1,
             });
         });
 
@@ -197,23 +210,30 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
             });
 
         if (extractedKeys.length) {
-            const res = await db
+            const published = await db
                 .select({ name: schema.dataKeys.name, })
                 .from(schema.dataKeys)
                 .where(inArray(sql`lower(${schema.dataKeys.name})`, extractedKeys.map(key => key.name.toLowerCase())));
 
+            const drafts = await db
+                .select({ name: schema.dataKeysDrafts.name, })
+                .from(schema.dataKeysDrafts)
+                .where(inArray(sql`lower(${schema.dataKeysDrafts.name})`, extractedKeys.map(key => key.name.toLowerCase())));
+
+            const existing = [...published, ...drafts];
+
             extractedKeys = extractedKeys.filter(key => {
-                return !res.map(k => k.name.toLowerCase()).includes(key.name.toLowerCase());
+                return !existing.map(k => k.name.toLowerCase()).includes(key.name.toLowerCase());
             });
 
-            if (extractedKeys.length) await db.insert(schema.dataKeys).values(extractedKeys);
+            if (extractedKeys.length) await _saveDataKeys({ data: extractedKeys, });
         }
 
-        return { data: extractedKeys, };
+        return { data: { extracted: extractedKeys.length, }, };
     } catch(e: any) {
         logger.log('db_extract_data_keys', e.message);
         return {
-            data: [],
+            data: { extracted: 0, },
             errors: [e.message],
         };
     }

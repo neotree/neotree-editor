@@ -21,17 +21,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { SelectModal } from '@/components/select-modal';
-import { _createDataKeys, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { useAppContext } from '@/contexts/app';
 
-type tDataKey = Omit<DataKey, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'> & {
-    id: undefined | number;
-};
+type FormDataWithoutChildren = Partial<DataKey> & 
+    Pick<DataKey, 'uuid' | 'name' | 'label' | 'dataType' |'parentKeys' | 'defaults'>;
 
-type FormData = tDataKey & {
-    children: tDataKey[];
+type FormData = FormDataWithoutChildren & {
+    children: FormDataWithoutChildren[];
 };
 
 type Props = typeof actions & {
@@ -87,7 +86,7 @@ function Form(props: Props) {
 
     const dataKey = dataKeyProp || item?.dataKey;
 
-    const form = useForm({
+    const form = useForm<FormData>({
         defaultValues: {
             id: dataKey?.id || undefined,
             uuid: dataKey?.uuid || v4(),
@@ -97,7 +96,7 @@ function Form(props: Props) {
             parentKeys: dataKey?.parentKeys || [],
             defaults: dataKey?.defaults || {},
             children: dataKey?.children || [],
-        } satisfies FormData,
+        },
     });
 
     const {
@@ -118,13 +117,16 @@ function Form(props: Props) {
         try {
             setLoading(true);
 
-            const keys = [data, ...children];
+            const keys = [
+                data, 
+                ...children.map(child => ({
+                    ...child,
+                    parentKeys: child.parentKeys.map(pk => pk === dataKey?.name ? data.name : pk),
+                })),
+            ];
 
             const response = await axios.post('/api/data-keys/save', { 
-                data: {
-                    inserts: keys.filter(k => !k.id),
-                    updates: keys.filter(k => !!k.id),
-                }, 
+                data: keys, 
                 broadcastAction: true, 
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
@@ -358,7 +360,7 @@ function FormFields({
     },
 }: Props & {
     childIndex?: number;
-    form: UseFormReturn<NonNullable<Props['item']>['dataKey']>;
+    form: UseFormReturn<FormData>;
     disabled: boolean;
 }) {
     const types = useMemo(() => getDataKeysTypes(dataKeys).map(k => k.value), [dataKeys]);

@@ -1,67 +1,89 @@
-import {} from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
+import * as uuid from 'uuid';
 
-import socket from '@/lib/socket';
 import logger from '@/lib/logger';
-import { CreateDataKeysParams, _createDataKeys } from './_create';
-import { UpdateDataKeysParams, _updateDataKeys } from './_update';
+import db from '@/databases/pg/drizzle';
+import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
+import socket from '@/lib/socket';
+
+export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
 export type SaveDataKeysParams = {
-    data: {
-        inserts: CreateDataKeysParams['data'];
-        updates: UpdateDataKeysParams['data'];
-    };
-    throwErrors?: boolean;
-    broadcastAction?: boolean;
+    data: SaveDataKeysData[],
+    broadcastAction?: boolean,
 };
 
-export type SaveDataKeysResponse = {
-    errors?: string[];
-    data: {
-        success: boolean;
-    };
+export type SaveDataKeysResponse = { 
+    success: boolean; 
+    errors?: string[]; 
 };
 
-export async function _saveDataKeys({
-    data,
-    throwErrors,
-    broadcastAction,
-}: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+export async function _saveDataKeys({ data, broadcastAction, }: SaveDataKeysParams) {
+    const response: SaveDataKeysResponse = { success: false, };
+
     try {
-        let errors: string[] = [];
-        let success = true;
-                
-        if (data.inserts.length) {
-            const createRes = await _createDataKeys({
-                data: data.inserts,
-            });
-            errors = [...errors, ...(createRes?.errors || [])];
-            success = createRes.data.success;
+        const errors = [];
+
+        let index = 0;
+        for (const { uuid: itemDataKeyUuid, ...item } of data) {
+            try {
+                index++;
+
+                const dataKeyUuid = itemDataKeyUuid || uuid.v4();
+
+                if (!errors.length) {
+                    const draft = !itemDataKeyUuid ? null : await db.query.dataKeysDrafts.findFirst({
+                        where: eq(dataKeysDrafts.uuid, dataKeyUuid),
+                    });
+
+                    const published = (draft || !itemDataKeyUuid) ? null : await db.query.dataKeys.findFirst({
+                        where: eq(dataKeys.uuid, dataKeyUuid),
+                    });
+
+                    if (draft) {
+                        const data = {
+                            ...draft.data,
+                            ...item,
+                        };
+                        
+                        await db
+                            .update(dataKeysDrafts)
+                            .set({
+                                data,
+                                name: data.name,
+                            }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+                    } else {
+                        const data = {
+                            ...published,
+                            ...item,
+                            uuid: dataKeyUuid,
+                            version: published?.version ? (published.version + 1) : 1,
+                        } as typeof dataKeys.$inferInsert;
+
+                        await db.insert(dataKeysDrafts).values({
+                            data,
+                            uuid: dataKeyUuid,
+                            dataKeyId: published?.uuid,
+                            name: data.name,
+                        });
+                    }
+                }
+            } catch(e: any) {
+                errors.push(e.message);
+            }
         }
 
-        if (data.updates.length) {
-            const updateRes = await _updateDataKeys({
-                data: data.updates,
-            });
-            errors = [...errors, ...(updateRes?.errors || [])];
-            success = updateRes.data.success;
+        if (errors.length) {
+            response.errors = errors;
+        } else {
+            response.success = true;
         }
-
-        if (broadcastAction) socket.emit('data_changed', 'save_data_keys');
-
-        return {
-            data: { success, },
-            errors: errors.length ? errors : undefined,
-        };
     } catch(e: any) {
+        response.success = false;
+        response.errors = [e.message];
         logger.error('_saveDataKeys ERROR', e.message);
-
-        if (throwErrors) throw e;
-
-        return {
-            errors: [e.message],
-            data: {
-                success: false,
-            },
-        };
+    } finally {
+        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_data_keys');
+        return response;
     }
 }
