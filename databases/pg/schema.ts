@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ScriptField } from "@/types";
 import { defaultPreferences } from "@/constants";
 import { DiagnosisSymptom, DrugField, FeedField, FluidField, Preferences, ScriptImage, ScriptItem } from "../types";
+import { dataKeys, dataKeysDrafts } from "./_data-keys";
 
 export * from './_data-keys';
 
@@ -876,6 +877,8 @@ export const pendingDeletion = pgTable(
         diagnosisDraftId: uuid('diagnosis_draft_id').references(() => diagnosesDrafts.diagnosisDraftId, { onDelete: 'cascade', }),
         configKeyDraftId: uuid('config_key_draft_id').references(() => configKeysDrafts.configKeyDraftId, { onDelete: 'cascade', }),
         drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
+        dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
+        dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
@@ -929,5 +932,13 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     drugsLibraryItemDraft: one(drugsLibraryDrafts, {
         fields: [pendingDeletion.drugsLibraryItemDraftId],
         references: [drugsLibraryDrafts.itemDraftId],
+    }),
+    dataKey: one(dataKeys, {
+        fields: [pendingDeletion.dataKeyId],
+        references: [dataKeys.uuid],
+    }),
+    dataKeyDraft: one(dataKeysDrafts, {
+        fields: [pendingDeletion.dataKeyDraftId],
+        references: [dataKeysDrafts.uuid],
     }),
 }));
