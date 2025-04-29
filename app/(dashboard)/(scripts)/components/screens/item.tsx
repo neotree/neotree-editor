@@ -4,7 +4,6 @@ import { Controller, useForm } from "react-hook-form";
 
 import { ScriptItem as ItemType } from "@/types";
 import * as dialog from "@/components/ui/dialog";
-import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -201,6 +200,7 @@ function Form({
         const _type = isChecklistScreen ? 'checklist_option' : type;
         return (
             <SelectModal
+                modal
                 selected={key}
                 disabled={isKeyDisabled}
                 error={isKeyDisabled ? undefined : !disabled && (!key || keyHasError)}

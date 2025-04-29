@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
-import { v4 } from "uuid";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import {
@@ -25,7 +24,6 @@ import { Switch } from "@/components/ui/switch";
 import { DateTimePicker } from "@/components/datetime-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { cn } from "@/lib/utils";
 import { isEmpty } from "@/lib/isEmpty";
 import { useScriptsContext } from "@/contexts/scripts";
@@ -228,6 +226,7 @@ export function Field<P = {}>({
                                         error={!disabled && !key}
                                     /> */}
                                     <SelectModal 
+                                        modal
                                         selected={key}
                                         error={!disabled && !key}
                                         placeholder="Select key"
