@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ type Option = {
 };
 
 type Props = {
+    modal?: boolean;
     placeholder?: string;
     selected?: string | number | (string | number)[];
     options: Option[];
@@ -40,6 +42,76 @@ type Props = {
 };
 
 export function SelectModal({ 
+    options: optionsProp, 
+    selected: selectedProp, 
+    ...props 
+}: Props) {
+    selectedProp = Array.isArray(selectedProp) ? selectedProp : !selectedProp ? [] : [selectedProp];
+
+    const options = optionsProp.map(o => ({ ...o, value: `${o.value}`, }));
+    const selected = selectedProp.map(o => `${o}`);
+
+    let selectedValueExists = true;
+
+    if (!props.multiple) {
+        const [value] = Array.isArray(selected) ? selected : [selected];
+        if (value) selectedValueExists = !!options.find(o => o.value === value);
+    }
+
+    if (selectedValueExists) {
+        return (
+            <>
+                <Modal 
+                    {...props}
+                    options={options}
+                    selected={selected}
+                />
+            </>
+        );
+    }
+
+    return (
+        <div className="relative flex gap-x-2 items-center">
+            <Popover modal={props.modal}>
+                <PopoverTrigger>
+                    <AlertCircle className="size-4 text-destructive" />
+                </PopoverTrigger>
+                <PopoverContent className="p-0 bg-background">
+                    <div className="p-4 bg-destructive/20 text-destructive">
+                        <b>{selected[0]}</b> is not defined in the datakeys library. Click <b>`change`</b> to select from the library
+                    </div>
+                </PopoverContent>
+            </Popover>
+            
+            <Input 
+                disabled
+                value={selected[0]}
+                onChange={() => {}}
+                className="w-full disabled:opacity-70 pr-1w-16"
+            />
+
+            <Modal 
+                {...props}
+                options={options}
+                selected={selected}
+                trigger={(
+                    <div
+                        role={props.disabled ? undefined : 'button'}
+                        className={cn(
+                            'w-16 absolute top-0 right-0 h-full text-xs flex items-center justify-center px-2',
+                            props.disabled ? 'opacity-70' : 'text-primary',
+                        )}
+                    >
+                        Change
+                    </div>
+                )}
+            />
+        </div>
+    );
+}
+
+function Modal({ 
+    modal,
     header,
     placeholder,
     search,
@@ -48,8 +120,15 @@ export function SelectModal({
     disabled = false,
     selected: selectedProp,
     options: optionsProp = [],
+    trigger,
     onSelect,
-}: Props) {
+}: Omit<Props, 'selected' | 'options'> & {
+    selected: string[];
+    options: (Omit<Option, 'value'> & {
+        value: string;
+    })[];
+    trigger?: React.ReactNode;
+}) {
     const [searchValue, setSearchValue] = useState('');
     const deferredSearchValue = useDeferredValue(searchValue);
 
@@ -91,22 +170,25 @@ export function SelectModal({
     return (
         <>
             <Dialog
+                modal={modal}
                 onOpenChange={() => {
                     setSearchValue('');
                 }}
             >
                 <DialogTrigger asChild>
-                    <Button
-                        disabled={disabled}
-                        variant="outline"
-                        className={cn(
-                            'justify-between w-full',
-                            error && 'border border-destructive hover:bg-destructive/10',
-                        )}
-                    >
-                        <span className={!selected.length ? 'opacity-50' : ''}>{selected[0]?.label  || placeholder || ''}</span>
-                        <ChevronsUpDown className="size-4 opacity-50" />
-                    </Button>
+                    {trigger || (
+                        <Button
+                            disabled={disabled}
+                            variant="outline"
+                            className={cn(
+                                'justify-between w-full',
+                                error && 'border border-destructive hover:bg-destructive/10',
+                            )}
+                        >
+                            <span className={!selected.length ? 'opacity-50' : ''}>{selected[0]?.label  || placeholder || ''}</span>
+                            <ChevronsUpDown className="size-4 opacity-50" />
+                        </Button>
+                    )}
                 </DialogTrigger>
 
                 <DialogContent
