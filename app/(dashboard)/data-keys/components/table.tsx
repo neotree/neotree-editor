@@ -73,7 +73,6 @@ export function DataKeysTable(props: Props) {
         loading: false,
         maxRows: undefined,
         onSort: () => {},
-        getRowOptions: () => ({}),
         // search: {
         //     inputPlaceholder: 'Search data keys',
         // },
@@ -82,6 +81,12 @@ export function DataKeysTable(props: Props) {
                 <div>No data keys saved.</div>
             </div>
         ),
+        getRowOptions({ rowIndex }) {
+            const s = data.dataKeys[rowIndex];
+            return !s ? {} : {
+                className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+            };
+        },
         columns: [
             {
                 name: 'Key',

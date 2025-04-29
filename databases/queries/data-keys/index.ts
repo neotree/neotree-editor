@@ -1,1 +1,2 @@
-export * from './_get-many';
+export * from './_get';
+export * from './_count';

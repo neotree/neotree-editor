@@ -1,4 +1,3 @@
-import '@/server/env';
 import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
@@ -6,14 +5,6 @@ import db from "@/databases/pg/drizzle";
 import { dataKeys, dataKeysDrafts, dataKeysHistory, pendingDeletion } from "@/databases/pg/schema";
 import { _saveDataKeysHistory } from "./_history";
 import { v4 } from "uuid";
-
-(async () => {
-    try {
-        await _publishDataKeys();
-    } finally {
-        process.exit();
-    }
-})();
 
 export async function _publishDataKeys(opts?: {
     broadcastAction?: boolean;

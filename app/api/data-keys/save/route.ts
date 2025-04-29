@@ -11,16 +11,9 @@ export async function POST(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
             
         const body = await req.json();
-
-        const inserts = body?.data?.inserts || [];
-        const updates = body?.data?.updates || [];
         
         const res = await saveDataKeys({
             ...body,
-            data: {
-                inserts,
-                updates,
-            },
         });
 
         return NextResponse.json(res);
