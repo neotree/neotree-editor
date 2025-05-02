@@ -814,8 +814,24 @@ export function ScreenForm({
                                     </div>
                                 );
                             })}
+                            {
+                                prePopulate?.length > 0 &&(
+                                    <div className="max-w-64">
+                                        <Label secondary htmlFor="alias">ALIAS</Label>
+                                        <Input
+                                            {...register('alias', { disabled: true, })}
+                                            name="alias"
+                                            placeholder=""
+                                            noRing={false}
+                                        />
+                                    </div>
+                                )
+
+                            }
                         </div>
+
                     </>
+
                 )}
 
                 {canConfigurePrint && (
@@ -910,37 +926,37 @@ export function ScreenForm({
 
                                 />
                             </div>
-                                <div className="flex flex-col gap-y-5">
-                                    <Label secondary htmlFor="collectionLabel">Collection Label</Label>
-                                    <Select
-                                        value={collectionLabel || ''}
-                                        required={repeatable}
-                                        name="collectionLabel"
-                                        disabled={disabled}
-                                        onValueChange={value => {
-                                            value = value === 'none' ? '': value;
-                                            setValue('collectionLabel', value || '', { shouldDirty: true, });
-                                        }}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Collection Label" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
+                            <div className="flex flex-col gap-y-5">
+                                <Label secondary htmlFor="collectionLabel">Collection Label</Label>
+                                <Select
+                                    value={collectionLabel || ''}
+                                    required={repeatable}
+                                    name="collectionLabel"
+                                    disabled={disabled}
+                                    onValueChange={value => {
+                                        value = value === 'none' ? '' : value;
+                                        setValue('collectionLabel', value || '', { shouldDirty: true, });
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Collection Label" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
 
-                                                <SelectItem value="none">No Collection Label</SelectItem>
-                                                {form?.getValues()?.fields?.map(f => (
-                                                    <SelectItem key={f.key} value={f.key}>
-                                                        {f.key}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
+                                            <SelectItem value="none">No Collection Label</SelectItem>
+                                            {form?.getValues()?.fields?.map(f => (
+                                                <SelectItem key={f.key} value={f.key}>
+                                                    {f.key}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
 
 
-                                </div>
-                                <Separator className="my-8" />
+                            </div>
+                            <Separator className="my-8" />
                         </div>
                     )}
                 </>

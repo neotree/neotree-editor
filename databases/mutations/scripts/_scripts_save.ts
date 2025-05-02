@@ -16,9 +16,10 @@ export type SaveScriptsResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScripts({ data, broadcastAction, }: {
+export async function _saveScripts({ data, broadcastAction,syncSilently }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean,
+    syncSilently?:boolean
 }) {
     const response: SaveScriptsResponse = { success: false, };
     const errors = [];
@@ -113,7 +114,9 @@ export async function _saveScripts({ data, broadcastAction, }: {
         response.info = info;
         logger.error('_saveScripts ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_scripts');
+        if (!response?.errors?.length && broadcastAction && !syncSilently) {
+            console.log("..SCRIPT SAVE ...TRIGGERED")
+            socket.emit('data_changed', 'save_scripts');}
         return response;
     }
 }

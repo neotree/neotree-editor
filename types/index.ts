@@ -143,5 +143,4 @@ export type ScreenReviewField = {
  export type Alias = {
     value: string;
     key: string;
-    script:string;
  }

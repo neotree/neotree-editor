@@ -28,33 +28,10 @@ export const countScreens: typeof queries._countScreens = async (...args) => {
 };
 
 export const getScreens: typeof queries._getScreens = async (...args) => {
-    try {     
+    try {
         await isAllowed();
-        const scriptId = args[0]?.scriptsIds?.[0]||'';
-        const returnDraftIfExists = args[0]?.returnDraftsIfExist;
-        const aliases = await queries._getScriptAliases({scriptId,returnDraftIfExists})
-
-        console.log("....ALIASES.....",JSON.stringify(aliases))
-
-        const allScreens = await queries._getScreens(...args)
-        const excluded = ['management'
-            , 'mwi_edliz_summary_table'
-            , 'progress'
-            , 'zw_edliz_summary_table'
-            , 'diagnosis'
-            , 'drugs',
-            'fluids',
-            'feeds',
-        ];
-        
-    //   const filtered=   allScreens?.data.filter(d => !excluded.includes(d.type)).map(d => {
-           
-    //     })
-
-        const filtered=   allScreens?.data.filter(d => !excluded.includes(d.type))
-        
-        return allScreens
-    } catch (e: any) {
+        return await queries._getScreens(...args);
+    } catch(e: any) {
         logger.error('getScreens ERROR', e.message);
         return { errors: [e.message], data: [], };
     }
@@ -88,6 +65,7 @@ export const deleteScreens: typeof mutations._deleteScreens = async (...args) =>
 export const saveScreens: typeof mutations._saveScreens = async (...args) => {
     try {
         await isAllowed();
+        console.log("%%%....RRRR..",...args)
         return await mutations._saveScreens(...args);
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
@@ -764,40 +742,8 @@ export async function copyDiagnoses(params?: {
         return { errors: [e.message], success: false, copied, };
     }
 }
-function getNextAlias(prev: string | null): string {
-    if (!prev || prev==='') return 'A';
+
   
-    const match = prev.match(/^([A-Z]+)(\d*)$/);
-    if (!match) throw new Error('Invalid alias format');
-  
-    const [_, letters, numStr] = match;
-    const num = numStr ? parseInt(numStr, 10) : 0;
-  
-    // Convert letters to a number (base 26)
-    const toNumber = (s: string) => {
-      return s.split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 65), 0);
-    };
-  
-    // Convert a number to base 26 letters
-    const toLetters = (n: number): string => {
-      let str = '';
-      do {
-        str = String.fromCharCode((n % 26) + 65) + str;
-        n = Math.floor(n / 26) - 1;
-      } while (n >= 0);
-      return str;
-    };
-  
-    let nextLettersNum = toNumber(letters) + 1;
-    let nextLetters = toLetters(nextLettersNum);
-  
-    // Wrap from Z to A1, Z1 to A2, etc.
-    if (nextLetters.length > letters.length) {
-      nextLetters = 'A';
-      return nextLetters + (num + 1);
-    }
-  
-    return nextLetters + (numStr || '');
-  }
-  
+
+
   
