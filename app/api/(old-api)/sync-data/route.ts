@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _getScripts, _getScreens, _getDiagnoses, } from "@/databases/queries/scripts";
+import { _getScripts, _getScreens, _getDiagnoses,_getAliases } from "@/databases/queries/scripts";
 import { _getConfigKeys, } from "@/databases/queries/config-keys";
 import { _getHospitals, } from "@/databases/queries/hospitals";
 import { mapNewConfigKeysToOld, mapNewDiagnosisToOld, mapNewScreenToOld, mapNewScriptToOld } from '@/lib/map-old-and-new';
@@ -33,11 +33,13 @@ export async function GET(req: NextRequest) {
             getScripts,
             getConfigKeys,
             getDrugsLibrary,
+            aliases
         ] = await Promise.all([
             _getHospitals(),
             _getScripts({ withDeleted, returnDraftsIfExist, hospitalIds: hospitalId ? [hospitalId] : undefined, }),
             _getConfigKeys({ withDeleted, returnDraftsIfExist, }),
             _getDrugsLibraryItems({ withDeleted, returnDraftsIfExist, }),
+            _getAliases()
         ]);
 
         const [
@@ -185,6 +187,7 @@ export async function GET(req: NextRequest) {
             diagnoses,
             screens,
             scripts,
+            aliases
         });
 	} catch(e: any) {
 		logger.error('[GET] /api/sync', e.message);

@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ScreenReviewField, ScriptField,Alias } from "@/types";
 import { defaultPreferences } from "@/constants";
+import { alias } from "drizzle-orm/mysql-core";
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {
@@ -570,6 +571,7 @@ export const screens = pgTable(
         collectionName: text('collection_name').notNull().default(''),
         collectionLabel: text('collection_label').notNull().default(''),
         repeatable: boolean('repeatable'),
+        alias:text('alias').notNull().default(''),
     },
     table => ({
         searchIndex: index('screens_search_index')
