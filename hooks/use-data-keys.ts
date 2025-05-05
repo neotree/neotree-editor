@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext, IAppContext } from "@/contexts/app";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 
-type DataKey = Awaited<ReturnType<IAppContext['fetchDataKeys']>>['data'][0];
+type DataKey = Awaited<ReturnType<IAppContext['getDataKeys']>>['data'][0];
 
-type Params = NonNullable<Parameters<IAppContext['fetchDataKeys']>[0]> & {
+type Params = NonNullable<Parameters<IAppContext['getDataKeys']>[0]> & {
     pause?: boolean;
 };
 
@@ -14,7 +14,7 @@ export function useDataKeys(params?: Params) {
 
     const _params = useMemo(() => ({ ...params, }), [params]);
 
-    const { fetchDataKeys } = useAppContext();
+    const { getDataKeys: _getDataKeys } = useAppContext();
 
     const { alert } = useAlertModal();
 
@@ -25,7 +25,7 @@ export function useDataKeys(params?: Params) {
         const { ...fetchParams } = _params;
         try {
             setLoading(true);
-            const { data, errors } = await fetchDataKeys(fetchParams);
+            const { data, errors } = await _getDataKeys(fetchParams);
             if (errors?.length) {
                 alert({
                     variant: 'error',
@@ -45,7 +45,7 @@ export function useDataKeys(params?: Params) {
             ref.current = _params;
             setLoading(false);
         }
-    }, [_params, fetchDataKeys, alert]);
+    }, [_params, _getDataKeys, alert]);
 
     useEffect(() => {
         if (
@@ -53,9 +53,9 @@ export function useDataKeys(params?: Params) {
             !_params.pause && 
             (JSON.stringify(ref.current) !== JSON.stringify(_params))
         ) {
-            getDataKeys();
+            _getDataKeys();
         }
-    }, [_params, loading, getDataKeys]);
+    }, [_params, loading, _getDataKeys]);
 
     return {
         dataKeys,
