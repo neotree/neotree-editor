@@ -13,6 +13,48 @@ export async function _publishDataKeys(opts?: {
     const errors: string[] = [];
 
     try {
+        let deleted = await db.query.pendingDeletion.findMany({
+            where: isNotNull(pendingDeletion.dataKeyId),
+            columns: { dataKeyId: true, },
+            with: {
+                dataKey: {
+                    columns: {
+                        version: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        deleted = deleted.filter(c => c.dataKey);
+
+        if (deleted.length) {
+            const deletedAt = new Date();
+
+            await db.update(dataKeys)
+                .set({ 
+                    deletedAt,
+                    name: sql`CONCAT(${dataKeys.name}, '_', ${dataKeys.uuid})`, // make the unique name available for use
+                })
+                .where(inArray(dataKeys.uuid, deleted.map(c => c.dataKeyId!)));
+
+            await db.insert(dataKeysHistory).values(deleted.map(c => ({
+                version: c.dataKey!.version,
+                dataKeyId: c.dataKeyId!,
+                changes: {
+                    action: 'delete_data_key',
+                    description: 'Delete data key',
+                    oldValues: [{ deletedAt: null, name: c.dataKey!.name, }],
+                    newValues: [{ deletedAt, name: `${c.dataKey!.name}_${c.dataKeyId}`,  }],
+                },
+            })));
+        }
+
+        await db.delete(pendingDeletion).where(or(
+            isNotNull(pendingDeletion.dataKeyId),
+            isNotNull(pendingDeletion.dataKeyDraftId),
+        ));
+
         let updates: (typeof dataKeysDrafts.$inferSelect)[] = [];
         let inserts: (typeof dataKeysDrafts.$inferSelect)[] = [];
 
@@ -75,44 +117,6 @@ export async function _publishDataKeys(opts?: {
         }
 
         await db.delete(dataKeysDrafts);
-
-        let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.dataKeyId),
-            columns: { dataKeyId: true, },
-            with: {
-                dataKey: {
-                    columns: {
-                        version: true,
-                    },
-                },
-            },
-        });
-
-        deleted = deleted.filter(c => c.dataKey);
-
-        if (deleted.length) {
-            const deletedAt = new Date();
-
-            await db.update(dataKeys)
-                .set({ deletedAt, })
-                .where(inArray(dataKeys.uuid, deleted.map(c => c.dataKeyId!)));
-
-            await db.insert(dataKeysHistory).values(deleted.map(c => ({
-                version: c.dataKey!.version,
-                dataKeyId: c.dataKeyId!,
-                changes: {
-                    action: 'delete_data_key',
-                    description: 'Delete data key',
-                    oldValues: [{ deletedAt: null, }],
-                    newValues: [{ deletedAt, }],
-                },
-            })));
-        }
-
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.dataKeyId),
-            isNotNull(pendingDeletion.dataKeyDraftId),
-        ));
 
         const published = [
             // ...inserts.map(c => c.dataKeyId! || c.dataKeyDraftId),

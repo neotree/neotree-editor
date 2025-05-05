@@ -13,6 +13,50 @@ export async function _publishDrugsLibraryItems(opts?: {
     const errors: string[] = [];
 
     try {
+        let deleted = await db.query.pendingDeletion.findMany({
+            where: isNotNull(pendingDeletion.drugsLibraryItemId),
+            columns: { drugsLibraryItemId: true, },
+            with: {
+                drugsLibraryItem: {
+                    columns: {
+                        version: true,
+                        key: true,
+                    },
+                },
+            },
+        });
+
+        deleted = deleted.filter(c => c.drugsLibraryItem);
+
+        if (deleted.length) {
+            const deletedAt = new Date();
+
+            await db.update(drugsLibrary)
+                .set({ 
+                    deletedAt,
+                    key: sql`CONCAT(${drugsLibrary.key}, '_', ${drugsLibrary.itemId})`, // make the unique key available for use
+                })
+                .where(inArray(drugsLibrary.itemId, deleted.map(c => c.drugsLibraryItemId!)));
+
+            await db.insert(drugsLibraryHistory).values(deleted.map(c => {
+                return {
+                    version: c.drugsLibraryItem!.version,
+                    itemId: c.drugsLibraryItemId!,
+                    changes: {
+                        action: 'delete_drugs_library_item',
+                        description: 'Delete drugs library item',
+                        oldValues: [{ deletedAt: null, key: c.drugsLibraryItem!.key, }],
+                        newValues: [{ deletedAt, key: `${c.drugsLibraryItem!.key}_${c.drugsLibraryItemId}`, }],
+                    },
+                };
+            }));
+        }
+
+        await db.delete(pendingDeletion).where(or(
+            isNotNull(pendingDeletion.drugsLibraryItemId),
+            isNotNull(pendingDeletion.drugsLibraryItemDraftId),
+        ));
+
         let updates: (typeof drugsLibraryDrafts.$inferSelect)[] = [];
         let inserts: (typeof drugsLibraryDrafts.$inferSelect)[] = [];
 
@@ -75,54 +119,6 @@ export async function _publishDrugsLibraryItems(opts?: {
         }
 
         await db.delete(drugsLibraryDrafts);
-
-        let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.drugsLibraryItemId),
-            columns: { drugsLibraryItemId: true, },
-            with: {
-                drugsLibraryItem: {
-                    columns: {
-                        version: true,
-                    },
-                },
-            },
-        });
-
-        deleted = deleted.filter(c => c.drugsLibraryItem);
-
-        if (deleted.length) {
-            const deletedAt = new Date();
-
-            const deletedArr = await db.update(drugsLibrary)
-                .set({ 
-                    deletedAt,
-                    key: sql`CONCAT(${drugsLibrary.key}, '-', date_part('epoch', now()))`, // make the unique key available for use
-                })
-                .where(inArray(drugsLibrary.itemId, deleted.map(c => c.drugsLibraryItemId!)))
-                .returning();
-
-            await db.insert(drugsLibraryHistory).values(deletedArr.map(c => {
-                const oldKeyArr = c.key.split('-');
-                if (oldKeyArr.length > 2) oldKeyArr.pop();
-                const oldKey = oldKeyArr.join('-');
-
-                return {
-                    version: c.version,
-                    itemId: c.itemId!,
-                    changes: {
-                        action: 'delete_drugs_library_item',
-                        description: 'Delete drugs library item',
-                        oldValues: [{ deletedAt: null, key: oldKey, }],
-                        newValues: [{ deletedAt, key: c.key, }],
-                    },
-                };
-            }));
-        }
-
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.drugsLibraryItemId),
-            isNotNull(pendingDeletion.drugsLibraryItemDraftId),
-        ));
 
         const published = [
             // ...inserts.map(c => c.itemId! || c.drugsLibraryItemDraftId),

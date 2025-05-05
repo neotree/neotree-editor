@@ -19,7 +19,7 @@ export async function _saveDrugsLibraryItemsHistory({ previous, drafts, }: {
             if (c?.data?.version === 1) {
                 changeHistoryData.changes = {
                     action: 'create_drugs_library_item',
-                    dedrugsLibraryItemion: 'Create drugs library item',
+                    description: 'Create drugs library item',
                     oldValues: [],
                     newValues: [],
                 };
