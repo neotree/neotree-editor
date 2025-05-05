@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewDataKeyPage() { 
     const [res, { isSuperUser }] = await Promise.all([
-        actions.fetchDataKeys(),
+        actions.getDataKeys(),
         getAuthenticatedUserWithRoles(),
     ]);
 

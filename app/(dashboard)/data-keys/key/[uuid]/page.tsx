@@ -18,7 +18,7 @@ export default async function EditDataKeyPage({ params }: Props) {
     const { uuid } = await params;
 
     const [res, { isSuperUser }] = await Promise.all([
-        actions.fetchDataKeys(),
+        actions.getDataKeys(),
         getAuthenticatedUserWithRoles(),
     ]);
 
