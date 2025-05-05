@@ -19,7 +19,7 @@ export async function _saveConfigKeysHistory({ previous, drafts, }: {
             if (c?.data?.version === 1) {
                 changeHistoryData.changes = {
                     action: 'create_config_key',
-                    deconfigKeyion: 'Create config key',
+                    description: 'Create config key',
                     oldValues: [],
                     newValues: [],
                 };

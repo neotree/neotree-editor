@@ -19,7 +19,7 @@ export async function _saveDataKeysHistory({ previous, drafts, }: {
             if (c?.data?.version === 1) {
                 changeHistoryData.changes = {
                     action: 'create_data_key',
-                    dedataKeyion: 'Create data key',
+                    description: 'Create data key',
                     oldValues: [],
                     newValues: [],
                 };
