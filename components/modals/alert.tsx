@@ -59,7 +59,9 @@ export function AlertModal() {
                                 </div>
                             )}
                             
-                            <div className="flex-1 text-lg">{message}</div>
+                            <div className="flex-1 text-lg">
+                                <div dangerouslySetInnerHTML={{ __html: message, }} />
+                            </div>
                         </div>
                     )}
                 </AlertDialogHeader>

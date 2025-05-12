@@ -19,6 +19,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(res);
     } catch(e: any) {
         logger.log('/api/data-keys/save', e);
-        return NextResponse.json({ errors: [e.message], });
+        return NextResponse.json({ success: false, errors: [e.message], });
     }
 }
