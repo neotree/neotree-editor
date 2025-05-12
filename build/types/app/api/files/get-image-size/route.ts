@@ -1,4 +1,4 @@
-// File: /home/morris/Documents/NEOTREE/REPOS/neotree-editor/app/api/files/get-image-size/route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor-master/app/api/files/get-image-size/route.ts
 import * as entry from '../../../../../../app/api/files/get-image-size/route.js'
 import type { NextRequest } from 'next/server.js'
 
