@@ -15,8 +15,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
-import { ScreenReviewField, ScriptField } from "@/types";
+import { ScreenReviewField, ScriptField,Alias } from "@/types";
 import { defaultPreferences } from "@/constants";
+import { alias } from "drizzle-orm/mysql-core";
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {
@@ -411,6 +412,8 @@ export const scripts = pgTable(
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
         reviewable: boolean('reviewable').notNull().default(false),
         reviewConfigurations: jsonb('review_configurations').default('[]').notNull(),
+        aliases: jsonb('aliases').default('[]').notNull(),
+        lastAlias:text('last_alias').default(''),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         printSections: jsonb('print_sections').default('[]').notNull(),
         publishDate: timestamp('publish_date').defaultNow().notNull(),
@@ -456,7 +459,7 @@ export const scriptsDrafts = pgTable(
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert
          & { nuidSearchFields: ScriptField[]; } 
-         &{ reviewConfigurations: ScreenReviewField[]; } >().notNull(),
+         &{ reviewConfigurations: ScreenReviewField[]; } &{aliases: Alias[];}>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -568,6 +571,7 @@ export const screens = pgTable(
         collectionName: text('collection_name').notNull().default(''),
         collectionLabel: text('collection_label').notNull().default(''),
         repeatable: boolean('repeatable'),
+        alias:text('alias').notNull().default(''),
     },
     table => ({
         searchIndex: index('screens_search_index')
