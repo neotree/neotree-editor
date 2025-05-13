@@ -85,6 +85,40 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
     } 
 }
 
+export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastAction, }: {
+    data: SaveDrugsLibraryItemsData[],
+    broadcastAction?: boolean,
+}) {
+    try {
+        const keys = data.map(item => item.key!).filter(key => key);
+        
+        if (keys.length) {
+            const existing = await _getDrugsLibraryItems({ keys });
+
+            data = data.map(item => {
+                const found = existing.data.find(k => `${k.key}`.toLowerCase() === `${item.key}`.toLowerCase());
+                return {
+                    ...item,
+                    itemId: found?.itemId || item.itemId,
+                    createdAt: found?.createdAt || item.createdAt,
+                    updatedAt: found?.updatedAt || item.updatedAt,
+                    deletedAt: found?.deletedAt || item.deletedAt,
+                    publishDate: found?.publishDate || item.publishDate,
+                    id: found?.id || item.id,
+                    position: found?.position || item.position,
+                };
+            });
+
+            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
+        }
+
+        return { success: true, };
+    } catch(e: any) {
+        logger.error('_saveDrugsLibraryItemsAndUpdateIfExists ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    } 
+}
+
 export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
