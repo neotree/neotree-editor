@@ -255,6 +255,7 @@ export const editorInfo = pgTable(
         id: serial('id').primaryKey(),
         dataVersion: integer('data_version').notNull().default(1),
         lastPublishDate: timestamp('last_publish_date'),
+        lastDataKeysSyncDate: timestamp('last_data_keys_sync_date'),
     },
 );
 

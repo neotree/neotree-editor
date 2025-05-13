@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/app";
 
 export function useRoutes() {
     const pathname = usePathname();
-    const { isDefaultUser, isSuperUser, sys } = useAppContext();
+    const { isDefaultUser, isSuperUser, } = useAppContext();
 
     return [
         {
