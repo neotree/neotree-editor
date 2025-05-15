@@ -7,7 +7,7 @@ import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
-import { _getAllAliases } from '@/databases/queries/scripts';
+import { _generateScreenAliases } from './_aliases_save';
 
 export type SaveScreensData = Partial<ScreenType>;
 
@@ -17,16 +17,15 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScreens({ data, broadcastAction,syncSilently }: {
+export async function _saveScreens({ data, broadcastAction, }: {
     data: SaveScreensData[],
     broadcastAction?: boolean,
-    syncSilently?: boolean
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
-
+      await _generateScreenAliases()
     try {
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
@@ -76,7 +75,7 @@ export async function _saveScreens({ data, broadcastAction,syncSilently }: {
                             position = Math.max(0, screen?.position || 0, screenDraft?.position || 0) + 1;
                         }
 
-                        let data = {
+                        const data = {
                             ...published,
                             ...item,
                             screenId,
@@ -96,7 +95,6 @@ export async function _saveScreens({ data, broadcastAction,syncSilently }: {
                             });
 
                             if (scriptDraft || publishedScript) {
-        
                                 const q = db.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
@@ -135,9 +133,7 @@ export async function _saveScreens({ data, broadcastAction,syncSilently }: {
         response.info = info;
         logger.error('_saveScreens ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !syncSilently) 
-            {
-                socket.emit('data_changed', 'save_screens');}
+        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_screens');
         return response;
     }
 }

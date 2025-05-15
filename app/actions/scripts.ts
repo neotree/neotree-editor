@@ -65,7 +65,6 @@ export const deleteScreens: typeof mutations._deleteScreens = async (...args) =>
 export const saveScreens: typeof mutations._saveScreens = async (...args) => {
     try {
         await isAllowed();
-        console.log("%%%....RRRR..",...args)
         return await mutations._saveScreens(...args);
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);

@@ -206,10 +206,10 @@ export async function ScreenReviewConfig({
                             columns={[
 
                                 {
-                                    name: 'Label'
+                                    name: 'Screen'
                                 },
                                 {
-                                    name: 'Screen'
+                                    name: 'Label'
                                 },
                                 {
                                     name: 'Action',

@@ -3,8 +3,10 @@ import { Title } from "@/components/title";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScriptsTable } from "./components/scripts-table";
+import { _updateAliases } from '@/databases/mutations/scripts/_aliases_save';
 
 export default async function ScriptsPage() { 
+    await _updateAliases()
     const scripts = await serverActions.getScripts({ returnDraftsIfExist: true, });
 
     return (

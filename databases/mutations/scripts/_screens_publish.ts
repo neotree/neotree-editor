@@ -2,10 +2,10 @@ import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { pendingDeletion, screens, screensDrafts, screensHistory, scripts, scriptsDrafts } from "@/databases/pg/schema";
+import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema";
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
-import { _getAllAliases, assignAliasOnScreen, mergeAliasesSingleScreen } from "@/databases/queries/scripts";
+import { _generateScreenAliases, _updateAliases } from "./_aliases_save";
 
 export async function _publishScreens(opts?: {
     scriptsIds?: string[];
@@ -13,6 +13,9 @@ export async function _publishScreens(opts?: {
     broadcastAction?: boolean;
 }) {
     const { scriptsIds, screensIds, } = { ...opts, };
+
+       // GENERATE ALIASES FOR ALL UPDATED SCREENS
+    
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
@@ -50,43 +53,15 @@ export async function _publishScreens(opts?: {
                 });
             }
 
-            for(const { screenId: _screenId, data: c,screenDraftId } of updates) {
+            for(const { screenId: _screenId, data: c} of updates) {
                 const screenId = _screenId!;
+                const { screenId: __screenId, id, oldScreenId, createdAt, updatedAt, deletedAt, ...payload } = c;
 
-                const { screenId: __screenId, id, oldScreenId, createdAt, updatedAt, deletedAt,scriptId, ...payload } = c;
+                const updates = {
+                    ...payload,
+                    publishDate: new Date(),
+                };
 
-                let updatedPayLoad = payload
-                const {lastAlias,aliases} = await _getAllAliases(scriptId);
-                
-                  try{
-                    const {newScreen,last} = assignAliasOnScreen(payload,lastAlias)
-                      if((last !==lastAlias)){
-                        const {aliases:updatedAliases} = mergeAliasesSingleScreen(newScreen,aliases)
-                        if(newScreen && aliases?.length!==updatedAliases?.length){
-                            updatedPayLoad= newScreen
-                          
-                          await db.update(scriptsDrafts)
-                          .set({
-                            data: sql`data || ${JSON.stringify({ aliases: updatedAliases,lastAlias:last})}::jsonb`,
-                          })
-                          .where(eq(scriptsDrafts.scriptDraftId, screenDraftId||''));
-
-                         await db.update(scripts)
-                        .set({
-                          aliases: updatedAliases,lastAlias:last
-                        })
-                        .where(eq(scripts.scriptId, scriptId));
-                      }
-                      }
-                
-                    }catch(e){
-                
-                    }
-
-                    const updates = {
-                        ...updatedPayLoad,
-                        publishDate: new Date(),
-                    };
 
                 await db
                     .update(screens)
@@ -110,38 +85,12 @@ export async function _publishScreens(opts?: {
             for(const { id, scriptId: _scriptId, scriptDraftId, data } of inserts) {
                 const screenId = data.screenId || v4();
                 const scriptId = (data.scriptId || _scriptId || scriptDraftId)!;
-                let payload = { ...data, screenId, scriptId};
-                
+                const payload = { ...data, screenId, scriptId };
+
                 inserts = inserts.map(d => {
                     if (d.id === id) d.data.screenId = screenId;
                     return d;
                 });
-         
-                const {lastAlias,aliases} = await _getAllAliases(scriptId);
-                  try{
-                    const {newScreen,last} = assignAliasOnScreen(payload,lastAlias)
-                      if((last !==lastAlias)){
-                        const {aliases:updatedAliases} = mergeAliasesSingleScreen(newScreen,aliases)
-                        if(newScreen && aliases?.length!==updatedAliases?.length){
-                          payload = newScreen
-
-                          await db.update(scriptsDrafts)
-                          .set({
-                            data: sql`data || ${JSON.stringify({ aliases: updatedAliases,lastAlias:last})}::jsonb`,
-                          })
-                          .where(eq(scriptsDrafts.scriptDraftId, scriptDraftId||''));
-
-                         await db.update(scripts)
-                        .set({
-                          aliases: updatedAliases,lastAlias:last
-                        })
-                        .where(eq(scripts.scriptId, scriptId));
-                      }
-                      }
-                
-                    }catch(e){
-                
-                    }
 
                 await db.insert(screens).values(payload);
             }
