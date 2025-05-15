@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ScreenReviewField, ScriptField,Alias } from "@/types";
 import { defaultPreferences } from "@/constants";
 import { alias } from "drizzle-orm/mysql-core";
+import { aliases, aliasesDrafts } from "./aliases";
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {
@@ -880,7 +881,8 @@ export const pendingDeletion = pgTable(
         diagnosisDraftId: uuid('diagnosis_draft_id').references(() => diagnosesDrafts.diagnosisDraftId, { onDelete: 'cascade', }),
         configKeyDraftId: uuid('config_key_draft_id').references(() => configKeysDrafts.configKeyDraftId, { onDelete: 'cascade', }),
         drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
-
+        aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
+        aliasDraftId: uuid('alias_draft_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -933,5 +935,13 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     drugsLibraryItemDraft: one(drugsLibraryDrafts, {
         fields: [pendingDeletion.drugsLibraryItemDraftId],
         references: [drugsLibraryDrafts.itemDraftId],
+    }),
+      alias: one(aliases, {
+        fields: [pendingDeletion.aliasId],
+        references: [aliases.uuid],
+    }),
+    aliasDraft: one(aliasesDrafts, {
+        fields: [pendingDeletion.aliasDraftId],
+        references: [aliasesDrafts.uuid],
     }),
 }));
