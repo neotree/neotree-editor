@@ -5,8 +5,10 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { ScriptType } from '../../queries/scripts/_scripts_get';
+import { _getLeanAliases, _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
+import {_saveScreens} from './_screens_save'
 import { removeHexCharacters } from '../../utils'
+import { _getScreens } from '@/databases/queries/scripts';
 
 export type SaveScriptsData = Partial<ScriptType>;
 
@@ -115,8 +117,9 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
         logger.error('_saveScripts ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction && !syncSilently) {
-            console.log("..SCRIPT SAVE ...TRIGGERED")
             socket.emit('data_changed', 'save_scripts');}
         return response;
     }
 }
+
+ 
