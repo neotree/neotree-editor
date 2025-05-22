@@ -171,7 +171,7 @@ function Form({
     const keyHasError = false; // key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
-    const isKeyDisabled = isChecklistScreen ? disabled : true;
+    const isKeyDisabled = false; // isChecklistScreen ? disabled : true;
 
     const onSave = handleSubmit(data => {
         if (!isEmpty(itemIndex) && item) {
@@ -197,7 +197,9 @@ function Form({
         label?: string;
         variant?: 'key' | 'id';
     }) => {
-        const _type = isChecklistScreen ? 'checklist_option' : type;
+        // const _type = isChecklistScreen ? 'checklist_option' : type;
+        const _type = screenType + '_option';
+
         return (
             <SelectModal
                 modal

@@ -126,7 +126,8 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                headerActions={(isDiagnosisScreen || isChecklistScreen || isProgressScreen) && (
+                // headerActions={(isDiagnosisScreen || isChecklistScreen || isProgressScreen) && (
+                headerActions={(
                     <>
                         {disabled ? null : (
                             <Button 
