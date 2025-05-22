@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { v4 } from "uuid";
 
-import { ScriptField } from "@/types";
+import { ScriptField,ScreenReviewField } from "@/types";
 
 export function useField(field?: ScriptField) {
     const getDefaultValues = useCallback(() => {
@@ -36,6 +36,20 @@ export function useField(field?: ScriptField) {
             editable: field?.editable || false,
             ...field
         } satisfies ScriptField;
+    }, [field]);
+
+    return {
+        getDefaultValues,
+    };
+}
+
+export function useScreenReviewField(field?: ScreenReviewField) {
+    const getDefaultValues = useCallback(() => {
+        return {
+            label: field?.label || '',
+            screen: field?.screen||'',
+            ...field
+        } satisfies ScreenReviewField;
     }, [field]);
 
     return {
