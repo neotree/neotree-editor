@@ -49,7 +49,7 @@ type Props = {
     scriptId: string;
 };
 
-export async function ScreenReviewConfig({
+export function ScreenReviewConfig({
     disabled,
     form: {
         watch,
