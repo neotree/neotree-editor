@@ -1,5 +1,6 @@
 import { configKeys, diagnoses, screens, scripts } from "@/databases/pg/schema";
-import { ScriptField } from "@/types";
+import { ScreenReviewField, ScriptField } from "@/types";
+import { Label } from "@radix-ui/react-dropdown-menu";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
     return {
@@ -212,6 +213,11 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 minTimeKey: f.minTimeKey,
                 maxTimeKey: f.maxTimeKey,
                 values: f.values,
+            })),
+            reviewable: s.reviewable,
+            reviewConfigurations: (s.reviewConfigurations as ScreenReviewField[]).map(rc=>({
+                label: rc.label,
+                screen: rc.screen
             })),
             preferences: s.preferences,
             printSections: s.printSections,
