@@ -17,8 +17,9 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ScreenReviewField, ScriptField,Alias } from "@/types";
 import { defaultPreferences } from "@/constants";
-import { alias } from "drizzle-orm/mysql-core";
 import { aliases, aliasesDrafts } from "./aliases";
+
+export * from './aliases';
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, Fragment } from "react";
+import { useCallback, useState, Fragment,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 
@@ -20,6 +20,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
+import {_getLeanAlias} from '@/databases/queries/aliases'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +81,7 @@ export function ScreenForm({
         setValue,
         save,
     } = form;
-
+    const [alias, setAlias] = useState('');
     const type = watch('type');
     const skippable = watch('skippable');
     const printable = watch('printable');
@@ -94,8 +95,22 @@ export function ScreenForm({
     const reasons = watch('reasons');
     const repeatable = watch('repeatable');
     const collectionLabel = watch('collectionLabel');
+    const key = watch('key');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+
+      const getAlias = useCallback(async () => {
+    try {
+      const result = await _getLeanAlias({ script: scriptId, name: key });
+      setAlias(result); 
+    } catch (err) {
+      setAlias(''); 
+    }
+  }, [scriptId, key]);
+
+   useEffect(() => {
+    getAlias();
+  }, [getAlias]);
 
     if (!showForm) {
         return (
@@ -815,11 +830,12 @@ export function ScreenForm({
                                 );
                             })}
                             {
-                                prePopulate?.length > 0 &&(
+                                prePopulate?.length > 0 && !!key &&(
                                     <div className="max-w-64">
                                         <Label secondary htmlFor="alias">ALIAS</Label>
                                         <Input
-                                            {...register('alias', { disabled: true, })}
+                                           value={alias}
+                                           disabled={true}
                                             name="alias"
                                             placeholder=""
                                             noRing={false}
@@ -911,6 +927,7 @@ export function ScreenForm({
                     <Fields
                         form={form}
                         disabled={disabled}
+                        scriptId={scriptId}
                     />
                     <Separator className="my-8" />
                     {repeatable && (

@@ -20,6 +20,7 @@ import { Field } from "./field";
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
+    scriptId? : string;
 };
 
 export function Fields({

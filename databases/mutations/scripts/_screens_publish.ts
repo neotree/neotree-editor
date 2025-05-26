@@ -5,7 +5,6 @@ import db from "@/databases/pg/drizzle";
 import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema";
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
-import { _generateScreenAliases, _updateAliases } from "./_aliases_save";
 
 export async function _publishScreens(opts?: {
     scriptsIds?: string[];

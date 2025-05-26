@@ -7,7 +7,7 @@ import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
-import { _generateScreenAliases } from './_aliases_save';
+import { _generateScreenAliases } from '../aliases/_aliases_save';
 
 export type SaveScreensData = Partial<ScreenType>;
 
@@ -25,7 +25,7 @@ export async function _saveScreens({ data, broadcastAction, }: {
     data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
-      await _generateScreenAliases()
+    
     try {
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
