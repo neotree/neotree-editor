@@ -15,7 +15,7 @@ export function dbInit() {
     const client = postgres(process.env.POSTGRES_DB_URL!);
     const db = postgresDrizzle(client, { 
         schema, 
-        logger: true, 
+        logger: dbLogging, 
     });
     return db;
 }

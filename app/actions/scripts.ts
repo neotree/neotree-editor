@@ -438,7 +438,8 @@ export async function saveScriptsWithItems({ data }: {
                 oldScriptId,
                 scriptId: _ignoreScriptId,
                 position,
-                printSections,
+                printSections = [],
+                reviewConfigurations = [],
                 ...s 
             } = script;
 
@@ -448,12 +449,14 @@ export async function saveScriptsWithItems({ data }: {
             const screens = copiedScreens.map(s => {
                 const screenId = v4();
                 oldScreensIdsMap[s.screenId] = screenId;
+                if (s.oldScreenId) oldScreensIdsMap[s.oldScreenId] = screenId;
                 return { ...s, screenId, };
             });
 
             const diagnoses = copiedDiagnoses.map(d => {
                 const diagnosisId = v4();
                 oldDiagnosesIdsMap[d.diagnosisId] = diagnosisId;
+                if (d.oldDiagnosisId) oldDiagnosesIdsMap[d.oldDiagnosisId] = diagnosisId;
                 return { ...d, diagnosisId, };
             });
 
@@ -468,6 +471,10 @@ export async function saveScriptsWithItems({ data }: {
                         ...s,
                         screensIds: s.screensIds.map(id => oldScreensIdsMap[id]).filter(id => id),
                     })),
+                    reviewConfigurations: reviewConfigurations.map(c => ({
+                        ...c,
+                        screen: oldScreensIdsMap[c.screen],
+                    })).filter(c => c.screen),
                 }],
             });
 
