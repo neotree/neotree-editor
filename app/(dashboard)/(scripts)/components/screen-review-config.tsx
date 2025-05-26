@@ -109,7 +109,7 @@ export async function ScreenReviewConfig({
 
     const getScreenTitle = (id: string) => {
 
-        const screen = screens.data?.find(f => f.screenId === id)
+        const screen = screens.data?.find(f => (f.screenId === id) || (f.oldScreenId === id))
         return screen?.title
     }
 
@@ -254,8 +254,8 @@ export async function ScreenReviewConfig({
                                 },
                             ]}
                             data={fields.map(f => [
-                                getScreenTitle(f.screen) || '',
-                                f.label
+                                f.label,
+                                getScreenTitle(f.screen) || 'Failed to load screen, try to delete this row add another screen',
                             ])}
                         />
                     </div>
