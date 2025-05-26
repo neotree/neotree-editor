@@ -31,6 +31,8 @@ import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
 import { PrintSections } from './print';
+import { Separator } from "@/components/ui/separator";
+import { ScreenReviewConfig } from "./screen-review-config";
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -55,6 +57,7 @@ export function ScriptForm(props: Props) {
         register,
         getDefaultFormValues,
         getDefaultNuidSearchFields,
+        getDefaultScreenReviewConfigurations,
         onSubmit,
     } = form;
 
@@ -66,17 +69,18 @@ export function ScriptForm(props: Props) {
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
     const preferences = watch('preferences');
+    const reviewable = watch('reviewable');
 
     return (
         <>
             {loading && <Loader overlay />}
 
-            <ScriptItemsFab 
-                disabled={disabled} 
+            <ScriptItemsFab
+                disabled={disabled}
                 resetForm={() => resetForm(getDefaultFormValues())}
             />
 
-            <div 
+            <div
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
@@ -116,14 +120,14 @@ export function ScriptForm(props: Props) {
                                 <SelectValue placeholder="Select hospital" />
                             </SelectTrigger>
                             <SelectContent>
-                            <SelectGroup>
-                                {/* <SelectLabel>Hospitals</SelectLabel> */}
-                                <SelectItem value="none">No hospital</SelectItem>
-                                {hospitals.map(h => (
-                                    <SelectItem key={h.hospitalId} value={h.hospitalId}>
-                                        {h.name}
-                                    </SelectItem>
-                                ))}
+                                <SelectGroup>
+                                    {/* <SelectLabel>Hospitals</SelectLabel> */}
+                                    <SelectItem value="none">No hospital</SelectItem>
+                                    {hospitals.map(h => (
+                                        <SelectItem key={h.hospitalId} value={h.hospitalId}>
+                                            {h.name}
+                                        </SelectItem>
+                                    ))}
                                 </SelectGroup>
                             </SelectContent>
                         </Select>
@@ -133,12 +137,12 @@ export function ScriptForm(props: Props) {
 
                     <div>
                         <Label secondary htmlFor="title">Title *</Label>
-                        <Input 
+                        <Input
                             {...register('title', { required: true, disabled, })}
                             placeholder="Title"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                         />
-                        <PreferencesForm 
+                        <PreferencesForm
                             id="title"
                             title="Title"
                             disabled={disabled}
@@ -150,12 +154,12 @@ export function ScriptForm(props: Props) {
 
                     <div>
                         <Label secondary htmlFor="printTitle">Print title</Label>
-                        <Input 
+                        <Input
                             {...register('printTitle', { disabled, })}
                             placeholder="Print title"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                         />
-                        <PreferencesForm 
+                        <PreferencesForm
                             id="printTitle"
                             title="Print title"
                             disabled={disabled}
@@ -167,12 +171,12 @@ export function ScriptForm(props: Props) {
 
                     <div>
                         <Label secondary htmlFor="description">Description</Label>
-                        <Input 
+                        <Input
                             {...register('description', { disabled, })}
                             placeholder="Description"
                             className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                         />
-                        <PreferencesForm 
+                        <PreferencesForm
                             id="description"
                             title="Description"
                             disabled={disabled}
@@ -183,7 +187,7 @@ export function ScriptForm(props: Props) {
                     </div>
 
                     <div className="flex gap-x-2">
-                        <Checkbox 
+                        <Checkbox
                             name="exportable"
                             id="exportable"
                             disabled={disabled}
@@ -196,7 +200,7 @@ export function ScriptForm(props: Props) {
                     <Title className="mt-5">Neotree ID Search</Title>
 
                     <div className="flex gap-x-2">
-                        <Checkbox 
+                        <Checkbox
                             name="nuidSearchEnabled"
                             id="nuidSearchEnabled"
                             disabled={disabled}
@@ -209,11 +213,39 @@ export function ScriptForm(props: Props) {
                         />
                         <Label secondary htmlFor="nuidSearchEnabled">Enable NUID Search</Label>
 
-                        <NuidSearchFieldsConfig 
+                        <NuidSearchFieldsConfig
                             disabled={disabled}
                             form={form}
                         />
                     </div>
+
+                    {!!props?.formData?.scriptId && ( 
+                        <>
+                        <Title className="mt-5">Screens Review Configuration</Title>
+
+                    <div className="flex gap-x-2">
+                        <Checkbox
+                            name="reviewable"
+                            id="reviewable"
+                            disabled={disabled}
+                            checked={reviewable}
+                            onCheckedChange={() => {
+                                const enabled = !reviewable;
+                                setValue('reviewable', enabled, { shouldDirty: true, });
+                                setValue('reviewConfigurations', getDefaultScreenReviewConfigurations(), { shouldDirty: true, });
+                            }}
+                        />
+                        <Label secondary htmlFor="reviewable">Enable Screen Review</Label>      
+                        <ScreenReviewConfig
+                           scriptId={props?.formData?.scriptId||''}
+                            disabled={disabled}
+                            form={form}
+                        />
+                    </div>
+                    </>
+                    )
+                   }
+
                 </>
 
                 <div className={cn('flex gap-x-2 py-4')}>
@@ -236,30 +268,30 @@ export function ScriptForm(props: Props) {
             </div>
 
             {!!props.formData && (
-                <div 
+                <div
                     className={clsx(
                         'flex flex-col gap-y-4 mt-10',
                     )}
                 >
-                    <Tabs 
+                    <Tabs
                         options={scriptsPageTabs}
                         searchParamsKey="section"
                     />
 
                     {(!section || (section === 'screens')) && (
-                        <Screens 
-                            scriptId={props.formData.scriptId!} 
+                        <Screens
+                            scriptId={props.formData.scriptId!}
                         />
                     )}
 
                     {section === 'diagnoses' && (
-                        <Diagnoses 
-                            scriptId={props.formData.scriptId!} 
+                        <Diagnoses
+                            scriptId={props.formData.scriptId!}
                         />
                     )}
 
                     {section === 'print' && (
-                        <PrintSections 
+                        <PrintSections
                             disabled={disabled}
                             form={form}
                         />
