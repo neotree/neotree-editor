@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getLeanAliases, _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
+import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import {_saveScreens} from './_screens_save'
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';

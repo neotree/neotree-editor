@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState,useEffect } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
 
@@ -30,6 +30,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
+import {_getLeanAlias} from '@/databases/queries/aliases'
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -39,12 +40,14 @@ type Props = {
         data: FieldType,
     };
     form: ReturnType<typeof useScreenForm>;
+    scriptId?: string;
 };
 
 export function Field<P = {}>({
     children,
     field: fieldProp,
     form,
+    scriptId,
     disabled: disabledProp,
     ...extraProps
 }: Props & P) {
@@ -67,6 +70,7 @@ export function Field<P = {}>({
     } = useForm({
         defaultValues: getDefaultValues(),
     });
+    const [alias, setAlias] = useState('');
 
     const type = watch('type');
     const format = watch('format');
@@ -92,6 +96,19 @@ export function Field<P = {}>({
     const isPeriodField = useMemo(() => type === 'period', [type]);
     const isNumberField = useMemo(() => type === 'number', [type]);
     const isDropdownField = useMemo(() => type === 'dropdown', [type]);
+
+    const getAlias = useCallback(async () => {
+        try {
+            const result = await _getLeanAlias({ script: scriptId||'', name: key });
+            setAlias(result);
+        } catch (err) {
+            setAlias('');
+        }
+    }, [scriptId, key]);
+
+    useEffect(() => {
+        getAlias();
+    }, [getAlias]);
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
@@ -575,7 +592,8 @@ export function Field<P = {}>({
                                     <div className="max-w-64">
                                         <Label secondary htmlFor="alias">ALIAS</Label>
                                         <Input
-                                            {...register('alias', { disabled: true, })}
+                                            value={alias}
+                                            disabled={true}
                                             name="alias"
                                             placeholder=""
                                             noRing={false}

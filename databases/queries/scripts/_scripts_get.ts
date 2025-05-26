@@ -38,44 +38,15 @@ export type AliaseType = {
     value: string
 }
 
-export async function _getLeanAliases():Promise<any> {
+export async function _getLeanScriptIds():Promise<any> {
    const allScripts = await db.select({
                scriptId:scripts.scriptId,
-               lastAlias: scripts.lastAlias,
              })
             .from(scripts)
             .where(
             isNull(scripts.deletedAt))
  return allScripts;
 }
-
-export async function _getAliases():Promise<any> {
-    const allScripts = await db.select({
-                scriptId:scripts.scriptId,
-                aliases: scripts.aliases,
-                oldScriptId: scripts.oldScriptId                
-              })
-             .from(scripts)
-             .where(
-             isNull(scripts.deletedAt))
-  return allScripts;
- }
- 
-
-export async function _getAllAliases(sid: string): Promise<any> {
-    const allScripts = await db.select({
-      scriptId: scripts.scriptId,
-      lastAlias: scripts.lastAlias,
-      aliases: scripts.aliases
-    })
-    .from(scripts)
-    .where(and(
-      eq(scripts.scriptId, sid),
-      isNull(scripts.deletedAt)
-    ));
-  
-    return allScripts.length > 0 ? allScripts[0] : null;
-  }
 
 export async function _getScripts(
     params?: GetScriptsParams
