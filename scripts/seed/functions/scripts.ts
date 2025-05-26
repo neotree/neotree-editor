@@ -102,6 +102,8 @@ export async function seedScripts(site: typeof schema.sites.$inferSelect) {
                         exportable: s.data?.exportable || s.exportable || true,
                         nuidSearchEnabled: s.data?.nuid_search_enabled || s.nuid_search_enabled || false,
                         nuidSearchFields: s.data?.nuidSearchFields || s.nuidSearchFields || [],
+                        reviewable: s.data?.reviewable || s.reviewable || false,
+                        reviewConfigurations: s.data?.reviewConfigurations || s.reviewConfigurations || []
                     },
                 } satisfies typeof schema.scriptsDrafts.$inferInsert;
             });
