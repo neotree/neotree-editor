@@ -2,6 +2,7 @@
 import db from "@/databases/pg/drizzle";
 import { aliases } from "@/databases/pg/schema";
 import { eq, and } from 'drizzle-orm';
+import logger from "@/lib/logger";
 
 
 export type GetAliasesResults = {
@@ -30,14 +31,16 @@ export async function _getLeanAlias(opts:{
   name: string
 }){
   try{
-
+  logger.log('##########IN LEAN LEAN', opts);
   const alias = await db.query.aliases.findFirst({
           where: (and(eq(aliases.script, opts.script),
             eq(aliases.name, opts.name)
           ))
         })
+         logger.log('##########IN-HUI', alias);
         return alias?alias.alias:''
-      }catch(ex:any){   
+      }catch(ex:any){ 
+        logger.error('##########IN ERROR', ex);  
       }
         
 

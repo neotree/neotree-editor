@@ -17,7 +17,7 @@ export type SaveAliasesResponse = {
 
 
 
-export function getNextAlias(prev: string | null): string {
+function getNextAlias(prev: string | null): string {
   if (!prev || prev === '') return 'A';
 
   const match = prev.match(/^([A-Z]+)(\d*)$/);
@@ -66,59 +66,55 @@ function excludedScreenType(type: string) {
   return excluded.includes(type)
 
 }
-
-export function assignAliases(
-  scriptId:string,
+async function assignAliases(
+  scriptId: string,
   screens: any[],
   lastAlias: string | null
-): any[] {
-
-  const updated: any[] =[]
+): Promise<any[]> {
+  let updated: any[] = [];
   let currentAlias = lastAlias;
-screens.map(async (screen) => {
+
+  for (const screen of screens) {
     if (excludedScreenType(screen.type)) {
-      return updated;
+      continue;
     }
-    else {
-      if (screen.type === "form" && Array.isArray(screen.fields)) {
-       screen.fields.map(async(field: any) => {
-          if (
-            Array.isArray(field.prePopulate) &&
-            field.prePopulate.length > 0 &&
-            !await aliasExists({name: field.key,script:scriptId})
-          ) {
-            currentAlias = getNextAlias(currentAlias);
-            if(!!currentAlias){
-              updated.push({
-                 name: field.key,
-                 alias: currentAlias,
-                 script:scriptId
-            })
-            }        
+
+    if (screen.type === "form" && Array.isArray(screen.fields)) {
+      for (const field of screen.fields) {
+        if (
+          Array.isArray(field.prePopulate) &&
+          field.prePopulate.length > 0 &&
+          !(await aliasExists({ name: field.key, script: scriptId }))
+        ) {
+          currentAlias = getNextAlias(currentAlias);
+          if (currentAlias) {
+            updated.push({
+              name: field.key,
+              alias: currentAlias,
+              script: scriptId,
+            });
           }
-        
+        }
+      }
+    } else if (
+      Array.isArray(screen.prePopulate) &&
+      screen.prePopulate.length > 0 &&
+      !(await aliasExists({ name: screen.key, script: scriptId }))
+    ) {
+      currentAlias = getNextAlias(currentAlias);
+      if (currentAlias) {
+        updated.push({
+          name: screen.key,
+          alias: currentAlias,
+          script: scriptId,
         });
-     
-      } else if (
-        Array.isArray(screen.prePopulate) &&
-        screen.prePopulate.length > 0 &&
-        ! await aliasExists({name: screen.key,script:scriptId})
-      ) {
-        currentAlias = getNextAlias(currentAlias);
-        if(!!currentAlias){
-           updated.push({
-                 name: screen.key,
-                 alias: currentAlias,
-                 script:scriptId
-            })
-    
       }
     }
   }
-})
 
   return updated;
 }
+
 
 async function aliasExists(opts:{
   script: string,
@@ -143,6 +139,7 @@ alls: any[]) {
   const errors = [];
   const info: SaveAliasesResponse['info'] = {};
   try {
+    logger.log("#########LOGGER",alls.length.toString())
     for (const al of alls) {
       try {
         const duplicate = await db.query.aliases.findFirst({
@@ -183,7 +180,7 @@ alls: any[]) {
   }
 
 }
-export async function _getLastAlias(
+async function _getLastAlias(
   script: string
 ) {
   try{
@@ -203,7 +200,6 @@ export async function _seedAliases() {
   try {
     const leanScripts = await _getLeanScriptIds();
     const alreadySeeded = await aliasSeeded()
-
     if(!alreadySeeded){
      await _generateScreenAliases(leanScripts)
     }
@@ -212,30 +208,25 @@ export async function _seedAliases() {
   }
 }
 
-export async function _generateScreenAliases(
-  scriptsIds: string[]
-) {
+export async function _generateScreenAliases(scriptsIds: string[]) {
   try {
+    for (const scriptId of scriptsIds) {
+      
+      if (scriptId) {
+        const lastAlias = await _getLastAlias(scriptId);
+        const sids = [scriptId];
+        const { data, errors } = await _getScreens({ scriptsIds: sids });
 
-        scriptsIds?.map(async (ls: any) => {
-        const { scriptId} = ls
-        if(scriptId){
-        const lastAlias = await _getLastAlias(scriptId)
+        if (!errors || errors.length === 0) {
+          const aliases = await assignAliases(scriptId, data, lastAlias || '');
 
-        const scriptsIds = Array.of(scriptId)
-         const { data, errors } = await _getScreens({ scriptsIds })
-          if (!errors?.length || errors?.length <= 0) {
-         const aliases = assignAliases(scriptId,data,lastAlias||'')
-         if(!!aliases && aliases.length>0){
-          await _saveAliases(
-            aliases
-          )
-         }
+          if (aliases && aliases.length > 0) {
+            await _saveAliases(aliases);
+          }
         }
-       }
-       })
-
+      }
+    }
   } catch (e) {
-  
+    logger.error("Error in _generateScreenAliases:", e);
   }
 }

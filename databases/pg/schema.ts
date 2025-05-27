@@ -459,7 +459,7 @@ export const scriptsDrafts = pgTable(
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert
          & { nuidSearchFields: ScriptField[]; } 
-         &{ reviewConfigurations: ScreenReviewField[]; } &{aliases: Alias[];}>().notNull(),
+         &{ reviewConfigurations: ScreenReviewField[]; }>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),

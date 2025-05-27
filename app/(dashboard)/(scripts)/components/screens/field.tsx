@@ -30,7 +30,8 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
-import {_getLeanAlias} from '@/databases/queries/aliases'
+import { getLeanAlias } from '@/app/actions/aliases'
+import axios from 'axios';
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -99,8 +100,8 @@ export function Field<P = {}>({
 
     const getAlias = useCallback(async () => {
         try {
-            const result = await _getLeanAlias({ script: scriptId, name: key });
-            setAlias(result);
+              const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data='+JSON.stringify({ script: scriptId, name: key, }))
+            setAlias(res.data||'');
         } catch (err) {
             setAlias('');
         }
