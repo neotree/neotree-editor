@@ -26,6 +26,7 @@ type Props = {
 export function Fields({
     form,
     disabled,
+    scriptId
 }: Props) {
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
@@ -108,6 +109,7 @@ export function Fields({
                         <Field
                             form={form}
                             disabled={disabled}
+                            scriptId={scriptId}
                         >
                             {!disabled && (
                                 <DialogTrigger asChild>
@@ -153,6 +155,7 @@ export function Fields({
                                             <Field 
                                                 disabled={disabled} 
                                                 form={form}
+                                                 scriptId={scriptId}
                                                 field={{
                                                     data: field,
                                                     index: rowIndex,

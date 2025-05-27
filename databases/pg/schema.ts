@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ScreenReviewField, ScriptField,Alias } from "@/types";
 import { defaultPreferences } from "@/constants";
-import { aliases, aliasesDrafts } from "./aliases";
+import { aliases } from "./aliases";
 
 export * from './aliases';
 
@@ -414,8 +414,6 @@ export const scripts = pgTable(
         nuidSearchFields: jsonb('nuid_search_fields').default('[]').notNull(),
         reviewable: boolean('reviewable').notNull().default(false),
         reviewConfigurations: jsonb('review_configurations').default('[]').notNull(),
-        aliases: jsonb('aliases').default('[]').notNull(),
-        lastAlias:text('last_alias').default(''),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         printSections: jsonb('print_sections').default('[]').notNull(),
         publishDate: timestamp('publish_date').defaultNow().notNull(),
@@ -573,7 +571,6 @@ export const screens = pgTable(
         collectionName: text('collection_name').notNull().default(''),
         collectionLabel: text('collection_label').notNull().default(''),
         repeatable: boolean('repeatable'),
-        alias:text('alias').notNull().default(''),
     },
     table => ({
         searchIndex: index('screens_search_index')
@@ -883,7 +880,6 @@ export const pendingDeletion = pgTable(
         configKeyDraftId: uuid('config_key_draft_id').references(() => configKeysDrafts.configKeyDraftId, { onDelete: 'cascade', }),
         drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
         aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
-        aliasDraftId: uuid('alias_draft_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -941,8 +937,5 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
     }),
-    aliasDraft: one(aliasesDrafts, {
-        fields: [pendingDeletion.aliasDraftId],
-        references: [aliasesDrafts.uuid],
-    }),
+
 }));

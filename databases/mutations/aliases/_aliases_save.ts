@@ -5,7 +5,7 @@ import { _saveEditorInfo } from "../editor-info";
 import { _publishScripts } from "../scripts/_scripts_publish";
 import db from '@/databases/pg/drizzle';
 import { desc, eq, and, Query } from 'drizzle-orm';
-import { aliases } from "@/databases/pg/aliases";
+import { aliases } from "@/databases/pg/schema";
 import logger from '@/lib/logger';
 
 
@@ -15,63 +15,6 @@ export type SaveAliasesResponse = {
   info?: { query?: Query; };
 };
 
-export function mergeAliases(
-  screens: any[],
-): { aliases: { key: string; value: string }[] } {
-
-  const aliases: { key: string; value: string }[] = [];
-
-  screens.map(screen => {
-
-    // Collect aliases
-    if (screen.type === 'form' && Array.isArray(screen.fields)) {
-      screen.fields.forEach((field: any) => {
-        if (field.alias && field.key) {
-          aliases.push({ key: field.key, value: field.alias });
-        }
-      });
-    } else if (screen.alias && screen.key) {
-      aliases.push({ key: screen.key, value: screen.alias });
-    }
-
-  });
-
-  return { aliases };
-}
-
-export function mergeAliasesSingleScreen(
-  screen: any,
-  oldAliases: { key: string; value: string }[]
-): { aliases: { key: string; value: string }[] } {
-  const aliases = [...oldAliases];
-
-  function upsertAlias(key: string, value: string) {
-    const existing = aliases.find(a => a.key === key);
-    if (existing) {
-      if (existing.value !== value) {
-        existing.value = value; // update value
-      }
-      // else skip since alias is same
-    } else {
-      aliases.push({ key, value }); // add new alias
-    }
-  }
-  if (excludedScreenType(screen.type)) {
-    return { aliases }
-  }
-
-  if (screen.type === 'form' && Array.isArray(screen.fields)) {
-    screen.fields.forEach((field: any) => {
-      if (field.alias && field.key) {
-        upsertAlias(field.key, field.alias);
-      }
-    });
-  } else if (screen.alias && screen.key) {
-    upsertAlias(screen.key, screen.alias);
-  }
-
-  return { aliases };
-}
 
 
 export function getNextAlias(prev: string | null): string {
@@ -132,17 +75,17 @@ export function assignAliases(
 
   const updated: any[] =[]
   let currentAlias = lastAlias;
-screens.map(screen => {
+screens.map(async (screen) => {
     if (excludedScreenType(screen.type)) {
       return updated;
     }
     else {
       if (screen.type === "form" && Array.isArray(screen.fields)) {
-       screen.fields.map((field: any) => {
+       screen.fields.map(async(field: any) => {
           if (
             Array.isArray(field.prePopulate) &&
             field.prePopulate.length > 0 &&
-            !aliasExists({name: field.key,script:scriptId})
+            !await aliasExists({name: field.key,script:scriptId})
           ) {
             currentAlias = getNextAlias(currentAlias);
             if(!!currentAlias){
@@ -159,7 +102,7 @@ screens.map(screen => {
       } else if (
         Array.isArray(screen.prePopulate) &&
         screen.prePopulate.length > 0 &&
-        !aliasExists({name: screen.key,script:scriptId})
+        ! await aliasExists({name: screen.key,script:scriptId})
       ) {
         currentAlias = getNextAlias(currentAlias);
         if(!!currentAlias){
@@ -217,10 +160,10 @@ alls: any[]) {
 
           })
           info.query = q.toSQL();
-
           await q.execute();
         }
       } catch (ex: any) {
+         logger.error(ex.message)
         errors.push(ex.message);
       }
 
@@ -236,19 +179,22 @@ alls: any[]) {
      response.success = false;
         response.errors = [ex.message];
         response.info = info;
-        logger.error('_saveAliases ERROR', ex.message);
+        
   }
 
 }
 export async function _getLastAlias(
   script: string
 ) {
+  try{
   const lastAlias = !script ? '' : await db.query.aliases.findFirst({
     where: eq(aliases.script, script),
     orderBy: desc(aliases.createdAt)
   })
 
   return lastAlias?lastAlias.alias:''
+}catch(e:any){
+}
 }
 
 
@@ -256,13 +202,13 @@ export async function _getLastAlias(
 export async function _seedAliases() {
   try {
     const leanScripts = await _getLeanScriptIds();
-    const alreadySeeded = aliasSeeded()
+    const alreadySeeded = await aliasSeeded()
+
     if(!alreadySeeded){
      await _generateScreenAliases(leanScripts)
     }
 
-  } catch (e) {
-
+  } catch (e:any) {
   }
 }
 
@@ -279,7 +225,7 @@ export async function _generateScreenAliases(
         const scriptsIds = Array.of(scriptId)
          const { data, errors } = await _getScreens({ scriptsIds })
           if (!errors?.length || errors?.length <= 0) {
-         const aliases = assignAliases(scriptId,data,lastAlias)
+         const aliases = assignAliases(scriptId,data,lastAlias||'')
          if(!!aliases && aliases.length>0){
           await _saveAliases(
             aliases
@@ -290,6 +236,6 @@ export async function _generateScreenAliases(
        })
 
   } catch (e) {
-    console.log("---MAHIIII....", e)
+  
   }
 }

@@ -91,7 +91,6 @@ export function useScreenForm({
             repeatable:  (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
             collectionName:  formData?.collectionName || '',
             collectionLabel:  formData?.collectionLabel || '',
-             alias:  formData?.alias || ''
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 
