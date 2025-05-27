@@ -15,7 +15,7 @@ const log: typeof console.log = (...args) => {
     if (process.env.NODE_ENV !== 'production') {
         console.log(...args, __filename);
     }
-    //writeLogsToFile('logs.txt', ...args);
+    writeLogsToFile('logs.txt', ...args);
 };
 
 const error: typeof console.error = (...args) => {

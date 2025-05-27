@@ -3,11 +3,11 @@ import { Title } from "@/components/title";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScriptsTable } from "./components/scripts-table";
-import { _seedAliases } from '@/databases/mutations/aliases/_aliases_save';
+import { seedAliases } from '@/app/actions/aliases'
 
 export default async function ScriptsPage() { 
     // Once Off Initialisation On First Load
-    await _seedAliases()
+    await seedAliases()
     const scripts = await serverActions.getScripts({ returnDraftsIfExist: true, });
 
     return (

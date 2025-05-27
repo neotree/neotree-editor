@@ -48,6 +48,8 @@ import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
 import { KeyValueTextarea } from "@/components/key-value-textarea";
+import { getLeanAlias } from '@/app/actions/aliases'
+import axios from 'axios';
 
 type Props = {
     scriptId: string;
@@ -101,8 +103,10 @@ export function ScreenForm({
 
       const getAlias = useCallback(async () => {
     try {
-      const result = await _getLeanAlias({ script: scriptId, name: key });
-      setAlias(result); 
+      
+    
+    const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data='+JSON.stringify({ script: scriptId, name: key, }))        
+      setAlias(res?.data||''); 
     } catch (err) {
       setAlias(''); 
     }
@@ -830,7 +834,7 @@ export function ScreenForm({
                                 );
                             })}
                             {
-                                prePopulate?.length > 0 && !!key &&(
+                                prePopulate?.length > 0 && !!alias &&(
                                     <div className="max-w-64">
                                         <Label secondary htmlFor="alias">ALIAS</Label>
                                         <Input

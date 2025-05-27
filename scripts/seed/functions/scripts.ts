@@ -104,8 +104,6 @@ export async function seedScripts(site: typeof schema.sites.$inferSelect) {
                         nuidSearchFields: s.data?.nuidSearchFields || s.nuidSearchFields || [],
                         reviewable: s.data?.reviewable || s.reviewable || false,
                         reviewConfigurations: s.data?.reviewConfigurations || s.reviewConfigurations || [],
-                        lastAlias: s.data?.lastAlias || s.lastAlias || '',
-                        aliases: s.data?.aliases || s.aliases || [],
                     },
                 } satisfies typeof schema.scriptsDrafts.$inferInsert;
             });
