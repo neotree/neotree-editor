@@ -40,7 +40,7 @@ type Props = {
         data: FieldType,
     };
     form: ReturnType<typeof useScreenForm>;
-    scriptId?: string;
+    scriptId: any;
 };
 
 export function Field<P = {}>({
@@ -99,12 +99,12 @@ export function Field<P = {}>({
 
     const getAlias = useCallback(async () => {
         try {
-            const result = await _getLeanAlias({ script: scriptId||'', name: key });
+            const result = await _getLeanAlias({ script: scriptId, name: key });
             setAlias(result);
         } catch (err) {
             setAlias('');
         }
-    }, [scriptId, key]);
+    }, [ key]);
 
     useEffect(() => {
         getAlias();
