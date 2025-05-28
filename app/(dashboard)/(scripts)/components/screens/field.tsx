@@ -32,26 +32,26 @@ import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
 
 type Props = {
-    children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
+    open: boolean;
     disabled?: boolean;
     field?: {
         index: number;
         data: FieldType,
     };
     form: ReturnType<typeof useScreenForm>;
+    onClose: () => void;
 };
 
 export function Field<P = {}>({
-    children,
+    open,
     field: fieldProp,
     form,
     disabled: disabledProp,
-    ...extraProps
+    onClose,
 }: Props & P) {
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
     const [showForm, setShowForm] = useState(!!field);
-    const [open, setOpen] = useState(false);
 
     const { getDefaultValues } = useField(!field ? undefined : {
         ...field,
@@ -104,20 +104,19 @@ export function Field<P = {}>({
         } else {
             form.setValue('fields', [...form.getValues('fields'), data], { shouldDirty: true, })
         }
-        setOpen(false);
+        onClose();
     });
 
     return (
         <>
             <Modal
                 open={open}
-                title={field ? 'New field' : 'Edit field'}
-                trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
-                    setOpen(open);
+                    if (!open) onClose();
                     resetForm(getDefaultValues());
                     setShowForm(!!field);
                 }}
+                title={field ? 'New field' : 'Edit field'}
                 actions={(
                     <>
                         <span className={cn('text-danger text-xs', disabled && 'hidden')}>* Required</span>

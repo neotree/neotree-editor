@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
+import { useQueryState } from 'nuqs';
 
 import { DataTable } from "@/components/data-table";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -93,8 +93,26 @@ export function Items({
         })
     }, [form, items, confirm]);
 
+    const [currentItem, setCurrentItem] = useQueryState('item', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     return (
         <>
+            {!!currentItem && (
+                <Item
+                    open={!!currentItem}
+                    onClose={() => setCurrentItem('')}
+                    form={form}
+                    disabled={disabled}
+                    item={!items[Number(currentItem)] ? undefined : {
+                        data: items[Number(currentItem)],
+                        index: Number(currentItem),
+                    }}
+                />
+            )}
+
             <DataTable 
                 title="Items"
                 sortable={!disabled}
@@ -105,21 +123,16 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                headerActions={(
+                headerActions={disabled ? undefined : (
                     <>
-                        <Item
-                            form={form}
-                            disabled={disabled}
+                        <Button 
+                            className="text-primary border-primary" 
+                            variant="outline"
+                            onClick={() => setCurrentItem('new')}
                         >
-                            {!disabled && (
-                                <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary" variant="outline">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        New item
-                                    </Button>
-                                </DialogTrigger>
-                            )}
-                        </Item>
+                            <Plus className="h-4 w-4 mr-1" />
+                            New item
+                        </Button>
                     </>
                 )}
                 columns={[
@@ -151,25 +164,13 @@ export function Items({
                                     </DropdownMenuTrigger>
 
                                     <DropdownMenuContent>
-                                        <DropdownMenuItem asChild>
-                                            <Item 
-                                                disabled={disabled} 
-                                                form={form}
-                                                item={{
-                                                    data: item,
-                                                    index: rowIndex,
-                                                }}
-                                            >
-                                                {({ extraProps }) => (
-                                                    <DialogTrigger 
-                                                        {...extraProps}
-                                                        className={cn(extraProps?.className, 'w-full')}
-                                                    >
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                    </DialogTrigger>
-                                                )}
-                                            </Item>
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                setTimeout(() => setCurrentItem(`${rowIndex}`), 0);
+                                            }}
+                                        >
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            <span>{disabled ? 'View' : 'Edit'}</span>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuItem 
