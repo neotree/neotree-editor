@@ -1,8 +1,8 @@
 'use client';
 
 import React, { forwardRef, useEffect, useState } from 'react';
-
 import AsyncSelect, { type AsyncProps, } from 'react-select/async';
+
 import { Label } from '@/components/ui/label';
 import { reactSelectContainerClassName, reactSelectClasses, reactSelectStyles } from './react-select';
 
@@ -11,8 +11,6 @@ export type ReactSelectAsyncProps = AsyncProps<any, boolean, any> & {
     error?: string;
     helperText?: string;
 };
-
-;
 
 export const ReactSelectAsync = forwardRef<any, ReactSelectAsyncProps>(({
 	label,
