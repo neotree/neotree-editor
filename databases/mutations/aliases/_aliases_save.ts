@@ -139,7 +139,6 @@ alls: any[]) {
   const errors = [];
   const info: SaveAliasesResponse['info'] = {};
   try {
-    logger.log("#########LOGGER",alls.length.toString())
     for (const al of alls) {
       try {
         const duplicate = await db.query.aliases.findFirst({

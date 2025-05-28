@@ -7,7 +7,6 @@ import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistor
 import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
-import { _generateScreenAliases } from "../aliases/_aliases_save";
 
 export async function _publishScripts() {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
@@ -141,13 +140,11 @@ export async function _publishScripts() {
             ...updates.map(c => c.scriptId!),
             ...deleted.map(c => c.scriptId!),
         ];
-
+  
         if (published.length) {
             await db.update(scripts)
                 .set({ version: sql`${scripts.version} + 1`,}).
                 where(inArray(scripts.scriptId, published));
-
-                await _generateScreenAliases(published)
         }
 
         results.success = true;

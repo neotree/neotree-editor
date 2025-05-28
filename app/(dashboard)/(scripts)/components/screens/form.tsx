@@ -20,7 +20,6 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { GetDrugsLibraryItemsResults } from '@/databases/queries/drugs-library';
-import {_getLeanAlias} from '@/databases/queries/aliases'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,20 +100,20 @@ export function ScreenForm({
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
-      const getAlias = useCallback(async () => {
-    try {
-      
-    
-    const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data='+JSON.stringify({ script: scriptId, name: key, }))        
-      setAlias(res?.data||''); 
-    } catch (err) {
-      setAlias(''); 
-    }
-  }, [scriptId, key]);
+  const getAlias = useCallback(async (name: string) => {
+         if (!name) return;
+        try {
 
-   useEffect(() => {
-    getAlias();
-  }, [getAlias]);
+            const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data=' + JSON.stringify({ script: scriptId, name: name}))
+            setAlias(res?.data?.alias || '');
+        } catch (err) {
+            setAlias('');
+        }
+    }, []);
+
+    useEffect(() => {
+        getAlias(key)
+    }, [getAlias,key]);
 
     if (!showForm) {
         return (
