@@ -1017,18 +1017,18 @@ export function ScreenForm({
                             <Label secondary htmlFor="repeatable">Repeatable Form</Label>
                         </div>
                     </div>
-
+                    
                     <Separator className="my-20" />
 
                     <Fields
                         form={form}
                         disabled={disabled}
                     />
-
+                    
                     {repeatable && (
                         <>
                             <Separator className="my-8" />
-                            
+
                             <div className="flex flex-col gap-y-5 [&>*]:px-4">
                                 <div className="flex flex-col gap-x-2">
                                     <Label secondary htmlFor="collectionName">Collection Name</Label>
@@ -1060,7 +1060,7 @@ export function ScreenForm({
                                                 <SelectGroup>
 
                                                     <SelectItem value="none">No Collection Label</SelectItem>
-                                                    {form?.getValues()?.fields?.map?.(f => (
+                                                    {form?.getValues()?.fields?.map(f => (
                                                         <SelectItem key={f.key} value={f.key}>
                                                             {f.key}
                                                         </SelectItem>

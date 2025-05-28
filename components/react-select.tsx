@@ -1,9 +1,9 @@
 'use client';
 
 import React, { forwardRef, useEffect, useState } from 'react';
+import Select, { type Props as SelectProps } from 'react-select';
 
 import { cn } from '@/lib/utils';
-import Select, { type Props as SelectProps } from 'react-select';
 import { Label } from '@/components/ui/label';
 
 export type ReactSelectProps = SelectProps & {
@@ -65,7 +65,7 @@ export const reactSelectContainerClassName = cn(
     [&_.react-slct-opt-focused]:bg-accent [&_.react-slct-opt-focused]:text-foreground`
 );
 
-export const ReactSelect = forwardRef<any, ReactSelectProps>(({
+export const ReactSelect = forwardRef<unknown, ReactSelectProps>(({
 	label,
 	error,
 	helperText,
@@ -89,7 +89,7 @@ export const ReactSelect = forwardRef<any, ReactSelectProps>(({
 				className={reactSelectContainerClassName}
 			>
 				<Select
-					ref={ref}
+					ref={ref as any}
 					{...props}
 					classNames={reactSelectClasses}
 					styles={reactSelectStyles}

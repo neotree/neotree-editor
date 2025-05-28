@@ -1,9 +1,12 @@
-import React, { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
 import { Controller, useForm } from "react-hook-form";
+import { FilterIcon } from "lucide-react";
 
+import { useScreenForm } from "../../hooks/use-screen-form";
 import { ScriptItem as ItemType } from "@/types";
-import * as dialog from "@/components/ui/dialog";
+import { DialogClose, } from "@/components/ui/dialog";
+import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,13 +24,10 @@ import {
 } from "@/components/ui/select";
 import { SelectModal } from "@/components/select-modal";
 import { useScriptsContext } from "@/contexts/scripts";
-import { useScreenForm } from "../../hooks/use-screen-form";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { FilterIcon } from "lucide-react";
 
 type Props = {
-    open?: boolean;
-    children?: React.ReactElement;
+    open: boolean;
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     types?: { value: string; label: string; }[];
@@ -37,61 +37,19 @@ type Props = {
         index: number;
         data: ItemType,
     };
-    onClose?: () => void;
+    onClose: () => void;
 };
 
-export const Item = forwardRef((props: Props, ref) => {
-    const {
-        children,
-        item,
-        itemType,
-        form,
-        disabled,
-        types,
-        subTypes,
-        open: openProp,
-        onClose,
-        ...triggerProps
-    } = props;
-
-    const [isOpen, setIsOpen] = useState<undefined | boolean>(openProp);
-
-    useEffect(() => { setIsOpen(openProp); }, [openProp]);
-
-    return (
-        <>
-            <dialog.Dialog
-                open={isOpen}
-                onOpenChange={open => {
-                    setIsOpen(open);
-                    if (!open) setTimeout(() => onClose?.(), 0);
-                }}
-            >
-                <dialog.DialogContent
-                    hideCloseButton
-                    className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
-                >
-                    <dialog.DialogHeader className="border-b border-b-border px-4 py-4">
-                        <dialog.DialogTitle>{!props.item?.data ? 'New item' : 'Edit item'}</dialog.DialogTitle>
-                        <dialog.DialogDescription className="hidden">{''}</dialog.DialogDescription>
-                    </dialog.DialogHeader>
-
-                    {isOpen && <Form {...props} />}
-                </dialog.DialogContent>
-            </dialog.Dialog>
-        </>
-    );
-});
-
-function Form({
-    children,
+export function Item<P = {}>({
+    open,
     item: itemProp,
     itemType,
     form,
     disabled: disabledProp,
     types = [],
     subTypes = [],
-}: Props) {
+    onClose,
+}: Props & P) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
@@ -103,7 +61,6 @@ function Form({
 
     const { dataKeys } = useScriptsContext();
 
-    const [open, setOpen] = useState(false);
     const [isCustomType, setIsCustomType] = useState(false);
     const [isCustomSubType, setIsCustomSubType] = useState(false);
 
@@ -157,7 +114,6 @@ function Form({
         defaultValues: getDefaultValues(),
     });
 
-    const itemId = watch('itemId');
     const id = watch('id');
     const subType = watch('subType');
     const type = watch('type');
@@ -171,7 +127,6 @@ function Form({
     const keyHasError = false; // key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
-    const isKeyDisabled = false; // isChecklistScreen ? disabled : true;
 
     const onSave = handleSubmit(data => {
         if (!isEmpty(itemIndex) && item) {
@@ -185,8 +140,10 @@ function Form({
         } else {
             form.setValue('items', [...form.getValues('items'), data], { shouldDirty: true, })
         }
-        setOpen(false);
+        onClose();
     });
+
+    const isKeyDisabled = false; // isChecklistScreen ? disabled : true;
 
     const renderKeyComponent = ({ 
         value: key, 
@@ -205,7 +162,7 @@ function Form({
                 modal
                 selected={key}
                 disabled={isKeyDisabled}
-                error={isKeyDisabled ? undefined : !disabled && (!key || keyHasError)}
+                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)}
                 placeholder={label}
                 search={{
                     placeholder: 'Search data keys',
@@ -245,7 +202,36 @@ function Form({
 
     return (
         <>
-            <div className="flex-1 flex flex-col overflow-y-auto px-4 py-2">
+            <Modal
+                open={open}
+                title={!item ? 'New item' : 'Edit item'}
+                onOpenChange={open => {
+                    if (!open) onClose();
+                    resetForm(getDefaultValues());
+                }}
+                actions={(
+                    <>
+                        <span className={cn('text-danger text-xs', disabled && 'hidden')}>* Required</span>
+
+                        <div className="flex-1" />
+
+                        <DialogClose asChild>
+                            <Button
+                                variant="ghost"
+                            >
+                                Cancel
+                            </Button>
+                        </DialogClose>
+
+                        <Button
+                            disabled={disabled}
+                            onClick={() => onSave()}
+                        >
+                            Save
+                        </Button>
+                    </>
+                )}
+            >
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         {(() => {
@@ -253,8 +239,17 @@ function Form({
                                 return (
                                     <>
                                         <div>
+                                            <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                                            <Input
+                                                {...register('label', { disabled, required: true, })}
+                                                name="label"
+                                                error={!disabled && !label}
+                                            />
+                                        </div>
+
+                                        <div>
                                             <Label 
-                                                error={isKeyDisabled ? undefined : !disabled && (!key || keyHasError)} 
+                                                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)} 
                                                 htmlFor="key"
                                             >Key *</Label>
                                             <Controller 
@@ -265,15 +260,6 @@ function Form({
                                                     variant: 'key',
                                                     label: 'Select key',
                                                 })}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label error={!disabled && !label} htmlFor="label">Label *</Label>
-                                            <Input
-                                                {...register('label', { disabled, required: true, })}
-                                                name="label"
-                                                error={!disabled && !label}
                                             />
                                         </div>
 
@@ -335,7 +321,7 @@ function Form({
                                         <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
                                             <div>
                                                 <Label 
-                                                    error={isKeyDisabled ? undefined : !disabled && !id} 
+                                                    error={(isKeyDisabled || disabled) ? undefined : !id} 
                                                     htmlFor="id"
                                                 >ID *</Label>
                                                 <Controller 
@@ -353,7 +339,7 @@ function Form({
                                                 <Label error={!disabled && !label} htmlFor="label">Label *</Label>
                                                 <Input
                                                     {...register('label', { disabled, required: true, })}
-                                                    // name="label"
+                                                    name="label"
                                                     error={!disabled && !label}
                                                 />
                                             </div>
@@ -493,7 +479,7 @@ function Form({
                                                 </div>
 
                                                 <div>
-                                                    <Label htmlFor="score">Score</Label>
+                                                    <Label htmlFor="label">Score</Label>
                                                     <Input
                                                         {...register('score', { disabled, required: false, })}
                                                         name="score"
@@ -508,28 +494,7 @@ function Form({
                         })()}
                     </div>
                 </div>
-            </div>
-
-            <dialog.DialogFooter className="border-t border-t-border px-4 py-2 items-center w-full">
-                <span className={cn('text-danger text-xs', disabled && 'hidden')}>* Required</span>
-
-                <div className="flex-1" />
-
-                <dialog.DialogClose asChild>
-                    <Button
-                        variant="ghost"
-                    >
-                        Cancel
-                    </Button>
-                </dialog.DialogClose>
-
-                <Button
-                    disabled={disabled}
-                    onClick={() => onSave()}
-                >
-                    Save
-                </Button>
-            </dialog.DialogFooter>
+            </Modal>
         </>
     );
 }

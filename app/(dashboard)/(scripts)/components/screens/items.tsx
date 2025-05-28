@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
+import { useQueryState } from 'nuqs';
 
 import { DataTable } from "@/components/data-table";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -101,20 +101,25 @@ export function Items({
         })
     }, [form, items, confirm]);
 
+    const [currentItem, setCurrentItem] = useQueryState('item', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     return (
         <>
-            <div>
-                <Item 
-                    open={showAddItemForm || !!activeItem}
-                    disabled={disabled} 
+            {!!currentItem && (
+                <Item
+                    open={!!currentItem}
+                    onClose={() => setCurrentItem('')}
                     form={form}
-                    item={activeItem || undefined}
-                    onClose={() => {
-                        setActiveItem(null);
-                        setShowAddItemForm(false);
+                    disabled={disabled}
+                    item={!items[Number(currentItem)] ? undefined : {
+                        data: items[Number(currentItem)],
+                        index: Number(currentItem),
                     }}
                 />
-            </div>
+            )}
 
             <DataTable 
                 title="Items"
@@ -126,19 +131,16 @@ export function Items({
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
-                // headerActions={(isDiagnosisScreen || isChecklistScreen || isProgressScreen) && (
-                headerActions={(
+                headerActions={disabled ? undefined : (
                     <>
-                        {disabled ? null : (
-                            <Button 
-                                className="text-primary border-primary w-full" 
-                                variant="outline"
-                                onClick={() => setShowAddItemForm(true)}
-                            >
-                                <Plus className="h-4 w-4 mr-1" />
-                                New item
-                            </Button>
-                        )}
+                        <Button 
+                            className="text-primary border-primary" 
+                            variant="outline"
+                            onClick={() => setCurrentItem('new')}
+                        >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New item
+                        </Button>
                     </>
                 )}
                 columns={[
@@ -170,20 +172,13 @@ export function Items({
                                     </DropdownMenuTrigger>
 
                                     <DropdownMenuContent>
-                                        <DropdownMenuItem asChild>
-                                            <Button 
-                                                variant="ghost"
-                                                className="justify-start w-full"
-                                                onClick={() => {
-                                                    setTimeout(() => setActiveItem({
-                                                        data: item,
-                                                        index: rowIndex,
-                                                    }), 0);
-                                                }}
-                                            >
-                                                <Edit className="w-4 h-4 mr-2" />
-                                                <span>{disabled ? 'View' : 'Edit'}</span>
-                                            </Button>
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                setTimeout(() => setCurrentItem(`${rowIndex}`), 0);
+                                            }}
+                                        >
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            <span>{disabled ? 'View' : 'Edit'}</span>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuItem 
