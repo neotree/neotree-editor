@@ -7,7 +7,7 @@ import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
-import { _generateScreenAliases } from '../aliases/_aliases_save';
+
 
 export type SaveScreensData = Partial<ScreenType>;
 

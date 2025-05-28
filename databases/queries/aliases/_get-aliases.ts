@@ -29,18 +29,23 @@ export async function _getAllAliases(): Promise<GetAliasesResults> {
 export async function _getLeanAlias(opts:{
   script: string,
   name: string
+  from?:string
 }){
   try{
-  logger.log('##########IN LEAN LEAN', opts);
+    if(opts && opts.name){
   const alias = await db.query.aliases.findFirst({
+    
           where: (and(eq(aliases.script, opts.script),
             eq(aliases.name, opts.name)
-          ))
+          )  
+        ),columns: {alias:true}
         })
-         logger.log('##########IN-HUI', alias);
-        return alias?alias.alias:''
+        return alias
+      }
+      return {alias:''}
       }catch(ex:any){ 
-        logger.error('##########IN ERROR', ex);  
+        logger.error("--PARAMS---",opts)
+        logger.error('##########IN ERROR', ex); 
       }
         
 

@@ -15,9 +15,18 @@ export const getAllAliases: typeof queries._getAllAliases = async (...args) => {
 };
 
 export const getLeanAlias: typeof queries._getLeanAlias = async (...args) => {
-      logger.log('##########', ...args);
+    try{
         await isAllowed();
-        return await queries._getLeanAlias(...args);
+        const alias =  await queries._getLeanAlias(...args)
+        if(alias){
+          return alias
+        }
+
+        return {alias:''};
+       
+    }catch(e:any){
+
+    }
     
 };
 

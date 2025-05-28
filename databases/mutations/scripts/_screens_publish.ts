@@ -5,6 +5,7 @@ import db from "@/databases/pg/drizzle";
 import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema";
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
+import { _generateScreenAliases } from "../aliases/_aliases_save";
 
 export async function _publishScreens(opts?: {
     scriptsIds?: string[];
@@ -13,8 +14,8 @@ export async function _publishScreens(opts?: {
 }) {
     const { scriptsIds, screensIds, } = { ...opts, };
 
-       // GENERATE ALIASES FOR ALL UPDATED SCREENS
-    
+    // GENERATE ALIASES FOR ALL UPDATED SCREENS
+
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
@@ -52,7 +53,7 @@ export async function _publishScreens(opts?: {
                 });
             }
 
-            for(const { screenId: _screenId, data: c} of updates) {
+            for (const { screenId: _screenId, data: c } of updates) {
                 const screenId = _screenId!;
                 const { screenId: __screenId, id, oldScreenId, createdAt, updatedAt, deletedAt, ...payload } = c;
 
@@ -80,8 +81,8 @@ export async function _publishScreens(opts?: {
                     where: inArray(screens.screenId, inserts.filter(c => c.screenId).map(c => c.screenId!))
                 });
             }
-            
-            for(const { id, scriptId: _scriptId, scriptDraftId, data } of inserts) {
+
+            for (const { id, scriptId: _scriptId, scriptDraftId, data } of inserts) {
                 const screenId = data.screenId || v4();
                 const scriptId = (data.scriptId || _scriptId || scriptDraftId)!;
                 const payload = { ...data, screenId, scriptId };
@@ -145,6 +146,17 @@ export async function _publishScreens(opts?: {
             ...deleted.map(c => c.screenId!),
         ];
 
+        const updatedScripts = Array.from(
+            new Set(
+                (updates ?? [])
+                    .map(ud => ud.scriptId)
+                    .filter((id): id is string => Boolean(id))
+            )
+        );
+        if (updatedScripts.length) {
+            await _generateScreenAliases(updatedScripts)
+        }
+
         if (published.length) {
             await db.update(screens)
                 .set({ version: sql`${screens.version} + 1`, }).
@@ -152,7 +164,7 @@ export async function _publishScreens(opts?: {
         }
 
         results.success = true;
-    } catch(e: any) {
+    } catch (e: any) {
         results.success = false;
         results.errors = [e.message];
         logger.error('_publishScreens ERROR', e);

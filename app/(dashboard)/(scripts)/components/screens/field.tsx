@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState,useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
 
@@ -98,18 +98,23 @@ export function Field<P = {}>({
     const isNumberField = useMemo(() => type === 'number', [type]);
     const isDropdownField = useMemo(() => type === 'dropdown', [type]);
 
-    const getAlias = useCallback(async () => {
+
+    const getAlias = useCallback(async (name: string) => {
+         if (!name) return;
         try {
-              const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data='+JSON.stringify({ script: scriptId, name: key, }))
-            setAlias(res.data||'');
+
+            const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data=' + JSON.stringify({ script: scriptId, name: name}))
+            setAlias(res?.data?.alias || '');
         } catch (err) {
             setAlias('');
         }
-    }, [ key]);
+    }, []);
 
     useEffect(() => {
-        getAlias();
-    }, [getAlias]);
+        getAlias(key)
+    }, [getAlias,key]);
+
+
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
