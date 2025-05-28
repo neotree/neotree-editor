@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 import '@/lib/resize-observer-polyfill';
 import { AuthContextProvider } from "@/components/providers/auth-context-provider";
@@ -56,47 +57,49 @@ export default async function RootLayout({
     return (
         <html lang="en">
             <body className={roboto.className}>
-                <AuthContextProvider>
-                    <ThemeProvider
-                        attribute="class"
-                        defaultTheme="light"
-                        enableSystem
-                        disableTransitionOnChange
-                    >
-                        <AppContextProvider
-                            {...opsActions}
-                            {...sysActions}
-                            {...editorDetails}
-                            {...authenticatedUser}
-                            sys={sys}
-                            getSites={getSitesWithoutConfidentialData}
+                <NuqsAdapter>
+                    <AuthContextProvider>
+                        <ThemeProvider
+                            attribute="class"
+                            defaultTheme="light"
+                            enableSystem
+                            disableTransitionOnChange
                         >
-                            {children}
+                            <AppContextProvider
+                                {...opsActions}
+                                {...sysActions}
+                                {...editorDetails}
+                                {...authenticatedUser}
+                                sys={sys}
+                                getSites={getSitesWithoutConfidentialData}
+                            >
+                                {children}
 
-                            <SocketEventsListener 
-                                events={[
-                                    {
-                                        name: 'mode_changed',
-                                        onEvent: { refreshRouter: true, },
-                                    },
-                                    {
-                                        name: 'update_system',
-                                        onEvent: { refreshRouter: true, },
-                                    },
-                                    {
-                                        name: 'data_changed',
-                                        onEvent: { refreshRouter: true, },
-                                    },
+                                <SocketEventsListener 
+                                    events={[
+                                        {
+                                            name: 'mode_changed',
+                                            onEvent: { refreshRouter: true, },
+                                        },
+                                        {
+                                            name: 'update_system',
+                                            onEvent: { refreshRouter: true, },
+                                        },
+                                        {
+                                            name: 'data_changed',
+                                            onEvent: { refreshRouter: true, },
+                                        },
 
-                                ]}
-                            />
-                        </AppContextProvider>
-                        <Toaster />
-                        <ConfirmModal />
-                        <AlertModal />
-                        <FilesModal />
-                    </ThemeProvider>
-                </AuthContextProvider>
+                                    ]}
+                                />
+                            </AppContextProvider>
+                            <Toaster />
+                            <ConfirmModal />
+                            <AlertModal />
+                            <FilesModal />
+                        </ThemeProvider>
+                    </AuthContextProvider>
+                </NuqsAdapter>
             </body>
         </html>
     );

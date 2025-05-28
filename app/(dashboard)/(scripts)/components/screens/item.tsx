@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 
 type Props = {
-    children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
+    open: boolean;
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     types?: { value: string; label: string; }[];
@@ -33,17 +33,18 @@ type Props = {
         index: number;
         data: ItemType,
     };
+    onClose: () => void;
 };
 
 export function Item<P = {}>({
-    children,
+    open,
     item: itemProp,
     itemType,
     form,
     disabled: disabledProp,
     types = [],
     subTypes = [],
-    ...extraProps
+    onClose,
 }: Props & P) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
@@ -54,7 +55,6 @@ export function Item<P = {}>({
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
-    const [open, setOpen] = useState(false);
     const [isCustomType, setIsCustomType] = useState(false);
     const [isCustomSubType, setIsCustomSubType] = useState(false);
 
@@ -133,7 +133,7 @@ export function Item<P = {}>({
         } else {
             form.setValue('items', [...form.getValues('items'), data], { shouldDirty: true, })
         }
-        setOpen(false);
+        onClose();
     });
 
     return (
@@ -141,9 +141,8 @@ export function Item<P = {}>({
             <Modal
                 open={open}
                 title={!item ? 'New item' : 'Edit item'}
-                trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
-                    setOpen(open);
+                    if (!open) onClose();
                     resetForm(getDefaultValues());
                 }}
                 actions={(

@@ -1,20 +1,15 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams, useParams } from "next/navigation";
-import queryString from "query-string";
-import { MoreVertical, Trash, ChevronDown } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { MoreVertical, Trash } from "lucide-react"
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
-import clsx from "clsx";
 import { arrayMoveImmutable } from 'array-move';
 
 import { listScreens } from "@/app/actions/scripts";
 import {
     DropdownMenu,
-    DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
     DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
@@ -26,8 +21,6 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator"
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { PrintSection } from "@/types";
@@ -35,12 +28,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
+import { ReactSelect } from "@/components/react-select";
 
 type Screen = Awaited<ReturnType<typeof listScreens>>['data'][0];
 
-export function PrintForm({ disabled, section, onChange }: {
+export function PrintForm({ open, disabled, section, onClose, onChange }: {
+    open: boolean;
     disabled?: boolean;
     section?: PrintSection;
+    onClose: () => void;
     onChange: (section: PrintSection) => void;
 }) {
     const screensInitialised = useRef(false);
@@ -49,22 +45,13 @@ export function PrintForm({ disabled, section, onChange }: {
     const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
     const [loading, setLoading] = useState(false);
-    const [open, setOpen] = useState(false);
     const [title, setTitle] = useState(section?.title || '');
     const [screens, setScreens] = useState<Screen[]>([]);
     const [selected, setSelected] = useState(section?.screensIds || []);
 
     const { alert } = useAlertModal();
 
-    const router = useRouter();
     const { scriptId } = useParams();
-    const searchParams = useSearchParams(); 
-    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { printSectionId, addPrintSection } = searchParamsObj;
-
-    useEffect(() => {
-        setOpen(!!printSectionId || !!addPrintSection);
-    }, [printSectionId, addPrintSection]);
 
     useEffect(() => {
         setTitle(section?.title || '');
@@ -80,20 +67,13 @@ export function PrintForm({ disabled, section, onChange }: {
         });
     }, [selected, title, section, onChange]);
 
-    const onClose = useCallback(() => {
-        setOpen(false);
+    const _onClose = useCallback(() => {
         setTitle('');
         setSelected([]);
-
-        router.push(`?${queryString.stringify({ 
-            ...searchParamsObj, 
-            printSectionId: undefined, 
-            addPrintSection: undefined, 
-        })}`);
-
         const scrollPos = containerDiv?.top || 0;
         setTimeout(() => window.scrollTo({ top: scrollPos, }), 500);
-    }, [searchParamsObj, containerDiv, router.push]);
+        onClose();
+    }, [containerDiv, onClose]);
 
     const loadScreens = useCallback(async () => {
         if (!screensInitialised.current && open) {
@@ -129,9 +109,14 @@ export function PrintForm({ disabled, section, onChange }: {
         return [
             screen.position,
             screen.title,
-            `<span class="opacity-50">${screen.refId || ''}</span>`,
+            screen.refId || '',
         ].join(' - ');
     }, []);
+
+    const selectOpts = screens.map(s => ({
+        value: s.screenId,
+        label: getScreenLabel(s),
+    })).filter(s => !selected.includes(s.value));
 
     return (
         <>
@@ -141,7 +126,7 @@ export function PrintForm({ disabled, section, onChange }: {
                 <Sheet
                     open={open}
                     onOpenChange={open => {
-                        if (!open) onClose();
+                        if (!open) _onClose();
                     }}
                 >
                     <SheetContent
@@ -150,7 +135,7 @@ export function PrintForm({ disabled, section, onChange }: {
                         className="p-0 m-0 flex flex-col w-full max-w-full sm:max-w-[80%] md:max-w-[80%] lg:max-w-[50%]"
                     >
                         <SheetHeader className="flex flex-row items-center py-2 px-4 border-b border-b-border text-left sm:text-left">
-                            <SheetTitle>{addPrintSection ? 'Add' : ''}{printSectionId ? 'Edit' : ''} print section</SheetTitle>
+                            <SheetTitle>{!section ? 'Add' : 'Edit'} print section</SheetTitle>
                             <SheetDescription className="hidden"></SheetDescription>
                         </SheetHeader>
 
@@ -169,37 +154,18 @@ export function PrintForm({ disabled, section, onChange }: {
                                 <Label secondary>Screens</Label>
 
                                 <div>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="outline" className="w-full">
-                                                Select screens
-                                                <ChevronDown className="ml-auto h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent 
-                                            className="max-h-[400px] overflow-y-auto"
-                                            style={{ width: contentDiv.width, }}
-                                        >
-                                            <DropdownMenuLabel>Screens</DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <div className=" max-h-[400px] overflow-y-auto">
-                                                {screens.map(s => {
-                                                    const checked = selected.includes(s.screenId);
-                                                    return (
-                                                        <DropdownMenuCheckboxItem
-                                                            key={s.screenId}
-                                                            checked={checked}
-                                                            onCheckedChange={() => {
-                                                                setSelected(prev => checked ? prev.filter(v => v !== s.screenId) : [...prev, s.screenId]);
-                                                            }}
-                                                        >
-                                                            <div dangerouslySetInnerHTML={{ __html: getScreenLabel(s), }} />
-                                                        </DropdownMenuCheckboxItem>
-                                                    );
-                                                })}
-                                            </div>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <ReactSelect
+                                        isDisabled={disabled}
+                                        value={null}
+                                        placeholder="Select screen"
+                                        isClearable={false}
+                                        options={selectOpts}
+                                        onChange={(val) =>
+                                        {
+                                            const v = val as null | typeof selectOpts[0];
+                                            if (v?.value) setSelected(prev => [...prev, v.value]);
+                                        }}
+                                    />
                                 </div>
                             </div>
 
