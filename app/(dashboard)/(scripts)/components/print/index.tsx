@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react"
 import { arrayMoveImmutable } from 'array-move';
+import { useQueryState } from 'nuqs';
 
 import {
     DropdownMenu,
@@ -38,12 +39,19 @@ export function PrintSections({
         setValue('printSections', sections.filter(s => s.sectionId !== sectionId));
     }, [sections, setValue]);
 
+    const [currentSection, setCurrentSection] = useQueryState('item', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     return (
         <>
             <PrintForm
+                open={!!currentSection}
+                onClose={() => setCurrentSection('')}
                 disabled={disabled}
-                section={sections.filter(s => s.sectionId === printSectionId)[0]}
-                onChange={section => !printSectionId ? 
+                section={sections.filter(s => `${s.sectionId}` === `${currentSection}`)[0]}
+                onChange={section => (currentSection === 'new') ? 
                     setValue('printSections', [...sections, section])
                     :
                     setValue('printSections', sections.map(s => {
@@ -62,18 +70,11 @@ export function PrintSections({
                 headerActions={(
                     <>
                         <Button
-                            asChild
                             variant="outline"
+                            onClick={() => setCurrentSection('new')}
                         >
-                            <Link
-                                href={`?${queryString.stringify({ 
-                                    ...searchParamsObj,
-                                    addPrintSection: 1,
-                                })}`}
-                            >
-                                Add print section
-                                <Plus className="w-4 h-4 ml-2" />
-                            </Link>
+                            Add print section
+                            <Plus className="w-4 h-4 ml-2" />
                         </Button>
                     </>
                 )}
@@ -104,15 +105,14 @@ export function PrintSections({
 
                                         <DropdownMenuContent>
                                             <DropdownMenuItem 
-                                                asChild
+                                                onClick={() => {
+                                                    setTimeout(() => setCurrentSection(`${section.sectionId}`), 0);
+                                                }}
                                             >
-                                                <Link
-                                                    href={`?${queryString.stringify({ ...searchParamsObj, printSectionId: section.sectionId, })}`}
-                                                >
-                                                    <>
-                                                        {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
-                                                    </>
-                                                </Link>
+                                                {!disabled ? 
+                                                    <><Edit className="mr-2 h-4 w-4" /> Edit</> 
+                                                    : 
+                                                    <><Eye className="mr-2 h-4 w-4" /> View</>}
                                             </DropdownMenuItem>
 
                                             {!disabled && (

@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import {
@@ -41,15 +41,15 @@ type Props = {
     onClose: () => void;
 };
 
-const Field = forwardRef<any, Props>(({
+export function Field({
     open,
     field: fieldProp,
     form,
     disabled: disabledProp,
     onClose,
-}: Props, ref) => {
+}: Props) {
     const { dataKeys } = useScriptsContext();
-
+    
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
     const [showForm, setShowForm] = useState(!!field);
@@ -650,8 +650,4 @@ const Field = forwardRef<any, Props>(({
             </Dialog>
         </>
     );
-});
-
-Field.displayName = 'Field';
-
-export { Field, };
+};

@@ -1,12 +1,11 @@
 import { useCallback, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
 import { useQueryState } from 'nuqs';
 
 import { DataTable } from "@/components/data-table";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -108,7 +107,6 @@ export function Fields({
                         data: fields[Number(currentField)],
                         index: Number(currentField),
                     }}
-
                 />
             )}
 
@@ -122,7 +120,7 @@ export function Fields({
                 search={{
                     inputPlaceholder: 'Search fields',
                 }}
-                headerActions={(
+                headerActions={disabled ? undefined : (
                     <>
                         <Button 
                             className="text-primary border-primary" 

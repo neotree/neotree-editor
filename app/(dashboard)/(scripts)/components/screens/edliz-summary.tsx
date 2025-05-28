@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback, useState } from "react";
 import { Edit, MoreVertical, Trash, Plus } from "lucide-react"
+import { useQueryState } from 'nuqs';
 
 import {
     DropdownMenu,
@@ -103,34 +104,46 @@ export function EdlizSummary({
             })), 
         };
     }, [items]);
+
+    const [currentItem, setCurrentItem] = useQueryState('item', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
+    const [currentItemType, setCurrentItemType] = useQueryState('itemType', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
     
     return (
         <>
-            <div>
-                <Item 
-                    {...getTypes()}
-                    open={showAddItemForm || !!activeItem}
-                    disabled={disabled} 
-                    form={form}
-                    item={activeItem || undefined}
+            {!!currentItem && (
+                <Item
+                    open={!!currentItem}
                     onClose={() => {
-                        setActiveItem(null);
-                        setShowAddItemForm(false);
+                        setCurrentItem('');
+                        setCurrentItemType('');
                     }}
+                    form={form}
+                    disabled={disabled}
+                    itemType={!currentItemType ? undefined : currentItemType}
+                    item={!items[Number(currentItem)] ? undefined : {
+                        data: items[Number(currentItem)],
+                        index: Number(currentItem),
+                    }}
+                    {...getTypes()}
                 />
-            </div>
+            )}
 
             {!items.length && (
-                <div className="flex items-center justify-center p-8">
-                    <Button 
-                        className="text-primary border-primary w-full" 
-                        variant="outline"
-                        onClick={() => setShowAddItemForm(true)}
-                    >
-                        <Plus className="h-4 w-4 mr-1" />
-                        New item
-                    </Button>
-                </div>
+                <Button 
+                    className="text-primary border-primary" 
+                    variant="outline"
+                    onClick={() => setCurrentItem('new')}
+                >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New item
+                </Button>
             )}
 
             {Object.keys(sections).map(key => {
@@ -145,19 +158,17 @@ export function EdlizSummary({
                                     <>
                                         {!disabled && (
                                             <div className="flex gap-x-4">
-                                                <Item
-                                                    form={form}
-                                                    disabled={disabled}
-                                                    itemType={key}
-                                                    {...getTypes()}
+                                                <Button 
+                                                    className="text-primary border-primary" 
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setCurrentItem('new');
+                                                        setCurrentItemType(key);
+                                                    }}
                                                 >
-                                                    <DialogTrigger asChild>
-                                                        <Button className="text-primary border-primary" variant="outline">
-                                                            <Plus className="h-4 w-4 mr-1" />
-                                                            New item
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                </Item>
+                                                    <Plus className="h-4 w-4 mr-1" />
+                                                    New item
+                                                </Button>
 
                                                 <EditSection
                                                     form={form}
@@ -241,20 +252,13 @@ export function EdlizSummary({
                                                         </DropdownMenuTrigger>
 
                                                         <DropdownMenuContent>
-                                                            <DropdownMenuItem asChild>
-                                                                <Button 
-                                                                    variant="ghost"
-                                                                    className="justify-start w-full"
-                                                                    onClick={() => {
-                                                                        setTimeout(() => setActiveItem({
-                                                                            data: item,
-                                                                            index: rowIndex,
-                                                                        }), 0);
-                                                                    }}
-                                                                >
-                                                                    <Edit className="w-4 h-4 mr-2" />
-                                                                    <span>{disabled ? 'View' : 'Edit'}</span>
-                                                                </Button>
+                                                            <DropdownMenuItem 
+                                                                onClick={() => {
+                                                                    setTimeout(() => setCurrentItem(`${rowIndex}`), 0);
+                                                                }}
+                                                            >
+                                                                <Edit className="w-4 h-4 mr-2" />
+                                                                <span>{disabled ? 'View' : 'Edit'}</span>
                                                             </DropdownMenuItem>
 
                                                             <DropdownMenuItem
