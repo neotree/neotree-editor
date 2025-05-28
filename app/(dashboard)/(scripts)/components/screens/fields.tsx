@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
+import { useQueryState } from 'nuqs';
 
 import { DataTable } from "@/components/data-table";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -90,8 +90,26 @@ export function Fields({
         })
     }, [form, fields, confirm]);
 
+    const [currentField, setCurrentField] = useQueryState('field', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     return (
         <>
+            {!!currentField && (
+                <Field
+                    open={!!currentField}
+                    onClose={() => setCurrentField('')}
+                    form={form}
+                    disabled={disabled}
+                    field={!fields[Number(currentField)] ? undefined : {
+                        data: fields[Number(currentField)],
+                        index: Number(currentField),
+                    }}
+                />
+            )}
+
             <DataTable 
                 title="Fields"
                 sortable={!disabled}
@@ -102,21 +120,16 @@ export function Fields({
                 search={{
                     inputPlaceholder: 'Search fields',
                 }}
-                headerActions={(
+                headerActions={disabled ? undefined : (
                     <>
-                        <Field
-                            form={form}
-                            disabled={disabled}
+                        <Button 
+                            className="text-primary border-primary" 
+                            variant="outline"
+                            onClick={() => setCurrentField('new')}
                         >
-                            {!disabled && (
-                                <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary" variant="outline">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        New field
-                                    </Button>
-                                </DialogTrigger>
-                            )}
-                        </Field>
+                            <Plus className="h-4 w-4 mr-1" />
+                            New field
+                        </Button>
                     </>
                 )}
                 columns={[
@@ -148,25 +161,13 @@ export function Fields({
                                     </DropdownMenuTrigger>
 
                                     <DropdownMenuContent>
-                                        <DropdownMenuItem asChild>
-                                            <Field 
-                                                disabled={disabled} 
-                                                form={form}
-                                                field={{
-                                                    data: field,
-                                                    index: rowIndex,
-                                                }}
-                                            >
-                                                {({ extraProps }) => (
-                                                    <DialogTrigger 
-                                                        {...extraProps}
-                                                        className={cn(extraProps?.className, 'w-full')}
-                                                    >
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                    </DialogTrigger>
-                                                )}
-                                            </Field>
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                setTimeout(() => setCurrentField(`${rowIndex}`), 0);
+                                            }}
+                                        >
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            <span>{disabled ? 'View' : 'Edit'}</span>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuItem 
