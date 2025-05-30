@@ -1,5 +1,5 @@
 import { configKeys, diagnoses, screens, scripts } from "@/databases/pg/schema";
-import { ScreenReviewField, ScriptField } from "@/types";
+import { Alias, ScreenReviewField, ScriptField } from "@/types";
 import { Label } from "@radix-ui/react-dropdown-menu";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
