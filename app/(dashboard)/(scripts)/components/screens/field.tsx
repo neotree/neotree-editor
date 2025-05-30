@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { v4 } from "uuid";
 import { useForm } from "react-hook-form";
 
@@ -30,6 +30,8 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
+import { getLeanAlias } from '@/app/actions/aliases'
+import axios from 'axios';
 
 type Props = {
     open: boolean;
@@ -40,12 +42,14 @@ type Props = {
     };
     form: ReturnType<typeof useScreenForm>;
     onClose: () => void;
+    scriptId: any;
 };
 
 export function Field<P = {}>({
     open,
     field: fieldProp,
     form,
+    scriptId,
     disabled: disabledProp,
     onClose,
 }: Props & P) {
@@ -67,6 +71,7 @@ export function Field<P = {}>({
     } = useForm({
         defaultValues: getDefaultValues(),
     });
+    const [alias, setAlias] = useState('');
 
     const type = watch('type');
     const format = watch('format');
@@ -92,6 +97,24 @@ export function Field<P = {}>({
     const isPeriodField = useMemo(() => type === 'period', [type]);
     const isNumberField = useMemo(() => type === 'number', [type]);
     const isDropdownField = useMemo(() => type === 'dropdown', [type]);
+
+
+    const getAlias = useCallback(async (name: string) => {
+         if (!name) return;
+        try {
+
+            const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data=' + JSON.stringify({ script: scriptId, name: name}))
+            setAlias(res?.data?.alias || '');
+        } catch (err) {
+            setAlias('');
+        }
+    }, []);
+
+    useEffect(() => {
+        getAlias(key)
+    }, [getAlias,key]);
+
+
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
@@ -183,13 +206,13 @@ export function Field<P = {}>({
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                    <SelectGroup>
-                                        <SelectLabel>User role</SelectLabel>
-                                        {FieldTypes.map(t => (
-                                            <SelectItem key={t.name} value={t.name}>
-                                                {t.label}
-                                            </SelectItem>
-                                        ))}
+                                        <SelectGroup>
+                                            <SelectLabel>User role</SelectLabel>
+                                            {FieldTypes.map(t => (
+                                                <SelectItem key={t.name} value={t.name}>
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
                                         </SelectGroup>
                                     </SelectContent>
                                 </Select>
@@ -244,8 +267,8 @@ export function Field<P = {}>({
 
                             <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
                                 <div className="flex-1 flex items-center space-x-2">
-                                    <Switch 
-                                        id="confidential" 
+                                    <Switch
+                                        id="confidential"
                                         disabled={disabled}
                                         checked={confidential}
                                         onCheckedChange={checked => setValue('confidential', checked, { shouldDirty: true, })}
@@ -254,8 +277,8 @@ export function Field<P = {}>({
                                 </div>
 
                                 <div className="flex-1 flex items-center space-x-2">
-                                    <Switch 
-                                        id="optional" 
+                                    <Switch
+                                        id="optional"
                                         disabled={disabled}
                                         checked={optional}
                                         onCheckedChange={checked => setValue('optional', checked, { shouldDirty: true, })}
@@ -309,13 +332,13 @@ export function Field<P = {}>({
                                             <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                        <SelectGroup>
-                                            <SelectLabel>Formats</SelectLabel>
-                                            {PERIOD_FIELD_FORMATS.map(t => (
-                                                <SelectItem key={t.value} value={t.value}>
-                                                    {t.label}
-                                                </SelectItem>
-                                            ))}
+                                            <SelectGroup>
+                                                <SelectLabel>Formats</SelectLabel>
+                                                {PERIOD_FIELD_FORMATS.map(t => (
+                                                    <SelectItem key={t.value} value={t.value}>
+                                                        {t.label}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectGroup>
                                         </SelectContent>
                                     </Select>
@@ -365,7 +388,7 @@ export function Field<P = {}>({
                                         <div className="flex-1 flex flex-col gap-y-5">
                                             <div>
                                                 <Label>Min date</Label>
-                                                <DateTimePicker 
+                                                <DateTimePicker
                                                     disabled={disabled || (minDate === 'date_now')}
                                                     type="datetime"
                                                     value={minDate}
@@ -378,8 +401,8 @@ export function Field<P = {}>({
                                             </div>
 
                                             <div className="flex-1 flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id="minDateCurrent" 
+                                                <Checkbox
+                                                    id="minDateCurrent"
                                                     disabled={disabled}
                                                     checked={minDate === 'date_now'}
                                                     onCheckedChange={checked => setValue('minDate', checked ? 'date_now' : '', { shouldDirty: true, })}
@@ -400,7 +423,7 @@ export function Field<P = {}>({
                                         <div className="flex-1 flex flex-col gap-y-5">
                                             <div>
                                                 <Label>Max date</Label>
-                                                <DateTimePicker 
+                                                <DateTimePicker
                                                     disabled={disabled || (maxDate === 'date_now')}
                                                     type="datetime"
                                                     value={maxDate}
@@ -413,8 +436,8 @@ export function Field<P = {}>({
                                             </div>
 
                                             <div className="flex-1 flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id="maxDateCurrent" 
+                                                <Checkbox
+                                                    id="maxDateCurrent"
                                                     disabled={disabled}
                                                     checked={maxDate === 'date_now'}
                                                     onCheckedChange={checked => setValue('maxDate', checked ? 'date_now' : '', { shouldDirty: true, })}
@@ -463,8 +486,8 @@ export function Field<P = {}>({
                                         <div className="flex-1 flex flex-col gap-y-5">
                                             <div>
                                                 <Label>Min time</Label>
-                                                {minTime === 'time_now' ? <Input disabled type="time" /> :  (
-                                                    <DateTimePicker 
+                                                {minTime === 'time_now' ? <Input disabled type="time" /> : (
+                                                    <DateTimePicker
                                                         disabled={disabled}
                                                         type="time"
                                                         value={minTime}
@@ -472,10 +495,10 @@ export function Field<P = {}>({
                                                     />
                                                 )}
                                             </div>
-                                            
+
                                             <div className="flex-1 flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id="minTime" 
+                                                <Checkbox
+                                                    id="minTime"
                                                     disabled={disabled}
                                                     checked={minTime === 'time_now'}
                                                     onCheckedChange={checked => setValue('minTime', checked ? 'time_now' : '', { shouldDirty: true, })}
@@ -488,7 +511,7 @@ export function Field<P = {}>({
                                             <div>
                                                 <Label>Max time</Label>
                                                 {maxTime === 'time_now' ? <Input disabled type="time" /> : (
-                                                    <DateTimePicker 
+                                                    <DateTimePicker
                                                         disabled={disabled}
                                                         type="time"
                                                         value={maxTime}
@@ -498,8 +521,8 @@ export function Field<P = {}>({
                                             </div>
 
                                             <div className="flex-1 flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id="maxTime" 
+                                                <Checkbox
+                                                    id="maxTime"
                                                     disabled={disabled}
                                                     checked={maxTime === 'time_now'}
                                                     onCheckedChange={checked => setValue('maxTime', checked ? 'time_now' : '', { shouldDirty: true, })}
@@ -546,7 +569,7 @@ export function Field<P = {}>({
 
                                     return (
                                         <div key={id} className="flex items-center space-x-2">
-                                            <Checkbox 
+                                            <Checkbox
                                                 id={id}
                                                 checked={checked}
                                                 disabled={disabled}
@@ -569,14 +592,29 @@ export function Field<P = {}>({
                                     );
                                 })}
                             </div>
+                            {
+                                prePopulate?.length > 0 && (
+                                    <div className="max-w-64">
+                                        <Label secondary htmlFor="alias">ALIAS</Label>
+                                        <Input
+                                            value={alias}
+                                            disabled={true}
+                                            name="alias"
+                                            placeholder=""
+                                            noRing={false}
+                                        />
+                                    </div>
+                                )
+
+                            }
                         </>
 
                         <>
                             <Title>Print</Title>
                             <div>
                                 <div className="flex-1 flex items-center space-x-2">
-                                    <Checkbox 
-                                        id="printable" 
+                                    <Checkbox
+                                        id="printable"
                                         disabled={disabled}
                                         checked={printable}
                                         onCheckedChange={() => setValue('printable', !printable, { shouldDirty: true, })}
@@ -591,8 +629,8 @@ export function Field<P = {}>({
                             <Title>Editable</Title>
                             <div>
                                 <div className="flex-1 flex items-center space-x-2">
-                                    <Checkbox 
-                                        id="editable" 
+                                    <Checkbox
+                                        id="editable"
                                         disabled={disabled}
                                         checked={editable}
                                         onCheckedChange={() => setValue('editable', !editable, { shouldDirty: true, })}
