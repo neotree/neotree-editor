@@ -2,7 +2,6 @@
 import db from "@/databases/pg/drizzle";
 import { aliases } from "@/databases/pg/schema";
 import { eq, and } from 'drizzle-orm';
-import logger from "@/lib/logger";
 
 
 export type GetAliasesResults = {
@@ -11,6 +10,7 @@ export type GetAliasesResults = {
         name: typeof aliases.$inferSelect['name'];
         script: typeof aliases.$inferSelect['script'];
         alias: typeof aliases.$inferSelect['alias'];
+        oldScript:typeof aliases.$inferSelect['oldScript']
     }[];
     errors?: string[];
 };
@@ -44,8 +44,7 @@ export async function _getLeanAlias(opts:{
       }
       return {alias:''}
       }catch(ex:any){ 
-        logger.error("--PARAMS---",opts)
-        logger.error('##########IN ERROR', ex); 
+     
       }
         
 

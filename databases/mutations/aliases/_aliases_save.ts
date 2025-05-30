@@ -1,4 +1,4 @@
-import { _getLeanScriptIds, _getScreens, _getScript } from "@/databases/queries/scripts";
+import { _getLeanScriptIds, _getScreens, _getScript,_getOldScript} from "@/databases/queries/scripts";
 import { _saveScreens } from "../scripts/_screens_save";
 import { _saveScripts } from "../scripts/_scripts_save";
 import { _saveEditorInfo } from "../editor-info";
@@ -69,7 +69,8 @@ function excludedScreenType(type: string) {
 async function assignAliases(
   scriptId: string,
   screens: any[],
-  lastAlias: string | null
+  lastAlias: string | null,
+  oldScript: string | null
 ): Promise<any[]> {
   let updated: any[] = [];
   let currentAlias = lastAlias;
@@ -87,11 +88,13 @@ async function assignAliases(
           !(await aliasExists({ name: field.key, script: scriptId }))
         ) {
           currentAlias = getNextAlias(currentAlias);
+
           if (currentAlias) {
             updated.push({
               name: field.key,
               alias: currentAlias,
               script: scriptId,
+              oldScript: oldScript
             });
           }
         }
@@ -107,6 +110,7 @@ async function assignAliases(
           name: screen.key,
           alias: currentAlias,
           script: scriptId,
+          oldScript: oldScript
         });
       }
     }
@@ -153,6 +157,7 @@ alls: any[]) {
             alias: al.alias,
             name: al.name,
             script: al.script,
+            oldScript:al.oldScript
 
           })
           info.query = q.toSQL();
@@ -210,14 +215,15 @@ export async function _seedAliases() {
 export async function _generateScreenAliases(scriptsIds: string[]) {
   try {
     for (const scriptId of scriptsIds) {
-      
+   
       if (scriptId) {
+        const oldScript = await _getOldScript(scriptId)
         const lastAlias = await _getLastAlias(scriptId);
         const sids = [scriptId];
         const { data, errors } = await _getScreens({ scriptsIds: sids });
 
         if (!errors || errors.length === 0) {
-          const aliases = await assignAliases(scriptId, data, lastAlias || '');
+          const aliases = await assignAliases(scriptId, data, lastAlias || '',oldScript?.[0] ?? null);
 
           if (aliases && aliases.length > 0) {
             await _saveAliases(aliases);

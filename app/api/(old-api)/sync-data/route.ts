@@ -43,12 +43,14 @@ export async function GET(req: NextRequest) {
             _getAllAliases()
         ]);
 
+      
+
         const [
             getScreens,
             getDiagnoses,
         ] = await Promise.all([
-            !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
-            !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts.data.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
         ]);
 
         const getImageUrl = (suffix: string) => {
@@ -83,8 +85,8 @@ export async function GET(req: NextRequest) {
         });
 
         // config keys
-        const configKeys = getConfigKeys.data.filter(s => !s.isDeleted).map(s => mapNewConfigKeysToOld(s));
-        const deletedConfigKeys = getConfigKeys.data.filter(s => s.isDeleted).map(s => mapNewConfigKeysToOld(s));
+        const configKeys = getConfigKeys.data.filter(s => !s.isDeleted)?.map(s => mapNewConfigKeysToOld(s));
+        const deletedConfigKeys = getConfigKeys.data.filter(s => s.isDeleted)?.map(s => mapNewConfigKeysToOld(s));
 
         // drugs library
         const drugsLibrary = getDrugsLibrary.data.filter(s => !s.isDeleted);
@@ -93,11 +95,12 @@ export async function GET(req: NextRequest) {
         // scripts
         const scriptIdToOldScriptId:  { [key: string]: null | string; } = {};
         const scripts = (() => {
-            const _scripts = getScripts.data.filter(s => !s.isDeleted).map(s => {
+            const _scripts = getScripts.data.filter(s => !s.isDeleted)?.map(s => {
                 const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
                 scriptIdToOldScriptId[s.scriptId] = s.oldScriptId || null;
                 return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
             });
+            logger.log("....REE",_scripts)
             const obj = _scripts.reduce((acc, s) => {
                 acc[s.script_id] = acc[s.script_id] || [];
                 acc[s.script_id].push(s);
@@ -107,7 +110,7 @@ export async function GET(req: NextRequest) {
             let sorted: (typeof _scripts[0])[] = [];
 
             Object.values(obj).forEach(s => {
-                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position)?.map((s, i) => ({
                     ...s,
                     position: i + 1,
                     data: { ...s.data, position: i + 1, },
@@ -116,14 +119,14 @@ export async function GET(req: NextRequest) {
 
             return sorted;
         })();
-        const deletedScripts = getScripts.data.filter(s => s.isDeleted).map(s => {
+        const deletedScripts = getScripts.data.filter(s => s.isDeleted)?.map(s => {
             const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
             return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
         });
 
         // screens
         const screens = (() => {
-            const _screens = getScreens.data.filter(s => !s.isDeleted).map(s => mapNewScreenToOld(({
+            const _screens = getScreens.data.filter(s => !s.isDeleted)?.map(s => mapNewScreenToOld(({
                 ...s,
                 oldScriptId: scriptIdToOldScriptId[s.scriptId],
             })));
@@ -136,7 +139,7 @@ export async function GET(req: NextRequest) {
             let sorted: (typeof _screens[0])[] = [];
 
             Object.values(obj).forEach(s => {
-                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position)?.map((s, i) => ({
                     ...s,
                     position: i + 1,
                     data: { ...s.data, position: i + 1, },
@@ -145,11 +148,11 @@ export async function GET(req: NextRequest) {
 
             return sorted;
         })();
-        const deletedScreens = getScreens.data.filter(s => s.isDeleted).map(s => mapNewScreenToOld(s));
+        const deletedScreens = getScreens.data.filter(s => s.isDeleted)?.map(s => mapNewScreenToOld(s));
 
         // diagnoses
         const diagnoses = (() => {
-            const _diagnoses = getDiagnoses.data.filter(s => !s.isDeleted).map(s => mapNewDiagnosisToOld({
+            const _diagnoses = getDiagnoses.data.filter(s => !s.isDeleted)?.map(s => mapNewDiagnosisToOld({
                 ...s,
                 oldScriptId: scriptIdToOldScriptId[s.scriptId],
             }));
@@ -162,7 +165,7 @@ export async function GET(req: NextRequest) {
             let sorted: (typeof _diagnoses[0])[] = [];
 
             Object.values(obj).forEach(s => {
-                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position).map((s, i) => ({
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position)?.map((s, i) => ({
                     ...s,
                     position: i + 1,
                     data: { ...s.data, position: i + 1, },
@@ -171,7 +174,7 @@ export async function GET(req: NextRequest) {
 
             return sorted;
         })();
-        const deletedDiagnoses = getDiagnoses.data.filter(s => s.isDeleted).map(s => mapNewDiagnosisToOld(s));
+        const deletedDiagnoses = getDiagnoses.data.filter(s => s.isDeleted)?.map(s => mapNewDiagnosisToOld(s));
 
         logger.log(`[GET - finish]: ${req.url}`);
 
