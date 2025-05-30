@@ -140,10 +140,10 @@ export async function _publishScripts() {
             ...updates.map(c => c.scriptId!),
             ...deleted.map(c => c.scriptId!),
         ];
-
+  
         if (published.length) {
             await db.update(scripts)
-                .set({ version: sql`${scripts.version} + 1`, }).
+                .set({ version: sql`${scripts.version} + 1`,}).
                 where(inArray(scripts.scriptId, published));
         }
 

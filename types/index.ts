@@ -138,3 +138,8 @@ export type ScreenReviewField = {
     label: string;
     screen:string;
  }
+
+ export type Alias = {
+    value: string;
+    key: string;
+ }

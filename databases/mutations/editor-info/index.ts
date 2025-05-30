@@ -9,6 +9,7 @@ export type SaveEditorInfoParams = {
     data: Partial<typeof editorInfo.$inferSelect>;
     increaseVersion?: boolean;
     broadcastAction?: boolean;
+    syncSilently?:boolean
 };
 
 export type SaveEditorInfoResults = {
@@ -17,7 +18,7 @@ export type SaveEditorInfoResults = {
     errors?: string[];
 };
 
-export async function _saveEditorInfo({ data, increaseVersion, broadcastAction }: SaveEditorInfoParams): Promise<SaveEditorInfoResults> {
+export async function _saveEditorInfo({ data, increaseVersion, broadcastAction ,syncSilently}: SaveEditorInfoParams): Promise<SaveEditorInfoResults> {
     try {
         let info = await db.query.editorInfo.findFirst();
 
@@ -27,8 +28,10 @@ export async function _saveEditorInfo({ data, increaseVersion, broadcastAction }
         }
 
         info = await db.query.editorInfo.findFirst();
-
-        if (!!info && broadcastAction) socket.emit('data_changed', 'save_editor_info');
+        if (!!info && broadcastAction &&!syncSilently) {
+            socket.emit('data_changed', 'save_editor_info');
+        }
+            
 
         return  { data: info || null, success: !!info, };
     } catch(e: any) {

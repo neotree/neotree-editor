@@ -5,8 +5,10 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { ScriptType } from '../../queries/scripts/_scripts_get';
+import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
+import {_saveScreens} from './_screens_save'
 import { removeHexCharacters } from '../../utils'
+import { _getScreens } from '@/databases/queries/scripts';
 
 export type SaveScriptsData = Partial<ScriptType>;
 
@@ -16,9 +18,10 @@ export type SaveScriptsResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScripts({ data, broadcastAction, }: {
+export async function _saveScripts({ data, broadcastAction,syncSilently }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean,
+    syncSilently?:boolean
 }) {
     const response: SaveScriptsResponse = { success: false, };
     const errors = [];
@@ -113,7 +116,10 @@ export async function _saveScripts({ data, broadcastAction, }: {
         response.info = info;
         logger.error('_saveScripts ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_scripts');
+        if (!response?.errors?.length && broadcastAction && !syncSilently) {
+            socket.emit('data_changed', 'save_scripts');}
         return response;
     }
 }
+
+ 
