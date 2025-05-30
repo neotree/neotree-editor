@@ -14,6 +14,7 @@ export const aliases = pgTable('nt_aliases', {
     name: text('name').notNull(),
     alias: text('alias').notNull(),
     script: text('script').notNull(),
+    oldScript: text('old_script'),
     publishDate: timestamp('publish_date').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),

@@ -45,8 +45,21 @@ export async function _getLeanScriptIds():Promise<any> {
             .from(scripts)
             .where(
             isNull(scripts.deletedAt))
- return allScripts;
+ return allScripts?.map(sid=>sid.scriptId)??[];
 }
+
+export async function _getOldScript(script:string):Promise<any> {
+   const oldScript = await db.select({
+               oldScript:scripts.oldScriptId,
+             })
+            .from(scripts)
+            .where(
+            eq(scripts.scriptId, script))
+ return oldScript?.map(os=>os.oldScript)??[];
+}
+
+
+
 
 export async function _getScripts(
     params?: GetScriptsParams

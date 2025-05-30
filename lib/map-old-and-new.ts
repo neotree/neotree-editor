@@ -138,7 +138,6 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 repeatable: s.repeatable,
                 collectionLabel: s.collectionLabel,
                 collectionName: s.collectionName,
-                alias: s.alias,
                 image1: !s.image1 ? null : {
                     ...s.image1,
                     data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
@@ -220,11 +219,6 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 label: rc.label,
                 screen: rc.screen
             })),
-            aliases: (s.aliases as Alias[]).map(al=>({
-                value: al.value,
-                key: al.key,
-            })),
-            lastAlias: s.lastAlias,
             preferences: s.preferences,
             printSections: s.printSections,
         },
