@@ -14,7 +14,7 @@ type Props = {
     token: Awaited<ReturnType<typeof getToken>>;
 };
 
-export async function Form({ token }: Props) {
+export function Form({ token }: Props) {
     const router = useRouter();
 
     const onSignIn = useCallback(() => {
