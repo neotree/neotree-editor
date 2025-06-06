@@ -25,10 +25,22 @@ const edlizSummaryData = {
             id: 'MAJC4'
         },
         {
+            label: 'None',
+            type: 'Major criteria',
+            subType: 'Antenatal',
+            id: 'MAJC_Antenatal_None',
+        },
+        {
             label: 'Signs of shock',
             type: 'Major criteria',
             subType: 'Natal',
             id: 'MAJC5'
+        },
+        {
+            label: 'None',
+            type: 'Major criteria',
+            subType: 'Natal',
+            id: 'MAJC_Natal_None',
         },
         {
             label: 'ROM >18h',
@@ -49,6 +61,12 @@ const edlizSummaryData = {
             id: 'MINC3',
         },
         {
+            label: 'None',
+            type: 'Minor criteria',
+            subType: 'Antenatal',
+            id: 'MINC_Antenatal_None',
+        },
+        {
             label: 'Born Before Arrival',
             type: 'Minor criteria',
             subType: 'Natal',
@@ -59,6 +77,12 @@ const edlizSummaryData = {
             type: 'Minor criteria',
             subType: 'Natal',
             id: 'MINC5',
+        },
+        {
+            label: 'None',
+            type: 'Minor criteria',
+            subType: 'Natal',
+            id: 'MINC_Natal_None',
         },
         {
             label: 'Respiratory distress that is not obviously related to:\n1. environmental hypothermia \n2. “delayed transition to extra-uterine life” i.e. mild to moderate respiratory distress apparent soon after birth that is improving with time. ',
@@ -132,6 +156,12 @@ const edlizSummaryData = {
             subType: 'Postnatal',
             id: 'MINC17',
         },
+        {
+            label: 'None',
+            type: 'Minor criteria',
+            subType: 'Postnatal',
+            id: 'MINC_Postnatal_None',
+        },
     ],
     mwi_edliz_summary_table: [
         {
@@ -157,6 +187,12 @@ const edlizSummaryData = {
             type: 'Antenatal risk factors',
             subType: '',
             id: 'ARF4',
+        },
+        {
+            label: 'None',
+            type: 'Antenatal risk factors',
+            subType: '',
+            id: 'ARF_None',
         },
         {
             label: 'Temperature <35.5 or >37.5',
@@ -225,6 +261,12 @@ const edlizSummaryData = {
             id: 'SSS11',
         },
         {
+            label: 'None',
+            type: 'Symptoms and Signs of Sepsis',
+            subType: '',
+            id: 'SSS_None',
+        },
+        {
             label: 'Drowsiness',
             type: 'Signs/symptoms of meningitis',
             subType: '',
@@ -261,6 +303,12 @@ const edlizSummaryData = {
             id: 'SM6',
         },
         {
+            label: 'None',
+            type: 'Signs/symptoms of meningitis',
+            subType: '',
+            id: 'SM_None',
+        },
+        {
             label: 'Cold hands and feet',
             type: 'Shock (Danger signs)',
             subType: '',
@@ -277,6 +325,12 @@ const edlizSummaryData = {
             type: 'Shock (Danger signs)',
             subType: '',
             id: 'SDS3',
+        },
+        {
+            label: 'None',
+            type: 'Shock (Danger signs)',
+            subType: '',
+            id: 'SDS_None',
         },
     ],
 };

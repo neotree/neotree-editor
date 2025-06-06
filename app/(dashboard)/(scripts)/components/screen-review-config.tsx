@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Settings, Trash, MoreVertical, Edit2, Plus } from "lucide-react";
 import { listScreens } from "@/app/actions/scripts";
@@ -49,7 +49,7 @@ type Props = {
     scriptId: string;
 };
 
-export async function ScreenReviewConfig({
+export function ScreenReviewConfig({
     disabled,
     form: {
         watch,
@@ -57,6 +57,7 @@ export async function ScreenReviewConfig({
     },
     scriptId
 }: Props) {
+    const mounted = useRef(false);
     const fields = watch('reviewConfigurations');
     const reviewEnabled = watch('reviewable');
 
@@ -69,19 +70,22 @@ export async function ScreenReviewConfig({
     
     
     useEffect(() => {
-        (async () => {
-            try {
-            
-                const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
-                setScreens(res.data);
-            } catch(e: any) {
-                alert({
-                    title: "",
-                    message: e.message,
-                });
-            } 
-        })();
-    }, [alert, scriptId]);
+        if (open && !mounted.current) {
+            mounted.current = true;
+            (async () => {
+                try {
+                    const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
+                    setScreens(res.data);
+                } catch(e: any) {
+                    mounted.current = false;
+                    alert({
+                        title: "",
+                        message: e.message,
+                    });
+                } 
+            })();
+        }
+    }, [alert, open, scriptId]);
 
     useEffect(() => {
 

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { v4 } from "uuid";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import axios from 'axios';
 
 import {
     Select,
@@ -11,6 +12,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
@@ -31,7 +38,7 @@ import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
 import { getLeanAlias } from '@/app/actions/aliases'
-import axios from 'axios';
+import { ChevronDown, XIcon } from "lucide-react";
 
 type Props = {
     open: boolean;
@@ -62,6 +69,7 @@ export function Field<P = {}>({
     });
 
     const {
+        control,
         reset: resetForm,
         register,
         getValues,
@@ -87,6 +95,7 @@ export function Field<P = {}>({
     const prePopulate = watch('prePopulate');
     const defaultValue = watch('defaultValue');
     const values = watch('values');
+    const valuesOptions = watch('valuesOptions');
     const editable = watch('editable');
 
     const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
@@ -97,6 +106,7 @@ export function Field<P = {}>({
     const isPeriodField = useMemo(() => type === 'period', [type]);
     const isNumberField = useMemo(() => type === 'number', [type]);
     const isDropdownField = useMemo(() => type === 'dropdown', [type]);
+    const isMultiSelectField = useMemo(() => type === 'form_multi_select', [type]);
 
 
     const getAlias = useCallback(async (name: string) => {
@@ -129,6 +139,16 @@ export function Field<P = {}>({
         }
         onClose();
     });
+
+    const valuesParsed = useMemo(() => {
+        return (values || '').split('\n')
+            .map((v = '') => v.trim())
+            .map((value) => {
+                const valueSplit = value.split(',');
+                return { value: valueSplit[0], label: valueSplit[1], };
+            })
+            .filter(o => o.value && o.label);
+    }, [values]);
 
     return (
         <>
@@ -164,6 +184,11 @@ export function Field<P = {}>({
                                         type,
                                     });
                                 } else {
+                                    setValue(
+                                        'valuesOptions',
+                                        valuesOptions.filter(o => o.optionKey && o.optionLabel && o.key),
+                                        { shouldDirty: true, },
+                                    );
                                     onSave();
                                 }
                             }}
@@ -287,19 +312,147 @@ export function Field<P = {}>({
                                 </div>
                             </div>
 
-                            {isDropdownField && (
+                            {(isDropdownField || isMultiSelectField) && (
                                 <>
-                                    <div>
-                                        <Label htmlFor="values" className={cn(valuesErrors.length ? 'text-danger' : '')}>Values</Label>
-                                        <Textarea
-                                            {...register('values', { disabled })}
-                                            name="values"
-                                            rows={5}
-                                            noRing={false}
-                                            className={cn(valuesErrors.length ? 'border-danger' : '')}
-                                        />
-                                        <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>
-                                    </div>
+                                    
+
+                                    <Controller 
+                                        control={control}
+                                        name="values"
+                                        render={({ field }) => {
+                                            return (
+                                                <div>
+                                                    <Label htmlFor="values" className={cn(valuesErrors.length ? 'text-danger' : '')}>Values</Label>
+                                                    <Textarea
+                                                        value={field.value}
+                                                        disabled={disabled}
+                                                        name="values"
+                                                        rows={5}
+                                                        noRing={false}
+                                                        className={cn(valuesErrors.length ? 'border-danger' : '')}
+                                                        onChange={e => {
+                                                            const values = e.target.value;
+                                                            const valuesParsed = (values || '').split('\n')
+                                                                .map((v = '') => v.trim())
+                                                                .map((value) => {
+                                                                    const valueSplit = value.split(',');
+                                                                    return { value: valueSplit[0], label: valueSplit[1], };
+                                                                })
+                                                                .filter(o => o.value && o.label);
+
+                                                            field.onChange(values);
+
+                                                            setValue(
+                                                                'valuesOptions',
+                                                                valuesOptions.filter(o => valuesParsed.map(o => o.value).includes(o.key)),
+                                                                { shouldDirty: true, },
+                                                            );
+                                                        }}
+                                                    />
+                                                    <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+
+                                    {!!valuesParsed.length && (
+                                        <div className="flex flex-col gap-y-4">
+                                            {!!valuesOptions.length && (
+                                                <>
+                                                    <Title>Options</Title>
+                                                    {valuesOptions.map((o, i) => {
+                                                        const label = valuesParsed.find(v => v.value === o.key)?.label;
+                                                        return (
+                                                            <Controller
+                                                                key={o.key + i}
+                                                                control={control}
+                                                                name={`valuesOptions.${i}`}
+                                                                render={({ field }) => {
+                                                                    return (
+                                                                        <div>
+                                                                            <div className="text-xs p-2 rounded-sm bg-primary/20 font-bold inline-block mb-2">{label}</div>
+                                                                            <div className="flex gap-x-2 items-end">
+                                                                                <div className="flex-1">
+                                                                                    <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
+                                                                                    <Input 
+                                                                                        value={field.value.optionKey}
+                                                                                        onChange={e => field.onChange({
+                                                                                            ...field.value,
+                                                                                            optionKey: e.target.value,
+                                                                                        })}
+                                                                                        onBlur={field.onBlur}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <div className="flex-1">
+                                                                                    <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
+                                                                                    <Input 
+                                                                                        value={field.value.optionLabel}
+                                                                                        onChange={e => field.onChange({
+                                                                                            ...field.value,
+                                                                                            optionLabel: e.target.value,
+                                                                                        })}
+                                                                                        onBlur={field.onBlur}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    onClick={() => setValue(
+                                                                                        'valuesOptions',
+                                                                                        valuesOptions.filter((_, j) => j !== i),
+                                                                                        { shouldDirty: true, },
+                                                                                    )} 
+                                                                                >
+                                                                                    <XIcon className="size-4" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+
+                                            {(valuesOptions.length < valuesParsed.length) && (
+                                                <div>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                            >
+                                                                Add value option
+                                                                <ChevronDown className="size-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            {valuesParsed.filter(o => !valuesOptions.map(o => o.key).includes(o.value)).map(o => (
+                                                                <DropdownMenuItem 
+                                                                    key={o.value} 
+                                                                    onClick={() => {
+                                                                        setValue(
+                                                                            'valuesOptions',
+                                                                            [...valuesOptions, {
+                                                                                key: o.value,
+                                                                                optionKey: '',
+                                                                                optionLabel: '',
+                                                                            }],
+                                                                            { shouldDirty: true, },
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    {o.label}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
