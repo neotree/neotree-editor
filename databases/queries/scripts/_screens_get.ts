@@ -223,7 +223,6 @@ export async function _getScreen(
         };
 
         if (!responseData) return { data: null, };
-
         return  { 
             data: responseData, 
         };

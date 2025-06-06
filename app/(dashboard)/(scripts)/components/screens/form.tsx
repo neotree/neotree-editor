@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useState, Fragment } from "react";
+import { useCallback, useState, Fragment,useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FilterIcon, Info, SortAsc, SortDesc } from "lucide-react";
+import { Info } from "lucide-react";
 import { Controller } from "react-hook-form";
 import { v4 } from "uuid";
+import axios from 'axios';
 
+import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
 import { SelectModal } from "@/components/select-modal";
 import { listScreens } from "@/app/actions/scripts";
@@ -84,7 +86,7 @@ export function ScreenForm({
         setValue,
         save,
     } = form;
-
+    const [alias, setAlias] = useState('');
     const type = watch('type');
     const skippable = watch('skippable');
     const printable = watch('printable');
@@ -98,8 +100,24 @@ export function ScreenForm({
     const reasons = watch('reasons');
     const repeatable = watch('repeatable');
     const collectionLabel = watch('collectionLabel');
+    const key = watch('key');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+
+  const getAlias = useCallback(async (name: string) => {
+         if (!name) return;
+        try {
+
+            const res = await axios.get<Awaited<ReturnType<typeof getLeanAlias>>>('/api/aliases/lean?data=' + JSON.stringify({ script: scriptId, name: name}))
+            setAlias(res?.data?.alias || '');
+        } catch (err) {
+            setAlias('');
+        }
+    }, []);
+
+    useEffect(() => {
+        getAlias(key)
+    }, [getAlias,key]);
 
     if (!showForm) {
         return (
@@ -292,6 +310,7 @@ export function ScreenForm({
                                 minTimeKey: '',
                                 maxTimeKey: '',
                                 values: '',
+                                valuesOptions: [],
                                 confidential: false,
                                 optional: false,
                                 printable: false,
@@ -584,20 +603,36 @@ export function ScreenForm({
                     />
                 </div>
 
-                <div>
-                    <Label secondary htmlFor="contentText">Content</Label>
-                    <Textarea
-                        {...register('contentText', { disabled, })}
-                        name="contentText"
-                        noRing={false}
-                        rows={5}
-                    />
-                    <PreferencesForm
-                        id="contentText"
-                        title="Content"
-                        disabled={disabled}
-                        data={preferences}
-                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                <div className="flex gap-x-4">
+                    <div className="flex-1">
+                        <Label secondary htmlFor="contentText">Content</Label>
+                        <Textarea
+                            {...register('contentText', { disabled, })}
+                            name="contentText"
+                            noRing={false}
+                            rows={5}
+                        />
+                        <PreferencesForm
+                            id="contentText"
+                            title="Content"
+                            disabled={disabled}
+                            data={preferences}
+                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        />
+                    </div>
+
+                    <Controller
+                        control={control}
+                        name="contentTextImage"
+                        render={({ field }) => {
+                            return (
+                                <ImageField
+                                    disabled={disabled}
+                                    image={field.value}
+                                    onChange={value => field.onChange(value)}
+                                />
+                            );
+                        }}
                     />
                 </div>
 
@@ -940,8 +975,25 @@ export function ScreenForm({
                                     </div>
                                 );
                             })}
+                            {
+                                prePopulate?.length > 0 && !!alias &&(
+                                    <div className="max-w-64">
+                                        <Label secondary htmlFor="alias">ALIAS</Label>
+                                        <Input
+                                           value={alias}
+                                           disabled={true}
+                                            name="alias"
+                                            placeholder=""
+                                            noRing={false}
+                                        />
+                                    </div>
+                                )
+
+                            }
                         </div>
+
                     </>
+
                 )}
 
                 {canConfigurePrint && (
@@ -1023,6 +1075,7 @@ export function ScreenForm({
                     <Fields
                         form={form}
                         disabled={disabled}
+                        scriptId={scriptId}
                     />
                     
                     {repeatable && (

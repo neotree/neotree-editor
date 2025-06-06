@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { Loader } from '@/components/loader';
 import * as scriptsActions from '@/app/actions/scripts';
 import { ScreensTable } from './table';
+import logger from "@/lib/logger"
 
 type Props = {
     scriptId: string;
