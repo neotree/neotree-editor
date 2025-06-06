@@ -3,6 +3,7 @@
 import { useCallback, useState, Fragment,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
+import { Controller } from 'react-hook-form';
 
 import { listScreens } from "@/app/actions/scripts";
 import {
@@ -73,6 +74,7 @@ export function ScreenForm({
     });
 
     const {
+        control,
         formIsDirty,
         saving,
         scriptPageHref,
@@ -483,20 +485,36 @@ export function ScreenForm({
                     />
                 </div>
 
-                <div>
-                    <Label secondary htmlFor="contentText">Content</Label>
-                    <Textarea
-                        {...register('contentText', { disabled, })}
-                        name="contentText"
-                        noRing={false}
-                        rows={5}
-                    />
-                    <PreferencesForm
-                        id="contentText"
-                        title="Content"
-                        disabled={disabled}
-                        data={preferences}
-                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                <div className="flex gap-x-4">
+                    <div className="flex-1">
+                        <Label secondary htmlFor="contentText">Content</Label>
+                        <Textarea
+                            {...register('contentText', { disabled, })}
+                            name="contentText"
+                            noRing={false}
+                            rows={5}
+                        />
+                        <PreferencesForm
+                            id="contentText"
+                            title="Content"
+                            disabled={disabled}
+                            data={preferences}
+                            onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                        />
+                    </div>
+
+                    <Controller
+                        control={control}
+                        name="contentTextImage"
+                        render={({ field }) => {
+                            return (
+                                <ImageField
+                                    disabled={disabled}
+                                    image={field.value}
+                                    onChange={value => field.onChange(value)}
+                                />
+                            );
+                        }}
                     />
                 </div>
 

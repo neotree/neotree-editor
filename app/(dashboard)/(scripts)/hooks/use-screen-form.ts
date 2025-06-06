@@ -49,6 +49,7 @@ export function useScreenForm({
             step: formData?.step || '',
             actionText: formData?.actionText || '',
             contentText: formData?.contentText || '',
+            contentTextImage: formData?.contentTextImage || null,
             title: formData?.title || '',
             title1: formData?.title1 || '',
             title2: formData?.title2 || '',

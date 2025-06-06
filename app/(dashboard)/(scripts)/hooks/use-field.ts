@@ -29,6 +29,7 @@ export function useField(field?: ScriptField) {
             minTimeKey: field?.minTimeKey || '',
             maxTimeKey: field?.maxTimeKey || '',
             values: field?.values || '',
+            valuesOptions: field?.valuesOptions || [],
             confidential: field?.confidential || false,
             optional: field?.optional || false,
             printable: field?.printable || false,
