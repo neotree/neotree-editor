@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 
+
 export type SaveScreensData = Partial<ScreenType>;
 
 export type SaveScreensResponse = { 
@@ -24,7 +25,7 @@ export async function _saveScreens({ data, broadcastAction, }: {
     data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
-
+    
     try {
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
