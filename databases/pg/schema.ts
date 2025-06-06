@@ -15,12 +15,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
-import { ScreenReviewField, ScriptField } from "@/types";
+import { ScreenReviewField, ScriptField, DiagnosisSymptom, DrugField, FeedField, FluidField, Preferences, ScriptImage, ScriptItem } from "@/types";
 import { defaultPreferences } from "@/constants";
-import { DiagnosisSymptom, DrugField, FeedField, FluidField, Preferences, ScriptImage, ScriptItem } from "../types";
 import { dataKeys, dataKeysDrafts } from "./_data-keys";
 
 export * from './_data-keys';
+import { aliases } from "./aliases";
+
+export * from './aliases';
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
     dataType() {
@@ -461,7 +463,7 @@ export const scriptsDrafts = pgTable(
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
         data: jsonb('data').$type<typeof scripts.$inferInsert
          & { nuidSearchFields: ScriptField[]; } 
-         &{ reviewConfigurations: ScreenReviewField[]; } >().notNull(),
+         &{ reviewConfigurations: ScreenReviewField[]; }>().notNull(),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -525,6 +527,7 @@ export const screens = pgTable(
         step: text('step').notNull().default(''),
         actionText: text('action_text').notNull().default(''),
         contentText: text('content_text').notNull().default(''),
+        contentTextImage: jsonb('content_text_image').$type<null | ScriptImage>(),
         infoText: text('info_text').notNull().default(''),
         title: text('title').notNull(),
         title1: text('title1').notNull().default(''),
@@ -534,9 +537,9 @@ export const screens = pgTable(
         text1: text('text1').notNull().default(''),
         text2: text('text2').notNull().default(''),
         text3: text('text3').notNull().default(''),
-        image1: jsonb('image1').$type<ScriptImage | null>(),
-        image2: jsonb('image2').$type<ScriptImage | null>(),
-        image3: jsonb('image3').$type<ScriptImage | null>(),
+        image1: jsonb('image1').$type<null | ScriptImage>(),
+        image2: jsonb('image2').$type<null | ScriptImage>(),
+        image3: jsonb('image3').$type<null | ScriptImage>(),
         instructions: text('instructions').notNull().default(''),
         instructions2: text('instructions2').notNull().default(''),
         instructions3: text('instructions3').notNull().default(''),
@@ -883,7 +886,7 @@ export const pendingDeletion = pgTable(
         drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
-
+        aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -944,5 +947,9 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     dataKeyDraft: one(dataKeysDrafts, {
         fields: [pendingDeletion.dataKeyDraftId],
         references: [dataKeysDrafts.uuid],
+    }),
+    alias: one(aliases, {
+        fields: [pendingDeletion.aliasId],
+        references: [aliases.uuid],
     }),
 }));

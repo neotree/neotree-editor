@@ -20,11 +20,13 @@ import { Field } from "./field";
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
+    scriptId? : string;
 };
 
 export function Fields({
     form,
     disabled,
+    scriptId
 }: Props) {
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
@@ -102,6 +104,7 @@ export function Fields({
                     open={!!currentField}
                     onClose={() => setCurrentField('')}
                     form={form}
+                    scriptId={scriptId}
                     disabled={disabled}
                     field={!fields[Number(currentField)] ? undefined : {
                         data: fields[Number(currentField)],

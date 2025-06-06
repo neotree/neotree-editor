@@ -1,6 +1,5 @@
 import { configKeys, diagnoses, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
-import { Label } from "@radix-ui/react-dropdown-menu";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
     return {
@@ -98,6 +97,10 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             sectionTitle: s.sectionTitle,
             actionText: s.actionText,
             contentText: s.contentText,
+            contentTextImage: !s.contentTextImage ? null : {
+                ...s.contentTextImage,
+                data: s.contentTextImage?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.contentTextImage,
+            },
             instructions: s.instructions,
             instructions2: s.instructions2,
             instructions3: s.instructions3,
@@ -140,15 +143,15 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 collectionName: s.collectionName,
                 image1: !s.image1 ? null : {
                     ...s.image1,
-                    data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
+                    data: s.image1?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
                 },
                 image2: !s.image2 ? null : {
                     ...s.image2,
-                    data: (s.image2 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image2,
+                    data: s.image2?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image2,
                 },
                 image3: !s.image3 ? null : {
                     ...s.image3,
-                    data: (s.image3 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
+                    data: s.image3?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
                 },
                 drugs: s.drugs,
                 fluids: s.fluids,

@@ -15,11 +15,11 @@ export function validateDropdownValues(_values: string) {
     const duplicateLabels = labels.filter((item, index) => labels.indexOf(item) !== index);
 
     if (duplicateLabels.length || duplicateValues.length) {
-        errors.push('Dropdown values contain duplicate data');
+        errors.push('Values contain duplicate data');
     }
     
     if (missing.length) {
-        errors.push('Incorrect dropdown values format');
+        errors.push('Incorrect values format');
     }
 
     return errors;
