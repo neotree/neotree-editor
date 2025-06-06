@@ -2,9 +2,13 @@ import { and, eq, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzl
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, scriptsDrafts, pendingDeletion, hospitals, } from "@/databases/pg/schema";
+import { scripts, scriptsDrafts, pendingDeletion, hospitals } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { ScriptField, Preferences, PrintSection,ScreenReviewField } from "@/types";
+import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
+import { _getScreens } from "./_screens_get";
+import { _publishScripts, _saveScreens, _saveScripts } from "@/databases/mutations/scripts";
+import { _saveEditorInfo } from "@/databases/mutations/editor-info";
+
 
 export type GetScriptsParams = {
     scriptsIds?: string[];
@@ -18,6 +22,8 @@ export type ScriptType = typeof scripts.$inferSelect & {
     isDeleted: boolean;
     nuidSearchFields: ScriptField[];
     reviewConfigurations: ScreenReviewField[];
+    aliases: Alias[];
+    lastAlias:string;
     preferences: Preferences;
     printSections: PrintSection[];
     hospitalName: string;
@@ -27,11 +33,39 @@ export type GetScriptsResults = {
     data: ScriptType[];
     errors?: string[];
 };
+export type AliaseType = {
+    key: string
+    value: string
+}
+
+export async function _getLeanScriptIds():Promise<any> {
+   const allScripts = await db.select({
+               scriptId:scripts.scriptId,
+             })
+            .from(scripts)
+            .where(
+            isNull(scripts.deletedAt))
+ return allScripts?.map(sid=>sid.scriptId)??[];
+}
+
+export async function _getOldScript(script:string):Promise<any> {
+   const oldScript = await db.select({
+               oldScript:scripts.oldScriptId,
+             })
+            .from(scripts)
+            .where(
+            eq(scripts.scriptId, script))
+ return oldScript?.map(os=>os.oldScript)??[];
+}
+
+
+
 
 export async function _getScripts(
     params?: GetScriptsParams
 ): Promise<GetScriptsResults> {
     try {
+       
         let { 
             scriptsIds = [], 
             hospitalIds = [],
@@ -134,7 +168,7 @@ export async function _getScripts(
                 ...s,
                 hospitalId: s.hospitalName ? s.hospitalId : null,
             }));
-
+        
         return  { 
             data: responseData,
         };
@@ -144,8 +178,15 @@ export async function _getScripts(
     }
 }
 
+
 export type GetScriptResults = {
     data?: null | ScriptType;
+    errors?: string[];
+};
+
+export type GetAliasResults = {
+    data?: null | Alias[];
+    lastAlias?: string;
     errors?: string[];
 };
 
@@ -223,3 +264,4 @@ export async function _getScript(
         return { errors: [e.message], };
     }
 } 
+

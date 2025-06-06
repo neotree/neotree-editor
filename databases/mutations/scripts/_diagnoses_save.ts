@@ -15,9 +15,11 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, }: {
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently}: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean,
+    syncSilently?:boolean
+    
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -137,7 +139,7 @@ export async function _saveDiagnoses({ data, broadcastAction, }: {
         response.errors = [e.message];
         logger.error('_saveDiagnoses ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_diagnoses');
+        if (!response?.errors?.length && broadcastAction && !syncSilently) socket.emit('data_changed', 'save_diagnoses');
         return response;
     }
 }

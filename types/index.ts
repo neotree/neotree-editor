@@ -75,6 +75,11 @@ export type ScriptField = {
     minTimeKey: string;
     maxTimeKey: string;
     values: string;
+    valuesOptions: {
+        key: string;
+        optionKey: string;
+        optionLabel: string;
+    }[];
     confidential: boolean;
     optional: boolean;
     printable: boolean;
@@ -137,4 +142,9 @@ export type Script = {
 export type ScreenReviewField = {
     label: string;
     screen:string;
+ }
+
+ export type Alias = {
+    value: string;
+    key: string;
  }
