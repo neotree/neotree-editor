@@ -375,6 +375,7 @@ export function Field<P = {}>({
                                                                                 <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
                                                                                     <Input 
+                                                                                        disabled={disabled}
                                                                                         value={field.value.optionKey}
                                                                                         onChange={e => field.onChange({
                                                                                             ...field.value,
@@ -387,6 +388,7 @@ export function Field<P = {}>({
                                                                                 <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
                                                                                     <Input 
+                                                                                        disabled={disabled}
                                                                                         value={field.value.optionLabel}
                                                                                         onChange={e => field.onChange({
                                                                                             ...field.value,
@@ -396,17 +398,19 @@ export function Field<P = {}>({
                                                                                     />
                                                                                 </div>
 
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="ghost"
-                                                                                    onClick={() => setValue(
-                                                                                        'valuesOptions',
-                                                                                        valuesOptions.filter((_, j) => j !== i),
-                                                                                        { shouldDirty: true, },
-                                                                                    )} 
-                                                                                >
-                                                                                    <XIcon className="size-4" />
-                                                                                </Button>
+                                                                                {!disabled && (
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        onClick={() => setValue(
+                                                                                            'valuesOptions',
+                                                                                            valuesOptions.filter((_, j) => j !== i),
+                                                                                            { shouldDirty: true, },
+                                                                                        )} 
+                                                                                    >
+                                                                                        <XIcon className="size-4" />
+                                                                                    </Button>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -417,7 +421,7 @@ export function Field<P = {}>({
                                                 </>
                                             )}
 
-                                            {(valuesOptions.length < valuesParsed.length) && (
+                                            {!disabled && (valuesOptions.length < valuesParsed.length) && (
                                                 <div>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
