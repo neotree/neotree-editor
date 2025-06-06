@@ -1004,9 +1004,9 @@
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/cmake.js": {
-    "id": 48443,
+    "id": 94700,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_cmake.0efe2055d02e96d4.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_cmake.f53555acfa209eef.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/cobol.js": {
@@ -2432,7 +2432,7 @@
   "node_modules/react-syntax-highlighter/dist/esm/prism-async-light.js -> refractor/core": {
     "id": 54692,
     "files": [
-      "static/chunks/react-syntax-highlighter/refractor-core-import.18c16e311915a150.js"
+      "static/chunks/react-syntax-highlighter/refractor-core-import.23fe80855b364d6d.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/prism-async.js -> refractor": {
