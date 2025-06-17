@@ -106,7 +106,7 @@ export function Field<P = {}>({
     const isPeriodField = useMemo(() => type === 'period', [type]);
     const isNumberField = useMemo(() => type === 'number', [type]);
     const isDropdownField = useMemo(() => type === 'dropdown', [type]);
-    const isMultiSelectField = useMemo(() => type === 'form_multi_select', [type]);
+    const isMultiSelectField = useMemo(() => type === 'multi_select', [type]);
 
 
     const getAlias = useCallback(async (name: string) => {

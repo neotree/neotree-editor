@@ -197,8 +197,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     case 'dropdown':
                                         dataType = 'dropdown';
                                         break;
-                                    case 'form_multi_select':
-                                        dataType = 'form_multi_select';
+                                    case 'multi_select':
+                                        dataType = 'multi_select';
                                         break;
                                     case 'number':
                                         dataType = 'number';
@@ -214,9 +214,9 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         dataType = f.dataType;
                                 }
 
-                                if (['form_multi_select', 'dropdown'].includes(f.type)) {
+                                if (['multi_select', 'dropdown'].includes(f.type)) {
                                     let dataType = 'dropdown';
-                                    if (f.type === 'form_multi_select') dataType = 'form_multi_select';
+                                    if (f.type === 'multi_select') dataType = 'multi_select';
 
                                     const opts = (f.values || '').split('\n')
                                         .map((v = '') => v.trim())
