@@ -446,11 +446,21 @@ export async function saveScriptsWithItems({ data }: {
             const oldScreensIdsMap: { [key: string]: string; } = {};
             const oldDiagnosesIdsMap: { [key: string]: string; } = {};
 
-            const screens = copiedScreens.map(s => {
+            let screens = copiedScreens.map(s => {
                 const screenId = v4();
                 oldScreensIdsMap[s.screenId] = screenId;
                 if (s.oldScreenId) oldScreensIdsMap[s.oldScreenId] = screenId;
-                return { ...s, screenId, };
+                return { 
+                    ...s, 
+                    screenId,
+                };
+            });
+
+            screens = screens.map(s => {
+                return {
+                    ...s,
+                    skipToScreenId: (!s.skipToScreenId ? null : oldScreensIdsMap[s.skipToScreenId]) || null,
+                };
             });
 
             const diagnoses = copiedDiagnoses.map(d => {
