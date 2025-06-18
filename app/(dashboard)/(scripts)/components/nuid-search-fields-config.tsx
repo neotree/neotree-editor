@@ -300,7 +300,7 @@ export function Field({
 
     const onSave = handleSubmit(onChange);
 
-    const valuesErrors = useMemo(() => ['dropdown', 'form_multi_select'].includes(type) ? validateDropdownValues(values) : [], [values, type]);
+    const valuesErrors = useMemo(() => ['dropdown', 'multi_select'].includes(type) ? validateDropdownValues(values) : [], [values, type]);
 
     return (
         <>
@@ -357,7 +357,7 @@ export function Field({
 
                     {(
                         (type === 'dropdown') ||
-                        (type === 'form_multi_select')
+                        (type === 'multi_select')
                     ) && (
                         <div>
                             <Label htmlFor="values">Options *</Label>
