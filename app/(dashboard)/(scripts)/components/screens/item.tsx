@@ -408,6 +408,16 @@ export function Item<P = {}>({
                                                         type="number"
                                                     />
                                                 </div>
+
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch 
+                                                        id="exclusive" 
+                                                        checked={exclusive}
+                                                        disabled={disabled}
+                                                        onCheckedChange={checked => setValue('exclusive', checked, { shouldDirty: true, })}
+                                                    />
+                                                    <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
+                                                </div>
                                             </>
                                         )}
                                     </>
