@@ -17,12 +17,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogClose,
-    DialogProps,
-    DialogContentProps,
-    DialogFooterProps,
-    DialogTriggerProps,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
