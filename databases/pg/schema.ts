@@ -15,8 +15,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
-import { ScreenReviewField, ScriptField, ScriptImage } from "@/types";
+import { ScreenReviewField, ScriptField, DiagnosisSymptom, DrugField, FeedField, FluidField, Preferences, ScriptImage, ScriptItem } from "@/types";
 import { defaultPreferences } from "@/constants";
+import { dataKeys, dataKeysDrafts } from "./_data-keys";
+
+export * from './_data-keys';
 import { aliases } from "./aliases";
 
 export * from './aliases';
@@ -254,6 +257,7 @@ export const editorInfo = pgTable(
         id: serial('id').primaryKey(),
         dataVersion: integer('data_version').notNull().default(1),
         lastPublishDate: timestamp('last_publish_date'),
+        lastDataKeysSyncDate: timestamp('last_data_keys_sync_date'),
     },
 );
 
@@ -556,13 +560,13 @@ export const screens = pgTable(
         printable: boolean('printable'),
         skippable: boolean('skippable').notNull().default(false),
         confidential: boolean('confidential').notNull().default(false),
-        prePopulate: jsonb('pre_populate').default('[]').notNull(),
-        fields: jsonb('fields').default('[]').notNull(),
-        items: jsonb('items').default('[]').notNull(),
-        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
-        drugs: jsonb('drugs').default('[]').notNull(),
-        fluids: jsonb('fluids').default('[]').notNull(),
-        feeds: jsonb('feeds').default('[]').notNull(),
+        prePopulate: jsonb('pre_populate').default('[]').$type<string[]>().notNull(),
+        fields: jsonb('fields').default('[]').$type<ScriptField[]>().notNull(),
+        items: jsonb('items').default('[]').$type<ScriptItem[]>().notNull(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
+        drugs: jsonb('drugs').default('[]').$type<DrugField[]>().notNull(),
+        fluids: jsonb('fluids').default('[]').$type<FluidField[]>().notNull(),
+        feeds: jsonb('feeds').default('[]').$type<FeedField[]>().notNull(),
         reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
@@ -674,14 +678,14 @@ export const diagnoses = pgTable(
         key: text('key').default(''),
         severityOrder: integer('severity_order'),
         expressionMeaning: text('expression_meaning').notNull().default(''),
-        symptoms: jsonb('symptoms').default('[]').notNull(),
+        symptoms: jsonb('symptoms').default('[]').$type<DiagnosisSymptom[]>().notNull(),
         text1: text('text1').notNull().default(''),
         text2: text('text2').notNull().default(''),
         text3: text('text3').notNull().default(''),
-        image1: jsonb('image1'),
-        image2: jsonb('image2'),
-        image3: jsonb('image3'),
-        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        image1: jsonb('image1').$type<null | ScriptImage>(),
+        image2: jsonb('image2').$type<null | ScriptImage>(),
+        image3: jsonb('image3').$type<null | ScriptImage>(),
+        preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -880,6 +884,8 @@ export const pendingDeletion = pgTable(
         diagnosisDraftId: uuid('diagnosis_draft_id').references(() => diagnosesDrafts.diagnosisDraftId, { onDelete: 'cascade', }),
         configKeyDraftId: uuid('config_key_draft_id').references(() => configKeysDrafts.configKeyDraftId, { onDelete: 'cascade', }),
         drugsLibraryItemDraftId: uuid('drugs_library_item_draft_id').references(() => drugsLibraryDrafts.itemDraftId, { onDelete: 'cascade', }),
+        dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
+        dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
@@ -934,9 +940,16 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.drugsLibraryItemDraftId],
         references: [drugsLibraryDrafts.itemDraftId],
     }),
-      alias: one(aliases, {
+    dataKey: one(dataKeys, {
+        fields: [pendingDeletion.dataKeyId],
+        references: [dataKeys.uuid],
+    }),
+    dataKeyDraft: one(dataKeysDrafts, {
+        fields: [pendingDeletion.dataKeyDraftId],
+        references: [dataKeysDrafts.uuid],
+    }),
+    alias: one(aliases, {
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
     }),
-
 }));

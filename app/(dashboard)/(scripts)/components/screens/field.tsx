@@ -18,6 +18,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useScriptsContext } from "@/contexts/scripts";
+import { getLeanAlias } from '@/app/actions/aliases'
+import { ChevronDown, XIcon } from "lucide-react";
+import { SelectModal } from "@/components/select-modal";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
@@ -37,8 +41,6 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
-import { getLeanAlias } from '@/app/actions/aliases'
-import { ChevronDown, XIcon } from "lucide-react";
 
 type Props = {
     open: boolean;
@@ -60,6 +62,8 @@ export function Field<P = {}>({
     disabled: disabledProp,
     onClose,
 }: Props & P) {
+    const { dataKeys } = useScriptsContext();
+    
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
     const [showForm, setShowForm] = useState(!!field);
@@ -263,10 +267,39 @@ export function Field<P = {}>({
                             <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
                                 <div>
                                     <Label error={!disabled && !key} htmlFor="key">Key *</Label>
-                                    <Input
+                                    {/* <Input
                                         {...register('key', { disabled, required: true, })}
                                         name="key"
                                         error={!disabled && !key}
+                                    /> */}
+                                    <SelectModal 
+                                        modal
+                                        selected={key}
+                                        error={!disabled && !key}
+                                        placeholder="Select key"
+                                        search={{
+                                            placeholder: 'Search data keys',
+                                        }}
+                                        options={dataKeys.data.map(o => ({
+                                            value: o.name,
+                                            label: o.name,
+                                            description: o.label || '',
+                                            caption: o.dataType || '',
+                                            disabled: type !== o.dataType,
+                                        }))}
+                                        onSelect={([key]) => {
+                                            const fullKey = dataKeys.data.find(k => k.name === key?.value);
+                                            const children = dataKeys.data
+                                                .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+
+                                            setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
+                                            setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+
+                                            if (fullKey?.dataType === 'dropdown' && isDropdownField) {
+                                                const values = children.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
+                                                setValue('values', values || '', { shouldDirty: true, });
+                                            }
+                                        }}
                                     />
                                 </div>
 

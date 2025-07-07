@@ -7,6 +7,8 @@ type Props = {
     },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function OpsScripyPage({ params: { scriptId }, }: Props) {
     const [scriptsMeta] = await Promise.all([
         getScriptsMetadata({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),

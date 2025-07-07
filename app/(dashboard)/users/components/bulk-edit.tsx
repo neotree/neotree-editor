@@ -34,7 +34,7 @@ export function BulkEdit({
     open, 
     userIds, 
     roles, 
-    onClose, 
+    onOpenChange, 
     updateUsers,
     onSaveSuccess,
 }: {
@@ -42,7 +42,7 @@ export function BulkEdit({
     userIds: string[];
     roles: Awaited<ReturnType<typeof getRoles>>;
     updateUsers: typeof updateUsersAction;
-    onClose?: () => void;
+    onOpenChange?: (open: boolean) => void;
     onSaveSuccess?: () => Promise<any>;
 }) {
     const { alert } = useAlertModal();
@@ -61,10 +61,9 @@ export function BulkEdit({
     });
 
     const close = useCallback(() => {
-        onClose?.();
         searchParamsReplace({ bulkEdit: undefined, });
         setValue('role', '' as Role);
-    }, [onClose, searchParamsReplace, setValue]);
+    }, [onOpenChange, searchParamsReplace, setValue]);
 
     const onSave = handleSubmit(data => {
         (async () => {
@@ -106,9 +105,10 @@ export function BulkEdit({
     return (
         <>
             <Sheet
-                open={parsed.bulkEdit === '1'}
+                open={open}
                 onOpenChange={open => {
                     if (!open) close();
+                    onOpenChange?.(open);
                 }}
             >
                 <SheetContent 

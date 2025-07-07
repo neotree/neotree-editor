@@ -14,6 +14,8 @@ import * as configKeysMutations from '@/databases/mutations/config-keys';
 import * as configKeysQueries from '@/databases/queries/config-keys';
 import * as drugsLibraryMutations from '@/databases/mutations/drugs-library';
 import * as drugsLibraryQueries from '@/databases/queries/drugs-library';
+import * as dataKeysMutations from '@/databases/mutations/data-keys';
+import * as dataKeysQueries from '@/databases/queries/data-keys';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
@@ -68,6 +70,7 @@ export const countAllDrafts = async () => {
     try {
         const configKeys = await configKeysQueries._countConfigKeys();
         const drugsLibraryItems = await drugsLibraryQueries._countDrugsLibraryItems();
+        const dataKeys = await dataKeysQueries._countDataKeys();
         const screens = await scriptsQueries._countScreens();
         const scripts = await scriptsQueries._countScripts();
         const diagnoses = await scriptsQueries._countDiagnoses();
@@ -78,6 +81,7 @@ export const countAllDrafts = async () => {
             screens: screens.data.allDrafts,
             scripts: scripts.data.allDrafts,
             diagnoses: diagnoses.data.allDrafts,
+            dataKeys: dataKeys.data.allDrafts,
         };
     } catch(e: any) {
         logger.error('countAllDrafts ERROR', e.message);
@@ -106,11 +110,17 @@ export async function publishData() {
 
         const publishConfigKeys = await configKeysMutations._publishConfigKeys();
         const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems();
+        const publishDataKeys = await dataKeysMutations._publishDataKeys();
         const publishScripts = await scriptsMutations._publishScripts();
         const publishScreens = await scriptsMutations._publishScreens();
         const publishDiagnoses = await scriptsMutations._publishDiagnoses();
         const processPendingDeletion = await _processPendingDeletion();
         
+        if (publishDataKeys.errors) {
+            results.success = false;
+            results.errors = [...(results.errors || []), ...publishDataKeys.errors];
+        }
+
         if (publishConfigKeys.errors) {
             results.success = false;
             results.errors = [...(results.errors || []), ...publishConfigKeys.errors];
@@ -169,6 +179,7 @@ export async function discardDrafts() {
 
          await configKeysMutations._deleteAllConfigKeysDrafts();
          await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts();
+         await dataKeysMutations._deleteAllDataKeysDrafts();
          await scriptsMutations._deleteAllScriptsDrafts();
          await scriptsMutations._deleteAllScreensDrafts();
          await scriptsMutations._deleteAllDiagnosesDrafts();
