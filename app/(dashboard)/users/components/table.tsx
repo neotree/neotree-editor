@@ -31,11 +31,11 @@ import { useSearchParams } from "@/hooks/use-search-params";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAppContext } from "@/contexts/app";
 import { UserAction } from "./action";
-import { UserForm } from "./user-form";
 import { Header } from "./header";
 import { BulkEdit } from "./bulk-edit";
 
 type Props = {
+    user?: Awaited<ReturnType<typeof getUser>>;
     users: Awaited<ReturnType<typeof getUsers>>;
     roles: Awaited<ReturnType<typeof getRoles>>;
     getUsers: typeof getUsers;
@@ -50,6 +50,7 @@ type Props = {
 export function UsersTable({ 
     users: initialData, 
     roles, 
+    user,
     getUsers: _getUsers, 
     deleteUsers, 
     getUser,
@@ -64,7 +65,6 @@ export function UsersTable({
     const [users, setUsers] = useState(initialData);
     const [loading, setLoading] = useState(false);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
-    const [showUserForm, setShowUserForm] = useState(false);
 
     const { confirm } = useConfirmModal();
 
@@ -171,136 +171,124 @@ export function UsersTable({
         });
     }, [confirm, resetUsersPasswords, users]);
 
-    const userForm = (searchParams.parsed.userId || showUserForm) ? (
-        <UserForm 
-            roles={roles}
-            open={showUserForm}
-            getUser={getUser}
-            updateUsers={updateUsers}
-            createUsers={createUsers}
-            onSaveSuccess={getUsers}
-            onClose={() => setShowUserForm(false)}
-        />
-    ) : null;
+    const disabled = useMemo(() => (mode === 'view'), [mode]);
 
     const bulkEditForm = (
         <BulkEdit 
             roles={roles}
-            open={showUserForm}
+            open={!!selectedIndexes.length}
             userIds={selectedIndexes.map(i => users.data[i].userId)}
             updateUsers={updateUsers}
             onSaveSuccess={() => getUsers({ page: users.page, })}
+            onOpenChange={open => !open && setSelectedIndexes([])}
         />
     );
 
-    const disabled = useMemo(() => (mode === 'view'), [mode]);
-
     return (
-        <div className="flex flex-col">
-            <DataTable
-                title="Users"
-                selectable={!disabled}
-                selectedIndexes={selectedIndexes}
-                onSelect={setSelectedIndexes}
-                search={{
-                    inputPlaceholder: 'Search users',
-                }}
-                headerActions={(
-                    <Header 
-                        users={users}
-                        roles={roles}
-                        selected={selectedIndexes.map(i => users.data[i].userId)}
-                        onDelete={onDelete}
-                        getUsers={getUsers}
-                        searchUsers={searchUsers}
-                        toggleUserForm={() => setShowUserForm(prev => !prev)}
-                    />
-                )}
-                columns={[
-                    {
-                        name: 'Display name',
-                    },
-                    {
-                        name: 'Email',
-                    },
-                    {
-                        name: 'Role',
-                    },
-                    {
-                        name: 'Last login date',
-                    },
-                    {
-                        name: 'Active',
-                        align: 'right',
-                        cellRenderer(cell) {
-                            const u = users.data[cell.rowIndex];
-                            return (
-                                <TooltipProvider delayDuration={0}>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <CheckCircle className={cn(u.activationDate ? 'text-green-400' : 'text-gray-400', 'w-4 h-4')} />
-                                        </TooltipTrigger>
-                                        {!!u.activationDate && (
-                                            <TooltipContent>
-                                                <p className="text-xs text-muted-foreground">Activation date: {moment(u.activationDate).format('LLL')}</p>
-                                            </TooltipContent>
-                                        )}
-                                    </Tooltip>
-                                </TooltipProvider>
-                            );
-                        },
-                    },
-                    {
-                        name: 'Action',
-                        align: 'right',
-                        // thClassName: 'opacity-0',
-                        cellRenderer(cell) {
-                            const u = users.data[cell.rowIndex];
-                            return (
-                                <UserAction 
-                                    email={u.email}
-                                    userId={u.userId}
-                                    userName={u.displayName}
-                                    isActivated={!!u.activationDate}
-                                    onDelete={() => onDelete([u.userId])}
-                                    onResetPasswords={() => onResetPasswords([u.userId])}
-                                />
-                            );
-                        },
-                    },
-                ]}
-                data={users.data.map(u => {
-                    return [
-                        u.displayName,
-                        u.email,
-                        roles.filter(r => r.name === u.role)[0]?.description || u.role,
-                        u.lastLoginDate ? moment(u.lastLoginDate).format('LLL') : '',
-                        '',
-                    ];
-                })}
-            />
-
-            <Separator />
-
-            <div className="p-2">
-                <Pagination
-                    currentPage={users.page}
-                    totalPages={users.totalPages}
-                    disabled={loading}
-                    limit={users.limit || users.totalRows}
-                    totalRows={users.totalRows}
-                    collectionName="users"
-                    onPaginate={page => getUsers({ page }, (e, rslts) => !e && searchParams.push({ page: rslts?.page || users.page, }))}
-                    hideControls={false}
-                    hideSummary={false}
-                />
-            </div>
-
-            {userForm}
+        <>
+            {loading && <Loader overlay />}
 
             {bulkEditForm}
+            
+            <div className="flex flex-col">
+                <DataTable
+                    title="Users"
+                    selectable={!disabled}
+                    selectedIndexes={selectedIndexes}
+                    onSelect={setSelectedIndexes}
+                    search={{
+                        inputPlaceholder: 'Search users',
+                    }}
+                    headerActions={(
+                        <Header 
+                            users={users}
+                            roles={roles}
+                            selected={selectedIndexes.map(i => users.data[i].userId)}
+                            onDelete={onDelete}
+                            getUsers={getUsers}
+                            searchUsers={searchUsers}
+                        />
+                    )}
+                    columns={[
+                        {
+                            name: 'Display name',
+                        },
+                        {
+                            name: 'Email',
+                        },
+                        {
+                            name: 'Role',
+                        },
+                        {
+                            name: 'Last login date',
+                        },
+                        {
+                            name: 'Active',
+                            align: 'right',
+                            cellRenderer(cell) {
+                                const u = users.data[cell.rowIndex];
+                                return (
+                                    <TooltipProvider delayDuration={0}>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <CheckCircle className={cn(u.activationDate ? 'text-green-400' : 'text-gray-400', 'w-4 h-4')} />
+                                            </TooltipTrigger>
+                                            {!!u.activationDate && (
+                                                <TooltipContent>
+                                                    <p className="text-xs text-muted-foreground">Activation date: {moment(u.activationDate).format('LLL')}</p>
+                                                </TooltipContent>
+                                            )}
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                );
+                            },
+                        },
+                        {
+                            name: 'Action',
+                            align: 'right',
+                            // thClassName: 'opacity-0',
+                            cellRenderer(cell) {
+                                const u = users.data[cell.rowIndex];
+                                return (
+                                    <UserAction 
+                                        email={u.email}
+                                        userId={u.userId}
+                                        userName={u.displayName}
+                                        isActivated={!!u.activationDate}
+                                        onDelete={() => onDelete([u.userId])}
+                                        onResetPasswords={() => onResetPasswords([u.userId])}
+                                    />
+                                );
+                            },
+                        },
+                    ]}
+                    data={users.data.map(u => {
+                        return [
+                            u.displayName,
+                            u.email,
+                            roles.filter(r => r.name === u.role)[0]?.description || u.role,
+                            u.lastLoginDate ? moment(u.lastLoginDate).format('LLL') : '',
+                            '',
+                        ];
+                    })}
+                />
 
-            {loading && <Loader overlay />}
-        </div>
+                <Separator />
+
+                <div className="p-2">
+                    <Pagination
+                        currentPage={users.page}
+                        totalPages={users.totalPages}
+                        disabled={loading}
+                        limit={users.limit || users.totalRows}
+                        totalRows={users.totalRows}
+                        collectionName="users"
+                        onPaginate={page => getUsers({ page }, (e, rslts) => !e && searchParams.push({ page: rslts?.page || users.page, }))}
+                        hideControls={false}
+                        hideSummary={false}
+                    />
+                </div>
+            </div>
+        </>
     )
 }

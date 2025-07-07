@@ -12,6 +12,7 @@ import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
+import { ScriptsTableHeaderActions } from "./scripts-table-header-actions";
 
 type Props = UseScriptsTableParams;
 
@@ -57,15 +58,16 @@ export function ScriptsTable(props: Props) {
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
+                    // headerActions={<ScriptsTableHeaderActions />}
                     getRowOptions={({ rowIndex }) => {
                         const s = scripts.data[rowIndex];
                         return !s ? {} : {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
-                    search={{
-                        inputPlaceholder: 'Search scripts',
-                    }}
+                    // search={{
+                    //     inputPlaceholder: 'Search scripts',
+                    // }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
                             <div>No scripts saved.</div>

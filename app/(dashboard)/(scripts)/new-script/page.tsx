@@ -7,6 +7,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewScriptPage({}: Props) {
     const hospitals = await getHospitals();
 

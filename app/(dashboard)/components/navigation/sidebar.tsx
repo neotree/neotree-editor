@@ -44,9 +44,9 @@ export function Sidebar() {
                                 key={route.id}
                                 href={route.href}
                                 className={cn(
-                                    'p-4 flex flex-col justify-center transition-colors dark:text-foreground',
+                                    'p-4 flex flex-col justify-center transition-colors dark:text-foreground font-medium',
                                     isActive ? 
-                                        'bg-primary text-primary-foreground' 
+                                        'bg-primary/10 text-primary' 
                                         : 
                                         'text-secondary hover:bg-primary/10 dark:hover:bg-primary-foreground/10'
                                 )}

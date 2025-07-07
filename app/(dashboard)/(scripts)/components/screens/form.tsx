@@ -3,8 +3,13 @@
 import { useCallback, useState, Fragment,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
-import { Controller } from 'react-hook-form';
+import { Controller } from "react-hook-form";
+import { v4 } from "uuid";
+import axios from 'axios';
 
+import { getLeanAlias } from '@/app/actions/aliases'
+import { KeyValueTextarea } from "@/components/key-value-textarea";
+import { SelectModal } from "@/components/select-modal";
 import { listScreens } from "@/app/actions/scripts";
 import {
     Select,
@@ -29,7 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
-import { ScreenFormDataType } from "@/contexts/scripts";
+import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
 import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
@@ -37,7 +42,7 @@ import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
 import { Separator } from "@/components/ui/separator";
 import edlizSummaryData from "@/constants/edliz-summary-table";
-import { ScriptItem } from "@/types";
+import { ScriptField, ScriptItem } from "@/types";
 import { PreferencesForm } from "@/components/preferences-form";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
@@ -47,9 +52,6 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
-import { KeyValueTextarea } from "@/components/key-value-textarea";
-import { getLeanAlias } from '@/app/actions/aliases'
-import axios from 'axios';
 
 type Props = {
     scriptId: string;
@@ -65,7 +67,7 @@ export function ScreenForm({
     screens,
 }: Props) {
     const router = useRouter();
-
+    const { dataKeys } = useScriptsContext();
     const [showForm, setShowForm] = useState(!!formData);
 
     const form = useScreenForm({
@@ -216,6 +218,122 @@ export function ScreenForm({
     const isFluidsScreen = type === 'fluids';
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
     const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
+    const hasItems = isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen;
+    const hasFields = isFormScreen;
+
+    const renderKeyInput = ({ 
+        value: key, 
+    }: {
+        value: string;
+    }) => {
+        return (
+            <SelectModal
+                selected={key}
+                error={!disabled && !key}
+                placeholder="Select key"
+                search={{
+                    placeholder: 'Search data keys',
+                }}
+                options={dataKeys.data.map(o => ({
+                    value: o.name,
+                    label: o.name,
+                    description: o.label || '',
+                    caption: o.dataType || '',
+                    disabled: type !== o.dataType,
+                }))}
+                onSelect={([key]) => {
+                    const fullKey = dataKeys.data.find(k => k.name === key?.value);
+                    const children = dataKeys.data
+                        .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+
+                    setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
+                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+
+                    if (hasItems) {
+                        const items = children.map((k, i) => {
+                            return {
+                                itemId: v4(),
+                                id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
+                                label: (k.label || k.name).trim(),
+                                position: i + 1,
+                                subType: '', // edliz
+                                type: '', // edliz,
+                                exclusive: false,
+                                confidential: false,
+                                checked: false,
+                                enterValueManually: false,
+                                severity_order: '',
+                                summary: '',
+                                key: isChecklistScreen ? k.name : '',
+                                score: (isEdlizScreen ? '' : '') as unknown as number,
+                                dataType: (() => {
+                                    switch (type) {
+                                        //   case 'list':
+                                        //     return 'void';
+                                        case 'checklist':
+                                            return 'boolean';
+                                        case 'single_select':
+                                            return 'id';
+                                        case 'diagnosis':
+                                            return 'diagnosis';
+                                        default:
+                                            return null;
+                                    }
+                                })(),
+                            };
+                        });
+
+                        setValue('items', items, { shouldDirty: true, });
+                    }
+
+                    if (hasFields) {
+                        const fields = children.filter(k => k.dataType).map((k, i) => {
+                            const f = {
+                                fieldId: v4(),
+                                type: k.dataType!,
+                                key: k.name,
+                                label: (k.label || k.name).trim(),
+                                refKey: '',
+                                calculation: '',
+                                condition: '',
+                                dataType: '',
+                                defaultValue: '',
+                                format: '',
+                                minValue: '',
+                                maxValue: '',
+                                minDate: '',
+                                maxDate: '',
+                                minTime: '',
+                                maxTime: '',
+                                minDateKey: '',
+                                maxDateKey: '',
+                                minTimeKey: '',
+                                maxTimeKey: '',
+                                values: '',
+                                valuesOptions: [],
+                                confidential: false,
+                                optional: false,
+                                printable: false,
+                                prePopulate: [],
+                                editable: false,
+                            } satisfies ScriptField;
+
+                            if (k.dataType === 'dropdown') {
+                                const valuesArr = dataKeys.data
+                                    .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${k.name}`.toLowerCase()));
+                                const values = valuesArr.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
+                                f.values = values;
+                            }
+
+                            return f;
+                        });
+
+                        setValue('fields', fields, { shouldDirty: true, });
+                    }
+                }}
+            />
+        );
+    }
 
     return (
         <>
@@ -596,10 +714,17 @@ export function ScreenForm({
                     <div className={cn('flex flex-col gap-y-5', isTimerScreen && 'sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1')}>
                         <div>
                             <Label secondary htmlFor="key">Input key{!isTimerScreen ? ' *' : ''}</Label>
-                            <Input
+                            {/* <Input
                                 {...register('key', { disabled, required: !isTimerScreen, })}
                                 name="key"
                                 noRing={false}
+                            /> */}
+                            <Controller 
+                                name="key"
+                                control={control}
+                                render={({ field: { value: key, } }) => {
+                                    return renderKeyInput({ value: key, });
+                                }}
                             />
                         </div>
 
@@ -1006,7 +1131,7 @@ export function ScreenForm({
                 </>
             )}
 
-            {(isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen) && (
+            {hasItems && (
                 <>
                     <Separator className="my-20" />
 

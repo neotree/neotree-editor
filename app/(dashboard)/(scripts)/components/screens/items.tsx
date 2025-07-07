@@ -28,11 +28,19 @@ export function Items({
 }: Props) {
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
+    const isChecklistScreen = screenType === 'checklist';
+    const isProgressScreen = screenType === 'progress';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
     const items = form.watch('items');
+
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
+    const [activeItem, setActiveItem] = useState<null | {
+        index: number;
+        data: typeof items[0];
+    }>(null);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...items], oldIndex, newIndex);
@@ -198,7 +206,7 @@ export function Items({
                     },
                 ]}
                 data={items.map(f => [
-                    f.id,
+                    f.key || f.id,
                     f.label,
                     isDiagnosisScreen ? f.severity_order : '',
                     '',

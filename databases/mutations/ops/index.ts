@@ -1,12 +1,12 @@
-import { isNotNull, and, isNull, inArray } from "drizzle-orm";
+import { isNotNull, and, isNull, inArray, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { configKeys, diagnoses, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
+import { configKeys, dataKeys, diagnoses, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 
 export async function _clearPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
@@ -15,6 +15,7 @@ export async function _clearPendingDeletion(params?: {
         const where = [
             items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
             items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
+            items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
             items === 'scripts' ? and(
                 isNotNull(pendingDeletion.scriptId),
                 isNull(pendingDeletion.screenId),
@@ -36,7 +37,7 @@ export async function _clearPendingDeletion(params?: {
 }
 
 export async function _processPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
@@ -56,9 +57,25 @@ export async function _processPendingDeletion(params?: {
             where: items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
         });
 
+        const _dataKeys = await db.query.pendingDeletion.findMany({
+            where: items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
+        });
+
+        if (_dataKeys.length) {
+            await db.update(dataKeys)
+                .set({ 
+                    deletedAt: new Date(),
+                    name: sql`CONCAT(${dataKeys.name}, '_', ${dataKeys.uuid})`,
+                })
+                .where(inArray(dataKeys.uuid, _dataKeys.map(c => c.dataKeyId!)));
+        }
+
         if (_drugsLibraryItems.length) {
             await db.update(drugsLibrary)
-                .set({ deletedAt: new Date(), })
+                .set({ 
+                    deletedAt: new Date(), 
+                    key: sql`CONCAT(${drugsLibrary.key}, '_', ${drugsLibrary.itemId})`,
+                })
                 .where(inArray(drugsLibrary.itemId, _drugsLibraryItems.map(c => c.drugsLibraryItemId!)));
         }
 
