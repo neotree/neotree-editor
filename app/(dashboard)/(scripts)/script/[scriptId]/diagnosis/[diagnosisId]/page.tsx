@@ -9,6 +9,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Diagnoses({ params: { diagnosisId, scriptId } }: Props) {
     const [diagnosis, script] = await Promise.all([
         getDiagnosis({ diagnosisId, returnDraftIfExists: true, }),

@@ -15,6 +15,7 @@ import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
+import * as dataKeysActions from '@/app/actions/data-keys';
 
 import "@/app/globals.css";
 import { SocketEventsListener } from "@/components/socket-events-listener";
@@ -23,6 +24,8 @@ const roboto = Roboto({
     subsets: ['latin'],
     weight: ['100', '300', '400', '500', '700', '900'],
 }); 
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
     title: "Neotree",
@@ -56,7 +59,7 @@ export default async function RootLayout({
 
     return (
         <html lang="en">
-            <body className={roboto.className}>
+            <body className={roboto.className} suppressHydrationWarning>
                 <NuqsAdapter>
                     <AuthContextProvider>
                         <ThemeProvider
@@ -70,6 +73,7 @@ export default async function RootLayout({
                                 {...sysActions}
                                 {...editorDetails}
                                 {...authenticatedUser}
+                                {...dataKeysActions}
                                 sys={sys}
                                 getSites={getSitesWithoutConfidentialData}
                             >

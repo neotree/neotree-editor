@@ -38,7 +38,9 @@ export function AlertModal() {
         >
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle className={cn(!title && 'hidden')}>{title}</AlertDialogTitle>
+                    <AlertDialogTitle className={cn(!title && 'hidden')}>{title || ''}</AlertDialogTitle>
+                    <AlertDialogDescription className="hidden">{''}</AlertDialogDescription>
+
                     {!!message && (
                         <div
                             className={cn(
@@ -57,7 +59,9 @@ export function AlertModal() {
                                 </div>
                             )}
                             
-                            <div className="flex-1 text-lg">{message}</div>
+                            <div className="flex-1 text-lg">
+                                <div dangerouslySetInnerHTML={{ __html: message, }} />
+                            </div>
                         </div>
                     )}
                 </AlertDialogHeader>

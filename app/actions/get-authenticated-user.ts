@@ -28,7 +28,7 @@ export async function getAuthenticatedUserWithRoles() {
 
         const isAdmin = user?.role === 'admin';
         const isSuperUser = user?.role === 'super_user';
-        const isDefaultUser = !isAdmin && !isSuperUser;
+        const isDefaultUser = (isAdmin || isSuperUser) ? false : true;
 
         return {
             isAdmin,
@@ -41,7 +41,7 @@ export async function getAuthenticatedUserWithRoles() {
             isAdmin: false,
             isSuperUser: false,
             isDefaultUser: false,
-            user: null,
+            authenticatedUser: null,
         };
     }
 }

@@ -10,6 +10,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Scripts({ params: { scriptId }, searchParams: { section } }: Props) {
     const [hospitals, { data: formData }] = await Promise.all([
         getHospitals(),
