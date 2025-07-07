@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from 'lucide-react';
+import Link from "next/link";
 
 import { getUsers, searchUsers } from "@/app/actions/users";
 import { getRoles } from "@/app/actions/roles";
@@ -22,7 +23,6 @@ type Props = {
     roles: Awaited<ReturnType<typeof getRoles>>;
     selected: string[];
     onDelete: (ids: string[], cb?: () => void) => void;
-    toggleUserForm: () => void;
     searchUsers: typeof searchUsers;
     getUsers: (
         filters: Partial<Parameters<typeof getUsers>[0]>,
@@ -40,7 +40,6 @@ export function Header({
     roles, 
     getUsers, 
     onDelete, 
-    toggleUserForm, 
     searchUsers, 
 }: Props) {
     const searchParams = useSearchParams();
@@ -112,10 +111,12 @@ export function Header({
                 <Button
                     variant="outline"
                     className="w-auto h-auto border-primary text-primary"
-                    onClick={() => toggleUserForm()}
+                    asChild
                 >
-                    <Plus className="w-4 h-4 mr-1" />
-                    New User
+                    <Link href="/users/add">
+                        <Plus className="w-4 h-4 mr-1" />
+                        New User
+                    </Link>
                 </Button>
             </div>
         </>

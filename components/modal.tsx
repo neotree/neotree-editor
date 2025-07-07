@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from "react";
+
 import {
     Dialog,
     DialogContent,
@@ -14,8 +16,10 @@ import {
     DialogTriggerProps,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useModalState } from "@/hooks/use-modal-state";
 
 export type ModalProps = DialogProps & {
+    id?: string;
     children?: React.ReactNode;
     title?: React.ReactNode;
     description?: React.ReactNode;
@@ -26,6 +30,7 @@ export type ModalProps = DialogProps & {
 };
 
 export function Modal({
+    id,
     children,
     title,
     description,
@@ -35,9 +40,22 @@ export function Modal({
     footerProps,
     ...props
 }: ModalProps) {
+    const { close, isOpen, set } = useModalState();
+
+    useEffect(() => {
+        if (id) set({ [id]: false, });
+    }, [id]);
+
     return (
         <>
-            <Dialog {...props}>
+            <Dialog 
+                {...props}
+                open={(!id ? undefined : isOpen(id)) || props.open}
+                onOpenChange={open => {
+                    if (id) set({ [id]: open, });
+                    props?.onOpenChange?.(open);
+                }}
+            >
                 {trigger}
 
                 <DialogContent 

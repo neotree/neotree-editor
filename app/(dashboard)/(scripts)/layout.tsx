@@ -8,6 +8,7 @@ import { Title } from "@/components/title";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
+import { getDataKeys } from "@/app/actions/data-keys";
 
 export default async function ScriptsLayout({ children }: {
     children: React.ReactNode;
@@ -28,7 +29,10 @@ export default async function ScriptsLayout({ children }: {
         );
     }
 
-    const hospitals = await getHospitals();
+    const [hospitals, dataKeys] = await Promise.all([
+        getHospitals(),
+        getDataKeys(),
+    ]);
 
     return (
         <>
@@ -39,6 +43,7 @@ export default async function ScriptsLayout({ children }: {
                 {...filesActions}
                 hospitals={hospitals}
                 getHospitals={getHospitals}
+                dataKeys={dataKeys}
             >
                 {children}
             </ScriptsContextProvider>

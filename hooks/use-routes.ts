@@ -5,13 +5,20 @@ import { useAppContext } from "@/contexts/app";
 
 export function useRoutes() {
     const pathname = usePathname();
-    const { isDefaultUser, isSuperUser, sys } = useAppContext();
+    const { isDefaultUser, isSuperUser, } = useAppContext();
 
     return [
         {
             label: 'Scripts',
             href: '/',
-            isActive: pathname.substring(0, 8) === '/script/',
+            isActive: (pathname.substring(0, 8) === '/script/'),
+            id: v4(),
+            hidden: false,
+        },
+        {
+            label: 'Data keys Library',
+            href: '/data-keys',
+            isActive: pathname.substring(0, 10) === '/data-keys',
             id: v4(),
             hidden: false,
         },

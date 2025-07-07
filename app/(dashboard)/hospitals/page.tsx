@@ -14,6 +14,8 @@ type Props = {
     searchParams: { [key: string]: string; };
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function Hospitals({ searchParams: { page } }: Props) {
     const [hospitals] = await Promise.all([
         getHospitals(),

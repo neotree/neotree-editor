@@ -42,6 +42,13 @@ export function EdlizSummary({
     const { confirm } = useConfirmModal();
     const items = form.watch('items');
 
+    const [activeSection, setActiveSection] = useState<string | null>(null);
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
+    const [activeItem, setActiveItem] = useState<null | {
+        index: number;
+        data: typeof items[0];
+    }>(null);
+
     const sections = useMemo(() => {
         return items.reduce((acc, item, index) => {
             if (item.type) {
@@ -158,6 +165,13 @@ export function EdlizSummary({
                                                     New item
                                                 </Button>
 
+                                                <EditSection
+                                                    form={form}
+                                                    title={key}
+                                                    open={activeSection === key}
+                                                    onOpenChange={open => !open && setActiveSection(null)}
+                                                />
+
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button 
@@ -171,20 +185,16 @@ export function EdlizSummary({
 
                                                     <DropdownMenuContent>
                                                         <DropdownMenuItem asChild>
-                                                            <EditSection
-                                                                form={form}
-                                                                title={key}
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                className="justify-start w-full"
+                                                                onClick={(e) => {
+                                                                    setTimeout(() => setActiveSection(key), 0);
+                                                                }} 
                                                             >
-                                                                {({ open, setOpen, ...props }) => (
-                                                                    <div 
-                                                                        {...props}
-                                                                        onClick={() => setOpen(true)} 
-                                                                    >
-                                                                        <Edit className="w-4 h-4 mr-2" />
-                                                                        <span>Edit section</span>
-                                                                    </div>
-                                                                )}
-                                                            </EditSection>
+                                                                <Edit className="w-4 h-4 mr-2" />
+                                                                <span>Edit section</span>
+                                                            </Button>
                                                         </DropdownMenuItem>
 
                                                         <DropdownMenuItem
@@ -281,25 +291,27 @@ export function EdlizSummary({
 }
 
 function EditSection({ 
-    children, 
+    open,
     title: titleProp, 
     form,
+    onOpenChange,
     ...props
 }: {
+    open: boolean;
     title: string;
-    children: (opts: { open: boolean; setOpen: (open: boolean) => void; }) => React.ReactNode;
     form: ReturnType<typeof useScreenForm>;
+    onOpenChange: (open: boolean) => void;
 }) {
-    const [open, setOpen] = useState(false);
+    // const [open, setOpen] = useState(false);
     const [title, setTitle] = useState(titleProp);
 
     return (
-        <>
-            {children({ open, setOpen, ...props })}
-            
+        <>            
             <Dialog
                 open={open}
-                onOpenChange={setOpen}
+                onOpenChange={open => {
+                    if (!open) onOpenChange?.(open);
+                }}
             >
                 <DialogContent className="p-0">
                     <DialogHeader className="px-4 py-4">

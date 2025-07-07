@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import { FilterIcon } from "lucide-react";
 
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { ScriptItem as ItemType } from "@/types";
@@ -21,6 +22,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { SelectModal } from "@/components/select-modal";
+import { useScriptsContext } from "@/contexts/scripts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Props = {
     open: boolean;
@@ -54,6 +58,8 @@ export function Item<P = {}>({
     const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
+
+    const { dataKeys } = useScriptsContext();
 
     const [isCustomType, setIsCustomType] = useState(false);
     const [isCustomSubType, setIsCustomSubType] = useState(false);
@@ -98,6 +104,7 @@ export function Item<P = {}>({
     }, [item, screenType, itemType]);
 
     const {
+        control,
         reset: resetForm,
         watch,
         register,
@@ -117,7 +124,7 @@ export function Item<P = {}>({
     const exclusive = watch('exclusive');
     const checked = watch('checked');
 
-    const keyHasError = key && /[a-zA-Z0-9]+/.test(key) ? false : true;
+    const keyHasError = false; // key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
 
@@ -135,6 +142,63 @@ export function Item<P = {}>({
         }
         onClose();
     });
+
+    const isKeyDisabled = false; // isChecklistScreen ? disabled : true;
+
+    const renderKeyComponent = ({ 
+        value: key, 
+        label = "Select key", 
+        variant = 'id',
+    }: {
+        value: string;
+        label?: string;
+        variant?: 'key' | 'id';
+    }) => {
+        // const _type = isChecklistScreen ? 'checklist_option' : type;
+        const _type = screenType + '_option';
+
+        return (
+            <SelectModal
+                modal
+                selected={key}
+                disabled={isKeyDisabled}
+                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)}
+                placeholder={label}
+                search={{
+                    placeholder: 'Search data keys',
+                }}
+                options={dataKeys.data.map(o => ({
+                    value: o.name,
+                    label: o.name,
+                    description: o.label || '',
+                    caption: o.dataType || '',
+                    disabled: _type !== o.dataType,
+                }))}
+                onSelect={([key]) => {
+                    setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
+                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+                }}
+                header={(
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Button
+                                variant="ghost"
+                            >
+                                <FilterIcon className="size-4" />
+                                Filter
+                            </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent>
+                            <DropdownMenuItem>
+                                
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+            />
+        );
+    }
 
     return (
         <>
@@ -184,11 +248,18 @@ export function Item<P = {}>({
                                         </div>
 
                                         <div>
-                                            <Label error={!disabled && (!key || keyHasError)} htmlFor="key">Key *</Label>
-                                            <Input
-                                                {...register('key', { disabled, required: true, })}
+                                            <Label 
+                                                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)} 
+                                                htmlFor="key"
+                                            >Key *</Label>
+                                            <Controller 
+                                                control={control}
                                                 name="key"
-                                                error={!disabled && (!key || keyHasError)}
+                                                render={({ field: { value }, }) => renderKeyComponent({
+                                                    value,
+                                                    variant: 'key',
+                                                    label: 'Select key',
+                                                })}
                                             />
                                         </div>
 
@@ -249,11 +320,18 @@ export function Item<P = {}>({
                                     <>
                                         <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
                                             <div>
-                                                <Label error={!disabled && !id} htmlFor="id">ID *</Label>
-                                                <Input
-                                                    {...register('id', { disabled, required: true, })}
+                                                <Label 
+                                                    error={(isKeyDisabled || disabled) ? undefined : !id} 
+                                                    htmlFor="id"
+                                                >ID *</Label>
+                                                <Controller 
+                                                    control={control}
                                                     name="id"
-                                                    error={!disabled && !id}
+                                                    render={({ field: { value }, }) => renderKeyComponent({
+                                                        value,
+                                                        variant: 'id',
+                                                        label: 'Select id',
+                                                    })}
                                                 />
                                             </div>
 
