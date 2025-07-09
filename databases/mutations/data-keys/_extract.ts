@@ -15,12 +15,21 @@ export type ExtractDataKeysResponse = {
 
 export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
     try {
+        console.log('Fetching screens...');
         const screens = await db.query.screens.findMany();
+        console.log('Fetching screens... DONE');
+
+        console.log('Fetching diagnoses...');
         const diagnoses = await db.query.diagnoses.findMany();
+        console.log('Fetching diagnoses... DONE');
+
+        console.log('Fetching drugsLibrary...');
         const drugsLibrary = await db.query.drugsLibrary.findMany();
+        console.log('Fetching drugsLibrary... DONE');
 
         let extractedKeys: DataKey[] = [];
 
+        console.log('Extacting screens keys...');
         screens.forEach(s => {
             if (s.key) {
                 const dataKey: DataKey = { 
@@ -138,34 +147,41 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
             });
         });
 
+        console.log('Extacting diagnoses keys...');
         diagnoses.forEach(d => {
-            if (d.key) extractedKeys.push({ 
-                id: undefined,
-                uuid: v4(),
-                name: d.key, 
-                label: d.name, 
-                dataType: 'diagnosis', 
-                parentKeys: [],
-                version: 1,
-            });
+            if (d.key) {
+                extractedKeys.push({ 
+                    id: undefined,
+                    uuid: v4(),
+                    name: d.key, 
+                    label: d.name, 
+                    dataType: 'diagnosis', 
+                    parentKeys: [],
+                    version: 1,
+                });
+            }
             
             // d.symptoms.forEach(s => {
             //     if (s.name) data.push(s.name);
             // });
         });
 
+        console.log('Extacting drugsLibrary keys...');
         drugsLibrary.forEach(d => {
-            if (d.key) extractedKeys.push({
-                id: undefined,
-                uuid: v4(), 
-                name: d.key, 
-                label: d.drug, 
-                dataType: d.type, 
-                parentKeys: [],
-                version: 1,
-            });
+            if (d.key) {
+                extractedKeys.push({
+                    id: undefined,
+                    uuid: v4(), 
+                    name: d.key, 
+                    label: d.drug, 
+                    dataType: d.type, 
+                    parentKeys: [],
+                    version: 1,
+                });
+            }
         });
 
+        console.log(`Processing extracted keys (${extractedKeys.length}) ...`);
         for (const key of extractedKeys) {
             let parentKeys = key.parentKeys || [];
             extractedKeys
@@ -174,9 +190,11 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                     return isMatch;
                 })
                 .forEach(k => {
+                    // console.log(k.name);
                     parentKeys = [...parentKeys, ...k.parentKeys!];
                 });
         }
+        console.log('Processing extracted keys... DONE');
 
         extractedKeys = extractedKeys
             .map(key => {
@@ -209,7 +227,11 @@ export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
                 return (extractedKeys.map(key => key.name.toLowerCase()).indexOf(key.name.toLowerCase()) === i);
             });
 
+        console.log(`Extracted ${extractedKeys.length} keys...`);
+
         if (extractedKeys.length) {
+            console.log(`Saving ${extractedKeys.length} keys...`);
+
             const published = await db
                 .select({ name: schema.dataKeys.name, })
                 .from(schema.dataKeys)
