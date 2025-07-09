@@ -136,9 +136,9 @@ function Modal({
         if (!selectedProp) {
             return [] as typeof optionsProp;
         } else if (Array.isArray(selectedProp)) {
-            return selectedProp.map(v => optionsProp.find(o => o.value === v)!).map(o => o);
+            return selectedProp.map(v => optionsProp.find(o => o?.value === v)!).map(o => o);
         } else {
-            return optionsProp.filter(o => o.value === selectedProp) || [];
+            return optionsProp.filter(o => o?.value === selectedProp) || [];
         }
 
     }, [selectedProp, optionsProp]);
@@ -146,7 +146,7 @@ function Modal({
     const options = useMemo(() => {
         return optionsProp
             .map(o => {
-                const isSelected = selected.map(o => o.value).map(s => `${s || ''}`).filter(s => s).includes(`${o.value}`);
+                const isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
                 return {
                     ...o,
                     isSelected,
@@ -162,7 +162,7 @@ function Modal({
                 const v2 = b.isSelected ? 1 : 0;
                 return v2 - v1;
             })
-            .filter(o => `${o.value || ''}`.includes(deferredSearchValue));
+            .filter(o => `${o?.value || ''}`.includes(deferredSearchValue));
     }, [optionsProp, deferredSearchValue, selected]);
 
     useEffect(() => () => setSearchValue(''), []);
