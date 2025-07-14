@@ -3,6 +3,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
 import { ScriptField, ScriptItem } from "@/types";
+import * as uuid from "uuid";
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -46,15 +47,30 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 isNull(hospitals.deletedAt),
             ),
         });
+        const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
 
-        const whereScriptsIds = !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds);
+        if (oldScriptsIds.length) {
+            const res = await db.query.scripts.findMany({
+                where: inArray(scripts.oldScriptId, oldScriptsIds),
+                columns: { scriptId: true, oldScriptId: true, },
+            });
+            oldScriptsIds.forEach(oldScriptId => {
+                const s = res.filter(s => s.oldScriptId === oldScriptId)[0];
+                scriptsIds.push(s?.scriptId || uuid.v4());
+                
+            });
+
+        }
+        const newScriptIds = scriptsIds.filter(s=>uuid.validate(s))
+
+        let whereScriptsIds = !newScriptIds.length ? undefined : inArray(scripts.scriptId, newScriptIds);
         const whereHospitalsIds = !hospitalsIds.length ? undefined : inArray(scripts.hospitalId, hospitalsIds);
 
         const unpublisedScriptsRes = await db.query.scriptsDrafts.findMany({
             where: and(
                 whereHospitalsIds,
-                !scriptsIds.length ? undefined : and(
-                    inArray(scriptsDrafts.scriptDraftId, scriptsIds),
+                !newScriptIds.length ? undefined : and(
+                    inArray(scriptsDrafts.scriptDraftId, newScriptIds),
                     isNull(scriptsDrafts.scriptId),
                 ),
             ),
@@ -122,7 +138,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         key: screen.key,
                         type: screen.type,
                         ...(() => {
-                            switch(screen.type) {
+                            switch (screen.type) {
                                 default:
                                     return {
                                         dataType: screen.dataType,
@@ -133,7 +149,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         })(),
                     }];
 
-                    switch(screen.type) {
+                    switch (screen.type) {
                         case 'progress':
                         case 'edliz_summary_table':
                         case 'mwi_edliz_summary_table':
@@ -179,12 +195,12 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: null,
                             }));
                             break;
-                    
+
                         case 'form':
                             const formFields = screenFields.map(f => {
                                 let dataType = f.dataType;
 
-                                switch(f.type) {
+                                switch (f.type) {
                                     case 'datetime':
                                         dataType = 'datetime';
                                         break;
@@ -272,8 +288,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 valueLabel: item.label,
                             }));
                             break;
-                        default: 
-                            // do nothing
+                        default:
+                        // do nothing
                     }
 
                     return {
@@ -288,7 +304,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
         });
 
         return { data, };
-    } catch(e: any) {
+    } catch (e: any) {
         return { errors: [e.message], data: [], };
     }
 }
