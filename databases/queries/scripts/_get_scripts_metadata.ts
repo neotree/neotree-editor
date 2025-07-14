@@ -3,6 +3,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
 import { ScriptField, ScriptItem } from "@/types";
+import * as uuid from "uuid";
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -46,8 +47,12 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 isNull(hospitals.deletedAt),
             ),
         });
+         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
 
-        const whereScriptsIds = !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds);
+        let  whereScriptsIds = !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds);
+        if(oldScriptsIds.length>0){
+          whereScriptsIds = inArray(scripts.oldScriptId, oldScriptsIds) 
+        }
         const whereHospitalsIds = !hospitalsIds.length ? undefined : inArray(scripts.hospitalId, hospitalsIds);
 
         const unpublisedScriptsRes = await db.query.scriptsDrafts.findMany({
