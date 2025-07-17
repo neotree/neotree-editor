@@ -22,7 +22,7 @@ import { useScriptsContext } from "@/contexts/scripts";
 import { getLeanAlias } from '@/app/actions/aliases'
 import { ChevronDown, XIcon } from "lucide-react";
 import { SelectModal } from "@/components/select-modal";
-import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
+import { CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -285,7 +285,7 @@ export function Field<P = {}>({
                                             label: o.name,
                                             description: o.label || '',
                                             caption: o.dataType || '',
-                                            disabled: type !== o.dataType,
+                                            disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
                                         }))}
                                         onSelect={([key]) => {
                                             const fullKey = dataKeys.data.find(k => k.name === key?.value);
