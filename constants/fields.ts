@@ -40,7 +40,7 @@ export const DefaultValueType = {
     { name: 'text', label: 'Text' },
     { name: 'time', label: 'Time' },
     { name: 'period', label: 'Time period' },
-  ];
+  ] as const;
   
   export const ScreenTypes = [
     { name: 'diagnosis', label: 'Diagnosis' },
