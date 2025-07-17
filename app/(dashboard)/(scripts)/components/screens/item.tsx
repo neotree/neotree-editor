@@ -25,6 +25,7 @@ import {
 import { SelectModal } from "@/components/select-modal";
 import { useScriptsContext } from "@/contexts/scripts";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DATA_KEYS_MAP } from "@/constants";
 
 type Props = {
     open: boolean;
@@ -172,7 +173,7 @@ export function Item<P = {}>({
                     label: o.name,
                     description: o.label || '',
                     caption: o.dataType || '',
-                    disabled: _type !== o.dataType,
+                    disabled: !DATA_KEYS_MAP[screenType!].includes(o.dataType!),
                 }))}
                 onSelect={([key]) => {
                     setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
