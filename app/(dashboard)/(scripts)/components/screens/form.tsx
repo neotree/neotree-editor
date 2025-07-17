@@ -36,7 +36,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
 import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
-import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
+import { screenTypes, CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
@@ -239,7 +239,7 @@ export function ScreenForm({
                     label: o.name,
                     description: o.label || '',
                     caption: o.dataType || '',
-                    disabled: type !== o.dataType,
+                    disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
                 }))}
                 onSelect={([key]) => {
                     const fullKey = dataKeys.data.find(k => k.name === key?.value);
