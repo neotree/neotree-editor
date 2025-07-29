@@ -168,13 +168,19 @@ export function Item<P = {}>({
                 search={{
                     placeholder: 'Search data keys',
                 }}
-                options={dataKeys.data.map(o => ({
-                    value: o.name,
-                    label: o.name,
-                    description: o.label || '',
-                    caption: o.dataType || '',
-                    disabled: !DATA_KEYS_MAP[screenType!].includes(o.dataType!),
-                }))}
+                options={dataKeys.data
+                    .sort((a, b) => {
+                        const aVal = !DATA_KEYS_MAP[screenType!].includes(a.dataType!) ? 1 : 0;
+                        const bVal = !DATA_KEYS_MAP[screenType!].includes(b.dataType!) ? 1 : 0;
+                        return aVal - bVal;
+                    })
+                    .map(o => ({
+                        value: o.name,
+                        label: o.name,
+                        description: o.label || '',
+                        caption: o.dataType || '',
+                        // disabled: !DATA_KEYS_MAP[screenType!].includes(o.dataType!),
+                    }))}
                 onSelect={([key]) => {
                     setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
                     setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });

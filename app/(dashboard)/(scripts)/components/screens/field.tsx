@@ -280,13 +280,19 @@ export function Field<P = {}>({
                                         search={{
                                             placeholder: 'Search data keys',
                                         }}
-                                        options={dataKeys.data.map(o => ({
-                                            value: o.name,
-                                            label: o.name,
-                                            description: o.label || '',
-                                            caption: o.dataType || '',
-                                            disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                                        }))}
+                                        options={dataKeys.data
+                                            .sort((a, b) => {
+                                                const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
+                                                const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
+                                                return aVal - bVal;
+                                            })
+                                            .map(o => ({
+                                                value: o.name,
+                                                label: o.name,
+                                                description: o.label || '',
+                                                caption: o.dataType || '',
+                                                // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
+                                            }))}
                                         onSelect={([key]) => {
                                             const fullKey = dataKeys.data.find(k => k.name === key?.value);
                                             const children = dataKeys.data

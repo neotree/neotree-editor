@@ -206,13 +206,19 @@ function Form(props: Props) {
                                         search={{
                                             placeholder: 'Search data keys',
                                         }}
-                                        options={dataKeys.filter(k => !children.map(k => k.name).includes(k.name)).map(o => ({
-                                            value: o.name,
-                                            label: o.name,
-                                            description: o.label || '',
-                                            caption: o.dataType || '',
-                                            disabled: o.dataType !== `${dataType}_option`,
-                                        }))}
+                                        options={dataKeys
+                                            .sort((a, b) => {
+                                                const aVal = a.dataType !== `${dataType}_option` ? 1 : 0;
+                                                const bVal = b.dataType !== `${dataType}_option` ? 1 : 0;
+                                                return aVal - bVal;
+                                            })
+                                            .filter(k => !children.map(k => k.name).includes(k.name)).map(o => ({
+                                                value: o.name,
+                                                label: o.name,
+                                                description: o.label || '',
+                                                caption: o.dataType || '',
+                                                // disabled: o.dataType !== `${dataType}_option`,
+                                            })) }
                                         onSelect={([key]) => {
                                             const _dataKey = dataKeys.find(k => k.name === key?.value);
                                             if (_dataKey) {
