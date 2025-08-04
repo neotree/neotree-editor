@@ -190,7 +190,9 @@ export function Field<P = {}>({
                                 } else {
                                     setValue(
                                         'valuesOptions',
-                                        valuesOptions.filter(o => o.optionKey && o.optionLabel && o.key),
+                                        valuesOptions
+                                            // .filter(o => o.optionKey && o.optionLabel && o.key)
+                                            .filter(o => o.optionLabel && o.key),
                                         { shouldDirty: true, },
                                     );
                                     onSave();
@@ -411,7 +413,7 @@ export function Field<P = {}>({
                                                                         <div>
                                                                             <div className="text-xs p-2 rounded-sm bg-primary/20 font-bold inline-block mb-2">{label}</div>
                                                                             <div className="flex gap-x-2 items-end">
-                                                                                <div className="flex-1">
+                                                                                {/* <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
                                                                                     <Input 
                                                                                         disabled={disabled}
@@ -422,7 +424,7 @@ export function Field<P = {}>({
                                                                                         })}
                                                                                         onBlur={field.onBlur}
                                                                                     />
-                                                                                </div>
+                                                                                </div> */}
 
                                                                                 <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
