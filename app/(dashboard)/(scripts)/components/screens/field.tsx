@@ -190,7 +190,9 @@ export function Field<P = {}>({
                                 } else {
                                     setValue(
                                         'valuesOptions',
-                                        valuesOptions.filter(o => o.optionKey && o.optionLabel && o.key),
+                                        valuesOptions
+                                            // .filter(o => o.optionKey && o.optionLabel && o.key)
+                                            .filter(o => o.optionLabel && o.key),
                                         { shouldDirty: true, },
                                     );
                                     onSave();
@@ -280,13 +282,19 @@ export function Field<P = {}>({
                                         search={{
                                             placeholder: 'Search data keys',
                                         }}
-                                        options={dataKeys.data.map(o => ({
-                                            value: o.name,
-                                            label: o.name,
-                                            description: o.label || '',
-                                            caption: o.dataType || '',
-                                            disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                                        }))}
+                                        options={dataKeys.data
+                                            .sort((a, b) => {
+                                                const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
+                                                const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
+                                                return aVal - bVal;
+                                            })
+                                            .map(o => ({
+                                                value: o.name,
+                                                label: o.name,
+                                                description: o.label || '',
+                                                caption: o.dataType || '',
+                                                // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
+                                            }))}
                                         onSelect={([key]) => {
                                             const fullKey = dataKeys.data.find(k => k.name === key?.value);
                                             const children = dataKeys.data
@@ -405,7 +413,7 @@ export function Field<P = {}>({
                                                                         <div>
                                                                             <div className="text-xs p-2 rounded-sm bg-primary/20 font-bold inline-block mb-2">{label}</div>
                                                                             <div className="flex gap-x-2 items-end">
-                                                                                <div className="flex-1">
+                                                                                {/* <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
                                                                                     <Input 
                                                                                         disabled={disabled}
@@ -416,7 +424,7 @@ export function Field<P = {}>({
                                                                                         })}
                                                                                         onBlur={field.onBlur}
                                                                                     />
-                                                                                </div>
+                                                                                </div> */}
 
                                                                                 <div className="flex-1">
                                                                                     <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
