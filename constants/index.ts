@@ -2,6 +2,12 @@ import { ScreenType, ScriptType } from "@/databases/queries/scripts";
 import { Preferences } from "@/types";
 import { FieldTypes } from "./fields";
 
+export const scriptPrintConfig = {
+    headerFields: [] as string[],
+    footerFields: [] as string[],
+    sections: [] as any[],
+};
+
 export const CONDITIONAL_EXP_EXAMPLE = "Example: ($key = true and $key2 = false) or $key3 = 'HD'";
 
 export const defaultPreferences = { 
