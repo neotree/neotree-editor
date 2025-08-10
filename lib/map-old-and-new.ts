@@ -224,6 +224,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
             })),
             preferences: s.preferences,
             printSections: s.printSections,
+            printConfig: s.printConfig,
         },
     };
 }
