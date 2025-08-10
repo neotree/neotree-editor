@@ -30,7 +30,7 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
-import { PrintSections } from './print';
+import { ScriptPrintSetup } from './print';
 import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
 
@@ -291,7 +291,7 @@ export function ScriptForm(props: Props) {
                     )}
 
                     {section === 'print' && (
-                        <PrintSections
+                        <ScriptPrintSetup
                             disabled={disabled}
                             form={form}
                         />
