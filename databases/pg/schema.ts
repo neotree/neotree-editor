@@ -419,6 +419,17 @@ export const scripts = pgTable(
         reviewable: boolean('reviewable').notNull().default(false),
         reviewConfigurations: jsonb('review_configurations').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        printConfig: jsonb('print_config').notNull()
+            .default(`{
+              "headerFields": [],
+              "footerFields": [],
+              "sections": []
+            }`)
+            .$type<{
+                headerFields: string[],
+                footerFields: string[],
+                sections: any[],
+            }>(),
         printSections: jsonb('print_sections').default('[]').notNull(),
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),

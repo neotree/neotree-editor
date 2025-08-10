@@ -201,6 +201,57 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
     }
 }
 
+export async function getScriptsKeys(params: Parameters<typeof queries._getScripts>[0]) {
+    const { errors, data } = await getScriptsWithItems(params);
+
+    const scripts = data.map(script => {
+        let keys: { label: string; key: string; }[] = [];
+
+        script.screens.forEach(screen => {
+            screen.fields?.forEach?.(field => {
+                if (field.key) {
+                    const key = field.key;
+                    keys.push({
+                        key,
+                        label: field.label || key,
+                    });
+                }
+            });
+
+            screen.items?.forEach?.(item => {
+                if (item.key) {
+                    const key = item.id || item.key;
+                    keys.push({
+                        key,
+                        label: item.label || key,
+                    });
+                }
+            });
+
+            if (screen.key) {
+                keys.push({
+                    key: screen.key,
+                    label: screen.label || screen.key,
+                });
+            }
+        });
+
+        keys = keys.filter((k, i) => keys.map(k => k.key).indexOf(k.key) === i);
+
+        return {
+            title: script.title,
+            hospitalId: script.hospitalId,
+            hospitalName: script.hospitalName,
+            keys,
+        };
+    });
+
+    return {
+        errors,
+        data: scripts,
+    };
+}
+
 export async function saveScriptScreens({
     screens,
     scriptId,

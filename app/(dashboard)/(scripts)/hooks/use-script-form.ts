@@ -7,7 +7,7 @@ import axios from "axios";
 
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { defaultNuidSearchFields } from "@/constants/fields";
-import { defaultPreferences, scriptTypes } from "@/constants";
+import { defaultPreferences, scriptPrintConfig, scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
@@ -47,6 +47,7 @@ export function useScriptForm(params: UseScriptFormParams) {
             nuidSearchFields: (formData?.nuidSearchFields || []),
             preferences: (formData?.preferences || defaultPreferences),
             printSections: (formData?.printSections || []),
+            printConfig: (formData?.printConfig || scriptPrintConfig),
             reviewConfigurations: (formData?.reviewConfigurations||[]),
             reviewable: isEmpty(formData?.reviewable) ? false : formData?.reviewable,
 

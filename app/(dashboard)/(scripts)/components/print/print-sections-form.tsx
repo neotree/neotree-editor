@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { MoreVertical, Trash } from "lucide-react"
-import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
 import { arrayMoveImmutable } from 'array-move';
 
-import { listScreens } from "@/app/actions/scripts";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,11 +23,9 @@ import { DataTable } from "@/components/data-table";
 import { PrintSection } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { ReactSelect } from "@/components/react-select";
-
-type Screen = Awaited<ReturnType<typeof listScreens>>['data'][0];
+import { useScriptsContext } from "@/contexts/scripts";
 
 export function PrintForm({ open, disabled, section, onClose, onChange }: {
     open: boolean;
@@ -39,19 +34,14 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
     onClose: () => void;
     onChange: (section: PrintSection) => void;
 }) {
-    const screensInitialised = useRef(false);
-
     const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
     const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
     const [loading, setLoading] = useState(false);
     const [title, setTitle] = useState(section?.title || '');
-    const [screens, setScreens] = useState<Screen[]>([]);
     const [selected, setSelected] = useState(section?.screensIds || []);
 
-    const { alert } = useAlertModal();
-
-    const { scriptId } = useParams();
+    const { screens: { data: screens, } } = useScriptsContext();
 
     useEffect(() => {
         setTitle(section?.title || '');
@@ -75,37 +65,7 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
         onClose();
     }, [containerDiv, onClose]);
 
-    const loadScreens = useCallback(async () => {
-        if (!screensInitialised.current && open) {
-            try {
-                setLoading(true);
-
-                const res = await axios.get<Awaited<ReturnType<typeof listScreens>>>('/api/screens/list?data='+JSON.stringify({ 
-                    returnDraftsIfExist: true,
-                    scriptsIds: [scriptId], 
-                }));
-                const { data, errors } = res.data;
-
-                if (errors?.length) throw new Error(errors.join(', '));
-
-                screensInitialised.current = true;
-
-                setScreens(data);
-            } catch(e: any) {
-                alert({
-                    title: '',
-                    message: 'Error: ' + e.message,
-                    variant: 'error',
-                });
-            } finally {
-                setLoading(false);
-            }
-        }
-    }, [scriptId, open, alert]);
-
-    useEffect(() => { loadScreens(); }, [open, loadScreens]);
-
-    const getScreenLabel = useCallback((screen: Screen) => {
+    const getScreenLabel = useCallback((screen: typeof screens[0]) => {
         return [
             screen.position,
             screen.title,
