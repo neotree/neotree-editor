@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations, sql,inArray } from "drizzle-orm";
 import { 
     boolean,
     customType,
@@ -12,6 +12,7 @@ import {
     text, 
     timestamp, 
     uuid,
+
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
@@ -65,6 +66,9 @@ export const screenTypeEnum = pgEnum('screen_type', [
 
 // DRUG TYPE ENUM
 export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
+
+export const lockStatusEnum = pgEnum('lock_status', ['opened', 'editing']);
+
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
@@ -963,4 +967,30 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
     }),
+}));
+
+export const ntScriptLock = pgTable(
+  'nt_script_lock',
+  {
+    lockId: uuid('lock_id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.userId, { onDelete: 'cascade' }),
+    lockedAt: timestamp('locked_at').defaultNow().notNull(),
+    status: lockStatusEnum('status').notNull().default('opened'),
+    scriptId: uuid('script_id')
+      .references(() => scripts.scriptId, { onDelete: 'cascade' }),
+    editedDraftScreens: uuid('edited_draft_screens').array().default([]),
+    editedDraftScripts: uuid('edited_draft_scripts').array().default([]),
+  })
+
+  export const scriptLockRelations = relations(ntScriptLock, ({ one }) => ({
+  user: one(users, {
+    fields: [ntScriptLock.userId],
+    references: [users.userId],
+  }),
+  script: one(scripts, {
+    fields: [ntScriptLock.scriptId],
+    references: [scripts.scriptId],
+  }),
 }));

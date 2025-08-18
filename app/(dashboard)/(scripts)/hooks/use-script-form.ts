@@ -16,15 +16,17 @@ import { resetDrugsLibraryState } from "@/hooks/use-drugs-library";
 export type UseScriptFormParams = {
     formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
+    locked?:boolean
 };
 
 export function useScriptForm(params: UseScriptFormParams) {
-    const { formData } = params;
+    const { formData,locked } = params;
 
     const { alert } = useAlertModal();
     const { viewOnly, } = useAppContext();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [isLocked, setLocked] = useState(false);
     const { saveScripts, } = useScriptsContext();
 
     useEffect(() => {
@@ -80,6 +82,7 @@ export function useScriptForm(params: UseScriptFormParams) {
 
     const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
 
+   
     const onSubmit = handleSubmit(async data => {
         setLoading(true);
 
@@ -108,7 +111,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => !!(viewOnly || locked), [viewOnly, locked]);
 
     return {
         ...params,

@@ -4,6 +4,7 @@ import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
 import { ScriptForm } from "../../components/script-form";
 import { PageContainer } from "../../components/page-container";
+import { getLockStatus } from "@/app/actions/locks";
 
 type Props = {
     params: { scriptId: string; };
@@ -13,11 +14,13 @@ type Props = {
 export const dynamic = 'force-dynamic';
 
 export default async function Scripts({ params: { scriptId }, searchParams: { section } }: Props) {
-    const [hospitals, { data: formData }] = await Promise.all([
+    const [hospitals, { data: formData },lockStatus] = await Promise.all([
         getHospitals(),
         getScript({ scriptId, returnDraftIfExists: true, }),
+        getLockStatus({script:scriptId})
     ]);
 
+  
     if (!formData) {
         return (
             <Alert 
@@ -35,10 +38,13 @@ export default async function Scripts({ params: { scriptId }, searchParams: { se
             <PageContainer
                 title="Edit script"
                 backLink="/"
+            
             >
                 <ScriptForm 
                     hospitals={hospitals.data}
                     formData={formData} 
+                    locked={lockStatus}
+                    
                 />
             </PageContainer>
         </>

@@ -31,12 +31,13 @@ import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
 import { ScriptPrintSetup } from './print';
-import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
 
 type Props = {
     formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
+    locked?:boolean
+
 };
 
 export function ScriptForm(props: Props) {
