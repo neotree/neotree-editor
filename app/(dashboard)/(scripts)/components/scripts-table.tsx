@@ -13,7 +13,6 @@ import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { LockStatus } from "./lock-status"
-import { ScriptsTableHeaderActions } from "./scripts-table-header-actions";
 
 
 type Props = UseScriptsTableParams;
@@ -143,7 +142,7 @@ export function ScriptsTable(props: Props) {
                                 return (
                                     <div className="flex items-center justify-end gap-2">
                                         <LockStatus
-                                            key={`lock-status-${s.scriptId}`} // Important for proper reconciliation
+                                            key={`lock-status-${s.scriptId}`} 
                                             scriptId={s.scriptId}
                                             onStatusChange={(locked) => handleLockStatusChange(s.scriptId, locked)}
                                         />
