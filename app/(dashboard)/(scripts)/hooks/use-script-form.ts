@@ -26,7 +26,6 @@ export function useScriptForm(params: UseScriptFormParams) {
     const { viewOnly, } = useAppContext();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [isLocked, setLocked] = useState(false);
     const { saveScripts, } = useScriptsContext();
 
     useEffect(() => {
