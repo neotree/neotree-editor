@@ -13,11 +13,13 @@ import { defaultPreferences } from "@/constants";
 export type UseScreenFormParams = {
     scriptId: string;
     formData?: ScreenFormDataType;
+    locked?:boolean
 };
 
 export function useScreenForm({
     formData,
     scriptId,
+    locked
 }: UseScreenFormParams) {
     const router = useRouter();
 
@@ -153,7 +155,7 @@ export function useScreenForm({
         }
     });
 
-    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+    const disabled = useMemo(() => saving || viewOnly ||!!locked, [saving, viewOnly,locked]);
 
     return {
         ...form,

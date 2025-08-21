@@ -11,10 +11,12 @@ import { useAppContext } from "@/contexts/app";
 
 export type UseScreensTableParams = {
     screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
+    locked?:boolean
 };
 
 export function useScreensTable({
     screens: screensParam,
+    locked
 }: UseScreensTableParams) {
     const [screens, setScreens] = useState(screensParam);
     const [loading, setLoading] = useState(false);
@@ -97,7 +99,7 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, screens, router]);
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => !!(viewOnly || locked), [viewOnly,locked]);
 
     return {
         screens,

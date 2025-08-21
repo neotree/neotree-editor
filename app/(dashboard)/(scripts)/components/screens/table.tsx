@@ -28,6 +28,7 @@ export function ScreensTable(props: Props) {
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const {locked } = props
 
     return (
         <>
@@ -144,7 +145,7 @@ export function ScreensTable(props: Props) {
             </div>
 
             <ScreensTableBottomActions 
-                disabled={viewOnly}
+                disabled={viewOnly|| !!locked}
                 selected={selected}
                 screens={screens}
                 onCopy={() => setScreensIdsToCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}

@@ -44,7 +44,6 @@ export default async function Scripts({ params: { scriptId }, searchParams: { se
                     hospitals={hospitals.data}
                     formData={formData} 
                     locked={lockStatus}
-                    
                 />
             </PageContainer>
         </>
