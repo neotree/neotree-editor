@@ -44,6 +44,7 @@ export function ScriptForm(props: Props) {
     const searchParams = useSearchParams();
     const section = searchParams.get('section');
 
+
     const { onCancelScriptForm } = useScriptsContext();
 
     const form = useScriptForm(props);
@@ -52,6 +53,7 @@ export function ScriptForm(props: Props) {
         hospitals,
         loading,
         disabled,
+        locked,
         reset: resetForm,
         watch,
         setValue,
@@ -61,7 +63,7 @@ export function ScriptForm(props: Props) {
         getDefaultScreenReviewConfigurations,
         onSubmit,
     } = form;
-
+    console.log("-...MY LOCKOD",locked)
     const { mode } = useAppContext();
 
     const type = watch('type');
@@ -282,6 +284,7 @@ export function ScriptForm(props: Props) {
                     {(!section || (section === 'screens')) && (
                         <Screens
                             scriptId={props.formData.scriptId!}
+                            locked={locked}
                         />
                     )}
 
