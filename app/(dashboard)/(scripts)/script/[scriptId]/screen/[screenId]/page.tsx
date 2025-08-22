@@ -3,22 +3,24 @@ import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
 import { ScreenForm } from "../../../../components/screens/form";
 import { PageContainer } from "../../../../components/page-container";
+import { getLockStatus } from "@/app/actions/locks";
 
 type Props = {
-    params: { screenId: string; scriptId: string; };
-    searchParams: { [key: string]: string; };
-    locked: boolean;
+    params: { screenId: string; scriptId: string };
+    searchParams?: { [key: string]: string; };
+
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Screens({ params: { screenId, scriptId },locked }: Props) {
-    const [screen, script, screens] = await Promise.all([
+export default async function Screens({ params: { screenId, scriptId } }: Props) {
+    const [screen, script, screens,locked] = await Promise.all([
         getScreen({ screenId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
         listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
+        getLockStatus({script:scriptId})
     ]);
-  console.log("@@@@---LOCKED",locked)
+ 
     if (!script.data) {
         return (
             <Alert 

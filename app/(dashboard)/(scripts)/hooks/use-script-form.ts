@@ -58,6 +58,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     const form = useForm({
         defaultValues: getDefaultFormValues(),
     });
+    
 
     const getDefaultNuidSearchFields = useCallback(() => {
         const fields = form.getValues('nuidSearchFields');
@@ -118,6 +119,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         formIsDirty,
         loading,
         disabled,
+        locked,
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,

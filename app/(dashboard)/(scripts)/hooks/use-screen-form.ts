@@ -154,13 +154,13 @@ export function useScreenForm({
             setSaving(false);
         }
     });
-
-    const disabled = useMemo(() => saving || viewOnly ||!!locked, [saving, viewOnly,locked]);
-
+    
+    const disabled = useMemo(() => saving || viewOnly ||!!locked , [saving, viewOnly,locked]);
     return {
         ...form,
         formIsDirty,
         saving,
+        locked,
         scriptPageHref,
         disabled,
         save,

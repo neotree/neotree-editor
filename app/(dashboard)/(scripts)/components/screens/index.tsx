@@ -16,9 +16,7 @@ type Props = {
 export default function Screens({ scriptId,locked }: Props) {
     const [loading, setLoading] = useState(false);
     const [screens, setScreens] = useState<Awaited<ReturnType<typeof scriptsActions.getScreens>>>({ data: [], });
-
     const { alert } = useAlertModal();
-
     useEffect(() => {
         (async () => {
             try {
@@ -42,7 +40,7 @@ export default function Screens({ scriptId,locked }: Props) {
 
             <ScreensTable 
                 screens={screens}
-                locked
+                locked={locked}
             />
         </>
     );
