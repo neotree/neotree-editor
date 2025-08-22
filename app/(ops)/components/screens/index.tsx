@@ -29,7 +29,6 @@ export function Screens(props: Props) {
         screensColumns,
         setScreensColumns,
     } = props;
-
     const columns = useMemo(() => {
         return Object.keys({ ...screens.data[0] }).map(_key => {
             const key = _key as keyof typeof screens.data[0];

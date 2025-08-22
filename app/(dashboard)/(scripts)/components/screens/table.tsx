@@ -20,6 +20,7 @@ export function ScreensTable(props: Props) {
         loading,
         selected,
         disabled,
+        locked,
         screensIdsToCopy,
         setScreensIdsToCopy,
         onDelete,
@@ -27,8 +28,7 @@ export function ScreensTable(props: Props) {
         setSelected,
     } = useScreensTable(props);
 
-    const { sys, viewOnly } = useAppContext();
-    const {locked } = props
+    const { sys, viewOnly } = useAppContext()
 
     return (
         <>
@@ -50,8 +50,8 @@ export function ScreensTable(props: Props) {
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     title=""
-                    selectable={!disabled}
-                    sortable={!disabled}
+                    selectable={!disabled ||!!locked}
+                    sortable={!disabled ||!!locked}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
@@ -123,7 +123,7 @@ export function ScreensTable(props: Props) {
                                 return (
                                     <ScreensTableRowActions 
                                         screen={s}
-                                        disabled={disabled}
+                                        disabled={disabled ||!!locked}
                                         onDelete={() => onDelete([s.screenId])}
                                         onCopy={() => setScreensIdsToCopy([s.screenId])}
                                     />

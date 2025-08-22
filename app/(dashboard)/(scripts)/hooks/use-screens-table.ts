@@ -99,13 +99,14 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, screens, router]);
 
-    const disabled = useMemo(() => !!(viewOnly || locked), [viewOnly,locked]);
+    const disabled = useMemo(() => viewOnly || !!locked, [viewOnly,locked]);
 
     return {
         screens,
         loading,
         selected,
         disabled,
+        locked,
         screensIdsToCopy, 
         setScreensIdsToCopy,
         onDelete,

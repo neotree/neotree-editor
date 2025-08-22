@@ -63,7 +63,6 @@ export function ScriptForm(props: Props) {
         getDefaultScreenReviewConfigurations,
         onSubmit,
     } = form;
-    console.log("-...MY LOCKOD",locked)
     const { mode } = useAppContext();
 
     const type = watch('type');
@@ -73,7 +72,6 @@ export function ScriptForm(props: Props) {
     const nuidSearchEnabled = watch('nuidSearchEnabled');
     const preferences = watch('preferences');
     const reviewable = watch('reviewable');
-
     return (
         <>
             {loading && <Loader overlay />}

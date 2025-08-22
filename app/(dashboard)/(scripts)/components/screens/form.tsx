@@ -51,6 +51,7 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { useAppContext } from "@/contexts/app";
 
 type Props = {
     scriptId: string;
@@ -77,6 +78,7 @@ export function ScreenForm({
         scriptId,
         locked
     });
+
 
     const {
         control,
