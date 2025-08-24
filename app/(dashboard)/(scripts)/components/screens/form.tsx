@@ -716,7 +716,7 @@ export function ScreenForm({
                     </>
                 )}
 
-                {(isTimerScreen || isYesNoScreen || isSelectScreen) && (
+                {(isTimerScreen || isYesNoScreen || isSelectScreen || isChecklistScreen) && (
                     <div className={cn('flex flex-col gap-y-5', isTimerScreen && 'sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1')}>
                         <div>
                             <Label secondary htmlFor="key">Input key{!isTimerScreen ? ' *' : ''}</Label>
