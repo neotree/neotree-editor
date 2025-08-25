@@ -13,7 +13,7 @@ import {
 export const dataKeys = pgTable('nt_data_keys', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
-    name: text('name').notNull().unique(),
+    name: text('name').notNull(),
     label: text('label').default('').notNull(),
     dataType: text('data_type'),
     parentKeys: jsonb('parent_keys').default([]).$type<string[]>().notNull(),
@@ -38,7 +38,7 @@ export const dataKeysRelations = relations(dataKeys, ({ many, one }) => ({
 export const dataKeysDrafts = pgTable('nt_data_keys_drafts', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
-    name: text('name').notNull().unique(),
+    name: text('name').notNull(),
     dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
     data: jsonb('data').$type<typeof dataKeys.$inferInsert>().notNull(),
 

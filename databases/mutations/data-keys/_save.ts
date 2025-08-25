@@ -33,16 +33,16 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
             };
         });
 
-        const { data: { drafts, published, }, } = await checkDataKeyName(
-            data.filter(d => d.name).map(d => d.name!),
-            { uuidNot: data.filter(d => d.name).map(d => d.uuid), },
-        );
+        // const { data: { drafts, published, }, } = await checkDataKeyName(
+        //     data.filter(d => d.name).map(d => d.name!),
+        //     { uuidNot: data.filter(d => d.name).map(d => d.uuid), },
+        // );
 
-        const duplicates = { ...drafts, ...published, };
+        // const duplicates = { ...drafts, ...published, };
 
-        if (Object.keys(duplicates).length) {
-            return { success: false, errors: [`Duplicate keys: ${Object.keys(duplicates).join(', ')}`] };
-        }
+        // if (Object.keys(duplicates).length) {
+        //     return { success: false, errors: [`Duplicate keys: ${Object.keys(duplicates).join(', ')}`] };
+        // }
 
         let index = 0;
         for (const { uuid: dataKeyUuid, isNewUuid, ...item } of data) {
