@@ -12,6 +12,7 @@ import {
     text, 
     timestamp, 
     uuid,
+    varchar
 
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
@@ -970,27 +971,16 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
 }));
 
 export const ntScriptLock = pgTable(
-  'nt_script_lock',
+  'nt_lock',
   {
     lockId: uuid('lock_id').primaryKey().defaultRandom(),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.userId, { onDelete: 'cascade' }),
     lockedAt: timestamp('locked_at').defaultNow().notNull(),
-    status: lockStatusEnum('status').notNull().default('opened'),
     scriptId: uuid('script_id')
-      .references(() => scripts.scriptId, { onDelete: 'cascade' }),
-    editedDraftScreens: uuid('edited_draft_screens').array().default([]),
-    editedDraftScripts: uuid('edited_draft_scripts').array().default([]),
+      .references(() => scripts.scriptId, { onDelete: 'cascade' }), 
+    lockType: varchar('lock_type', { length: 20 }).notNull().default('script').$type<'script' | 'data_key' | 'drug_library'>()
+  
   })
 
-  export const scriptLockRelations = relations(ntScriptLock, ({ one }) => ({
-  user: one(users, {
-    fields: [ntScriptLock.userId],
-    references: [users.userId],
-  }),
-  script: one(scripts, {
-    fields: [ntScriptLock.scriptId],
-    references: [scripts.scriptId],
-  }),
-}));
