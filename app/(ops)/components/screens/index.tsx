@@ -35,7 +35,6 @@ export function Screens(props: Props) {
             return key;
         });
     }, [screens.data[0]]);
-
     return (
         <>
             <Header {...props}>

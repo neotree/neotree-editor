@@ -28,10 +28,13 @@ import { DeleteDataKeysResponse, DeleteDataKeysParams, SaveDataKeysParams } from
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataKeyForm } from "./form";
+import { createLock } from "@/app/actions/locks";
+
 
 type Props = typeof actions & {
     disabled?: boolean;
     dataKeys: DataKey[];
+    locked?:boolean;
 };
 
 export function DataKeysTable(props: Props) {
@@ -77,8 +80,25 @@ export function DataKeysTable(props: Props) {
         });
     }, [props.dataKeys]);
 
+
     const { confirm, } = useConfirmModal();
     const { alert, } = useAlertModal();
+
+      useEffect(() => {
+                (async () => {
+                    try {
+                       if(!props.locked){
+                        await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data='+JSON.stringify({script: null,lockType:'data_key'}))
+                       }
+                     
+                    } catch(e: any) {
+                        alert({
+                            title: "",
+                            message: e.message,
+                        });
+                    }
+                })();
+            }, [alert, props.locked]);
 
     const onDelete = useCallback(async (dataKeys: (DataKey & { children: DataKey[]; })[]) => {
         try {

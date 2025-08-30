@@ -3,7 +3,7 @@ import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
 import { ScreenForm } from "../../../../components/screens/form";
 import { PageContainer } from "../../../../components/page-container";
-import { getLockStatus } from "@/app/actions/locks";
+import { getUpdateAvailability } from "@/app/actions/locks";
 
 type Props = {
     params: { screenId: string; scriptId: string };
@@ -18,9 +18,8 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
         getScreen({ screenId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
         listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
-        getLockStatus({script:scriptId})
+        getUpdateAvailability({script:scriptId,lockType:'script'})
     ]);
- 
     if (!script.data) {
         return (
             <Alert 

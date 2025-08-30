@@ -7,9 +7,11 @@ import axios from "axios";
 
 export function LockStatus({ 
     scriptId,
+    lockType,
     onStatusChange 
 }: { 
     scriptId: string;
+    lockType: string;
     onStatusChange?: (locked: boolean) => void;
 }) {
     const [lockStatus, setLockStatus] = useState<boolean | undefined>(undefined);
@@ -19,7 +21,10 @@ export function LockStatus({
 
         async function fetchLockStatus() {
             try {
-                const res = await axios.get<boolean>('/api/locks?data='+JSON.stringify({script:scriptId }));
+                //DROP STALE LOCKS:
+                const script = scriptId?scriptId:null
+                const deleted = await axios.delete('/api/locks?data='+JSON.stringify({script: script,lockType:lockType}))
+                const res = await axios.get<boolean>('/api/locks?data='+JSON.stringify({script:script,lockType:lockType }));
                     const status = res.data;
                 if (mounted) {
                     setLockStatus(status);

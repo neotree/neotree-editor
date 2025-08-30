@@ -12,7 +12,7 @@ import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
-import { LockStatus } from "./lock-status"
+import { LockStatus } from "../../lock-status"
 import { ScriptsTableHeaderActions } from "./scripts-table-header-actions";
 
 
@@ -145,6 +145,7 @@ export function ScriptsTable(props: Props) {
                                         <LockStatus
                                             key={`lock-status-${s.scriptId}`} 
                                             scriptId={s.scriptId}
+                                            lockType={"script"}
                                             onStatusChange={(locked) => handleLockStatusChange(s.scriptId, locked)}
                                         />
                                         <ScriptsTableActions

@@ -1,17 +1,24 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql, } from "drizzle-orm";
 import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts } from "@/databases/pg/schema";
+import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts,ntScriptLock } from "@/databases/pg/schema";
 import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
+import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
 
 export async function _publishScripts() {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
 
     try {
+        const authenticated = await getAuthenticatedUser();
+        const updatedScriptIds = await db.query.ntScriptLock.findMany({
+            where: (eq(ntScriptLock.userId,authenticated?.userId||'')),
+            columns: { scriptId: true, },
+        });
+
         const drafts = await db.query.scriptsDrafts.findMany();
         let inserts = drafts.filter(c => !c.scriptId).map(s => ({
             ...s,
