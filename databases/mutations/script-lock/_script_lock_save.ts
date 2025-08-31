@@ -24,6 +24,7 @@ export async function lockExists(opts:{
         }):(opts.lockType &&opts.lockType!='script')?await db.query.ntScriptLock.findFirst({
           where: (eq(ntScriptLock.lockType, opts.lockType))
         }):null
+
 return !!duplicate
    
 }
@@ -39,11 +40,10 @@ export async function isLocked(opts:{
            eq(ntScriptLock.lockType, opts.lockType||'script')
           ))
         }): (opts.lockType &&opts.lockType!='script')?await db.query.ntScriptLock.findFirst({
-          where: (eq(ntScriptLock.userId, authenticated.userId),
-           eq(ntScriptLock.lockType, opts.lockType))
-        }):null
-        
-  const lockedBySomeone = await lockExists({script:opts.script,lockType:opts.lockType})
+          where: (and(eq(ntScriptLock.userId, authenticated.userId),
+           eq(ntScriptLock.lockType, opts.lockType)))
+        }):null  
+  const lockedBySomeone = await lockExists({script:opts.script,lockType:opts.lockType})   
    if(duplicate){
     return false
    } else{
@@ -66,7 +66,7 @@ export async function isAvailableForUpdate(opts:{
 }){
   await _createNewLock({script:opts.script,lockType: opts.lockType})
 
-  return await isLocked({script:opts.script});
+  return await isLocked({script:opts.script,lockType:opts.lockType});
 }
 
 export async function dropLocks(opts:{
@@ -125,10 +125,12 @@ export async function dropAllStaleLocks(){
   }
 
   const drugs_draft = await db.query.drugsLibraryDrafts.findFirst()
+
   if(!drugs_draft){
       await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'drug_library'),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
   const data_key_draft = await db.query.dataKeys.findFirst()
+
   if(!data_key_draft){
       await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'data_key'),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
@@ -147,10 +149,8 @@ params: {
   const errors = [];
   const info: SaveLockResponse['info'] = {};
   try {
-    console.log("---I MA NOT NNNNNNN",params.lockType)
       try {
         const duplicate = await lockExists({script:params.script,lockType:params.lockType})
-        console.log("---KWETE---",duplicate)
         if (!duplicate) {
            const authenticated = await getAuthenticatedUser();
           const q = db.insert(ntScriptLock).values({
@@ -178,7 +178,7 @@ params: {
         response.info = info;
         
   }
-
+return response
 }
 
 

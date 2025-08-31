@@ -14,11 +14,13 @@ import {
 type Props = {
     addDrugLink: string;
     addFluidLink: string;
+    disabled?: boolean;
 };
 
 export function Add({
     addDrugLink,
     addFluidLink,
+    disabled
 }: Props) {
     return (
         <>
@@ -26,6 +28,7 @@ export function Add({
                 <DropdownMenuTrigger asChild>
                     <Button
                         variant="outline"
+                        disabled={!!disabled}
                     >
                         <span>Add</span>
                         <ChevronDown className="w-4 h-4 ml-2" />

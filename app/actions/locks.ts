@@ -4,13 +4,9 @@ import logger from "@/lib/logger";
 
 
 export const createLock: typeof _createNewLock = async (...args) => {
-    try {
         await isAllowed();
         return await _createNewLock(...args);
-    } catch (e: any) {
-        logger.error('create lock ERROR', e.message);
     
-    }
 };
 
 export const getLockStatus: typeof isLocked = async (...args) => {
