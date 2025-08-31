@@ -87,15 +87,24 @@ export async function dropLocks(opts:{
   if(!script_draft && !screens_draft && !diagnoses_draft){
     await db.delete(ntScriptLock).where(and(eq(ntScriptLock.scriptId,opts.script),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
-}else{
-  const drugs_draft = await db.query.drugsLibraryDrafts.findFirst()
-  
+    const drugs_draft = await db.query.drugsLibraryDrafts.findFirst({})
   if(!drugs_draft){
      await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'drug_library'),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
-   const data_key_draft = await db.query.dataKeys.findFirst()
+   const data_key_draft = await db.query.dataKeys.findFirst({})
 
   if(!data_key_draft){
+     await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'data_key'),eq(ntScriptLock.userId,authenticated?.userId||'')))
+  }
+}else{
+  //DROP LOCKS IF A USER NAVIGATES TO ANOTHER PAGE
+  const drugs_draft = await db.query.drugsLibraryDrafts.findFirst({})
+  if(!drugs_draft &&opts.lockType=='data_key'){
+     await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'drug_library'),eq(ntScriptLock.userId,authenticated?.userId||'')))
+  }
+   const data_key_draft = await db.query.dataKeys.findFirst({})
+
+  if(!data_key_draft && opts.lockType=='drug_library'){
      await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'data_key'),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
 }
@@ -124,12 +133,12 @@ export async function dropAllStaleLocks(){
   }
   }
 
-  const drugs_draft = await db.query.drugsLibraryDrafts.findFirst()
+  const drugs_draft = await db.query.drugsLibraryDrafts.findFirst({})
 
   if(!drugs_draft){
       await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'drug_library'),eq(ntScriptLock.userId,authenticated?.userId||'')))
   }
-  const data_key_draft = await db.query.dataKeys.findFirst()
+  const data_key_draft = await db.query.dataKeys.findFirst({})
 
   if(!data_key_draft){
       await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'data_key'),eq(ntScriptLock.userId,authenticated?.userId||'')))
