@@ -52,7 +52,8 @@ export function DrugsLibrary({ locked }: Props) {
             try {
                 if (!locked) {
                    
-                    await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'drug_library' }))
+                   const res =await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'drug_library' }))
+                    console.log("....",res)
                 }
 
             } catch (e: any) {
@@ -76,7 +77,7 @@ export function DrugsLibrary({ locked }: Props) {
             });
         }, []);
 
-      const disabled = useMemo(() => viewOnly || !!lockLibrary, [viewOnly, locked]);
+      const disabled = useMemo(() => viewOnly || !!lockLibrary, [viewOnly, lockLibrary]);
 
     return (
         <>
@@ -103,6 +104,7 @@ export function DrugsLibrary({ locked }: Props) {
                         <Add
                             addDrugLink={addLink('drug')}
                             addFluidLink={addLink('fluid')}
+                            disabled={disabled}
                         />
                     </>
                 )}

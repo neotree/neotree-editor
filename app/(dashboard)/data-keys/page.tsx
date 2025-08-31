@@ -6,7 +6,7 @@ import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-u
 import { DataKeysTable } from './components/table';
 import {useEffect } from 'react';
 import axios from 'axios';
-import { getLockStatus,createLock } from "@/app/actions/locks";
+import { getUpdateAvailability } from "@/app/actions/locks";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default async function DataKeysPage() {
     const [res, { isSuperUser },locked] = await Promise.all([
         actions.getDataKeys(),
         getAuthenticatedUserWithRoles(),
-        getLockStatus({script:'',lockType:'data_key'})
+        getUpdateAvailability({script:'',lockType:'data_key'})
     ]);
      
 
@@ -29,6 +29,7 @@ export default async function DataKeysPage() {
                             {...actions}
                             disabled={!isSuperUser || !!locked}
                             dataKeys={res.data}
+                            locked={locked}
                         />
                     </CardContent>
                 </Card>

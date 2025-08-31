@@ -28,12 +28,11 @@ export async function POST(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
         
         const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}');
-    
         const res = await createLock(params);
       
         return NextResponse.json(res);
     } catch(e: any) {
-        logger.error('[POST] /api/locks', e.message);
+        logger.error('[POSTINGI] /api/locks', e.message);
         return NextResponse.json({ errors: ['Internal Error'] });
     }
 }
@@ -50,7 +49,7 @@ export async function DELETE(req: NextRequest) {
       
         return NextResponse.json({dropped: true});
     } catch(e: any) {
-        logger.error('[POST] /api/locks', e.message);
+        logger.error('[DELETE] /api/locks', e.message);
         return NextResponse.json({ errors: ['Internal Error'] });
     }
 }

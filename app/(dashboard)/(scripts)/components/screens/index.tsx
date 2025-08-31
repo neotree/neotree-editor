@@ -26,7 +26,9 @@ export default function Screens({ scriptId,locked }: Props) {
                 const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
                 setScreens(res.data);
                //CREATE NEW LOCK
+               if(scriptId){
                 await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data='+JSON.stringify({script: scriptId,lockType:'script'}))
+            }
              
             } catch(e: any) {
                 alert({

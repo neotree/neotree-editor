@@ -16,10 +16,10 @@ import { Button } from "@/components/ui/button";
 import { DataKey } from "@/databases/queries/data-keys";
 import { Separator } from "@/components/ui/separator";
 import { DEFAULT_DATA_KEYS_SORT, SortDataKeysComponent, sortDataKeysFn } from '@/lib/data-keys-sort';
-import { 
-    DEFAULT_DATA_KEYS_FILTER, 
-    FilterDataKeysComponent, 
-    filterDataKeysFn, 
+import {
+    DEFAULT_DATA_KEYS_FILTER,
+    FilterDataKeysComponent,
+    filterDataKeysFn,
 } from '@/lib/data-keys-filter';
 import * as actions from '@/app/actions/data-keys';
 import { useAppContext } from '@/contexts/app';
@@ -29,12 +29,13 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataKeyForm } from "./form";
 import { createLock } from "@/app/actions/locks";
+import { LockStatus } from "../../lock-status"
 
 
 type Props = typeof actions & {
     disabled?: boolean;
     dataKeys: DataKey[];
-    locked?:boolean;
+    locked?: boolean;
 };
 
 export function DataKeysTable(props: Props) {
@@ -46,9 +47,10 @@ export function DataKeysTable(props: Props) {
     const searchParams = useSearchParams();
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
     const sortValue = (searchParamsObj.sort as typeof DEFAULT_DATA_KEYS_SORT) || DEFAULT_DATA_KEYS_SORT;
-    
+
     const [refresh, setRefresh] = useState(false);
     const { viewOnly, } = useAppContext();
+    const [lockDataKeys, setLockDataKeys] = useState<boolean>(!!props.locked);
 
     const [data, setDataKeys] = useState({
         sortValue: sortValue,
@@ -84,30 +86,40 @@ export function DataKeysTable(props: Props) {
     const { confirm, } = useConfirmModal();
     const { alert, } = useAlertModal();
 
-      useEffect(() => {
-                (async () => {
-                    try {
-                       if(!props.locked){
-                        await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data='+JSON.stringify({script: null,lockType:'data_key'}))
-                       }
-                     
-                    } catch(e: any) {
-                        alert({
-                            title: "",
-                            message: e.message,
-                        });
-                    }
-                })();
-            }, [alert, props.locked]);
+    useEffect(() => {
+        (async () => {
+            try {
+                if (!props.locked) {
+                    await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'data_key' }))
+                }
+
+            } catch (e: any) {
+                alert({
+                    title: "",
+                    message: e.message,
+                });
+            }
+        })();
+    }, [alert, props.locked]);
+
+    const handleLockStatusChange = useCallback((isLocked: boolean) => {
+        setLockDataKeys(prev => {
+
+            if (lockDataKeys !== isLocked) {
+                return isLocked;
+            }
+            return prev;
+        });
+    }, []);
 
     const onDelete = useCallback(async (dataKeys: (DataKey & { children: DataKey[]; })[]) => {
         try {
             setLoading(true);
 
             // TODO: Replace this with server action
-            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({ 
-                dataKeysIds: dataKeys.map(k => k.uuid), 
-                broadcastAction: true, 
+            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data=' + JSON.stringify({
+                dataKeysIds: dataKeys.map(k => k.uuid),
+                broadcastAction: true,
             } satisfies DeleteDataKeysParams));
 
             const res = response.data;
@@ -115,7 +127,7 @@ export function DataKeysTable(props: Props) {
             if (res.errors?.length) throw new Error(res.errors[0]);
 
             const children = dataKeys.reduce((acc: DataKey[], k) => [
-                ...acc, 
+                ...acc,
                 ...k.children.map(child => ({
                     ...child,
                     parentKeys: child.parentKeys.filter(parentKey => parentKey != k.name),
@@ -123,9 +135,9 @@ export function DataKeysTable(props: Props) {
             ], []);
 
             if (children.length) {
-                await axios.post('/api/data-keys/save', { 
-                    data: children, 
-                    broadcastAction: true, 
+                await axios.post('/api/data-keys/save', {
+                    data: children,
+                    broadcastAction: true,
                 } satisfies SaveDataKeysParams);
             }
 
@@ -138,7 +150,7 @@ export function DataKeysTable(props: Props) {
                 message: 'Scripts deleted successfully!',
                 variant: 'success',
             });
-        } catch(e: any) {
+        } catch (e: any) {
             alert({
                 title: 'Error',
                 message: e.message,
@@ -159,7 +171,7 @@ export function DataKeysTable(props: Props) {
         loading: false,
         maxRows: undefined,
         onSelect: setSelected,
-        onSort: () => {},
+        onSort: () => { },
         // search: {
         //     inputPlaceholder: 'Search data keys',
         // },
@@ -197,6 +209,7 @@ export function DataKeysTable(props: Props) {
 
                     return (
                         <div>
+        
                             <ddMenu.DropdownMenu>
                                 <ddMenu.DropdownMenuTrigger>
                                     <MoreVertical className="size-4" />
@@ -280,7 +293,7 @@ export function DataKeysTable(props: Props) {
                 </ActionsBar>
             )}
 
-            <DataKeyForm 
+            <DataKeyForm
                 {...props}
                 modal
                 item={activeDataKey || undefined}
@@ -296,9 +309,15 @@ export function DataKeysTable(props: Props) {
                     <div>
                         <h1 className="text-2xl">Data keys</h1>
                     </div>
-
+                    <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">  
+                        <LockStatus
+                                key={`data-key`}
+                                scriptId={''}
+                                lockType={"data_key"}
+                                onStatusChange={(locked: any) => handleLockStatusChange(locked)}
+                            /></div>
                     <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">
-                        <SortDataKeysComponent 
+                        <SortDataKeysComponent
                             value={sortValue}
                             dataKeys={data.dataKeys}
                             onSort={(dataKeys, sortValue) => {
@@ -312,7 +331,7 @@ export function DataKeysTable(props: Props) {
                             }}
                         />
 
-                        <FilterDataKeysComponent 
+                        <FilterDataKeysComponent
                             dataKeys={props.dataKeys}
                             onFilter={(dataKeys, filter) => {
                                 setRefresh(true);
