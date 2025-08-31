@@ -23,7 +23,9 @@ export function LockStatus({
             try {
                 //DROP STALE LOCKS:
                 const script = scriptId?scriptId:null
-                const deleted = await axios.delete('/api/locks?data='+JSON.stringify({script: script,lockType:lockType}))
+            
+                await axios.delete('/api/locks?data='+JSON.stringify({script: script,lockType:lockType}))
+            
                 const res = await axios.get<boolean>('/api/locks?data='+JSON.stringify({script:script,lockType:lockType }));
                     const status = res.data;
                 if (mounted) {
