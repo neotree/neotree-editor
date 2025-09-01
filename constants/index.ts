@@ -3,6 +3,7 @@ import { Preferences } from "@/types";
 import { FieldTypes } from "./fields";
 
 export const scriptPrintConfig = {
+    headerFormat: '',
     headerFields: [] as string[],
     footerFields: [] as string[],
     sections: [] as any[],
