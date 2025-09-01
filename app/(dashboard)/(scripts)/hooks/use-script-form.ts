@@ -47,7 +47,7 @@ export function useScriptForm(params: UseScriptFormParams) {
             nuidSearchFields: (formData?.nuidSearchFields || []),
             preferences: (formData?.preferences || defaultPreferences),
             printSections: (formData?.printSections || []),
-            printConfig: (formData?.printConfig || scriptPrintConfig),
+            printConfig: (formData?.printConfig || scriptPrintConfig) satisfies NonNullable<NonNullable<typeof formData>['printConfig']>,
             reviewConfigurations: (formData?.reviewConfigurations||[]),
             reviewable: isEmpty(formData?.reviewable) ? false : formData?.reviewable,
 

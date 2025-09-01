@@ -421,11 +421,13 @@ export const scripts = pgTable(
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         printConfig: jsonb('print_config').notNull()
             .default(`{
+              "headerFormat": "",
               "headerFields": [],
               "footerFields": [],
               "sections": []
             }`)
             .$type<{
+                headerFormat?: string;
                 headerFields: string[],
                 footerFields: string[],
                 sections: any[],

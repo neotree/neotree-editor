@@ -21,6 +21,7 @@ import { useScriptsContext } from "@/contexts/scripts";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader } from "@/components/loader";
 import { ReactSelect } from "@/components/react-select";
 import { useScriptForm } from "../../hooks/use-script-form";
@@ -36,6 +37,7 @@ export function ScriptPrintConfig(props: Props) {
         form: {
             watch,
             setValue,
+            register,
         },
     } = props;
 
@@ -70,24 +72,45 @@ export function ScriptPrintConfig(props: Props) {
                 }}
             />
 
+            <div className="px-4 mb-5 flex flex-col gap-y-4">
+                <div className="flex items-center">
+                    <div className="text-2xl mr-auto">Print fields (Header)</div>
+                    <Button
+                        variant="outline"
+                        onClick={() => setCurrentItem('new-header-field')}
+                    >
+                        Add field
+                        <Plus className="w-4 h-4 ml-2" />
+                    </Button>
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                    <Label htmlFor="print_config_header_format">Format</Label>
+                    <Textarea 
+                        rows={3}
+                        {...register('printConfig.headerFormat', {
+                            disabled,
+                        })}
+                    />
+                    <div className="text-xs font-bold">
+                        <div>
+                            Format:&nbsp;
+                            <span className="opacity-50">[BabyFirstName] [BabyLastName], [DOB], [Hosp]</span>
+                        </div>
+                        <div>
+                            Result:&nbsp;
+                            <span className="opacity-50">John Doe, 21-01-2025, Central Hospital</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <DataTable
                 sortable={!disabled}
                 onSort={(oldIndex: number, newIndex: number) => {
                     const arr = arrayMoveImmutable(printConfig.headerFields, oldIndex, newIndex);
                     setValue('printConfig.headerFields', arr);
                 }}
-                title="Print fields (Header)"
-                headerActions={(
-                    <>
-                        <Button
-                            variant="outline"
-                            onClick={() => setCurrentItem('new-header-field')}
-                        >
-                            Add field
-                            <Plus className="w-4 h-4 ml-2" />
-                        </Button>
-                    </>
-                )}
                 columns={[
                     {
                         name: 'Field',
