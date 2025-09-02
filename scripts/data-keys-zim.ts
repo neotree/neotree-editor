@@ -1,11 +1,11 @@
 import '@/server/env';
-import { _extractDataKeys } from "@/databases/mutations/data-keys";
+import { _remoteExtractDataKeys } from "@/databases/mutations/data-keys";
 
 main();
 
 async function main() {
     try {
-        const res = await _extractDataKeys({ country: 'zim', });
+        const res = await _remoteExtractDataKeys({ country: 'zw', });
         console.log('SUCCESS');
         console.log(res);
     } catch(e: any) {
