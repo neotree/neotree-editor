@@ -5,7 +5,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import * as schema from "@/databases/pg/schema";
 import { _saveDataKeys } from "./_save";
-import { _extractDataKeys } from "./_extract";
+import { _extractDataKeys, type ExtractDataKeysParams } from "./_extract";
 
 export const syncedEmptyResponseData = {
     synced: {
@@ -22,7 +22,7 @@ export type SyncDataKeysResponse = {
     errors?: string[];
 };
 
-export async function _syncDataKeys(): Promise<SyncDataKeysResponse> {
+export async function _syncDataKeys(opts?: ExtractDataKeysParams): Promise<SyncDataKeysResponse> {
     try {
         // disable for now
         const disabled = true;
@@ -34,7 +34,7 @@ export async function _syncDataKeys(): Promise<SyncDataKeysResponse> {
 
         const lastSynced = editorInfo.lastDataKeysSyncDate;
 
-        if (!lastSynced) await _extractDataKeys();
+        if (!lastSynced) await _extractDataKeys(opts);
 
         const dataKeys = await db.query.dataKeys.findMany({
             where: !lastSynced ? undefined : gte(schema.dataKeys.updatedAt, lastSynced),

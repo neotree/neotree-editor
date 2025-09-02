@@ -1,4 +1,4 @@
-import { count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
@@ -13,14 +13,55 @@ export type ExtractDataKeysResponse = {
     errors?: string[];
 };
 
-export async function _extractDataKeys(): Promise<ExtractDataKeysResponse> {
+const scripts = {
+    mwi: [
+        'c04f628d-3d1a-46f1-8d9a-14c203a45463',
+        'e6b6c37c-7583-440b-8f7e-eea62cd951df',
+        '1a911540-24ad-4220-8745-1fdb83246427',
+        '1a911540-24ad-4220-8745-1fdb83246427',
+        '0dd4ab66-b693-49b1-8363-5a4d5beeee8c',
+        'c06d63a4-0da4-463e-9024-422a10a5d19b',
+        '2173593d-8ac3-4c67-a880-8390728279bb',
+        '0acf7627-ef74-4dc0-8c74-f51fc5b9a4ad',
+    ],
+    zim: [
+        'c021e05a-a562-48b0-b495-34529ee51d0a',
+        '3b953d22-8a46-45bc-8234-9521334221a3',
+        '21940a83-8d97-41d1-a0ec-5dad7fb2f3db',
+        '7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6',
+        'fea2c220-f9dc-4363-a35f-13b2b4bfed26',
+        'afa5984e-c07d-4025-8150-de25bb37144a',
+        '0cbb1921-c1b3-4a4c-a516-45397e01a801',
+        '488c51f9-9f75-4dcf-a527-aed0ae16e9b6',
+        'e06666f2-2147-4391-86a2-160d86d3b72b',
+        '910a2d2f-df69-4917-b0cf-d275d511bb3e',
+        '678cbcfd-37df-42c3-96bf-c290dfa3ec69',
+        '5e72aa19-79d3-4676-9435-c5759d762e5a',
+        '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
+        '9dabc437-635e-431f-bded-6eee128e0249',
+    ],
+};
+
+export type ExtractDataKeysParams = {
+    country: keyof typeof scripts,
+};
+
+export async function _extractDataKeys(opts?: ExtractDataKeysParams): Promise<ExtractDataKeysResponse> {
     try {
         console.log('Fetching screens...');
-        const screens = await db.query.screens.findMany();
+        const screens = await db.query.screens.findMany({
+            where: and(
+                !opts?.country ? undefined : inArray(schema.screens.scriptId, scripts[opts.country]),
+            ),
+        });
         console.log('Fetching screens... DONE');
 
         console.log('Fetching diagnoses...');
-        const diagnoses = await db.query.diagnoses.findMany();
+        const diagnoses = await db.query.diagnoses.findMany({
+            where: and(
+                !opts?.country ? undefined : inArray(schema.screens.scriptId, scripts[opts.country]),
+            ),
+        });
         console.log('Fetching diagnoses... DONE');
 
         console.log('Fetching drugsLibrary...');
