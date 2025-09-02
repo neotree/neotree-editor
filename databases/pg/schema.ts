@@ -219,6 +219,9 @@ export const sites = pgTable('nt_sites', {
     apiKey: text('api_key').notNull(),
     type: siteTypeEnum('type').notNull(),
     env: siteEnvEnum('env').notNull().default('production'),
+    displayName: text('display_name'),
+    countryISO: text('country_iso'),
+    countryName: text('country_name'),
     
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
