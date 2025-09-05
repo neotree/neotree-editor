@@ -314,6 +314,7 @@ export function DataKeysTable(props: Props) {
                                 key={`data-key`}
                                 scriptId={''}
                                 lockType={"data_key"}
+                                doneLoading={true}
                                 onStatusChange={(locked: any) => handleLockStatusChange(locked)}
                             /></div>
                     <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">

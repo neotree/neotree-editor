@@ -4,6 +4,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@/databases/pg/schema";
 import { _saveDiagnosesHistory } from "./_diagnoses_history";
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 import { v4 } from "uuid";
 
 export async function _publishDiagnoses(opts?: {
@@ -15,31 +16,21 @@ export async function _publishDiagnoses(opts?: {
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
-
+    const myUpdatedScripts = await getChangedScripts()
     try {
         let updates: (typeof diagnosesDrafts.$inferSelect)[] = [];
         let inserts: (typeof diagnosesDrafts.$inferSelect)[] = [];
-
-        if (scriptsIds?.length || diagnosesIds?.length) {
+        if(myUpdatedScripts){
+     
             const res = await db.query.diagnosesDrafts.findMany({
                 where: or(
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptDraftId, scriptsIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisId, diagnosesIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
+                   inArray(diagnosesDrafts.scriptId, myUpdatedScripts)   
                 ),
             });
 
             updates = res.filter(s => s.diagnosisId);
             inserts = res.filter(s => !s.diagnosisId);
-        } else {
-            const _diagnosesDrafts = await db.query.diagnosesDrafts.findMany({
-                where: isNotNull(diagnosesDrafts.scriptId),
-            });
-            updates = _diagnosesDrafts.filter(s => s.diagnosisId);
-            inserts = _diagnosesDrafts.filter(s => !s.diagnosisId);
-        }
-
+     
         if (updates.length) {
             // we'll use data before to compare changes
             let dataBefore: typeof diagnoses.$inferSelect[] = [];
@@ -94,7 +85,7 @@ export async function _publishDiagnoses(opts?: {
             await _saveDiagnosesHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(diagnosesDrafts);
+        await db.delete(diagnosesDrafts).where(inArray(diagnosesDrafts.scriptId||diagnosesDrafts.scriptDraftId,myUpdatedScripts));
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.diagnosisId),
@@ -149,6 +140,9 @@ export async function _publishDiagnoses(opts?: {
         }
 
         results.success = true;
+    }
+     results.success = true;
+
     } catch(e: any) {
         results.success = false;
         results.errors = [e.message];

@@ -87,6 +87,7 @@ export function DrugsLibrary({ locked }: Props) {
                 key={`drug-lib`}
                 scriptId={''}
                 lockType={"drug_library"}
+                doneLoading={true}
                 onStatusChange={(locked:any) => handleLockStatusChange(locked)}
             />
 

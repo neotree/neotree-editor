@@ -979,7 +979,9 @@ export const ntScriptLock = pgTable(
       .references(() => users.userId, { onDelete: 'cascade' }),
     lockedAt: timestamp('locked_at').defaultNow().notNull(),
     scriptId: uuid('script_id')
-      .references(() => scripts.scriptId, { onDelete: 'cascade' }), 
+      .references(() => scripts.scriptId, { onDelete: 'cascade' }),
+    newScriptId: uuid('new_script_id')
+      .references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade' }), 
     lockType: varchar('lock_type', { length: 20 }).notNull().default('script').$type<'script' | 'data_key' | 'drug_library'>()
   
   })

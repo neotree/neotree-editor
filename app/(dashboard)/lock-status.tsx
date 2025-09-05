@@ -8,23 +8,26 @@ import axios from "axios";
 export function LockStatus({ 
     scriptId,
     lockType,
+    doneLoading,
     onStatusChange 
 }: { 
     scriptId: string;
     lockType: string;
+    doneLoading: boolean
     onStatusChange?: (locked: boolean) => void;
 }) {
     const [lockStatus, setLockStatus] = useState<boolean | undefined>(undefined);
 
     useEffect(() => {
         let mounted = true;
-
+        console.log("---DONE-----",doneLoading)
         async function fetchLockStatus() {
             try {
                 //DROP STALE LOCKS:
                 const script = scriptId?scriptId:null
-            
-                await axios.delete('/api/locks?data='+JSON.stringify({script: script,lockType:lockType}))
+                 if((lockType==='script' &&!!doneLoading)||lockType!=='script'){
+                 await axios.delete('/api/locks?data='+JSON.stringify({lockType:lockType}))
+                 }
             
                 const res = await axios.get<boolean>('/api/locks?data='+JSON.stringify({script:script,lockType:lockType }));
                     const status = res.data;
