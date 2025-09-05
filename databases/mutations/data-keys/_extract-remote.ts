@@ -64,7 +64,7 @@ export async function _remoteExtractDataKeys(opts: RemoteExtractDataKeysParams):
         let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
 
         for (const site of sites) {
-            if (site.link === 'https://zim-webeditor.neotree.org:10243') continue;
+            // if (site.link === 'https://zim-webeditor.neotree.org:10243') continue;
 
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
