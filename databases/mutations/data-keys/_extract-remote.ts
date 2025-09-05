@@ -42,6 +42,7 @@ const scripts = {
         '5e72aa19-79d3-4676-9435-c5759d762e5a',
         '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
         '9dabc437-635e-431f-bded-6eee128e0249',
+        '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
     ],
 };
 
