@@ -17,7 +17,7 @@ import * as drugsLibraryQueries from '@/databases/queries/drugs-library';
 import * as dataKeysMutations from '@/databases/mutations/data-keys';
 import * as dataKeysQueries from '@/databases/queries/data-keys';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
-import {dropAllStaleLocks} from '@/databases/mutations/script-lock'
+import {dropAllStaleLocks, userLockExists} from '@/databases/mutations/script-lock'
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
 export async function getEditorDetails(): Promise<{
@@ -40,8 +40,8 @@ export async function getEditorDetails(): Promise<{
         draftsErrors?.forEach(e => errors.push(e));
 
         const mode = 'development';
-
-        shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total);
+        const userChangesExist = await userLockExists()
+        shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total) && !!userChangesExist;
 
         return {
             pendingDeletion: pendingDeletion.total,

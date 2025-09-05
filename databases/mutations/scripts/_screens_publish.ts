@@ -6,6 +6,7 @@ import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/datab
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
 import { _generateScreenAliases } from "../aliases/_aliases_save";
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 
 export async function _publishScreens(opts?: {
     scriptsIds?: string[];
@@ -20,29 +21,20 @@ export async function _publishScreens(opts?: {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
 
+ const myUpdatedScripts = await getChangedScripts()
     try {
+        if(myUpdatedScripts){
         let updates: (typeof screensDrafts.$inferSelect)[] = [];
         let inserts: (typeof screensDrafts.$inferSelect)[] = [];
 
-        if (scriptsIds?.length || screensIds?.length) {
-            const res = await db.query.screensDrafts.findMany({
-                where: or(
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptDraftId, scriptsIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenId, screensIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
+        const res = await db.query.screensDrafts.findMany({
+                where:(
+                    inArray(screensDrafts.scriptId, myUpdatedScripts)
                 ),
-            });
-
-            updates = res.filter(s => s.screenId);
-            inserts = res.filter(s => !s.screenId);
-        } else {
-            const _screensDrafts = await db.query.screensDrafts.findMany({
-                where: isNotNull(screensDrafts.scriptId),
-            });
-            updates = _screensDrafts.filter(s => s.screenId);
-            inserts = _screensDrafts.filter(s => !s.screenId);
-        }
+        });
+        updates = res.filter(s => s.screenId);
+        inserts = res.filter(s => !s.screenId);
+      
 
         if (updates.length) {
             // we'll use data before to compare changes
@@ -98,7 +90,7 @@ export async function _publishScreens(opts?: {
             await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(screensDrafts);
+        await db.delete(screensDrafts).where(inArray(screensDrafts.scriptId||screensDrafts.scriptDraftId,myUpdatedScripts));
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.screenId),
@@ -162,6 +154,8 @@ export async function _publishScreens(opts?: {
                 .set({ version: sql`${screens.version} + 1`, }).
                 where(inArray(screens.screenId, published));
         }
+         results.success = true;
+    }
 
         results.success = true;
     } catch (e: any) {

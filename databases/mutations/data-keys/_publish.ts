@@ -3,6 +3,7 @@ import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { dataKeys, dataKeysDrafts, dataKeysHistory, pendingDeletion } from "@/databases/pg/schema";
+import {existsByLockTypeAndUser} from "../script-lock"
 import { _saveDataKeysHistory } from "./_history";
 import { v4 } from "uuid";
 
@@ -13,6 +14,8 @@ export async function _publishDataKeys(opts?: {
     const errors: string[] = [];
 
     try {
+        const iMadeChanges = existsByLockTypeAndUser('data_key')
+        if(!!iMadeChanges){
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.dataKeyId),
             columns: { dataKeyId: true, },
@@ -131,6 +134,9 @@ export async function _publishDataKeys(opts?: {
         }
 
         results.success = true;
+    }else{
+       results.success = true; 
+    }
     } catch(e: any) {
         results.success = false;
         results.errors = [e.message];

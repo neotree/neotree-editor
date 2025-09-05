@@ -52,6 +52,11 @@ export function ScriptsTable(props: Props) {
         return disabled || lockedScripts[scriptId] === true;
     };
 
+    const doneLoading = (scriptId: string): boolean => {
+    const scriptArray = scripts.data || [];
+    return scriptArray.length > 0 && scriptArray[scriptArray.length - 1].scriptId === scriptId;
+    };
+
     return (
         <>
             {loading && <Loader overlay />}
@@ -146,6 +151,7 @@ export function ScriptsTable(props: Props) {
                                             key={`lock-status-${s.scriptId}`} 
                                             scriptId={s.scriptId}
                                             lockType={"script"}
+                                            doneLoading={doneLoading(s.scriptId)}
                                             onStatusChange={(locked) => handleLockStatusChange(s.scriptId, locked)}
                                         />
                                         <ScriptsTableActions
