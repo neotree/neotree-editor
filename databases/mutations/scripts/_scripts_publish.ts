@@ -109,7 +109,7 @@ export async function _publishScripts() {
                 },
             },
         });
-       
+
         await db.delete(scriptsDrafts).where(inArray(scriptsDrafts.scriptId||scriptsDrafts.scriptDraftId,myUpdatedScripts));
 
         deleted = deleted.filter(c => c.script && myUpdatedScripts.includes(c.scriptId||''));

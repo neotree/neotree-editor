@@ -33,13 +33,7 @@ export async function lockExists(opts: {
         ),
         eq(ntScriptLock.lockType, lockType)
       )
-    : and(
-        eq(ntScriptLock.lockType, lockType),
-        or(
-          isNotNull(ntScriptLock.scriptId),
-          isNotNull(ntScriptLock.newScriptId)
-        )
-      );
+    : eq(ntScriptLock.lockType, lockType)
 
   const duplicate = await db.query.ntScriptLock.findFirst({
     where: whereClause
@@ -248,8 +242,8 @@ export async function dropLocks(opts: {
         )
       );
     }
-   }    
-  
+   }   
+   
 }
 
 export async function dropAllStaleLocks(){
@@ -317,6 +311,73 @@ if(!new_script_draft){
 
 
 
+export async function cleanUpStaleLocks(){
+  const lockedScripts = await db.query.ntScriptLock.findMany({
+     columns: {
+                scriptId: true,
+                lockType:true,
+                newScriptId:true,
+                lockedAt:true
+            }
+          }
+  )
+  
+  for (const sid of lockedScripts){
+    const hasBeenIdle = hasTwoHoursPassed(sid.lockedAt)
+    if(hasBeenIdle){
+    if(sid.scriptId){
+  const script_draft = await db.query.scriptsDrafts.findFirst({
+          where: (eq(scriptsDrafts.scriptId,String(sid.scriptId)))
+        })
+  const screens_draft = await db.query.screensDrafts.findFirst({
+          where: (eq(scriptsDrafts.scriptId,String(sid.scriptId)))
+        })
+   const diagnoses_draft = await db.query.diagnosesDrafts.findFirst({
+          where: (eq(scriptsDrafts.scriptId,String(sid.scriptId)))
+        })
+  if(!script_draft && !screens_draft && !diagnoses_draft){
+    await db.delete(ntScriptLock)
+    .where(eq(ntScriptLock.scriptId,String(sid.scriptId)))   
+  }
+ } else if(sid.newScriptId){
+const new_script_draft = await db.query.scriptsDrafts.findFirst({
+  where: (eq(scriptsDrafts.scriptDraftId,sid.newScriptId))
+})
+if(!new_script_draft){
+   await db.delete(ntScriptLock)
+   .where(eq(ntScriptLock.newScriptId,String(sid.scriptId)))
+}
+} else {
+  if(sid.lockType=='drug_library'){
+      const drugs_draft = await db.query.drugsLibraryDrafts.findFirst({})
+    const pd_drugs = await db.query.pendingDeletion.findFirst({
+      where: (isNotNull(pendingDeletion?.drugsLibraryItemId))
+    }) 
+
+  if(!drugs_draft && !pd_drugs){
+      await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'drug_library')))
+  }
+  }
+
+  if(sid.lockType=='data_key'){
+  const data_key_draft = await db.query.dataKeys.findFirst({})
+    const pd_data_keys = await db.query.pendingDeletion.findFirst({
+      where: (isNotNull(pendingDeletion?.dataKeyId))
+    }) 
+
+  if(!data_key_draft && !pd_data_keys){
+      await db.delete(ntScriptLock).where(and(eq(ntScriptLock.lockType,'data_key')))
+  }
+  }
+}
+}
+}
+}
+function hasTwoHoursPassed(timestamp:Date) {
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000; 
+  const now = Date.now();           
+  return (now - timestamp.getTime()) >= TWO_HOURS_MS;
+}
 
 export async function _createNewLock(
 params: {
@@ -329,12 +390,12 @@ params: {
   try {
       try {
         const duplicate = await lockExists({script:params.script,lockType:params.lockType})
-
        const scriptExists = await db.query.scripts.findFirst({
                         where: eq(scripts.scriptId, params.script),});
+
         if (!duplicate) {
            const authenticated = await getAuthenticatedUser();
-           if(!!scriptExists || !params.script){
+           if(!!scriptExists ){
           const q = db.insert(ntScriptLock).values({
             userId: authenticated?.userId!,
             scriptId:params.script||null,
@@ -391,4 +452,32 @@ export async function getChangedScripts(){
           );
   }
 
+  export async function getChangedDrugs(){
+    const authenticated = await getAuthenticatedUser();
+         return await db.query.ntScriptLock.findMany({
+              where: and(
+                  eq(ntScriptLock.userId, authenticated?.userId || ''),    
+                  eq(ntScriptLock.lockType,'drug_library')        
+              ),
+          }).then(locks =>
+              locks.flatMap(lock => [
+                  lock.userId
+              ]).filter(Boolean) as string[]
+          );
+  }
+
+
+  export async function getChangedDataKeys(){
+    const authenticated = await getAuthenticatedUser();
+         return await db.query.ntScriptLock.findMany({
+              where: and(
+                  eq(ntScriptLock.userId, authenticated?.userId || ''),    
+                  eq(ntScriptLock.lockType,'data_key')        
+              ),
+          }).then(locks =>
+              locks.flatMap(lock => [
+                  lock.userId
+              ]).filter(Boolean) as string[]
+          );
+  }
 

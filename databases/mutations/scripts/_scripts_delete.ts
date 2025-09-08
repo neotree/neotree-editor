@@ -6,6 +6,7 @@ import { scripts, scriptsDrafts, pendingDeletion, } from '@/databases/pg/schema'
 import socket from '@/lib/socket';
 import { _deleteScreens } from './_screens_delete';
 import { _deleteDiagnoses } from './_diagnoses_delete';
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 
 export type DeleteScriptsData = {
     scriptsIds?: string[];
@@ -20,7 +21,8 @@ export type DeleteScriptsResponse = {
 
 export async function _deleteAllScriptsDrafts(): Promise<boolean> {
     try {
-        await db.delete(scriptsDrafts);
+        const myChangedScripts = await getChangedScripts()
+        await db.delete(scriptsDrafts).where(inArray(scriptsDrafts.scriptId||scriptsDrafts.scriptDraftId,myChangedScripts));
         return true;
     } catch(e: any) {
         throw e;

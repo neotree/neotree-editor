@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { screens, screensDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 
 export type DeleteScreensData = {
     screensIds?: string[];
@@ -19,7 +20,8 @@ export type DeleteScreensResponse = {
 
 export async function _deleteAllScreensDrafts(): Promise<boolean> {
     try {
-        await db.delete(screensDrafts);
+        const myChangedScreens = await getChangedScripts()
+        await db.delete(screensDrafts).where(inArray(screensDrafts.scriptId||screensDrafts.scriptDraftId,myChangedScreens));
         return true;
     } catch(e: any) {
         throw e;
