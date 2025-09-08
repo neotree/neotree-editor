@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { diagnoses, diagnosesDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 
 export type DeleteDiagnosesData = {
     diagnosesIds?: string[];
@@ -40,8 +41,10 @@ export async function _deleteDiagnoses(
         const shouldConfirmDeleteAll = !scriptsIds.length && !diagnosesIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the diagnoses, please confirm this action!');
 
+       const changedDiagnoses = await getChangedScripts()
         // delete drafts
         await db.delete(diagnosesDrafts).where(and(
+            inArray(diagnosesDrafts.scriptId||diagnosesDrafts.scriptDraftId,changedDiagnoses),
             !diagnosesIds.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
             !scriptsIds.length ? undefined : or(
                 inArray(diagnosesDrafts.scriptId, scriptsIds),

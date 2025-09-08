@@ -50,10 +50,8 @@ export function DrugsLibrary({ locked }: Props) {
         (async () => {
 
             try {
-                if (!locked) {
-                   
+                if (!locked) {       
                    const res =await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'drug_library' }))
-                    console.log("....",res)
                 }
 
             } catch (e: any) {

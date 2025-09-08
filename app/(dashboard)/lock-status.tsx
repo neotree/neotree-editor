@@ -20,7 +20,6 @@ export function LockStatus({
 
     useEffect(() => {
         let mounted = true;
-        console.log("---DONE-----",doneLoading)
         async function fetchLockStatus() {
             try {
                 //DROP STALE LOCKS:
