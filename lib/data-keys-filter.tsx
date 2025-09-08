@@ -5,23 +5,46 @@ import * as select from '@/components/ui/select';
 import { DataKey } from "@/databases/queries/data-keys";
 
 export function getDataKeysTypes(dataKeys: DataKey[]) {
-    return Object
-        .values(dataKeys
-            .filter(k => k.dataType)
-            .reduce((acc, k) => ({
-                ...acc,
-                [k.dataType!]: {
-                    value: k.dataType!,
-                    label: k.dataType!,
-                },
-            }), {} as Record<string, { value: string; label: string; }>)
-        )
-        .sort((key1, key2) => {
-            let returnVal = 0;
-            if(key1.label < key2.label) returnVal = -1;
-            if(key1.label > key2.label) returnVal = 1;
-            return returnVal;
-        });
+    // return Object
+    //     .values(dataKeys
+    //         .filter(k => k.dataType)
+    //         .reduce((acc, k) => ({
+    //             ...acc,
+    //             [k.dataType!]: {
+    //                 value: k.dataType!,
+    //                 label: k.dataType!,
+    //             },
+    //         }), {} as Record<string, { value: string; label: string; }>)
+    //     )
+    //     .sort((key1, key2) => {
+    //         let returnVal = 0;
+    //         if(key1.label < key2.label) returnVal = -1;
+    //         if(key1.label > key2.label) returnVal = 1;
+    //         return returnVal;
+    //     });
+    return [
+        { label: 'checklist_option', value: 'checklist_option', },
+        { label: 'date', value: 'date', },
+        { label: 'datetime', value: 'datetime', },
+        { label: 'diagnosis', value: 'diagnosis', },
+        { label: 'dropdown', value: 'dropdown', },
+        { label: 'dropdown_option', value: 'dropdown_option', },
+        { label: 'drug', value: 'drug', },
+        { label: 'fluid', value: 'fluid', },
+        { label: 'multi_select', value: 'multi_select', },
+        { label: 'multi_select_option', value: 'multi_select_option', },
+        // { label: 'mwi_edliz_summary_table', value: 'mwi_edliz_summary_table', },
+        { label: 'mwi_edliz_summary_table_option', value: 'mwi_edliz_summary_table_option', },
+        { label: 'number', value: 'number', },
+        { label: 'period', value: 'period', },
+        { label: 'single_select', value: 'single_select', },
+        { label: 'single_select_option', value: 'single_select_option', },
+        { label: 'text', value: 'text', },
+        { label: 'timer', value: 'timer', },
+        { label: 'yesno', value: 'yesno', },
+        // { label: 'zw_edliz_summary_table', value: 'zw_edliz_summary_table', },
+        { label: 'zw_edliz_summary_table_option', value: 'zw_edliz_summary_table_option', },
+    ];
 }
 
 export const DEFAULT_DATA_KEYS_FILTER = 'all';
