@@ -1,30 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useMeasure } from 'react-use';
 
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useSearchParams } from "@/hooks/use-search-params";
 import { DataTableSearchOptions } from "./types";
 
 type Props = DataTableSearchOptions;
 
 export function DataTableSearch({
     inputPlaceholder,
+    onSearch,
 }: Props) {
-    const timeout = useRef<any>();
+    const inputRef = useRef<HTMLInputElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const [formWidth, setFormWidth] = useState(0);
+    const [isSearching, setIsSearching] = useState(false);
 
-    const [formRef, { width: formWidth, }] = useMeasure<HTMLFormElement>();
-    const searchParams = useSearchParams();
-
-    const [openPopover, setOpenPopover] = useState(false);
-    const [searching, setSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<any>();
-
-    const { watch, register, handleSubmit, } = useForm({
+    const { register, watch, setValue } = useForm({
         defaultValues: {
             searchValue: '',
         },
@@ -32,62 +27,67 @@ export function DataTableSearch({
 
     const searchValue = watch('searchValue');
 
-    useEffect(() => { if (!searchValue) setOpenPopover(false); }, [searchValue]);
+    // Proper input ref handling
+    const { ref: formRefCallback, ...rest } = register('searchValue');
 
-    const onSubmit = handleSubmit(({ searchValue }) => {
-        (async () => {
-            try {
-                if (searchValue) {
-                    
-                } else {
-                    setSearchResults(undefined);
-                    setOpenPopover(false);
+    // Combine refs correctly
+    const setRefs = useCallback((element: HTMLInputElement | null) => {
+        formRefCallback(element);
+        if (element) {
+            // @ts-ignore - We know this is safe
+            inputRef.current = element;
+        }
+    }, [formRefCallback]);
+
+    // Measure form width
+    useEffect(() => {
+        if (formRef.current) {
+            const resizeObserver = new ResizeObserver(entries => {
+                setFormWidth(entries[0].contentRect.width);
+            });
+            resizeObserver.observe(formRef.current);
+            return () => resizeObserver.disconnect();
+        }
+    }, []);
+
+    // Handle search with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            onSearch?.(searchValue);
+            setIsSearching(false);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchValue, onSearch]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setIsSearching(true);
+        setValue('searchValue', e.target.value, { shouldDirty: true });
+        
+        // Maintain focus and cursor position
+        if (inputRef.current) {
+            const cursorPosition = e.target.selectionStart;
+            requestAnimationFrame(() => {
+                if (inputRef.current && cursorPosition !== null) {
+                    inputRef.current.setSelectionRange(cursorPosition, cursorPosition);
                 }
-            } catch(e: any) {
-                toast.error(e.message);
-            } finally {
-                setSearching(false);
-            }
-        })();
-    });
+            });
+        }
+    };
 
     return (
-        <Popover
-            open={openPopover}
-            onOpenChange={open => {
-                setOpenPopover(open);
-            }}
-        >
-            <PopoverTrigger disabled className="w-full">
-                <form 
-                    onSubmit={onSubmit}
-                    className=""
-                    ref={formRef}
-                >
-                    <Input
-                        {...register('searchValue', { required: true, })}
-                        noRing
-                        type="search"
-                        placeholder={inputPlaceholder || 'Search'}
-                        data-search-input="true"
-                        // onFocus={e => {
-                        //     setOpenPopover(!!searchValue);
-                        //     setTimeout(() => e.target.focus(), 0);
-                        // }}
-                        // onKeyUp={() => {
-                        //     if (timeout.current) clearTimeout(timeout.current);
-                        //     timeout.current = setTimeout(onSubmit, 1000);
-                        // }}
-                    />
-                </form>
-            </PopoverTrigger>
-
-            <PopoverContent 
-                style={{ width: formWidth }}
-                className="flex flex-col gap-y-2 p-0"
-            >
-                
-            </PopoverContent>
-        </Popover>
+        <div className="w-full">
+            <form ref={formRef}>
+                <Input
+                    {...rest}
+                    ref={setRefs}
+                    type="search"
+                    placeholder={inputPlaceholder || 'Search...'}
+                    value={searchValue}
+                    onChange={handleChange}
+                    className="w-full"
+                />
+            </form>
+        </div>
     );
 }

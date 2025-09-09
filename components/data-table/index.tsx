@@ -2,7 +2,7 @@
 
 import SortableList, { SortableItem, SortableKnob } from 'react-easy-sort';
 import { arrayMoveImmutable } from 'array-move';
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import {  useCallback, useMemo, useRef, useState,useEffect } from 'react';
 import { Move } from 'lucide-react';
 
 import {
@@ -27,11 +27,13 @@ export {
 };
 
 export const DataTable = (props: DataTableProps) => {
-    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, } = props;
+    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort } = props;
 
     const tBodyRef = useRef<HTMLTableSectionElement>(null);
 
     const table = useTable({ props });
+    const [searchValue, setSearchValue] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
     const { 
         state: { columns, rows, skeletonRows, selected, }, 
@@ -42,6 +44,48 @@ export const DataTable = (props: DataTableProps) => {
     } = table;
 
     const displayRows = useMemo(() => loading ? skeletonRows : rows, [loading, skeletonRows, rows]);
+   
+    const searchableColumns = useMemo(() => {
+        return columns
+            .filter(col => !col.hidden && col.name &&
+                (/title|name|key|ref|hospital|field|type/i.test(String(col.name))))
+            .map(col => col.columnIndex);
+    }, [columns]);
+
+    const handleSearch = useCallback((value: string) => {
+        setSearchValue(value.toLowerCase());
+    }, []);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchValue);
+        }, 300);
+
+        return () => clearTimeout(handler);
+    }, [searchValue]);
+
+    const filterRows = useCallback((rows: typeof displayRows, term: string) => {
+        if (!term.trim()) return rows;
+        const lowerTerm = term.toLowerCase();
+        return rows.filter(row => {
+            for (const colIndex of searchableColumns) {
+                const cell = row.cells[colIndex];
+                const cellValue = cell?.value;
+
+                if (cellValue != null &&
+                    String(cellValue).toLowerCase().includes(lowerTerm)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }, [searchableColumns]);
+
+
+    // Final filtered rows
+    const filteredRows = useMemo(() => {
+        return filterRows(displayRows, debouncedSearch);
+    }, [displayRows, debouncedSearch, filterRows]);
 
     const onSortEnd = useCallback((oldIndex: number, newIndex: number) => {
         let sorted: { oldIndex: number, newIndex: number; }[] = [];
@@ -62,7 +106,12 @@ export const DataTable = (props: DataTableProps) => {
 
     return ( 
         <>
-            <DataTableHeader {...props} />
+            <DataTableHeader {...props}
+             search={{
+                    ...props.search,
+                    onSearch: handleSearch,
+                }}
+            />
 
             <SortableList 
                 allowDrag={!!sortable}
@@ -84,8 +133,8 @@ export const DataTable = (props: DataTableProps) => {
                                     >
                                         <Checkbox
                                             disabled={loading}
-                                            checked={!!displayRows.length && (Object.values(selected).filter(v => v).length === displayRows.length)}
-                                            onCheckedChange={() => setSelected(displayRows.map(r => r.rowIndex))}
+                                            checked={!!filteredRows.length && (Object.values(selected).filter(v => v).length === filteredRows.length)}
+                                            onCheckedChange={() => setSelected(filteredRows.map(r => r.rowIndex))}
                                         />
                                     </TableHead>                
                                 )}
@@ -160,7 +209,7 @@ export const DataTable = (props: DataTableProps) => {
                         </TableHeader>
 
                         <TableBody ref={tBodyRef} className={tableBodyClassname}>
-                            {!displayRows.length && (
+                            {!filteredRows.length && (
                                 <TableRow className="p-0">
                                     <TableCell
                                         colSpan={columns.length + (selectable ? 1 : 0) + (sortable ? 1 : 0)}
@@ -171,7 +220,7 @@ export const DataTable = (props: DataTableProps) => {
                                 </TableRow>
                             )}
 
-                            {displayRows.map((row) => {
+                            {filteredRows.map((row) => {
                                 const rowProps = { ...props.getRowOptions?.({ rowIndex: row.rowIndex, }), };
 
                                 return (
