@@ -2,7 +2,7 @@
 
 import SortableList, { SortableItem, SortableKnob } from 'react-easy-sort';
 import { arrayMoveImmutable } from 'array-move';
-import {  useCallback, useMemo, useRef, useState,useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Move } from 'lucide-react';
 
 import {
@@ -22,12 +22,12 @@ import type { DataTableProps, } from './types';
 import { FilterText } from "./filter-text";
 import { DataTableHeader } from './header';
 
-export { 
-    type DataTableProps, 
+export {
+    type DataTableProps,
 };
 
 export const DataTable = (props: DataTableProps) => {
-    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort } = props;
+    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, searchKeys } = props;
 
     const tBodyRef = useRef<HTMLTableSectionElement>(null);
 
@@ -35,8 +35,8 @@ export const DataTable = (props: DataTableProps) => {
     const [searchValue, setSearchValue] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const { 
-        state: { columns, rows, skeletonRows, selected, }, 
+    const {
+        state: { columns, rows, skeletonRows, selected },
         setState,
         setFilter,
         setSelected,
@@ -44,8 +44,9 @@ export const DataTable = (props: DataTableProps) => {
     } = table;
 
     const displayRows = useMemo(() => loading ? skeletonRows : rows, [loading, skeletonRows, rows]);
-   
+
     const searchableColumns = useMemo(() => {
+        console.log(columns)
         return columns
             .filter(col => !col.hidden && col.name &&
                 (/title|name|key|ref|hospital|field|type/i.test(String(col.name))))
@@ -64,22 +65,64 @@ export const DataTable = (props: DataTableProps) => {
         return () => clearTimeout(handler);
     }, [searchValue]);
 
-    const filterRows = useCallback((rows: typeof displayRows, term: string) => {
-        if (!term.trim()) return rows;
-        const lowerTerm = term.toLowerCase();
-        return rows.filter(row => {
-            for (const colIndex of searchableColumns) {
-                const cell = row.cells[colIndex];
-                const cellValue = cell?.value;
+    // const filterRows = useCallback((rows: typeof displayRows, term: string) => {
+    //     if (!term.trim()) return rows;
+    //     const lowerTerm = term.toLowerCase();
 
-                if (cellValue != null &&
-                    String(cellValue).toLowerCase().includes(lowerTerm)) {
-                    return true;
+    //     return rows.filter(row => {
+    //         for (const colIndex of searchableColumns) {
+    //             const cell = row.cells[colIndex];
+    //             const cellValue = cell?.value;
+
+    //             if (cellValue != null &&
+    //                 String(cellValue).toLowerCase().includes(lowerTerm)) {
+    //                 return true;
+    //             }
+    //         }
+    //         return false;
+    //     });
+
+
+    // }, [searchableColumns]);
+
+    const filterRows = useCallback(
+        (
+            rows: typeof displayRows,
+            term: string,
+        ) => {
+            if (!term.trim()) return rows;
+            const lowerTerm = term.toLowerCase();
+                
+            return rows.filter(row => {
+                for (const colIndex of searchableColumns) {
+                    const cell = row.cells[colIndex];
+                    const cellValue = cell?.value;
+
+                    if (
+                        cellValue != null &&
+                        String(cellValue).toLowerCase().includes(lowerTerm)
+                    ) {
+                        return true;
+                    }
                 }
-            }
-            return false;
-        });
-    }, [searchableColumns]);
+                const positionCol = row.cells[0]?.value;
+           
+                if (positionCol != null) {
+                    const match = searchKeys?.find(
+                        sk => String(sk.position) === String(positionCol)
+                    );
+                    if (match && match.keys.some(k => k.toLowerCase().includes(lowerTerm))) {
+                        return true;
+                    }
+                }
+
+
+                return false;
+            });
+        },
+        [searchableColumns]
+    );
+
 
 
     // Final filtered rows
@@ -104,18 +147,18 @@ export const DataTable = (props: DataTableProps) => {
         setSelected([]);
     }, [setState, onSort, setSelected]);
 
-    return ( 
+    return (
         <>
             <DataTableHeader {...props}
-             search={{
+                search={{
                     ...props.search,
                     onSearch: handleSearch,
                 }}
             />
 
-            <SortableList 
+            <SortableList
                 allowDrag={!!sortable}
-                onSortEnd={onSortEnd} 
+                onSortEnd={onSortEnd}
                 draggedItemClassName="opacity-90 z-[9999999999999]"
                 customHolderRef={tBodyRef}
             >
@@ -128,7 +171,7 @@ export const DataTable = (props: DataTableProps) => {
                         >
                             <TableRow>
                                 {selectable && (
-                                    <TableHead 
+                                    <TableHead
                                         className={cn(columns[0]?.cellClassName, 'w-8')}
                                     >
                                         <Checkbox
@@ -136,13 +179,13 @@ export const DataTable = (props: DataTableProps) => {
                                             checked={!!filteredRows.length && (Object.values(selected).filter(v => v).length === filteredRows.length)}
                                             onCheckedChange={() => setSelected(filteredRows.map(r => r.rowIndex))}
                                         />
-                                    </TableHead>                
+                                    </TableHead>
                                 )}
 
                                 {sortable && (
-                                    <TableHead 
+                                    <TableHead
                                         className={cn(columns[0]?.cellClassName, 'w-4')}
-                                    />                
+                                    />
                                 )}
 
                                 {columns.map((col) => {
@@ -152,9 +195,9 @@ export const DataTable = (props: DataTableProps) => {
                                             colSpan={col.colSpan}
                                             align={col.align}
                                             className={cn(
-                                                props.cellClassName, 
-                                                props.thClassName, 
-                                                col.cellClassName, 
+                                                props.cellClassName,
+                                                props.thClassName,
+                                                col.cellClassName,
                                                 col.thClassName,
                                                 'px-2',
                                                 col.hidden ? 'hidden' : '',
@@ -168,11 +211,11 @@ export const DataTable = (props: DataTableProps) => {
                                             )}
                                         >
                                             {(() => {
-                                                switch(col.filterType) {
+                                                switch (col.filterType) {
                                                     case 'number':
                                                     case 'text':
                                                         return (
-                                                            <FilterText 
+                                                            <FilterText
                                                                 column={col}
                                                                 value={col.filter}
                                                                 onFilter={value => {
@@ -186,8 +229,8 @@ export const DataTable = (props: DataTableProps) => {
                                                         );
                                                     default:
                                                         return (
-                                                            <Button 
-                                                                variant="ghost" 
+                                                            <Button
+                                                                variant="ghost"
                                                                 size="sm"
                                                                 className="
                                                                     focus-visible:ring-0 
@@ -225,7 +268,7 @@ export const DataTable = (props: DataTableProps) => {
 
                                 return (
                                     <SortableItem key={row.id}>
-                                        <TableRow 
+                                        <TableRow
                                             {...rowProps}
                                             className={cn(
                                                 props.trClassName,
@@ -236,7 +279,7 @@ export const DataTable = (props: DataTableProps) => {
                                             )}
                                         >
                                             {selectable && (
-                                                <TableCell 
+                                                <TableCell
                                                     className={cn(columns[0]?.cellClassName, 'w-8')}
                                                 >
                                                     <Checkbox
@@ -244,33 +287,33 @@ export const DataTable = (props: DataTableProps) => {
                                                         checked={!!selected[row.rowIndex]}
                                                         onCheckedChange={() => setSelected([row.rowIndex])}
                                                     />
-                                                </TableCell>                
+                                                </TableCell>
                                             )}
 
                                             {sortable && (
-                                                <TableCell 
+                                                <TableCell
                                                     className={cn(columns[0]?.cellClassName, 'w-4 cursor-move')}
                                                 >
                                                     <SortableKnob>
                                                         <Move className="w-4 h-4 text-muted-foreground" />
                                                     </SortableKnob>
-                                                </TableCell>                
+                                                </TableCell>
                                             )}
 
-                                            {row.cells.map(cell => {
+                                            {row.cells.map((cell: any) => {
                                                 const col = columns[cell.columnIndex];
                                                 const cellProps = { ...props.getCellOptions?.({ rowIndex: row.rowIndex, columnIndex: cell.columnIndex }), };
 
                                                 return (
-                                                    <TableCell 
+                                                    <TableCell
                                                         {...cellProps}
                                                         key={cell.id}
                                                         colSpan={col.colSpan}
                                                         align={col.align}
                                                         className={cn(
-                                                            props.cellClassName, 
-                                                            props.tdClassName, 
-                                                            col.cellClassName, 
+                                                            props.cellClassName,
+                                                            props.tdClassName,
+                                                            col.cellClassName,
                                                             col.tdClassName,
                                                             'px-4',
                                                             cellProps.className,

@@ -82,7 +82,7 @@ export function DataTableSearch({
                     {...rest}
                     ref={setRefs}
                     type="search"
-                    placeholder={inputPlaceholder || 'Search...'}
+                    placeholder={inputPlaceholder || 'Search...[title,description,hospital]'}
                     value={searchValue}
                     onChange={handleChange}
                     className="w-full"

@@ -28,7 +28,6 @@ useEffect(() => {
     try {
       setLoading(true);
       const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
-      
       if (isMounted) {
         setScreens(res.data);
       }
@@ -49,12 +48,10 @@ useEffect(() => {
       }
     }
   })();
-
   return () => {
     isMounted = false; // Cleanup on unmount
   };
 }, [alert, scriptId, locked]);
-
     return (
         <>
             {loading && <Loader overlay />}

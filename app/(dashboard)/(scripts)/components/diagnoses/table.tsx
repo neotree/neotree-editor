@@ -61,7 +61,7 @@ export function DiagnosesTable(props: Props) {
                         };
                     }}
                     search={{
-                        inputPlaceholder: 'Search diagnoses',
+                        inputPlaceholder: 'Search diagnoses [Name,Description]',
                     }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
