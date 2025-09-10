@@ -30,6 +30,7 @@ export type ScreenType = typeof screens.$inferSelect & {
     image3: null | ScriptImage;
     scriptTitle?: string;
     hospitalName?: string;
+    searchKeys?: string[]
 };
 
 export type GetScreensResults = {
@@ -140,17 +141,20 @@ export async function _getScreens(
                 ...s,
                 isDraft: false,
                 isDeleted: false,
+                searchKeys: s.key?Array.of(s.key):s.fields.map(f=>f.key)
             } as GetScreensResults['data'][0])),
 
             ...drafts.map((s => ({
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                searchKeys: s?.data?.key?Array.of(s?.data?.key):s?.data?.fields?.map(f=>f.key)
             } as GetScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
             .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
 
+        
         return  { 
             data: responseData,
         };

@@ -11,8 +11,8 @@ import { useAppContext } from "@/contexts/app";
 
 export type UseScreensTableParams = {
     screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
-    locked?:boolean
-};
+    locked?:boolean,
+}
 
 export function useScreensTable({
     screens: screensParam,
@@ -22,6 +22,7 @@ export function useScreensTable({
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
     const [screensIdsToCopy, setScreensIdsToCopy] = useState<string[]>([]);
+
 
     useEffect(() => { setScreens(screensParam); }, [screensParam]);
 
@@ -99,6 +100,7 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, screens, router]);
 
+
     const disabled = useMemo(() => viewOnly || !!locked, [viewOnly,locked]);
 
     return {
@@ -113,6 +115,6 @@ export function useScreensTable({
         onSort,
         setScreens,
         setLoading,
-        setSelected,
+        setSelected
     };
 }

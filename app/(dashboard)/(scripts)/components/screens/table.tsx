@@ -25,7 +25,8 @@ export function ScreensTable(props: Props) {
         setScreensIdsToCopy,
         onDelete,
         onSort,
-        setSelected,
+        setSelected
+
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext()
@@ -62,7 +63,7 @@ export function ScreensTable(props: Props) {
                         };
                     }}
                     search={{
-                        inputPlaceholder: 'Search screens',
+                        inputPlaceholder: 'Search screens using type,ref,title or key',
                     }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
@@ -139,8 +140,13 @@ export function ScreensTable(props: Props) {
                         s.refId,
                         s.title,
                         s.version,
-                        '',
+                        ''
                     ])}
+                    searchKeys={screens.data.map(s => ({
+                            position: s.position,
+                            keys: s.searchKeys ?? []
+                        }))||[]}    
+                
                 />
             </div>
 
