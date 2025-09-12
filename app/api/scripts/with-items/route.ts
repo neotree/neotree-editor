@@ -11,9 +11,9 @@ export async function POST(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
 
         const body = await req.json();
-        const scripts = body.data as Parameters<typeof saveScriptsWithItems>[0]['data'];
+        const { data: scripts, dataKeys, } = body.data as Parameters<typeof saveScriptsWithItems>[0];
 
-        const res = await saveScriptsWithItems({ data: scripts, });
+        const res = await saveScriptsWithItems({ data: scripts, dataKeys, });
 
 		return NextResponse.json(res, { status: 200, });
 	} catch(e: any) {
@@ -33,16 +33,14 @@ export async function GET(req: NextRequest) {
 
 		const dataJSON = JSON.parse(req.nextUrl.searchParams.get('data') || '{}');
 
-        const { errors, data } = await getScriptsWithItems({ 
+        const res = await getScriptsWithItems({ 
 			...dataJSON, 
 			scriptsIds: scriptsIds || dataJSON.scriptsIds, 
 		});
 
-        if (errors?.length) return NextResponse.json({ errors, }, { status: 200, });
-
-		return NextResponse.json({ data, }, { status: 200, });
+		return NextResponse.json(res, { status: 200, });
 	} catch(e: any) {
 		logger.error('[GET] /api/scripts/with-items', e.message);
-		return NextResponse.json({ errors: ['Internal Error'] }, { status: 200, });
+		return NextResponse.json({ errors: ['Internal Error'], data: [], dataKeys: [], }, { status: 200, });
 	}
 }
