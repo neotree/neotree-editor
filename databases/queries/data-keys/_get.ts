@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -12,6 +12,7 @@ export type DataKey = typeof dataKeys.$inferSelect & {
 
 export type GetDataKeysParams = {
     dataKeysIds?: string[];
+    names?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
 };
@@ -25,35 +26,47 @@ export async function _getDataKeys(
     params?: GetDataKeysParams
 ): Promise<GetDataKeysResults> {
     try {
-        const { dataKeysIds: _dataKeysIds, returnDraftsIfExist = true, } = { ...params };
+        const { 
+            dataKeysIds: _dataKeysIds, 
+            names: namesParam = [],
+            returnDraftsIfExist = true, 
+        } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
+        const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
         
         // unpublished dataKeys conditions
-        const whereDataKeysDraftsIds = !dataKeysIds?.length ? 
-            undefined 
-            : 
-            inArray(dataKeysDrafts.uuid, dataKeysIds.map(id => uuid.validate(id) ? id : uuid.v4()));
         const whereDataKeysDrafts = [
-            ...(!whereDataKeysDraftsIds ? [] : [whereDataKeysDraftsIds]),
-        ];
+            !dataKeysIds?.length ? 
+                undefined 
+                : 
+                inArray(dataKeysDrafts.uuid, dataKeysIds.map(id => uuid.validate(id) ? id : uuid.v4())),
+                
+            !names?.length ? 
+                undefined 
+                : 
+                inArray(sql`lower(${dataKeysDrafts.name})`, names),
+        ].filter(q => q);
+
         const drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
-            where: and(...whereDataKeysDrafts),
+            where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
         });
         dataKeysIds = dataKeysIds.filter(id => !drafts.map(d => d.uuid).includes(id));
 
         // published dataKeys conditions
-        const whereDataKeysIdsNotIn = !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid));
-        const whereDataKeysIds = !dataKeysIds?.length ? 
-            undefined 
-            : 
-            inArray(dataKeys.uuid, dataKeysIds.filter(id => uuid.validate(id)));
         const whereDataKeys = [
             isNull(dataKeys.deletedAt),
             isNull(pendingDeletion),
-            whereDataKeysIds,
-            whereDataKeysIdsNotIn,
-        ];
+            !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid)),
+            !dataKeysIds?.length ? 
+                undefined 
+                : 
+                inArray(dataKeys.uuid, dataKeysIds.filter(id => uuid.validate(id))),
+            !names?.length ? 
+                undefined 
+                : 
+                inArray(sql`lower(${dataKeys.name})`, names),
+        ].filter(q => q);
 
         const publishedRes = await db
             .select({
