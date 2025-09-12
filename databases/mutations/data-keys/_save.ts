@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { checkDataKeyName } from '@/databases/queries/data-keys';
+import { _getDataKeys, checkDataKeyName } from '@/databases/queries/data-keys';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
@@ -104,5 +104,45 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
         response.errors = [e.message];
         logger.error('_saveDataKeys ERROR', e.message);
         return { success: false, errors: [e.message], };
+    }
+}
+
+export async function _saveDataKeysIfNotExist({
+    data,
+}: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+    try {
+        const names = data.map(item => item.name!).filter(n => n);
+
+        const saved = await _getDataKeys({ names, });
+
+        data = data.filter(key => {
+            const nameExists = saved.data.find(dk => `${dk.name || ''}`.toLowerCase() === `${key.name || ''}`.toLowerCase());
+            const labelExists = saved.data.find(dk => `${dk.label || ''}`.toLowerCase() === `${key.label || ''}`.toLowerCase());
+            const typeExists = saved.data.find(dk => `${dk.dataType || ''}`.toLowerCase() === `${key.dataType || ''}`.toLowerCase());
+
+            if (nameExists && labelExists && typeExists) return false;
+
+            return true;
+        });
+
+        const res = await _saveDataKeys({
+            data: data.map(item => ({
+                ...item,
+                uuid: undefined,
+                id: undefined,
+                createdAt: undefined,
+                updatedAt: undefined,
+                publishDate: undefined,
+                deletedAt: undefined,
+                version: undefined,
+            })),
+        });
+
+        return res;
+    } catch(e: any) {
+        return {
+            success: false,
+            errors: [e.message],
+        };
     }
 }
