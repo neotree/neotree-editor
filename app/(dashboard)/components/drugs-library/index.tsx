@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
@@ -19,14 +19,18 @@ import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
+import { ActionsBar } from "@/components/actions-bar";
 import { DrugsLibraryForm } from "./form";
 import { Add } from "./add";
+import { ExportModal } from "./export-modal";
 
 type Props = {};
 
 export function DrugsLibrary({}: Props) {
     const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
+
+    const [selected, setSelected] = useState<number[]>([]);
 
     // const searchParams = useSearchParams();
     // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
@@ -54,7 +58,17 @@ export function DrugsLibrary({}: Props) {
                 onChange={saveDrugs}
             />
 
+            {!!selected.length && (
+                <ActionsBar>
+                    <ExportModal 
+                        uuids={drugs.filter((_, i) => selected.includes(i)).map(k => k.itemId!)}
+                    />
+                </ActionsBar>
+            )}
+
             <DataTable 
+                onSelect={setSelected}
+                selectable={!disabled}
                 title="Drugs & Fluids Library"
                 headerActions={(
                     <>

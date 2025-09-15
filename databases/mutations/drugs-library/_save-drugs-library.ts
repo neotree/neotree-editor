@@ -85,7 +85,7 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
     } 
 }
 
-export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastAction, }: {
+export async function _saveDrugsLibraryItemsUpdateIfExists({ data, broadcastAction, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
 }) {
