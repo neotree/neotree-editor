@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MoreVertical, PlusIcon } from "lucide-react";
+import { MoreVertical, PlusIcon, UploadIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
@@ -28,6 +28,7 @@ import { DeleteDataKeysResponse, DeleteDataKeysParams, SaveDataKeysParams } from
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataKeyForm } from "./form";
+import { ExportModal } from "./export-modal";
 
 type Props = typeof actions & {
     disabled?: boolean;
@@ -228,6 +229,10 @@ export function DataKeysTable(props: Props) {
 
             {!!selected.length && (
                 <ActionsBar>
+                    <ExportModal 
+                        uuids={data.dataKeys.filter((_, i) => selected.includes(i)).map(k => k.uuid)}
+                    />
+
                     <Button
                         variant="destructive"
                         className="h-auto w-auto"
