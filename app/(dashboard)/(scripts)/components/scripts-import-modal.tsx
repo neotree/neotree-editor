@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import axios from "axios";
@@ -17,7 +17,6 @@ import {
 import { DialogClose, } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAlertModal } from "@/hooks/use-alert-modal";
-import { useAppContext } from "@/contexts/app";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
@@ -25,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useSites } from "@/hooks/use-sites";
 
 export function ScriptsImportModal({ 
     open, 
@@ -42,12 +42,16 @@ export function ScriptsImportModal({
 
     overWriteScriptWithId = overWriteScriptWithId || (routeParams.scriptId as string);
 
-    const { getSites } = useAppContext();
     const { copyScripts } = useScriptsContext();
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
-    const [sites, setSites] = useState<Awaited<ReturnType<typeof getSites>>>({ data: [] });
+    const { sites, loading: sitesLoading, } = useSites({
+        onLoadSitesError: () => onOpenChange(false),
+    });
+
+    const isLoading = sitesLoading || loading;
+    const disabled = isLoading;
 
     const {
         formState: { errors },
@@ -65,31 +69,6 @@ export function ScriptsImportModal({
     });
 
     const confirmed = watch('confirmed');
-
-    const disabled = useMemo(() => loading, [loading]);
-
-    const loadSites = useCallback(async () => {
-        try {
-            // const res = await getSites({ types: ['webeditor'], });
-
-            // TODO: Replace this with server action
-            const response = await axios.get('/api/sites?data='+JSON.stringify({ types: ['webeditor'], }));
-            const res = response.data as Awaited<ReturnType<typeof getSites>>;
-
-            if (res.errors?.length) throw new Error(res.errors.join(', '));
-
-            setSites(res);
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: 'Failed to load sites: ' + e.message,
-                variant: 'error',
-                onClose: () => onOpenChange(false),
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [getSites, alert, onOpenChange]);
 
     const importScripts = handleSubmit(async (data) => {
         try {
@@ -140,11 +119,9 @@ export function ScriptsImportModal({
         }
     });
 
-    useEffect(() => { if(open) { loadSites();  } }, [open, loadSites]);
-
     return (
         <>
-            {loading && <Loader overlay />}
+            {isLoading && <Loader overlay />}
 
             <Modal
                 open={open}
@@ -192,7 +169,7 @@ export function ScriptsImportModal({
                             <SelectContent>
                                 <SelectGroup>
                                     <SelectLabel>Sites</SelectLabel>
-                                    {sites.data.map(({ siteId, name }) => (
+                                    {sites.map(({ siteId, name }) => (
                                         <SelectItem key={siteId} value={siteId}>
                                             {name}
                                         </SelectItem>
