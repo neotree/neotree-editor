@@ -116,11 +116,13 @@ export async function _saveDataKeysIfNotExist({
         const saved = await _getDataKeys({ names, });
 
         data = data.filter(key => {
-            const nameExists = saved.data.find(dk => `${dk.name || ''}`.toLowerCase() === `${key.name || ''}`.toLowerCase());
-            const labelExists = saved.data.find(dk => `${dk.label || ''}`.toLowerCase() === `${key.label || ''}`.toLowerCase());
-            const typeExists = saved.data.find(dk => `${dk.dataType || ''}`.toLowerCase() === `${key.dataType || ''}`.toLowerCase());
+            const existing = saved.data.find(dk => (
+                (`${dk.name || ''}`.toLowerCase() === `${key.name || ''}`.toLowerCase()) &&
+                (`${dk.label || ''}`.toLowerCase() === `${key.label || ''}`.toLowerCase()) &&
+                (`${dk.dataType || ''}`.toLowerCase() === `${key.dataType || ''}`.toLowerCase())
+            ));
 
-            if (nameExists && labelExists && typeExists) return false;
+            if (existing) return false;
 
             return true;
         });
@@ -136,6 +138,44 @@ export async function _saveDataKeysIfNotExist({
                 deletedAt: undefined,
                 version: undefined,
             })),
+        });
+
+        return res;
+    } catch(e: any) {
+        return {
+            success: false,
+            errors: [e.message],
+        };
+    }
+}
+
+export async function _saveDataKeysUpdateIfExist({
+    data,
+}: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+    try {
+        const names = data.map(item => item.name!).filter(n => n);
+
+        const saved = await _getDataKeys({ names, });
+
+        const res = await _saveDataKeys({
+            data: data.map(item => {
+                const existing = saved.data.find(dk => (
+                    (`${dk.name || ''}`.toLowerCase() === `${item.name || ''}`.toLowerCase()) &&
+                    (`${dk.label || ''}`.toLowerCase() === `${item.label || ''}`.toLowerCase()) &&
+                    (`${dk.dataType || ''}`.toLowerCase() === `${item.dataType || ''}`.toLowerCase())
+                ));
+
+                return {
+                    ...item,
+                    uuid: existing?.uuid,
+                    id: existing?.id,
+                    createdAt: existing?.createdAt,
+                    updatedAt: existing?.updatedAt,
+                    publishDate: existing?.publishDate,
+                    deletedAt: existing?.deletedAt,
+                    version: existing?.version,
+                };
+            }),
         });
 
         return res;
