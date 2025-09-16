@@ -132,12 +132,14 @@ export function DrugsLibrary({}: Props) {
 
                                             {!disabled && (
                                                 <DropdownMenuItem 
-                                                    onClick={() => confirm(() => copyDrugs([item.itemId!]), {
-                                                        title: 'Copy drug',
-                                                        message: `Are you sure you want to copy drug?<br /> <b>${item.drug}</b>`,
-                                                        positiveLabel: 'Yes, copy',
-                                                        negativeLabel: 'Cancel',
-                                                    })}
+                                                    onClick={() => setTimeout(() => {
+                                                        confirm(() => copyDrugs([item.itemId!]), {
+                                                            title: 'Copy drug',
+                                                            message: `Are you sure you want to copy drug?<br /> <b>${item.drug}</b>`,
+                                                            positiveLabel: 'Yes, copy',
+                                                            negativeLabel: 'Cancel',
+                                                        });
+                                                    }, 0)}
                                                 >
                                                     <>
                                                         <CopyIcon className="mr-2 h-4 w-4" /> Copy
@@ -147,13 +149,15 @@ export function DrugsLibrary({}: Props) {
 
                                             {!disabled && (
                                                 <DropdownMenuItem
-                                                    onClick={() => confirm(() => deleteDrugs([item.itemId!]), {
-                                                        title: 'Delete drug',
-                                                        message: 'Are you sure you want to delete drug?',
-                                                        positiveLabel: 'Yes, delete',
-                                                        negativeLabel: 'Cancel',
-                                                        danger: true,
-                                                    })}
+                                                    onClick={() => setTimeout(() => {
+                                                        confirm(() => deleteDrugs([item.itemId!]), {
+                                                            title: 'Delete drug',
+                                                            message: 'Are you sure you want to delete drug?',
+                                                            positiveLabel: 'Yes, delete',
+                                                            negativeLabel: 'Cancel',
+                                                            danger: true,
+                                                        });
+                                                    }, 0)}
                                                     className="text-danger focus:bg-danger focus:text-danger-foreground"
                                                 >
                                                     <Trash className="mr-2 h-4 w-4" />

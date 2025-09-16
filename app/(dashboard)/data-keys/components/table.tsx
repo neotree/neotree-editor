@@ -194,14 +194,14 @@ export function DataKeysTable(props: Props) {
 
                                     <ddMenu.DropdownMenuItem
                                         className="text-destructive w-full hover:bg-destructive hover:text-destructive-foreground gap-x-2"
-                                        onClick={e => {
+                                        onClick={() => setTimeout(() => {
                                             confirm(() => onDelete([{ ...dataKey, children, }]), {
                                                 title: 'Delete data key',
                                                 message: `Are you sure you want to delete data key: <b>${dataKey.name}</b>?`,
                                                 danger: true,
                                                 positiveLabel: 'Yes',
                                             });
-                                        }}
+                                        }, 0)}
                                     >
                                         <>
                                             <TrashIcon className="text-destructive size-4" />

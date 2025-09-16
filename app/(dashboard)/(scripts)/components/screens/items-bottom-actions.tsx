@@ -21,7 +21,7 @@ export function ItemsBottomActions({ disabled, selected, onDelete, onCopy, }: Pr
                         variant="destructive"
                         className="h-auto w-auto"
                         disabled={disabled}
-                        onClick={() => onDelete()}
+                        onClick={() => setTimeout(() => onDelete(), 0)}
                     >
                         <Trash className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Delete ${selected.length} items` : 'Delete item'}</span>
