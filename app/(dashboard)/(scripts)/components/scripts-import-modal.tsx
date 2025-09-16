@@ -74,7 +74,7 @@ export function ScriptsImportModal({
         try {
             if (!data.siteId) throw new Error('Please select a site!');
             if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (!data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
+            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
 
             setLoading(true);
 

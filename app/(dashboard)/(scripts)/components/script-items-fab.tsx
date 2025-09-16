@@ -51,7 +51,7 @@ export function ScriptItemsFab({ disabled }: {
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setShowImportsModal(true)}>
+                        <DropdownMenuItem onClick={() => setTimeout(() => setShowImportsModal(true), 0)}>
                             Import script
                         </DropdownMenuItem>
 

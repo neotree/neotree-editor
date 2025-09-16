@@ -52,14 +52,14 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => onDuplicate()}
+                        onClick={() => setTimeout(() => onDuplicate(), 0)}
                     >
                         <CopyPlus className="mr-2 h-4 w-4" />
                         Duplicate
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => setScriptsIdsToExport()}
+                        onClick={() => setTimeout(() => setScriptsIdsToExport(), 0)}
                     >
                         <Upload className="mr-2 h-4 w-4" />
                         Export
@@ -85,7 +85,7 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
 
                     {!disabled && (
                         <DropdownMenuItem
-                            onClick={() => onDelete()}
+                            onClick={() => setTimeout(() => onDelete(), 0)}
                             className="text-danger focus:bg-danger focus:text-danger-foreground"
                         >
                             <Trash className="mr-2 h-4 w-4" />
