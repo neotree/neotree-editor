@@ -30,10 +30,16 @@ export const exportDataKeys = async ({
     try {
         const axiosClient = await getSiteAxiosClient(siteId);
         
-        const dataKeys = await _getDataKeys({
+        let dataKeys = await _getDataKeys({
             dataKeysIds: uuids,
             returnDraftsIfExist: true,
         });
+
+        // TODO: include related keys???
+        dataKeys.data = dataKeys.data.map(k => ({
+            ...k,
+            parentKeys: [],
+        }));
 
         if (dataKeys.errors?.length) {
             return {
