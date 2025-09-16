@@ -150,7 +150,7 @@ export function ScriptPrintConfig(props: Props) {
 
                                             {!disabled && (
                                                 <DropdownMenuItem
-                                                    onClick={() => onDeleteHeaderField(field)}
+                                                    onClick={() => setTimeout(() => onDeleteHeaderField(field), 0)}
                                                     className="text-danger focus:bg-danger focus:text-danger-foreground"
                                                 >
                                                     <Trash className="mr-2 h-4 w-4" />

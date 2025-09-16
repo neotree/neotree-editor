@@ -23,7 +23,7 @@ export function DiagnosesTableBottomActions({ disabled, selected, onDelete, onCo
                         variant="destructive"
                         className="h-auto w-auto"
                         disabled={disabled}
-                        onClick={() => onDelete()}
+                        onClick={() => setTimeout(() => onDelete(), 0)}
                     >
                         <Trash className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Delete ${selected.length} diagnoses` : 'Delete diagnosis'}</span>
@@ -32,7 +32,7 @@ export function DiagnosesTableBottomActions({ disabled, selected, onDelete, onCo
                     <Button
                         className="h-auto w-auto"
                         disabled={disabled}
-                        onClick={() => onCopy()}
+                        onClick={() => setTimeout(() => onCopy(), 0)}
                     >
                         <Copy className="h-4 w-4 mr-1" />
                         <span>{selected.length > 1 ? `Copy ${selected.length} diagnoses` : 'Copy diagnosis'}</span>
