@@ -223,6 +223,24 @@ export function DataKeysTable(props: Props) {
         ]),
     } satisfies DataTableProps;
 
+    const getExportDataKeysUuids = useCallback((exportKeys: typeof data.dataKeys) => {
+        let uuids = exportKeys.map(k => k.uuid);
+
+        // TODO: include related keys???
+        // data.dataKeys.forEach(({ name }) => {
+        //     const childKeys = exportKeys.filter(k => k.parentKeys.map(key => key.toLowerCase()).includes(name.toLowerCase()));
+        //     uuids = [...uuids, ...childKeys.map(k => k.uuid)];
+        // });
+
+        // exportKeys.forEach(({ parentKeys: parentKeysNames, }) => {
+        //     parentKeysNames = parentKeysNames.map(n => n.toLowerCase());
+        //     const parentKeys = data.dataKeys.filter(k => k.parentKeys.find(n => parentKeysNames.includes(n.toLowerCase())));
+        //     uuids = [...uuids, ...parentKeys.map(k => k.uuid)];
+        // });
+
+        return uuids.filter((uuid, i) => uuids.indexOf(uuid) === i);
+    }, [data.dataKeys]);
+
     return (
         <>
             {loading && <Loader overlay />}
@@ -230,7 +248,7 @@ export function DataKeysTable(props: Props) {
             {!!selected.length && (
                 <ActionsBar>
                     <ExportModal 
-                        uuids={data.dataKeys.filter((_, i) => selected.includes(i)).map(k => k.uuid)}
+                        uuids={getExportDataKeysUuids(data.dataKeys.filter((_, i) => selected.includes(i)))}
                     />
 
                     <Button
