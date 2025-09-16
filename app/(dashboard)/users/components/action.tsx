@@ -69,7 +69,7 @@ export function UserAction({
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={onResetPasswords}
+                        onClick={() => setTimeout(() => onResetPasswords(), 0)}
                         className="text-danger focus:bg-danger focus:text-danger-foreground"
                     >
                         Reset password
@@ -78,7 +78,7 @@ export function UserAction({
                     <DropdownMenuSeparator />
 
                     <DropdownMenuItem
-                        onClick={onDelete}
+                        onClick={() => setTimeout(() => onDelete(), 0)}
                         className="text-danger focus:bg-danger focus:text-danger-foreground"
                         disabled={email === session.data?.user?.email}
                     >
