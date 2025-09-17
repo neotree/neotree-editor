@@ -66,6 +66,9 @@ export const screenTypeEnum = pgEnum('screen_type', [
 // DRUG TYPE ENUM
 export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 
+// LIST STYLE ENUM
+export const listStyleEnum = pgEnum('list_style', ['none', 'number', 'bullet']);
+
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
     id: serial('id').primaryKey(),
@@ -584,6 +587,7 @@ export const screens = pgTable(
         fluids: jsonb('fluids').default('[]').$type<FluidField[]>().notNull(),
         feeds: jsonb('feeds').default('[]').$type<FeedField[]>().notNull(),
         reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
+        listStyle: listStyleEnum('list_style').default('none').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),

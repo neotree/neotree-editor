@@ -35,7 +35,6 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
 import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
-import { useAppContext } from "@/contexts/app";
 import { screenTypes, CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
