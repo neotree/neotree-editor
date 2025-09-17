@@ -72,6 +72,8 @@ export function Field<P = {}>({
         ...field,
     });
 
+    const listStyle = form.watch('listStyle');
+
     const {
         control,
         reset: resetForm,
@@ -355,7 +357,29 @@ export function Field<P = {}>({
 
                             {(isDropdownField || isMultiSelectField) && (
                                 <>
-                                    
+                                    {!!isMultiSelectField && (
+                                        <div>
+                                            <Label secondary htmlFor="listStyle">List style</Label>
+                                            <Select
+                                                value={listStyle}
+                                                name="listStyle"
+                                                onValueChange={(val: typeof listStyle) => {
+                                                    form.setValue('listStyle', val || 'none');
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        <SelectItem value="bullet">Bullet</SelectItem>
+                                                        <SelectItem value="number">Number</SelectItem>
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
 
                                     <Controller 
                                         control={control}
