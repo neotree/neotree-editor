@@ -105,7 +105,9 @@ export function Header({
                     <div className="ml-auto" />
 
                     <HeaderDesktopMenu />
-
+                     <div className="my-auto">
+                        {user?.displayName}
+                    </div>
                     <div className="my-auto">
                         <User user={user} />
                     </div>

@@ -7,7 +7,6 @@ async function main() {
     try {
         const res = await _extractDataKeys();
         console.log('SUCCESS');
-        console.log(res);
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);

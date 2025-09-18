@@ -50,8 +50,8 @@ export function LockStatus({
     if (lockStatus === undefined) return null;
 
     return (
-        <div className={`p-1 rounded ${lockStatus ? 'bg-red-100' : 'bg-green-100'}`}>
-            {lockStatus ? (
+        <div className={`p-1 rounded ${!!lockStatus ? 'bg-red-100' : 'bg-green-100'}`}>
+            {!!lockStatus ? (
                 <Lock className="h-4 w-4 text-red-900" />
             ) : (
                 <Unlock className="h-4 w-4 text-green-900" />

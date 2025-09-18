@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql,and } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -23,7 +23,7 @@ export async function _publishScreens(opts?: {
 
  const myUpdatedScripts = await getChangedScripts()
     try {
-        if(myUpdatedScripts){
+        if(myUpdatedScripts && myUpdatedScripts.length>0){
         let updates: (typeof screensDrafts.$inferSelect)[] = [];
         let inserts: (typeof screensDrafts.$inferSelect)[] = [];
 
@@ -90,7 +90,9 @@ export async function _publishScreens(opts?: {
             await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(screensDrafts).where(inArray(screensDrafts.scriptId||screensDrafts.scriptDraftId,myUpdatedScripts));
+        await db.delete(screensDrafts)
+        .where(or(inArray(screensDrafts.scriptId,myUpdatedScripts),
+        inArray(screensDrafts.scriptDraftId,myUpdatedScripts)));
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.screenId),
@@ -126,10 +128,13 @@ export async function _publishScreens(opts?: {
                 },
             })));
         }
-
-        await db.delete(pendingDeletion).where(or(
+     
+        await db.delete(pendingDeletion).where(and(or(or(
             isNotNull(pendingDeletion.screenId),
-            isNotNull(pendingDeletion.screenDraftId),
+            isNotNull(pendingDeletion.screenDraftId)),
+            inArray(pendingDeletion.scriptId,myUpdatedScripts),
+            inArray(pendingDeletion.scriptDraftId,myUpdatedScripts))
+            
         ));
 
         const published = [
@@ -154,7 +159,6 @@ export async function _publishScreens(opts?: {
                 .set({ version: sql`${screens.version} + 1`, }).
                 where(inArray(screens.screenId, published));
         }
-         results.success = true;
     }
 
         results.success = true;

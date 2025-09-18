@@ -21,7 +21,11 @@ export type DeleteScreensResponse = {
 export async function _deleteAllScreensDrafts(): Promise<boolean> {
     try {
         const myChangedScreens = await getChangedScripts()
-        await db.delete(screensDrafts).where(inArray(screensDrafts.scriptId||screensDrafts.scriptDraftId,myChangedScreens));
+         if(myChangedScreens && myChangedScreens.length>0){
+        await db.delete(screensDrafts)
+        .where(or(inArray(screensDrafts.scriptId,myChangedScreens),
+       inArray(screensDrafts.scriptDraftId,myChangedScreens)));
+         }
         return true;
     } catch(e: any) {
         throw e;

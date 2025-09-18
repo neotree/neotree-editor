@@ -14,14 +14,16 @@ export async function _publishScripts() {
 
     try {
          const myUpdatedScripts = await getChangedScripts()
+         if(myUpdatedScripts && myUpdatedScripts.length>0){
         const drafts = (await db.query.scriptsDrafts.findMany()).filter(s=>myUpdatedScripts.includes(s.scriptId||s.scriptDraftId));
         let inserts = drafts.
         filter(c => !c.scriptId)
         .map(s => ({
             ...s,
-            scriptId: s.data.scriptId || v4(),
-            data: { ...s.data, scriptId: s.data.scriptId || v4(), },
+            scriptId: s.scriptId||s.data.scriptId || v4(),
+            data: { ...s.data, scriptId: s.scriptId||s.data.scriptId || v4(), },
         }));
+         console.log("---INSERTS..",inserts)
         let updates = drafts.filter(c => c.scriptId);
 
         const scriptsIdsAndScriptsDraftsIds = [
@@ -109,8 +111,10 @@ export async function _publishScripts() {
                 },
             },
         });
-
-        await db.delete(scriptsDrafts).where(inArray(scriptsDrafts.scriptId||scriptsDrafts.scriptDraftId,myUpdatedScripts));
+      
+        await db.delete(scriptsDrafts).where(or(inArray(scriptsDrafts.scriptId,myUpdatedScripts),
+        inArray(scriptsDrafts.scriptDraftId,myUpdatedScripts)));
+        
 
         deleted = deleted.filter(c => c.script && myUpdatedScripts.includes(c.scriptId||''));
 
@@ -149,7 +153,7 @@ export async function _publishScripts() {
                 .set({ version: sql`${scripts.version} + 1`, }).
                 where(inArray(scripts.scriptId, published));
         }
-
+         }
         results.success = true;
     } catch (e: any) {
         results.success = false;
