@@ -103,7 +103,6 @@ export async function isLocked(opts: {
         eq(ntScriptLock.lockType, lockType)
       )
     });
-    
     if (userLock) {
       return false; // User has the lock, so it's not locked for them
     }

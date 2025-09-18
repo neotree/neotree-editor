@@ -27,7 +27,7 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
      data = removeHexCharacters(data)
-
+  
     try {
         let index = 0;
         for (const { scriptId: itemScriptId, ...item } of data) {
@@ -44,8 +44,6 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
                     const published = (draft || !itemScriptId) ? null : await db.query.scripts.findFirst({
                         where: eq(scripts.scriptId, scriptId),
                     });
-                   const isOldScript = await db.query.scripts.findFirst({
-                        where: eq(scripts.scriptId, scriptId),});
 
                     if (draft) {
                         const data = {
@@ -63,8 +61,11 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
 
                         info.query = q.toSQL();
 
-                        await q.execute();
+                        await q.execute(); 
+                      
+
                     } else {
+        
                         let position = item.position || published?.position;
                         if (!position) {
                             const script = await db.query.scripts.findFirst({
@@ -98,13 +99,11 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
 
                         info.query = q.toSQL();
 
-                        await q.execute();
-
-                    //COMPLETELY NEW SCRIPT,ON SAVE CREATE A LOCK    
-                    if(!isOldScript){
-                     await _createNewLock({script:scriptId,lockType:'script'})
+                        await q.execute();    
+                        await _createNewLock({script:scriptId,lockType:'script'})  
+                        
                     }
-                    }
+                    
                 }
             } catch(e: any) {
                 errors.push(e.message);

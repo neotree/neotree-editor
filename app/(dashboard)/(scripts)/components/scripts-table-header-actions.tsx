@@ -53,8 +53,6 @@ export function ScriptsTableHeaderActions() {
                             onClose: () => router.refresh(),
                         });
                     }
-
-                    console.log(res);
                 } catch(e: any) {
                     alert({
                         title: 'Error',

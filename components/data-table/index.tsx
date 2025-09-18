@@ -46,7 +46,6 @@ export const DataTable = (props: DataTableProps) => {
     const displayRows = useMemo(() => loading ? skeletonRows : rows, [loading, skeletonRows, rows]);
 
     const searchableColumns = useMemo(() => {
-        console.log(columns)
         return columns
             .filter(col => !col.hidden && col.name &&
                 (/title|name|key|ref|hospital|field|type/i.test(String(col.name))))
