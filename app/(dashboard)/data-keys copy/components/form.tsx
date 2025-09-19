@@ -26,7 +26,12 @@ import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { useAppContext } from '@/contexts/app';
 
-type FormData = Partial<DataKey>;
+type FormDataWithoutChildren = Partial<DataKey> & 
+    Pick<DataKey, 'uuid' | 'name' | 'label' | 'dataType' |'parentKeys' | 'defaults'>;
+
+type FormData = FormDataWithoutChildren & {
+    children: FormDataWithoutChildren[];
+};
 
 type Props = typeof actions & {
     open?: boolean;
@@ -88,6 +93,7 @@ function Form(props: Props) {
             name: dataKey?.name || '',
             label: dataKey?.label || '',
             dataType: dataKey?.dataType || null,
+            parentKeys: dataKey?.parentKeys || [],
             defaults: dataKey?.defaults || {},
             children: dataKey?.children || [],
         },
@@ -107,12 +113,16 @@ function Form(props: Props) {
     const router = useRouter();
     const { viewOnly, } = useAppContext();
 
-    const onSave = handleSubmit(async (data) => {
+    const onSave = handleSubmit(async ({ children, ...data }) => {
         try {
             setLoading(true);
 
             const keys = [
-                data,
+                data, 
+                ...children.map(child => ({
+                    ...child,
+                    parentKeys: child.parentKeys.map(pk => pk === dataKey?.name ? data.name : pk),
+                })),
             ];
 
             const response = await axios.post('/api/data-keys/save', { 
@@ -156,7 +166,7 @@ function Form(props: Props) {
 
     const name = watch('name');
     const dataType = watch('dataType');
-    const children = watch('children') || [];
+    const children = watch('children');
 
     const disabled = viewOnly || !!disabledProp;
     const hasChildren = [
@@ -210,7 +220,19 @@ function Form(props: Props) {
                                                 // disabled: o.dataType !== `${dataType}_option`,
                                             })) }
                                         onSelect={([key]) => {
-                                            console.log(key);
+                                            const _dataKey = dataKeys.find(k => k.name === key?.value);
+                                            if (_dataKey) {
+                                                const i = children.length;
+                                                const dataKey = { ..._dataKey!, parentKeys: [..._dataKey!.parentKeys, name], };
+                                                setValue(`children.${i}`, dataKey, { shouldDirty: true, });
+                                                setTimeout(() => {
+                                                    setValue(`children.${i}.uuid`, dataKey.uuid, { shouldDirty: true, shouldTouch: true, });
+                                                    setValue(`children.${i}.name`, dataKey.name, { shouldDirty: true, shouldTouch: true, });
+                                                    setValue(`children.${i}.label`, dataKey.label, { shouldDirty: true, shouldTouch: true, });
+                                                    setValue(`children.${i}.dataType`, dataKey.dataType, { shouldDirty: true, shouldTouch: true, });
+                                                    setValue(`children.${i}.parentKeys`, dataKey.parentKeys, { shouldDirty: true, shouldTouch: true, });
+                                                }, 0);
+                                            }
                                         }}
                                     />
                                 </div>

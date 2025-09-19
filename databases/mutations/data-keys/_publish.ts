@@ -20,7 +20,6 @@ export async function _publishDataKeys(opts?: {
                 dataKey: {
                     columns: {
                         version: true,
-                        name: true,
                     },
                 },
             },
@@ -34,7 +33,6 @@ export async function _publishDataKeys(opts?: {
             await db.update(dataKeys)
                 .set({ 
                     deletedAt,
-                    name: sql`CONCAT(${dataKeys.name}, '_', ${dataKeys.uuid})`, // make the unique name available for use
                 })
                 .where(inArray(dataKeys.uuid, deleted.map(c => c.dataKeyId!)));
 
@@ -44,8 +42,8 @@ export async function _publishDataKeys(opts?: {
                 changes: {
                     action: 'delete_data_key',
                     description: 'Delete data key',
-                    oldValues: [{ deletedAt: null, name: c.dataKey!.name, }],
-                    newValues: [{ deletedAt, name: `${c.dataKey!.name}_${c.dataKeyId}`,  }],
+                    oldValues: [{ deletedAt: null, }],
+                    newValues: [{ deletedAt, }],
                 },
             })));
         }

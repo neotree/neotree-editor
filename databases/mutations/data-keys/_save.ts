@@ -6,6 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys, checkDataKeyName } from '@/databases/queries/data-keys';
+import { compareDataKeys } from '@/lib/data-keys';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
@@ -115,12 +116,10 @@ export async function _saveDataKeysIfNotExist({
 
         const saved = await _getDataKeys({ names, });
 
-        data = data.filter(key => {
-            const existing = saved.data.find(dk => (
-                (`${dk.name || ''}`.toLowerCase() === `${key.name || ''}`.toLowerCase()) &&
-                (`${dk.label || ''}`.toLowerCase() === `${key.label || ''}`.toLowerCase()) &&
-                (`${dk.dataType || ''}`.toLowerCase() === `${key.dataType || ''}`.toLowerCase())
-            ));
+        data = data.filter(item => {
+            const existing = saved.data.find(dk => {
+                return compareDataKeys(dk, item);
+            });
 
             if (existing) return false;
 
@@ -159,11 +158,9 @@ export async function _saveDataKeysUpdateIfExist({
 
         const res = await _saveDataKeys({
             data: data.map(item => {
-                const existing = saved.data.find(dk => (
-                    (`${dk.name || ''}`.toLowerCase() === `${item.name || ''}`.toLowerCase()) &&
-                    (`${dk.label || ''}`.toLowerCase() === `${item.label || ''}`.toLowerCase()) &&
-                    (`${dk.dataType || ''}`.toLowerCase() === `${item.dataType || ''}`.toLowerCase())
-                ));
+                const existing = saved.data.find(dk => {
+                    return compareDataKeys(dk, item);
+                });
 
                 return {
                     ...item,
