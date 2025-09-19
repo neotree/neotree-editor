@@ -23,7 +23,6 @@ export type tDataKeysCtx = {
     selected: { index: number; uuid: string; }[];
     loadDataKeys: () => Promise<DataKey[]>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
-    refreshSelected: () => void;
 };
 
 export const DataKeysCtx = createContext<tDataKeysCtx>({
@@ -32,7 +31,6 @@ export const DataKeysCtx = createContext<tDataKeysCtx>({
     selected: [],
     loadDataKeys: async () => [],
     setSelected: () => {},
-    refreshSelected: () => {},
 });
 
 export const useDataKeysCtx = () => useContext(DataKeysCtx);
@@ -109,7 +107,6 @@ export function DataKeysCtxProvider({ children, }: {
                     selected,
                     loadDataKeys,
                     setSelected,
-                    refreshSelected,
                 }}
             >
                 {children}

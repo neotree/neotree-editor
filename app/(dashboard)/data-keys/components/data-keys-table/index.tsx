@@ -98,10 +98,11 @@ export function DataKeysTable({ disabled, }: {
                     <>
                         <Button
                             variant="ghost"
+                            className="w-auto h-auto"
                             onClick={() => setCurrentDataKeyUuid('new')}
                         >
                             <PlusIcon className="size-4 mr-2" />
-                            New data key
+                            Add
                         </Button>
                     </>
                 )}

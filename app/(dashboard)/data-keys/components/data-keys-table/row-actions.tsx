@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreVertical, EditIcon, EyeIcon, Trash2Icon } from 'lucide-react';
+import { MoreVertical, EditIcon, EyeIcon, TrashIcon } from 'lucide-react';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -51,7 +51,7 @@ export function DataKeysTableRowActions({
                     </DropdownMenuItem>
 
                     <DropdownMenuItem className={cn('text-destructive', disabled && 'hidden')}>
-                        <Trash2Icon className="h-4 w-4 mr-2" /> Delete
+                        <TrashIcon className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
