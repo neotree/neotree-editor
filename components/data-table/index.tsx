@@ -70,7 +70,7 @@ export const DataTable = (props: DataTableProps) => {
         <>
             <DataTableHeader 
                 {...props} 
-                search={{
+                search={!props.search ? undefined : {
                     ...props.search,
                     value: props.search?.value === undefined ? internalSearchValue : props.search.value,
                     setValue: props.search?.setValue || setInternalSearchValue,
@@ -189,7 +189,7 @@ export const DataTable = (props: DataTableProps) => {
 
                                 if (
                                     searchValue &&
-                                    !JSON.stringify(row.cells.map(r => r.value)).includes(searchValue)
+                                    !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
                                 ) return null;
 
                                 return (
