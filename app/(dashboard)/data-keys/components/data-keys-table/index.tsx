@@ -6,6 +6,7 @@ import { useQueryState } from 'nuqs';
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { useAppContext } from '@/contexts/app';
+import { cn } from '@/lib/utils';
 import { DataKeysTableRowActions } from './row-actions';
 import { DataKeysTableBottomActions } from './bottom-actions';
 import { DataKeyForm } from './form';
@@ -39,6 +40,7 @@ export function DataKeysTable({ disabled, }: {
 
     const tableProps: DataTableProps = {
         data: tableData,
+        title: 'Data keys',
         selectable: !disabled,
         selectedIndexes: selected.map(s => s.index),
         onSelect: indexes => setSelected(
@@ -49,6 +51,20 @@ export function DataKeysTable({ disabled, }: {
                 }))
                 .filter(s => s.uuid)
         ),
+        getRowOptions({ rowIndex }) {
+            const s = dataKeys[rowIndex];
+            return !s ? {} : {
+                className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+            };
+        },
+        search: {
+            inputPlaceholder: 'Search data keys',
+        },
+        noDataMessage: (
+            <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
+                <div>No data keys saved.</div>
+            </div>
+        ),
         columns: [
             {
                 name: 'Key',
@@ -57,10 +73,12 @@ export function DataKeysTable({ disabled, }: {
                 name: 'Label',
             },
             {
-                name: 'Type',
+                name: 'Data type',
             },
             {
                 name: '',
+                align: 'right',
+                cellClassName: cn('w-10'),
                 cellRenderer({ rowIndex }) {
                     return (
                         <DataKeysTableRowActions 
