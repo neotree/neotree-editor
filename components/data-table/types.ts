@@ -43,6 +43,8 @@ export type TableState = {
 
 export type DataTableSearchOptions = {
     inputPlaceholder?: string;
+    value?: string;
+    setValue?: (value: string) => void;
 };
 
 export type DataTableHeaderProps = {
