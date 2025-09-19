@@ -74,7 +74,7 @@ export function DataTableHeader({
 
                     <div 
                         className={cn(
-                            'flex flex-row flex-wrap gap-x-2 gap-y-1 ml-auto',
+                            'flex flex-row flex-wrap gap-x-2 gap-y-1 md:ml-auto',
                             !headerActions && 'hidden',
                         )}
                     >

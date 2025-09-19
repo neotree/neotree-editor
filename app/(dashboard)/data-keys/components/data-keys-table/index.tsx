@@ -2,11 +2,13 @@
 
 import { useMemo } from 'react';
 import { useQueryState } from 'nuqs';
+import { PlusIcon } from 'lucide-react';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { useAppContext } from '@/contexts/app';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { DataKeysTableRowActions } from './row-actions';
 import { DataKeysTableBottomActions } from './bottom-actions';
 import { DataKeyForm } from './form';
@@ -90,6 +92,21 @@ export function DataKeysTable({ disabled, }: {
                 }
             },
         ],
+        headerActions: (
+            <>
+                {disabled ? null : (
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setCurrentDataKeyUuid('new')}
+                        >
+                            <PlusIcon className="size-4 mr-2" />
+                            New data key
+                        </Button>
+                    </>
+                )}
+            </>
+        ),
     };
 
     return (
