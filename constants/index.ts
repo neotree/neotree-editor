@@ -116,12 +116,6 @@ export const dataKeyTypes: {
         defaults: {},
     },
     {
-        value: 'timer',
-        label: 'timer',
-        hasChildren: false,
-        defaults: {},
-    },
-    {
         value: 'yesno',
         label: 'yesno',
         hasChildren: false,
@@ -191,8 +185,8 @@ export const dataKeyTypes: {
         defaults: {},
     },
     {
-        value: 'time',
-        label: 'time',
+        value: 'timer',
+        label: 'timer',
         hasChildren: false,
         defaults: {},
     },

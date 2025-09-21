@@ -10,6 +10,9 @@ import * as schema from "@/databases/pg/schema";
 import { _getScreens } from '@/databases/queries/scripts';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
+import { dataKeyTypes } from "@/constants";
+
+const dataTypes = dataKeyTypes.map(t => t.value);
 
 type DataKey = Omit<typeof schema.dataKeys.$inferSelect['children'][0], 'uuid'>;
 type DataKeyChild = typeof schema.dataKeys.$inferSelect['children'][0];
@@ -88,11 +91,7 @@ async function main() {
             let label = s.label;
             let type = s.type;
 
-            if (
-                [
-                    'checklist', 
-                ].includes(type)
-            ) {
+            if (!dataTypes.filter(t => t.includes('edliz')).includes(type)) {
                 label = label || s.title;
                 name = name || label;
             }
@@ -112,6 +111,8 @@ async function main() {
                         dataType: item.dataType || undefined, 
                         severity_order: item.severity_order || undefined, 
                         score: item.score || undefined, 
+                        exclusive: item.exclusive || undefined,
+                        enterValueManually: item.enterValueManually || undefined,
                     },
                 };
 
@@ -210,13 +211,18 @@ async function main() {
         // await writeFile(path.resolve(__dirname, 'data-keys.json'), JSON.stringify(keys, null, 4));
 
         await db.insert(schema.dataKeysDrafts).values(
-            keys.map(k => ({ 
-                name: k.name,
-                data: { 
-                    ...k, 
-                    version: 1,
-                }, 
-            } satisfies typeof schema.dataKeysDrafts.$inferInsert)),
+            keys.map(k => {
+                const uuid = uuidV4();
+                return { 
+                    uuid,
+                    name: k.name,
+                    data: { 
+                        ...k, 
+                        uuid,
+                        version: 1,
+                    }, 
+                } satisfies typeof schema.dataKeysDrafts.$inferInsert;
+            }),
         );
     } catch(e: any) {
         console.error('ERROR:');
