@@ -27,7 +27,16 @@ export {
 };
 
 export const DataTable = (props: DataTableProps) => {
-    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, } = props;
+    const { 
+        selectable = false, 
+        loading, 
+        sortable, 
+        tableClassname, 
+        tableRowClassname, 
+        tableBodyClassname, 
+        filter,
+        onSort, 
+    } = props;
 
     const tBodyRef = useRef<HTMLTableSectionElement>(null);
 
@@ -60,12 +69,25 @@ export const DataTable = (props: DataTableProps) => {
         setSelected([]);
     }, [setState, onSort, setSelected]);
 
+    const [internalSearchValue, setInternalSearchValue] = useState(''); 
+
+    const searchValue = props.search?.value || internalSearchValue;
+    
+    const canSort = !searchValue && sortable;
+
     return ( 
         <>
-            <DataTableHeader {...props} />
+            <DataTableHeader 
+                {...props} 
+                search={!props.search ? undefined : {
+                    ...props.search,
+                    value: props.search?.value === undefined ? internalSearchValue : props.search.value,
+                    setValue: props.search?.setValue || setInternalSearchValue,
+                }}
+            />
 
             <SortableList 
-                allowDrag={!!sortable}
+                allowDrag={!!canSort}
                 onSortEnd={onSortEnd} 
                 draggedItemClassName="opacity-90 z-[9999999999999]"
                 customHolderRef={tBodyRef}
@@ -90,7 +112,7 @@ export const DataTable = (props: DataTableProps) => {
                                     </TableHead>                
                                 )}
 
-                                {sortable && (
+                                {canSort && (
                                     <TableHead 
                                         className={cn(columns[0]?.cellClassName, 'w-4')}
                                     />                
@@ -163,7 +185,7 @@ export const DataTable = (props: DataTableProps) => {
                             {!displayRows.length && (
                                 <TableRow className="p-0">
                                     <TableCell
-                                        colSpan={columns.length + (selectable ? 1 : 0) + (sortable ? 1 : 0)}
+                                        colSpan={columns.length + (selectable ? 1 : 0) + (canSort ? 1 : 0)}
                                         className="p-4 text-center text-muted-foreground"
                                     >
                                         {props.noDataMessage || 'No data to display'}
@@ -173,6 +195,13 @@ export const DataTable = (props: DataTableProps) => {
 
                             {displayRows.map((row) => {
                                 const rowProps = { ...props.getRowOptions?.({ rowIndex: row.rowIndex, }), };
+
+                                if (
+                                    searchValue &&
+                                    !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
+                                ) return null;
+
+                                if (filter && !filter(row.rowIndex)) return null;
 
                                 return (
                                     <SortableItem key={row.id}>
@@ -198,7 +227,7 @@ export const DataTable = (props: DataTableProps) => {
                                                 </TableCell>                
                                             )}
 
-                                            {sortable && (
+                                            {canSort && (
                                                 <TableCell 
                                                     className={cn(columns[0]?.cellClassName, 'w-4 cursor-move')}
                                                 >

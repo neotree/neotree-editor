@@ -9,14 +9,23 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 
+type DataKeyChild = {
+    uuid: string;
+    dataType?: string | null;
+    name: string;
+    label: string;
+    defaults: Record<string, any>;
+    children: DataKeyChild[];
+};
+
 // DATA KEYS
-export const dataKeys = pgTable('nt_data_keys', {
+export const dataKeys = pgTable('nt_datakeys', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     name: text('name').notNull(),
     label: text('label').default('').notNull(),
     dataType: text('data_type'),
-    parentKeys: jsonb('parent_keys').default([]).$type<string[]>().notNull(),
+    children: jsonb('children').default([]).$type<DataKeyChild[]>().notNull(),
     defaults: jsonb('defaults').default({}).$type<Record<string, any>>().notNull(),
     version: integer('version').notNull(),
 
@@ -35,7 +44,7 @@ export const dataKeysRelations = relations(dataKeys, ({ many, one }) => ({
 }));
 
 // DATA KEYS DRAFTS
-export const dataKeysDrafts = pgTable('nt_data_keys_drafts', {
+export const dataKeysDrafts = pgTable('nt_datakeys_drafts', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     name: text('name').notNull(),
@@ -47,7 +56,7 @@ export const dataKeysDrafts = pgTable('nt_data_keys_drafts', {
 });
 
 export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
-    configKey: one(dataKeys, {
+    dataKey: one(dataKeys, {
         fields: [dataKeysDrafts.dataKeyId],
         references: [dataKeys.uuid],
     }),
@@ -55,7 +64,7 @@ export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
 
 // DATA KEYS DRAFTS HISTORY
 export const dataKeysHistory = pgTable(
-    'nt_data_keys_history', 
+    'nt_datakeys_history', 
     {
         id: serial('id').primaryKey(),
         version: integer('version').notNull(),
@@ -68,7 +77,7 @@ export const dataKeysHistory = pgTable(
 );
 
 export const dataKeysHistoryRelations = relations(dataKeysHistory, ({ one }) => ({
-    configKey: one(dataKeys, {
+    dataKey: one(dataKeys, {
         fields: [dataKeysHistory.dataKeyId],
         references: [dataKeys.uuid],
     }),
