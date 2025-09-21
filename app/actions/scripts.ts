@@ -266,7 +266,7 @@ export async function getScriptsKeys(params: Parameters<typeof queries._getScrip
             }
         });
 
-        keys = keys.filter((k, i) => keys.map(k => k.key).indexOf(k.key) === i);
+        keys = keys.filter((k, i) => keys.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i);
 
         return {
             title: script.title,
