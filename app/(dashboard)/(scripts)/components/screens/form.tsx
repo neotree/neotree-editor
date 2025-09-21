@@ -102,6 +102,7 @@ export function ScreenForm({
     const repeatable = watch('repeatable');
     const collectionLabel = watch('collectionLabel');
     const key = watch('key');
+    const listStyle = form.watch('listStyle');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -1029,6 +1030,32 @@ export function ScreenForm({
 
                                 <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
                             </div>
+                        </div>
+                    </>
+                )}
+
+                {(isChecklistScreen || isMultiSelectScreen || isEdlizScreen || isDiagnosisScreen) && (
+                    <>
+                        <div>
+                            <Label secondary htmlFor="listStyle">List style</Label>
+                            <Select
+                                value={listStyle}
+                                name="listStyle"
+                                onValueChange={(val: typeof listStyle) => {
+                                    form.setValue('listStyle', val || 'none');
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="bullet">Bullet</SelectItem>
+                                        <SelectItem value="number">Number</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </>
                 )}
