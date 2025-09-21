@@ -243,7 +243,7 @@ export function DataKeyForm({
                             </>
                         )}
 
-                        {isChild && (parentDataKey?.dataType === 'multi_select') && (
+                        {isChild && (['multi_select', 'dropdown'].includes(parentDataKey?.dataType!)) && (
                             <div className="px-4 flex flex-col gap-y-4">
                                 <Controller 
                                     control={control}
@@ -251,15 +251,17 @@ export function DataKeyForm({
                                     render={({ field: { value, onChange, }, }) => {
                                         return (
                                             <>
-                                                <div className="flex items-center space-x-2">
-                                                    <Switch 
-                                                        id="exclusive" 
-                                                        checked={value.exclusive}
-                                                        disabled={disabled}
-                                                        onCheckedChange={() => onChange({ ...value, exclusive: !value.exclusive, })}
-                                                    />
-                                                    <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
-                                                </div>
+                                                {(parentDataKey?.dataType === 'multi_select') && (
+                                                    <div className="flex items-center space-x-2">
+                                                        <Switch 
+                                                            id="exclusive" 
+                                                            checked={value.exclusive}
+                                                            disabled={disabled}
+                                                            onCheckedChange={() => onChange({ ...value, exclusive: !value.exclusive, })}
+                                                        />
+                                                        <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
+                                                    </div>
+                                                )}
 
                                                 <div className="flex items-center space-x-2">
                                                     <Switch 

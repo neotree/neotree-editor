@@ -17,6 +17,7 @@ import {
     DialogTrigger, 
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type Option = {
     value: string | number;
@@ -24,6 +25,7 @@ type Option = {
     description?: string;
     caption?: string;
     disabled?: boolean;
+    data?: Record<string, any>;
 };
 
 type Props = {
@@ -130,7 +132,7 @@ function Modal({
     trigger?: React.ReactNode;
 }) {
     const [searchValue, setSearchValue] = useState('');
-    const deferredSearchValue = useDeferredValue(searchValue);
+    const searchValueDebounced = useDebounce(searchValue);
 
     const selected = useMemo(() => {
         if (!selectedProp) {
@@ -162,8 +164,14 @@ function Modal({
                 const v2 = b.isSelected ? 1 : 0;
                 return v2 - v1;
             })
-            .filter(o => `${o?.value || ''}`.includes(deferredSearchValue));
-    }, [optionsProp, deferredSearchValue, selected]);
+            .filter(o => JSON.stringify([
+                o.value || '', 
+                o.label || '', 
+                // o.caption || '', 
+                o.description || '',
+                o.data?.key || '',
+            ]).toLowerCase().includes(searchValueDebounced?.toLowerCase?.()));
+    }, [optionsProp, searchValueDebounced, selected]);
 
     useEffect(() => () => setSearchValue(''), []);
 

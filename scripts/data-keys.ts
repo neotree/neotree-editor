@@ -91,7 +91,7 @@ async function main() {
             let label = s.label;
             let type = s.type;
 
-            if (!dataTypes.filter(t => t.includes('edliz')).includes(type)) {
+            if (dataTypes.filter(t => t.includes('edliz')).includes(type)) {
                 label = label || s.title;
                 name = name || label;
             }
@@ -128,23 +128,35 @@ async function main() {
                     switch(item.type) {
                         case 'multi_select':
                         case 'dropdown':
-                            const values = `${item.values || ''}`
-                                .split('\n')
-                                .map(v => {
-                                    const [key, label] = `${v || ''}`.trim().split(',').map(v => v.trim());
-                                    return {
-                                        uuid: "",
-                                        label,
-                                        name: key,
-                                        dataType: `${item.type}_option`,
-                                        children: [],
-                                        defaults: {
-                                            valuesOptions: item.valuesOptions?.length || [],
-                                        },
-                                    };
-                                });
+                            // const values = `${item.values || ''}`
+                            //     .split('\n')
+                            //     .map(v => {
+                            //         const [key, label] = `${v || ''}`.trim().split(',').map(v => v.trim());
+                            //         return {
+                            //             uuid: "",
+                            //             label,
+                            //             name: key,
+                            //             dataType: `${item.type}_option`,
+                            //             children: [],
+                            //             defaults: {
+                            //                 valuesOptions: item.valuesOptions?.length || [],
+                            //             },
+                            //         };
+                            //     });
 
-                            return values;
+                            // return values;
+                            return (item.items || []).map(v => ({
+                                uuid: "",
+                                label: v.label as string,
+                                name: v.value as string,
+                                dataType: `${item.type}_option`,
+                                children: [],
+                                defaults: {
+                                    label2: v.label2 || undefined,
+                                    enterValueManually: v.enterValueManually,
+                                    exclusive: v.exclusive,
+                                },
+                            }));
                         default:
                             return []
                     }
