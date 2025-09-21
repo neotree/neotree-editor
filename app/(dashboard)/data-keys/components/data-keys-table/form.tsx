@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { EditIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 
-import { DataKey } from '@/contexts/data-keys';
+import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
     Sheet,
     SheetClose,
@@ -35,10 +35,7 @@ import { useAlertModal } from '@/hooks/use-alert-modal';
 import { DataTable } from '@/components/data-table';
 import { dataKeyTypes } from '@/constants';
 import { cn } from '@/lib/utils';
-
-type DataKeyFormData = DataKey['children'][0] & {
-    version?: DataKey['version'];
-};
+import { Loader } from '@/components/loader';
 
 export function DataKeyForm({
     dataKey,
@@ -55,7 +52,7 @@ export function DataKeyForm({
     onClose: () => void;
     onSave?: (formData: DataKeyFormData) => void;
 }) {
-    const [loading, setLoading] = useState(false);
+    const { saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert, } = useAlertModal();
 
@@ -83,31 +80,23 @@ export function DataKeyForm({
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
     const onSave = handleSubmit(async data => {
-        try {
-            if (onSaveProp) {
-                onSaveProp(data as DataKeyFormData);
-            } else {
-                setLoading(true);
-            }
-
+        if (onSaveProp) {
+            onSaveProp(data as DataKeyFormData);
             onClose();
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: 'Failed to save data key: ' + e.message,
-            });
-        } finally {
-            setLoading(false);
+        } else {
+            await saveDataKeys([data as DataKeyFormData], err => !err && onClose?.());
         }
     });
 
-    const isFormDisabled = disabled || loading;
+    const isFormDisabled = disabled || saving;
 
     const [selectedChildIndex, setSelectedChildIndex] = useState<number | null>(null);
     const [newChild, setNewChild] = useState(false);
 
     return (
         <>
+            {saving && <Loader overlay />}
+
             <Sheet 
                 open
                 modal={modal}

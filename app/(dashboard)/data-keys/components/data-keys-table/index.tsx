@@ -7,6 +7,7 @@ import { DataTable, DataTableProps } from "@/components/data-table";
 import { useAppContext } from '@/contexts/app';
 import { cn } from '@/lib/utils';
 import { dataKeysStatuses } from '@/constants';
+import { Loader } from '@/components/loader';
 import { DataKeysTableHeader } from './header';
 import { DataKeysTableRowActions } from './row-actions';
 import { DataKeysTableBottomActions } from './bottom-actions';
@@ -24,20 +25,14 @@ export function DataKeysTable({ disabled, }: {
         selected,
         currentDataKeyUuid, 
         filter: filterValue,
-        sort,
+        deleting,
         setCurrentDataKeyUuid,
         setSelected,
     } = useDataKeysCtx();
 
-    const tableData = useMemo(() => dataKeys.map(k => [
-        k.name || '',
-        k.label || '',
-        k.dataType || '',
-        '',
-    ]), [dataKeys, sort]);
+    const displayLoader = deleting;
 
     const tableProps: DataTableProps = {
-        data: tableData,
         selectable: !disabled,
         selectedIndexes: selected.map(s => s.index),
         filter: rowIndex => {
@@ -100,6 +95,12 @@ export function DataKeysTable({ disabled, }: {
                 }
             },
         ],
+        data: dataKeys.map(k => [
+            k.name || '',
+            k.label || '',
+            k.dataType || '',
+            '',
+        ]),
     };
 
     return (
@@ -119,6 +120,8 @@ export function DataKeysTable({ disabled, }: {
                     onClose={() => setCurrentDataKeyUuid('')}
                 />
             )}
+
+            {displayLoader && <Loader overlay />}
         </>
     );
 }
