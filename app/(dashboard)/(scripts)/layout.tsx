@@ -8,7 +8,8 @@ import { Title } from "@/components/title";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDataKeys } from "@/app/actions/data-keys";
+import { getDataKeys, getDataKeysSelectOptions } from "@/app/actions/data-keys";
+import { DataKeysCtxProvider } from '@/contexts/data-keys';
 
 export default async function ScriptsLayout({ children }: {
     children: React.ReactNode;
@@ -29,24 +30,30 @@ export default async function ScriptsLayout({ children }: {
         );
     }
 
-    const [hospitals, dataKeys] = await Promise.all([
+    const [hospitals, dataKeys, selectOptions] = await Promise.all([
         getHospitals(),
         getDataKeys(),
+        getDataKeysSelectOptions(),
     ]);
 
     return (
         <>
             <Title>Scripts</Title>
 
-            <ScriptsContextProvider
-                {...serverActions}
-                {...filesActions}
-                hospitals={hospitals}
-                getHospitals={getHospitals}
-                dataKeys={dataKeys}
+            <DataKeysCtxProvider
+                prefetchDataKeys={false}
+                selectOptions={selectOptions.data}
             >
-                {children}
-            </ScriptsContextProvider>
+                <ScriptsContextProvider
+                    {...serverActions}
+                    {...filesActions}
+                    hospitals={hospitals}
+                    getHospitals={getHospitals}
+                    dataKeys={dataKeys}
+                >
+                    {children}
+                </ScriptsContextProvider>
+            </DataKeysCtxProvider>
         </>
     );
 }

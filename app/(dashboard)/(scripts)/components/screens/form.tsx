@@ -11,6 +11,7 @@ import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
 import { SelectModal } from "@/components/select-modal";
 import { listScreens } from "@/app/actions/scripts";
+import { useDataKeysCtx } from "@/contexts/data-keys";
 import {
     Select,
     SelectContent,
@@ -34,8 +35,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
-import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
-import { screenTypes, CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from '@/constants';
+import { ScreenFormDataType } from "@/contexts/scripts";
+import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
@@ -65,8 +66,9 @@ export function ScreenForm({
     countDiagnosesScreens,
     screens,
 }: Props) {
+    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
+
     const router = useRouter();
-    const { dataKeys } = useScriptsContext();
     const [showForm, setShowForm] = useState(!!formData);
 
     const form = useScreenForm({
@@ -102,6 +104,8 @@ export function ScreenForm({
     const key = watch('key');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+
+    const displayLoader = saving || loadingSelectOptions;
 
   const getAlias = useCallback(async (name: string) => {
          if (!name) return;
@@ -227,39 +231,36 @@ export function ScreenForm({
     }) => {
         return (
             <SelectModal
-                selected={key}
+                // selected={key}
                 error={!disabled && !key}
-                placeholder="Select key"
+                placeholder={`${key || ''}` || 'Select key'}
                 search={{
                     placeholder: 'Search data keys',
                 }}
-                options={dataKeys.data
-                    .sort((a, b) => {
-                        const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
-                        const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
-                        return aVal - bVal;
-                    })
-                    .map(o => ({
-                        value: o.name,
-                        label: o.name,
-                        description: o.label || '',
-                        caption: o.dataType || '',
-                        // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                    }))}
-                onSelect={([key]) => {
-                    const fullKey = dataKeys.data.find(k => k.name === key?.value);
-                    const children = dataKeys.data
-                        .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+                options={selectOptions}
+                onSelect={([dataKey]) => {
+                    console.log(dataKey)
+                    const label = dataKey?.data?.label || '';
+                    const key = dataKey?.data?.key || '';
+                    const dataType = dataKey?.data?.dataType;
+                    const children: {
+                        value: string;
+                        label: string;
+                        children?: {
+                            value: string;
+                            label: string;
+                        }[];
+                    }[] = dataKey?.data?.children || [];
 
-                    setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
-                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+                    setValue('key', key, { shouldDirty: true, });
+                    setValue('label', label, { shouldDirty: true, });
 
                     if (hasItems) {
                         const items = children.map((k, i) => {
                             return {
                                 itemId: v4(),
-                                id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
-                                label: (k.label || k.name).trim(),
+                                id: (isChecklistScreen || isProgressScreen) ? '' : k.value,
+                                label: k.label,
                                 position: i + 1,
                                 subType: '', // edliz
                                 type: '', // edliz,
@@ -269,7 +270,7 @@ export function ScreenForm({
                                 enterValueManually: false,
                                 severity_order: '',
                                 summary: '',
-                                key: isChecklistScreen ? k.name : '',
+                                key: isChecklistScreen ? k.value : '',
                                 score: (isEdlizScreen ? '' : '') as unknown as number,
                                 dataType: (() => {
                                     switch (type) {
@@ -292,12 +293,12 @@ export function ScreenForm({
                     }
 
                     if (hasFields) {
-                        const fields = children.filter(k => k.dataType).map((k, i) => {
+                        const fields = children.map((k, i) => {
                             const f = {
                                 fieldId: v4(),
-                                type: k.dataType!,
-                                key: k.name,
-                                label: (k.label || k.name).trim(),
+                                type: dataType,
+                                key: k.value,
+                                label: (k.label || k.value).trim(),
                                 refKey: '',
                                 calculation: '',
                                 condition: '',
@@ -321,14 +322,11 @@ export function ScreenForm({
                                 printable: false,
                                 prePopulate: [],
                                 editable: false,
-                            } satisfies ScriptField;
+                                // items: (k.children || []).map(k => ({
+                                //     itemId: v4(),
 
-                            if (k.dataType === 'dropdown') {
-                                const valuesArr = dataKeys.data
-                                    .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${k.name}`.toLowerCase()));
-                                const values = valuesArr.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
-                                f.values = values;
-                            }
+                                // })),
+                            } satisfies ScriptField;
 
                             return f;
                         });
@@ -342,7 +340,7 @@ export function ScreenForm({
 
     return (
         <>
-            {saving && <Loader overlay />}
+            {displayLoader && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
                 <Title>Type</Title>

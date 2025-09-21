@@ -12,18 +12,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { Loader } from "@/components/loader";
 import { getLeanAlias } from '@/app/actions/aliases'
-import { ChevronDown, XIcon } from "lucide-react";
 import { SelectModal } from "@/components/select-modal";
-import { CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from "@/constants";
+import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -291,8 +284,8 @@ export function Field<P = {}>({
                                         }}
                                         options={selectOptions}
                                         onSelect={([dataKey]) => {
-                                            const label = dataKey.data?.label || '';
-                                            const key = dataKey.data?.key || '';
+                                            const label = dataKey?.data?.label || '';
+                                            const key = dataKey?.data?.key || '';
                                             const children: {
                                                 value: string;
                                                 label: string;
