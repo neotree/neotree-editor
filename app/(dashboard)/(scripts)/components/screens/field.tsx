@@ -256,10 +256,11 @@ export function Field<P = {}>({
                             <Title>Flow control</Title>
                             <div>
                                 <Label htmlFor="condition">Conditional expression</Label>
-                                <Input
+                                <Textarea
                                     {...register('condition', { disabled, })}
                                     name="condition"
                                     noRing={false}
+                                    rows={5}
                                 />
                                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                             </div>
