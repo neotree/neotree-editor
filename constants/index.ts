@@ -124,6 +124,12 @@ export const dataKeyTypes: {
             negativeLabel: 'No',
         },
     },
+    // {
+    //     value: 'progress',
+    //     label: 'progress',
+    //     hasChildren: true,
+    //     defaults: {},
+    // },
     {
         value: 'drug',
         label: 'drug',

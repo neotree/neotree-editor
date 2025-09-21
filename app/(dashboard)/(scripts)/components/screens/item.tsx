@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
+import { useDataKeysCtx } from "@/contexts/data-keys";
+import { Loader } from "@/components/loader";
 import {
     Select,
     SelectContent,
@@ -23,7 +25,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { SelectModal } from "@/components/select-modal";
-import { useScriptsContext } from "@/contexts/scripts";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DATA_KEYS_MAP } from "@/constants";
 
@@ -51,6 +52,8 @@ export function Item<P = {}>({
     subTypes = [],
     onClose,
 }: Props & P) {
+    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
+
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
@@ -59,8 +62,6 @@ export function Item<P = {}>({
     const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
-
-    const { dataKeys } = useScriptsContext();
 
     const [isCustomType, setIsCustomType] = useState(false);
     const [isCustomSubType, setIsCustomSubType] = useState(false);
@@ -164,26 +165,17 @@ export function Item<P = {}>({
                 selected={key}
                 disabled={isKeyDisabled}
                 error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)}
-                placeholder={label}
+                placeholder={`${key || ''}` || 'Select key'}
                 search={{
                     placeholder: 'Search data keys',
                 }}
-                options={dataKeys.data
-                    .sort((a, b) => {
-                        const aVal = !DATA_KEYS_MAP[screenType!].includes(a.dataType!) ? 1 : 0;
-                        const bVal = !DATA_KEYS_MAP[screenType!].includes(b.dataType!) ? 1 : 0;
-                        return aVal - bVal;
-                    })
-                    .map(o => ({
-                        value: o.name,
-                        label: o.name,
-                        description: o.label || '',
-                        caption: o.dataType || '',
-                        // disabled: !DATA_KEYS_MAP[screenType!].includes(o.dataType!),
-                    }))}
-                onSelect={([key]) => {
-                    setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
-                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+                options={selectOptions}
+                onSelect={([dataKey]) => {
+                    const label = dataKey.data?.label || '';
+                    const key = dataKey.data?.key || '';
+
+                    setValue('key', key, { shouldDirty: true, });
+                    setValue('label', label, { shouldDirty: true, });
                 }}
                 header={(
                     <DropdownMenu>
@@ -239,6 +231,8 @@ export function Item<P = {}>({
                     </>
                 )}
             >
+                {loadingSelectOptions && <Loader overlay />}
+
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         {(() => {

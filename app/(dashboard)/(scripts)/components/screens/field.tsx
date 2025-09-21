@@ -18,7 +18,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useScriptsContext } from "@/contexts/scripts";
+import { useDataKeysCtx } from "@/contexts/data-keys";
+import { Loader } from "@/components/loader";
 import { getLeanAlias } from '@/app/actions/aliases'
 import { ChevronDown, XIcon } from "lucide-react";
 import { SelectModal } from "@/components/select-modal";
@@ -41,6 +42,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
+import { FieldItems } from "./field-items";
 
 type Props = {
     open: boolean;
@@ -62,7 +64,7 @@ export function Field<P = {}>({
     disabled: disabledProp,
     onClose,
 }: Props & P) {
-    const { dataKeys } = useScriptsContext();
+    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
     
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
@@ -101,6 +103,7 @@ export function Field<P = {}>({
     const prePopulate = watch('prePopulate');
     const defaultValue = watch('defaultValue');
     const values = watch('values');
+    const items = watch('items');
     const valuesOptions = watch('valuesOptions');
     const editable = watch('editable');
 
@@ -206,6 +209,8 @@ export function Field<P = {}>({
                     </>
                 )}
             >
+                {loadingSelectOptions && <Loader overlay />}
+
                 {!showForm ? (
                     <RadioGroup
                         defaultValue={type}
@@ -279,37 +284,27 @@ export function Field<P = {}>({
                                     /> */}
                                     <SelectModal 
                                         modal
-                                        selected={key}
                                         error={!disabled && !key}
-                                        placeholder="Select key"
+                                        placeholder={`${key || ''}` || 'Select key'}
                                         search={{
                                             placeholder: 'Search data keys',
                                         }}
-                                        options={dataKeys.data
-                                            .sort((a, b) => {
-                                                const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
-                                                const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
-                                                return aVal - bVal;
-                                            })
-                                            .map(o => ({
-                                                value: o.name,
-                                                label: o.name,
-                                                description: o.label || '',
-                                                caption: o.dataType || '',
-                                                // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                                            }))}
-                                        onSelect={([key]) => {
-                                            const fullKey = dataKeys.data.find(k => k.name === key?.value);
-                                            const children = dataKeys.data
-                                                .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+                                        options={selectOptions}
+                                        onSelect={([dataKey]) => {
+                                            const label = dataKey.data?.label || '';
+                                            const key = dataKey.data?.key || '';
+                                            const children: {
+                                                value: string;
+                                                label: string;
+                                            }[] = dataKey.data?.children || [];
 
-                                            setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
-                                            setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
-
-                                            if (fullKey?.dataType === 'dropdown' && isDropdownField) {
-                                                const values = children.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
-                                                setValue('values', values || '', { shouldDirty: true, });
-                                            }
+                                            setValue('key', key, { shouldDirty: true, });
+                                            setValue('label', label, { shouldDirty: true, });
+                                            setValue('items', children.map(item => ({
+                                                itemId: v4(),
+                                                label: item.label,
+                                                value: item.value,
+                                            })));
                                         }}
                                     />
                                 </div>
@@ -384,145 +379,18 @@ export function Field<P = {}>({
 
                                     <Controller 
                                         control={control}
-                                        name="values"
-                                        render={({ field }) => {
+                                        name="items"
+                                        render={({ field: { value, onChange, }, }) => {
                                             return (
-                                                <div>
-                                                    <Label htmlFor="values" className={cn(valuesErrors.length ? 'text-danger' : '')}>Values</Label>
-                                                    <Textarea
-                                                        value={field.value}
-                                                        disabled={disabled}
-                                                        name="values"
-                                                        rows={5}
-                                                        noRing={false}
-                                                        className={cn(valuesErrors.length ? 'border-danger' : '')}
-                                                        onChange={e => {
-                                                            const values = e.target.value;
-                                                            const valuesParsed = (values || '').split('\n')
-                                                                .map((v = '') => v.trim())
-                                                                .map((value) => {
-                                                                    const valueSplit = value.split(',');
-                                                                    return { value: valueSplit[0], label: valueSplit[1], };
-                                                                })
-                                                                .filter(o => o.value && o.label);
-
-                                                            field.onChange(values);
-
-                                                            setValue(
-                                                                'valuesOptions',
-                                                                valuesOptions.filter(o => valuesParsed.map(o => o.value).includes(o.key)),
-                                                                { shouldDirty: true, },
-                                                            );
-                                                        }}
-                                                    />
-                                                    <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>
-                                                </div>
+                                                <FieldItems 
+                                                    disabled={disabled}
+                                                    items={value}
+                                                    fieldType={type}
+                                                    onChange={onChange}
+                                                />
                                             );
                                         }}
                                     />
-
-                                    {!!valuesParsed.length && (
-                                        <div className="flex flex-col gap-y-4">
-                                            {!!valuesOptions.length && (
-                                                <>
-                                                    <Title>Options</Title>
-                                                    {valuesOptions.map((o, i) => {
-                                                        const label = valuesParsed.find(v => v.value === o.key)?.label;
-                                                        return (
-                                                            <Controller
-                                                                key={o.key + i}
-                                                                control={control}
-                                                                name={`valuesOptions.${i}`}
-                                                                render={({ field }) => {
-                                                                    return (
-                                                                        <div>
-                                                                            <div className="text-xs p-2 rounded-sm bg-primary/20 font-bold inline-block mb-2">{label}</div>
-                                                                            <div className="flex gap-x-2 items-end">
-                                                                                {/* <div className="flex-1">
-                                                                                    <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
-                                                                                    <Input 
-                                                                                        disabled={disabled}
-                                                                                        value={field.value.optionKey}
-                                                                                        onChange={e => field.onChange({
-                                                                                            ...field.value,
-                                                                                            optionKey: e.target.value,
-                                                                                        })}
-                                                                                        onBlur={field.onBlur}
-                                                                                    />
-                                                                                </div> */}
-
-                                                                                <div className="flex-1">
-                                                                                    <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
-                                                                                    <Input 
-                                                                                        disabled={disabled}
-                                                                                        value={field.value.optionLabel}
-                                                                                        onChange={e => field.onChange({
-                                                                                            ...field.value,
-                                                                                            optionLabel: e.target.value,
-                                                                                        })}
-                                                                                        onBlur={field.onBlur}
-                                                                                    />
-                                                                                </div>
-
-                                                                                {!disabled && (
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="ghost"
-                                                                                        onClick={() => setValue(
-                                                                                            'valuesOptions',
-                                                                                            valuesOptions.filter((_, j) => j !== i),
-                                                                                            { shouldDirty: true, },
-                                                                                        )} 
-                                                                                    >
-                                                                                        <XIcon className="size-4" />
-                                                                                    </Button>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-
-                                            {!disabled && (valuesOptions.length < valuesParsed.length) && (
-                                                <div>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                variant="outline"
-                                                            >
-                                                                Add value option
-                                                                <ChevronDown className="size-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent>
-                                                            {valuesParsed.filter(o => !valuesOptions.map(o => o.key).includes(o.value)).map(o => (
-                                                                <DropdownMenuItem 
-                                                                    key={o.value} 
-                                                                    onClick={() => {
-                                                                        setValue(
-                                                                            'valuesOptions',
-                                                                            [...valuesOptions, {
-                                                                                key: o.value,
-                                                                                optionKey: '',
-                                                                                optionLabel: '',
-                                                                            }],
-                                                                            { shouldDirty: true, },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    {o.label}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                 </>
                             )}
 
