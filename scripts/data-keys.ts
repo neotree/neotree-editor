@@ -91,7 +91,7 @@ async function main() {
             let label = s.label;
             let type = s.type;
 
-            if (dataTypes.filter(t => t.includes('edliz')).includes(type)) {
+            if (dataTypes.filter(t => !t.includes('edliz')).includes(type)) {
                 label = label || s.title;
                 name = name || label;
             }
@@ -105,15 +105,7 @@ async function main() {
                     name: item.key || item.id,
                     dataType: `${s.type}_option`,
                     children: [],
-                    defaults: { 
-                        type: item.type || undefined, 
-                        subType: item.subType || undefined, 
-                        dataType: item.dataType || undefined, 
-                        severity_order: item.severity_order || undefined, 
-                        score: item.score || undefined, 
-                        exclusive: item.exclusive || undefined,
-                        enterValueManually: item.enterValueManually || undefined,
-                    },
+                    defaults: {},
                 };
 
                 if (s.type.includes('edliz')) {
@@ -151,11 +143,7 @@ async function main() {
                                 name: v.value as string,
                                 dataType: `${item.type}_option`,
                                 children: [],
-                                defaults: {
-                                    label2: v.label2 || undefined,
-                                    enterValueManually: v.enterValueManually,
-                                    exclusive: v.exclusive,
-                                },
+                                defaults: {},
                             }));
                         default:
                             return []
@@ -167,9 +155,7 @@ async function main() {
                     name: item.key,
                     dataType: item.type,
                     children: itemChildren,
-                    defaults: { 
-                        dataType: item.dataType && (item.dataType !== item.type) ? item.dataType : undefined, 
-                    },
+                    defaults: {},
                 });
             });
 
@@ -178,10 +164,7 @@ async function main() {
                 label,
                 dataType: type,
                 children,
-                defaults: {
-                    positiveLabel: s.positiveLabel,
-                    negativeLabel: s.negativeLabel,
-                },
+                defaults: {},
             };
 
             keys.push(key);

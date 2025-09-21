@@ -27,7 +27,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -40,7 +39,6 @@ import { Loader } from '@/components/loader';
 
 export function DataKeyForm({
     dataKey,
-    parentDataKey,
     disabled,
     modal,
     isChild,
@@ -155,7 +153,7 @@ export function DataKeyForm({
                                                 <Label htmlFor="name">Data type *</Label>
                                                 <Select
                                                     value={value}
-                                                    name="screen"
+                                                    name="name"
                                                     onValueChange={val => {
                                                         onChange(val);
 
@@ -176,7 +174,7 @@ export function DataKeyForm({
                                                     }}
                                                 >
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder="Select screen" />
+                                                        <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectGroup>
@@ -216,68 +214,6 @@ export function DataKeyForm({
                                 })}
                             />
                         </div>
-
-                        {dataType === 'yesno' && (
-                            <>
-                                <div className="px-4">
-                                    <Label htmlFor="defaults.positiveLabel">Positive label *</Label>
-                                    <Input 
-                                        disabled={isFormDisabled}
-                                        {...register('defaults.positiveLabel', {
-                                            disabled: isFormDisabled,
-                                            required: true,
-                                        })}
-                                    />
-                                </div>
-
-                                <div className="px-4">
-                                    <Label htmlFor="defaults.negativeLabel">Negative label *</Label>
-                                    <Input 
-                                        disabled={isFormDisabled}
-                                        {...register('defaults.negativeLabel', {
-                                            disabled: isFormDisabled,
-                                            required: true,
-                                        })}
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        {isChild && (['multi_select', 'dropdown'].includes(parentDataKey?.dataType!)) && (
-                            <div className="px-4 flex flex-col gap-y-4">
-                                <Controller 
-                                    control={control}
-                                    name="defaults"
-                                    render={({ field: { value, onChange, }, }) => {
-                                        return (
-                                            <>
-                                                {(parentDataKey?.dataType === 'multi_select') && (
-                                                    <div className="flex items-center space-x-2">
-                                                        <Switch 
-                                                            id="exclusive" 
-                                                            checked={value.exclusive}
-                                                            disabled={disabled}
-                                                            onCheckedChange={() => onChange({ ...value, exclusive: !value.exclusive, })}
-                                                        />
-                                                        <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center space-x-2">
-                                                    <Switch 
-                                                        id="enterValueManually" 
-                                                        checked={value.enterValueManually}
-                                                        disabled={disabled}
-                                                        onCheckedChange={() => onChange({ ...value, enterValueManually: !value.enterValueManually, })}
-                                                    />
-                                                    <Label secondary htmlFor="enterValueManually">Enter value manually if selected</Label>
-                                                </div>
-                                            </>
-                                        );
-                                    }}
-                                />
-                            </div>
-                        )}
 
                         <Controller
                             control={control}

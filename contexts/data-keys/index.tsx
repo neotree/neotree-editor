@@ -140,7 +140,11 @@ export function DataKeysCtxProvider({
         if (!mounted.current) {
             mounted.current = true;
             
-            if (prefetchDataKeys) loadDataKeys();
+            if (prefetchDataKeys) {
+                loadDataKeys();
+            } else {
+                setInitialised(true);
+            }
 
             if (prefetchSelectOptions) loadDataKeysSelectOptions();
         }
