@@ -30,10 +30,8 @@ export default async function ScriptsLayout({ children }: {
         );
     }
 
-    const [hospitals, dataKeys, selectOptions] = await Promise.all([
+    const [hospitals] = await Promise.all([
         getHospitals(),
-        getDataKeys(),
-        getDataKeysSelectOptions(),
     ]);
 
     return (
@@ -42,7 +40,7 @@ export default async function ScriptsLayout({ children }: {
 
             <DataKeysCtxProvider
                 prefetchDataKeys={false}
-                selectOptions={selectOptions.data}
+                prefetchSelectOptions
             >
                 <ScriptsContextProvider
                     {...serverActions}
