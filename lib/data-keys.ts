@@ -35,10 +35,12 @@ export function scrapDataKeys({
     screens,
     diagnoses,
     drugsLibrary,
+    flattened,
 }: {
     screens: GetScreensResults['data'];
     diagnoses: GetDiagnosesResults['data'];
     drugsLibrary: GetDrugsLibraryItemsResults['data'];
+    flattened?: boolean;
 }) {
     type DataKey = Omit<typeof schema.dataKeys.$inferSelect['children'][0], 'uuid'>;
     type DataKeyChild = typeof schema.dataKeys.$inferSelect['children'][0];
@@ -73,6 +75,7 @@ export function scrapDataKeys({
                 keys.push(key);
             } else {
                 children.push(key);
+                if (flattened) keys.push(key);
             }
         });
 
