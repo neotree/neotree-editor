@@ -85,6 +85,14 @@ export type ScriptField = {
     printable: boolean;
     prePopulate: string[];
     editable: boolean;
+    items?: {
+        itemId: string;
+        value: string | number;
+        label: string | number;
+        label2?: string;
+        exclusive?: boolean;
+        enterValueManually?: boolean;
+    }[];
 };
 
 export type DiagnosisSymptom = {
