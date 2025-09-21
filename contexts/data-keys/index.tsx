@@ -69,9 +69,13 @@ export const useDataKeysCtx = () => {
 export function DataKeysCtxProvider({ 
     children, 
     prefetchSelectOptions, 
+    selectOptions: selectOptionsProp = [],
+    prefetchDataKeys = true,
 }: {
     children: React.ReactNode;
     prefetchSelectOptions?: boolean;
+    prefetchDataKeys?: boolean;
+    selectOptions?: DataKeySelectOption[];
 }) {
     const mounted = useRef(false);
     const router = useRouter();
@@ -97,7 +101,7 @@ export function DataKeysCtxProvider({
         data: [],
     });
     const [loadingSelectOptions, setLoadingSelectOptions] = useState(false);
-    const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>([]);
+    const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>(selectOptionsProp);
 
     const loadDataKeys = useCallback(() => new Promise<DataKey[]>((resolve, reject) => {
         setLoading(true);
@@ -135,11 +139,12 @@ export function DataKeysCtxProvider({
     useEffect(() => {
         if (!mounted.current) {
             mounted.current = true;
-            loadDataKeys();
+            
+            if (prefetchDataKeys) loadDataKeys();
 
             if (prefetchSelectOptions) loadDataKeysSelectOptions();
         }
-    }, [prefetchSelectOptions, loadDataKeys]);
+    }, [prefetchSelectOptions, prefetchDataKeys, loadDataKeys]);
 
     /*****************************************************
      ************ SAVE 

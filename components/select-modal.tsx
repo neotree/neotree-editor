@@ -1,8 +1,7 @@
 'use client';
 
-import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,55 +59,12 @@ export function SelectModal({
         if (value) selectedValueExists = !!options.find(o => o.value === value);
     }
 
-    if (selectedValueExists) {
-        return (
-            <>
-                <Modal 
-                    {...props}
-                    options={options}
-                    selected={selected}
-                />
-            </>
-        );
-    }
-
     return (
-        <div className="relative flex gap-x-2 items-center">
-            <Popover modal={props.modal}>
-                <PopoverTrigger>
-                    <AlertCircle className="size-4 text-destructive" />
-                </PopoverTrigger>
-                <PopoverContent className="p-0 bg-background">
-                    <div className="p-4 bg-destructive/20 text-destructive">
-                        <b>{selected[0]}</b> is not defined in the datakeys library. Click <b>`change`</b> to select from the library
-                    </div>
-                </PopoverContent>
-            </Popover>
-            
-            <Input 
-                disabled
-                value={selected[0]}
-                onChange={() => {}}
-                className="w-full disabled:opacity-70 pr-1w-16"
-            />
-
-            <Modal 
-                {...props}
-                options={options}
-                selected={selected}
-                trigger={(
-                    <div
-                        role={props.disabled ? undefined : 'button'}
-                        className={cn(
-                            'w-16 absolute top-0 right-0 h-full text-xs flex items-center justify-center px-2',
-                            props.disabled ? 'opacity-70' : 'text-primary',
-                        )}
-                    >
-                        Change
-                    </div>
-                )}
-            />
-        </div>
+        <Modal 
+            {...props}
+            options={options}
+            selected={selected}
+        />
     );
 }
 

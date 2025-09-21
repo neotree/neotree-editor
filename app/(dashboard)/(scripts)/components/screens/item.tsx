@@ -171,8 +171,8 @@ export function Item<P = {}>({
                 }}
                 options={selectOptions}
                 onSelect={([dataKey]) => {
-                    const label = dataKey.data?.label || '';
-                    const key = dataKey.data?.key || '';
+                    const label = dataKey?.data?.label || '';
+                    const key = dataKey?.data?.key || '';
 
                     setValue('key', key, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
