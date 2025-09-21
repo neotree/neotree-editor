@@ -12,7 +12,6 @@ import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
-import { ScriptsTableHeaderActions } from "./scripts-table-header-actions";
 
 type Props = UseScriptsTableParams;
 

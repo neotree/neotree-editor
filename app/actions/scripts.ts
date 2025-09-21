@@ -6,7 +6,7 @@ import queryString from "query-string";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library";
-import { _saveDataKeysIfNotExist, scrapDataKeys } from "@/databases/mutations/data-keys";
+import { _saveDataKeysIfNotExist } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
@@ -15,6 +15,7 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys } from "@/databases/queries/data-keys";
+import { scrapDataKeys } from "@/lib/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
