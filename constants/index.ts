@@ -1,6 +1,7 @@
 import { ScreenType, ScriptType } from "@/databases/queries/scripts";
 import { Preferences } from "@/types";
 import { FieldTypes } from "./fields";
+import { SortAsc, SortDesc } from "lucide-react";
 
 export const scriptPrintConfig = {
     headerFormat: '',
@@ -202,3 +203,51 @@ export const dataKeyTypes: {
         defaults: {},
     },
 ]
+
+export const dataKeysSortOpts = [
+    {
+        value: 'label.asc',
+        label: 'Label (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'label.desc',
+        label: 'Label (desc)',
+        Icon: SortDesc,
+    },
+    {
+        value: 'key.asc',
+        label: 'Key (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'key.desc',
+        label: 'Key (desc)',
+        Icon: SortDesc,
+    },
+    {
+        value: 'type.asc',
+        label: 'Type (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'type.desc',
+        label: 'Type (desc)',
+        Icon: SortDesc,
+    },
+    {
+        value: 'createdAt.asc',
+        label: 'Date (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'createdAt.desc',
+        label: 'Date (desc)',
+        Icon: SortDesc,
+    },
+];
+
+export const dataKeysStatuses = [
+    { label: 'Published', value: 'published', },
+    { label: 'Drafts', value: 'drafts', },
+];
