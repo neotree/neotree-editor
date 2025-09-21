@@ -350,8 +350,11 @@ export function Field({
 
                     <div>
                         <Label htmlFor="condition">Condition</Label>
-                        <Input 
+                        <Textarea
                             {...register('condition', { required: false, })}
+                            name="condition"
+                            noRing={false}
+                            rows={5}
                         />
                     </div>
 

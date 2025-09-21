@@ -27,6 +27,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ import { Loader } from '@/components/loader';
 
 export function DataKeyForm({
     dataKey,
+    parentDataKey,
     disabled,
     modal,
     isChild,
@@ -48,6 +50,7 @@ export function DataKeyForm({
     modal?: boolean;
     isChild?: boolean;
     dataKey?: DataKeyFormData;
+    parentDataKey?: DataKeyFormData;
     disabled?: boolean;
     onClose: () => void;
     onSave?: (formData: DataKeyFormData) => void;
@@ -120,6 +123,7 @@ export function DataKeyForm({
                             isChild
                             disabled={false}
                             dataKey={selectedChildIndex !== null ? children[selectedChildIndex] : undefined}
+                            parentDataKey={dataKey}
                             onSave={data => {
                                 if (selectedChildIndex === null) {
                                     setValue('children', [...children, {
@@ -239,11 +243,45 @@ export function DataKeyForm({
                             </>
                         )}
 
+                        {isChild && (parentDataKey?.dataType === 'multi_select') && (
+                            <div className="px-4 flex flex-col gap-y-4">
+                                <Controller 
+                                    control={control}
+                                    name="defaults"
+                                    render={({ field: { value, onChange, }, }) => {
+                                        return (
+                                            <>
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch 
+                                                        id="exclusive" 
+                                                        checked={value.exclusive}
+                                                        disabled={disabled}
+                                                        onCheckedChange={() => onChange({ ...value, exclusive: !value.exclusive, })}
+                                                    />
+                                                    <Label secondary htmlFor="exclusive">Disable other items if selected</Label>
+                                                </div>
+
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch 
+                                                        id="enterValueManually" 
+                                                        checked={value.enterValueManually}
+                                                        disabled={disabled}
+                                                        onCheckedChange={() => onChange({ ...value, enterValueManually: !value.enterValueManually, })}
+                                                    />
+                                                    <Label secondary htmlFor="enterValueManually">Enter value manually if selected</Label>
+                                                </div>
+                                            </>
+                                        );
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         <Controller
                             control={control}
                             name="children"
                             disabled={isFormDisabled}
-                            render={({ field: { value, onChange, }, }) => {
+                            render={({ field: { value, }, }) => {
                                 if (!dataTypeInfo?.hasChildren) return <></>;
 
                                 return (
