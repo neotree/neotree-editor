@@ -27,7 +27,16 @@ export {
 };
 
 export const DataTable = (props: DataTableProps) => {
-    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, } = props;
+    const { 
+        selectable = false, 
+        loading, 
+        sortable, 
+        tableClassname, 
+        tableRowClassname, 
+        tableBodyClassname, 
+        filter,
+        onSort, 
+    } = props;
 
     const tBodyRef = useRef<HTMLTableSectionElement>(null);
 
@@ -191,6 +200,8 @@ export const DataTable = (props: DataTableProps) => {
                                     searchValue &&
                                     !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
                                 ) return null;
+
+                                if (filter && !filter(row.rowIndex)) return null;
 
                                 return (
                                     <SortableItem key={row.id}>

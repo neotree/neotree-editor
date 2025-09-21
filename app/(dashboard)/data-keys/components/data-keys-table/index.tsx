@@ -1,14 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useQueryState } from 'nuqs';
-import { PlusIcon } from 'lucide-react';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { useAppContext } from '@/contexts/app';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { dataKeysStatuses } from '@/constants';
+import { DataKeysTableHeader } from './header';
 import { DataKeysTableRowActions } from './row-actions';
 import { DataKeysTableBottomActions } from './bottom-actions';
 import { DataKeyForm } from './form';
@@ -18,18 +17,15 @@ export function DataKeysTable({ disabled, }: {
 }) {
     const { viewOnly, } = useAppContext();
 
-    const [currentDataKeyUuid, setCurrentDataKeyUuid] = useQueryState('uuid', {
-        clearOnDefault: true,
-        shallow: true,
-        history: 'push',
-        defaultValue: '',
-    });
-
     disabled = disabled || viewOnly;
 
     const { 
         dataKeys,
         selected,
+        currentDataKeyUuid, 
+        filter: filterValue,
+        sort,
+        setCurrentDataKeyUuid,
         setSelected,
     } = useDataKeysCtx();
 
@@ -38,13 +34,25 @@ export function DataKeysTable({ disabled, }: {
         k.label || '',
         k.dataType || '',
         '',
-    ]), [dataKeys]);
+    ]), [dataKeys, sort]);
 
     const tableProps: DataTableProps = {
         data: tableData,
-        title: 'Data keys',
         selectable: !disabled,
         selectedIndexes: selected.map(s => s.index),
+        filter: rowIndex => {
+            const dataKey = dataKeys[rowIndex];
+            if (!filterValue) {
+                return true;
+            } else if (filterValue === dataKeysStatuses[0].value) {
+                return !dataKey?.isDraft;
+            } else if (filterValue === dataKeysStatuses[1].value) {
+                return !!dataKey?.isDraft;
+            } else {
+                console.log(dataKey?.dataType, filterValue);
+                return dataKey?.dataType === filterValue;
+            }
+        },
         onSelect: indexes => setSelected(
             indexes
                 .map(i => ({
@@ -92,27 +100,15 @@ export function DataKeysTable({ disabled, }: {
                 }
             },
         ],
-        headerActions: (
-            <>
-                {disabled ? null : (
-                    <>
-                        <Button
-                            variant="ghost"
-                            className="w-auto h-auto"
-                            onClick={() => setCurrentDataKeyUuid('new')}
-                        >
-                            <PlusIcon className="size-4 mr-2" />
-                            Add
-                        </Button>
-                    </>
-                )}
-            </>
-        ),
     };
 
     return (
         <>
-            <DataTable {...tableProps} />
+            <div className="flex flex-col gap-y-4">
+                <DataKeysTableHeader />
+
+                <DataTable {...tableProps} />
+            </div>
 
             <DataKeysTableBottomActions disabled={disabled} />
 

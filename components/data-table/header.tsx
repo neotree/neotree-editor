@@ -57,6 +57,7 @@ export function DataTableHeader({
                                 }}
                             >
                                 <SearchInput 
+                                    placeholder={search?.inputPlaceholder || 'Search'}
                                     value={searchValue}
                                     onChange={e => {
                                         const val = e.target.value;
