@@ -49,7 +49,6 @@ export default async function ScriptsLayout({ children }: {
                     {...filesActions}
                     hospitals={hospitals}
                     getHospitals={getHospitals}
-                    dataKeys={dataKeys}
                 >
                     {children}
                 </ScriptsContextProvider>
