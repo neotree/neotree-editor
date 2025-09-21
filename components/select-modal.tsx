@@ -1,8 +1,7 @@
 'use client';
 
-import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,7 @@ import {
     DialogTrigger, 
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type Option = {
     value: string | number;
@@ -24,6 +24,7 @@ type Option = {
     description?: string;
     caption?: string;
     disabled?: boolean;
+    data?: Record<string, any>;
 };
 
 type Props = {
@@ -58,55 +59,12 @@ export function SelectModal({
         if (value) selectedValueExists = !!options.find(o => o.value === value);
     }
 
-    if (selectedValueExists) {
-        return (
-            <>
-                <Modal 
-                    {...props}
-                    options={options}
-                    selected={selected}
-                />
-            </>
-        );
-    }
-
     return (
-        <div className="relative flex gap-x-2 items-center">
-            <Popover modal={props.modal}>
-                <PopoverTrigger>
-                    <AlertCircle className="size-4 text-destructive" />
-                </PopoverTrigger>
-                <PopoverContent className="p-0 bg-background">
-                    <div className="p-4 bg-destructive/20 text-destructive">
-                        <b>{selected[0]}</b> is not defined in the datakeys library. Click <b>`change`</b> to select from the library
-                    </div>
-                </PopoverContent>
-            </Popover>
-            
-            <Input 
-                disabled
-                value={selected[0]}
-                onChange={() => {}}
-                className="w-full disabled:opacity-70 pr-1w-16"
-            />
-
-            <Modal 
-                {...props}
-                options={options}
-                selected={selected}
-                trigger={(
-                    <div
-                        role={props.disabled ? undefined : 'button'}
-                        className={cn(
-                            'w-16 absolute top-0 right-0 h-full text-xs flex items-center justify-center px-2',
-                            props.disabled ? 'opacity-70' : 'text-primary',
-                        )}
-                    >
-                        Change
-                    </div>
-                )}
-            />
-        </div>
+        <Modal 
+            {...props}
+            options={options}
+            selected={selected}
+        />
     );
 }
 
@@ -130,7 +88,7 @@ function Modal({
     trigger?: React.ReactNode;
 }) {
     const [searchValue, setSearchValue] = useState('');
-    const deferredSearchValue = useDeferredValue(searchValue);
+    const searchValueDebounced = useDebounce(searchValue);
 
     const selected = useMemo(() => {
         if (!selectedProp) {
@@ -162,8 +120,14 @@ function Modal({
                 const v2 = b.isSelected ? 1 : 0;
                 return v2 - v1;
             })
-            .filter(o => `${o?.value || ''}`.includes(deferredSearchValue));
-    }, [optionsProp, deferredSearchValue, selected]);
+            .filter(o => JSON.stringify([
+                o.value || '', 
+                o.label || '', 
+                // o.caption || '', 
+                o.description || '',
+                o.data?.key || '',
+            ]).toLowerCase().includes(searchValueDebounced?.toLowerCase?.()));
+    }, [optionsProp, searchValueDebounced, selected]);
 
     useEffect(() => () => setSearchValue(''), []);
 

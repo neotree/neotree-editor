@@ -175,3 +175,77 @@ export async function _getDataKey(
         return { errors: [e.message], };
     }
 } 
+
+export async function _getDataKeysSelectOptions() {
+    const res = await _getDataKeys();
+
+    const items: (Awaited<ReturnType<typeof _getDataKeys>>['data'][0]['children'][0] & {
+        isChild?: boolean;
+    })[] = [];
+    
+    res.data.forEach(({ children = [], uuid, ...k }) => {
+        if (!items.map(k => JSON.stringify(k)).includes(JSON.stringify(k))) {
+            items.push({
+                ...k,
+                children,
+                uuid: undefined!,
+            });
+        }
+
+        children.forEach(({ uuid, ...c }) => {
+            if (!items.map(c => JSON.stringify(c)).includes(JSON.stringify(c))) {
+                items.push({
+                    ...c,
+                    uuid: undefined!,
+                    isChild: true,
+                });
+            }
+        });
+    });
+
+    let opts: {
+        label: string;
+        value: string;
+        caption: string;
+        description: string;
+        defaults: DataKey['defaults'];
+        data?: Record<string, any>;
+    }[]  = items
+        .map(k => ({
+            label: k.name,
+            value: k.name,
+            description: k.label,
+            caption: k.dataType || '',
+            defaults: k.defaults,
+            data: {
+                label: k.label,
+                key: k.name,
+                isChild: k.isChild,
+                children: k.children.map(k => ({
+                    label: k.label,
+                    value: k.name,
+                    dataType: k.dataType,
+                })),
+            },
+        }));
+
+    opts = opts
+        .filter(o => o.data?.key)
+        // .filter((o, i) => {
+        //     return opts.map(o => JSON.stringify(o)).indexOf(JSON.stringify(o)) === i;
+        // })
+        .sort((a, b) => {
+            if (a.value < b.value) return -1;
+            if (a.value > b.value) return 1;
+            return 0;
+        })
+        .map((o, i) => ({
+            ...o,
+            value: o.value + i,
+        }));
+
+    return {
+        errors: res.errors,
+        data: opts,
+    };
+}

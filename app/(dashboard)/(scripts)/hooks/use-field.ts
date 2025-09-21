@@ -8,6 +8,7 @@ import { ScriptField,ScreenReviewField } from "@/types";
 export function useField(field?: ScriptField) {
     const getDefaultValues = useCallback(() => {
         return {
+            ...field,
             fieldId: field?.fieldId || v4(),
             type: field?.type || '',
             key: field?.key || '',
@@ -35,7 +36,7 @@ export function useField(field?: ScriptField) {
             printable: field?.printable || false,
             prePopulate: field?.prePopulate || [],
             editable: field?.editable || false,
-            ...field
+            items: field?.items || [],
         } satisfies ScriptField;
     }, [field]);
 

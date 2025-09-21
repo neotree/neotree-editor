@@ -27,7 +27,6 @@ type ScriptsContextProviderProps =
     {
         hospitals: Awaited<ReturnType<typeof getHospitals>>;
         getHospitals: typeof getHospitals;
-        dataKeys: Awaited<ReturnType<typeof getDataKeys>>;
     };
 
 export function ScriptsContextProvider({ 

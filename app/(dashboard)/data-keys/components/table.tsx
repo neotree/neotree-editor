@@ -56,9 +56,7 @@ export function DataKeysTable(props: Props) {
 
     const [showAddForm, setShowAddForm] = useState(false);
     const [activeDataKey, setActiveDataKey] = useState<null | {
-        dataKey: DataKey & {
-            children: DataKey[];
-        };
+        dataKey: DataKey;
         index: number;
     }>(null);
 
@@ -81,7 +79,7 @@ export function DataKeysTable(props: Props) {
     const { confirm, } = useConfirmModal();
     const { alert, } = useAlertModal();
 
-    const onDelete = useCallback(async (dataKeys: (DataKey & { children: DataKey[]; })[]) => {
+    const onDelete = useCallback(async (dataKeys: DataKey[]) => {
         try {
             setLoading(true);
 
@@ -94,21 +92,6 @@ export function DataKeysTable(props: Props) {
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
-
-            const children = dataKeys.reduce((acc: DataKey[], k) => [
-                ...acc, 
-                ...k.children.map(child => ({
-                    ...child,
-                    parentKeys: child.parentKeys.filter(parentKey => parentKey != k.name),
-                })),
-            ], []);
-
-            if (children.length) {
-                await axios.post('/api/data-keys/save', { 
-                    data: children, 
-                    broadcastAction: true, 
-                } satisfies SaveDataKeysParams);
-            }
 
             setSelected([]);
 
@@ -174,8 +157,6 @@ export function DataKeysTable(props: Props) {
 
                     if (!dataKey) return null;
 
-                    const children = props.dataKeys.filter(k => k.parentKeys.includes(dataKey.name));
-
                     return (
                         <div>
                             <ddMenu.DropdownMenu>
@@ -195,7 +176,7 @@ export function DataKeysTable(props: Props) {
                                     <ddMenu.DropdownMenuItem
                                         className="text-destructive w-full hover:bg-destructive hover:text-destructive-foreground gap-x-2"
                                         onClick={() => setTimeout(() => {
-                                            confirm(() => onDelete([{ ...dataKey, children, }]), {
+                                            confirm(() => onDelete([dataKey]), {
                                                 title: 'Delete data key',
                                                 message: `Are you sure you want to delete data key: <b>${dataKey.name}</b>?`,
                                                 danger: true,
@@ -255,19 +236,9 @@ export function DataKeysTable(props: Props) {
                         variant="destructive"
                         className="h-auto w-auto"
                         onClick={() => {
-                            let keys = data.dataKeys.filter((_, i) => selected.includes(i)).map(k => ({
-                                ...k,
-                                children: [] as typeof k[],
-                            }));
+                            let keys = data.dataKeys.filter((_, i) => selected.includes(i));
 
                             if (!keys.length) return;
-
-                            keys = keys.map(k => {
-                                const children = props.dataKeys.filter(k => k.parentKeys.includes(k.name)).filter(child => {
-                                    return !keys.map(k => k.name).includes(child.name);
-                                });
-                                return { ...k, children, };
-                            });
 
                             confirm(() => onDelete(keys), {
                                 title: 'Delete data key',

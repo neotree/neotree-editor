@@ -3,13 +3,12 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import * as actions from '@/app/actions/data-keys';
 import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
-import { DataKeysTable } from './components/table';
+import { DataKeysTable } from './components/data-keys-table';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DataKeysPage() { 
-    const [res, { isSuperUser }] = await Promise.all([
-        actions.getDataKeys(),
+    const [{ isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
 
@@ -23,7 +22,6 @@ export default async function DataKeysPage() {
                         <DataKeysTable 
                             {...actions}
                             disabled={!isSuperUser}
-                            dataKeys={res.data}
                         />
                     </CardContent>
                 </Card>
