@@ -84,10 +84,18 @@ async function main() {
         })[] = [];
 
         screens.forEach(s => {
-            const name = s.key;
-            const label = s.label;
-            
+            let name = s.key;
+            let label = s.label;
             let type = s.type;
+
+            if (
+                [
+                    'checklist', 
+                ].includes(type)
+            ) {
+                label = label || s.title;
+                name = name || label;
+            }
 
             const children: typeof keys[0]['children'] = [];
 
@@ -162,6 +170,8 @@ async function main() {
                     negativeLabel: s.negativeLabel,
                 },
             };
+
+            keys.push(key);
         });
 
         diagnoses.forEach(d => {

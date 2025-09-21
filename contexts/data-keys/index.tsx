@@ -5,28 +5,47 @@ import {
     useCallback, 
     useContext, 
     useEffect, 
-    useMemo, 
     useRef, 
     useState 
 } from "react";
 import axios from 'axios';
 import { useQueryState } from "nuqs";
+import { useRouter } from 'next/navigation';
 
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { Loader } from "@/components/loader";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
+import * as actions from '@/app/actions/data-keys';
+import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 
 export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
+
+export type DataKeyFormData = DataKey['children'][0] & {
+    version?: DataKey['version'];
+};
+
+export type ExportDataKeysFormData = {
+    overwriteExisting: boolean;
+    uuids: string[];
+    siteId: string;
+};
 
 export type tDataKeysCtx = {
     currentDataKeyUuid: string;
     loading: boolean;
+    saving: boolean;
+    exporting: boolean;
+    deleting: boolean;
     dataKeys: DataKey[];
     errors?: string[];
     selected: { index: number; uuid: string; }[];
     sort: string;
     filter: string;
+    saveDataKeys: (data: DataKeyFormData[], cb?: ((error?: string) => void)) => Promise<void>;
+    deleteDataKeys: (data: string[]) => Promise<void>;
+    exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
@@ -47,6 +66,8 @@ export function DataKeysCtxProvider({ children, }: {
     children: React.ReactNode;
 }) {
     const mounted = useRef(false);
+    const router = useRouter();
+    const { alert } = useAlertModal();
 
     const [currentDataKeyUuid, setCurrentDataKeyUuid] = useQueryState('uuid', {
         clearOnDefault: true,
@@ -58,6 +79,7 @@ export function DataKeysCtxProvider({ children, }: {
     const [selected, setSelected] = useState<tDataKeysCtx['selected']>([]);
     const [sort, setSort] = useState(dataKeysSortOpts[0].value);
     const [filter, setFilter] = useState('');
+    const [initialised, setInitialised] = useState(false);
 
     /*****************************************************
      ************ LOAD 
@@ -75,6 +97,7 @@ export function DataKeysCtxProvider({ children, }: {
                 res.data.data = sortDataKeys(res.data.data, sort),
                 setDataKeys(res.data);
                 resolve(res.data.data || []);
+                setInitialised(true);
             })
             .catch(e => {
                 setDataKeys({ data: [], errors: [e.message], });
@@ -90,6 +113,122 @@ export function DataKeysCtxProvider({ children, }: {
         }
     }, [loadDataKeys]);
 
+    /*****************************************************
+     ************ SAVE 
+    ******************************************************/
+    const [saving, setSaving] = useState(false);
+
+    const saveDataKeys: tDataKeysCtx['saveDataKeys'] = useCallback(async (data, cb) => {
+        try {
+            setSaving(true);
+
+            const response = await axios.post('/api/data-keys/save', { 
+                data, 
+                broadcastAction: true, 
+            } satisfies SaveDataKeysParams);
+            const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
+
+            if (res.errors?.length) {
+                alert({
+                    title: 'Error',
+                    message: res.errors.join(', '),
+                    variant: 'error',
+                });
+            } else {
+                await loadDataKeys();
+                router.refresh();
+                alert({
+                    message: "Data key saved!",
+                    variant: 'success',
+                    onClose: () => cb?.(),
+                });
+            }
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: 'Failed to save data key: ' + e.message,
+                onClose: () => cb?.(e.message),
+            });
+        } finally {
+            setSaving(false);
+        }
+    }, [alert, router.refresh, loadDataKeys]);
+
+    /*****************************************************
+     ************ DELETE 
+    ******************************************************/
+    const [deleting, setDeleting] = useState(false);
+
+    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data) => {
+        try {
+            setDeleting(true);
+
+            // TODO: Replace this with server action
+            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({ 
+                dataKeysIds: data, 
+                broadcastAction: true, 
+            } satisfies DeleteDataKeysParams));
+
+            const res = response.data;
+
+            if (res.errors?.length) throw new Error(res.errors[0]);
+
+            setSelected([]);
+
+            await loadDataKeys();
+
+            router.refresh();
+
+            alert({
+                title: 'Success',
+                message: 'Data keys deleted successfully!',
+                variant: 'success',
+            });
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+        } finally {
+            setDeleting(false);
+        }
+    }, [router.refresh, alert, loadDataKeys]);
+
+    /*****************************************************
+     ************ EXPORT 
+    ******************************************************/
+    const [exporting, setExporting] = useState(false);
+
+    const exportDataKeys: tDataKeysCtx['exportDataKeys'] = useCallback(async (data) => {
+        try {
+            setExporting(true);
+
+            const response = await axios.post<Awaited<ReturnType<typeof actions.exportDataKeys>>>(`/api/data-keys/export`, data);
+            const res = response.data;
+
+            if (res.errors?.length) throw new Error(res.errors[0]);
+            router.refresh();
+
+            alert({
+                title: 'Success',
+                message: 'Data exported successfully!',
+                variant: 'success',
+            });
+        } catch(e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+        } finally {
+            setExporting(false);
+        }
+    }, [router.refresh, alert]);
+   
+
+    /*****************************************************/
+
     const onSort = useCallback((sortValue = dataKeysSortOpts[0].value) => {
         setSort(sortValue);
         setSelected([]);
@@ -98,8 +237,6 @@ export function DataKeysCtxProvider({ children, }: {
             data: sortDataKeys(prev.data, sortValue),
         }))
     }, []);
-
-    if (loading) return <Loader overlay />;
 
     if (dataKeys?.errors?.length) {
         return (
@@ -112,17 +249,25 @@ export function DataKeysCtxProvider({ children, }: {
         );
     }
 
+    if (!initialised) return <Loader overlay />;
+
     return (
         <>
             <DataKeysCtx.Provider
                 value={{
                     loading,
+                    saving,
+                    exporting,
+                    deleting,
                     dataKeys: dataKeys.data,
                     errors: dataKeys.errors,
                     selected,
                     currentDataKeyUuid,
                     sort,
                     filter,
+                    deleteDataKeys,
+                    saveDataKeys,
+                    exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
                     setSelected,

@@ -10,6 +10,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
 
 
 export function DataKeysTableRowActions({ 
@@ -21,7 +22,8 @@ export function DataKeysTableRowActions({
     disabled: boolean;
     setCurrentDataKeyUuid: (uuid: string) => void;
 }) {
-    const { dataKeys, } = useDataKeysCtx();
+    const { dataKeys, deleteDataKeys, } = useDataKeysCtx();
+    const { confirm } = useConfirmModal();
 
     const dataKey = dataKeys[rowIndex];
 
@@ -50,7 +52,15 @@ export function DataKeysTableRowActions({
                         <EditIcon className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem className={cn('text-destructive', disabled && 'hidden')}>
+                    <DropdownMenuItem 
+                        className={cn('text-destructive', disabled && 'hidden')}
+                        onClick={() => setTimeout(() => {
+                            confirm(() => deleteDataKeys([dataKey.uuid]), {
+                                title: 'Delete data key',
+                                message: 'Are you sure?',
+                            });
+                        }, 0)}
+                    >
                         <TrashIcon className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
                 </DropdownMenuContent>
