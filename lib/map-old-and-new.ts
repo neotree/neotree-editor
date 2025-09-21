@@ -217,6 +217,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 minTimeKey: f.minTimeKey,
                 maxTimeKey: f.maxTimeKey,
                 values: f.values,
+                items: f.items || [],
             })),
             reviewable: s.reviewable,
             reviewConfigurations: (s.reviewConfigurations as ScreenReviewField[]).map(rc=>({
