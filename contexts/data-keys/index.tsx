@@ -101,7 +101,7 @@ export function DataKeysCtxProvider({
     const [loadingSelectOptions, setLoadingSelectOptions] = useState(false);
     const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>(selectOptionsProp);
 
-    const loadDataKeys = useCallback(() => new Promise<DataKey[]>((resolve, reject) => {
+    const loadDataKeys = useCallback(async () => new Promise<DataKey[]>((resolve) => {
         setLoadingDataKeys(true);
         axios
             .get<typeof dataKeys>('/api/data-keys')
@@ -112,12 +112,12 @@ export function DataKeysCtxProvider({
             })
             .catch(e => {
                 setDataKeys({ data: [], errors: [e.message], });
-                reject(e);
+                resolve([]);
             })
             .finally(() => setLoadingDataKeys(false));
     }), [sort]);
 
-    const loadDataKeysSelectOptions = useCallback(() => new Promise<DataKeySelectOption[]>((resolve, reject) => {
+    const loadDataKeysSelectOptions = useCallback(() => new Promise<DataKeySelectOption[]>((resolve) => {
         setLoadingSelectOptions(true);
         axios
             .get<Awaited<ReturnType<typeof _getDataKeysSelectOptions>>>('/api/data-keys/select-options')
@@ -126,9 +126,9 @@ export function DataKeysCtxProvider({
                 setSelectOptions(data);
                 resolve(data)
             })
-            .catch(e => {
-                setDataKeys({ data: [], errors: [e.message], });
-                reject(e);
+            .catch(() => {
+                setSelectOptions([]);
+                resolve([]);
             })
             .finally(() => setLoadingSelectOptions(false));
     }), []);
