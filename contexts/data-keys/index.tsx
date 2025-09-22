@@ -14,7 +14,6 @@ import { useRouter } from 'next/navigation';
 
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { _getDataKeys, _getDataKeysSelectOptions, } from "@/databases/queries/data-keys";
-import { Loader } from "@/components/loader";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
@@ -36,7 +35,7 @@ export type DataKeySelectOption = Awaited<ReturnType<typeof _getDataKeysSelectOp
 
 export type tDataKeysCtx = {
     currentDataKeyUuid: string;
-    loading: boolean;
+    loadingDataKeys: boolean;
     loadingSelectOptions: boolean;
     saving: boolean;
     exporting: boolean;
@@ -91,12 +90,11 @@ export function DataKeysCtxProvider({
     const [selected, setSelected] = useState<tDataKeysCtx['selected']>([]);
     const [sort, setSort] = useState(dataKeysSortOpts[0].value);
     const [filter, setFilter] = useState('');
-    const [initialised, setInitialised] = useState(false);
 
     /*****************************************************
      ************ LOAD 
     ******************************************************/
-    const [loading, setLoading] = useState(false);
+    const [loadingDataKeys, setLoadingDataKeys] = useState(false);
     const [dataKeys, setDataKeys] = useState<Awaited<ReturnType<typeof _getDataKeys>>>({
         data: [],
     });
@@ -104,20 +102,19 @@ export function DataKeysCtxProvider({
     const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>(selectOptionsProp);
 
     const loadDataKeys = useCallback(() => new Promise<DataKey[]>((resolve, reject) => {
-        setLoading(true);
+        setLoadingDataKeys(true);
         axios
             .get<typeof dataKeys>('/api/data-keys')
             .then(res => {
                 res.data.data = sortDataKeys(res.data.data, sort),
                 setDataKeys(res.data);
                 resolve(res.data.data || []);
-                setInitialised(true);
             })
             .catch(e => {
                 setDataKeys({ data: [], errors: [e.message], });
                 reject(e);
             })
-            .finally(() => setLoading(false));
+            .finally(() => setLoadingDataKeys(false));
     }), [sort]);
 
     const loadDataKeysSelectOptions = useCallback(() => new Promise<DataKeySelectOption[]>((resolve, reject) => {
@@ -140,11 +137,7 @@ export function DataKeysCtxProvider({
         if (!mounted.current) {
             mounted.current = true;
             
-            if (prefetchDataKeys) {
-                loadDataKeys();
-            } else {
-                setInitialised(true);
-            }
+            if (prefetchDataKeys) loadDataKeys();
 
             if (prefetchSelectOptions) loadDataKeysSelectOptions();
         }
@@ -286,13 +279,11 @@ export function DataKeysCtxProvider({
         );
     }
 
-    if (!initialised) return <Loader overlay />;
-
     return (
         <>
             <DataKeysCtx.Provider
                 value={{
-                    loading,
+                    loadingDataKeys,
                     saving,
                     exporting,
                     deleting,

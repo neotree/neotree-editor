@@ -26,11 +26,12 @@ export function DataKeysTable({ disabled, }: {
         currentDataKeyUuid, 
         filter: filterValue,
         deleting,
+        loadingDataKeys,
         setCurrentDataKeyUuid,
         setSelected,
     } = useDataKeysCtx();
 
-    const displayLoader = deleting;
+    const displayLoader = deleting || loadingDataKeys;
 
     const tableProps: DataTableProps = {
         selectable: !disabled,
