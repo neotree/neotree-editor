@@ -1,10 +1,9 @@
 import db from '@/databases/pg/drizzle';
-import { desc,ne,eq, and, Query,or,isNotNull } from 'drizzle-orm';
+import {eq, and, Query,or,isNotNull } from 'drizzle-orm';
 import { ntScriptLock,scriptsDrafts,screensDrafts,diagnosesDrafts,scripts, pendingDeletion} from "@/databases/pg/schema";
 import logger from '@/lib/logger';
 
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
-import OpsLayout from '@/app/(ops)/layout';
 
 export type SaveLockResponse = {
   success: boolean;
@@ -323,6 +322,7 @@ export async function cleanUpStaleLocks(){
   
   for (const sid of lockedScripts){
     const hasBeenIdle = hasTwoHoursPassed(sid.lockedAt)
+    console.log("...MY IDLE",hasBeenIdle)
     if(hasBeenIdle){
     if(sid.scriptId){
   const script_draft = await db.query.scriptsDrafts.findFirst({
@@ -374,7 +374,7 @@ if(!new_script_draft){
 }
 function hasTwoHoursPassed(timestamp:Date) {
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000; 
-  const now = Date.now();           
+  const now = Date.now();        
   return (now - timestamp.getTime()) >= TWO_HOURS_MS;
 }
 
@@ -398,7 +398,8 @@ params: {
           const q = db.insert(ntScriptLock).values({
             userId: authenticated?.userId!,
             scriptId:params.script||null,
-            lockType: params.lockType
+            lockType: params.lockType,
+            lockedAt: new Date(new Date().toISOString())
           })
           info.query = q.toSQL();
           await q.execute();
@@ -407,7 +408,8 @@ params: {
             userId: authenticated?.userId!,
             scriptId:null,
             newScriptId:params.script,
-            lockType: params.lockType
+            lockType: params.lockType,
+            lockedAt: new Date(new Date().toISOString())
           })
           info.query = q.toSQL();
           await q.execute();

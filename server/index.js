@@ -1,5 +1,4 @@
 require('./env');
-
 const { createServer } = require("node:http");
 const next = require("next");
 const { Server } = require("socket.io");
@@ -31,7 +30,6 @@ app.prepare().then(() => {
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
         socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
     });
-
     httpServer
         .once("error", (err) => {
             console.error(err);

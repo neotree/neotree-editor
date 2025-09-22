@@ -977,7 +977,7 @@ export const ntScriptLock = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.userId, { onDelete: 'cascade' }),
-    lockedAt: timestamp('locked_at').defaultNow().notNull(),
+    lockedAt: timestamp('locked_at').notNull(),
     scriptId: uuid('script_id')
       .references(() => scripts.scriptId, { onDelete: 'cascade' }),
     newScriptId: uuid('new_script_id')

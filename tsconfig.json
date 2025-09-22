@@ -34,7 +34,7 @@
     ".next/types/**/*.ts",
     "server/index.js",
     "build/types/**/*.ts"
-  ],
+, "server/helper.js", "server/env.js"  ],
   "exclude": [
     "node_modules"
   ]
