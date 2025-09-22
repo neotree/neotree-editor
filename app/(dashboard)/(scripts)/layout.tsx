@@ -40,7 +40,7 @@ export default async function ScriptsLayout({ children }: {
 
             <DataKeysCtxProvider
                 prefetchDataKeys={false}
-                prefetchSelectOptions
+                prefetchSelectOptions={false}
             >
                 <ScriptsContextProvider
                     {...serverActions}

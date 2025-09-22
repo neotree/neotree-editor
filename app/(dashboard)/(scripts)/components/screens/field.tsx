@@ -15,7 +15,7 @@ import {
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { Loader } from "@/components/loader";
 import { getLeanAlias } from '@/app/actions/aliases'
-import { SelectModal } from "@/components/select-modal";
+import { SelectDataKey } from "@/components/select-data-key";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
@@ -275,29 +275,15 @@ export function Field<P = {}>({
                                         name="key"
                                         error={!disabled && !key}
                                     /> */}
-                                    <SelectModal 
-                                        modal
-                                        error={!disabled && !key}
-                                        placeholder={`${key || ''}` || 'Select key'}
-                                        search={{
-                                            placeholder: 'Search data keys',
-                                        }}
-                                        options={selectOptions}
-                                        onSelect={([dataKey]) => {
-                                            const label = dataKey?.data?.label || '';
-                                            const key = dataKey?.data?.key || '';
-                                            const children: {
-                                                value: string;
-                                                label: string;
-                                            }[] = dataKey.data?.children || [];
 
-                                            setValue('key', key, { shouldDirty: true, });
-                                            setValue('label', label, { shouldDirty: true, });
-                                            setValue('items', children.map(item => ({
-                                                itemId: v4(),
-                                                label: item.label,
-                                                value: item.value,
-                                            })));
+                                    <SelectDataKey 
+                                        modal
+                                        value={key}
+                                        disabled={disabled}
+                                        onChange={item => {
+                                            setValue('key', item.value, { shouldDirty: true, });
+                                            setValue('label', item.label, { shouldDirty: true, });
+                                            setValue('items', item.children, { shouldDirty: true, });
                                         }}
                                     />
                                 </div>
