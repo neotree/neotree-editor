@@ -221,6 +221,7 @@ export async function _getDataKeysSelectOptions() {
                 label: k.label,
                 key: k.name,
                 isChild: k.isChild,
+                dataType: k.dataType,
                 children: k.children.map(k => ({
                     label: k.label,
                     value: k.name,

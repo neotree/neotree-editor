@@ -9,7 +9,7 @@ import axios from 'axios';
 
 import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
-import { SelectModal } from "@/components/select-modal";
+import { SelectDataKey } from "@/components/select-data-key";
 import { listScreens } from "@/app/actions/scripts";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import {
@@ -231,27 +231,14 @@ export function ScreenForm({
         value: string;
     }) => {
         return (
-            <SelectModal
-                // selected={key}
-                error={!disabled && !key}
-                placeholder={`${key || ''}` || 'Select key'}
-                search={{
-                    placeholder: 'Search data keys',
-                }}
-                options={selectOptions}
-                onSelect={([dataKey]) => {
+            <SelectDataKey
+                value={key}
+                disabled={disabled}
+                onChange={(dataKey) => {
                     console.log(dataKey)
-                    const label = dataKey?.data?.label || '';
-                    const key = dataKey?.data?.key || '';
-                    const dataType = dataKey?.data?.dataType;
-                    const children: {
-                        value: string;
-                        label: string;
-                        children?: {
-                            value: string;
-                            label: string;
-                        }[];
-                    }[] = dataKey?.data?.children || [];
+                    const label = dataKey?.label || '';
+                    const key = dataKey?.value || '';
+                    const children = dataKey?.children || [];
 
                     setValue('key', key, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
@@ -294,10 +281,10 @@ export function ScreenForm({
                     }
 
                     if (hasFields) {
-                        const fields = children.map((k, i) => {
+                        const fields = children.filter(k => k.dataType).map((k, i) => {
                             const f = {
                                 fieldId: v4(),
-                                type: dataType,
+                                type: k.dataType!,
                                 key: k.value,
                                 label: (k.label || k.value).trim(),
                                 refKey: '',

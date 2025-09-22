@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 
-type Option = {
+export type SelectModalOption = {
     value: string | number;
     label: string | number;
     description?: string;
@@ -31,7 +31,7 @@ type Props = {
     modal?: boolean;
     placeholder?: string;
     selected?: string | number | (string | number)[];
-    options: Option[];
+    options: SelectModalOption[];
     multiple?: boolean;
     error?: boolean;
     disabled?: boolean;
@@ -39,7 +39,9 @@ type Props = {
         placeholder?: string;
     };
     header?: React.ReactNode;
-    onSelect: (selected: Option[]) => void;
+    loading?: boolean;
+    onSelect: (selected: SelectModalOption[]) => void;
+    onTrigger?: () => void;
 };
 
 export function SelectModal({ 
@@ -79,10 +81,11 @@ function Modal({
     selected: selectedProp,
     options: optionsProp = [],
     trigger,
+    onTrigger,
     onSelect,
 }: Omit<Props, 'selected' | 'options'> & {
     selected: string[];
-    options: (Omit<Option, 'value'> & {
+    options: (Omit<SelectModalOption, 'value'> & {
         value: string;
     })[];
     trigger?: React.ReactNode;
@@ -148,6 +151,7 @@ function Modal({
                                 'justify-between w-full',
                                 error && 'border border-destructive hover:bg-destructive/10',
                             )}
+                            onClick={onTrigger}
                         >
                             <span className={!selected.length ? 'opacity-50' : ''}>{selected[0]?.label  || placeholder || ''}</span>
                             <ChevronsUpDown className="size-4 opacity-50" />

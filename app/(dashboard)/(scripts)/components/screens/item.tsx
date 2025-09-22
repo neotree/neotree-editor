@@ -24,9 +24,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { SelectModal } from "@/components/select-modal";
+import { SelectDataKey } from "@/components/select-data-key";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DATA_KEYS_MAP } from "@/constants";
 
 type Props = {
     open: boolean;
@@ -160,41 +159,17 @@ export function Item<P = {}>({
         const _type = screenType + '_option';
 
         return (
-            <SelectModal
+            <SelectDataKey
                 modal
-                selected={key}
+                value={key}
                 disabled={isKeyDisabled}
-                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)}
-                placeholder={`${key || ''}` || 'Select key'}
-                search={{
-                    placeholder: 'Search data keys',
-                }}
-                options={selectOptions}
-                onSelect={([dataKey]) => {
-                    const label = dataKey?.data?.label || '';
-                    const key = dataKey?.data?.key || '';
+                onChange={(dataKey) => {
+                    const label = dataKey?.label || '';
+                    const key = dataKey?.value || '';
 
-                    setValue('key', key, { shouldDirty: true, });
+                    setValue(variant, key, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
                 }}
-                header={(
-                    <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Button
-                                variant="ghost"
-                            >
-                                <FilterIcon className="size-4" />
-                                Filter
-                            </Button>
-                        </DropdownMenuTrigger>
-
-                        <DropdownMenuContent>
-                            <DropdownMenuItem>
-                                
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
             />
         );
     }
