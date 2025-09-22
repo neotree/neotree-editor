@@ -53,7 +53,8 @@ export type tDataKeysCtx = {
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
-    loadDataKeys: () => Promise<DataKey[]>;
+    loadDataKeys: () => Promise<void>;
+    loadDataKeysSelectOptions: () => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
 };
 
@@ -101,37 +102,37 @@ export function DataKeysCtxProvider({
     const [loadingSelectOptions, setLoadingSelectOptions] = useState(false);
     const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>(selectOptionsProp);
 
-    const loadDataKeys = useCallback(async () => new Promise<DataKey[]>((resolve) => {
+    const loadDataKeys = useCallback(async () => {
         setLoadingDataKeys(true);
         axios
             .get<typeof dataKeys>('/api/data-keys')
             .then(res => {
                 res.data.data = sortDataKeys(res.data.data, sort),
                 setDataKeys(res.data);
-                resolve(res.data.data || []);
             })
             .catch(e => {
                 setDataKeys({ data: [], errors: [e.message], });
-                resolve([]);
             })
             .finally(() => setLoadingDataKeys(false));
-    }), [sort]);
+    }, [sort]);
 
-    const loadDataKeysSelectOptions = useCallback(() => new Promise<DataKeySelectOption[]>((resolve) => {
+    const loadDataKeysSelectOptions = useCallback(async () => {
         setLoadingSelectOptions(true);
         axios
             .get<Awaited<ReturnType<typeof _getDataKeysSelectOptions>>>('/api/data-keys/select-options')
             .then(res => {
                 const data = res.data.data || [];
                 setSelectOptions(data);
-                resolve(data)
             })
-            .catch(() => {
+            .catch((e: any) => {
                 setSelectOptions([]);
-                resolve([]);
+                alert({
+                    title: 'Error',
+                    message: 'Failed to load data keys: ' + e.message,
+                });
             })
             .finally(() => setLoadingSelectOptions(false));
-    }), []);
+    }, [alert]);
 
     useEffect(() => {
         if (!mounted.current) {
@@ -300,6 +301,7 @@ export function DataKeysCtxProvider({
                     exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
+                    loadDataKeysSelectOptions,
                     setSelected,
                     setSort,
                     onSort,
