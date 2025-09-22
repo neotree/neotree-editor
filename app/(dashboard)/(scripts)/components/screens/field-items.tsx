@@ -27,8 +27,8 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { SelectModal } from '@/components/select-modal';
 import { useDataKeysCtx } from '@/contexts/data-keys';
+import { SelectDataKey } from '@/components/select-data-key';
 
 type Item = NonNullable<ScriptField['items']>[0];
 
@@ -218,19 +218,15 @@ function Form({
                                 name="value"
                                 render={({ field: { value, onChange, }, }) => {
                                     return (
-                                        <SelectModal 
-                                            multiple={false}
-                                            options={selectOptions}
-                                            placeholder={`${value || ''}` || 'Select key'}
-                                            search={{
-                                                placeholder: 'Search data keys',
-                                            }}
-                                            onSelect={([value]) => {
-                                                onChange(value.data?.key || '');
-                                                setValue('label', value.data?.label || '');
+                                        <SelectDataKey 
+                                            value={`${value}`}
+                                            disabled={false}
+                                            onChange={item => {
+                                                onChange(item.value);
+                                                setValue('label', item.label || '');
                                             }}
                                         />
-                                    )
+                                    );
                                 }}
                             />
                         </div>
