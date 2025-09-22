@@ -58,6 +58,7 @@ export function ScriptsTable(props: Props) {
                     maxRows={25}
                     onSort={onSort}
                     // headerActions={<ScriptsTableHeaderActions />}
+                    search={{ inputPlaceholder: 'Search scripts', }}
                     getRowOptions={({ rowIndex }) => {
                         const s = scripts.data[rowIndex];
                         return !s ? {} : {
