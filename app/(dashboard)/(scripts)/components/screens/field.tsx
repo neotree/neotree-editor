@@ -290,8 +290,6 @@ export function Field<P = {}>({
                                             }
                                         }}
                                     />
-
-                                    <pre>values: {values}</pre>
                                 </div>
 
                                 <div className="flex-1">
