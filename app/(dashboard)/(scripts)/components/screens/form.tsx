@@ -310,10 +310,6 @@ export function ScreenForm({
                                 printable: false,
                                 prePopulate: [],
                                 editable: false,
-                                // items: (k.children || []).map(k => ({
-                                //     itemId: v4(),
-
-                                // })),
                             } satisfies ScriptField;
 
                             return f;
