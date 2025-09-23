@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { EditIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { arrayMoveImmutable } from "array-move";
 
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -219,13 +220,17 @@ export function DataKeyForm({
                             control={control}
                             name="children"
                             disabled={isFormDisabled}
-                            render={({ field: { value, }, }) => {
+                            render={({ field: { value, onChange, }, }) => {
                                 if (!dataTypeInfo?.hasChildren) return <></>;
 
                                 return (
                                     <div className="mt-4 pt-4 border-t border-t-border">
                                         <DataTable 
                                             sortable={!disabled}
+                                            onSort={(oldIndex: number, newIndex: number) => {
+                                                const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
+                                                onChange(sorted);
+                                            }}
                                             search={{}}
                                             title="Options"
                                             headerActions={(

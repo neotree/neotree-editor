@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { v4 as uuidV4 } from 'uuid';
+import { arrayMoveImmutable } from 'array-move';
 
 import { ScriptField } from "@/types";
 import { DataTable } from "@/components/data-table";
@@ -29,7 +30,6 @@ import {
 } from "@/components/ui/sheet";
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { SelectDataKey } from '@/components/select-data-key';
-
 type Item = NonNullable<ScriptField['items']>[0];
 
 export function FieldItems({
@@ -86,6 +86,10 @@ export function FieldItems({
                         item.enterValueManually ? '✓' : '✕',
                         '',
                     ])}
+                    onSort={(oldIndex: number, newIndex: number) => {
+                        const sorted = arrayMoveImmutable([...items], oldIndex, newIndex);
+                        onChange(sorted);
+                    }}
                     headerActions={disabled ? null : (
                         <Button
                             variant="ghost"
