@@ -184,7 +184,10 @@ export async function _getDataKeysSelectOptions() {
     })[] = [];
     
     res.data.forEach(({ children = [], uuid, ...k }) => {
-        if (!items.map(k => JSON.stringify(k)).includes(JSON.stringify(k))) {
+        if (
+            !items.map(k => JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, }))
+                .includes(JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, }))
+        ) {
             items.push({
                 ...k,
                 children,
@@ -193,7 +196,10 @@ export async function _getDataKeysSelectOptions() {
         }
 
         children.forEach(({ uuid, ...c }) => {
-            if (!items.map(c => JSON.stringify(c)).includes(JSON.stringify(c))) {
+            if (
+                !items.map(c => JSON.stringify({ dataType: c.dataType, label: c.label, name: c.name, }).toLowerCase())
+                    .includes(JSON.stringify({ dataType: c.dataType, label: c.label, name: c.name, }).toLowerCase())
+            ) {
                 items.push({
                     ...c,
                     uuid: undefined!,
