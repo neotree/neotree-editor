@@ -14,41 +14,51 @@ async function main() {
 
         const payload: typeof screens = [];
 
-        screens.filter(s => (s.fields || []).find(f => f.values)).forEach(s => {
+        screens.filter(s => (s.fields || []).find(f => !f.values && f.items)).forEach(s => {
             const fields = s.fields || [];
 
-            if (fields.filter(f => f.values).length) {
+            if (fields.filter(f => !f.values && f.items).length) {
                 payload.push({
                     ...s,
                     fields: fields.map(f => {
-                        if (!f.values) return f;
+                        if (!f.values && f.items) {
+                            const values = f.items.map(item => `${item.value,item.label}`).join('\n');
+                            return {
+                                ...f,
+                                values,
+                            };
+                        } {
+                            return f;
+                        }
 
-                        const items: NonNullable<typeof f.items> = [];
+                        // if (!f.values) return f;
 
-                        const valueOpts = f.valuesOptions || [];
+                        // const items: NonNullable<typeof f.items> = [];
 
-                        f.values.split('\n').forEach(row => {
-                            let [value, label] = row.split(',');
+                        // const valueOpts = f.valuesOptions || [];
 
-                            value = `${value || ''}`.trim();
-                            label = `${label || ''}`.trim();
+                        // f.values.split('\n').forEach(row => {
+                        //     let [value, label] = row.split(',');
 
-                            const valOpts = valueOpts.find(o => o.key === value);
+                        //     value = `${value || ''}`.trim();
+                        //     label = `${label || ''}`.trim();
 
-                            items.push({
-                                itemId: uuidV4(),
-                                value,
-                                label,
-                                label2: valOpts?.optionLabel,
-                                exclusive: false,
-                                enterValueManually: !!valOpts,
-                            });
-                        });
+                        //     const valOpts = valueOpts.find(o => o.key === value);
 
-                        return {
-                            ...f,
-                            items,
-                        };
+                        //     items.push({
+                        //         itemId: uuidV4(),
+                        //         value,
+                        //         label,
+                        //         label2: valOpts?.optionLabel,
+                        //         exclusive: false,
+                        //         enterValueManually: !!valOpts,
+                        //     });
+                        // });
+
+                        // return {
+                        //     ...f,
+                        //     items,
+                        // };
                     }),
                 });
             }
