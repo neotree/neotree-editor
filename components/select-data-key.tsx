@@ -7,6 +7,23 @@ import { useDataKeysCtx } from "@/contexts/data-keys";
 import { Loader } from "@/components/loader";
 import { useMemo } from "react";
 
+type OnChangeValue = {
+    value: string;
+    label: string;
+    dataType?: string;
+    children: {
+        itemId: string;
+        value: string;
+        label: string;
+        dataType?: string;
+        children: {
+            value: string;
+            label: string;
+            dataType?: string;
+        }[];
+    }[];
+};
+
 export function SelectDataKey({
     value,
     disabled,
@@ -18,17 +35,7 @@ export function SelectDataKey({
     disabled?: boolean;
     modal?: boolean;
     filterOptions?: (option: SelectModalOption) => boolean;
-    onChange?: (value: {
-        value: string;
-        label: string;
-        dataType?: string;
-        children: {
-            itemId: string;
-            value: string;
-            label: string;
-            dataType?: string;
-        }[];
-    }) => void
+    onChange?: (value: OnChangeValue) => void
 }) {
     const { loadingSelectOptions, selectOptions, loadDataKeysSelectOptions, } = useDataKeysCtx();
 
@@ -57,6 +64,7 @@ export function SelectDataKey({
                         value: string;
                         label: string;
                         dataType?: string;
+                        children: OnChangeValue['children'];
                     }[] = dataKey.data?.children || [];
 
                     onChange?.({
@@ -68,6 +76,11 @@ export function SelectDataKey({
                             label: k.label || '',
                             value: k.value || '',
                             dataType: k.dataType,
+                            children: (k.children || []).map(k => ({
+                                itemId: v4(),
+                                label: k.label || '',
+                                value: k.value || '',
+                            })),
                         })),
                     });
                 }}

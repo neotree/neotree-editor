@@ -281,11 +281,17 @@ export function Field<P = {}>({
                                         value={key}
                                         disabled={disabled}
                                         onChange={item => {
-                                            setValue('key', item.value, { shouldDirty: true, });
-                                            setValue('label', item.label, { shouldDirty: true, });
-                                            setValue('items', item.children, { shouldDirty: true, });
+                                            const values = (item?.children || []).map(k => `${k.value},${(k.label || k.label).trim()}`).join('\n');
+                                            setValue('key', item?.value, { shouldDirty: true, });
+                                            setValue('label', item?.label, { shouldDirty: true, });
+                                            if (isDropdownField || isMultiSelectField) {
+                                                setValue('items', item?.children, { shouldDirty: true, });
+                                                setValue('values', values);
+                                            }
                                         }}
                                     />
+
+                                    <pre>values: {values}</pre>
                                 </div>
 
                                 <div className="flex-1">
