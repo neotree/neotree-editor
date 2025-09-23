@@ -184,16 +184,24 @@ export async function _getDataKeysSelectOptions() {
     })[] = [];
     
     res.data.forEach(({ children = [], uuid, ...k }) => {
-        if (
-            !items.map(k => JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, }))
-                .includes(JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, }))
-        ) {
-            items.push({
-                ...k,
-                children,
-                uuid: undefined!,
-            });
-        }
+        // const _children = (items: typeof children) => items.map(c => ({ dataType: c.dataType, label: c.label, name: c.name, }));
+
+        // if (
+        //     !items.map(k => JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, children: _children(k.children), }))
+        //         .includes(JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, children: _children(children), }))
+        // ) {
+        //     items.push({
+        //         ...k,
+        //         children,
+        //         uuid: undefined!,
+        //     });
+        // }
+
+        items.push({
+            ...k,
+            children,
+            uuid: undefined!,
+        });
 
         children.forEach(({ uuid, ...c }) => {
             if (
