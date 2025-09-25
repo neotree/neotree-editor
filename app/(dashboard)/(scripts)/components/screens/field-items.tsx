@@ -90,6 +90,14 @@ export function FieldItems({
                         const sorted = arrayMoveImmutable([...items], oldIndex, newIndex);
                         onChange(sorted);
                     }}
+                    headerActions={disabled ? null : (
+                        <Button
+                            variant="ghost"
+                            onClick={() => setNewItem(true)}
+                        >
+                            <PlusIcon className="h-4 w-4 mr-2" /> Add
+                        </Button>
+                    )}
                     columns={[
                         {
                             name: 'Key',
