@@ -109,6 +109,7 @@ export function FieldItems({
                         {
                             name: '',
                             align: 'right',
+                            cellClassName: 'hidden',
                             cellRenderer({ rowIndex }) {
                                 const item = items[rowIndex];
 
