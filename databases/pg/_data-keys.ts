@@ -22,6 +22,7 @@ type DataKeyChild = {
 export const dataKeys = pgTable('nt_datakeys', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
+    uniqueKey: uuid('unique_key').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     name: text('name').notNull(),
     label: text('label').default('').notNull(),
     dataType: text('data_type'),
