@@ -17,6 +17,28 @@ const dataTypes = dataKeyTypes.map(t => t.value);
 type DataKey = Omit<typeof schema.dataKeys.$inferSelect['children'][0], 'uuid'>;
 type DataKeyChild = typeof schema.dataKeys.$inferSelect['children'][0];
 
+type tKey = {
+    uniqueKey: string;
+    name: string;
+    label: string;
+    refId?: string;
+    dataType?: string;
+    children: {
+        uniqueKey: string;
+        name: string;
+        label: string;
+        refId?: string;
+        dataType?: string;
+        children: {
+            uniqueKey: string;
+            name: string;
+            label: string;
+            refId?: string;
+            dataType?: string;
+        }[];
+    }[];
+};
+
 const scripts = {
     mwi: [
         'c04f628d-3d1a-46f1-8d9a-14c203a45463',
@@ -81,6 +103,177 @@ async function main() {
                 drugsLibrary = [...drugsLibrary, ...s.drugsLibrary];
             });
         }
+
+        let keysMap: Record<string, string> = {};
+
+        const screensKeys = screens.map(s => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: s.key || '',
+                label: s.label || '',
+                refId: s.refId || '',
+                dataType: s.type,
+                children: [],
+            };
+
+            if (dataTypes.filter(t => !t.includes('edliz')).includes(key.dataType!)) {
+                key.label = key.label || s.title;
+                key.name = key.name || key.label;
+            }
+
+            s.items.forEach(item => {
+                key.children.push({
+                    uniqueKey: '',
+                    name: item.key || item.id || '',
+                    label: item.label || '',
+                    dataType: `${s.type}_option`,
+                    children: [],
+                });
+            });
+
+            s.fields.forEach(f => {
+                key.children.push({
+                    uniqueKey: '',
+                    name: f.key || '',
+                    label: f.label || '',
+                    dataType: f.type,
+                    children: (f.items || []).map(item => ({
+                        uniqueKey: '',
+                        name: (item.value || '') as string,
+                        label: (item.label || '') as string,
+                    })),
+                });
+            });
+
+            keysMap[uuidV4()] = JSON.stringify(key);
+
+            return {
+                screenId: s.screenId,
+                key,
+            };
+        });
+
+        const diagnosesKeys = diagnoses.map(d => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: d.key || d.name || '',
+                label: d.name || '',
+                dataType: 'diagnosis',
+                children: [],
+            };
+
+            (d.symptoms || []).forEach(item => {
+                key.children.push({
+                    uniqueKey: '',
+                    name: item.name || '',
+                    label: '',
+                    dataType: `diagnosis_symptom_${item.type}`,
+                    children: [],
+                });
+            });
+
+            keysMap[uuidV4()] = JSON.stringify(key);
+
+            return {
+                screenId: d.diagnosisId,
+                key,
+            };
+        });
+
+        const dffKeys = drugsLibrary.map(d => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: d.key || '',
+                label: d.drug || '',
+                dataType: d.type,
+                children: [],
+            };
+
+            keysMap[uuidV4()] = JSON.stringify(key);
+
+            return {
+                screenId: d.itemId,
+                key,
+            };
+        });
+
+        keysMap = Object.keys(keysMap)
+            .filter((uuid, i) => Object.values(keysMap).indexOf(keysMap[uuid]) === i)
+            .reduce((acc, uuid) => {
+                return {
+                    ...acc,
+                    [uuid]: keysMap[uuid],
+                };
+            }, {} as typeof keysMap);
+
+        let keys = Object.values(keysMap).map(k => {
+            const uniqueKey = uuidV4();
+
+            const key: DataKey = {
+                ...JSON.parse(k) as tKey,
+                uniqueKey,
+                defaults: {},
+            };
+
+            key.children = key.children.map(k => ({
+                ...k,
+                uniqueKey: uuidV4(),
+                defaults: {},
+                children: k.children.map(k => ({
+                    ...k,
+                    uniqueKey: uuidV4(),
+                    defaults: {},
+                })),
+            }))
+
+            screensKeys.forEach(sk => {
+                if (JSON.stringify(sk.key) === k) {
+                    sk.key = key;
+                }
+            });
+
+            diagnosesKeys.forEach(dk => {
+                if (JSON.stringify(dk.key) === k) {
+                    dk.key = key;
+                }
+            });
+
+            dffKeys.forEach(dk => {
+                if (JSON.stringify(dk.key) === k) {
+                    dk.key = key;
+                }
+            });
+
+            return key;
+        });
+
+        keys = keys.reduce((acc, key) => {
+            const dataType = key.dataType || '';
+            const shouldSpreadChildren = (dataType === 'form') || dataType.includes('edliz');
+
+            return [
+                ...acc,
+                ...(!shouldSpreadChildren ? [key] : (key.children as typeof keys)),
+            ];
+        }, [] as typeof keys);
+
+        // await writeFile(path.resolve(__dirname, 'keys.json'), JSON.stringify(keys, null, 4));
+        // await writeFile(path.resolve(__dirname, 'screensKeys.json'), JSON.stringify(screensKeys, null, 4));
+
+        await db.insert(schema.dataKeysDrafts).values(
+            keys.map(k => {
+                const uuid = uuidV4();
+                return { 
+                    uuid,
+                    name: k.name,
+                    data: { 
+                        ...k, 
+                        uuid,
+                        version: 1,
+                    }, 
+                } satisfies typeof schema.dataKeysDrafts.$inferInsert;
+            }),
+        );
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
