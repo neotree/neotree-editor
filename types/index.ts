@@ -49,6 +49,7 @@ export type ScriptItem = {
     severity_order: string;
     summary: string;
     key: string;
+    keyId?: string;
     dataType: null | string;
     score: null | number;
 };
@@ -57,6 +58,7 @@ export type ScriptField = {
     fieldId: string;
     type: string;
     key: string;
+    keyId?: string;
     label: string;
     refKey: string;
     calculation: string;
