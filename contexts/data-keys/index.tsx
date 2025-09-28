@@ -13,7 +13,7 @@ import { useQueryState } from "nuqs";
 import { useRouter } from 'next/navigation';
 
 import { useAlertModal } from "@/hooks/use-alert-modal";
-import { _getDataKeys, _getDataKeysSelectOptions, } from "@/databases/queries/data-keys";
+import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
@@ -21,8 +21,14 @@ import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from
 
 export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
 
-export type DataKeyFormData = DataKey['children'][0] & {
-    version?: DataKey['version'];
+export type DataKeyFormData = {
+    name: DataKey['name'];
+    refId: DataKey['refId'];
+    dataType: DataKey['dataType'];
+    label: DataKey['label'];
+    options: DataKey['options'];
+    metadata: DataKey['metadata'];
+    version: DataKey['version'];
 };
 
 export type ExportDataKeysFormData = {
@@ -31,12 +37,9 @@ export type ExportDataKeysFormData = {
     siteId: string;
 };
 
-export type DataKeySelectOption = Awaited<ReturnType<typeof _getDataKeysSelectOptions>>['data'][0];
-
 export type tDataKeysCtx = {
     currentDataKeyUuid: string;
     loadingDataKeys: boolean;
-    loadingSelectOptions: boolean;
     saving: boolean;
     exporting: boolean;
     deleting: boolean;
@@ -45,7 +48,6 @@ export type tDataKeysCtx = {
     selected: { index: number; uuid: string; }[];
     sort: string;
     filter: string;
-    selectOptions: DataKeySelectOption[];
     saveDataKeys: (data: DataKeyFormData[], cb?: ((error?: string) => void)) => Promise<void>;
     deleteDataKeys: (data: string[]) => Promise<void>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
@@ -54,8 +56,10 @@ export type tDataKeysCtx = {
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
     loadDataKeys: () => Promise<void>;
-    loadDataKeysSelectOptions: () => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
+    extractDataKeys: (uuids: string[], opts?: {
+        withNested?: boolean;
+    }) => DataKey[];
 };
 
 export const DataKeysCtx = createContext<tDataKeysCtx>(null!);
@@ -67,15 +71,11 @@ export const useDataKeysCtx = () => {
 };
 
 export function DataKeysCtxProvider({ 
-    children, 
-    prefetchSelectOptions, 
-    selectOptions: selectOptionsProp = [],
+    children,  
     prefetchDataKeys = true,
 }: {
     children: React.ReactNode;
-    prefetchSelectOptions?: boolean;
     prefetchDataKeys?: boolean;
-    selectOptions?: DataKeySelectOption[];
 }) {
     const mounted = useRef(false);
     const router = useRouter();
@@ -100,7 +100,6 @@ export function DataKeysCtxProvider({
         data: [],
     });
     const [loadingSelectOptions, setLoadingSelectOptions] = useState(false);
-    const [selectOptions, setSelectOptions] = useState<DataKeySelectOption[]>(selectOptionsProp);
 
     const loadDataKeys = useCallback(async () => {
         setLoadingDataKeys(true);
@@ -116,33 +115,12 @@ export function DataKeysCtxProvider({
             .finally(() => setLoadingDataKeys(false));
     }, [sort]);
 
-    const loadDataKeysSelectOptions = useCallback(async () => {
-        setLoadingSelectOptions(true);
-        axios
-            .get<Awaited<ReturnType<typeof _getDataKeysSelectOptions>>>('/api/data-keys/select-options')
-            .then(res => {
-                const data = res.data.data || [];
-                setSelectOptions(data);
-            })
-            .catch((e: any) => {
-                setSelectOptions([]);
-                alert({
-                    title: 'Error',
-                    message: 'Failed to load data keys: ' + e.message,
-                });
-            })
-            .finally(() => setLoadingSelectOptions(false));
-    }, [alert]);
-
     useEffect(() => {
         if (!mounted.current) {
             mounted.current = true;
-            
             if (prefetchDataKeys) loadDataKeys();
-
-            if (prefetchSelectOptions) loadDataKeysSelectOptions();
         }
-    }, [prefetchSelectOptions, prefetchDataKeys, loadDataKeys]);
+    }, [prefetchDataKeys, loadDataKeys]);
 
     /*****************************************************
      ************ SAVE 
@@ -239,7 +217,10 @@ export function DataKeysCtxProvider({
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
-            router.refresh();
+            
+            await loadDataKeys();
+
+            setSelected([]);
 
             alert({
                 title: 'Success',
@@ -255,7 +236,7 @@ export function DataKeysCtxProvider({
         } finally {
             setExporting(false);
         }
-    }, [router.refresh, alert]);
+    }, [dataKeys.data, loadDataKeys, alert]);
    
 
     /*****************************************************/
@@ -268,6 +249,21 @@ export function DataKeysCtxProvider({
             data: sortDataKeys(prev.data, sortValue),
         }))
     }, []);
+
+    const extractDataKeys: tDataKeysCtx['extractDataKeys'] = useCallback((uuids, opts) => {
+        let keys = uuids
+            .map(o => dataKeys.data.find(k => (k.uniqueKey === o) || (k.uuid === o))!)
+            .filter(k => k);
+
+        if (opts?.withNested) {
+            keys.filter(k => k.options.length).forEach(k => {
+                const nested = extractDataKeys(k.options, opts);
+                keys = [...keys, ...nested];
+            });
+        }
+
+        return keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
+    }, [dataKeys]);
 
     if (dataKeys?.errors?.length) {
         return (
@@ -294,14 +290,12 @@ export function DataKeysCtxProvider({
                     currentDataKeyUuid,
                     sort,
                     filter,
-                    selectOptions,
-                    loadingSelectOptions,
+                    extractDataKeys,
                     deleteDataKeys,
                     saveDataKeys,
                     exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
-                    loadDataKeysSelectOptions,
                     setSelected,
                     setSort,
                     onSort,
@@ -342,6 +336,22 @@ function sortDataKeys (
     };
 
     switch(sortValue) {
+        case 'refId.asc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'asc',
+                key1: (key1.refId || '').trim(),
+                key2: (key2.refId || '').trim(),
+            }));
+            break;
+
+        case 'refId.desc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'desc',
+                key1: (key1.refId || '').trim(),
+                key2: (key2.refId || '').trim(),
+            }));
+            break;
+
         case 'key.desc':
             sorted = dataKeys.sort((key1, key2) => sortFn({
                 sortDirection: 'desc',

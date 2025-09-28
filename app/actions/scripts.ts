@@ -204,7 +204,11 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
             });
         }
 
-        const keys = scrapDataKeys({
+        const names: string[] = [];
+
+        screen
+
+        const { keys } = scrapDataKeys({
             screens: data.reduce((acc, item) => {
                 return [...acc, ...item.screens];
             }, [] as typeof data[0]['screens']),

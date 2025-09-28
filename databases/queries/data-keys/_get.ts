@@ -13,6 +13,7 @@ export type DataKey = typeof dataKeys.$inferSelect & {
 export type GetDataKeysParams = {
     dataKeysIds?: string[];
     names?: string[];
+    uniqueKeys?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
 };
@@ -29,11 +30,14 @@ export async function _getDataKeys(
         const { 
             dataKeysIds: _dataKeysIds, 
             names: namesParam = [],
+            uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
+
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
+        const uniqueKeys = uniqueKeysParam.filter(n => n);
         
         // unpublished dataKeys conditions
         const whereDataKeysDrafts = [
@@ -46,6 +50,11 @@ export async function _getDataKeys(
                 undefined 
                 : 
                 inArray(sql`lower(${dataKeysDrafts.name})`, names),
+
+            !uniqueKeys?.length ? 
+                undefined 
+                : 
+                inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
         const drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
@@ -62,10 +71,16 @@ export async function _getDataKeys(
                 undefined 
                 : 
                 inArray(dataKeys.uuid, dataKeysIds.filter(id => uuid.validate(id))),
+
             !names?.length ? 
                 undefined 
                 : 
                 inArray(sql`lower(${dataKeys.name})`, names),
+
+            !uniqueKeys?.length ? 
+                undefined 
+                : 
+                inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
         const publishedRes = await db
@@ -175,92 +190,3 @@ export async function _getDataKey(
         return { errors: [e.message], };
     }
 } 
-
-export async function _getDataKeysSelectOptions() {
-    const res = await _getDataKeys();
-
-    const items: (Awaited<ReturnType<typeof _getDataKeys>>['data'][0]['children'][0] & {
-        isChild?: boolean;
-    })[] = [];
-    
-    res.data.forEach(({ children = [], uuid, ...k }) => {
-        // const _children = (items: typeof children) => items.map(c => ({ dataType: c.dataType, label: c.label, name: c.name, }));
-
-        // if (
-        //     !items.map(k => JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, children: _children(k.children), }))
-        //         .includes(JSON.stringify({ dataType: k.dataType, label: k.label, name: k.name, children: _children(children), }))
-        // ) {
-        //     items.push({
-        //         ...k,
-        //         children,
-        //         uuid: undefined!,
-        //     });
-        // }
-
-        items.push({
-            ...k,
-            children,
-            uuid: undefined!,
-        });
-
-        children.forEach(({ uuid, ...c }) => {
-            if (
-                !items.map(c => JSON.stringify({ dataType: c.dataType, label: c.label, name: c.name, }).toLowerCase())
-                    .includes(JSON.stringify({ dataType: c.dataType, label: c.label, name: c.name, }).toLowerCase())
-            ) {
-                items.push({
-                    ...c,
-                    uuid: undefined!,
-                    isChild: true,
-                });
-            }
-        });
-    });
-
-    let opts: {
-        label: string;
-        value: string;
-        caption: string;
-        description: string;
-        defaults: DataKey['defaults'];
-        data?: Record<string, any>;
-    }[]  = items
-        .map(k => ({
-            label: k.name,
-            value: k.name,
-            description: k.label,
-            caption: k.dataType || '',
-            defaults: k.defaults,
-            data: {
-                label: k.label,
-                key: k.name,
-                isChild: k.isChild,
-                dataType: k.dataType,
-                children: k.children.map(k => ({
-                    label: k.label,
-                    value: k.name,
-                    dataType: k.dataType,
-                })),
-            },
-        }));
-
-    opts = opts
-        .filter(o => o.data?.key)
-        // .filter((o, i) => {
-        //     return opts.map(o => JSON.stringify(o)).indexOf(JSON.stringify(o)) === i;
-        // })
-        .sort((a, b) => {
-            if (a.value < b.value) return -1;
-            if (a.value > b.value) return 1;
-            return 0;
-        })
-        .map((o, i) => ({
-            ...o,
-            value: o.value + i,
-        }));
-
-    return {
-        errors: res.errors,
-        data: opts,
-    };
-}

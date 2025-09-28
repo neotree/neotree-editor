@@ -11,7 +11,6 @@ import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
 import { SelectDataKey } from "@/components/select-data-key";
 import { listScreens } from "@/app/actions/scripts";
-import { useDataKeysCtx } from "@/contexts/data-keys";
 import {
     Select,
     SelectContent,
@@ -66,8 +65,6 @@ export function ScreenForm({
     countDiagnosesScreens,
     screens,
 }: Props) {
-    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
-
     const router = useRouter();
     const [showForm, setShowForm] = useState(!!formData);
 
@@ -106,7 +103,7 @@ export function ScreenForm({
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
-    const displayLoader = saving || loadingSelectOptions;
+    const displayLoader = saving;
 
   const getAlias = useCallback(async (name: string) => {
          if (!name) return;
@@ -234,20 +231,20 @@ export function ScreenForm({
             <SelectDataKey
                 value={key}
                 disabled={disabled}
-                onChange={(dataKey) => {
-                    console.log(dataKey)
+                onChange={([dataKey]) => {
                     const label = dataKey?.label || '';
-                    const key = dataKey?.value || '';
+                    const key = dataKey?.name || '';
                     const children = dataKey?.children || [];
 
                     setValue('key', key, { shouldDirty: true, });
+                    setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
 
                     if (hasItems) {
                         const items = children.map((k, i) => {
                             return {
                                 itemId: v4(),
-                                id: (isChecklistScreen || isProgressScreen) ? '' : k.value,
+                                id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
                                 label: k.label,
                                 position: i + 1,
                                 subType: '', // edliz
@@ -258,7 +255,7 @@ export function ScreenForm({
                                 enterValueManually: false,
                                 severity_order: '',
                                 summary: '',
-                                key: isChecklistScreen ? k.value : '',
+                                key: isChecklistScreen ? k.name : '',
                                 score: (isEdlizScreen ? '' : '') as unknown as number,
                                 dataType: (() => {
                                     switch (type) {
@@ -285,8 +282,8 @@ export function ScreenForm({
                             const f = {
                                 fieldId: v4(),
                                 type: k.dataType!,
-                                key: k.value,
-                                label: (k.label || k.value).trim(),
+                                key: k.name,
+                                label: (k.label || k.name).trim(),
                                 refKey: '',
                                 calculation: '',
                                 condition: '',

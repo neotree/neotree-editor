@@ -1,6 +1,8 @@
 'use client';
 
+import { useTransition } from 'react';
 import { MoreVertical, EditIcon, EyeIcon, TrashIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -11,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { Loader } from '@/components/loader';
 
 
 export function DataKeysTableRowActions({ 
@@ -22,6 +25,8 @@ export function DataKeysTableRowActions({
     disabled: boolean;
     setCurrentDataKeyUuid: (uuid: string) => void;
 }) {
+    const [isTransitionPending, startTransition] = useTransition();
+
     const { dataKeys, deleteDataKeys, } = useDataKeysCtx();
     const { confirm } = useConfirmModal();
 
@@ -31,25 +36,29 @@ export function DataKeysTableRowActions({
 
     return (
         <>
+            {isTransitionPending && <Loader overlay />}
+
             <DropdownMenu>
                 <DropdownMenuTrigger>
                     <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent>
-                    {!!disabled && (
-                        <DropdownMenuItem 
-                            onClick={() => setTimeout(() => setCurrentDataKeyUuid(dataKey.uuid), 0)}
-                        >
-                            <EyeIcon className="h-4 w-4 mr-2" /> View
-                        </DropdownMenuItem>
-                    )}
-
                     <DropdownMenuItem 
-                        className={cn(disabled && 'hidden')}
-                        onClick={() => setTimeout(() => setCurrentDataKeyUuid(dataKey.uuid), 0)}
+                        asChild
+                        onClick={() => setTimeout(() => startTransition(() => {}), 0)}
                     >
-                        <EditIcon className="h-4 w-4 mr-2" /> Edit
+                        <Link href={`/data-keys/edit/${dataKey.uuid}`}>
+                            {disabled ? (
+                                <>
+                                    <EyeIcon className="h-4 w-4 mr-2" /> View
+                                </>
+                            ) : (
+                                <>
+                                    <EditIcon className="h-4 w-4 mr-2" /> Edit
+                                </>
+                            )}
+                        </Link>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem 
