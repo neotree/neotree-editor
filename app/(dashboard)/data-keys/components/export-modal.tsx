@@ -35,7 +35,7 @@ export function ExportModal({ uuids, }: {
     uuids: string[];
 }) {
     const [open, setOpen] = useState(false);
-    const { exporting, exportDataKeys } = useDataKeysCtx();
+    const { dataKeys, exporting, exportDataKeys, extractDataKeys, } = useDataKeysCtx();
 
     const { 
         sites, 
@@ -70,10 +70,12 @@ export function ExportModal({ uuids, }: {
         if (!formData.siteId) {
             setError('siteId', { message: 'Site is required', });
         } else {
+            const ids: string[] = extractDataKeys(uuids, { withNested: true, }).map(k => k.uuid);
             await exportDataKeys({
                 ...formData,
-                uuids,
+                uuids: ids,
             });
+            setOpen(false);
         }
     });
 
@@ -137,6 +139,8 @@ export function ExportModal({ uuids, }: {
                             />
                             <Label secondary htmlFor="overwriteExisting">Overwrite existing</Label>
                         </div>
+
+                        {isLoading && <Loader overlay />}
                     </div>
 
                     <DialogFooter>
@@ -154,8 +158,6 @@ export function ExportModal({ uuids, }: {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            {isLoading && <Loader overlay />}
         </>
     );
 }

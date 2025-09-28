@@ -93,114 +93,106 @@ export const dataKeyTypes: {
     value: string;
     label: string;
     hasChildren: boolean;
-    defaults: Record<string, any>;
 }[] = [
     {
-        value: 'checklist',
-        label: 'checklist',
-        hasChildren: true,
-        defaults: {},
+        value: 'checklist_option',
+        label: 'checklist_option',
+        hasChildren: false,
     },
     {
         value: 'multi_select',
         label: 'multi_select',
         hasChildren: true,
-        defaults: {
-            valuesOptions: [],
-        },
+    },
+    {
+        value: 'multi_select_option',
+        label: 'multi_select_option',
+        hasChildren: false,
     },
     {
         value: 'single_select',
         label: 'single_select',
         hasChildren: true,
-        defaults: {},
+    },
+    {
+        value: 'single_select_option',
+        label: 'single_select_option',
+        hasChildren: false,
     },
     {
         value: 'yesno',
         label: 'yesno',
         hasChildren: false,
-        defaults: {
-            positiveLabel: 'Yes',
-            negativeLabel: 'No',
-        },
     },
     // {
     //     value: 'progress',
     //     label: 'progress',
     //     hasChildren: true,
-    //     defaults: {},
     // },
     {
         value: 'drug',
         label: 'drug',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'fluid',
         label: 'fluid',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'zw_edliz_summary_table_option',
         label: 'zw_edliz_summary_table_option',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'mwi_edliz_summary_table_option',
         label: 'mwi_edliz_summary_table_option',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'diagnosis',
         label: 'diagnosis',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'date',
         label: 'date',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'datetime',
         label: 'datetime',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'dropdown',
         label: 'dropdown',
         hasChildren: true,
-        defaults: {},
+    },
+    {
+        value: 'dropdown_option',
+        label: 'dropdown_option',
+        hasChildren: false,
     },
     {
         value: 'number',
         label: 'number',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'text',
         label: 'text',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'timer',
         label: 'timer',
         hasChildren: false,
-        defaults: {},
     },
     {
         value: 'period',
         label: 'period',
         hasChildren: false,
-        defaults: {},
     },
 ]
 
@@ -233,6 +225,16 @@ export const dataKeysSortOpts = [
     {
         value: 'type.desc',
         label: 'Type (desc)',
+        Icon: SortDesc,
+    },
+    {
+        value: 'refId.asc',
+        label: 'Ref ID (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'refId.desc',
+        label: 'Ref ID (desc)',
         Icon: SortDesc,
     },
     {

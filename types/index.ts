@@ -94,6 +94,7 @@ export type ScriptField = {
         label2?: string;
         exclusive?: boolean;
         enterValueManually?: boolean;
+        keyId?: string;
     }[];
 };
 

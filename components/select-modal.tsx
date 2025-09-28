@@ -40,6 +40,7 @@ type Props = {
     };
     header?: React.ReactNode;
     loading?: boolean;
+    trigger?: React.ReactNode;
     onSelect: (selected: SelectModalOption[]) => void;
     onTrigger?: () => void;
 };
@@ -88,10 +89,11 @@ function Modal({
     options: (Omit<SelectModalOption, 'value'> & {
         value: string;
     })[];
-    trigger?: React.ReactNode;
 }) {
     const [searchValue, setSearchValue] = useState('');
     const searchValueDebounced = useDebounce(searchValue);
+
+    const [selectedPending, setSelectedPending] = useState<SelectModalOption['value'][]>([]);
 
     const selected = useMemo(() => {
         if (!selectedProp) {
@@ -105,9 +107,11 @@ function Modal({
     }, [selectedProp, optionsProp]);
 
     const options = useMemo(() => {
-        return optionsProp
+        const filtered = optionsProp
             .map(o => {
-                const isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
+                let isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
+                isSelected = isSelected || selectedPending.includes(o.value);
+
                 return {
                     ...o,
                     isSelected,
@@ -128,9 +132,10 @@ function Modal({
                 o.label || '', 
                 // o.caption || '', 
                 o.description || '',
-                o.data?.key || '',
-            ]).toLowerCase().includes(searchValueDebounced?.toLowerCase?.()));
-    }, [optionsProp, searchValueDebounced, selected]);
+            ]).toLowerCase().match(searchValueDebounced.toLowerCase()));
+
+        return filtered;
+    }, [optionsProp, searchValueDebounced, selected, selectedPending]);
 
     useEffect(() => () => setSearchValue(''), []);
 
@@ -140,6 +145,7 @@ function Modal({
                 modal={modal}
                 onOpenChange={() => {
                     setSearchValue('');
+                    setSelectedPending([]);
                 }}
             >
                 <DialogTrigger asChild>
@@ -192,9 +198,17 @@ function Modal({
                                         onClick={() => {
                                             if (o.disabled) return;
                                             if (o.isSelected) {
-                                                onSelect?.(selected.filter(s => s.value !== o.value));
+                                                if (multiple) {
+                                                    setSelectedPending(prev => prev.filter(v => v !== o.value));
+                                                } else {
+                                                    onSelect?.(selected.filter(s => s.value !== o.value));
+                                                }
                                             } else {
-                                                onSelect?.(multiple ? [...selected, o] : [o]);
+                                                if (multiple) {
+                                                    setSelectedPending(prev => [...prev, o.value]);
+                                                } else {
+                                                    onSelect?.([o]);
+                                                }
                                             }
                                         }}
                                         className={cn(
@@ -219,7 +233,7 @@ function Modal({
                     </div>
 
                     <DialogFooter
-                        className="border-t border-t-border px-4 py-2 items-center w-full"
+                        className="border-t border-t-border px-4 py-2 items-center w-full gap-x-2"
                     >
                         <DialogClose asChild>
                             <Button
@@ -228,6 +242,21 @@ function Modal({
                                 Close
                             </Button>
                         </DialogClose>
+
+                        {!!selectedPending.length && (
+                            <DialogClose asChild>
+                                <Button
+                                    onClick={() => {
+                                        onSelect?.(
+                                            selectedPending.map(v => options.find(o => o.value === v)!)
+                                                .filter(o => o)
+                                        );
+                                    }}
+                                >
+                                    Save
+                                </Button>
+                            </DialogClose>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

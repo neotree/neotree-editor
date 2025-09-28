@@ -1,6 +1,7 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -23,7 +24,6 @@ export function DataKeysTableHeader() {
         filter,
         onSort,
         setFilter,
-        setCurrentDataKeyUuid, 
     } = useDataKeysCtx();
 
     return (
@@ -111,12 +111,14 @@ export function DataKeysTableHeader() {
                         </div>
 
                         <Button
+                            asChild
                             variant="ghost"
                             className="w-auto h-auto"
-                            onClick={() => setCurrentDataKeyUuid('new')}
                         >
-                            <PlusIcon className="size-4 mr-2" />
-                            Add
+                            <Link href="/data-keys/new">
+                                <PlusIcon className="size-4 mr-2" />
+                                Add
+                            </Link>
                         </Button>
                     </div>
                 </div>

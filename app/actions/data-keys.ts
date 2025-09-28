@@ -1,6 +1,6 @@
 'use server';
 
-import { GetDataKeysParams, _getDataKeys, _getDataKeysSelectOptions } from '@/databases/queries/data-keys';
+import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, } from '@/databases/mutations/data-keys';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 
@@ -9,8 +9,6 @@ export const saveDataKeys = _saveDataKeys;
 export const saveDataKeysIfNotExist = _saveDataKeysIfNotExist;
 
 export const saveDataKeysUpdateIfExist = _saveDataKeysUpdateIfExist;
-
-export const getDataKeysSelectOptions = _getDataKeysSelectOptions;
 
 export const getDataKeys = async (params?: GetDataKeysParams) => {
     const res = await _getDataKeys(params);
