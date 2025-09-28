@@ -9,25 +9,17 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 
-type DataKeyChild = {
-    uuid: string;
-    dataType?: string | null;
-    name: string;
-    label: string;
-    defaults: Record<string, any>;
-    children: DataKeyChild[];
-};
-
 // DATA KEYS
-export const dataKeys = pgTable('nt_datakeys', {
+export const dataKeys = pgTable('nt_data_keys', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     uniqueKey: uuid('unique_key').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     name: text('name').notNull(),
     label: text('label').default('').notNull(),
+    refId: text('ref_id'),
     dataType: text('data_type'),
-    children: jsonb('children').default([]).$type<DataKeyChild[]>().notNull(),
-    defaults: jsonb('defaults').default({}).$type<Record<string, any>>().notNull(),
+    options: jsonb('options').default([]).$type<string[]>().notNull(),
+    metadata: jsonb('metadata').default({}).$type<Record<string, any>>().notNull(),
     version: integer('version').notNull(),
 
     publishDate: timestamp('publish_date').defaultNow().notNull(),
@@ -45,10 +37,11 @@ export const dataKeysRelations = relations(dataKeys, ({ many, one }) => ({
 }));
 
 // DATA KEYS DRAFTS
-export const dataKeysDrafts = pgTable('nt_datakeys_drafts', {
+export const dataKeysDrafts = pgTable('nt_data_keys_drafts', {
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
     name: text('name').notNull(),
+    uniqueKey: uuid('unique_key').notNull(),
     dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
     data: jsonb('data').$type<typeof dataKeys.$inferInsert>().notNull(),
 
@@ -65,7 +58,7 @@ export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
 
 // DATA KEYS DRAFTS HISTORY
 export const dataKeysHistory = pgTable(
-    'nt_datakeys_history', 
+    'nt_data_keys_history', 
     {
         id: serial('id').primaryKey(),
         version: integer('version').notNull(),

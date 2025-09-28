@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { v4 as uuidV4 } from 'uuid';
@@ -28,19 +28,22 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import { useDataKeysCtx } from '@/contexts/data-keys';
+import { type DataKey, useDataKeysCtx } from '@/contexts/data-keys';
 import { SelectDataKey } from '@/components/select-data-key';
+import { dataKeyTypes } from '@/constants';
 type Item = NonNullable<ScriptField['items']>[0];
 
 export function FieldItems({
     items = [],
     disabled,
     fieldType,
+    dataKey,
     onChange,
 }: {
     disabled: boolean;
     items: Item[];
     fieldType: string;
+    dataKey?: DataKey | null;
     onChange: (items: Item[]) => void;
 }) {
     const { confirm } = useConfirmModal();
@@ -53,6 +56,7 @@ export function FieldItems({
         <>
             {showForm && (
                 <Form 
+                    fieldDataKey={dataKey}
                     fieldType={fieldType}
                     item={items[currentItemIndex] || null}
                     onClose={() => {
@@ -163,21 +167,24 @@ export function FieldItems({
 function Form({
     item,
     fieldType,
+    fieldDataKey,
     onClose,
     onChange,
 }: {
     item: null | Item;
     fieldType: string;
+    fieldDataKey?: DataKey | null;
     onClose: () => void;
     onChange: (item: Item) => void;
 }) {
-    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
+    const { dataKeys, extractDataKeys } = useDataKeysCtx();
 
     const {
         control,
         register,
         handleSubmit,
         setValue,
+        watch,
     } = useForm<Item>({
         defaultValues: {
             ...item,
@@ -187,8 +194,11 @@ function Form({
             label: item?.label || '',
             label2: item?.label2 || '',
             value: item?.value || '',
+            keyId: item?.keyId,
         },
     });
+
+    const keyId = watch('keyId');
 
     const onSave = handleSubmit(data => {
         console.log(data);
@@ -213,8 +223,6 @@ function Form({
                     </SheetHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-                        {loadingSelectOptions && <Loader overlay />}
-
                         <div className="px-4">
                             <Label htmlFor="value">Key *</Label>
                             <Controller 
@@ -225,9 +233,15 @@ function Form({
                                         <SelectDataKey 
                                             value={`${value}`}
                                             disabled={false}
-                                            onChange={item => {
-                                                onChange(item.value);
+                                            onChange={([item]) => {
+                                                onChange(item.name);
+                                                setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
                                                 setValue('label', item.label || '');
+                                            }}
+                                            filterDataKeys={k => {
+                                                const opts = fieldDataKey?.options || [];
+                                                if (!fieldDataKey) return true;
+                                                return opts.includes(k.uniqueKey);
                                             }}
                                         />
                                     );

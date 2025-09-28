@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
 import { Controller, useForm } from "react-hook-form";
-import { FilterIcon } from "lucide-react";
 
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { ScriptItem as ItemType } from "@/types";
@@ -13,8 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
-import { useDataKeysCtx } from "@/contexts/data-keys";
-import { Loader } from "@/components/loader";
 import {
     Select,
     SelectContent,
@@ -25,7 +22,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { SelectDataKey } from "@/components/select-data-key";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Props = {
     open: boolean;
@@ -51,8 +47,6 @@ export function Item<P = {}>({
     subTypes = [],
     onClose,
 }: Props & P) {
-    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
-
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
@@ -162,12 +156,14 @@ export function Item<P = {}>({
             <SelectDataKey
                 modal
                 value={key}
+                placeholder={label}
                 disabled={isKeyDisabled}
-                onChange={(dataKey) => {
+                onChange={([dataKey]) => {
                     const label = dataKey?.label || '';
-                    const key = dataKey?.value || '';
+                    const key = dataKey?.name || '';
 
                     setValue(variant, key, { shouldDirty: true, });
+                    setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
                 }}
             />
@@ -206,8 +202,6 @@ export function Item<P = {}>({
                     </>
                 )}
             >
-                {loadingSelectOptions && <Loader overlay />}
-
                 <div className="flex flex-col gap-y-5">
                     <div className="flex flex-col gap-y-5">
                         {(() => {

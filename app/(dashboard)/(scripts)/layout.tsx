@@ -8,7 +8,6 @@ import { Title } from "@/components/title";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDataKeys, getDataKeysSelectOptions } from "@/app/actions/data-keys";
 import { DataKeysCtxProvider } from '@/contexts/data-keys';
 
 export default async function ScriptsLayout({ children }: {
@@ -38,10 +37,7 @@ export default async function ScriptsLayout({ children }: {
         <>
             <Title>Scripts</Title>
 
-            <DataKeysCtxProvider
-                prefetchDataKeys={false}
-                prefetchSelectOptions={false}
-            >
+            <DataKeysCtxProvider>
                 <ScriptsContextProvider
                     {...serverActions}
                     {...filesActions}

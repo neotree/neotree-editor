@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { v4 } from "uuid";
 import { Controller, useForm } from "react-hook-form";
 import axios from 'axios';
 
@@ -13,7 +12,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useDataKeysCtx } from "@/contexts/data-keys";
-import { Loader } from "@/components/loader";
 import { getLeanAlias } from '@/app/actions/aliases'
 import { SelectDataKey } from "@/components/select-data-key";
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
@@ -57,7 +55,7 @@ export function Field<P = {}>({
     disabled: disabledProp,
     onClose,
 }: Props & P) {
-    const { loadingSelectOptions, selectOptions, } = useDataKeysCtx();
+    const { extractDataKeys, } = useDataKeysCtx();
     
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
@@ -85,6 +83,7 @@ export function Field<P = {}>({
     const type = watch('type');
     const format = watch('format');
     const key = watch('key');
+    const keyId = watch('keyId');
     const label = watch('label');
     const optional = watch('optional');
     const printable = watch('printable');
@@ -99,7 +98,7 @@ export function Field<P = {}>({
     const items = watch('items');
     const valuesOptions = watch('valuesOptions');
     const editable = watch('editable');
-
+    
     const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
 
     const isDateField = useMemo(() => (type === 'date') || (type === 'datetime'), [type]);
@@ -151,6 +150,11 @@ export function Field<P = {}>({
             })
             .filter(o => o.value && o.label);
     }, [values]);
+    
+    const dataKey = useMemo(() => {
+        const [key] = !keyId ? [null] : extractDataKeys([keyId]);
+        return key;
+    }, [keyId, extractDataKeys]);
 
     return (
         <>
@@ -202,8 +206,6 @@ export function Field<P = {}>({
                     </>
                 )}
             >
-                {loadingSelectOptions && <Loader overlay />}
-
                 {!showForm ? (
                     <RadioGroup
                         defaultValue={type}
@@ -280,14 +282,10 @@ export function Field<P = {}>({
                                         modal
                                         value={key}
                                         disabled={disabled}
-                                        onChange={item => {
-                                            const values = (item?.children || []).map(k => `${k.value},${(k.label || k.label).trim()}`).join('\n');
-                                            setValue('key', item?.value, { shouldDirty: true, });
+                                        onChange={([item]) => {
+                                            setValue('key', item?.name, { shouldDirty: true, });
+                                            setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
                                             setValue('label', item?.label, { shouldDirty: true, });
-                                            if (isDropdownField || isMultiSelectField) {
-                                                setValue('items', item?.children, { shouldDirty: true, });
-                                                setValue('values', values);
-                                            }
                                         }}
                                     />
                                 </div>
@@ -370,6 +368,7 @@ export function Field<P = {}>({
                                                     items={value}
                                                     fieldType={type}
                                                     onChange={onChange}
+                                                    dataKey={dataKey}
                                                 />
                                             );
                                         }}

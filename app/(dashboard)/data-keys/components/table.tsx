@@ -1,16 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { useAppContext } from '@/contexts/app';
 import { cn } from '@/lib/utils';
 import { dataKeysStatuses } from '@/constants';
 import { Loader } from '@/components/loader';
-import { DataKeysTableHeader } from './header';
-import { DataKeysTableRowActions } from './row-actions';
-import { DataKeysTableBottomActions } from './bottom-actions';
+import { DataKeysTableHeader } from './table-header';
+import { DataKeysTableRowActions } from './table-row-actions';
+import { DataKeysTableBottomActions } from './table-bottom-actions';
 import { DataKeyForm } from './form';
 
 export function DataKeysTable({ disabled, }: {
@@ -79,6 +77,9 @@ export function DataKeysTable({ disabled, }: {
                 name: 'Label',
             },
             {
+                name: 'Ref ID',
+            },
+            {
                 name: 'Data type',
             },
             {
@@ -92,13 +93,14 @@ export function DataKeysTable({ disabled, }: {
                             disabled={disabled} 
                             setCurrentDataKeyUuid={setCurrentDataKeyUuid}
                         />
-                    )
+                    );
                 }
             },
         ],
         data: dataKeys.map(k => [
             k.name || '',
             k.label || '',
+            k.refId || '',
             k.dataType || '',
             '',
         ]),
@@ -113,14 +115,6 @@ export function DataKeysTable({ disabled, }: {
             </div>
 
             <DataKeysTableBottomActions disabled={disabled} />
-
-            {!!currentDataKeyUuid && (
-                <DataKeyForm 
-                    disabled={disabled}
-                    dataKey={dataKeys.find(k => k.uuid === currentDataKeyUuid)}
-                    onClose={() => setCurrentDataKeyUuid('')}
-                />
-            )}
 
             {displayLoader && <Loader overlay />}
         </>
