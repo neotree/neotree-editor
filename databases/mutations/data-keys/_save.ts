@@ -165,6 +165,8 @@ export async function _saveDataKeysUpdateIfExist({
             data: data.map(item => {
                 const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
 
+                console.log('existing?.uuid', existing?.uuid);
+
                 return {
                     ...item,
                     uuid: existing?.uuid,
