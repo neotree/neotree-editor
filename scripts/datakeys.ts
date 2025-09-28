@@ -71,7 +71,7 @@ main();
 
 async function main() {
     try {
-        const country: keyof typeof scripts = 'zw';
+        const country: keyof typeof scripts = 'mwi';
 
         console.log(`Fetching ${country} sites`);
         const sites = await db.query.sites.findMany({
