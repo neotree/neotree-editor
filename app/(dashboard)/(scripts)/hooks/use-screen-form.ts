@@ -70,6 +70,7 @@ export function useScreenForm({
             notes: formData?.notes || '',
             dataType: formData?.dataType || '',
             key: formData?.key || '',
+            keyId: formData?.keyId || '',
             label: formData?.label || '',
             negativeLabel: formData?.negativeLabel || '',
             positiveLabel: formData?.positiveLabel || '',

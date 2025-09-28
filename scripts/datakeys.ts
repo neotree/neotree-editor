@@ -14,8 +14,28 @@ import { dataKeyTypes } from "@/constants";
 
 const dataTypes = dataKeyTypes.map(t => t.value);
 
-type DataKey = Omit<typeof schema.dataKeys.$inferSelect['children'][0], 'uuid'>;
-type DataKeyChild = typeof schema.dataKeys.$inferSelect['children'][0];
+type tKey = {
+    uniqueKey: string;
+    name: string;
+    label: string;
+    refId?: string;
+    dataType?: string;
+    children: tKey[];
+    // children: {
+    //     uniqueKey: string;
+    //     name: string;
+    //     label: string;
+    //     refId?: string;
+    //     dataType?: string;
+    //     children: {
+    //         uniqueKey: string;
+    //         name: string;
+    //         label: string;
+    //         refId?: string;
+    //         dataType?: string;
+    //     }[];
+    // }[];
+};
 
 const scripts = {
     mwi: [
@@ -81,6 +101,240 @@ async function main() {
                 drugsLibrary = [...drugsLibrary, ...s.drugsLibrary];
             });
         }
+
+        let keysMap: tKey[] = [];
+
+        const screensKeys = screens.map(s => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: s.key || '',
+                label: s.label || '',
+                refId: s.refId || '',
+                dataType: s.type,
+                children: [],
+            };
+
+            if (dataTypes.filter(t => !t.includes('edliz')).includes(key.dataType!)) {
+                key.label = key.label || s.title;
+                key.name = key.name || key.label;
+            }
+
+            if (['diagnosis', 'checklist'].includes(s.type)) key.dataType = `${s.type}_screen`;
+
+            s.items.forEach(item => {
+                let dataType = `${s.type}_option`;
+                if (s.type === 'diagnosis') dataType = s.type;
+                const k: tKey = {
+                    uniqueKey: '',
+                    name: item.key || item.id || '',
+                    label: item.label || '',
+                    dataType,
+                    children: [],
+                };
+                key.children.push(k);
+            });
+
+            s.fields.forEach(f => {
+                key.children.push({
+                    uniqueKey: '',
+                    name: f.key || '',
+                    label: f.label || '',
+                    dataType: f.type,
+                    children: (f.items || []).map(item => ({
+                        uniqueKey: '',
+                        name: (item.value || '') as string,
+                        label: (item.label || '') as string,
+                        children: [],
+                        dataType: `${f.type}_option`,
+                    })),
+                });
+            });
+
+            keysMap.push(key);
+
+            return {
+                screenId: s.screenId,
+                key,
+            };
+        });
+
+        const diagnosesKeys = diagnoses.map(d => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: d.key || d.name || '',
+                label: d.name || '',
+                dataType: 'diagnosis',
+                children: [],
+            };
+
+            (d.symptoms || []).forEach(item => {
+                key.children.push({
+                    uniqueKey: '',
+                    name: item.name || '',
+                    label: '',
+                    dataType: `diagnosis_symptom_${item.type}`,
+                    children: [],
+                });
+            });
+
+            keysMap.push(key);
+
+            return {
+                screenId: d.diagnosisId,
+                key,
+            };
+        });
+
+        const dffKeys = drugsLibrary.map(d => {
+            const key: tKey = {
+                uniqueKey: '',
+                name: d.key || '',
+                label: d.drug || '',
+                dataType: d.type,
+                children: [],
+            };
+
+            keysMap.push(key);
+
+            return {
+                screenId: d.itemId,
+                key,
+            };
+        });
+
+        keysMap = keysMap.filter((k, i) => keysMap.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i);
+        
+        keysMap = keysMap
+            .reduce<tKey[]>((acc, { uniqueKey, ...k }) => {
+                if (acc.map(({ uniqueKey, ...k }) => JSON.stringify(k)).includes(JSON.stringify(k))) return acc;
+
+                k.children = k.children.map(({ uniqueKey, ...child }) => {
+                    uniqueKey = acc.find(({ uniqueKey, ...k }) => JSON.stringify(k) === JSON.stringify(child))?.uniqueKey || uuidV4();
+                    return {
+                        ...child,
+                        uniqueKey,
+                        children: child.children.map(({ uniqueKey, ...child }) => {
+                            uniqueKey = acc.find(({ uniqueKey, ...k }) => JSON.stringify(k) === JSON.stringify(child))?.uniqueKey || uuidV4();
+                            return {
+                                ...child,
+                                uniqueKey,
+                            };
+                        }),
+                    };
+                });
+                
+                const children: tKey[] = [];
+
+                k.children.forEach(child => {
+                    children.push(child);
+                    child.children.forEach(child2 => {
+                        children.push({
+                            ...child2,
+                            children: [],
+                        });
+                    })
+                });
+
+                return [
+                    ...acc,
+                    { ...k, uniqueKey: uuidV4(), },
+                    ...children,
+                ];
+            }, []);
+
+        keysMap = keysMap.filter(({ uniqueKey, ...k }, i) => {
+            return keysMap.map(({ uniqueKey, ...k }) => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i;
+        });
+
+        let keys = keysMap.map(({ uniqueKey, ...k }) => {
+            const key = { ...k, uniqueKey };
+
+            k.children = k.children.map(({ uniqueKey, ...child }) => ({
+                ...child,
+                children: child.children.map(({ uniqueKey, ...child }) => ({
+                    ...child,
+                })),
+            })) as typeof key.children;
+
+            screensKeys.forEach(sk => {
+                const { uniqueKey, ...skKey } = sk.key;
+                skKey.children = skKey.children.map(({ uniqueKey, ...child }) => ({
+                    ...child,
+                    children: child.children.map(({ uniqueKey, ...child }) => ({
+                        ...child,
+                    })),
+                })) as typeof key.children;
+                if (JSON.stringify(skKey) === JSON.stringify(k)) {
+                    sk.key = key;
+                }
+            });
+
+            diagnosesKeys.forEach(dk => {
+                const { uniqueKey, ...dkKey } = dk.key;
+                dkKey.children = dkKey.children.map(({ uniqueKey, ...child }) => ({
+                    ...child,
+                    children: child.children.map(({ uniqueKey, ...child }) => ({
+                        ...child,
+                    })),
+                })) as typeof key.children;
+                if (JSON.stringify(dkKey) === JSON.stringify(k)) {
+                    dk.key = key;
+                }
+            });
+
+            dffKeys.forEach(dk => {
+                const { uniqueKey, ...dkKey } = dk.key;
+                dkKey.children = dkKey.children.map(({ uniqueKey, ...child }) => ({
+                    ...child,
+                    children: child.children.map(({ uniqueKey, ...child }) => ({
+                        ...child,
+                    })),
+                })) as typeof key.children;
+                if (JSON.stringify(dkKey) === JSON.stringify(k)) {
+                    dk.key = key;
+                }
+            });
+
+            return key;
+        });
+
+        keys = keys.reduce((acc, key) => {
+            const dataType = key.dataType || '';
+            const shouldSpreadChildren = (dataType === 'form') || dataType.includes('edliz') || dataType.includes('_screen');
+
+            return [
+                ...acc,
+                ...(!shouldSpreadChildren ? [key] : (key.children as typeof keys)),
+            ];
+        }, [] as typeof keys);
+
+        keys = keys
+            .map(k => ({ ...k, label: k.label || k.name, }))
+            .filter(k => k.label && k.name);
+
+        keys = keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
+
+        console.log('keys.length', keys.length);
+
+        // await writeFile(path.resolve(__dirname, 'keys.json'), JSON.stringify(keys, null, 4));
+        // await writeFile(path.resolve(__dirname, 'screensKeys.json'), JSON.stringify(screensKeys, null, 4));
+
+        await db.insert(schema.dataKeysDrafts).values(
+            keys.map(({ children, ...k }) => {
+                return { 
+                    uuid: uuidV4(),
+                    name: k.name,
+                    uniqueKey: k.uniqueKey,
+                    data: {
+                        ...k,
+                        uuid: uuidV4(),
+                        version: 1,
+                        options: children.map(k => k.uniqueKey),
+                        metadata: {},
+                    },
+                } satisfies typeof schema.dataKeysDrafts.$inferInsert;
+            }),
+        );
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);

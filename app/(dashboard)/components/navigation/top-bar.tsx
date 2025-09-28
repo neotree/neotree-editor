@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import axios from "axios";
 
 import { Content } from "@/components/content";
@@ -17,7 +16,6 @@ type Props = {
 };
 
 export function TopBar({}: Props) {
-    const router = useRouter();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
     const [loading, setLoading] = useState(false);
@@ -49,11 +47,11 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
                     message: 'Data published successfully!',
+                    onClose: () => window.location.reload(),
                 });
             }
         } catch(e: any) {
@@ -65,7 +63,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_publishData, alert, router]);
+    }, [_publishData, alert]);
 
     const discardDrafts = useCallback(async () => {
         try {
@@ -84,11 +82,11 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
                     message: 'Data discarded successfully!',
+                    onClose: () => window.location.reload(),
                 });
             }
         } catch(e: any) {
@@ -100,7 +98,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_discardDrafts, alert, router]);
+    }, [_discardDrafts, alert]);
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
     const canSwitchModes = isAdmin || isSuperUser;

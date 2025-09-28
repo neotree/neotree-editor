@@ -70,6 +70,9 @@ export function DrugsLibrary({}: Props) {
                 onSelect={setSelected}
                 selectable={!disabled}
                 title="Drugs & Fluids Library"
+                search={{
+                    inputPlaceholder: 'Search',
+                }}
                 headerActions={(
                     <>
                         <Add 

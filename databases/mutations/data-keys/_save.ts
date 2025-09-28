@@ -1,12 +1,11 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, or } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getDataKeys, checkDataKeyName } from '@/databases/queries/data-keys';
-import { compareDataKeys } from '@/lib/data-keys';
+import { _getDataKeys } from '@/databases/queries/data-keys';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
@@ -52,7 +51,10 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
 
                 if (!errors.length) {
                     const draft = isNewUuid ? null : await db.query.dataKeysDrafts.findFirst({
-                        where: eq(dataKeysDrafts.uuid, dataKeyUuid),
+                        where: or(
+                            eq(dataKeysDrafts.uuid, dataKeyUuid),
+                            !item.uniqueKey ? undefined :  eq(dataKeysDrafts.uniqueKey, item.uniqueKey)
+                        ),
                     });
 
                     const published = (draft || isNewUuid) ? null : await db.query.dataKeys.findFirst({
@@ -72,18 +74,22 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
                                 name: data.name,
                             }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
                     } else {
+                        const uniqueKey = published?.uniqueKey || item.uniqueKey || uuid.v4();
+
                         const data = {
                             ...published,
                             ...item,
+                            uniqueKey,
                             uuid: dataKeyUuid,
                             version: published?.version ? (published.version + 1) : 1,
-                        } as typeof dataKeys.$inferInsert;
+                        } as typeof dataKeys.$inferSelect;
 
                         await db.insert(dataKeysDrafts).values({
                             data,
                             uuid: dataKeyUuid,
                             dataKeyId: published?.uuid,
                             name: data.name,
+                            uniqueKey,
                         });
                     }
                 }
@@ -112,14 +118,12 @@ export async function _saveDataKeysIfNotExist({
     data,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
-        const names = data.map(item => item.name!).filter(n => n);
+        const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ names, });
+        const saved = await _getDataKeys({ uniqueKeys, });
 
         data = data.filter(item => {
-            const existing = saved.data.find(dk => {
-                return compareDataKeys(dk, item);
-            });
+            const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
 
             if (existing) return false;
 
@@ -152,15 +156,15 @@ export async function _saveDataKeysUpdateIfExist({
     data,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
-        const names = data.map(item => item.name!).filter(n => n);
+        const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ names, });
+        const saved = await _getDataKeys({ uniqueKeys, });
 
         const res = await _saveDataKeys({
             data: data.map(item => {
-                const existing = saved.data.find(dk => {
-                    return compareDataKeys(dk, item);
-                });
+                const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
+
+                console.log('existing?.uuid', existing?.uuid);
 
                 return {
                     ...item,
