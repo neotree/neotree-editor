@@ -5,8 +5,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getDataKeys, checkDataKeyName } from '@/databases/queries/data-keys';
-import { compareDataKeys } from '@/lib/data-keys';
+import { _getDataKeys } from '@/databases/queries/data-keys';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
