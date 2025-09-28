@@ -217,7 +217,10 @@ export function DataKeysCtxProvider({
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
-            router.refresh();
+            
+            await loadDataKeys();
+
+            setSelected([]);
 
             alert({
                 title: 'Success',
@@ -233,7 +236,7 @@ export function DataKeysCtxProvider({
         } finally {
             setExporting(false);
         }
-    }, [dataKeys.data, router.refresh, alert]);
+    }, [dataKeys.data, loadDataKeys, alert]);
    
 
     /*****************************************************/

@@ -54,7 +54,7 @@ export async function _getDataKeys(
             !uniqueKeys?.length ? 
                 undefined 
                 : 
-                inArray(sql`lower(${dataKeysDrafts.uniqueKey})`, uniqueKeys),
+                inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
         const drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
@@ -80,7 +80,7 @@ export async function _getDataKeys(
             !uniqueKeys?.length ? 
                 undefined 
                 : 
-                inArray(sql`lower(${dataKeys.uniqueKey})`, uniqueKeys),
+                inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
         const publishedRes = await db
