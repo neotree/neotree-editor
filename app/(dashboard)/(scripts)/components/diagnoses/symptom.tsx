@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { v4 } from "uuid";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -13,6 +13,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { cn } from "@/lib/utils";
 import { DiagnosisSymptom } from "@/types";
 import { SymptomTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
+import { SelectDataKey } from "@/components/select-data-key";
 import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
 
@@ -39,18 +40,21 @@ export function Symptom<P = {}>({
 
     const getDefaultValues = useCallback(() => {
         return {
+            ...symptom,
             symptomId: symptom?.symptomId || v4(),
             expression: symptom?.expression || '',
             name: symptom?.name || '',
+            key: symptom?.key || symptom?.name || '',
+            keyId: symptom?.keyId || '',
             weight: symptom?.weight || null,
             type: symptom?.type || SymptomTypes[0].value,
             position: symptom?.position || 1,
-            printable: symptom?.printable || true,
-            ...symptom
+            printable: !!symptom?.printable,
         } satisfies DiagnosisSymptom;
     }, [symptom]);
 
     const {
+        control,
         reset: resetForm,
         watch,
         register,
@@ -131,6 +135,29 @@ export function Symptom<P = {}>({
                     </div>
 
                     <Title>Properties</Title>
+
+                    <div>
+                        <Controller 
+                            control={control}
+                            name="key"
+                            render={({ field: { value, onChange, }, }) => {
+                                return (
+                                    <>
+                                        <Label htmlFor="key" error={!disabled && !value}>Key *</Label>
+                                        <SelectDataKey
+                                            value={`${value || ''}`}
+                                            disabled={false}
+                                            onChange={([item]) => {
+                                                onChange(item.name);
+                                                setValue('name', item?.label, { shouldDirty: true, });
+                                                setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
+                                            }}
+                                        />
+                                    </>
+                                );
+                            }}
+                        />
+                    </div>
 
                     <div>
                         <Label error={!disabled && !name} htmlFor="name">Name *</Label>

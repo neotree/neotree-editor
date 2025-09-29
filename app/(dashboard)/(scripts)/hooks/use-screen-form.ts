@@ -46,6 +46,8 @@ export function useScreenForm({
             storyId: formData?.storyId || '',
             refId: formData?.refId || '',
             refKey: formData?.refKey || '',
+            refIdDataKey: formData?.refIdDataKey || '',
+            refKeyDataKey: formData?.refKeyDataKey || '',
             step: formData?.step || '',
             actionText: formData?.actionText || '',
             contentText: formData?.contentText || '',

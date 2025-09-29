@@ -71,7 +71,7 @@ main();
 
 async function main() {
     try {
-        const country: keyof typeof scripts = 'mwi';
+        const country: keyof typeof scripts = 'zw';
 
         console.log(`Fetching ${country} sites`);
         const sites = await db.query.sites.findMany({
@@ -105,6 +105,16 @@ async function main() {
         let keysMap: tKey[] = [];
 
         const screensKeys = screens.map(s => {
+            if (s.refId) {
+                keysMap.push({
+                    uniqueKey: '',
+                    name: s.refId || '',
+                    label: s.refId || '',
+                    dataType: 'ref_id',
+                    children: [],
+                });
+            }
+
             const key: tKey = {
                 uniqueKey: '',
                 name: s.key || '',

@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { v4 } from "uuid";
 
-import { ScriptField,ScreenReviewField } from "@/types";
+import { ScriptField, ScreenReviewField } from "@/types";
 
 export function useField(field?: ScriptField) {
     const getDefaultValues = useCallback(() => {
@@ -12,8 +12,10 @@ export function useField(field?: ScriptField) {
             fieldId: field?.fieldId || v4(),
             type: field?.type || '',
             key: field?.key || '',
+            keyId: field?.keyId || '',
             label: field?.label || '',
             refKey: field?.refKey || '',
+            refKeyId: field?.refKeyId || '',
             calculation: field?.calculation || '',
             condition: field?.condition || '',
             dataType: field?.dataType || '',
@@ -29,6 +31,10 @@ export function useField(field?: ScriptField) {
             maxDateKey: field?.maxDateKey || '',
             minTimeKey: field?.minTimeKey || '',
             maxTimeKey: field?.maxTimeKey || '',
+            minDateKeyId: field?.minDateKeyId || '',
+            maxDateKeyId: field?.maxDateKeyId || '',
+            minTimeKeyId: field?.minTimeKeyId || '',
+            maxTimeKeyId: field?.maxTimeKeyId || '',
             values: field?.values || '',
             valuesOptions: field?.valuesOptions || [],
             confidential: field?.confidential || false,
