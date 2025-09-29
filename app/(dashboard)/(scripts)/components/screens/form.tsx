@@ -469,7 +469,6 @@ export function ScreenForm({
                                             onChange(item.name);
                                             setValue('refIdDataKey', item?.uniqueKey, { shouldDirty: true, });
                                         }}
-                                        // filterDataKeys={k => k.dataType === 'ref_id'}
                                     />
                                 );
                             }}
@@ -1029,7 +1028,6 @@ export function ScreenForm({
                                                         onChange(item.name);
                                                         setValue('refKeyDataKey', item?.uniqueKey, { shouldDirty: true, });
                                                     }}
-                                                    // filterDataKeys={k => k.dataType === 'ref_id'}
                                                 />
                                             );
                                         }}

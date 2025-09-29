@@ -2,6 +2,7 @@
 
 import { useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
+import { Controller } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { PreferencesForm } from "@/components/preferences-form";
+import { SelectDataKey } from "@/components/select-data-key";
 import { useDiagnosisForm, UseDiagnosisFormParams } from "../../hooks/use-diagnosis-form";
 import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
@@ -23,7 +25,7 @@ export function DiagnosisForm(props: Props) {
     const form = useDiagnosisForm(props);
 
     const {
-        formIsDirty,
+        control,
         saving,
         scriptPageHref,
         disabled,
@@ -48,12 +50,29 @@ export function DiagnosisForm(props: Props) {
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
                 <div>
-                    <Label htmlFor="name" error={!disabled && !name}>Name *</Label>
-                    <Input 
-                        {...register('name', { disabled, required: true, })}
-                        name="name"
+                    <Label htmlFor="key" error={!disabled && !key}>Key *</Label>
+                    {/* <Input 
+                        {...register('key', { disabled, required: true, })}
+                        name="key"
                         noRing={false}
-                        error={!disabled && !name}
+                        error={!disabled && !key}
+                    /> */}
+                    <Controller 
+                        control={control}
+                        name="key"
+                        render={({ field: { value, onChange, }, }) => {
+                            return (
+                                <SelectDataKey
+                                    value={`${value || ''}`}
+                                    disabled={false}
+                                    onChange={([item]) => {
+                                        onChange(item.name);
+                                        setValue('name', item?.label, { shouldDirty: true, });
+                                        setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
+                                    }}
+                                />
+                            );
+                        }}
                     />
                 </div>
 
@@ -69,12 +88,12 @@ export function DiagnosisForm(props: Props) {
                     </div>
 
                     <div className="flex-1">
-                        <Label htmlFor="key" error={!disabled && !key}>Key *</Label>
+                        <Label htmlFor="name" error={!disabled && !name}>Name *</Label>
                         <Input 
-                            {...register('key', { disabled, required: true, })}
-                            name="key"
+                            {...register('name', { disabled, required: true, })}
+                            name="name"
                             noRing={false}
-                            error={!disabled && !key}
+                            error={!disabled && !name}
                         />
                     </div>
                 </div>

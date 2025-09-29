@@ -105,6 +105,8 @@ export type ScriptField = {
 
 export type DiagnosisSymptom = {
     expression: string;
+    key?: string;
+    keyId?: string;
     name: string;
     weight: number | null;
     type: string;
