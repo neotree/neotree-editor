@@ -57,13 +57,13 @@ export function DiagnosesTableRowActions({
                     {!disabled && (
                         <>
                             <DropdownMenuItem 
-                                onClick={() => onCopy()}
+                                onClick={() => setTimeout(() => onCopy(), 0)}
                             >
                                 <Copy className="h-4 w-4 mr-2" /> Copy
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                                onClick={onDelete}
+                                onClick={() => setTimeout(() => onDelete(), 0)}
                                 className="text-danger focus:bg-danger focus:text-danger-foreground"
                             >
                                 <Trash className="mr-2 h-4 w-4" />

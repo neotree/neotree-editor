@@ -73,6 +73,7 @@ export type DataTableProps = DataTableHeaderProps & {
     tableBodyClassname?: string;
     noDataMessage?: React.ReactNode;
     searchKeys?:{position:number,keys:any[]}[];
+    filter?: (rowIndex: number) => boolean;
     onSort?: (oldIndex: number, newIndex: number, sorted: { oldIndex: number, newIndex: number; }[]) => void;
     onSelect?: (selectedIndexes: number[]) => void;
     getRowOptions?: (params: { rowIndex: number; }) => Partial<React.HTMLAttributes<HTMLTableRowElement>>;

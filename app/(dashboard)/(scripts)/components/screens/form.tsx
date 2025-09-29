@@ -9,7 +9,7 @@ import axios from 'axios';
 
 import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
-import { SelectModal } from "@/components/select-modal";
+import { SelectDataKey } from "@/components/select-data-key";
 import { listScreens } from "@/app/actions/scripts";
 import {
     Select,
@@ -34,8 +34,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
-import { ScreenFormDataType, useScriptsContext } from "@/contexts/scripts";
-import { screenTypes, CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from '@/constants';
+import { ScreenFormDataType } from "@/contexts/scripts";
+import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
@@ -70,7 +70,6 @@ export function ScreenForm({
     locked
 }: Props) {
     const router = useRouter();
-    const { dataKeys } = useScriptsContext();
     const [showForm, setShowForm] = useState(!!formData);
 
     const form = useScreenForm({
@@ -106,8 +105,11 @@ export function ScreenForm({
     const repeatable = watch('repeatable');
     const collectionLabel = watch('collectionLabel');
     const key = watch('key');
+    const listStyle = form.watch('listStyle');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+
+    const displayLoader = saving;
 
   const getAlias = useCallback(async (name: string) => {
          if (!name) return;
@@ -232,40 +234,24 @@ export function ScreenForm({
         value: string;
     }) => {
         return (
-            <SelectModal
-                selected={key}
-                error={!disabled && !key}
-                placeholder="Select key"
-                search={{
-                    placeholder: 'Search data keys',
-                }}
-                options={dataKeys.data
-                    .sort((a, b) => {
-                        const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
-                        const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
-                        return aVal - bVal;
-                    })
-                    .map(o => ({
-                        value: o.name,
-                        label: o.name,
-                        description: o.label || '',
-                        caption: o.dataType || '',
-                        // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                    }))}
-                onSelect={([key]) => {
-                    const fullKey = dataKeys.data.find(k => k.name === key?.value);
-                    const children = dataKeys.data
-                        .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
+            <SelectDataKey
+                value={key}
+                disabled={disabled}
+                onChange={([dataKey]) => {
+                    const label = dataKey?.label || '';
+                    const key = dataKey?.name || '';
+                    const children = dataKey?.children || [];
 
-                    setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
-                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
+                    setValue('key', key, { shouldDirty: true, });
+                    setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
+                    setValue('label', label, { shouldDirty: true, });
 
                     if (hasItems) {
                         const items = children.map((k, i) => {
                             return {
                                 itemId: v4(),
                                 id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
-                                label: (k.label || k.name).trim(),
+                                label: k.label,
                                 position: i + 1,
                                 subType: '', // edliz
                                 type: '', // edliz,
@@ -329,13 +315,6 @@ export function ScreenForm({
                                 editable: false,
                             } satisfies ScriptField;
 
-                            if (k.dataType === 'dropdown') {
-                                const valuesArr = dataKeys.data
-                                    .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${k.name}`.toLowerCase()));
-                                const values = valuesArr.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
-                                f.values = values;
-                            }
-
                             return f;
                         });
 
@@ -348,7 +327,7 @@ export function ScreenForm({
 
     return (
         <>
-            {saving && <Loader overlay />}
+            {displayLoader && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
                 <Title>Type</Title>
@@ -473,12 +452,32 @@ export function ScreenForm({
                         />
                     </div>
 
-                    <div>
+                    {/* <div>
                         <Label secondary htmlFor="refId">Ref *</Label>
                         <Input
                             {...register('refId', { disabled, required: true, })}
                             name="refId"
                             noRing={false}
+                        />
+                    </div> */}
+
+                    <div>
+                        <Label htmlFor="refId">Ref *</Label>
+                        <Controller 
+                            control={control}
+                            name="refId"
+                            render={({ field: { value, onChange, }, }) => {
+                                return (
+                                    <SelectDataKey 
+                                        value={`${value || ''}`}
+                                        disabled={false}
+                                        onChange={([item]) => {
+                                            onChange(item.name);
+                                            setValue('refIdDataKey', item?.uniqueKey, { shouldDirty: true, });
+                                        }}
+                                    />
+                                );
+                            }}
                         />
                     </div>
 
@@ -721,7 +720,7 @@ export function ScreenForm({
                     </>
                 )}
 
-                {(isTimerScreen || isYesNoScreen || isSelectScreen) && (
+                {(isTimerScreen || isYesNoScreen || isSelectScreen || isChecklistScreen) && (
                     <div className={cn('flex flex-col gap-y-5', isTimerScreen && 'sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1')}>
                         <div>
                             <Label secondary htmlFor="key">Input key{!isTimerScreen ? ' *' : ''}</Label>
@@ -1015,11 +1014,29 @@ export function ScreenForm({
                             {isManagementScreen && (
                                 <div className="max-w-64">
                                     <Label secondary htmlFor="refKey">Reference key</Label>
-                                    <Input
+
+                                    {/* <Input
                                         {...register('refKey', { disabled, })}
                                         name="refKey"
                                         placeholder="$refKey"
                                         noRing={false}
+                                    /> */}
+
+                                    <Controller 
+                                        control={control}
+                                        name="refKey"
+                                        render={({ field: { value, onChange, }, }) => {
+                                            return (
+                                                <SelectDataKey 
+                                                    value={`${value || ''}`}
+                                                    disabled={false}
+                                                    onChange={([item]) => {
+                                                        onChange(item.name);
+                                                        setValue('refKeyDataKey', item?.uniqueKey, { shouldDirty: true, });
+                                                    }}
+                                                />
+                                            );
+                                        }}
                                     />
                                 </div>
                             )}
@@ -1037,6 +1054,32 @@ export function ScreenForm({
 
                                 <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
                             </div>
+                        </div>
+                    </>
+                )}
+
+                {(isChecklistScreen || isMultiSelectScreen || isEdlizScreen || isDiagnosisScreen) && (
+                    <>
+                        <div>
+                            <Label secondary htmlFor="listStyle">List style</Label>
+                            <Select
+                                value={listStyle}
+                                name="listStyle"
+                                onValueChange={(val: typeof listStyle) => {
+                                    form.setValue('listStyle', val || 'none');
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="bullet">Bullet</SelectItem>
+                                        <SelectItem value="number">Number</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </>
                 )}

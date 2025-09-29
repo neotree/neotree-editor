@@ -48,6 +48,8 @@ export function useScreenForm({
             storyId: formData?.storyId || '',
             refId: formData?.refId || '',
             refKey: formData?.refKey || '',
+            refIdDataKey: formData?.refIdDataKey || '',
+            refKeyDataKey: formData?.refKeyDataKey || '',
             step: formData?.step || '',
             actionText: formData?.actionText || '',
             contentText: formData?.contentText || '',
@@ -72,6 +74,7 @@ export function useScreenForm({
             notes: formData?.notes || '',
             dataType: formData?.dataType || '',
             key: formData?.key || '',
+            keyId: formData?.keyId || '',
             label: formData?.label || '',
             negativeLabel: formData?.negativeLabel || '',
             positiveLabel: formData?.positiveLabel || '',
@@ -94,6 +97,7 @@ export function useScreenForm({
             repeatable:  (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
             collectionName:  formData?.collectionName || '',
             collectionLabel:  formData?.collectionLabel || '',
+            listStyle:  formData?.listStyle || 'none',
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 
