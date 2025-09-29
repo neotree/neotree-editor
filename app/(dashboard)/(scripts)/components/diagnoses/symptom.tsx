@@ -44,7 +44,7 @@ export function Symptom<P = {}>({
             symptomId: symptom?.symptomId || v4(),
             expression: symptom?.expression || '',
             name: symptom?.name || '',
-            key: symptom?.key || symptom?.name || '',
+            key: symptom?.key || '',
             keyId: symptom?.keyId || '',
             weight: symptom?.weight || null,
             type: symptom?.type || SymptomTypes[0].value,
