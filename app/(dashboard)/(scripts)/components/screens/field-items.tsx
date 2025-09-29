@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { v4 as uuidV4 } from 'uuid';
@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader } from '@/components/loader';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,7 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { type DataKey, useDataKeysCtx } from '@/contexts/data-keys';
 import { SelectDataKey } from '@/components/select-data-key';
-import { dataKeyTypes } from '@/constants';
+
 type Item = NonNullable<ScriptField['items']>[0];
 
 export function FieldItems({
@@ -231,7 +230,7 @@ function Form({
                                 render={({ field: { value, onChange, }, }) => {
                                     return (
                                         <SelectDataKey 
-                                            value={`${value}`}
+                                            value={`${value || ''}`}
                                             disabled={false}
                                             onChange={([item]) => {
                                                 onChange(item.name);
@@ -252,9 +251,10 @@ function Form({
                         <div className="px-4">
                             <Label htmlFor="label">Label *</Label>
                             <Input 
+                                disabled
                                 {...register('label', {
                                     required: true,
-                                    disabled: false,
+                                    disabled: true,
                                 })}
                             />
                         </div>

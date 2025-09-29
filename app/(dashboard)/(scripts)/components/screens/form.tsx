@@ -446,12 +446,33 @@ export function ScreenForm({
                         />
                     </div>
 
-                    <div>
+                    {/* <div>
                         <Label secondary htmlFor="refId">Ref *</Label>
                         <Input
                             {...register('refId', { disabled, required: true, })}
                             name="refId"
                             noRing={false}
+                        />
+                    </div> */}
+
+                    <div>
+                        <Label htmlFor="refId">Ref *</Label>
+                        <Controller 
+                            control={control}
+                            name="refId"
+                            render={({ field: { value, onChange, }, }) => {
+                                return (
+                                    <SelectDataKey 
+                                        value={`${value || ''}`}
+                                        disabled={false}
+                                        onChange={([item]) => {
+                                            onChange(item.name);
+                                            setValue('refIdDataKey', item?.uniqueKey, { shouldDirty: true, });
+                                        }}
+                                        // filterDataKeys={k => k.dataType === 'ref_id'}
+                                    />
+                                );
+                            }}
                         />
                     </div>
 
@@ -988,11 +1009,30 @@ export function ScreenForm({
                             {isManagementScreen && (
                                 <div className="max-w-64">
                                     <Label secondary htmlFor="refKey">Reference key</Label>
-                                    <Input
+
+                                    {/* <Input
                                         {...register('refKey', { disabled, })}
                                         name="refKey"
                                         placeholder="$refKey"
                                         noRing={false}
+                                    /> */}
+
+                                    <Controller 
+                                        control={control}
+                                        name="refKey"
+                                        render={({ field: { value, onChange, }, }) => {
+                                            return (
+                                                <SelectDataKey 
+                                                    value={`${value || ''}`}
+                                                    disabled={false}
+                                                    onChange={([item]) => {
+                                                        onChange(item.name);
+                                                        setValue('refKeyDataKey', item?.uniqueKey, { shouldDirty: true, });
+                                                    }}
+                                                    // filterDataKeys={k => k.dataType === 'ref_id'}
+                                                />
+                                            );
+                                        }}
                                     />
                                 </div>
                             )}

@@ -61,6 +61,7 @@ export type ScriptField = {
     keyId?: string;
     label: string;
     refKey: string;
+    refKeyId?: string;
     calculation: string;
     condition: string;
     dataType: string;
@@ -76,6 +77,10 @@ export type ScriptField = {
     maxDateKey: string;
     minTimeKey: string;
     maxTimeKey: string;
+    minDateKeyId?: string;
+    maxDateKeyId?: string;
+    minTimeKeyId?: string;
+    maxTimeKeyId?: string;
     values: string;
     valuesOptions: {
         key: string;
