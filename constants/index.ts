@@ -194,6 +194,11 @@ export const dataKeyTypes: {
         label: 'period',
         hasChildren: false,
     },
+    {
+        value: 'ref_id',
+        label: 'ref_id',
+        hasChildren: false,
+    },
 ]
 
 export const dataKeysSortOpts = [
