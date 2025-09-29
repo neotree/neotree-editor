@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { arrayMoveImmutable } from "array-move";
 import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
 
@@ -26,6 +26,7 @@ export function Symptoms({
     form,
     disabled,
 }: Props) {
+    const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
@@ -92,6 +93,8 @@ export function Symptoms({
 
     return (
         <>
+            <button ref={btnRef} />
+
             <DataTable 
                 title="Symptoms"
                 sortable={!disabled}
@@ -175,7 +178,10 @@ export function Symptoms({
                                         </DropdownMenuSymptom> */}
 
                                         <DropdownMenuItem
-                                            onClick={() => onDelete([rowIndex])}
+                                            onClick={() => {
+                                                btnRef.current?.click?.();
+                                                setTimeout(() => onDelete([rowIndex]), 0);
+                                            }}
                                             className={cn(
                                                 'text-danger focus:bg-danger focus:text-danger-foreground',
                                             )}

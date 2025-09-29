@@ -1,474 +1,323 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { arrayMoveImmutable } from "array-move";
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import queryString from 'query-string';
-import { v4 } from 'uuid';
-import { Controller, useForm, UseFormReturn } from 'react-hook-form';
-import { ChevronDown, ChevronUp, PlusIcon, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import axios from "axios";
 
-import { cn } from '@/lib/utils';
-import { getDataKeysTypes } from '@/lib/data-keys-filter';
-import { Loader } from '@/components/loader';
-import * as actions from '@/app/actions/data-keys';
+import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import * as dialog from '@/components/ui/dialog';
-import * as select from '@/components/ui/select';
-import { DataKey } from "@/databases/queries/data-keys";
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { SelectModal } from '@/components/select-modal';
-import { SaveDataKeysParams } from '@/databases/mutations/data-keys';
-import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
-import { useAppContext } from '@/contexts/app';
+import { DataTable } from '@/components/data-table';
+import { dataKeyTypes } from '@/constants';
+import { Loader } from '@/components/loader';
+import { SelectModal } from "@/components/select-modal";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
-type FormDataWithoutChildren = Partial<DataKey> & 
-    Pick<DataKey, 'uuid' | 'name' | 'label' | 'dataType' |'parentKeys' | 'defaults'>;
-
-type FormData = FormDataWithoutChildren & {
-    children: FormDataWithoutChildren[];
-};
-
-type Props = typeof actions & {
-    open?: boolean;
+export function DataKeyForm(props: {
     disabled?: boolean;
-    dataKeys: DataKey[];
-    dataKey?: FormData;
-    item?: {
-        dataKey: FormData;
-        index: number
-    };
-    modal?: boolean;
-    onOpenChange?: (open: boolean) => void;
-};
+}) {
+    const { loadingDataKeys, } = useDataKeysCtx();
+    
+    if (loadingDataKeys) return <Loader overlay />;
 
-export function DataKeyForm(props: Props) {
-    if (props.modal !== true) return <Form {...props} />;
-
-    return (
-        <>
-            <dialog.Dialog
-                open={props.open}
-                onOpenChange={props.onOpenChange}
-            >
-                <dialog.DialogContent
-                    hideCloseButton
-                    className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl"
-                >
-                    <dialog.DialogHeader className="border-b border-b-border px-4 py-4">
-                        <dialog.DialogTitle>
-                            {props.item?.dataKey ? 'Edit data key' : 'Add data key'}
-                        </dialog.DialogTitle>
-                        <dialog.DialogDescription className="hidden">{''}</dialog.DialogDescription>
-                    </dialog.DialogHeader>
-
-                    {props.open && <Form {...props} />}
-                </dialog.DialogContent>
-            </dialog.Dialog>
-        </>
-    );
+    return <Form {...props} />;
 }
 
-function Form(props: Props) {
-    const scrollableDiv = useRef<HTMLDivElement>(null);
+function Form({
+    disabled,
+}: {
+    disabled?: boolean;
+}) {
+    const { dataKeyId, } = useParams();
 
-    const { 
-        item, 
-        dataKeys,
-        dataKey: dataKeyProp,
-        disabled: disabledProp,
-        onOpenChange,
-    } = props;
+    const { dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
+    const { confirm, } = useConfirmModal();
 
-    const dataKey = dataKeyProp || item?.dataKey;
-
-    const form = useForm<FormData>({
-        defaultValues: {
-            id: dataKey?.id || undefined,
-            uuid: dataKey?.uuid || v4(),
-            name: dataKey?.name || '',
-            label: dataKey?.label || '',
-            dataType: dataKey?.dataType || null,
-            parentKeys: dataKey?.parentKeys || [],
-            defaults: dataKey?.defaults || {},
-            children: dataKey?.children || [],
-        },
-    });
+    const dataKey = useMemo(() => dataKeys.find(k => k.uuid === dataKeyId), [dataKeys, dataKeyId]);
 
     const {
-        formState: {
-            isDirty,
-        },
+        control,
+        register,
         handleSubmit,
-        setValue,
         watch,
-    } = form;
-
-    const { confirm } = useConfirmModal();
-    const { alert } = useAlertModal();
-    const router = useRouter();
-    const { viewOnly, } = useAppContext();
-
-    const onSave = handleSubmit(async ({ children, ...data }) => {
-        try {
-            setLoading(true);
-
-            const keys = [
-                data, 
-                ...children.map(child => ({
-                    ...child,
-                    parentKeys: child.parentKeys.map(pk => pk === dataKey?.name ? data.name : pk),
-                })),
-            ];
-
-            const response = await axios.post('/api/data-keys/save', { 
-                data: keys, 
-                broadcastAction: true, 
-            } satisfies SaveDataKeysParams);
-            const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
-
-            if (res.errors?.length) {
-                alert({
-                    title: 'Error',
-                    message: res.errors.join(', '),
-                    variant: 'error',
-                });
-            } else {
-                router.refresh();
-                alert({
-                    message: "Data key created!",
-                    variant: 'success',
-                    onClose: () => {
-                        onOpenChange?.(false);
-                        router.push('/data-keys?' + queryString.stringify({
-                            sort: data.id ? undefined : 'createdAt.desc',
-                        }));
-                    },
-                });
-            }
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: e.message,
-                variant: 'error',
-            });
-        } finally {
-            setLoading(false);
-        }
+        setValue,
+    } = useForm({
+        defaultValues: {
+            ...dataKey,
+            name: dataKey?.name || '',
+            refId: dataKey?.refId || '',
+            dataType: dataKey?.dataType || '',
+            label: dataKey?.label || '',
+            options: dataKey?.options || [],
+            metadata: dataKey?.metadata || {},
+            version: dataKey?.version || 1,
+        },
     });
 
-    const [visibleChildren, setVisible] = useState<Record<string, boolean>>({});
-    const [loading, setLoading] = useState(false);
-
-    const name = watch('name');
     const dataType = watch('dataType');
-    const children = watch('children');
+    const options = watch('options');
 
-    const disabled = viewOnly || !!disabledProp;
-    const hasChildren = [
-        'dropdown',
-        'checklist',
-        'diagnosis',
-        'drug',
-        'fluid',
-        'multi_select',
-        'single_select',
-        'zw_edliz_summary_table_option',
-        'mwi_edliz_summary_table_option',
-    ].includes(dataType!);
-    const canAddOption = hasChildren && !disabledProp;
+    const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
+
+    const onSave = handleSubmit(async data => {
+        await saveDataKeys([data as DataKeyFormData], err => {
+            if (!err) window.location.href = '/data-keys';
+        });
+    });
+
+    const isFormDisabled = disabled || saving;
+
+    const children = useMemo(() => {
+        return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
+    }, [dataKeys, options]);
+
+    const displayLoader = loadingDataKeys || saving;
+
 
     return (
         <>
-            {loading && <Loader overlay />}
+            {displayLoader && <Loader overlay />}
 
-            <div ref={scrollableDiv} className="flex-1 flex flex-col gap-y-4 overflow-y-auto px-4 py-2">
-                <FormFields 
-                    {...props}
-                    form={form}
-                    disabled={disabled}
-                />
+            <Card>
+                <CardContent>
+                    <CardHeader>
+                        <CardTitle>{!dataKey ? 'New' : 'Edit'} data key</CardTitle>
+                        <CardDescription className="hidden">{''}</CardDescription>
+                    </CardHeader>
 
-                {!hasChildren ? null : (
-                    <>
-                        <div className="mt-2 flex items-center">
-                            <h1 className="text-xl flex-1">Options</h1>
-                            {canAddOption && (
-                                <div className="w-[130px]">
-                                    <SelectModal
-                                        disabled={disabled}
-                                        selected={[]}
-                                        placeholder="Add option"
-                                        search={{
-                                            placeholder: 'Search data keys',
-                                        }}
-                                        options={dataKeys
-                                            .sort((a, b) => {
-                                                const aVal = a.dataType !== `${dataType}_option` ? 1 : 0;
-                                                const bVal = b.dataType !== `${dataType}_option` ? 1 : 0;
-                                                return aVal - bVal;
-                                            })
-                                            .filter(k => !children.map(k => k.name).includes(k.name)).map(o => ({
-                                                value: o.name,
-                                                label: o.name,
-                                                description: o.label || '',
-                                                caption: o.dataType || '',
-                                                // disabled: o.dataType !== `${dataType}_option`,
-                                            })) }
-                                        onSelect={([key]) => {
-                                            const _dataKey = dataKeys.find(k => k.name === key?.value);
-                                            if (_dataKey) {
-                                                const i = children.length;
-                                                const dataKey = { ..._dataKey!, parentKeys: [..._dataKey!.parentKeys, name], };
-                                                setValue(`children.${i}`, dataKey, { shouldDirty: true, });
-                                                setTimeout(() => {
-                                                    setValue(`children.${i}.uuid`, dataKey.uuid, { shouldDirty: true, shouldTouch: true, });
-                                                    setValue(`children.${i}.name`, dataKey.name, { shouldDirty: true, shouldTouch: true, });
-                                                    setValue(`children.${i}.label`, dataKey.label, { shouldDirty: true, shouldTouch: true, });
-                                                    setValue(`children.${i}.dataType`, dataKey.dataType, { shouldDirty: true, shouldTouch: true, });
-                                                    setValue(`children.${i}.parentKeys`, dataKey.parentKeys, { shouldDirty: true, shouldTouch: true, });
-                                                }, 0);
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                    <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
+                        <Controller 
+                            control={control}
+                            name="dataType"
+                            disabled={isFormDisabled}
+                            rules={{ required: true, }}
+                            render={({ field: { value, onChange, } }) => {
+                                return (
+                                    <>
+                                        <div className="px-4">
+                                            <Label htmlFor="name">Data type *</Label>
+                                            <Select
+                                                value={value}
+                                                name="name"
+                                                onValueChange={val => {
+                                                    onChange(val);
 
-                        {children.map((child, i) => {
-                            const childKey = `children.${i}`;
-                            const isVisible = visibleChildren[childKey];
-                            const toggle = () => setVisible(prev => ({
-                                ...prev,
-                                [childKey]: !prev[childKey],
-                            }));
+                                                    const dataTypeInfo = dataKeyTypes.find(t => t.value === val);
 
-                            return (
-                                <Card key={child.uuid}>
-                                    <CardContent className="px-4 py-4">
-                                        <div className="flex items-center gap-x-2">
-                                            <div className="flex-1">
-                                                <div 
-                                                    role="button"
-                                                    className={cn(
-                                                        'text-sm font-bold',
-                                                        isVisible && 'hidden',
-                                                    )}
-                                                    onClick={toggle}
-                                                >{child.label}</div>
-                                            </div>
-
-                                            <button
-                                                className={cn(disabled && 'hidden')}
-                                                onClick={() => {
-                                                    confirm(
-                                                        () => setValue(
-                                                            'children',
-                                                            children.filter((_, j) => j !== i),
-                                                            { shouldDirty: true, },
-                                                        ),
-                                                        {
-                                                            title: 'Delete option',
-                                                            message: 'Are you sure?',
-                                                            danger: true,
-                                                        },
+                                                    setValue(
+                                                        'options',
+                                                        !dataTypeInfo?.hasChildren ? [] : (dataKey?.options || []),
                                                     );
                                                 }}
                                             >
-                                                <X className="size-4 opacity-40" />
-                                            </button>
-
-                                            <button
-                                                className="h-auto"
-                                                onClick={toggle}
-                                            >
-                                                {!isVisible ? 
-                                                    <ChevronDown className="size-4 opacity-40" />
-                                                    :
-                                                    <ChevronUp className="size-4 opacity-40" />}
-                                            </button>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        {dataKeyTypes.map((t) => (
+                                                            <SelectItem key={t.value} value={t.value}>
+                                                                {t.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
+                                    </>
+                                );
+                            }}
+                        />
 
-                                        {isVisible && (
-                                            <div 
-                                                className={cn(
-                                                    'flex flex-col mt-5 gap-y-2',
-                                                )}
-                                            >
-                                                <FormFields 
-                                                    {...props}
-                                                    form={form}
-                                                    disabled={disabled}
-                                                    childIndex={i}
-                                                />
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </>
-                )}
-            </div>
+                        <div className="px-4">
+                            <Label htmlFor="name">Key *</Label>
+                            <Input 
+                                disabled={isFormDisabled}
+                                {...register('name', {
+                                    disabled: isFormDisabled,
+                                    required: true,
+                                })}
+                            />
+                        </div>
 
-            {props.modal ? (
-                <dialog.DialogFooter className="border-t border-t-border px-4 py-2 items-center w-full">
-                    <dialog.DialogClose asChild>
+                        <div className="px-4">
+                            <Label htmlFor="label">Label *</Label>
+                            <Input 
+                                disabled={isFormDisabled}
+                                {...register('label', {
+                                    disabled: isFormDisabled,
+                                    required: true,
+                                })}
+                            />
+                        </div>
+
+                        <div className="px-4 hidden">
+                            <Label htmlFor="refId">Ref ID</Label>
+                            <Input 
+                                disabled={isFormDisabled}
+                                {...register('refId', {
+                                    disabled: isFormDisabled,
+                                    required: false,
+                                })}
+                            />
+                        </div>
+
+                        <Controller
+                            control={control}
+                            name="options"
+                            disabled={isFormDisabled}
+                            render={({ field: { value, onChange, }, }) => {
+                                if (!dataTypeInfo?.hasChildren) return <></>;
+
+                                return (
+                                    <div className="mt-4 pt-4 border-t border-t-border">
+                                        <DataTable 
+                                            sortable={!disabled}
+                                            onSort={(oldIndex: number, newIndex: number) => {
+                                                const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
+                                                onChange(sorted);
+                                            }}
+                                            search={{}}
+                                            title="Options"
+                                            headerActions={(
+                                                <>
+                                                    <SelectModal 
+                                                        multiple
+                                                        search={{
+                                                            placeholder: 'Search data keys',
+                                                        }}
+                                                        options={dataKeys.filter(k => !options.includes(k.uniqueKey)).map(k => ({
+                                                            label: k.name,
+                                                            value: k.uniqueKey,
+                                                            caption: k.dataType || '',
+                                                            description: k.label,
+                                                        }))}
+                                                        trigger={(
+                                                            <Button 
+                                                                variant="ghost"
+                                                                className="w-auto h-auto"
+                                                            >
+                                                                <PlusIcon className="w-4 h-4 mr-2" />
+                                                                Add
+                                                            </Button>
+                                                        )}
+                                                        onSelect={(keys) => {
+                                                            onChange([...value, ...keys.map(k => k.value)]);
+                                                        }}
+                                                    />
+                                                </>
+                                            )}
+                                            noDataMessage={(
+                                                <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
+                                                    <div>Data keys has no options</div>
+                                                </div>
+                                            )}
+                                            columns={[
+                                                {
+                                                    name: 'Key',
+                                                },
+                                                {
+                                                    name: 'Label',
+                                                },
+                                                {
+                                                    name: 'Data type',
+                                                },
+
+                                                {
+                                                    name: '',
+                                                    align: 'right',
+                                                    cellClassName: 'w-20',
+                                                    cellRenderer({ rowIndex }) {
+                                                        const child = value[rowIndex];
+
+                                                        if (!child || disabled) return null;
+
+                                                        return (
+                                                            <>
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </DropdownMenuTrigger>
+
+                                                                    <DropdownMenuContent>
+                                                                        <DropdownMenuItem 
+                                                                            className="text-destructive"
+                                                                            onClick={() => setTimeout(() => confirm(
+                                                                                () => setValue(
+                                                                                    'options',
+                                                                                    options.filter((_, i) => i !== rowIndex),
+                                                                                ),
+                                                                                {
+                                                                                    title: 'Delete',
+                                                                                    message: 'Are you sure you want to delete data key option?',
+                                                                                    danger: true,
+                                                                                },
+                                                                            ), 0)}
+                                                                        >
+                                                                            <TrashIcon className="h-4 w-4 mr-2" /> Delete
+                                                                        </DropdownMenuItem>
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </>
+                                                        );
+                                                    },
+                                                }
+                                            ]}
+                                            data={children.map(v => [
+                                                v.name || '',
+                                                v.label || '',
+                                                v.dataType || '',
+                                                '',
+                                            ])}
+                                        />
+                                    </div>
+                                );
+                            }}  
+                        />
+                    </div>
+
+                    <br />
+
+                    <CardFooter className="gap-x-2">
+                        <div className="ml-auto" />
+
                         <Button
+                            asChild
                             variant="ghost"
                         >
-                            Cancel
+                            <Link href="/data-keys">Cancel</Link>
                         </Button>
-                    </dialog.DialogClose>
 
-                    <Button
-                        onClick={onSave}
-                    >
-                        Save
-                    </Button>
-                </dialog.DialogFooter>
-            ) : (
-                <div className="flex items-center justify-end border-t border-t-border px-4 py-2 w-full gap-x-4">
-                    <Button
-                        asChild
-                        variant="ghost"
-                    >
-                        <Link
-                            href="/data-keys"
-                        >
-                            Cancel
-                        </Link>
-                    </Button>
-
-                    <Button
-                        disabled={disabled || !isDirty}
-                        onClick={onSave}
-                    >
-                        Save
-                    </Button>
-                </div>
-            )}
-        </>
-    );
-}
-
-function FormFields({ 
-    disabled,
-    childIndex,
-    dataKeys,
-    form: {
-        control,
-        register,
-    },
-}: Props & {
-    childIndex?: number;
-    form: UseFormReturn<FormData>;
-    disabled: boolean;
-}) {
-    const types = useMemo(() => getDataKeysTypes(dataKeys).map(k => k.value), [dataKeys]);
-
-    const dataTypeKey = (childIndex === undefined ? 
-        'dataType' 
-        : 
-        `children.${childIndex}.dataType`
-    ) as any;
-
-    const labelKey = (childIndex === undefined ? 
-        'label' 
-        : 
-        `children.${childIndex}.label`
-    ) as any;
-
-    const nameKey = (childIndex === undefined ? 
-        'name' 
-        : 
-        `children.${childIndex}.name`
-    ) as any;
-
-    return (
-        <>
-            <div>
-                <Label htmlFor={dataTypeKey}>Type *</Label>
-                <Controller
-                    control={control}
-                    name={dataTypeKey}
-                    rules={{
-                        required: true,
-                    }}
-                    render={({ field: { value, onChange, } }) => {
-                        return (
-                            <select.Select
-                                value={value || undefined}
-                                onValueChange={v => onChange(v)}
-                                disabled={disabled}
+                        {!disabled && (
+                            <Button
+                                onClick={() => onSave()}
+                                disabled={isFormDisabled}
                             >
-                                <select.SelectTrigger>
-                                    <select.SelectValue 
-                                        placeholder=""
-                                    />
-                                </select.SelectTrigger>
-                
-                                <select.SelectContent>
-                                    {types.map(t => {
-                                        return (
-                                            <select.SelectItem
-                                                key={t}
-                                                value={t}
-                                            >
-                                                {t}
-                                            </select.SelectItem>
-                                        )
-                                    })}
-                                </select.SelectContent>
-                            </select.Select>
-                        );
-                    }}
-                />
-            </div>
-
-            <div>
-                <Label htmlFor={nameKey}>Key *</Label>
-                <Controller
-                    control={control}
-                    name={nameKey}
-                    rules={{ required: true, }}
-                    render={({ field: { value, name, onChange, onBlur, } }) => {
-                        return (
-                            <Input 
-                                name={name}
-                                disabled={disabled}
-                                value={value}
-                                onChange={onChange}
-                                onBlur={onBlur}
-                            />
-                        )
-                    }}
-                />
-            </div>
-
-            <div>
-                <Label htmlFor={labelKey}>Label *</Label>
-                <Controller
-                    control={control}
-                    name={labelKey}
-                    rules={{ required: true, }}
-                    render={({ field: { value, name, onChange, onBlur, } }) => {
-                        return (
-                            <Input 
-                                name={name}
-                                disabled={disabled}
-                                value={value}
-                                onChange={onChange}
-                                onBlur={onBlur}
-                            />
-                        )
-                    }}
-                />
-            </div>
+                                Save
+                            </Button>
+                        )}
+                    </CardFooter>
+                </CardContent>
+            </Card>
         </>
     );
 }

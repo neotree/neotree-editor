@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
 import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
 import { useQueryState } from 'nuqs';
@@ -26,6 +26,7 @@ export function Items({
     form,
     disabled,
 }: Props) {
+    const btnRef = useRef<HTMLButtonElement>(null);
     const screenType = form.getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isChecklistScreen = screenType === 'checklist';
@@ -108,6 +109,8 @@ export function Items({
 
     return (
         <>
+            <button ref={btnRef} />
+
             {!!currentItem && (
                 <Item
                     open={!!currentItem}
@@ -190,7 +193,10 @@ export function Items({
                                         </DropdownMenuItem> */}
 
                                         <DropdownMenuItem
-                                            onClick={() => onDelete([rowIndex])}
+                                            onClick={() => {
+                                                btnRef.current?.click?.();
+                                                setTimeout(() => onDelete([rowIndex]), 0);
+                                            }}
                                             className={cn(
                                                 'text-danger focus:bg-danger focus:text-danger-foreground',
                                             )}

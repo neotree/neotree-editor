@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 } from "uuid";
 import { Controller, useForm } from "react-hook-form";
-import { FilterIcon } from "lucide-react";
 
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { ScriptItem as ItemType } from "@/types";
@@ -22,10 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { SelectModal } from "@/components/select-modal";
-import { useScriptsContext } from "@/contexts/scripts";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DATA_KEYS_MAP } from "@/constants";
+import { SelectDataKey } from "@/components/select-data-key";
 
 type Props = {
     open: boolean;
@@ -59,8 +55,6 @@ export function Item<P = {}>({
     const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
-
-    const { dataKeys } = useScriptsContext();
 
     const [isCustomType, setIsCustomType] = useState(false);
     const [isCustomSubType, setIsCustomSubType] = useState(false);
@@ -159,50 +153,19 @@ export function Item<P = {}>({
         const _type = screenType + '_option';
 
         return (
-            <SelectModal
+            <SelectDataKey
                 modal
-                selected={key}
-                disabled={isKeyDisabled}
-                error={(isKeyDisabled || disabled) ? undefined : (!key || keyHasError)}
+                value={key}
                 placeholder={label}
-                search={{
-                    placeholder: 'Search data keys',
-                }}
-                options={dataKeys.data
-                    .sort((a, b) => {
-                        const aVal = !DATA_KEYS_MAP[screenType!].includes(a.dataType!) ? 1 : 0;
-                        const bVal = !DATA_KEYS_MAP[screenType!].includes(b.dataType!) ? 1 : 0;
-                        return aVal - bVal;
-                    })
-                    .map(o => ({
-                        value: o.name,
-                        label: o.name,
-                        description: o.label || '',
-                        caption: o.dataType || '',
-                        // disabled: !DATA_KEYS_MAP[screenType!].includes(o.dataType!),
-                    }))}
-                onSelect={([key]) => {
-                    setValue(variant, `${key?.value || ''}`, { shouldDirty: true, });
-                    setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
-                }}
-                header={(
-                    <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Button
-                                variant="ghost"
-                            >
-                                <FilterIcon className="size-4" />
-                                Filter
-                            </Button>
-                        </DropdownMenuTrigger>
+                disabled={isKeyDisabled}
+                onChange={([dataKey]) => {
+                    const label = dataKey?.label || '';
+                    const key = dataKey?.name || '';
 
-                        <DropdownMenuContent>
-                            <DropdownMenuItem>
-                                
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                    setValue(variant, key, { shouldDirty: true, });
+                    setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
+                    setValue('label', label, { shouldDirty: true, });
+                }}
             />
         );
     }

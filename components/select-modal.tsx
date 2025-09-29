@@ -1,8 +1,7 @@
 'use client';
 
-import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,20 +16,22 @@ import {
     DialogTrigger, 
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 
-type Option = {
+export type SelectModalOption = {
     value: string | number;
     label: string | number;
     description?: string;
     caption?: string;
     disabled?: boolean;
+    data?: Record<string, any>;
 };
 
 type Props = {
     modal?: boolean;
     placeholder?: string;
     selected?: string | number | (string | number)[];
-    options: Option[];
+    options: SelectModalOption[];
     multiple?: boolean;
     error?: boolean;
     disabled?: boolean;
@@ -38,7 +39,10 @@ type Props = {
         placeholder?: string;
     };
     header?: React.ReactNode;
-    onSelect: (selected: Option[]) => void;
+    loading?: boolean;
+    trigger?: React.ReactNode;
+    onSelect: (selected: SelectModalOption[]) => void;
+    onTrigger?: () => void;
 };
 
 export function SelectModal({ 
@@ -58,55 +62,12 @@ export function SelectModal({
         if (value) selectedValueExists = !!options.find(o => o.value === value);
     }
 
-    if (selectedValueExists) {
-        return (
-            <>
-                <Modal 
-                    {...props}
-                    options={options}
-                    selected={selected}
-                />
-            </>
-        );
-    }
-
     return (
-        <div className="relative flex gap-x-2 items-center">
-            <Popover modal={props.modal}>
-                <PopoverTrigger>
-                    <AlertCircle className="size-4 text-destructive" />
-                </PopoverTrigger>
-                <PopoverContent className="p-0 bg-background">
-                    <div className="p-4 bg-destructive/20 text-destructive">
-                        <b>{selected[0]}</b> is not defined in the datakeys library. Click <b>`change`</b> to select from the library
-                    </div>
-                </PopoverContent>
-            </Popover>
-            
-            <Input 
-                disabled
-                value={selected[0]}
-                onChange={() => {}}
-                className="w-full disabled:opacity-70 pr-1w-16"
-            />
-
-            <Modal 
-                {...props}
-                options={options}
-                selected={selected}
-                trigger={(
-                    <div
-                        role={props.disabled ? undefined : 'button'}
-                        className={cn(
-                            'w-16 absolute top-0 right-0 h-full text-xs flex items-center justify-center px-2',
-                            props.disabled ? 'opacity-70' : 'text-primary',
-                        )}
-                    >
-                        Change
-                    </div>
-                )}
-            />
-        </div>
+        <Modal 
+            {...props}
+            options={options}
+            selected={selected}
+        />
     );
 }
 
@@ -121,16 +82,18 @@ function Modal({
     selected: selectedProp,
     options: optionsProp = [],
     trigger,
+    onTrigger,
     onSelect,
 }: Omit<Props, 'selected' | 'options'> & {
     selected: string[];
-    options: (Omit<Option, 'value'> & {
+    options: (Omit<SelectModalOption, 'value'> & {
         value: string;
     })[];
-    trigger?: React.ReactNode;
 }) {
     const [searchValue, setSearchValue] = useState('');
-    const deferredSearchValue = useDeferredValue(searchValue);
+    const searchValueDebounced = useDebounce(searchValue);
+
+    const [selectedPending, setSelectedPending] = useState<SelectModalOption['value'][]>([]);
 
     const selected = useMemo(() => {
         if (!selectedProp) {
@@ -144,9 +107,11 @@ function Modal({
     }, [selectedProp, optionsProp]);
 
     const options = useMemo(() => {
-        return optionsProp
+        const filtered = optionsProp
             .map(o => {
-                const isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
+                let isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
+                isSelected = isSelected || selectedPending.includes(o.value);
+
                 return {
                     ...o,
                     isSelected,
@@ -162,8 +127,15 @@ function Modal({
                 const v2 = b.isSelected ? 1 : 0;
                 return v2 - v1;
             })
-            .filter(o => `${o?.value || ''}`.includes(deferredSearchValue));
-    }, [optionsProp, deferredSearchValue, selected]);
+            .filter(o => JSON.stringify([
+                o.value || '', 
+                o.label || '', 
+                // o.caption || '', 
+                o.description || '',
+            ]).toLowerCase().match(searchValueDebounced.toLowerCase()));
+
+        return filtered;
+    }, [optionsProp, searchValueDebounced, selected, selectedPending]);
 
     useEffect(() => () => setSearchValue(''), []);
 
@@ -173,6 +145,7 @@ function Modal({
                 modal={modal}
                 onOpenChange={() => {
                     setSearchValue('');
+                    setSelectedPending([]);
                 }}
             >
                 <DialogTrigger asChild>
@@ -184,6 +157,7 @@ function Modal({
                                 'justify-between w-full',
                                 error && 'border border-destructive hover:bg-destructive/10',
                             )}
+                            onClick={onTrigger}
                         >
                             <span className={!selected.length ? 'opacity-50' : ''}>{selected[0]?.label  || placeholder || ''}</span>
                             <ChevronsUpDown className="size-4 opacity-50" />
@@ -224,9 +198,17 @@ function Modal({
                                         onClick={() => {
                                             if (o.disabled) return;
                                             if (o.isSelected) {
-                                                onSelect?.(selected.filter(s => s.value !== o.value));
+                                                if (multiple) {
+                                                    setSelectedPending(prev => prev.filter(v => v !== o.value));
+                                                } else {
+                                                    onSelect?.(selected.filter(s => s.value !== o.value));
+                                                }
                                             } else {
-                                                onSelect?.(multiple ? [...selected, o] : [o]);
+                                                if (multiple) {
+                                                    setSelectedPending(prev => [...prev, o.value]);
+                                                } else {
+                                                    onSelect?.([o]);
+                                                }
                                             }
                                         }}
                                         className={cn(
@@ -251,7 +233,7 @@ function Modal({
                     </div>
 
                     <DialogFooter
-                        className="border-t border-t-border px-4 py-2 items-center w-full"
+                        className="border-t border-t-border px-4 py-2 items-center w-full gap-x-2"
                     >
                         <DialogClose asChild>
                             <Button
@@ -260,6 +242,21 @@ function Modal({
                                 Close
                             </Button>
                         </DialogClose>
+
+                        {!!selectedPending.length && (
+                            <DialogClose asChild>
+                                <Button
+                                    onClick={() => {
+                                        onSelect?.(
+                                            selectedPending.map(v => options.find(o => o.value === v)!)
+                                                .filter(o => o)
+                                        );
+                                    }}
+                                >
+                                    Save
+                                </Button>
+                            </DialogClose>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

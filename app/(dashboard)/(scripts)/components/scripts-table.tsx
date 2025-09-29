@@ -13,7 +13,6 @@ import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { LockStatus } from "../../lock-status"
-import { ScriptsTableHeaderActions } from "./scripts-table-header-actions";
 
 
 type Props = UseScriptsTableParams;
@@ -83,6 +82,7 @@ export function ScriptsTable(props: Props) {
                     maxRows={25}
                     onSort={onSort}
                     // headerActions={<ScriptsTableHeaderActions />}
+                    search={{ inputPlaceholder: 'Search scripts', }}
                     getRowOptions={({ rowIndex }) => {
                         const s = scripts.data[rowIndex];
                         return !s ? {} : {

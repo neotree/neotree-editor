@@ -73,7 +73,19 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
         if (keys.length) {
             const existing = await _getDrugsLibraryItems({ keys });
 
-            data = data.filter(item => !existing.data.map(d => d.key).includes(item.key!));
+            data = data
+                .filter(item => !existing.data.map(d => d.key).includes(item.key!))
+                .map(item => ({
+                    ...item,
+                    itemId: undefined,
+                    createdAt: undefined,
+                    updatedAt: undefined,
+                    deletedAt: undefined,
+                    publishDate: undefined,
+                    id: undefined,
+                    position: undefined,
+                    version: undefined,
+                }));
 
             if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
         }
@@ -85,7 +97,7 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
     } 
 }
 
-export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastAction, }: {
+export async function _saveDrugsLibraryItemsUpdateIfExists({ data, broadcastAction, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
 }) {
@@ -106,6 +118,7 @@ export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastA
                     publishDate: found?.publishDate || item.publishDate,
                     id: found?.id || item.id,
                     position: found?.position || item.position,
+                    version: found?.version || item.version,
                 };
             });
 

@@ -42,7 +42,7 @@ export function ConfigKeysTableActions({ item }: {
 
                     {!disabled && (
                         <DropdownMenuItem
-                            onClick={() => onDelete([item.configKeyId])}
+                            onClick={() => setTimeout(() => onDelete([item.configKeyId]), 0)}
                             className="text-danger focus:bg-danger focus:text-danger-foreground"
                         >
                             <Trash className="mr-2 h-4 w-4" />

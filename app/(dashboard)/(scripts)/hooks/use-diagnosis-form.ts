@@ -36,6 +36,7 @@ export function useDiagnosisForm({
             name: formData?.name || '',
             description: formData?.description || '',
             key: formData?.key || '',
+            keyId: formData?.keyId || '',
             expression: formData?.expression || '',
             expressionMeaning: formData?.expressionMeaning || '',
             severityOrder: formData?.severityOrder || null,

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { arrayMoveImmutable } from "array-move";
 import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
 import { useQueryState } from 'nuqs';
@@ -28,6 +28,7 @@ export function Fields({
     disabled,
     scriptId
 }: Props) {
+    const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
@@ -99,6 +100,8 @@ export function Fields({
 
     return (
         <>
+            <button ref={btnRef} />
+
             {!!currentField && (
                 <Field
                     open={!!currentField}
@@ -182,7 +185,10 @@ export function Fields({
                                         </DropdownMenuItem> */}
 
                                         <DropdownMenuItem
-                                            onClick={() => onDelete([rowIndex])}
+                                            onClick={() => {
+                                                btnRef.current?.click?.();
+                                                setTimeout(() => onDelete([rowIndex]), 0);
+                                            }}
                                             className={cn(
                                                 'text-danger focus:bg-danger focus:text-danger-foreground',
                                             )}

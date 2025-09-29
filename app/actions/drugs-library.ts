@@ -1,7 +1,10 @@
 'use server';
 
+import { getSiteAxiosClient } from "@/lib/server/axios";
 import { 
     _saveDrugsLibraryItems, 
+    _saveDrugsLibraryItemsIfKeysNotExist,
+    _saveDrugsLibraryItemsUpdateIfExists,
     _deleteDrugsLibraryItems,
     _copyDrugsLibraryItems,
     _removeDrugLibraryItemsReferences 
@@ -14,6 +17,10 @@ import {
 } from "@/databases/queries/drugs-library";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+
+export const saveDrugsLibraryItemsIfKeysNotExist = _saveDrugsLibraryItemsIfKeysNotExist;
+
+export const saveDrugsLibraryItemsUpdateIfExists = _saveDrugsLibraryItemsUpdateIfExists;
 
 export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async (...args) => {
     try {
@@ -79,3 +86,62 @@ export const removeDrugLibraryItemsReferences: typeof _removeDrugLibraryItemsRef
         return { errors: [e.message], data: { success: false }, };
     }
 };
+
+export const exportDrugLibraryItems = async ({
+    uuids,
+    siteId,
+    overwriteExisting,
+}: {
+    uuids: string[];
+    siteId: string;
+    overwriteExisting?: boolean;
+}): Promise<{
+    success: boolean;
+    errors?: string[];
+}> => {
+    try {
+        const axiosClient = await getSiteAxiosClient(siteId);
+        
+        const drugLibraryItems = await _getDrugsLibraryItems({
+            itemsIds: uuids,
+            returnDraftsIfExist: true,
+        });
+
+        if (drugLibraryItems.errors?.length) {
+            return {
+                success: false,
+                errors: drugLibraryItems.errors,
+            };
+        }
+
+        let errors: string[] = [];
+
+        if (drugLibraryItems.data.length) {
+            if (overwriteExisting) {
+                const res = await axiosClient.post<Awaited<ReturnType<typeof saveDrugsLibraryItemsIfKeysNotExist>>>('/api/drugs-library/save-and-update-if-exist', {
+                    data: drugLibraryItems.data,
+                    broadcastAction: true,
+                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0]);
+
+                if (res.data.errors) errors = res.data.errors;
+            } else {
+                const res = await axiosClient.post<Awaited<ReturnType<typeof saveDrugsLibraryItemsIfKeysNotExist>>>('/api/drugs-library/save-if-not-exist', {
+                    data: drugLibraryItems.data,
+                    broadcastAction: true,
+                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0]);
+
+                if (res.data.errors) errors = res.data.errors;
+            }
+        }
+
+        return {
+            success: !errors.length,
+            errors: errors.length ? errors : undefined,
+        };
+    } catch(e: any) {
+        return {
+            success: false,
+            errors: [e.message],
+        };
+    }
+}

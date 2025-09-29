@@ -19,10 +19,12 @@ import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
+import { ActionsBar } from "@/components/actions-bar";
 import { DrugsLibraryForm } from "./form";
 import { createLock } from "@/app/actions/locks";
 import { Add } from "./add";
 import axios from 'axios';
+import { ExportModal } from "./export-modal";
 
 type Props = {
     locked?: boolean
@@ -31,6 +33,8 @@ type Props = {
 export function DrugsLibrary({ locked }: Props) {
     const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
+
+    const [selected, setSelected] = useState<number[]>([]);
 
     // const searchParams = useSearchParams();
     // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
@@ -96,8 +100,21 @@ export function DrugsLibrary({ locked }: Props) {
             />
             </div>
 
-            <DataTable
+            {!!selected.length && (
+                <ActionsBar>
+                    <ExportModal 
+                        uuids={drugs.filter((_, i) => selected.includes(i)).map(k => k.itemId!)}
+                    />
+                </ActionsBar>
+            )}
+
+            <DataTable 
+                onSelect={setSelected}
+                selectable={!disabled}
                 title="Drugs & Fluids Library"
+                search={{
+                    inputPlaceholder: 'Search',
+                }}
                 headerActions={(
                     <>
                         <Add
@@ -160,13 +177,15 @@ export function DrugsLibrary({ locked }: Props) {
                                             </DropdownMenuItem>
 
                                             {!disabled && (
-                                                <DropdownMenuItem
-                                                    onClick={() => confirm(() => copyDrugs([item.itemId!]), {
-                                                        title: 'Copy drug',
-                                                        message: `Are you sure you want to copy drug?<br /> <b>${item.drug}</b>`,
-                                                        positiveLabel: 'Yes, copy',
-                                                        negativeLabel: 'Cancel',
-                                                    })}
+                                                <DropdownMenuItem 
+                                                    onClick={() => setTimeout(() => {
+                                                        confirm(() => copyDrugs([item.itemId!]), {
+                                                            title: 'Copy drug',
+                                                            message: `Are you sure you want to copy drug?<br /> <b>${item.drug}</b>`,
+                                                            positiveLabel: 'Yes, copy',
+                                                            negativeLabel: 'Cancel',
+                                                        });
+                                                    }, 0)}
                                                 >
                                                     <>
                                                         <CopyIcon className="mr-2 h-4 w-4" /> Copy
@@ -176,13 +195,15 @@ export function DrugsLibrary({ locked }: Props) {
 
                                             {!disabled && (
                                                 <DropdownMenuItem
-                                                    onClick={() => confirm(() => deleteDrugs([item.itemId!]), {
-                                                        title: 'Delete drug',
-                                                        message: 'Are you sure you want to delete drug?',
-                                                        positiveLabel: 'Yes, delete',
-                                                        negativeLabel: 'Cancel',
-                                                        danger: true,
-                                                    })}
+                                                    onClick={() => setTimeout(() => {
+                                                        confirm(() => deleteDrugs([item.itemId!]), {
+                                                            title: 'Delete drug',
+                                                            message: 'Are you sure you want to delete drug?',
+                                                            positiveLabel: 'Yes, delete',
+                                                            negativeLabel: 'Cancel',
+                                                            danger: true,
+                                                        });
+                                                    }, 0)}
                                                     className="text-danger focus:bg-danger focus:text-danger-foreground"
                                                 >
                                                     <Trash className="mr-2 h-4 w-4" />

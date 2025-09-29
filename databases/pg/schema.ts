@@ -68,8 +68,8 @@ export const screenTypeEnum = pgEnum('screen_type', [
 // DRUG TYPE ENUM
 export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 
-export const lockStatusEnum = pgEnum('lock_status', ['opened', 'editing']);
-
+// LIST STYLE ENUM
+export const listStyleEnum = pgEnum('list_style', ['none', 'number', 'bullet']);
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
@@ -224,6 +224,9 @@ export const sites = pgTable('nt_sites', {
     apiKey: text('api_key').notNull(),
     type: siteTypeEnum('type').notNull(),
     env: siteEnvEnum('env').notNull().default('production'),
+    displayName: text('display_name'),
+    countryISO: text('country_iso'),
+    countryName: text('country_name'),
     
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -426,11 +429,13 @@ export const scripts = pgTable(
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
         printConfig: jsonb('print_config').notNull()
             .default(`{
+              "headerFormat": "",
               "headerFields": [],
               "footerFields": [],
               "sections": []
             }`)
             .$type<{
+                headerFormat?: string;
                 headerFields: string[],
                 footerFields: string[],
                 sections: any[],
@@ -539,7 +544,9 @@ export const screens = pgTable(
         epicId: text('epic_id').notNull().default(''),
         storyId: text('story_id').notNull().default(''),
         refId: text('ref_id').notNull().default(''),
+        refIdDataKey: text('ref_id_data_key').notNull().default(''),
         refKey: text('ref_key').notNull().default(''),
+        refKeyDataKey: text('ref_key_data_key').notNull().default(''),
         step: text('step').notNull().default(''),
         actionText: text('action_text').notNull().default(''),
         contentText: text('content_text').notNull().default(''),
@@ -565,6 +572,7 @@ export const screens = pgTable(
         notes: text('notes').notNull().default(''),
         dataType: text('data_type').notNull().default(''),
         key: text('key').notNull().default(''),
+        keyId: text('key_id').notNull().default(''),
         label: text('label').notNull().default(''),
         negativeLabel: text('negative_label').notNull().default(''),
         positiveLabel: text('positive_label').notNull().default(''),
@@ -584,6 +592,7 @@ export const screens = pgTable(
         fluids: jsonb('fluids').default('[]').$type<FluidField[]>().notNull(),
         feeds: jsonb('feeds').default('[]').$type<FeedField[]>().notNull(),
         reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
+        listStyle: listStyleEnum('list_style').default('none').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -692,6 +701,7 @@ export const diagnoses = pgTable(
         name: text('name').notNull().default(''),
         description: text('description').notNull().default(''),
         key: text('key').default(''),
+        keyId: text('key_id').notNull().default(''),
         severityOrder: integer('severity_order'),
         expressionMeaning: text('expression_meaning').notNull().default(''),
         symptoms: jsonb('symptoms').default('[]').$type<DiagnosisSymptom[]>().notNull(),
@@ -796,6 +806,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
     key: text('key').notNull().unique(),
+    keyId: text('key_id').notNull().default(''),
     type: drugTypeEnum('type').notNull().default('drug'),
     drug: text('drug').notNull().default(''),
     minGestation: doublePrecision('min_gestation'),
