@@ -21,7 +21,6 @@ export function DataKeysTable({ disabled, }: {
     const { 
         dataKeys,
         selected,
-        currentDataKeyUuid, 
         filter: filterValue,
         deleting,
         loadingDataKeys,
@@ -78,6 +77,7 @@ export function DataKeysTable({ disabled, }: {
             },
             {
                 name: 'Ref ID',
+                cellClassName: 'hidden',
             },
             {
                 name: 'Data type',
