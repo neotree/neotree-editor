@@ -319,7 +319,6 @@ export function Field<P = {}>({
                                                     onChange(item.name);
                                                     setValue('refKeyId', item?.uniqueKey, { shouldDirty: true, });
                                                 }}
-                                                // filterDataKeys={k => k.dataType === 'ref_id'}
                                             />
                                         );
                                     }}
@@ -519,7 +518,6 @@ export function Field<P = {}>({
                                                                     onChange(item.name);
                                                                     setValue('minDateKeyId', item?.uniqueKey, { shouldDirty: true, });
                                                                 }}
-                                                                // filterDataKeys={k => k.dataType === 'ref_id'}
                                                             />
                                                         );
                                                     }}
@@ -571,7 +569,6 @@ export function Field<P = {}>({
                                                                     onChange(item.name);
                                                                     setValue('maxDateKeyId', item?.uniqueKey, { shouldDirty: true, });
                                                                 }}
-                                                                // filterDataKeys={k => k.dataType === 'ref_id'}
                                                             />
                                                         );
                                                     }}
