@@ -170,7 +170,7 @@ function Form({
                             />
                         </div>
 
-                        <div className="px-4">
+                        <div className="px-4 hidden">
                             <Label htmlFor="refId">Ref ID</Label>
                             <Input 
                                 disabled={isFormDisabled}
