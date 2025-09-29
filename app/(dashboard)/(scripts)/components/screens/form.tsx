@@ -239,7 +239,6 @@ export function ScreenForm({
                     setValue('key', key, { shouldDirty: true, });
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
-                    if (dataKey?.refId) setValue('refId', dataKey.refId, { shouldDirty: true, });
 
                     if (hasItems) {
                         const items = children.map((k, i) => {
