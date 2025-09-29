@@ -15,6 +15,7 @@ export function SelectDataKey({
     modal,
     multiple,
     placeholder,
+    error,
     onChange,
     filterDataKeys,
 }: {
@@ -23,6 +24,7 @@ export function SelectDataKey({
     modal?: boolean;
     multiple?: boolean;
     placeholder?: string;
+    error?: boolean;
     filterDataKeys?: (dataKey: DataKey) => boolean;
     onChange?: (value: OnChangeValue[]) => void
 }) {
@@ -43,7 +45,7 @@ export function SelectDataKey({
             <SelectModal 
                 multiple={multiple}
                 modal={modal}
-                error={!disabled && !value}
+                error={error}
                 placeholder={`${value || ''}` || placeholder || 'Select key'}
                 search={{
                     placeholder: 'Search data keys',

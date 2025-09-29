@@ -302,10 +302,26 @@ export function Field<P = {}>({
 
                             <div>
                                 <Label htmlFor="refKey">Reference Key</Label>
-                                <Input
+                                {/* <Input
                                     {...register('refKey', { disabled, })}
                                     name="refKey"
                                     noRing={false}
+                                /> */}
+                                <Controller 
+                                    control={control}
+                                    name="refKey"
+                                    render={({ field: { value, onChange, }, }) => {
+                                        return (
+                                            <SelectDataKey 
+                                                value={`${value || ''}`}
+                                                disabled={false}
+                                                onChange={([item]) => {
+                                                    onChange(item.name);
+                                                    setValue('refKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                }}
+                                            />
+                                        );
+                                    }}
                                 />
                                 <span className="text-xs text-muted-foreground">Link this field to <b>another field with this key</b></span>
                             </div>
@@ -485,10 +501,26 @@ export function Field<P = {}>({
 
                                             <div>
                                                 <Label htmlFor="minDateKey">Min Date Key e.g $DateOfBirth</Label>
-                                                <Input
+                                                {/* <Input
                                                     {...register('minDateKey', { disabled, })}
                                                     name="minDateKey"
                                                     noRing={false}
+                                                /> */}
+                                                <Controller 
+                                                    control={control}
+                                                    name="minDateKey"
+                                                    render={({ field: { value, onChange, }, }) => {
+                                                        return (
+                                                            <SelectDataKey 
+                                                                value={`${value || ''}`}
+                                                                disabled={false}
+                                                                onChange={([item]) => {
+                                                                    onChange(item.name);
+                                                                    setValue('minDateKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                                }}
+                                                            />
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -520,10 +552,26 @@ export function Field<P = {}>({
 
                                             <div>
                                                 <Label htmlFor="maxDateKey">Max Date Key e.g $DateOfBirth</Label>
-                                                <Input
+                                                {/* <Input
                                                     {...register('maxDateKey', { disabled, })}
                                                     name="maxDateKey"
                                                     noRing={false}
+                                                /> */}
+                                                <Controller 
+                                                    control={control}
+                                                    name="maxDateKey"
+                                                    render={({ field: { value, onChange, }, }) => {
+                                                        return (
+                                                            <SelectDataKey 
+                                                                value={`${value || ''}`}
+                                                                disabled={false}
+                                                                onChange={([item]) => {
+                                                                    onChange(item.name);
+                                                                    setValue('maxDateKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                                }}
+                                                            />
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         </div>
