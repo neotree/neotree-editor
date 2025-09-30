@@ -52,27 +52,28 @@ import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
 import { LockStatus } from "@/components/lock-status";
+import { ScriptType } from "@/databases/queries/scripts";
 
 type Props = {
     scriptId: string;
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
     screens: Awaited<ReturnType<typeof listScreens>>['data'];
+    script: ScriptType;
 };
 
-export function ScreenForm({
-    formData,
-    scriptId,
-    countDiagnosesScreens,
-    screens,
-}: Props) {
+export function ScreenForm(props: Props) {
+    const {
+        formData,
+        scriptId,
+        countDiagnosesScreens,
+        screens,
+    } = props;
+
     const router = useRouter();
     const [showForm, setShowForm] = useState(!!formData);
 
-    const form = useScreenForm({
-        formData,
-        scriptId,
-    });
+    const form = useScreenForm(props);
 
     const {
         isLocked,
@@ -81,6 +82,8 @@ export function ScreenForm({
         saving,
         scriptPageHref,
         disabled,
+        isScriptLocked,
+        scriptLockedByUserId,
         register,
         watch,
         setValue,
@@ -122,12 +125,12 @@ export function ScreenForm({
         getAlias(key)
     }, [getAlias,key]);
 
-    const lockStatus = !isLocked ? null : (
+    const lockStatus = !(isLocked || isScriptLocked) ? null : (
         <div>
             <LockStatus 
                 card
-                isDraft={!!formData?.isDraft}
-                userId={formData?.draftCreatedByUserId}
+                isDraft={!!formData?.isDraft || isScriptLocked}
+                userId={formData?.draftCreatedByUserId || scriptLockedByUserId}
                 dataType="screen"
             />
         </div>

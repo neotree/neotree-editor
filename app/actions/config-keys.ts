@@ -5,10 +5,13 @@ import { _getConfigKey, _getConfigKeys, _countConfigKeys, _defaultConfigKeysCoun
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 
-export const deleteConfigKeys: typeof _deleteConfigKeys = async (...args) => {
+export const deleteConfigKeys: typeof _deleteConfigKeys = async params => {
     try {
-        await isAllowed();
-        return await _deleteConfigKeys(...args);
+        const session = await isAllowed();
+        return await _deleteConfigKeys({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('deleteConfigKeys ERROR', e.message);
         return { errors: [e.message], success: false, };

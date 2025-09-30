@@ -18,12 +18,16 @@ import { useIsLocked } from "@/hooks/use-is-locked";
 type Props = {
     disabled: boolean;
     screen: Awaited<ReturnType<IScriptsContext['getScreens']>>['data'][0];
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
     onDelete: () => void;
     onCopy: () => void;
 };
 
 export function ScreensTableRowActions({ 
     disabled,
+    isScriptLocked,
+    scriptLockedByUserId,
     screen: { screenId, isDraft, draftCreatedByUserId, },
     onDelete, 
     onCopy,
@@ -33,8 +37,8 @@ export function ScreensTableRowActions({
     const editHref = `/script/${scriptId}/screen/${screenId}`;
 
     const lockStatusParams: LockStatusProps = {
-        isDraft,
-        userId: draftCreatedByUserId,
+        isDraft: isDraft || !!isScriptLocked,
+        userId: draftCreatedByUserId || scriptLockedByUserId,
         dataType: 'screen',
     };
 

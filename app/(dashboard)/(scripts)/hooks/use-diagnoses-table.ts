@@ -11,11 +11,17 @@ import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
 
 export type UseDiagnosesTableParams = {
+    disabled?: boolean;
     diagnoses: Awaited<ReturnType<IScriptsContext['getDiagnoses']>>;
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
     loadDiagnoses: () => Promise<void>;
 };
 
 export function useDiagnosesTable({
+    disabled: disabledProp,
+    isScriptLocked,
+    scriptLockedByUserId,
     diagnoses: diagnosesParam,
     loadDiagnoses,
 }: UseDiagnosesTableParams) {
@@ -112,7 +118,7 @@ export function useDiagnosesTable({
         router.refresh();
     }, [saveDiagnoses, loadDiagnoses, diagnoses, router]);
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly]);
 
     return {
         diagnoses,
@@ -120,6 +126,8 @@ export function useDiagnosesTable({
         selected,
         disabled,
         diagnosesIdsToCopy, 
+        isScriptLocked,
+        scriptLockedByUserId,
         setDiagnosesIdsToCopy,
         onDelete,
         onSort,

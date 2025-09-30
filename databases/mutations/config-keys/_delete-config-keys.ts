@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 export type DeleteConfigKeysData = {
     configKeysIds: string[];
     broadcastAction?: boolean;
+    userId?: string | null;
 };
 
 export type DeleteConfigKeysResponse = { 
@@ -27,7 +28,7 @@ export async function _deleteAllConfigKeysDrafts(opts?: {
 }
 
 export async function _deleteConfigKeys(
-    { configKeysIds: configKeysIdsParam, broadcastAction, }: DeleteConfigKeysData,
+    { configKeysIds: configKeysIdsParam, broadcastAction, userId, }: DeleteConfigKeysData,
 ) {
     const response: DeleteConfigKeysResponse = { success: false, };
 
@@ -48,7 +49,11 @@ export async function _deleteConfigKeys(
                 .leftJoin(pendingDeletion, eq(pendingDeletion.configKeyId, configKeys.configKeyId))
                 .where(inArray(configKeys.configKeyId, configKeysIds));
 
-            const pendingDeletionInsertData = configKeysArr.filter(s => !s.pendingDeletion);
+            const pendingDeletionInsertData = configKeysArr.filter(s => !s.pendingDeletion).map(s => ({
+                ...s,
+                createdByUserId: userId,
+            }));
+            
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
         }
 

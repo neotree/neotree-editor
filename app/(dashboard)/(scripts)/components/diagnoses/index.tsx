@@ -10,9 +10,12 @@ import { DiagnosesTable } from './table';
 
 type Props = {
     scriptId: string;
+    disabled?: boolean;
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
 };
 
-export default function Diagnoses({ scriptId }: Props) {
+export default function Diagnoses({ scriptId, disabled, isScriptLocked, scriptLockedByUserId }: Props) {
     const [loading, setLoading] = useState(false);
     const [diagnoses, setDiagnoses] = useState<Awaited<ReturnType<typeof scriptsActions.getDiagnoses>>>({ data: [], });
 
@@ -42,6 +45,8 @@ export default function Diagnoses({ scriptId }: Props) {
             <DiagnosesTable 
                 diagnoses={diagnoses}
                 loadDiagnoses={loadDiagnoses}
+                isScriptLocked={isScriptLocked}
+                scriptLockedByUserId={scriptLockedByUserId}
             />
         </>
     );

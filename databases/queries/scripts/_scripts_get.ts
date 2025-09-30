@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, scriptsDrafts, pendingDeletion, hospitals } from "@/databases/pg/schema";
+import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
 import { _getScreens } from "./_screens_get";
@@ -26,6 +26,8 @@ export type ScriptType = typeof scripts.$inferSelect & {
     printSections: PrintSection[];
     hospitalName: string;
     draftCreatedByUserId?: string | null;
+    hasChangedItems?: boolean;
+    itemsChangedByUserId?: string | null;
 };
 
 export type GetScriptsResults = {
@@ -57,14 +59,10 @@ export async function _getOldScript(script:string):Promise<any> {
  return oldScript?.map(os=>os.oldScript)??[];
 }
 
-
-
-
 export async function _getScripts(
     params?: GetScriptsParams
 ): Promise<GetScriptsResults> {
     try {
-       
         let { 
             scriptsIds = [], 
             hospitalIds = [],
@@ -168,6 +166,14 @@ export async function _getScripts(
                 ...s,
                 hospitalId: s.hospitalName ? s.hospitalId : null,
             }));
+
+        let i = 0;
+        for (const s of responseData) {
+            const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [s.scriptId], });
+            responseData[i].hasChangedItems = !!item?.hasChangedItems;
+            responseData[i].itemsChangedByUserId = item?.itemsDeletedByUserId || null;
+            i++;
+        }
         
         return  { 
             data: responseData,
@@ -216,7 +222,13 @@ export async function _getScript(
             isDeleted: false,
         } as GetScriptResults['data'];
 
-        if (responseData) return { data: responseData, };
+        if (responseData) {
+            const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
+            responseData.hasChangedItems = !!item?.hasChangedItems;
+            responseData.itemsChangedByUserId = item.itemsDeletedByUserId || null;
+
+            return { data: responseData, };
+        }
 
         const publishedRes = await db
             .select({
@@ -258,6 +270,10 @@ export async function _getScript(
 
         if (!responseData) return { data: null, };
 
+        const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
+        responseData.hasChangedItems = !!item?.hasChangedItems;
+        responseData.itemsChangedByUserId = item.itemsDeletedByUserId || null;
+
         return  { 
             data: responseData, 
         };
@@ -267,3 +283,73 @@ export async function _getScript(
     }
 } 
 
+export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
+    userId?: string | null;
+    scriptsIds: string[];
+}) {
+    const data: {
+        hasDraftedScreens: boolean;
+        hasDraftedDiagnoses: boolean;
+        hasDeletedItems: boolean;
+        hasChangedItems: boolean;
+        screensDraftsCreatedByUserId: string | null | undefined;
+        diagnosesDraftsCreatedByUserId: string | null | undefined;
+        itemsDeletedByUserId: string | null | undefined;
+        itemsChangedByUserId: string | null | undefined;
+    }[] = [];
+
+    try {
+        for (const scriptId of scriptsIds) {
+            const screenDraft = await db.query.screensDrafts.findFirst({
+                where: or(
+                    eq(screensDrafts.scriptDraftId, scriptId),
+                    eq(screensDrafts.scriptId, scriptId),
+                ),
+                columns: {
+                    createdByUserId: true,
+                },
+            });
+
+            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
+                where: or(
+                    eq(diagnosesDrafts.scriptDraftId, scriptId),
+                    eq(diagnosesDrafts.scriptId, scriptId),
+                ),
+                columns: {
+                    createdByUserId: true,
+                },
+            });
+
+            const _pendingDeletion = await db.query.pendingDeletion.findMany({
+                where: or(
+                    eq(pendingDeletion.scriptDraftId, scriptId),
+                    eq(pendingDeletion.screenScriptId, scriptId),
+                    eq(pendingDeletion.diagnosisScriptId, scriptId),
+                    // eq(pendingDeletion.scriptId, scriptId),
+                ),
+                columns: {
+                    createdByUserId: true,
+                },
+            });
+
+            const pendingDeletionBy = _pendingDeletion.find(s => s.createdByUserId);
+
+            const _data: typeof data[0] = {
+                hasDraftedScreens: !!screenDraft?.createdByUserId,
+                hasDraftedDiagnoses: !!diagnosisDraft?.createdByUserId,
+                hasDeletedItems: !!_pendingDeletion?.length,
+                hasChangedItems: !!screenDraft?.createdByUserId || !!diagnosisDraft?.createdByUserId || !!_pendingDeletion?.length,
+                screensDraftsCreatedByUserId: screenDraft?.createdByUserId,
+                diagnosesDraftsCreatedByUserId: diagnosisDraft?.createdByUserId,
+                itemsDeletedByUserId: pendingDeletionBy?.createdByUserId,
+                itemsChangedByUserId: screenDraft?.createdByUserId || diagnosisDraft?.createdByUserId || pendingDeletionBy?.createdByUserId,
+            };
+
+            data.push(_data);
+        }
+        return { data, };
+    } catch(e: any) {
+        logger.error('_getScriptsRelationsChanges ERROR', e.message);
+        return { errors: [e.message], data, };
+    }
+}

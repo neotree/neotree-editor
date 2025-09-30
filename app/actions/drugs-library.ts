@@ -57,10 +57,13 @@ export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async params
     }
 };
 
-export const deleteDrugsLibraryItems: typeof _deleteDrugsLibraryItems = async (...args) => {
+export const deleteDrugsLibraryItems: typeof _deleteDrugsLibraryItems = async params => {
     try {
-        await isAllowed();
-        return await _deleteDrugsLibraryItems(...args);
+        const session = await isAllowed();
+        return await _deleteDrugsLibraryItems({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('deleteDrugsLibraryItems ERROR', e.message);
         return { errors: [e.message], success: false, };
