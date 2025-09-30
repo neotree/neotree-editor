@@ -17,6 +17,7 @@ export type GetConfigKeysResults = {
         isDraft: boolean;
         isDeleted: boolean;
         preferences: Preferences;
+        draftCreatedByUserId?: string | null;
     })[];
     errors?: string[];
 };
@@ -86,6 +87,7 @@ export async function _getConfigKeys(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetConfigKeysResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)

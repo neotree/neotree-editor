@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { arrayMoveImmutable } from "array-move";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -11,10 +12,12 @@ import { useAppContext } from "@/contexts/app";
 
 export type UseScreensTableParams = {
     screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
+    loadScreens: () => Promise<void>;
 };
 
 export function useScreensTable({
     screens: screensParam,
+    loadScreens,
 }: UseScreensTableParams) {
     const [screens, setScreens] = useState(screensParam);
     const [loading, setLoading] = useState(false);
@@ -73,29 +76,41 @@ export function useScreensTable({
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
         const payload: { screenId: string; position: number; }[] = [];
-        const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
-            const s = screens.data[oldIndex];
-            let position = s.position;
-            if (oldIndex !== newIndex) {
-                // position = newIndex + 1;
-                position = screens.data[newIndex].position;
-                payload.push({ screenId: s.screenId, position, });
-            }
+
+        const sorted = arrayMoveImmutable([...screens.data], oldIndex, newIndex).map((s, i) => {
+            const newPosition = screens.data[i].position;
+            if (newPosition !== s.position) payload.push({ screenId: s.screenId, position: newPosition, });
             return {
                 ...s,
-                position,
+                position: newPosition,
             };
-        }).sort((a, b) => a.position - b.position);
+        });
+
+        // const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
+        //     const s = screens.data[oldIndex];
+        //     let position = s.position;
+        //     if (oldIndex !== newIndex) {
+        //         // position = newIndex + 1;
+        //         position = screens.data[newIndex].position;
+        //         payload.push({ screenId: s.screenId, position, });
+        //     }
+        //     return {
+        //         ...s,
+        //         position,
+        //     };
+        // }).sort((a, b) => a.position - b.position);
 
         setScreens(prev => ({ ...prev, data: sorted, }));
         
-        // await saveScreens({ data: payload, broadcastAction: true, });
+        await saveScreens({ data: payload, broadcastAction: true, });
 
         // TODO: Replace this with server action
         await axios.post('/api/screens/save', { data: payload, broadcastAction: true, });
 
+        await loadScreens();
+
         router.refresh();
-    }, [saveScreens, screens, router]);
+    }, [saveScreens, loadScreens, screens, router]);
 
     const disabled = useMemo(() => viewOnly, [viewOnly]);
 

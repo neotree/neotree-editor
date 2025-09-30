@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { IScriptsContext } from "@/contexts/scripts";
+import { LockStatus, type LockStatusProps } from "@/components/lock-status";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 type Props = {
     disabled: boolean;
@@ -22,7 +24,7 @@ type Props = {
 
 export function ScreensTableRowActions({ 
     disabled,
-    screen: { screenId },
+    screen: { screenId, isDraft, draftCreatedByUserId, },
     onDelete, 
     onCopy,
 }: Props) {
@@ -30,8 +32,20 @@ export function ScreensTableRowActions({
 
     const editHref = `/script/${scriptId}/screen/${screenId}`;
 
+    const lockStatusParams: LockStatusProps = {
+        isDraft,
+        userId: draftCreatedByUserId,
+        dataType: 'screen',
+    };
+
+    const isLocked = useIsLocked(lockStatusParams);
+
+    disabled = disabled || isLocked;
+
     return (
-        <>
+        <div className="flex gap-x-2">
+            <LockStatus {...lockStatusParams} />
+
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button 
@@ -73,6 +87,6 @@ export function ScreensTableRowActions({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
-        </>
+        </div>
     );
 }
