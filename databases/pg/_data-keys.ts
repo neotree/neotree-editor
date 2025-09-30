@@ -44,6 +44,7 @@ export const dataKeysDrafts = pgTable('nt_data_keys_drafts', {
     uniqueKey: uuid('unique_key').notNull(),
     dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
     data: jsonb('data').$type<typeof dataKeys.$inferInsert>().notNull(),
+    createdByUserId: uuid('created_by_user_id'),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),

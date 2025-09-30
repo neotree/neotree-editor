@@ -40,10 +40,13 @@ export const getConfigKey: typeof _getConfigKey = async (...args) => {
     return await _getConfigKey(...args);
 };
 
-export const saveConfigKeys: typeof _saveConfigKeys = async (...args) => {
+export const saveConfigKeys: typeof _saveConfigKeys = async (params) => {
     try {
-        await isAllowed();
-        return await _saveConfigKeys(...args);
+        const session = await isAllowed();
+        return await _saveConfigKeys({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };

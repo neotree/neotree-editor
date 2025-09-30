@@ -6,12 +6,12 @@ import { drugsLibraryDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import { _getScreens } from '@/databases/queries/scripts';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
-import { _saveScreens } from '@/databases/mutations/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
     broadcastAction?: boolean;
+    userId?: string;
 };
 
 export type DeleteDrugsLibraryItemsResponse = { 
@@ -29,7 +29,7 @@ export async function _deleteAllDrugsLibraryItemsDrafts(): Promise<boolean> {
 }
 
 export async function _deleteDrugsLibraryItems(
-    { itemsIds: itemsIdsParam, broadcastAction, }: DeleteDrugsLibraryItemsData,
+    { itemsIds: itemsIdsParam, broadcastAction, userId, }: DeleteDrugsLibraryItemsData,
 ) {
     const response: DeleteDrugsLibraryItemsResponse = { success: false, };
 
@@ -47,7 +47,7 @@ export async function _deleteDrugsLibraryItems(
             }));
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
-            await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), });
+            await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), userId, });
         }
 
         response.success = true;

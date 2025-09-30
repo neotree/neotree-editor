@@ -15,10 +15,11 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently}: {
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, }: {
     data: SaveDiagnosesData[],
-    broadcastAction?: boolean,
-    syncSilently?:boolean
+    broadcastAction?: boolean;
+    userId?: string;
+    syncSilently?: boolean;
     
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
@@ -110,6 +111,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently}: {
                                     diagnosisDraftId: diagnosisId,
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
+                                    createdByUserId: userId,
                                 });
 
                                 sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();
