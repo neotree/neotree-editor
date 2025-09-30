@@ -15,9 +15,11 @@ export type DeleteDataKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllDataKeysDrafts(): Promise<boolean> {
+export async function _deleteAllDataKeysDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(dataKeysDrafts);
+        await db.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;

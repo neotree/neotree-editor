@@ -946,6 +946,7 @@ export const pendingDeletion = pgTable(
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -1010,5 +1011,9 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     alias: one(aliases, {
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
+    }),
+    createdBy: one(users, {
+        fields: [pendingDeletion.createdByUserId],
+        references: [users.userId],
     }),
 }));

@@ -35,7 +35,9 @@ export function PublishDrafts({ variant, }: Props) {
             // const res = await _publishData();
 
             // TODO: Replace this with server action
-            const response = await axios.post('/api/ops/publish-data');
+            const response = await axios.post('/api/ops/publish-data', {
+                scope: Number(scope),
+            } satisfies Parameters<typeof _publishData>[0]);
             const res = response.data as Awaited<ReturnType<typeof _publishData>>;
 
             if (res.errors) {
@@ -61,7 +63,7 @@ export function PublishDrafts({ variant, }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_publishData, alert]);
+    }, [scope, _publishData, alert]);
 
     const discardDrafts = useCallback(async () => {
         try {
@@ -70,7 +72,9 @@ export function PublishDrafts({ variant, }: Props) {
             // const res = await _discardDrafts();
 
             // TODO: Replace this with server action
-            const response = await axios.post('/api/ops/discard-drafts');
+            const response = await axios.post('/api/ops/discard-drafts', {
+                scope: Number(scope),
+            } satisfies Parameters<typeof _discardDrafts>[0]);
             const res = response.data as Awaited<ReturnType<typeof _discardDrafts>>;
 
             if (res.errors) {
@@ -96,7 +100,7 @@ export function PublishDrafts({ variant, }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_discardDrafts, alert]);
+    }, [scope, _discardDrafts, alert]);
 
     const trigger = variant === 'discard' ? (
         <Button
