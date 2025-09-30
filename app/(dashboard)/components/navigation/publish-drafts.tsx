@@ -3,33 +3,30 @@
 import { useCallback, useState } from "react";
 import axios from "axios";
 
-import { Content } from "@/components/content";
 import { useAppContext } from "@/contexts/app";
 import { Button } from "@/components/ui/button";
-import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
-import { cn } from "@/lib/utils";
-import { PublishDrafts } from "./publish-drafts";
+import { Dialog, DialogDescription, DialogHeader, DialogContent, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import ucFirst from "@/lib/ucFirst";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 type Props = {
-
+    variant: 'publish' | 'discard';
 };
 
-export function TopBar({}: Props) {
-    const { confirm } = useConfirmModal();
+const scopeOptions = [
+    { label: 'my changes only', value: '0', },
+    { label: 'everything', value: '1', },
+];
+
+export function PublishDrafts({ variant, }: Props) {
     const { alert } = useAlertModal();
     const [loading, setLoading] = useState(false);
-    const { 
-        mode, 
-        sys,
-        shouldPublishData,
-        isAdmin, 
-        isSuperUser,
-        setMode,
-        publishData: _publishData, 
-        discardDrafts: _discardDrafts 
-    } = useAppContext();
+    const [scope, setScope] = useState<'0' | '1'>('0');
+
+    const { publishData: _publishData, discardDrafts: _discardDrafts, } = useAppContext();
 
     const publishData = useCallback(async () => {
         try {
@@ -101,39 +98,62 @@ export function TopBar({}: Props) {
         }
     }, [_discardDrafts, alert]);
 
-    const usePlainBg = sys.data.use_plain_background === 'yes';
-    const canSwitchModes = isAdmin || isSuperUser;
+    const trigger = variant === 'discard' ? (
+        <Button
+            variant="destructive"
+            className="h-auto text-xs px-2 py-1"
+        >
+            Discard changes
+        </Button>
+    ) : (
+        <Button className="h-auto text-xs px-4 py-1">
+            Publish
+        </Button>
+    )
 
     return (
         <>
             {loading && <Loader overlay />}
 
-            <Content className="p-0 flex items-center justify-center h-full">
-                <div className="text-secondary-foreground flex items-center justify-center gap-x-2 text-xs">
-                    <span>You&apos;re in <b>{mode}</b> mode</span>
+            <Dialog>
+                <DialogTrigger asChild>
+                    {trigger}
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{ucFirst(variant)} data</DialogTitle>
+                        <DialogDescription></DialogDescription>
+                    </DialogHeader>
 
-                    <a 
-                        href="#"
-                        className={cn(
-                            usePlainBg ? 'text-primary' : 'text-primary',
-                            !canSwitchModes && 'hidden',
-                        )}
-                        onClick={e => {
-                            e.preventDefault();
-                            setMode(mode === 'development' ? 'view' : 'development');
-                        }}
-                    >
-                        Switch to <b>{mode === 'development' ? 'view' : 'development'}</b> mode
-                    </a>
+                    <div>
+                        <RadioGroup
+                            defaultValue={scopeOptions[0].value}
+                            onValueChange={value => setScope(value as typeof scope)}
+                            className="flex flex-col gap-y-4"
+                        >
+                            {scopeOptions.map(t => (
+                                <div key={t.value} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={t.value} id={t.value} />
+                                    <Label secondary htmlFor={t.value}>{ucFirst(variant)} {t.label}</Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </div>
 
-                    {(mode === 'development') && shouldPublishData && (isSuperUser || isAdmin) && (
-                        <>
-                            <PublishDrafts variant="publish" />
-                            <PublishDrafts variant="discard" />
-                        </>
-                    )}
-                </div>
-            </Content>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="ghost">Cancel</Button>
+                        </DialogClose>
+
+                        <Button
+                            variant={variant === 'discard' ? 'destructive' : undefined}
+                            onClick={variant === 'discard' ? discardDrafts : publishData}
+                        >
+                            {ucFirst(variant)} data
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
