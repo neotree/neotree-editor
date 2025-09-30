@@ -42,7 +42,10 @@ export function ConfigKeysContextProvider({
     );
 }
 
-export type FormDataType = Parameters<IConfigKeysContext['saveConfigKeys']>[0]['data'][0];
+export type FormDataType = Parameters<IConfigKeysContext['saveConfigKeys']>[0]['data'][0] & {
+    isDraft?: boolean;
+    draftCreatedByUserId?: string | null;
+};
 
 function useConfigKeysContentHook({
     configKeys: configKeysProp,

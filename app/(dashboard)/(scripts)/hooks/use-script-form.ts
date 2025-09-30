@@ -12,6 +12,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { resetDrugsLibraryState } from "@/hooks/use-drugs-library";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 export type UseScriptFormParams = {
     formData?: ScriptFormDataType;
@@ -108,7 +109,12 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const isLocked = useIsLocked({
+        isDraft: !!params.formData?.isDraft,
+        userId: params.formData?.draftCreatedByUserId,
+    });
+
+    const disabled = useMemo(() => viewOnly || isLocked, [viewOnly, isLocked]);
 
     return {
         ...params,
@@ -116,6 +122,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         formIsDirty,
         loading,
         disabled,
+        isLocked,
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,

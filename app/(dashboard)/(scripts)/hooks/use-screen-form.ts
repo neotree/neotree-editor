@@ -9,6 +9,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 export type UseScreenFormParams = {
     scriptId: string;
@@ -157,7 +158,16 @@ export function useScreenForm({
         }
     });
 
-    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+    const isLocked = useIsLocked({
+        isDraft: !!formData?.isDraft,
+        userId: formData?.draftCreatedByUserId,
+    });
+
+    const disabled = useMemo(() => (
+        saving || 
+        viewOnly || 
+        isLocked
+    ), [saving, viewOnly, isLocked]);
 
     return {
         ...form,
@@ -165,6 +175,7 @@ export function useScreenForm({
         saving,
         scriptPageHref,
         disabled,
+        isLocked,
         save,
         getDefaultValues,
     }
