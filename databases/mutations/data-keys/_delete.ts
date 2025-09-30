@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import {getChangedDataKeys} from "../script-lock/_script_lock_save"
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -17,7 +18,11 @@ export type DeleteDataKeysResponse = {
 
 export async function _deleteAllDataKeysDrafts(): Promise<boolean> {
     try {
-        await db.delete(dataKeysDrafts);
+        const myChangedDataKeys = await getChangedDataKeys()
+        if(myChangedDataKeys.length>0){
+           await db.delete(dataKeysDrafts);
+        return true;  
+        }
         return true;
     } catch(e: any) {
         throw e;

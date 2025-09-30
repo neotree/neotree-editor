@@ -4,6 +4,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion } from "@/databases/pg/schema";
 import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history";
+import {existsByLockTypeAndUser} from "../script-lock"
 import { v4 } from "uuid";
 
 export async function _publishDrugsLibraryItems(opts?: {
@@ -13,6 +14,8 @@ export async function _publishDrugsLibraryItems(opts?: {
     const errors: string[] = [];
 
     try {
+        const iMadeChanges = await existsByLockTypeAndUser('drug_library')
+        if(!!iMadeChanges){
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.drugsLibraryItemId),
             columns: { drugsLibraryItemId: true, },
@@ -133,6 +136,9 @@ export async function _publishDrugsLibraryItems(opts?: {
         }
 
         results.success = true;
+    }else{
+        results.success = true;
+    }
     } catch(e: any) {
         results.success = false;
         results.errors = [e.message];

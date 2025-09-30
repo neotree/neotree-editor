@@ -9,13 +9,14 @@ export function useTable({ props: _props }: {
 }) {
     const mounted = useRef(false);
 
-    const { selectable, sortable, selectedIndexes, columns, data, maxRows, onSelect } = _props;
+    const { selectable, sortable, selectedIndexes, columns, data, maxRows, onSelect,searchKeys } = _props;
 
     const [state, setState] = useState<TableState>({
         selected: {},
         columns: [],
         rows: [],
         skeletonRows: [],
+        searchKeys: []
     });
 
     const getDefaultSelected = useCallback(() => {
@@ -26,6 +27,7 @@ export function useTable({ props: _props }: {
     }, [selectedIndexes, selectable]);
 
     useEffect(() => {
+    
         const skeletonRows: TableState['skeletonRows'] = [];
         const totalRows = maxRows || 25;
         for (let i = 0; i < totalRows; i++) {
@@ -58,7 +60,7 @@ export function useTable({ props: _props }: {
             }),
 
             skeletonRows,
-
+            searchKeys: searchKeys||[],
             rows: data.map((cells, rowIndex) => {
                 return {
                     id: `${rowIndex}`,
@@ -125,7 +127,7 @@ export function useTable({ props: _props }: {
                 columns,
             };
         }),
-
+      
         setFilter: (colIndex: number, value: FilterValue) => setState(prev => {
             const columns = [...prev.columns]
                 .map(col => {

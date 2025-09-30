@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql,and } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -6,6 +6,7 @@ import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/datab
 import { _saveScreensHistory } from "./_screens_history";
 import { v4 } from "uuid";
 import { _generateScreenAliases } from "../aliases/_aliases_save";
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 
 export async function _publishScreens(opts?: {
     scriptsIds?: string[];
@@ -20,29 +21,20 @@ export async function _publishScreens(opts?: {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
 
+ const myUpdatedScripts = await getChangedScripts()
     try {
+        if(myUpdatedScripts && myUpdatedScripts.length>0){
         let updates: (typeof screensDrafts.$inferSelect)[] = [];
         let inserts: (typeof screensDrafts.$inferSelect)[] = [];
 
-        if (scriptsIds?.length || screensIds?.length) {
-            const res = await db.query.screensDrafts.findMany({
-                where: or(
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptDraftId, scriptsIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenId, screensIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
+        const res = await db.query.screensDrafts.findMany({
+                where:(
+                    inArray(screensDrafts.scriptId, myUpdatedScripts)
                 ),
-            });
-
-            updates = res.filter(s => s.screenId);
-            inserts = res.filter(s => !s.screenId);
-        } else {
-            const _screensDrafts = await db.query.screensDrafts.findMany({
-                where: isNotNull(screensDrafts.scriptId),
-            });
-            updates = _screensDrafts.filter(s => s.screenId);
-            inserts = _screensDrafts.filter(s => !s.screenId);
-        }
+        });
+        updates = res.filter(s => s.screenId);
+        inserts = res.filter(s => !s.screenId);
+      
 
         if (updates.length) {
             // we'll use data before to compare changes
@@ -98,7 +90,9 @@ export async function _publishScreens(opts?: {
             await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(screensDrafts);
+        await db.delete(screensDrafts)
+        .where(or(inArray(screensDrafts.scriptId,myUpdatedScripts),
+        inArray(screensDrafts.scriptDraftId,myUpdatedScripts)));
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.screenId),
@@ -134,10 +128,13 @@ export async function _publishScreens(opts?: {
                 },
             })));
         }
-
-        await db.delete(pendingDeletion).where(or(
+     
+        await db.delete(pendingDeletion).where(and(or(or(
             isNotNull(pendingDeletion.screenId),
-            isNotNull(pendingDeletion.screenDraftId),
+            isNotNull(pendingDeletion.screenDraftId)),
+            inArray(pendingDeletion.scriptId,myUpdatedScripts),
+            inArray(pendingDeletion.scriptDraftId,myUpdatedScripts))
+            
         ));
 
         const published = [
@@ -162,6 +159,7 @@ export async function _publishScreens(opts?: {
                 .set({ version: sql`${screens.version} + 1`, }).
                 where(inArray(screens.screenId, published));
         }
+    }
 
         results.success = true;
     } catch (e: any) {

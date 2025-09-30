@@ -1,9 +1,10 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql,and } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@/databases/pg/schema";
 import { _saveDiagnosesHistory } from "./_diagnoses_history";
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 import { v4 } from "uuid";
 
 export async function _publishDiagnoses(opts?: {
@@ -15,32 +16,22 @@ export async function _publishDiagnoses(opts?: {
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
-
+    const myUpdatedScripts = await getChangedScripts()
     try {
         let updates: (typeof diagnosesDrafts.$inferSelect)[] = [];
         let inserts: (typeof diagnosesDrafts.$inferSelect)[] = [];
-
-        if (scriptsIds?.length || diagnosesIds?.length) {
+        if(myUpdatedScripts && myUpdatedScripts.length>0){
+     
             const res = await db.query.diagnosesDrafts.findMany({
                 where: or(
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptDraftId, scriptsIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisId, diagnosesIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
+                   inArray(diagnosesDrafts.scriptId, myUpdatedScripts)   
                 ),
             });
 
             updates = res.filter(s => s.diagnosisId);
             inserts = res.filter(s => !s.diagnosisId);
-        } else {
-            const _diagnosesDrafts = await db.query.diagnosesDrafts.findMany({
-                where: isNotNull(diagnosesDrafts.scriptId),
-            });
-            updates = _diagnosesDrafts.filter(s => s.diagnosisId);
-            inserts = _diagnosesDrafts.filter(s => !s.diagnosisId);
-        }
-
-        if (updates.length) {
+     
+            if (updates.length) {
             // we'll use data before to compare changes
             let dataBefore: typeof diagnoses.$inferSelect[] = [];
             if (updates.filter(c => c.diagnosisId).length) {
@@ -67,7 +58,7 @@ export async function _publishDiagnoses(opts?: {
             }
 
             await _saveDiagnosesHistory({ drafts: updates, previous: dataBefore, });
-        }
+        
 
         if (inserts.length) {
             // we'll use data before to compare changes
@@ -94,7 +85,9 @@ export async function _publishDiagnoses(opts?: {
             await _saveDiagnosesHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(diagnosesDrafts);
+        await db.delete(diagnosesDrafts).where(or(inArray(diagnosesDrafts.scriptId,myUpdatedScripts),
+        inArray(diagnosesDrafts.scriptId,myUpdatedScripts)
+    ));
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: isNotNull(pendingDeletion.diagnosisId),
@@ -130,11 +123,14 @@ export async function _publishDiagnoses(opts?: {
                 },
             })));
         }
-
-        await db.delete(pendingDeletion).where(or(
+      
+        await db.delete(pendingDeletion).where(and(or(or(
             isNotNull(pendingDeletion.diagnosisId),
-            isNotNull(pendingDeletion.diagnosisDraftId),
+            isNotNull(pendingDeletion.diagnosisDraftId)),
+            inArray(pendingDeletion.scriptId,myUpdatedScripts),
+             inArray(pendingDeletion.scriptDraftId,myUpdatedScripts))
         ));
+    
 
         const published = [
             // ...inserts.map(c => c.diagnosisId! || c.diagnosisDraftId),
@@ -147,8 +143,10 @@ export async function _publishDiagnoses(opts?: {
                 .set({ version: sql`${diagnoses.version} + 1`, }).
                 where(inArray(diagnoses.diagnosisId, published));
         }
+    }
+  }
+     results.success = true;
 
-        results.success = true;
     } catch(e: any) {
         results.success = false;
         results.errors = [e.message];

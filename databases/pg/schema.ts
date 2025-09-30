@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations, sql,inArray } from "drizzle-orm";
 import { 
     boolean,
     customType,
@@ -12,6 +12,8 @@ import {
     text, 
     timestamp, 
     uuid,
+    varchar
+
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
 
@@ -978,3 +980,20 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
         references: [aliases.uuid],
     }),
 }));
+
+export const ntScriptLock = pgTable(
+  'nt_lock',
+  {
+    lockId: uuid('lock_id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.userId, { onDelete: 'cascade' }),
+    lockedAt: timestamp('locked_at').notNull(),
+    scriptId: uuid('script_id')
+      .references(() => scripts.scriptId, { onDelete: 'cascade' }),
+    newScriptId: uuid('new_script_id')
+      .references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade' }), 
+    lockType: varchar('lock_type', { length: 20 }).notNull().default('script').$type<'script' | 'data_key' | 'drug_library'>()
+  
+  })
+

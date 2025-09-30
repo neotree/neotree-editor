@@ -9,7 +9,7 @@ import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import {_saveScreens} from './_screens_save'
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';
-
+import {_createNewLock} from '../script-lock'
 export type SaveScriptsData = Partial<ScriptType>;
 
 export type SaveScriptsResponse = { 
@@ -27,7 +27,7 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
      data = removeHexCharacters(data)
-
+  
     try {
         let index = 0;
         for (const { scriptId: itemScriptId, ...item } of data) {
@@ -61,8 +61,11 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
 
                         info.query = q.toSQL();
 
-                        await q.execute();
+                        await q.execute(); 
+                      
+
                     } else {
+        
                         let position = item.position || published?.position;
                         if (!position) {
                             const script = await db.query.scripts.findFirst({
@@ -96,8 +99,11 @@ export async function _saveScripts({ data, broadcastAction,syncSilently }: {
 
                         info.query = q.toSQL();
 
-                        await q.execute();
+                        await q.execute();    
+                        await _createNewLock({script:scriptId,lockType:'script'})  
+                        
                     }
+                    
                 }
             } catch(e: any) {
                 errors.push(e.message);

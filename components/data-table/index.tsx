@@ -2,7 +2,7 @@
 
 import SortableList, { SortableItem, SortableKnob } from 'react-easy-sort';
 import { arrayMoveImmutable } from 'array-move';
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Move } from 'lucide-react';
 
 import {
@@ -22,28 +22,21 @@ import type { DataTableProps, } from './types';
 import { FilterText } from "./filter-text";
 import { DataTableHeader } from './header';
 
-export { 
-    type DataTableProps, 
+export {
+    type DataTableProps,
 };
 
 export const DataTable = (props: DataTableProps) => {
-    const { 
-        selectable = false, 
-        loading, 
-        sortable, 
-        tableClassname, 
-        tableRowClassname, 
-        tableBodyClassname, 
-        filter,
-        onSort, 
-    } = props;
+    const { selectable = false, loading, sortable, tableClassname, tableRowClassname, tableBodyClassname, onSort, searchKeys } = props;
 
     const tBodyRef = useRef<HTMLTableSectionElement>(null);
 
     const table = useTable({ props });
+    const [searchValue, setSearchValue] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const { 
-        state: { columns, rows, skeletonRows, selected, }, 
+    const {
+        state: { columns, rows, skeletonRows, selected },
         setState,
         setFilter,
         setSelected,
@@ -51,6 +44,90 @@ export const DataTable = (props: DataTableProps) => {
     } = table;
 
     const displayRows = useMemo(() => loading ? skeletonRows : rows, [loading, skeletonRows, rows]);
+
+    const searchableColumns = useMemo(() => {
+        return columns
+            .filter(col => !col.hidden && col.name &&
+                (/title|name|key|ref|hospital|field|type/i.test(String(col.name))))
+            .map(col => col.columnIndex);
+    }, [columns]);
+
+    const handleSearch = useCallback((value: string) => {
+        setSearchValue(value.toLowerCase());
+    }, []);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchValue);
+        }, 300);
+
+        return () => clearTimeout(handler);
+    }, [searchValue]);
+
+    // const filterRows = useCallback((rows: typeof displayRows, term: string) => {
+    //     if (!term.trim()) return rows;
+    //     const lowerTerm = term.toLowerCase();
+
+    //     return rows.filter(row => {
+    //         for (const colIndex of searchableColumns) {
+    //             const cell = row.cells[colIndex];
+    //             const cellValue = cell?.value;
+
+    //             if (cellValue != null &&
+    //                 String(cellValue).toLowerCase().includes(lowerTerm)) {
+    //                 return true;
+    //             }
+    //         }
+    //         return false;
+    //     });
+
+
+    // }, [searchableColumns]);
+
+    const filterRows = useCallback(
+        (
+            rows: typeof displayRows,
+            term: string,
+        ) => {
+            if (!term.trim()) return rows;
+            const lowerTerm = term.toLowerCase();
+                
+            return rows.filter(row => {
+                for (const colIndex of searchableColumns) {
+                    const cell = row.cells[colIndex];
+                    const cellValue = cell?.value;
+
+                    if (
+                        cellValue != null &&
+                        String(cellValue).toLowerCase().includes(lowerTerm)
+                    ) {
+                        return true;
+                    }
+                }
+                const positionCol = row.cells[0]?.value;
+           
+                if (positionCol != null) {
+                    const match = searchKeys?.find(
+                        sk => String(sk.position) === String(positionCol)
+                    );
+                    if (match && match.keys.some(k => k.toLowerCase().includes(lowerTerm))) {
+                        return true;
+                    }
+                }
+
+
+                return false;
+            });
+        },
+        [searchableColumns]
+    );
+
+
+
+    // Final filtered rows
+    const filteredRows = useMemo(() => {
+        return filterRows(displayRows, debouncedSearch);
+    }, [displayRows, debouncedSearch, filterRows]);
 
     const onSortEnd = useCallback((oldIndex: number, newIndex: number) => {
         let sorted: { oldIndex: number, newIndex: number; }[] = [];
@@ -69,26 +146,18 @@ export const DataTable = (props: DataTableProps) => {
         setSelected([]);
     }, [setState, onSort, setSelected]);
 
-    const [internalSearchValue, setInternalSearchValue] = useState(''); 
-
-    const searchValue = props.search?.value || internalSearchValue;
-    
-    const canSort = !searchValue && sortable;
-
-    return ( 
+    return (
         <>
-            <DataTableHeader 
-                {...props} 
-                search={!props.search ? undefined : {
+            <DataTableHeader {...props}
+                search={{
                     ...props.search,
-                    value: props.search?.value === undefined ? internalSearchValue : props.search.value,
-                    setValue: props.search?.setValue || setInternalSearchValue,
+                    onSearch: handleSearch,
                 }}
             />
 
-            <SortableList 
-                allowDrag={!!canSort}
-                onSortEnd={onSortEnd} 
+            <SortableList
+                allowDrag={!!sortable}
+                onSortEnd={onSortEnd}
                 draggedItemClassName="opacity-90 z-[9999999999999]"
                 customHolderRef={tBodyRef}
             >
@@ -101,21 +170,21 @@ export const DataTable = (props: DataTableProps) => {
                         >
                             <TableRow>
                                 {selectable && (
-                                    <TableHead 
+                                    <TableHead
                                         className={cn(columns[0]?.cellClassName, 'w-8')}
                                     >
                                         <Checkbox
                                             disabled={loading}
-                                            checked={!!displayRows.length && (Object.values(selected).filter(v => v).length === displayRows.length)}
-                                            onCheckedChange={() => setSelected(displayRows.map(r => r.rowIndex))}
+                                            checked={!!filteredRows.length && (Object.values(selected).filter(v => v).length === filteredRows.length)}
+                                            onCheckedChange={() => setSelected(filteredRows.map(r => r.rowIndex))}
                                         />
-                                    </TableHead>                
+                                    </TableHead>
                                 )}
 
-                                {canSort && (
-                                    <TableHead 
+                                {sortable && (
+                                    <TableHead
                                         className={cn(columns[0]?.cellClassName, 'w-4')}
-                                    />                
+                                    />
                                 )}
 
                                 {columns.map((col) => {
@@ -125,9 +194,9 @@ export const DataTable = (props: DataTableProps) => {
                                             colSpan={col.colSpan}
                                             align={col.align}
                                             className={cn(
-                                                props.cellClassName, 
-                                                props.thClassName, 
-                                                col.cellClassName, 
+                                                props.cellClassName,
+                                                props.thClassName,
+                                                col.cellClassName,
                                                 col.thClassName,
                                                 'px-2',
                                                 col.hidden ? 'hidden' : '',
@@ -141,11 +210,11 @@ export const DataTable = (props: DataTableProps) => {
                                             )}
                                         >
                                             {(() => {
-                                                switch(col.filterType) {
+                                                switch (col.filterType) {
                                                     case 'number':
                                                     case 'text':
                                                         return (
-                                                            <FilterText 
+                                                            <FilterText
                                                                 column={col}
                                                                 value={col.filter}
                                                                 onFilter={value => {
@@ -159,8 +228,8 @@ export const DataTable = (props: DataTableProps) => {
                                                         );
                                                     default:
                                                         return (
-                                                            <Button 
-                                                                variant="ghost" 
+                                                            <Button
+                                                                variant="ghost"
                                                                 size="sm"
                                                                 className="
                                                                     focus-visible:ring-0 
@@ -182,10 +251,10 @@ export const DataTable = (props: DataTableProps) => {
                         </TableHeader>
 
                         <TableBody ref={tBodyRef} className={tableBodyClassname}>
-                            {!displayRows.length && (
+                            {!filteredRows.length && (
                                 <TableRow className="p-0">
                                     <TableCell
-                                        colSpan={columns.length + (selectable ? 1 : 0) + (canSort ? 1 : 0)}
+                                        colSpan={columns.length + (selectable ? 1 : 0) + (sortable ? 1 : 0)}
                                         className="p-4 text-center text-muted-foreground"
                                     >
                                         {props.noDataMessage || 'No data to display'}
@@ -193,19 +262,12 @@ export const DataTable = (props: DataTableProps) => {
                                 </TableRow>
                             )}
 
-                            {displayRows.map((row) => {
+                            {filteredRows.map((row) => {
                                 const rowProps = { ...props.getRowOptions?.({ rowIndex: row.rowIndex, }), };
-
-                                if (
-                                    searchValue &&
-                                    !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
-                                ) return null;
-
-                                if (filter && !filter(row.rowIndex)) return null;
 
                                 return (
                                     <SortableItem key={row.id}>
-                                        <TableRow 
+                                        <TableRow
                                             {...rowProps}
                                             className={cn(
                                                 props.trClassName,
@@ -216,7 +278,7 @@ export const DataTable = (props: DataTableProps) => {
                                             )}
                                         >
                                             {selectable && (
-                                                <TableCell 
+                                                <TableCell
                                                     className={cn(columns[0]?.cellClassName, 'w-8')}
                                                 >
                                                     <Checkbox
@@ -224,33 +286,33 @@ export const DataTable = (props: DataTableProps) => {
                                                         checked={!!selected[row.rowIndex]}
                                                         onCheckedChange={() => setSelected([row.rowIndex])}
                                                     />
-                                                </TableCell>                
+                                                </TableCell>
                                             )}
 
-                                            {canSort && (
-                                                <TableCell 
+                                            {sortable && (
+                                                <TableCell
                                                     className={cn(columns[0]?.cellClassName, 'w-4 cursor-move')}
                                                 >
                                                     <SortableKnob>
                                                         <Move className="w-4 h-4 text-muted-foreground" />
                                                     </SortableKnob>
-                                                </TableCell>                
+                                                </TableCell>
                                             )}
 
-                                            {row.cells.map(cell => {
+                                            {row.cells.map((cell: any) => {
                                                 const col = columns[cell.columnIndex];
                                                 const cellProps = { ...props.getCellOptions?.({ rowIndex: row.rowIndex, columnIndex: cell.columnIndex }), };
 
                                                 return (
-                                                    <TableCell 
+                                                    <TableCell
                                                         {...cellProps}
                                                         key={cell.id}
                                                         colSpan={col.colSpan}
                                                         align={col.align}
                                                         className={cn(
-                                                            props.cellClassName, 
-                                                            props.tdClassName, 
-                                                            col.cellClassName, 
+                                                            props.cellClassName,
+                                                            props.tdClassName,
+                                                            col.cellClassName,
                                                             col.tdClassName,
                                                             'px-4',
                                                             cellProps.className,

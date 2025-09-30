@@ -1,11 +1,8 @@
 'use client';
 
-import { useState } from "react";
-
 import { cn } from "@/lib/utils";
 import { DataTableSearch } from "./search";
 import { DataTableHeaderProps } from "./types";
-import { SearchInput } from "./search-input";
 
 export function DataTableHeader({
     title,
@@ -13,8 +10,6 @@ export function DataTableHeader({
     headerActions,
 }: DataTableHeaderProps) {
     const hidden = !search && !title && !headerActions;
-
-    const [searchValue, setSearchValue] = useState(search?.value || '');
 
     if (hidden) return null;
 
@@ -49,33 +44,17 @@ export function DataTableHeader({
                         )}
                     >
                         {!!search && (
-                            <form
-                                onSubmit={e =>  {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (searchValue) search?.setValue?.(searchValue)
-                                }}
-                            >
-                                <SearchInput 
-                                    placeholder={search?.inputPlaceholder || 'Search'}
-                                    value={searchValue}
-                                    onChange={e => {
-                                        const val = e.target.value;
-                                        setSearchValue(val);
-                                        if (!val) search?.setValue?.(val);
-                                    }}
-                                    searchButton={{
-                                        type: 'button',
-                                        // onClick: () => searchValue && search?.setValue?.(searchValue),
-                                    }}
+                            <>
+                                <DataTableSearch 
+                                    {...search}
                                 />
-                            </form>
+                            </>
                         )}
                     </div>
 
                     <div 
                         className={cn(
-                            'flex flex-row flex-wrap gap-x-2 gap-y-1 md:ml-auto',
+                            'flex flex-row flex-wrap gap-x-2 gap-y-1 ml-auto',
                             !headerActions && 'hidden',
                         )}
                     >

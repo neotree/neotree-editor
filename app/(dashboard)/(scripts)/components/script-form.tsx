@@ -31,17 +31,19 @@ import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
 import { ScriptPrintSetup } from './print';
-import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
 
 type Props = {
     formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
+    locked?:boolean
+
 };
 
 export function ScriptForm(props: Props) {
     const searchParams = useSearchParams();
     const section = searchParams.get('section');
+
 
     const { onCancelScriptForm } = useScriptsContext();
 
@@ -51,6 +53,7 @@ export function ScriptForm(props: Props) {
         hospitals,
         loading,
         disabled,
+        locked,
         reset: resetForm,
         watch,
         setValue,
@@ -60,7 +63,6 @@ export function ScriptForm(props: Props) {
         getDefaultScreenReviewConfigurations,
         onSubmit,
     } = form;
-
     const { mode } = useAppContext();
 
     const type = watch('type');
@@ -70,7 +72,6 @@ export function ScriptForm(props: Props) {
     const nuidSearchEnabled = watch('nuidSearchEnabled');
     const preferences = watch('preferences');
     const reviewable = watch('reviewable');
-
     return (
         <>
             {loading && <Loader overlay />}
@@ -281,6 +282,7 @@ export function ScriptForm(props: Props) {
                     {(!section || (section === 'screens')) && (
                         <Screens
                             scriptId={props.formData.scriptId!}
+                            locked={locked}
                         />
                     )}
 

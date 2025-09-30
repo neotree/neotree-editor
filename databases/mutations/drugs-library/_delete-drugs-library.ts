@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _saveScreens } from '@/databases/mutations/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
+import {getChangedDrugs} from "../script-lock/_script_lock_save"
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
@@ -21,8 +22,13 @@ export type DeleteDrugsLibraryItemsResponse = {
 
 export async function _deleteAllDrugsLibraryItemsDrafts(): Promise<boolean> {
     try {
-        await db.delete(drugsLibraryDrafts);
+        const myChangedDrugs = await getChangedDrugs() 
+        if(myChangedDrugs.length>0){
+         await db.delete(drugsLibraryDrafts);
         return true;
+        }
+        return true;
+       
     } catch(e: any) {
         throw e;
     }

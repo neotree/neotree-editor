@@ -16,10 +16,11 @@ import { resetDrugsLibraryState } from "@/hooks/use-drugs-library";
 export type UseScriptFormParams = {
     formData?: ScriptFormDataType;
     hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
+    locked?:boolean
 };
 
 export function useScriptForm(params: UseScriptFormParams) {
-    const { formData } = params;
+    const { formData,locked } = params;
 
     const { alert } = useAlertModal();
     const { viewOnly, } = useAppContext();
@@ -57,6 +58,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     const form = useForm({
         defaultValues: getDefaultFormValues(),
     });
+    
 
     const getDefaultNuidSearchFields = useCallback(() => {
         const fields = form.getValues('nuidSearchFields');
@@ -80,6 +82,7 @@ export function useScriptForm(params: UseScriptFormParams) {
 
     const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
 
+   
     const onSubmit = handleSubmit(async data => {
         setLoading(true);
 
@@ -108,7 +111,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => !!(viewOnly || locked), [viewOnly, locked]);
 
     return {
         ...params,
@@ -116,6 +119,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         formIsDirty,
         loading,
         disabled,
+        locked,
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,

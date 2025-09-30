@@ -1,3 +1,5 @@
+import { GetScreensResults } from "@/databases/queries/scripts";
+
 export type TableColumn = {
     name: string;
     colSpan?: number;
@@ -10,7 +12,7 @@ export type TableColumn = {
     cellRenderer?: (cell: TableStateDataCell) => React.ReactNode;
 };
 
-export type TableData = (number | string)[][];
+export type TableData = (number | any)[][];
 
 export type TableStateDataCell = {
     id: number | string;
@@ -39,12 +41,12 @@ export type TableState = {
     rows: TableStateDataRow[];
     skeletonRows: TableStateDataRow[];
     selected: { [key: string]: boolean; };
+    searchKeys:any[]
 };
 
 export type DataTableSearchOptions = {
     inputPlaceholder?: string;
-    value?: string;
-    setValue?: (value: string) => void;
+    onSearch?: (value: string) => void
 };
 
 export type DataTableHeaderProps = {
@@ -70,6 +72,7 @@ export type DataTableProps = DataTableHeaderProps & {
     tableRowClassname?: string;
     tableBodyClassname?: string;
     noDataMessage?: React.ReactNode;
+    searchKeys?:{position:number,keys:any[]}[];
     filter?: (rowIndex: number) => boolean;
     onSort?: (oldIndex: number, newIndex: number, sorted: { oldIndex: number, newIndex: number; }[]) => void;
     onSelect?: (selectedIndexes: number[]) => void;

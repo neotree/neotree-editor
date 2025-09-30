@@ -1,7 +1,10 @@
 'use client';
 
+import {useState,useEffect,useCallback} from 'react'
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
+import { createLock } from "@/app/actions/locks";
+import { LockStatus } from "../../lock-status"
 import { useAppContext } from '@/contexts/app';
 import { cn } from '@/lib/utils';
 import { dataKeysStatuses } from '@/constants';
@@ -10,11 +13,14 @@ import { DataKeysTableHeader } from './table-header';
 import { DataKeysTableRowActions } from './table-row-actions';
 import { DataKeysTableBottomActions } from './table-bottom-actions';
 import { DataKeyForm } from './form';
+import axios from 'axios';
 
-export function DataKeysTable({ disabled, }: {
+export function DataKeysTable({ disabled,locked }: {
     disabled: boolean;
+    locked: boolean;
 }) {
     const { viewOnly, } = useAppContext();
+    const [lockDataKeys, setLockDataKeys] = useState<boolean>(!!locked);
 
     disabled = disabled || viewOnly;
 
@@ -27,6 +33,32 @@ export function DataKeysTable({ disabled, }: {
         setCurrentDataKeyUuid,
         setSelected,
     } = useDataKeysCtx();
+
+        useEffect(() => {
+        (async () => {
+            try {
+                if (!locked) {
+                    await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'data_key' }))
+                }
+
+            } catch (e: any) {
+                alert({
+                    title: "",
+                    message: e.message,
+                });
+            }
+        })();
+    }, [alert, locked]);
+
+    const handleLockStatusChange = useCallback((isLocked: boolean) => {
+        setLockDataKeys(prev => {
+
+            if (lockDataKeys !== isLocked) {
+                return isLocked;
+            }
+            return prev;
+        });
+    }, []);
 
     const displayLoader = deleting || loadingDataKeys;
 
@@ -108,6 +140,14 @@ export function DataKeysTable({ disabled, }: {
 
     return (
         <>
+         <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">  
+                        <LockStatus
+                                key={`data-key`}
+                                scriptId={''}
+                                lockType={"data_key"}
+                                doneLoading={true}
+                                onStatusChange={(locked: any) => handleLockStatusChange(locked)}
+                            /></div>
             <div className="flex flex-col gap-y-4">
                 <DataKeysTableHeader />
 

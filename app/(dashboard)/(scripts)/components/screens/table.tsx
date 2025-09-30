@@ -20,14 +20,16 @@ export function ScreensTable(props: Props) {
         loading,
         selected,
         disabled,
+        locked,
         screensIdsToCopy,
         setScreensIdsToCopy,
         onDelete,
         onSort,
-        setSelected,
+        setSelected
+
     } = useScreensTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys, viewOnly } = useAppContext()
 
     return (
         <>
@@ -49,8 +51,8 @@ export function ScreensTable(props: Props) {
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     title=""
-                    selectable={!disabled}
-                    sortable={!disabled}
+                    selectable={!disabled ||!!locked}
+                    sortable={!disabled ||!!locked}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
@@ -61,7 +63,7 @@ export function ScreensTable(props: Props) {
                         };
                     }}
                     search={{
-                        inputPlaceholder: 'Search screens',
+                        inputPlaceholder: 'Search screens using type,ref,title or key',
                     }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
@@ -122,7 +124,7 @@ export function ScreensTable(props: Props) {
                                 return (
                                     <ScreensTableRowActions 
                                         screen={s}
-                                        disabled={disabled}
+                                        disabled={disabled ||!!locked}
                                         onDelete={() => onDelete([s.screenId])}
                                         onCopy={() => setScreensIdsToCopy([s.screenId])}
                                     />
@@ -138,13 +140,18 @@ export function ScreensTable(props: Props) {
                         s.refId,
                         s.title,
                         s.version,
-                        '',
+                        ''
                     ])}
+                    searchKeys={screens.data.map(s => ({
+                            position: s.position,
+                            keys: s.searchKeys ?? []
+                        }))||[]}    
+                
                 />
             </div>
 
             <ScreensTableBottomActions 
-                disabled={viewOnly}
+                disabled={viewOnly|| !!locked}
                 selected={selected}
                 screens={screens}
                 onCopy={() => setScreensIdsToCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}

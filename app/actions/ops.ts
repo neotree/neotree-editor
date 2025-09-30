@@ -17,6 +17,7 @@ import * as drugsLibraryQueries from '@/databases/queries/drugs-library';
 import * as dataKeysMutations from '@/databases/mutations/data-keys';
 import * as dataKeysQueries from '@/databases/queries/data-keys';
 import { _saveEditorInfo } from '@/databases/mutations/editor-info';
+import {dropAllStaleLocks, userLockExists, cleanUpStaleLocks} from '@/databases/mutations/script-lock'
 import { _getEditorInfo, GetEditorInfoResults } from '@/databases/queries/editor-info';
 
 export async function getEditorDetails(): Promise<{
@@ -31,7 +32,7 @@ export async function getEditorDetails(): Promise<{
     try {
         const editorInfo = await _getEditorInfo();
         editorInfo.errors?.forEach(e => errors.push(e));
-
+        await cleanUpStaleLocks()
         const pendingDeletion = await opsQueries._countPendingDeletion();
         pendingDeletion.errors?.forEach(e => errors.push(e));
 
@@ -39,8 +40,8 @@ export async function getEditorDetails(): Promise<{
         draftsErrors?.forEach(e => errors.push(e));
 
         const mode = 'development';
-
-        shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total);
+        const userChangesExist = await userLockExists()
+        shouldPublishData = (mode === 'development') && (!!drafts.total || !!pendingDeletion.total) && !!userChangesExist;
 
         return {
             pendingDeletion: pendingDeletion.total,
@@ -115,6 +116,8 @@ export async function publishData() {
         const publishScreens = await scriptsMutations._publishScreens();
         const publishDiagnoses = await scriptsMutations._publishDiagnoses();
         const processPendingDeletion = await _processPendingDeletion();
+        //Open Access To Other Users
+        await dropAllStaleLocks()
         
         if (publishDataKeys.errors) {
             results.success = false;
@@ -184,6 +187,7 @@ export async function discardDrafts() {
          await scriptsMutations._deleteAllScreensDrafts();
          await scriptsMutations._deleteAllDiagnosesDrafts();
          await _clearPendingDeletion();
+         await dropAllStaleLocks()
 
         socket.emit('data_changed', 'discard_drafts');
     } catch(e: any) {

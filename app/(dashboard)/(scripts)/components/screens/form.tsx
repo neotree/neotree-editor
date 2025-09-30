@@ -51,12 +51,15 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { useAppContext } from "@/contexts/app";
 
 type Props = {
     scriptId: string;
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
     screens: Awaited<ReturnType<typeof listScreens>>['data'];
+    locked?:boolean
+    
 };
 
 export function ScreenForm({
@@ -64,6 +67,7 @@ export function ScreenForm({
     scriptId,
     countDiagnosesScreens,
     screens,
+    locked
 }: Props) {
     const router = useRouter();
     const [showForm, setShowForm] = useState(!!formData);
@@ -71,7 +75,9 @@ export function ScreenForm({
     const form = useScreenForm({
         formData,
         scriptId,
+        locked
     });
+
 
     const {
         control,

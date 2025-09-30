@@ -1,14 +1,14 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useMemo, useEffect,useState,useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { MoreVertical, Trash, Edit, Eye, Plus, CopyIcon } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
+import { LockStatus } from "../../lock-status"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,12 +21,16 @@ import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
 import { ActionsBar } from "@/components/actions-bar";
 import { DrugsLibraryForm } from "./form";
+import { createLock } from "@/app/actions/locks";
 import { Add } from "./add";
+import axios from 'axios';
 import { ExportModal } from "./export-modal";
 
-type Props = {};
+type Props = {
+    locked?: boolean
+};
 
-export function DrugsLibrary({}: Props) {
+export function DrugsLibrary({ locked }: Props) {
     const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
 
@@ -35,28 +39,66 @@ export function DrugsLibrary({}: Props) {
     // const searchParams = useSearchParams();
     // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
 
-    const { 
-        drugs, 
-        loading, 
+    const {
+        drugs,
+        loading,
         addLink,
-        selectedItemId: itemId, 
+        selectedItemId: itemId,
         editLink,
-        saveDrugs, 
+        saveDrugs,
         deleteDrugs,
         copyDrugs,
     } = useDrugsLibrary();
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    useEffect(() => {
+        (async () => {
+
+            try {
+                if (!locked) {       
+                   const res =await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'drug_library' }))
+                }
+
+            } catch (e: any) {
+                alert({
+                    title: "",
+                    message: e.message,
+                });
+            }
+        })();
+    }, [alert, locked]);
+
+    const [lockLibrary, setLockLibrary] = useState<boolean>(!!locked);
+    
+    const handleLockStatusChange = useCallback((isLocked: boolean) => {
+            setLockLibrary(prev => {
+              
+                if (lockLibrary !== isLocked) {
+                    return isLocked;
+                }
+                return prev;
+            });
+        }, []);
+
+      const disabled = useMemo(() => viewOnly || !!lockLibrary, [viewOnly, lockLibrary]);
 
     return (
         <>
             {loading && <Loader overlay />}
+            <div className="flex items-center justify-center gap-2">
+            <LockStatus
+                key={`drug-lib`}
+                scriptId={''}
+                lockType={"drug_library"}
+                doneLoading={true}
+                onStatusChange={(locked:any) => handleLockStatusChange(locked)}
+            />
 
             <DrugsLibraryForm
                 disabled={disabled}
                 item={drugs.filter(s => s.itemId === itemId)[0]}
                 onChange={saveDrugs}
             />
+            </div>
 
             {!!selected.length && (
                 <ActionsBar>
@@ -75,9 +117,10 @@ export function DrugsLibrary({}: Props) {
                 }}
                 headerActions={(
                     <>
-                        <Add 
+                        <Add
                             addDrugLink={addLink('drug')}
                             addFluidLink={addLink('fluid')}
+                            disabled={disabled}
                         />
                     </>
                 )}
@@ -113,9 +156,9 @@ export function DrugsLibrary({}: Props) {
                                 <>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 className="p-0 h-auto w-auto transition-colors rounded-full hover:text-primary hover:bg-transparent"
                                             >
                                                 <MoreVertical className="h-4 w-4" />
@@ -123,7 +166,7 @@ export function DrugsLibrary({}: Props) {
                                         </DropdownMenuTrigger>
 
                                         <DropdownMenuContent>
-                                            <DropdownMenuItem 
+                                            <DropdownMenuItem
                                                 asChild
                                             >
                                                 <Link href={editLink(`${itemId}`)}>

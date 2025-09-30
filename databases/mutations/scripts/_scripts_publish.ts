@@ -1,9 +1,10 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, or, sql, and } from "drizzle-orm";
 import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts } from "@/databases/pg/schema";
+import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts, ntScriptLock } from "@/databases/pg/schema";
+import {getChangedScripts} from "../script-lock/_script_lock_save"
 import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
@@ -12,12 +13,17 @@ export async function _publishScripts() {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
 
     try {
-        const drafts = await db.query.scriptsDrafts.findMany();
-        let inserts = drafts.filter(c => !c.scriptId).map(s => ({
+         const myUpdatedScripts = await getChangedScripts()
+         if(myUpdatedScripts && myUpdatedScripts.length>0){
+        const drafts = (await db.query.scriptsDrafts.findMany()).filter(s=>myUpdatedScripts.includes(s.scriptId||s.scriptDraftId));
+        let inserts = drafts.
+        filter(c => !c.scriptId)
+        .map(s => ({
             ...s,
-            scriptId: s.data.scriptId || v4(),
-            data: { ...s.data, scriptId: s.data.scriptId || v4(), },
+            scriptId: s.scriptId||s.data.scriptId || v4(),
+            data: { ...s.data, scriptId: s.scriptId||s.data.scriptId || v4(), },
         }));
+         console.log("---INSERTS..",inserts)
         let updates = drafts.filter(c => c.scriptId);
 
         const scriptsIdsAndScriptsDraftsIds = [
@@ -37,7 +43,7 @@ export async function _publishScripts() {
                 });
             }
 
-            for(const { scriptId: _scriptId, data: c } of updates) {
+            for (const { scriptId: _scriptId, data: c } of updates) {
                 const scriptId = _scriptId!;
 
                 const { scriptId: __scriptId, id, oldScriptId, createdAt, updatedAt, deletedAt, ...payload } = c;
@@ -72,7 +78,7 @@ export async function _publishScripts() {
 
             await db.insert(scripts).values(insertData);
 
-            for(const { scriptId } of insertData) {
+            for (const { scriptId } of insertData) {
                 processedScripts.push({ scriptId, });
 
                 await db.update(screensDrafts).set({ scriptId }).where(or(
@@ -86,7 +92,6 @@ export async function _publishScripts() {
                 ));
             }
         }
-
         if (processedScripts.length) {
             const publishScreens = await _publishScreens({ scriptsIds: processedScripts.map(s => s.scriptId) });
             if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
@@ -106,10 +111,12 @@ export async function _publishScripts() {
                 },
             },
         });
+      
+        await db.delete(scriptsDrafts).where(or(inArray(scriptsDrafts.scriptId,myUpdatedScripts),
+        inArray(scriptsDrafts.scriptDraftId,myUpdatedScripts)));
+        
 
-        await db.delete(scriptsDrafts);
-
-        deleted = deleted.filter(c => c.script);
+        deleted = deleted.filter(c => c.script && myUpdatedScripts.includes(c.scriptId||''));
 
         if (deleted.length) {
             const deletedAt = new Date();
@@ -130,25 +137,25 @@ export async function _publishScripts() {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
+        await db.delete(pendingDeletion).where(and(or(
             isNotNull(pendingDeletion.scriptId),
-            isNotNull(pendingDeletion.scriptDraftId),
-        ));
+            isNotNull(pendingDeletion.scriptDraftId)),
+            inArray(pendingDeletion.scriptId,myUpdatedScripts)));
 
         const published = [
             // ...inserts.map(c => c.scriptId! || c.scriptDraftId),
             ...updates.map(c => c.scriptId!),
             ...deleted.map(c => c.scriptId!),
         ];
-  
+
         if (published.length) {
             await db.update(scripts)
-                .set({ version: sql`${scripts.version} + 1`,}).
+                .set({ version: sql`${scripts.version} + 1`, }).
                 where(inArray(scripts.scriptId, published));
         }
-
+         }
         results.success = true;
-    } catch(e: any) {
+    } catch (e: any) {
         results.success = false;
         results.errors = [e.message];
         logger.error('_publishScripts ERROR', e.message);

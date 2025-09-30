@@ -11,10 +11,12 @@ import { useAppContext } from "@/contexts/app";
 
 export type UseScriptsTableParams = {
     scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>;
+    locked?:boolean
 };
 
 export function useScriptsTable({
     scripts: scriptsParam,
+    locked
 }: UseScriptsTableParams) {
     const [scripts, setScripts] = useState(scriptsParam);
     const [selected, setSelected] = useState<number[]>([]);
@@ -144,7 +146,7 @@ export function useScriptsTable({
         });
     }, [confirm, copyScripts, alert, router, scripts]);
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => !!(viewOnly||locked), [viewOnly,locked]);
     const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
 
     return {

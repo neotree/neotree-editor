@@ -1,7 +1,7 @@
 'use client';
 
 import { Edit } from "lucide-react";
-
+import { useState, useCallback } from "react";
 import { DataTable } from "@/components/data-table";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
@@ -12,6 +12,8 @@ import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
+import { LockStatus } from "../../lock-status"
+
 
 type Props = UseScriptsTableParams;
 
@@ -32,15 +34,37 @@ export function ScriptsTable(props: Props) {
     const { sys, viewOnly } = useAppContext();
     const { hospitals, } = useScriptsContext();
 
+    const [lockedScripts, setLockedScripts] = useState<Record<string, boolean>>({});
+
+    const handleLockStatusChange = useCallback((scriptId: string, isLocked: boolean) => {
+        setLockedScripts(prev => {
+            // Only update if status changed
+            if (prev[scriptId] !== isLocked) {
+                return { ...prev, [scriptId]: isLocked };
+            }
+            return prev;
+        });
+    }, []);
+
+    const isScriptDisabled = (scriptId: string) => {
+        // Combine existing disabled prop with lock status
+        return disabled || lockedScripts[scriptId] === true;
+    };
+
+    const doneLoading = (scriptId: string): boolean => {
+    const scriptArray = scripts.data || [];
+    return scriptArray.length > 0 && scriptArray[scriptArray.length - 1].scriptId === scriptId;
+    };
+
     return (
         <>
             {loading && <Loader overlay />}
 
             {!!scriptsIdsToExport.length && (
-                <ScriptsExportModal 
-                    open 
+                <ScriptsExportModal
+                    open
                     scriptsIdsToExport={scriptsIdsToExport}
-                    onOpenChange={() => setScriptsIdsToExport([])} 
+                    onOpenChange={() => setScriptsIdsToExport([])}
                     setScriptsIdsToExport={setScriptsIdsToExport}
                 />
             )}
@@ -48,7 +72,7 @@ export function ScriptsTable(props: Props) {
             <ScriptsFab disabled={disabled} />
 
             <div className="">
-                <DataTable 
+                <DataTable
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     title="Scripts"
@@ -122,13 +146,22 @@ export function ScriptsTable(props: Props) {
                                 const s = scripts.data[rowIndex];
                                 if (!s) return null;
                                 return (
-                                    <ScriptsTableActions 
-                                        item={s}
-                                        disabled={disabled}
-                                        setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
-                                        onDelete={() => onDelete([s.scriptId])}
-                                        onDuplicate={() => onDuplicate([s.scriptId])}
-                                    />
+                                    <div className="flex items-center justify-end gap-2">
+                                        <LockStatus
+                                            key={`lock-status-${s.scriptId}`} 
+                                            scriptId={s.scriptId}
+                                            lockType={"script"}
+                                            doneLoading={doneLoading(s.scriptId)}
+                                            onStatusChange={(locked) => handleLockStatusChange(s.scriptId, locked)}
+                                        />
+                                        <ScriptsTableActions
+                                            item={s}
+                                            disabled={isScriptDisabled(s.scriptId)}
+                                            setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
+                                            onDelete={() => onDelete([s.scriptId])}
+                                            onDuplicate={() => onDuplicate([s.scriptId])}
+                                        />
+                                    </div>
                                 );
                             },
                         },
@@ -142,9 +175,10 @@ export function ScriptsTable(props: Props) {
                         '',
                     ])}
                 />
+
             </div>
 
-            <ScriptsTableBottomActions 
+            <ScriptsTableBottomActions
                 selected={selected}
                 onDelete={() => onDelete(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
                 setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
