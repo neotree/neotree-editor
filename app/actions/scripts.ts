@@ -65,10 +65,13 @@ export const deleteScreens: typeof mutations._deleteScreens = async (...args) =>
     }
 };
 
-export const saveScreens: typeof mutations._saveScreens = async (...args) => {
+export const saveScreens: typeof mutations._saveScreens = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScreens(...args);
+        const session = await isAllowed();
+        return await mutations._saveScreens({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -111,10 +114,13 @@ export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async (...args
     }
 };
 
-export const saveDiagnoses: typeof mutations._saveDiagnoses = async (...args) => {
+export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveDiagnoses(...args);
+        const session = await isAllowed();
+        return await mutations._saveDiagnoses({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -157,12 +163,15 @@ export const deleteScripts: typeof mutations._deleteScripts = async (...args) =>
     }
 };
 
-export const saveScripts: typeof mutations._saveScripts = async (...args) => {
+export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScripts(...args);
+        const session = await isAllowed();
+        return await mutations._saveScripts({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
-        logger.error('getSys ERROR', e.message);
+        logger.error('saveScripts ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
 };

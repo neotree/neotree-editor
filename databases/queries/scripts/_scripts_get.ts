@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -6,8 +6,6 @@ import { scripts, scriptsDrafts, pendingDeletion, hospitals } from "@/databases/
 import logger from "@/lib/logger";
 import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
 import { _getScreens } from "./_screens_get";
-import { _publishScripts, _saveScreens, _saveScripts } from "@/databases/mutations/scripts";
-import { _saveEditorInfo } from "@/databases/mutations/editor-info";
 
 
 export type GetScriptsParams = {
