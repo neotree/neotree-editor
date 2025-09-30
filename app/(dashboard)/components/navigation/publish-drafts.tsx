@@ -117,13 +117,13 @@ export function PublishDrafts({ variant, }: Props) {
 
     return (
         <>
-            {loading && <Loader overlay />}
-
             <Dialog>
                 <DialogTrigger asChild>
                     {trigger}
                 </DialogTrigger>
                 <DialogContent>
+                    {loading && <Loader overlay />}
+                    
                     <DialogHeader>
                         <DialogTitle>{ucFirst(variant)} data</DialogTitle>
                         <DialogDescription></DialogDescription>
