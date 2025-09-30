@@ -183,7 +183,6 @@ function Form({
         register,
         handleSubmit,
         setValue,
-        watch,
     } = useForm<Item>({
         defaultValues: {
             ...item,
@@ -197,10 +196,7 @@ function Form({
         },
     });
 
-    const keyId = watch('keyId');
-
     const onSave = handleSubmit(data => {
-        console.log(data);
         onChange(data);
     });
 
@@ -235,7 +231,7 @@ function Form({
                                             onChange={([item]) => {
                                                 onChange(item.name);
                                                 setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
-                                                setValue('label', item.label || '');
+                                                setValue('label', item.label || '', { shouldDirty: true, });
                                             }}
                                             filterDataKeys={k => {
                                                 const opts = fieldDataKey?.options || [];
@@ -251,10 +247,10 @@ function Form({
                         <div className="px-4">
                             <Label htmlFor="label">Label *</Label>
                             <Input 
-                                disabled
+                                disabled={false}
                                 {...register('label', {
                                     required: true,
-                                    disabled: true,
+                                    disabled: false,
                                 })}
                             />
                         </div>
