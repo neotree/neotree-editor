@@ -211,7 +211,8 @@ export async function _getScript(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetScriptResults['data'];
 
@@ -249,7 +250,8 @@ export async function _getScript(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
             hospitalId: data.hospitalName ? data.hospitalId : null,
         };

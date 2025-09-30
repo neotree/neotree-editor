@@ -188,7 +188,8 @@ export async function _getScreen(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetScreenResults['data'];
 
@@ -220,7 +221,8 @@ export async function _getScreen(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 

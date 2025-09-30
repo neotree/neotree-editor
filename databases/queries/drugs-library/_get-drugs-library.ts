@@ -119,6 +119,7 @@ export type GetDrugsLibraryItemResults = {
     data?: null | typeof drugsLibrary.$inferSelect & {
         isDraft: boolean;
         isDeleted: boolean;
+        draftCreatedByUserId?: string | null;
     };
     errors?: string[];
 };
@@ -143,7 +144,8 @@ export async function _getDrugsLibraryItem(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetDrugsLibraryItemResults['data'];
 
@@ -164,7 +166,8 @@ export async function _getDrugsLibraryItem(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 

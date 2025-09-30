@@ -31,6 +31,7 @@ import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-libra
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import ucFirst from "@/lib/ucFirst";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -78,6 +79,13 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
         item: DrugsLibraryState['drugs'][0],
     ) => void;
 }) {
+    const isLocked = useIsLocked({
+        isDraft: !!item?.isDraft,
+        userId: item?.draftCreatedByUserId,
+    });
+
+    disabled = disabled || isLocked;
+    
     const router = useRouter();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);

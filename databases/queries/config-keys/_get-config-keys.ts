@@ -106,6 +106,7 @@ export type GetConfigKeyResults = {
     data?: null | typeof configKeys.$inferSelect & {
         isDraft: boolean;
         isDeleted: boolean;
+        draftCreatedByUserId?: string | null;
     };
     errors?: string[];
 };
@@ -131,7 +132,8 @@ export async function _getConfigKey(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetConfigKeyResults['data'];
 
@@ -153,7 +155,8 @@ export async function _getConfigKey(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 
