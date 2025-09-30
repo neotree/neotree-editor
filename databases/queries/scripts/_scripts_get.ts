@@ -25,6 +25,7 @@ export type ScriptType = typeof scripts.$inferSelect & {
     preferences: Preferences;
     printSections: PrintSection[];
     hospitalName: string;
+    draftCreatedByUserId?: string | null;
 };
 
 export type GetScriptsResults = {
@@ -158,6 +159,7 @@ export async function _getScripts(
                 hospitalName: s.hospitalName,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetScriptsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)

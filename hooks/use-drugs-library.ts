@@ -12,6 +12,7 @@ import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
+    draftCreatedByUserId?: string | null;
 };
 
 export type DrugsLibraryState = {

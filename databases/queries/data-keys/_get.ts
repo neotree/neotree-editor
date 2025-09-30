@@ -8,6 +8,7 @@ import logger from "@/lib/logger";
 export type DataKey = typeof dataKeys.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
+    draftCreatedByUserId?: string | null;
 };
 
 export type GetDataKeysParams = {
@@ -110,6 +111,7 @@ export async function _getDataKeys(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetDataKeysResults['data'][0])))
         ]
             .sort((a, b) => {

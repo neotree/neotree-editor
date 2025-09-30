@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { Loader } from '@/components/loader';
@@ -18,22 +18,22 @@ export default function Screens({ scriptId }: Props) {
 
     const { alert } = useAlertModal();
 
-    useEffect(() => {
-        (async () => {
-            try {
-                setLoading(true);
-                const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
-                setScreens(res.data);
-            } catch(e: any) {
-                alert({
-                    title: "",
-                    message: e.message,
-                });
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [alert, scriptId]);
+    const loadScreens = useCallback(async () => {
+        try {
+            setLoading(true);
+            const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
+            setScreens(res.data);
+        } catch(e: any) {
+            alert({
+                title: "",
+                message: e.message,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [scriptId, alert]);
+
+    useEffect(() => { loadScreens(); }, [loadScreens]);
 
     return (
         <>
@@ -41,6 +41,7 @@ export default function Screens({ scriptId }: Props) {
 
             <ScreensTable 
                 screens={screens}
+                loadScreens={loadScreens}
             />
         </>
     );
