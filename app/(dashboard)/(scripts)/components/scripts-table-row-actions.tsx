@@ -35,8 +35,8 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
     const [_, copyToClipboard] = useCopyToClipboard({ showValueOnToast: true, });
 
     const lockStatusParams: LockStatusProps = {
-        isDraft: item.isDraft,
-        userId: item.draftCreatedByUserId,
+        isDraft: item.isDraft || !!item.hasChangedItems,
+        userId: item.draftCreatedByUserId || item.itemsChangedByUserId,
         dataType: 'script',
     };
 

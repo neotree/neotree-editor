@@ -53,6 +53,7 @@ export function ScriptForm(props: Props) {
         loading,
         disabled,
         isLocked,
+        lockedByUserId,
         reset: resetForm,
         watch,
         setValue,
@@ -90,8 +91,8 @@ export function ScriptForm(props: Props) {
                         <div>
                             <LockStatus 
                                 card
-                                isDraft={!!formData?.isDraft}
-                                userId={formData?.draftCreatedByUserId}
+                                isDraft={!!formData?.isDraft || !!formData?.hasChangedItems}
+                                userId={formData?.draftCreatedByUserId || formData?.itemsChangedByUserId}
                                 dataType="script"
                             />
                         </div>
@@ -294,12 +295,16 @@ export function ScriptForm(props: Props) {
                     {(!section || (section === 'screens')) && (
                         <Screens
                             scriptId={props.formData.scriptId!}
+                            isScriptLocked={isLocked}
+                            scriptLockedByUserId={lockedByUserId}
                         />
                     )}
 
                     {section === 'diagnoses' && (
                         <Diagnoses
                             scriptId={props.formData.scriptId!}
+                            isScriptLocked={isLocked}
+                            scriptLockedByUserId={lockedByUserId}
                         />
                     )}
 

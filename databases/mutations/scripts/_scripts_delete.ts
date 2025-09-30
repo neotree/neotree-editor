@@ -11,6 +11,7 @@ export type DeleteScriptsData = {
     scriptsIds?: string[];
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
+    userId?: string | null;
 };
 
 export type DeleteScriptsResponse = { 
@@ -30,7 +31,7 @@ export async function _deleteAllScriptsDrafts(opts?: {
 }
 
 export async function _deleteScripts(
-    { scriptsIds = [], broadcastAction, confirmDeleteAll, }: DeleteScriptsData,
+    { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, }: DeleteScriptsData,
 ) {
     const response: DeleteScriptsResponse = { success: false, };
 
@@ -45,7 +46,7 @@ export async function _deleteScripts(
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
-        const scriptsToDelete = await db
+        let scriptsToDelete = await db
             .select({
                 scriptId: scripts.scriptId,
                 pendingDeletion: pendingDeletion,
@@ -57,6 +58,11 @@ export async function _deleteScripts(
                 isNull(pendingDeletion),
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
             ));
+
+        scriptsToDelete = scriptsToDelete.map(s => ({
+            ...s,
+            createdByUserId: userId,
+        }));
 
         if (scriptsToDelete.length) {
             await db.insert(pendingDeletion).values(scriptsToDelete.map(s => ({ scriptId: s.scriptId, })));

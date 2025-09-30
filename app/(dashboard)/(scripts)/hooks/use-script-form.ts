@@ -109,9 +109,11 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
+    const lockedByUserId = params.formData?.draftCreatedByUserId || params.formData?.itemsChangedByUserId;
+
     const isLocked = useIsLocked({
-        isDraft: !!params.formData?.isDraft,
-        userId: params.formData?.draftCreatedByUserId,
+        isDraft: !!params.formData?.isDraft || !!params.formData?.hasChangedItems,
+        userId: lockedByUserId,
     });
 
     const disabled = useMemo(() => viewOnly || isLocked, [viewOnly, isLocked]);
@@ -123,6 +125,7 @@ export function useScriptForm(params: UseScriptFormParams) {
         loading,
         disabled,
         isLocked,
+        lockedByUserId: !isLocked ? null : lockedByUserId,
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,

@@ -18,12 +18,16 @@ import { useIsLocked } from "@/hooks/use-is-locked";
 type Props = {
     disabled: boolean;
     diagnosis: Awaited<ReturnType<IScriptsContext['getDiagnoses']>>['data'][0];
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
     onDelete: () => void;
     onCopy: () => void;
 };
 
 export function DiagnosesTableRowActions({ 
     disabled,
+    isScriptLocked,
+    scriptLockedByUserId,
     diagnosis: { diagnosisId, isDraft, draftCreatedByUserId, },
     onDelete, 
     onCopy,
@@ -33,8 +37,8 @@ export function DiagnosesTableRowActions({
     const editHref = `/script/${scriptId}/diagnosis/${diagnosisId}`;
 
     const lockStatusParams: LockStatusProps = {
-        isDraft,
-        userId: draftCreatedByUserId,
+        isDraft: isDraft || !!isScriptLocked,
+        userId: draftCreatedByUserId || scriptLockedByUserId,
         dataType: 'diagnosis',
     };
 

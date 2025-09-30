@@ -10,15 +10,18 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { ScriptType } from "@/databases/queries/scripts";
 
 export type UseScreenFormParams = {
     scriptId: string;
+    script?: ScriptType;
     formData?: ScreenFormDataType;
 };
 
 export function useScreenForm({
     formData,
     scriptId,
+    script,
 }: UseScreenFormParams) {
     const router = useRouter();
 
@@ -163,11 +166,19 @@ export function useScreenForm({
         userId: formData?.draftCreatedByUserId,
     });
 
+    const scriptLockedByUserId = script?.draftCreatedByUserId || script?.itemsChangedByUserId;
+
+    const isScriptLocked = useIsLocked({
+        isDraft: !!script?.isDraft || !!script?.hasChangedItems,
+        userId: scriptLockedByUserId,
+    });
+
     const disabled = useMemo(() => (
         saving || 
         viewOnly || 
-        isLocked
-    ), [saving, viewOnly, isLocked]);
+        isLocked ||
+        isScriptLocked
+    ), [saving, viewOnly, isLocked, isScriptLocked]);
 
     return {
         ...form,
@@ -176,6 +187,8 @@ export function useScreenForm({
         scriptPageHref,
         disabled,
         isLocked,
+        isScriptLocked,
+        scriptLockedByUserId,
         save,
         getDefaultValues,
     }

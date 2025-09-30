@@ -10,9 +10,12 @@ import logger from "@/lib/logger"
 
 type Props = {
     scriptId: string;
+    disabled?: boolean;
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
 };
 
-export default function Screens({ scriptId }: Props) {
+export default function Screens({ scriptId, disabled, isScriptLocked, scriptLockedByUserId, }: Props) {
     const [loading, setLoading] = useState(false);
     const [screens, setScreens] = useState<Awaited<ReturnType<typeof scriptsActions.getScreens>>>({ data: [], });
 
@@ -40,8 +43,11 @@ export default function Screens({ scriptId }: Props) {
             {loading && <Loader overlay />}
 
             <ScreensTable 
+                disabled={disabled}
                 screens={screens}
                 loadScreens={loadScreens}
+                isScriptLocked={isScriptLocked}
+                scriptLockedByUserId={scriptLockedByUserId}
             />
         </>
     );

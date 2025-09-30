@@ -11,12 +11,18 @@ import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
 
 export type UseScreensTableParams = {
+    disabled?: boolean;
     screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
     loadScreens: () => Promise<void>;
 };
 
 export function useScreensTable({
+    disabled: disabledProp,
     screens: screensParam,
+    isScriptLocked,
+    scriptLockedByUserId,
     loadScreens,
 }: UseScreensTableParams) {
     const [screens, setScreens] = useState(screensParam);
@@ -112,14 +118,16 @@ export function useScreensTable({
         router.refresh();
     }, [saveScreens, loadScreens, screens, router]);
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly]);
 
     return {
         screens,
         loading,
         selected,
         disabled,
-        screensIdsToCopy, 
+        screensIdsToCopy,
+        isScriptLocked,
+        scriptLockedByUserId, 
         setScreensIdsToCopy,
         onDelete,
         onSort,

@@ -10,6 +10,7 @@ export type DeleteScreensData = {
     scriptsIds?: string[];
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
+    userId?: string | null;
 };
 
 export type DeleteScreensResponse = { 
@@ -34,6 +35,7 @@ export async function _deleteScreens(
         scriptsIds = [], 
         confirmDeleteAll,
         broadcastAction, 
+        userId,
     }: DeleteScreensData,
 ) {
     const response: DeleteScreensResponse = { success: false, };
@@ -69,7 +71,11 @@ export async function _deleteScreens(
                 !scriptsIds.length ? undefined : inArray(screens.scriptId, scriptsIds),
             ));
 
-        const pendingDeletionInsertData = screensArr;
+        const pendingDeletionInsertData = screensArr.map(s => ({
+            ...s,
+            createdByUserId: userId,
+        }));
+        
         if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
         response.success = true;

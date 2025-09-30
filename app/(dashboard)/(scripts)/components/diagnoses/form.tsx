@@ -31,6 +31,8 @@ export function DiagnosisForm(props: Props) {
         saving,
         scriptPageHref,
         disabled,
+        isScriptLocked,
+        scriptLockedByUserId,
         register,
         watch,
         setValue,
@@ -51,12 +53,12 @@ export function DiagnosisForm(props: Props) {
             {saving && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
-                {isLocked && (
+                {(isLocked || isScriptLocked) && (
                     <div>
                         <LockStatus 
                             card
-                            isDraft={!!props.formData?.isDraft}
-                            userId={props.formData?.draftCreatedByUserId}
+                            isDraft={!!props.formData?.isDraft || isScriptLocked}
+                            userId={props.formData?.draftCreatedByUserId || scriptLockedByUserId}
                             dataType="diagnosis"
                         />
                     </div>

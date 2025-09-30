@@ -46,7 +46,9 @@ export async function _deleteDrugsLibraryItems(
 
             const pendingDeletionInsertData = drugsLibraryItems.data.filter(s => !s.isDraft).map(s => ({
                 drugsLibraryItemId: s.itemId,
+                createdByUserId: userId,
             }));
+            
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
             await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), userId, });

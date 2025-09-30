@@ -9,15 +9,18 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { ScriptType } from "@/databases/queries/scripts";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
+    script?: ScriptType;
     formData?: DiagnosisFormDataType;
 };
 
 export function useDiagnosisForm({
     formData,
     scriptId,
+    script,
 }: UseDiagnosisFormParams) {
     const router = useRouter();
 
@@ -105,11 +108,19 @@ export function useDiagnosisForm({
         userId: formData?.draftCreatedByUserId,
     });
 
+    const scriptLockedByUserId = script?.draftCreatedByUserId || script?.itemsChangedByUserId;
+    
+    const isScriptLocked = useIsLocked({
+        isDraft: !!script?.isDraft || !!script?.hasChangedItems,
+        userId: scriptLockedByUserId,
+    });
+
     const disabled = useMemo(() => (
         saving || 
         viewOnly || 
-        isLocked
-    ), [saving, viewOnly, isLocked]);
+        isLocked ||
+        isScriptLocked
+    ), [saving, viewOnly, isLocked, isScriptLocked]);
 
     return {
         ...form,
@@ -118,6 +129,8 @@ export function useDiagnosisForm({
         scriptPageHref,
         disabled,
         isLocked,
+        isScriptLocked,
+        scriptLockedByUserId,
         save,
         getDefaultValues,
     }

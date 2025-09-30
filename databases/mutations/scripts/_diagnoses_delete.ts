@@ -10,6 +10,7 @@ export type DeleteDiagnosesData = {
     scriptsIds?: string[];
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
+    userId?: string | null;
 };
 
 export type DeleteDiagnosesResponse = { 
@@ -34,6 +35,7 @@ export async function _deleteDiagnoses(
         scriptsIds = [], 
         confirmDeleteAll,
         broadcastAction, 
+        userId,
     }: DeleteDiagnosesData,
 ) {
     const response: DeleteDiagnosesResponse = { success: false, };
@@ -69,7 +71,11 @@ export async function _deleteDiagnoses(
                 !scriptsIds.length ? undefined : inArray(diagnoses.scriptId, scriptsIds),
             ));
 
-        const pendingDeletionInsertData = diagnosesArr;
+        const pendingDeletionInsertData = diagnosesArr.map(s => ({
+            ...s,
+            createdByUserId: userId,
+        }));
+        
         if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
         response.success = true;
