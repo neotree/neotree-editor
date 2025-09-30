@@ -51,6 +51,7 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { LockStatus } from "@/components/lock-status";
 
 type Props = {
     scriptId: string;
@@ -74,6 +75,7 @@ export function ScreenForm({
     });
 
     const {
+        isLocked,
         control,
         formIsDirty,
         saving,
@@ -119,6 +121,17 @@ export function ScreenForm({
     useEffect(() => {
         getAlias(key)
     }, [getAlias,key]);
+
+    const lockStatus = !isLocked ? null : (
+        <div>
+            <LockStatus 
+                card
+                isDraft={!!formData?.isDraft}
+                userId={formData?.draftCreatedByUserId}
+                dataType="screen"
+            />
+        </div>
+    );
 
     if (!showForm) {
         return (
@@ -324,6 +337,8 @@ export function ScreenForm({
             {displayLoader && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
+                {lockStatus}
+
                 <Title>Type</Title>
 
                 <div>

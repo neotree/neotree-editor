@@ -12,25 +12,32 @@ import { useIsLocked } from "@/hooks/use-is-locked";
 import { cn } from "@/lib/utils";
 import { Loader } from "@/components/loader";
 import { useUser } from "@/hooks/use-user";
+import { ErrorCard } from "./error-card";
 
 export type LockStatusProps = {
     isDraft: boolean;
     userId?: string | null;
     dataType?: string;
+    card?: boolean;
 };
 
 export type LockStatusRef = {
     isLocked: boolean;
 };
 
-const LockStatus = forwardRef<LockStatusRef, LockStatusProps>(({ isDraft, userId, dataType, }, ref) => {
+const LockStatus = forwardRef<LockStatusRef, LockStatusProps>(({ 
+    isDraft, 
+    userId, 
+    dataType, 
+    card,
+}, ref) => {
     const isLocked = useIsLocked({ isDraft, userId });
 
     useImperativeHandle(ref, () => ({ isLocked, }), [isLocked]);
 
     const { loading, error, user, getUser, } = useUser({
         userId,
-        loadOnMount: false,
+        loadOnMount: !!card,
     });
 
     const onOpenChange = useCallback(async (open: boolean) => {
@@ -38,6 +45,21 @@ const LockStatus = forwardRef<LockStatusRef, LockStatusProps>(({ isDraft, userId
             getUser();
         }
     }, [userId, user, loading]);
+
+    if (card && isLocked && !loading) {
+        return (
+            <ErrorCard>
+                <div className="flex items-center gap-x-4">
+                    <LockIcon className="w-4 h-4" />
+                    {!user ? null : (
+                        <div>
+                            <strong>{user.displayName}</strong> is working on this {dataType || ''}
+                        </div>
+                    )}
+                </div>
+            </ErrorCard>
+        );
+    }
 
     return (
         <>

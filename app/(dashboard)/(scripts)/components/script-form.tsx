@@ -33,6 +33,7 @@ import Diagnoses from './diagnoses';
 import { ScriptPrintSetup } from './print';
 import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
+import { LockStatus } from '@/components/lock-status';
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -51,6 +52,7 @@ export function ScriptForm(props: Props) {
         hospitals,
         loading,
         disabled,
+        isLocked,
         reset: resetForm,
         watch,
         setValue,
@@ -84,6 +86,17 @@ export function ScriptForm(props: Props) {
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
+                    {isLocked && (
+                        <div>
+                            <LockStatus 
+                                card
+                                isDraft={!!formData?.isDraft}
+                                userId={formData?.draftCreatedByUserId}
+                                dataType="script"
+                            />
+                        </div>
+                    )}
+
                     <Title>Type</Title>
 
                     <div>
