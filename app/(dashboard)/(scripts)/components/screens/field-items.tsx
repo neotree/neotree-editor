@@ -183,8 +183,6 @@ function Form({
         register,
         handleSubmit,
         setValue,
-        watch,
-        reset,
     } = useForm<Item>({
         defaultValues: {
             ...item,
@@ -198,10 +196,7 @@ function Form({
         },
     });
 
-    const keyId = watch('keyId');
-
     const onSave = handleSubmit(data => {
-        console.log(data);
         onChange(data);
     });
 
