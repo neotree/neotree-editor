@@ -18,9 +18,11 @@ export type DeleteScriptsResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllScriptsDrafts(): Promise<boolean> {
+export async function _deleteAllScriptsDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(scriptsDrafts);
+        await db.delete(scriptsDrafts).where(!opts?.userId ? undefined : eq(scriptsDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;

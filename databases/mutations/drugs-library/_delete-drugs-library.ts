@@ -19,9 +19,11 @@ export type DeleteDrugsLibraryItemsResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllDrugsLibraryItemsDrafts(): Promise<boolean> {
+export async function _deleteAllDrugsLibraryItemsDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(drugsLibraryDrafts);
+        await db.delete(drugsLibraryDrafts).where(!opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;

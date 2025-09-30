@@ -17,9 +17,11 @@ export type DeleteScreensResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllScreensDrafts(): Promise<boolean> {
+export async function _deleteAllScreensDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(screensDrafts);
+        await db.delete(screensDrafts).where(!opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;

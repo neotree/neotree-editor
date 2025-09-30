@@ -17,9 +17,11 @@ export type DeleteDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllDiagnosesDrafts(): Promise<boolean> {
+export async function _deleteAllDiagnosesDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(diagnosesDrafts);
+        await db.delete(diagnosesDrafts).where(!opts?.userId ? undefined : eq(diagnosesDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;

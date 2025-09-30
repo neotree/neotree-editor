@@ -9,8 +9,10 @@ export async function POST(req: NextRequest) {
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
+
+        const body = await req.json();
         
-        const data = await publishData();
+        const data = await publishData(body);
 
         return NextResponse.json(data);
     } catch(e: any) {

@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -11,6 +11,7 @@ export async function _publishScreens(opts?: {
     scriptsIds?: string[];
     screensIds?: string[];
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const { scriptsIds, screensIds, } = { ...opts, };
 
@@ -26,11 +27,14 @@ export async function _publishScreens(opts?: {
 
         if (scriptsIds?.length || screensIds?.length) {
             const res = await db.query.screensDrafts.findMany({
-                where: or(
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptDraftId, scriptsIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenId, screensIds),
-                    !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
+                where: and(
+                    or(
+                        !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds),
+                        !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptDraftId, scriptsIds),
+                        !screensIds?.length ? undefined : inArray(screensDrafts.screenId, screensIds),
+                        !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
+                    ),
+                    !opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId),
                 ),
             });
 
@@ -38,7 +42,10 @@ export async function _publishScreens(opts?: {
             inserts = res.filter(s => !s.screenId);
         } else {
             const _screensDrafts = await db.query.screensDrafts.findMany({
-                where: isNotNull(screensDrafts.scriptId),
+                where: and(
+                    isNotNull(screensDrafts.scriptId),
+                    !opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId),
+                ),
             });
             updates = _screensDrafts.filter(s => s.screenId);
             inserts = _screensDrafts.filter(s => !s.screenId);
@@ -101,7 +108,10 @@ export async function _publishScreens(opts?: {
         await db.delete(screensDrafts);
 
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.screenId),
+            where: and(
+                isNotNull(pendingDeletion.screenId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { screenId: true, },
             with: {
                 screen: {
@@ -135,9 +145,12 @@ export async function _publishScreens(opts?: {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.screenId),
-            isNotNull(pendingDeletion.screenDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.screenId),
+                isNotNull(pendingDeletion.screenDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         const published = [

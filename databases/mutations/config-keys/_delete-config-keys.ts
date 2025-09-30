@@ -15,9 +15,11 @@ export type DeleteConfigKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllConfigKeysDrafts(): Promise<boolean> {
+export async function _deleteAllConfigKeysDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(configKeysDrafts);
+        await db.delete(configKeysDrafts).where(!opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;
