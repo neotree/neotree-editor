@@ -30,6 +30,13 @@ export const bytea = customType<{ data: Buffer; notNull: false; default: false }
     },
 });
 
+export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
+    createdBy: one(users, {
+        fields: [dataKeysDrafts.createdByUserId],
+        references: [users.userId],
+    }),
+}));
+
 // MAILER SETTINGS ENUM
 export const mailerServiceEnum = pgEnum('mailer_service', ['gmail', 'smtp']);
 
@@ -65,6 +72,9 @@ export const screenTypeEnum = pgEnum('screen_type', [
 
 // DRUG TYPE ENUM
 export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
+
+// LIST STYLE ENUM
+export const listStyleEnum = pgEnum('list_style', ['none', 'number', 'bullet']);
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
@@ -219,6 +229,9 @@ export const sites = pgTable('nt_sites', {
     apiKey: text('api_key').notNull(),
     type: siteTypeEnum('type').notNull(),
     env: siteEnvEnum('env').notNull().default('production'),
+    displayName: text('display_name'),
+    countryISO: text('country_iso'),
+    countryName: text('country_name'),
     
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -363,6 +376,7 @@ export const configKeysDrafts = pgTable(
         configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof configKeys.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -373,6 +387,10 @@ export const configKeysDraftsRelations = relations(configKeysDrafts, ({ one }) =
     configKey: one(configKeys, {
         fields: [configKeysDrafts.configKeyId],
         references: [configKeys.configKeyId],
+    }),
+    createdBy: one(users, {
+        fields: [configKeysDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -419,6 +437,19 @@ export const scripts = pgTable(
         reviewable: boolean('reviewable').notNull().default(false),
         reviewConfigurations: jsonb('review_configurations').default('[]').notNull(),
         preferences: jsonb('preferences').default(JSON.stringify(defaultPreferences)).notNull(),
+        printConfig: jsonb('print_config').notNull()
+            .default(`{
+              "headerFormat": "",
+              "headerFields": [],
+              "footerFields": [],
+              "sections": []
+            }`)
+            .$type<{
+                headerFormat?: string;
+                headerFields: string[],
+                footerFields: string[],
+                sections: any[],
+            }>(),
         printSections: jsonb('print_sections').default('[]').notNull(),
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -461,9 +492,12 @@ export const scriptsDrafts = pgTable(
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
-        data: jsonb('data').$type<typeof scripts.$inferInsert
-         & { nuidSearchFields: ScriptField[]; } 
-         &{ reviewConfigurations: ScreenReviewField[]; }>().notNull(),
+        data: jsonb('data').$type<
+            typeof scripts.$inferInsert
+            & { nuidSearchFields: ScriptField[]; } 
+            &{ reviewConfigurations: ScreenReviewField[]; }
+        >().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -476,6 +510,10 @@ export const scriptsDraftsRelations = relations(scriptsDrafts, ({ one, many, }) 
     script: one(scripts, {
         fields: [scriptsDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [scriptsDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -523,7 +561,9 @@ export const screens = pgTable(
         epicId: text('epic_id').notNull().default(''),
         storyId: text('story_id').notNull().default(''),
         refId: text('ref_id').notNull().default(''),
+        refIdDataKey: text('ref_id_data_key').notNull().default(''),
         refKey: text('ref_key').notNull().default(''),
+        refKeyDataKey: text('ref_key_data_key').notNull().default(''),
         step: text('step').notNull().default(''),
         actionText: text('action_text').notNull().default(''),
         contentText: text('content_text').notNull().default(''),
@@ -549,6 +589,7 @@ export const screens = pgTable(
         notes: text('notes').notNull().default(''),
         dataType: text('data_type').notNull().default(''),
         key: text('key').notNull().default(''),
+        keyId: text('key_id').notNull().default(''),
         label: text('label').notNull().default(''),
         negativeLabel: text('negative_label').notNull().default(''),
         positiveLabel: text('positive_label').notNull().default(''),
@@ -568,6 +609,7 @@ export const screens = pgTable(
         fluids: jsonb('fluids').default('[]').$type<FluidField[]>().notNull(),
         feeds: jsonb('feeds').default('[]').$type<FeedField[]>().notNull(),
         reasons: jsonb('reasons').default('[]').notNull().$type<{ key: string; value: string; }[]>(),
+        listStyle: listStyleEnum('list_style').default('none').notNull(),
         
         publishDate: timestamp('publish_date').defaultNow().notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -612,6 +654,7 @@ export const screensDrafts = pgTable(
         type: screenTypeEnum('type').notNull(),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof screens.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -630,6 +673,10 @@ export const screensDraftsRelations = relations(screensDrafts, ({ one }) => ({
     script: one(scripts, {
         fields: [screensDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [screensDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -676,6 +723,7 @@ export const diagnoses = pgTable(
         name: text('name').notNull().default(''),
         description: text('description').notNull().default(''),
         key: text('key').default(''),
+        keyId: text('key_id').notNull().default(''),
         severityOrder: integer('severity_order'),
         expressionMeaning: text('expression_meaning').notNull().default(''),
         symptoms: jsonb('symptoms').default('[]').$type<DiagnosisSymptom[]>().notNull(),
@@ -726,6 +774,7 @@ export const diagnosesDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof diagnoses.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -744,6 +793,10 @@ export const diagnosesDraftsRelations = relations(diagnosesDrafts, ({ one }) => 
     script: one(scripts, {
         fields: [diagnosesDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [diagnosesDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -780,6 +833,7 @@ export const drugsLibrary = pgTable('nt_drugs_library', {
     id: serial('id').primaryKey(),
     itemId: uuid('item_id').notNull().unique().defaultRandom(),
     key: text('key').notNull().unique(),
+    keyId: text('key_id').notNull().default(''),
     type: drugTypeEnum('type').notNull().default('drug'),
     drug: text('drug').notNull().default(''),
     minGestation: doublePrecision('min_gestation'),
@@ -832,6 +886,7 @@ export const drugsLibraryDrafts = pgTable(
         type: drugTypeEnum('type').notNull().default('drug'),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof drugsLibrary.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -842,6 +897,10 @@ export const drugsLibraryDraftsRelations = relations(drugsLibraryDrafts, ({ one 
     item: one(drugsLibrary, {
         fields: [drugsLibraryDrafts.itemId],
         references: [drugsLibrary.itemId],
+    }),
+    createdBy: one(users, {
+        fields: [drugsLibraryDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -887,6 +946,7 @@ export const pendingDeletion = pgTable(
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -951,5 +1011,9 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     alias: one(aliases, {
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
+    }),
+    createdBy: one(users, {
+        fields: [pendingDeletion.createdByUserId],
+        references: [users.userId],
     }),
 }));

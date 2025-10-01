@@ -6,6 +6,7 @@ import queryString from "query-string";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library";
+import { _saveDataKeysIfNotExist } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
@@ -13,6 +14,8 @@ import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
+import { _getDataKeys } from "@/databases/queries/data-keys";
+import { scrapDataKeys } from "@/lib/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -52,20 +55,26 @@ export const getScreen: typeof queries._getScreen = async (...args) => {
     return await queries._getScreen(...args);
 };
 
-export const deleteScreens: typeof mutations._deleteScreens = async (...args) => {
+export const deleteScreens: typeof mutations._deleteScreens = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteScreens(...args);
+        const session = await isAllowed();
+        return await mutations._deleteScreens({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveScreens: typeof mutations._saveScreens = async (...args) => {
+export const saveScreens: typeof mutations._saveScreens = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScreens(...args);
+        const session = await isAllowed();
+        return await mutations._saveScreens({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -98,20 +107,26 @@ export const getDiagnosis: typeof queries._getDiagnosis = async (...args) => {
     return await queries._getDiagnosis(...args);
 };
 
-export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async (...args) => {
+export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteDiagnoses(...args);
+        const session = await isAllowed();
+        return await mutations._deleteDiagnoses({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveDiagnoses: typeof mutations._saveDiagnoses = async (...args) => {
+export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveDiagnoses(...args);
+        const session = await isAllowed();
+        return await mutations._saveDiagnoses({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -144,32 +159,47 @@ export const getScript: typeof queries._getScript = async (...args) => {
     return await queries._getScript(...args);
 };
 
-export const deleteScripts: typeof mutations._deleteScripts = async (...args) => {
+export const deleteScripts: typeof mutations._deleteScripts = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteScripts(...args);
+        const session = await isAllowed();
+        return await mutations._deleteScripts({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteScripts ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveScripts: typeof mutations._saveScripts = async (...args) => {
+export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScripts(...args);
+        const session = await isAllowed();
+        return await mutations._saveScripts({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
-        logger.error('getSys ERROR', e.message);
+        logger.error('saveScripts ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
 };
-export async function getScriptsWithItems(params: Parameters<typeof queries._getScripts>[0]) {
-    const data: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
-        screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][],
-        diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][]
-        drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][]
-    })[] = [];
+
+type GetScriptsWithItemsResponse = {
+    errors?: string[];
+    dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+    data: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
+        screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
+        diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
+        drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
+    })[];
+};
+
+export async function getScriptsWithItems(params: Parameters<typeof queries._getScripts>[0]): Promise<GetScriptsWithItemsResponse> {
+    const data: GetScriptsWithItemsResponse['data'] = [];
     const errors: string[] = [];
+    let dataKeys: GetScriptsWithItemsResponse['dataKeys'] = [];
+
     try {
         const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
         const scripts = await queries._getScripts({ ...params, returnDraftsIfExist });
@@ -192,13 +222,82 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
             });
         }
 
-        if (errors.length) return { errors, data: [], };
+        const { keys } = scrapDataKeys({
+            screens: data.reduce((acc, item) => {
+                return [...acc, ...item.screens];
+            }, [] as typeof data[0]['screens']),
 
-        return { data, };
+            diagnoses: data.reduce((acc, item) => {
+                return [...acc, ...item.diagnoses];
+            }, [] as typeof data[0]['diagnoses']),
+
+            drugsLibrary: data.reduce((acc, item) => {
+                return [...acc, ...item.drugsLibrary];
+            }, [] as typeof data[0]['drugsLibrary']),
+        });
+
+        if (keys.length) {
+            dataKeys = (await _getDataKeys({ names: keys.map(key => key.name) }))?.data || [];
+        }
+
+        if (errors.length) return { errors, data: [], dataKeys, };
+
+        return { data, dataKeys, };
     } catch (e: any) {
         logger.error('getScriptsWithItems ERROR', e.message);
-        return { data: [], errors: [e.message], };
+        return { data: [], dataKeys, errors: [e.message], };
     }
+}
+
+export async function getScriptsKeys(params: Parameters<typeof queries._getScripts>[0]) {
+    const { errors, data } = await getScriptsWithItems(params);
+
+    const scripts = data.map(script => {
+        let keys: { label: string; key: string; }[] = [];
+
+        script.screens.forEach(screen => {
+            screen.fields?.forEach?.(field => {
+                if (field.key) {
+                    const key = field.key;
+                    keys.push({
+                        key,
+                        label: field.label || key,
+                    });
+                }
+            });
+
+            screen.items?.forEach?.(item => {
+                if (item.key) {
+                    const key = item.id || item.key;
+                    keys.push({
+                        key,
+                        label: item.label || key,
+                    });
+                }
+            });
+
+            if (screen.key) {
+                keys.push({
+                    key: screen.key,
+                    label: screen.label || screen.key,
+                });
+            }
+        });
+
+        keys = keys.filter((k, i) => keys.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i);
+
+        return {
+            title: script.title,
+            hospitalId: script.hospitalId,
+            hospitalName: script.hospitalName,
+            keys,
+        };
+    });
+
+    return {
+        errors,
+        data: scripts,
+    };
 }
 
 export async function saveScriptScreens({
@@ -390,7 +489,8 @@ export async function deleteScriptsItems({ scriptsIds, }: {
 
 const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, drugsLibrary: 0, };
 
-export async function saveScriptsWithItems({ data }: {
+export async function saveScriptsWithItems({ data, dataKeys, }: {
+    dataKeys: Awaited<ReturnType<typeof getScriptsWithItems>>['dataKeys'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
     })[];
@@ -502,7 +602,7 @@ export async function saveScriptsWithItems({ data }: {
             info.diagnoses += saveDiagnoses.saved;
 
             if (drugsLibrary.length) {
-                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsAndUpdateIfExists({ 
+                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
                     data: drugsLibrary.map(item => ({
                         ...item,
                         itemId: v4(),
@@ -518,6 +618,8 @@ export async function saveScriptsWithItems({ data }: {
                 info.drugsLibrary += drugsLibrary.length;
             }
         }
+
+        if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
 
         if (errors.length) return { success: false, errors, info, };
 
@@ -550,7 +652,7 @@ export async function copyScripts(params?: {
     try {
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
-        let scripts = fromRemoteSiteId ? { data: [], } : await getScriptsWithItems({ scriptsIds });
+        let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], dataKeys: [], } : await getScriptsWithItems({ scriptsIds });
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
@@ -620,6 +722,7 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
             } else {
                 response = await saveScriptsWithItems({
+                    dataKeys: scripts.dataKeys,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,

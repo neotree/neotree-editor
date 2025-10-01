@@ -8,15 +8,19 @@ import { DiagnosisFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
+import { useIsLocked } from "@/hooks/use-is-locked";
+import { ScriptType } from "@/databases/queries/scripts";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
+    script?: ScriptType;
     formData?: DiagnosisFormDataType;
 };
 
 export function useDiagnosisForm({
     formData,
     scriptId,
+    script,
 }: UseDiagnosisFormParams) {
     const router = useRouter();
 
@@ -36,6 +40,7 @@ export function useDiagnosisForm({
             name: formData?.name || '',
             description: formData?.description || '',
             key: formData?.key || '',
+            keyId: formData?.keyId || '',
             expression: formData?.expression || '',
             expressionMeaning: formData?.expressionMeaning || '',
             severityOrder: formData?.severityOrder || null,
@@ -98,7 +103,24 @@ export function useDiagnosisForm({
         }
     });
 
-    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+    const isLocked = useIsLocked({
+        isDraft: !!formData?.isDraft,
+        userId: formData?.draftCreatedByUserId,
+    });
+
+    const scriptLockedByUserId = script?.draftCreatedByUserId || script?.itemsChangedByUserId;
+    
+    const isScriptLocked = useIsLocked({
+        isDraft: !!script?.isDraft || !!script?.hasChangedItems,
+        userId: scriptLockedByUserId,
+    });
+
+    const disabled = useMemo(() => (
+        saving || 
+        viewOnly || 
+        isLocked ||
+        isScriptLocked
+    ), [saving, viewOnly, isLocked, isScriptLocked]);
 
     return {
         ...form,
@@ -106,6 +128,9 @@ export function useDiagnosisForm({
         saving,
         scriptPageHref,
         disabled,
+        isLocked,
+        isScriptLocked,
+        scriptLockedByUserId,
         save,
         getDefaultValues,
     }

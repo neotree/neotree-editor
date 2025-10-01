@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import axios from "axios";
 
 import { Content } from "@/components/content";
@@ -11,13 +10,13 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
+import { PublishDrafts } from "./publish-drafts";
 
 type Props = {
 
 };
 
 export function TopBar({}: Props) {
-    const router = useRouter();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
     const [loading, setLoading] = useState(false);
@@ -49,11 +48,11 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
                     message: 'Data published successfully!',
+                    onClose: () => window.location.reload(),
                 });
             }
         } catch(e: any) {
@@ -65,7 +64,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_publishData, alert, router]);
+    }, [_publishData, alert]);
 
     const discardDrafts = useCallback(async () => {
         try {
@@ -84,11 +83,11 @@ export function TopBar({}: Props) {
                     message: res.errors.map(e => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(''),
                 });
             } else {
-                router.refresh();
                 alert({
                     variant: 'success',
                     title: 'Success',
                     message: 'Data discarded successfully!',
+                    onClose: () => window.location.reload(),
                 });
             }
         } catch(e: any) {
@@ -100,7 +99,7 @@ export function TopBar({}: Props) {
         } finally {
             setLoading(false);
         }
-    }, [_discardDrafts, alert, router]);
+    }, [_discardDrafts, alert]);
 
     const usePlainBg = sys.data.use_plain_background === 'yes';
     const canSwitchModes = isAdmin || isSuperUser;
@@ -129,31 +128,8 @@ export function TopBar({}: Props) {
 
                     {(mode === 'development') && shouldPublishData && (isSuperUser || isAdmin) && (
                         <>
-                            <Button
-                                variant="destructive"
-                                className="h-auto text-xs px-2 py-1"
-                                onClick={() => confirm(discardDrafts, {
-                                    title: 'Discard changes',
-                                    message: 'Are you sure you want to discard changes?',
-                                    negativeLabel: 'Cancel',
-                                    positiveLabel: 'Discard',
-                                    danger: true,
-                                })}
-                            >
-                                Discard changes
-                            </Button>
-
-                            <Button
-                                className="h-auto text-xs px-4 py-1"
-                                onClick={() => confirm(publishData, {
-                                    title: 'Publish data',
-                                    message: 'Are you sure you want to publish data?',
-                                    negativeLabel: 'Cancel',
-                                    positiveLabel: 'Publish',
-                                })}
-                            >
-                                Publish
-                            </Button>
+                            <PublishDrafts variant="publish" />
+                            <PublishDrafts variant="discard" />
                         </>
                     )}
                 </div>

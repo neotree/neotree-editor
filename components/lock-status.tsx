@@ -1,0 +1,101 @@
+'use client';
+
+import { forwardRef, useCallback, useImperativeHandle } from "react";
+import { LockIcon } from "lucide-react"
+
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { useIsLocked } from "@/hooks/use-is-locked";
+import { cn } from "@/lib/utils";
+import { Loader } from "@/components/loader";
+import { useUser } from "@/hooks/use-user";
+import { ErrorCard } from "./error-card";
+
+export type LockStatusProps = {
+    isDraft: boolean;
+    userId?: string | null;
+    dataType?: string;
+    card?: boolean;
+};
+
+export type LockStatusRef = {
+    isLocked: boolean;
+};
+
+const LockStatus = forwardRef<LockStatusRef, LockStatusProps>(({ 
+    isDraft, 
+    userId, 
+    dataType, 
+    card,
+}, ref) => {
+    const isLocked = useIsLocked({ isDraft, userId });
+
+    useImperativeHandle(ref, () => ({ isLocked, }), [isLocked]);
+
+    const { loading, error, user, getUser, } = useUser({
+        userId,
+        loadOnMount: !!card,
+    });
+
+    const onOpenChange = useCallback(async (open: boolean) => {
+        if (open && !loading && !user && userId) {
+            getUser();
+        }
+    }, [userId, user, loading]);
+
+    if (card && isLocked && !loading) {
+        return (
+            <ErrorCard>
+                <div className="flex items-center gap-x-4">
+                    <LockIcon className="w-4 h-4" />
+                    {!user ? null : (
+                        <div>
+                            <strong>{user.displayName}</strong> is working on this {dataType || ''}
+                        </div>
+                    )}
+                </div>
+            </ErrorCard>
+        );
+    }
+
+    return (
+        <>
+            <Popover onOpenChange={onOpenChange}>
+                <PopoverTrigger asChild>
+                    <button disabled={!isLocked}>
+                        <LockIcon 
+                            className={cn(
+                                'w-4 h-4 text-destructive/80',
+                                !isLocked && 'opacity-0', 
+                            )}
+                        />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 text-sm max-w-[200px]">
+                    {loading ? (
+                        <div className="p-2 flex justify-center">
+                            <Loader padding={0} />
+                        </div>
+                    ) : (
+                        (error || !user) ? (
+                            <div className="p-2 text-destructive bg-destructive/20">
+                                {error || 'Failed to load user!'}
+                            </div>
+                        ) : (
+                            <div className="p-2">
+                                <strong>{user.displayName}</strong> is working on this {dataType || ''}
+                            </div>
+                        )
+                    )}
+                </PopoverContent>
+            </Popover>
+        </>
+    );
+});
+
+LockStatus.displayName = 'LockStatus';
+
+export { LockStatus };

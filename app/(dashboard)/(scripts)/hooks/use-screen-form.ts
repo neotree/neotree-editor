@@ -9,15 +9,19 @@ import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
+import { useIsLocked } from "@/hooks/use-is-locked";
+import { ScriptType } from "@/databases/queries/scripts";
 
 export type UseScreenFormParams = {
     scriptId: string;
+    script?: ScriptType;
     formData?: ScreenFormDataType;
 };
 
 export function useScreenForm({
     formData,
     scriptId,
+    script,
 }: UseScreenFormParams) {
     const router = useRouter();
 
@@ -46,6 +50,8 @@ export function useScreenForm({
             storyId: formData?.storyId || '',
             refId: formData?.refId || '',
             refKey: formData?.refKey || '',
+            refIdDataKey: formData?.refIdDataKey || '',
+            refKeyDataKey: formData?.refKeyDataKey || '',
             step: formData?.step || '',
             actionText: formData?.actionText || '',
             contentText: formData?.contentText || '',
@@ -70,6 +76,7 @@ export function useScreenForm({
             notes: formData?.notes || '',
             dataType: formData?.dataType || '',
             key: formData?.key || '',
+            keyId: formData?.keyId || '',
             label: formData?.label || '',
             negativeLabel: formData?.negativeLabel || '',
             positiveLabel: formData?.positiveLabel || '',
@@ -92,6 +99,7 @@ export function useScreenForm({
             repeatable:  (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
             collectionName:  formData?.collectionName || '',
             collectionLabel:  formData?.collectionLabel || '',
+            listStyle:  formData?.listStyle || 'none',
         } satisfies ScreenFormDataType;
     }, [formData, scriptId]);
 
@@ -153,7 +161,24 @@ export function useScreenForm({
         }
     });
 
-    const disabled = useMemo(() => saving || viewOnly, [saving, viewOnly]);
+    const isLocked = useIsLocked({
+        isDraft: !!formData?.isDraft,
+        userId: formData?.draftCreatedByUserId,
+    });
+
+    const scriptLockedByUserId = script?.draftCreatedByUserId || script?.itemsChangedByUserId;
+
+    const isScriptLocked = useIsLocked({
+        isDraft: !!script?.isDraft || !!script?.hasChangedItems,
+        userId: scriptLockedByUserId,
+    });
+
+    const disabled = useMemo(() => (
+        saving || 
+        viewOnly || 
+        isLocked ||
+        isScriptLocked
+    ), [saving, viewOnly, isLocked, isScriptLocked]);
 
     return {
         ...form,
@@ -161,6 +186,9 @@ export function useScreenForm({
         saving,
         scriptPageHref,
         disabled,
+        isLocked,
+        isScriptLocked,
+        scriptLockedByUserId,
         save,
         getDefaultValues,
     }

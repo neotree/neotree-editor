@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -8,19 +8,22 @@ import { v4 } from "uuid";
 
 export async function _publishDataKeys(opts?: {
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
 
     try {
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.dataKeyId),
+            where: and(
+                isNotNull(pendingDeletion.dataKeyId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { dataKeyId: true, },
             with: {
                 dataKey: {
                     columns: {
                         version: true,
-                        name: true,
                     },
                 },
             },
@@ -34,7 +37,6 @@ export async function _publishDataKeys(opts?: {
             await db.update(dataKeys)
                 .set({ 
                     deletedAt,
-                    name: sql`CONCAT(${dataKeys.name}, '_', ${dataKeys.uuid})`, // make the unique name available for use
                 })
                 .where(inArray(dataKeys.uuid, deleted.map(c => c.dataKeyId!)));
 
@@ -44,21 +46,26 @@ export async function _publishDataKeys(opts?: {
                 changes: {
                     action: 'delete_data_key',
                     description: 'Delete data key',
-                    oldValues: [{ deletedAt: null, name: c.dataKey!.name, }],
-                    newValues: [{ deletedAt, name: `${c.dataKey!.name}_${c.dataKeyId}`,  }],
+                    oldValues: [{ deletedAt: null, }],
+                    newValues: [{ deletedAt, }],
                 },
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.dataKeyId),
-            isNotNull(pendingDeletion.dataKeyDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.dataKeyId),
+                isNotNull(pendingDeletion.dataKeyDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         let updates: (typeof dataKeysDrafts.$inferSelect)[] = [];
         let inserts: (typeof dataKeysDrafts.$inferSelect)[] = [];
 
-        const res = await db.query.dataKeysDrafts.findMany();
+        const res = await db.query.dataKeysDrafts.findMany({
+            where: !opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts?.userId),
+        });
 
         updates = res.filter(s => s.dataKeyId);
         inserts = res.filter(s => !s.dataKeyId);

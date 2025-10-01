@@ -21,6 +21,8 @@ export function ScreensTable(props: Props) {
         selected,
         disabled,
         screensIdsToCopy,
+        isScriptLocked,
+        scriptLockedByUserId,
         setScreensIdsToCopy,
         onDelete,
         onSort,
@@ -123,6 +125,8 @@ export function ScreensTable(props: Props) {
                                     <ScreensTableRowActions 
                                         screen={s}
                                         disabled={disabled}
+                                        isScriptLocked={isScriptLocked}
+                                        scriptLockedByUserId={scriptLockedByUserId}
                                         onDelete={() => onDelete([s.screenId])}
                                         onCopy={() => setScreensIdsToCopy([s.screenId])}
                                     />

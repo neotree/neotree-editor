@@ -125,6 +125,7 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             id: s.id,
             previewTitle: s.previewTitle,
             previewPrintTitle: s.previewPrintTitle,
+            listStyle: s.listStyle,
             // printCategory: s.printCategory,
             // order: s.order,
             metadata: {
@@ -216,6 +217,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 minTimeKey: f.minTimeKey,
                 maxTimeKey: f.maxTimeKey,
                 values: f.values,
+                items: f.items || [],
             })),
             reviewable: s.reviewable,
             reviewConfigurations: (s.reviewConfigurations as ScreenReviewField[]).map(rc=>({
@@ -224,6 +226,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
             })),
             preferences: s.preferences,
             printSections: s.printSections,
+            printConfig: s.printConfig,
         },
     };
 }

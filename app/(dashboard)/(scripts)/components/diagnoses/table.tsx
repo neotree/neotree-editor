@@ -21,6 +21,8 @@ export function DiagnosesTable(props: Props) {
         selected,
         disabled,
         diagnosesIdsToCopy,
+        isScriptLocked,
+        scriptLockedByUserId,
         setDiagnosesIdsToCopy,
         onDelete,
         onSort,
@@ -117,6 +119,8 @@ export function DiagnosesTable(props: Props) {
                                     <DiagnosesTableRowActions 
                                         diagnosis={s}
                                         disabled={disabled}
+                                        isScriptLocked={isScriptLocked}
+                                        scriptLockedByUserId={scriptLockedByUserId}
                                         onDelete={() => onDelete([s.diagnosisId])}
                                         onCopy={() => setDiagnosesIdsToCopy([s.diagnosisId])}
                                     />

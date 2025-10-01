@@ -30,9 +30,10 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
 import Diagnoses from './diagnoses';
-import { PrintSections } from './print';
+import { ScriptPrintSetup } from './print';
 import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
+import { LockStatus } from '@/components/lock-status';
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -51,6 +52,8 @@ export function ScriptForm(props: Props) {
         hospitals,
         loading,
         disabled,
+        isLocked,
+        lockedByUserId,
         reset: resetForm,
         watch,
         setValue,
@@ -84,6 +87,17 @@ export function ScriptForm(props: Props) {
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
+                    {isLocked && (
+                        <div>
+                            <LockStatus 
+                                card
+                                isDraft={!!formData?.isDraft || !!formData?.hasChangedItems}
+                                userId={formData?.draftCreatedByUserId || formData?.itemsChangedByUserId}
+                                dataType="script"
+                            />
+                        </div>
+                    )}
+
                     <Title>Type</Title>
 
                     <div>
@@ -281,17 +295,21 @@ export function ScriptForm(props: Props) {
                     {(!section || (section === 'screens')) && (
                         <Screens
                             scriptId={props.formData.scriptId!}
+                            isScriptLocked={isLocked}
+                            scriptLockedByUserId={lockedByUserId}
                         />
                     )}
 
                     {section === 'diagnoses' && (
                         <Diagnoses
                             scriptId={props.formData.scriptId!}
+                            isScriptLocked={isLocked}
+                            scriptLockedByUserId={lockedByUserId}
                         />
                     )}
 
                     {section === 'print' && (
-                        <PrintSections
+                        <ScriptPrintSetup
                             disabled={disabled}
                             form={form}
                         />

@@ -7,11 +7,12 @@ import axios from "axios";
 
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 import { defaultNuidSearchFields } from "@/constants/fields";
-import { defaultPreferences, scriptTypes } from "@/constants";
+import { defaultPreferences, scriptPrintConfig, scriptTypes } from "@/constants";
 import { isEmpty } from "@/lib/isEmpty";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { resetDrugsLibraryState } from "@/hooks/use-drugs-library";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 export type UseScriptFormParams = {
     formData?: ScriptFormDataType;
@@ -47,6 +48,7 @@ export function useScriptForm(params: UseScriptFormParams) {
             nuidSearchFields: (formData?.nuidSearchFields || []),
             preferences: (formData?.preferences || defaultPreferences),
             printSections: (formData?.printSections || []),
+            printConfig: (formData?.printConfig || scriptPrintConfig) satisfies NonNullable<NonNullable<typeof formData>['printConfig']>,
             reviewConfigurations: (formData?.reviewConfigurations||[]),
             reviewable: isEmpty(formData?.reviewable) ? false : formData?.reviewable,
 
@@ -107,7 +109,14 @@ export function useScriptForm(params: UseScriptFormParams) {
         setLoading(false);
     });
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+    const lockedByUserId = params.formData?.draftCreatedByUserId || params.formData?.itemsChangedByUserId;
+
+    const isLocked = useIsLocked({
+        isDraft: !!params.formData?.isDraft || !!params.formData?.hasChangedItems,
+        userId: lockedByUserId,
+    });
+
+    const disabled = useMemo(() => viewOnly || isLocked, [viewOnly, isLocked]);
 
     return {
         ...params,
@@ -115,6 +124,8 @@ export function useScriptForm(params: UseScriptFormParams) {
         formIsDirty,
         loading,
         disabled,
+        isLocked,
+        lockedByUserId: !isLocked ? null : lockedByUserId,
         setLoading,
         getDefaultFormValues,
         getDefaultNuidSearchFields,
