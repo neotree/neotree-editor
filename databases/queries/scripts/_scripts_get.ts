@@ -171,7 +171,7 @@ export async function _getScripts(
         for (const s of responseData) {
             const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [s.scriptId], });
             responseData[i].hasChangedItems = !!item?.hasChangedItems;
-            responseData[i].itemsChangedByUserId = item?.itemsDeletedByUserId || null;
+            responseData[i].itemsChangedByUserId = item?.itemsChangedByUserId || null;
             i++;
         }
         
@@ -225,7 +225,7 @@ export async function _getScript(
         if (responseData) {
             const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
             responseData.hasChangedItems = !!item?.hasChangedItems;
-            responseData.itemsChangedByUserId = item.itemsDeletedByUserId || null;
+            responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
 
             return { data: responseData, };
         }
@@ -272,7 +272,7 @@ export async function _getScript(
 
         const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
         responseData.hasChangedItems = !!item?.hasChangedItems;
-        responseData.itemsChangedByUserId = item.itemsDeletedByUserId || null;
+        responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
 
         return  { 
             data: responseData, 
