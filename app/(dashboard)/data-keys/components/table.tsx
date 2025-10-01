@@ -30,7 +30,7 @@ export function DataKeysTable({ disabled, locked }: {
     const { viewOnly } = useAppContext();
     const [lockDataKeys, setLockDataKeys] = useState<boolean>(!!locked);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(20);
+    const [itemsPerPage] = useState(100);
 
     disabled = disabled || viewOnly;
 

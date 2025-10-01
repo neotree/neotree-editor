@@ -89,7 +89,7 @@ export async function _getDataKeys(
                 inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
-        // Fetch all published data (we need to merge with drafts before paginating)
+        // Fetch all published data
         const publishedRes = await db
             .select({
                 dataKey: dataKeys,
