@@ -1,13 +1,10 @@
 import { _getLeanScriptIds, _getScreens, _getScript,_getOldScript} from "@/databases/queries/scripts";
-import { _saveScreens } from "../scripts/_screens_save";
-import { _saveScripts } from "../scripts/_scripts_save";
 import { _saveEditorInfo } from "../editor-info";
 import { _publishScripts } from "../scripts/_scripts_publish";
 import db from '@/databases/pg/drizzle';
 import { desc, eq, and, Query } from 'drizzle-orm';
 import { aliases } from "@/databases/pg/schema";
 import logger from '@/lib/logger';
-
 
 export type SaveAliasesResponse = {
   success: boolean;

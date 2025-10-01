@@ -33,7 +33,8 @@ const getUniqueKey = async (key: string, tries = 1, ogKey = '') => {
 
 export async function _copyDrugsLibraryItems({ data, ...params }: {
     data: { itemId: string; }[],
-    broadcastAction?: boolean,
+    broadcastAction?: boolean;
+    userId?: string;
 }): Promise<SaveDrugsLibraryItemsResponse> {
     const response: SaveDrugsLibraryItemsResponse = { success: false, };
 
@@ -63,9 +64,10 @@ export async function _copyDrugsLibraryItems({ data, ...params }: {
     }
 }
 
-export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastAction, }: {
-    data: SaveDrugsLibraryItemsData[],
-    broadcastAction?: boolean,
+export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, ...params }: {
+    data: SaveDrugsLibraryItemsData[];
+    broadcastAction?: boolean;
+    userId?: string;
 }) {
     try {
         const keys = data.map(item => item.key!).filter(key => key);
@@ -73,9 +75,21 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
         if (keys.length) {
             const existing = await _getDrugsLibraryItems({ keys });
 
-            data = data.filter(item => !existing.data.map(d => d.key).includes(item.key!));
+            data = data
+                .filter(item => !existing.data.map(d => d.key).includes(item.key!))
+                .map(item => ({
+                    ...item,
+                    itemId: undefined,
+                    createdAt: undefined,
+                    updatedAt: undefined,
+                    deletedAt: undefined,
+                    publishDate: undefined,
+                    id: undefined,
+                    position: undefined,
+                    version: undefined,
+                }));
 
-            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
+            if (data.length) return await _saveDrugsLibraryItems({ data, ...params, });
         }
 
         return { success: true, };
@@ -85,9 +99,10 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, broadcastActi
     } 
 }
 
-export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastAction, }: {
-    data: SaveDrugsLibraryItemsData[],
-    broadcastAction?: boolean,
+export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: {
+    data: SaveDrugsLibraryItemsData[];
+    broadcastAction?: boolean;
+    userId?: string;
 }) {
     try {
         const keys = data.map(item => item.key!).filter(key => key);
@@ -106,10 +121,11 @@ export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastA
                     publishDate: found?.publishDate || item.publishDate,
                     id: found?.id || item.id,
                     position: found?.position || item.position,
+                    version: found?.version || item.version,
                 };
             });
 
-            if (data.length) return await _saveDrugsLibraryItems({ data, broadcastAction, });
+            if (data.length) return await _saveDrugsLibraryItems({ data, ...params, });
         }
 
         return { success: true, };
@@ -119,9 +135,10 @@ export async function _saveDrugsLibraryItemsAndUpdateIfExists({ data, broadcastA
     } 
 }
 
-export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
+export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
+    userId?: string;
 }) {
     const response: SaveDrugsLibraryItemsResponse = { success: false, };
 
@@ -201,6 +218,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                             itemId: published?.itemId,
                             key: data.key,
                             type: data.type,
+                            createdByUserId: userId,
                         });
                     }
 
@@ -215,7 +233,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
             }
         }
 
-        if (removeReferences.length) await _removeDrugLibraryItemsReferences({ keys: removeReferences, });
+        if (removeReferences.length) await _removeDrugLibraryItemsReferences({ keys: removeReferences, userId, });
 
         if (keys.length) {
             const screens = await _getScreens({
@@ -257,7 +275,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, }: {
                 if (isUpdated) updatedScreens.push({ ...screen, drugs, fluids, feeds, });
             });
 
-            if (updatedScreens.length) await _saveScreens({ data: updatedScreens, });
+            if (updatedScreens.length) await _saveScreens({ data: updatedScreens, userId, });
         }
 
         if (errors.length) {

@@ -24,6 +24,7 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     image3: null | ScriptImage;
     scriptTitle?: string;
     hospitalName?: string;
+    draftCreatedByUserId?: string | null;
 };
 
 export type GetDiagnosesResults = {
@@ -137,6 +138,7 @@ export async function _getDiagnoses(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetDiagnosesResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -182,7 +184,8 @@ export async function _getDiagnosis(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetDiagnosisResults['data'];
 
@@ -214,7 +217,8 @@ export async function _getDiagnosis(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 

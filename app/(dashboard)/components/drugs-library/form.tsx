@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams, useParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { v4 as uuidv4 } from "uuid";
 import { useMeasure } from "react-use";
@@ -20,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { SelectDataKey } from "@/components/select-data-key";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import { useDrugsLibrary, type DrugsLibraryState } from "@/hooks/use-drugs-libra
 import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import ucFirst from "@/lib/ucFirst";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -43,6 +45,7 @@ const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     itemId: `${item?.itemId || uuidv4()}`,
     type: `${item?.type || type}`,
     key: `${item?.key || ''}`,
+    keyId: `${item?.keyId || ''}`,
     drug: `${item?.drug || ''}`,
     minGestation: `${item?.minGestation === null ? '' : item?.minGestation}`,
     maxGestation: `${item?.maxGestation === null ? '' : item?.maxGestation}`,
@@ -76,6 +79,13 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
         item: DrugsLibraryState['drugs'][0],
     ) => void;
 }) {
+    const isLocked = useIsLocked({
+        isDraft: !!item?.isDraft,
+        userId: item?.draftCreatedByUserId,
+    });
+
+    disabled = disabled || isLocked;
+    
     const router = useRouter();
     const searchParams = useSearchParams(); 
     const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
@@ -265,6 +275,31 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     </SelectContent>
                 </Select>
             </div>
+
+            <div>
+                <Label secondary htmlFor="key">Key *</Label>
+                {/* <Input
+                    name="key"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.key}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, key: e.target.value, }))}
+                /> */}
+                <SelectDataKey 
+                    modal
+                    value={`${form.key || ''}`}
+                    disabled={disabled}
+                    onChange={([item]) => {
+                        setForm(prev => ({ 
+                            ...prev, 
+                            key: item.name, 
+                            drug: item.label,
+                            keyId: item?.uniqueKey,
+                        }));
+                    }}
+                />
+            </div>
+
             <div>
                 <Label secondary htmlFor="drug">{ucFirst(form.type)} *</Label>
                 <Input
@@ -273,17 +308,6 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     value={form.drug}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, drug: e.target.value, }))}
-                />
-            </div>
-
-            <div>
-                <Label secondary htmlFor="key">Key *</Label>
-                <Input
-                    name="key"
-                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
-                    value={form.key}
-                    disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, key: e.target.value, }))}
                 />
             </div>
 

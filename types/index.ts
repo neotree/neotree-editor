@@ -49,6 +49,7 @@ export type ScriptItem = {
     severity_order: string;
     summary: string;
     key: string;
+    keyId?: string;
     dataType: null | string;
     score: null | number;
 };
@@ -57,8 +58,10 @@ export type ScriptField = {
     fieldId: string;
     type: string;
     key: string;
+    keyId?: string;
     label: string;
     refKey: string;
+    refKeyId?: string;
     calculation: string;
     condition: string;
     dataType: string;
@@ -74,6 +77,10 @@ export type ScriptField = {
     maxDateKey: string;
     minTimeKey: string;
     maxTimeKey: string;
+    minDateKeyId?: string;
+    maxDateKeyId?: string;
+    minTimeKeyId?: string;
+    maxTimeKeyId?: string;
     values: string;
     valuesOptions: {
         key: string;
@@ -85,10 +92,21 @@ export type ScriptField = {
     printable: boolean;
     prePopulate: string[];
     editable: boolean;
+    items?: {
+        itemId: string;
+        value: string | number;
+        label: string | number;
+        label2?: string;
+        exclusive?: boolean;
+        enterValueManually?: boolean;
+        keyId?: string;
+    }[];
 };
 
 export type DiagnosisSymptom = {
     expression: string;
+    key?: string;
+    keyId?: string;
     name: string;
     weight: number | null;
     type: string;

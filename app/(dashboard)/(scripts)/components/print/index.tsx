@@ -1,140 +1,41 @@
-import { useCallback, useMemo } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import queryString from "query-string";
-import { MoreVertical, Trash, Edit, Eye, Plus } from "lucide-react"
-import { arrayMoveImmutable } from 'array-move';
-import { useQueryState } from 'nuqs';
+import { useEffect, useRef } from "react";
 
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/data-table";
+import { useScriptsContext } from "@/contexts/scripts";
+import { Loader } from "@/components/loader";
+import { PrintSections } from "./print-sections";
 import { useScriptForm } from "../../hooks/use-script-form";
-import { PrintForm } from "./form";
+import { Title } from "../title";
+import { ScriptPrintConfig } from "./print-config";
 
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScriptForm>;
 };
 
-export function PrintSections({
-    disabled,
-    form: {
-        watch,
-        setValue,
-    },
-}: Props) {
-    const sections = watch('printSections');
+export function ScriptPrintSetup(props: Props) {
+    const mounted = useRef(false);
+    const { keysLoading, screensLoading, loadScreens, loadKeys, } = useScriptsContext();
 
-    const searchParams = useSearchParams();
-    const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
-    const { printSectionId } = searchParamsObj;
+    useEffect(() => {
+        if (!mounted.current) {
+            loadScreens();
+            loadKeys();
+        }
+    }, [loadScreens, loadKeys]);
 
-    const onDelete = useCallback((sectionId: string) => {
-        setValue('printSections', sections.filter(s => s.sectionId !== sectionId));
-    }, [sections, setValue]);
-
-    const [currentSection, setCurrentSection] = useQueryState('item', {
-        defaultValue: '',
-        clearOnDefault: true,
-    });
+    if (keysLoading || screensLoading) return <Loader overlay />;
 
     return (
         <>
-            <PrintForm
-                open={!!currentSection}
-                onClose={() => setCurrentSection('')}
-                disabled={disabled}
-                section={sections.filter(s => `${s.sectionId}` === `${currentSection}`)[0]}
-                onChange={section => (currentSection === 'new') ? 
-                    setValue('printSections', [...sections, section])
-                    :
-                    setValue('printSections', sections.map(s => {
-                        if (s.sectionId !== section.sectionId) return s;
-                        return { ...s, ...section, };
-                    }))
-                }
-            />
+            {/* Print sections */}
+            <Title className="px-4">Print sections</Title>
 
-            <DataTable 
-                sortable={!disabled}
-                onSort={(oldIndex: number, newIndex: number) => {
-                    const arr = arrayMoveImmutable(sections, oldIndex, newIndex);
-                    setValue('printSections', arr);
-                }}
-                headerActions={(
-                    <>
-                        <Button
-                            variant="outline"
-                            onClick={() => setCurrentSection('new')}
-                        >
-                            Add print section
-                            <Plus className="w-4 h-4 ml-2" />
-                        </Button>
-                    </>
-                )}
-                columns={[
-                    {
-                        name: 'Print section title',
-                    },
-                    {
-                        name: '',
-                        align: 'right',
-                        cellRenderer({ rowIndex }) {
-                            const section = sections[rowIndex];
+            <PrintSections {...props} />
 
-                            if (!section) return null;
+            {/* Print config */}
+            <Title className="px-4">Print config</Title>
 
-                            return (
-                                <>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="p-0 h-auto w-auto transition-colors rounded-full hover:text-primary hover:bg-transparent"
-                                            >
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-
-                                        <DropdownMenuContent>
-                                            <DropdownMenuItem 
-                                                onClick={() => {
-                                                    setTimeout(() => setCurrentSection(`${section.sectionId}`), 0);
-                                                }}
-                                            >
-                                                {!disabled ? 
-                                                    <><Edit className="mr-2 h-4 w-4" /> Edit</> 
-                                                    : 
-                                                    <><Eye className="mr-2 h-4 w-4" /> View</>}
-                                            </DropdownMenuItem>
-
-                                            {!disabled && (
-                                                <DropdownMenuItem
-                                                    onClick={() => onDelete(section.sectionId)}
-                                                    className="text-danger focus:bg-danger focus:text-danger-foreground"
-                                                >
-                                                    <Trash className="mr-2 h-4 w-4" />
-                                                    <span>Delete</span>
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </>
-                            );
-                        },
-                    }
-                ]}
-                data={sections.map(s => [
-                    s.title,
-                ])}
-            />
+            <ScriptPrintConfig {...props} />
         </>
     );
 }

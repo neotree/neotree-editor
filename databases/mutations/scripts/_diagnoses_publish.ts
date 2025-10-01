@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -10,6 +10,7 @@ export async function _publishDiagnoses(opts?: {
     scriptsIds?: string[];
     diagnosesIds?: string[];
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const { scriptsIds, diagnosesIds, } = { ...opts, };
 
@@ -22,11 +23,14 @@ export async function _publishDiagnoses(opts?: {
 
         if (scriptsIds?.length || diagnosesIds?.length) {
             const res = await db.query.diagnosesDrafts.findMany({
-                where: or(
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds),
-                    !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptDraftId, scriptsIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisId, diagnosesIds),
-                    !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
+                where: and(
+                    or(
+                        !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptId, scriptsIds),
+                        !scriptsIds?.length ? undefined : inArray(diagnosesDrafts.scriptDraftId, scriptsIds),
+                        !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisId, diagnosesIds),
+                        !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
+                    ),
+                    !opts?.userId ? undefined : eq(diagnosesDrafts.createdByUserId, opts.userId),
                 ),
             });
 
@@ -34,7 +38,10 @@ export async function _publishDiagnoses(opts?: {
             inserts = res.filter(s => !s.diagnosisId);
         } else {
             const _diagnosesDrafts = await db.query.diagnosesDrafts.findMany({
-                where: isNotNull(diagnosesDrafts.scriptId),
+                where: and(
+                    isNotNull(diagnosesDrafts.scriptId),
+                    !opts?.userId ? undefined : eq(diagnosesDrafts.createdByUserId, opts.userId),
+                ),
             });
             updates = _diagnosesDrafts.filter(s => s.diagnosisId);
             inserts = _diagnosesDrafts.filter(s => !s.diagnosisId);
@@ -97,7 +104,10 @@ export async function _publishDiagnoses(opts?: {
         await db.delete(diagnosesDrafts);
 
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.diagnosisId),
+            where: and(
+                isNotNull(pendingDeletion.diagnosisId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { diagnosisId: true, },
             with: {
                 diagnosis: {
@@ -131,9 +141,12 @@ export async function _publishDiagnoses(opts?: {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.diagnosisId),
-            isNotNull(pendingDeletion.diagnosisDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.diagnosisId),
+                isNotNull(pendingDeletion.diagnosisDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         const published = [

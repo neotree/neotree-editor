@@ -13,9 +13,10 @@ export type SaveConfigKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _saveConfigKeys({ data, broadcastAction, }: {
+export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
     data: SaveConfigKeysData[],
     broadcastAction?: boolean,
+    userId?: string;
 }) {
     const response: SaveConfigKeysResponse = { success: false, };
 
@@ -79,6 +80,7 @@ export async function _saveConfigKeys({ data, broadcastAction, }: {
                             configKeyDraftId: configKeyId,
                             position: data.position,
                             configKeyId: published?.configKeyId,
+                            createdByUserId: userId,
                         });
                     }
                 }

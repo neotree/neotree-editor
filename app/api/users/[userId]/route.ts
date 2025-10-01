@@ -2,22 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _syncDataKeys, syncedEmptyResponseData } from "@/databases/mutations/data-keys";
+import { getUser } from "@/app/actions/users";
 
-export async function POST(req: NextRequest) {
+interface IParams {
+    params: {
+        userId: string;
+    };
+}
+
+export async function GET(_: NextRequest, { params: { userId } }: IParams) {
 	try {
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const res = await _syncDataKeys();
+        const res = await getUser(userId);
 
 		return NextResponse.json(res);
 	} catch(e: any) {
-		logger.error('[GET] /api/data-keys/sync', e.message);
-		return NextResponse.json({ 
-			data: syncedEmptyResponseData,
-			errors: ['Internal Error'] 
-		});
+		logger.error('[GET] /api/users', e.message);
+		return NextResponse.json({ errors: ['Internal Error'] });
 	}
 }

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { v4 } from "uuid";
 import { Controller, useForm } from "react-hook-form";
 import axios from 'axios';
 
@@ -12,17 +11,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useScriptsContext } from "@/contexts/scripts";
+import { useDataKeysCtx } from "@/contexts/data-keys";
 import { getLeanAlias } from '@/app/actions/aliases'
-import { ChevronDown, XIcon } from "lucide-react";
-import { SelectModal } from "@/components/select-modal";
-import { CONDITIONAL_EXP_EXAMPLE, DATA_KEYS_MAP } from "@/constants";
+import { SelectDataKey } from "@/components/select-data-key";
+import { CONDITIONAL_EXP_EXAMPLE } from "@/constants";
 import { ScriptField as FieldType } from "@/types";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -41,6 +33,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import { Title } from "../title";
 import { useScreenForm } from "../../hooks/use-screen-form";
 import { useField } from "../../hooks/use-field";
+import { FieldItems } from "./field-items";
 
 type Props = {
     open: boolean;
@@ -62,7 +55,7 @@ export function Field<P = {}>({
     disabled: disabledProp,
     onClose,
 }: Props & P) {
-    const { dataKeys } = useScriptsContext();
+    const { extractDataKeys, } = useDataKeysCtx();
     
     const { data: field, index: fieldIndex, } = { ...fieldProp, };
 
@@ -71,6 +64,8 @@ export function Field<P = {}>({
     const { getDefaultValues } = useField(!field ? undefined : {
         ...field,
     });
+
+    const listStyle = form.watch('listStyle');
 
     const {
         control,
@@ -88,6 +83,7 @@ export function Field<P = {}>({
     const type = watch('type');
     const format = watch('format');
     const key = watch('key');
+    const keyId = watch('keyId');
     const label = watch('label');
     const optional = watch('optional');
     const printable = watch('printable');
@@ -99,9 +95,10 @@ export function Field<P = {}>({
     const prePopulate = watch('prePopulate');
     const defaultValue = watch('defaultValue');
     const values = watch('values');
+    const items = watch('items');
     const valuesOptions = watch('valuesOptions');
     const editable = watch('editable');
-
+    
     const valuesErrors = useMemo(() => validateDropdownValues(values), [values]);
 
     const isDateField = useMemo(() => (type === 'date') || (type === 'datetime'), [type]);
@@ -153,6 +150,11 @@ export function Field<P = {}>({
             })
             .filter(o => o.value && o.label);
     }, [values]);
+    
+    const dataKey = useMemo(() => {
+        const [key] = !keyId ? [null] : extractDataKeys([keyId]);
+        return key;
+    }, [keyId, extractDataKeys]);
 
     return (
         <>
@@ -190,7 +192,9 @@ export function Field<P = {}>({
                                 } else {
                                     setValue(
                                         'valuesOptions',
-                                        valuesOptions.filter(o => o.optionKey && o.optionLabel && o.key),
+                                        valuesOptions
+                                            // .filter(o => o.optionKey && o.optionLabel && o.key)
+                                            .filter(o => o.optionLabel && o.key),
                                         { shouldDirty: true, },
                                     );
                                     onSave();
@@ -252,10 +256,11 @@ export function Field<P = {}>({
                             <Title>Flow control</Title>
                             <div>
                                 <Label htmlFor="condition">Conditional expression</Label>
-                                <Input
+                                <Textarea
                                     {...register('condition', { disabled, })}
                                     name="condition"
                                     noRing={false}
+                                    rows={5}
                                 />
                                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                             </div>
@@ -272,39 +277,15 @@ export function Field<P = {}>({
                                         name="key"
                                         error={!disabled && !key}
                                     /> */}
-                                    <SelectModal 
+
+                                    <SelectDataKey 
                                         modal
-                                        selected={key}
-                                        error={!disabled && !key}
-                                        placeholder="Select key"
-                                        search={{
-                                            placeholder: 'Search data keys',
-                                        }}
-                                        options={dataKeys.data
-                                            .sort((a, b) => {
-                                                const aVal = !DATA_KEYS_MAP[type!].includes(a.dataType!) ? 1 : 0;
-                                                const bVal = !DATA_KEYS_MAP[type!].includes(b.dataType!) ? 1 : 0;
-                                                return aVal - bVal;
-                                            })
-                                            .map(o => ({
-                                                value: o.name,
-                                                label: o.name,
-                                                description: o.label || '',
-                                                caption: o.dataType || '',
-                                                // disabled: !DATA_KEYS_MAP[type!].includes(o.dataType!),
-                                            }))}
-                                        onSelect={([key]) => {
-                                            const fullKey = dataKeys.data.find(k => k.name === key?.value);
-                                            const children = dataKeys.data
-                                                .filter(k => k.parentKeys.map(k => k.toLowerCase()).includes(`${key?.value}`.toLowerCase()));
-
-                                            setValue('key', `${key?.value || ''}`, { shouldDirty: true, });
-                                            setValue('label', `${key?.description || key?.value || ''}`.trim(), { shouldDirty: true, });
-
-                                            if (fullKey?.dataType === 'dropdown' && isDropdownField) {
-                                                const values = children.map(k => `${k.name},${(k.label || k.name).trim()}`).join('\n');
-                                                setValue('values', values || '', { shouldDirty: true, });
-                                            }
+                                        value={key}
+                                        disabled={disabled}
+                                        onChange={([item]) => {
+                                            setValue('key', item?.name, { shouldDirty: true, });
+                                            setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
+                                            setValue('label', item?.label, { shouldDirty: true, });
                                         }}
                                     />
                                 </div>
@@ -321,10 +302,26 @@ export function Field<P = {}>({
 
                             <div>
                                 <Label htmlFor="refKey">Reference Key</Label>
-                                <Input
+                                {/* <Input
                                     {...register('refKey', { disabled, })}
                                     name="refKey"
                                     noRing={false}
+                                /> */}
+                                <Controller 
+                                    control={control}
+                                    name="refKey"
+                                    render={({ field: { value, onChange, }, }) => {
+                                        return (
+                                            <SelectDataKey 
+                                                value={`${value || ''}`}
+                                                disabled={false}
+                                                onChange={([item]) => {
+                                                    onChange(item.name);
+                                                    setValue('refKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                }}
+                                            />
+                                        );
+                                    }}
                                 />
                                 <span className="text-xs text-muted-foreground">Link this field to <b>another field with this key</b></span>
                             </div>
@@ -353,149 +350,45 @@ export function Field<P = {}>({
 
                             {(isDropdownField || isMultiSelectField) && (
                                 <>
-                                    
+                                    {!!isMultiSelectField && (
+                                        <div>
+                                            <Label secondary htmlFor="listStyle">List style</Label>
+                                            <Select
+                                                value={listStyle}
+                                                name="listStyle"
+                                                onValueChange={(val: typeof listStyle) => {
+                                                    form.setValue('listStyle', val || 'none');
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        <SelectItem value="bullet">Bullet</SelectItem>
+                                                        <SelectItem value="number">Number</SelectItem>
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
 
                                     <Controller 
                                         control={control}
-                                        name="values"
-                                        render={({ field }) => {
+                                        name="items"
+                                        render={({ field: { value, onChange, }, }) => {
                                             return (
-                                                <div>
-                                                    <Label htmlFor="values" className={cn(valuesErrors.length ? 'text-danger' : '')}>Values</Label>
-                                                    <Textarea
-                                                        value={field.value}
-                                                        disabled={disabled}
-                                                        name="values"
-                                                        rows={5}
-                                                        noRing={false}
-                                                        className={cn(valuesErrors.length ? 'border-danger' : '')}
-                                                        onChange={e => {
-                                                            const values = e.target.value;
-                                                            const valuesParsed = (values || '').split('\n')
-                                                                .map((v = '') => v.trim())
-                                                                .map((value) => {
-                                                                    const valueSplit = value.split(',');
-                                                                    return { value: valueSplit[0], label: valueSplit[1], };
-                                                                })
-                                                                .filter(o => o.value && o.label);
-
-                                                            field.onChange(values);
-
-                                                            setValue(
-                                                                'valuesOptions',
-                                                                valuesOptions.filter(o => valuesParsed.map(o => o.value).includes(o.key)),
-                                                                { shouldDirty: true, },
-                                                            );
-                                                        }}
-                                                    />
-                                                    <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>
-                                                </div>
+                                                <FieldItems 
+                                                    disabled={disabled}
+                                                    items={value}
+                                                    fieldType={type}
+                                                    onChange={onChange}
+                                                    dataKey={dataKey}
+                                                />
                                             );
                                         }}
                                     />
-
-                                    {!!valuesParsed.length && (
-                                        <div className="flex flex-col gap-y-4">
-                                            {!!valuesOptions.length && (
-                                                <>
-                                                    <Title>Options</Title>
-                                                    {valuesOptions.map((o, i) => {
-                                                        const label = valuesParsed.find(v => v.value === o.key)?.label;
-                                                        return (
-                                                            <Controller
-                                                                key={o.key + i}
-                                                                control={control}
-                                                                name={`valuesOptions.${i}`}
-                                                                render={({ field }) => {
-                                                                    return (
-                                                                        <div>
-                                                                            <div className="text-xs p-2 rounded-sm bg-primary/20 font-bold inline-block mb-2">{label}</div>
-                                                                            <div className="flex gap-x-2 items-end">
-                                                                                <div className="flex-1">
-                                                                                    <Label htmlFor={`valuesOptions${i}.optionKey`}>Key</Label>
-                                                                                    <Input 
-                                                                                        disabled={disabled}
-                                                                                        value={field.value.optionKey}
-                                                                                        onChange={e => field.onChange({
-                                                                                            ...field.value,
-                                                                                            optionKey: e.target.value,
-                                                                                        })}
-                                                                                        onBlur={field.onBlur}
-                                                                                    />
-                                                                                </div>
-
-                                                                                <div className="flex-1">
-                                                                                    <Label htmlFor={`valuesOptions${i}.optionLabel`}>Label</Label>
-                                                                                    <Input 
-                                                                                        disabled={disabled}
-                                                                                        value={field.value.optionLabel}
-                                                                                        onChange={e => field.onChange({
-                                                                                            ...field.value,
-                                                                                            optionLabel: e.target.value,
-                                                                                        })}
-                                                                                        onBlur={field.onBlur}
-                                                                                    />
-                                                                                </div>
-
-                                                                                {!disabled && (
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="ghost"
-                                                                                        onClick={() => setValue(
-                                                                                            'valuesOptions',
-                                                                                            valuesOptions.filter((_, j) => j !== i),
-                                                                                            { shouldDirty: true, },
-                                                                                        )} 
-                                                                                    >
-                                                                                        <XIcon className="size-4" />
-                                                                                    </Button>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-
-                                            {!disabled && (valuesOptions.length < valuesParsed.length) && (
-                                                <div>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                variant="outline"
-                                                            >
-                                                                Add value option
-                                                                <ChevronDown className="size-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent>
-                                                            {valuesParsed.filter(o => !valuesOptions.map(o => o.key).includes(o.value)).map(o => (
-                                                                <DropdownMenuItem 
-                                                                    key={o.value} 
-                                                                    onClick={() => {
-                                                                        setValue(
-                                                                            'valuesOptions',
-                                                                            [...valuesOptions, {
-                                                                                key: o.value,
-                                                                                optionKey: '',
-                                                                                optionLabel: '',
-                                                                            }],
-                                                                            { shouldDirty: true, },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    {o.label}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                 </>
                             )}
 
@@ -608,10 +501,26 @@ export function Field<P = {}>({
 
                                             <div>
                                                 <Label htmlFor="minDateKey">Min Date Key e.g $DateOfBirth</Label>
-                                                <Input
+                                                {/* <Input
                                                     {...register('minDateKey', { disabled, })}
                                                     name="minDateKey"
                                                     noRing={false}
+                                                /> */}
+                                                <Controller 
+                                                    control={control}
+                                                    name="minDateKey"
+                                                    render={({ field: { value, onChange, }, }) => {
+                                                        return (
+                                                            <SelectDataKey 
+                                                                value={`${value || ''}`}
+                                                                disabled={false}
+                                                                onChange={([item]) => {
+                                                                    onChange(item.name);
+                                                                    setValue('minDateKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                                }}
+                                                            />
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -643,10 +552,26 @@ export function Field<P = {}>({
 
                                             <div>
                                                 <Label htmlFor="maxDateKey">Max Date Key e.g $DateOfBirth</Label>
-                                                <Input
+                                                {/* <Input
                                                     {...register('maxDateKey', { disabled, })}
                                                     name="maxDateKey"
                                                     noRing={false}
+                                                /> */}
+                                                <Controller 
+                                                    control={control}
+                                                    name="maxDateKey"
+                                                    render={({ field: { value, onChange, }, }) => {
+                                                        return (
+                                                            <SelectDataKey 
+                                                                value={`${value || ''}`}
+                                                                disabled={false}
+                                                                onChange={([item]) => {
+                                                                    onChange(item.name);
+                                                                    setValue('maxDateKeyId', item?.uniqueKey, { shouldDirty: true, });
+                                                                }}
+                                                            />
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         </div>

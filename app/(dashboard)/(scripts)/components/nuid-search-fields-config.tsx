@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Settings, Trash, MoreVertical, Edit2, Plus } from "lucide-react";
 
 import {
@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
+import { FieldItems } from "./screens/field-items";
 
 type Props = {
     disabled?: boolean;
@@ -285,9 +286,13 @@ export function Field({
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { getDefaultValues } = useField({ ...field, type: fieldType, } as ScriptField);
+    const { getDefaultValues } = useField({ 
+        ...field, 
+        type: fieldType, 
+    } as ScriptField);
 
     const {
+        control,
         watch,
         register,
         handleSubmit,
@@ -350,8 +355,11 @@ export function Field({
 
                     <div>
                         <Label htmlFor="condition">Condition</Label>
-                        <Input 
+                        <Textarea
                             {...register('condition', { required: false, })}
+                            name="condition"
+                            noRing={false}
+                            rows={5}
                         />
                     </div>
 
@@ -367,6 +375,20 @@ export function Field({
                             />
                             {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
                         </div>
+                        // <Controller 
+                        //     control={control}
+                        //     name="items"
+                        //     render={({ field: { value, onChange, }, }) => {
+                        //         return (
+                        //             <FieldItems 
+                        //                 disabled={false}
+                        //                 items={value}
+                        //                 fieldType={type}
+                        //                 onChange={onChange}
+                        //             />
+                        //         );
+                        //     }}
+                        // />
                     )}
                 </div>
             </Modal>
