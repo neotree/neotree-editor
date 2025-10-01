@@ -1,6 +1,6 @@
 'use client';
 
-import {useState,useEffect,useCallback} from 'react'
+import {useState, useEffect, useCallback} from 'react'
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
 import { createLock } from "@/app/actions/locks";
@@ -12,53 +12,75 @@ import { Loader } from '@/components/loader';
 import { DataKeysTableHeader } from './table-header';
 import { DataKeysTableRowActions } from './table-row-actions';
 import { DataKeysTableBottomActions } from './table-bottom-actions';
-import { DataKeyForm } from './form';
 import axios from 'axios';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
-export function DataKeysTable({ disabled,locked }: {
+export function DataKeysTable({ disabled, locked }: {
     disabled: boolean;
     locked: boolean;
 }) {
-    const { viewOnly, } = useAppContext();
+    const { viewOnly } = useAppContext();
     const [lockDataKeys, setLockDataKeys] = useState<boolean>(!!locked);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(20);
 
     disabled = disabled || viewOnly;
 
-    const { 
+    const {
         dataKeys,
         selected,
         filter: filterValue,
         deleting,
         loadingDataKeys,
+        pagination,
         setCurrentDataKeyUuid,
         setSelected,
+        loadDataKeys,
     } = useDataKeysCtx();
 
-        useEffect(() => {
+    // Fetch data keys with pagination
+    useEffect(() => {
+        loadDataKeys({
+            pagination: {
+                limit: itemsPerPage,
+                page: currentPage,
+            }
+        });
+    }, [currentPage, itemsPerPage]);
+
+    useEffect(() => {
         (async () => {
             try {
                 if (!locked) {
                     await axios.post<Awaited<ReturnType<typeof createLock>>>('/api/locks?data=' + JSON.stringify({ script: null, lockType: 'data_key' }))
                 }
-
             } catch (e: any) {
-                alert({
-                    title: "",
-                    message: e.message,
-                });
+                console.error('Lock creation failed:', e.message);
             }
         })();
-    }, [alert, locked]);
+    }, [locked]);
 
     const handleLockStatusChange = useCallback((isLocked: boolean) => {
         setLockDataKeys(prev => {
-
             if (lockDataKeys !== isLocked) {
                 return isLocked;
             }
             return prev;
         });
-    }, []);
+    }, [lockDataKeys]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        setSelected([]);
+    };
 
     const displayLoader = deleting || loadingDataKeys;
 
@@ -74,7 +96,6 @@ export function DataKeysTable({ disabled,locked }: {
             } else if (filterValue === dataKeysStatuses[1].value) {
                 return !!dataKey?.isDraft;
             } else {
-                console.log(dataKey?.dataType, filterValue);
                 return dataKey?.dataType === filterValue;
             }
         },
@@ -120,9 +141,9 @@ export function DataKeysTable({ disabled,locked }: {
                 cellClassName: cn('w-10'),
                 cellRenderer({ rowIndex }) {
                     return (
-                        <DataKeysTableRowActions 
-                            rowIndex={rowIndex} 
-                            disabled={disabled} 
+                        <DataKeysTableRowActions
+                            rowIndex={rowIndex}
+                            disabled={disabled}
                             setCurrentDataKeyUuid={setCurrentDataKeyUuid}
                         />
                     );
@@ -138,20 +159,109 @@ export function DataKeysTable({ disabled,locked }: {
         ]),
     };
 
+    const renderPageNumbers = () => {
+        if (!pagination) return null;
+
+        const { page, totalPages } = pagination;
+        const pages: (number | 'ellipsis')[] = [];
+
+        pages.push(1);
+
+        if (totalPages <= 7) {
+            for (let i = 2; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (page > 3) {
+                pages.push('ellipsis');
+            }
+
+            for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+                pages.push(i);
+            }
+
+            if (page < totalPages - 2) {
+                pages.push('ellipsis');
+            }
+
+            if (totalPages > 1) {
+                pages.push(totalPages);
+            }
+        }
+
+        return pages.map((pageNum, idx) => {
+            if (pageNum === 'ellipsis') {
+                return (
+                    <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                    </PaginationItem>
+                );
+            }
+
+            return (
+                <PaginationItem key={pageNum}>
+                    <PaginationLink
+                        onClick={() => handlePageChange(pageNum)}
+                        isActive={pageNum === page}
+                        className="cursor-pointer"
+                    >
+                        {pageNum}
+                    </PaginationLink>
+                </PaginationItem>
+            );
+        });
+    };
+
     return (
         <>
-         <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">  
-                        <LockStatus
-                                key={`data-key`}
-                                scriptId={''}
-                                lockType={"data_key"}
-                                doneLoading={true}
-                                onStatusChange={(locked: any) => handleLockStatusChange(locked)}
-                            /></div>
+            <div className="sm:ml-auto flex flex-col sm:flex-row gap-2">
+                <LockStatus
+                    key={`data-key`}
+                    scriptId={''}
+                    lockType={"data_key"}
+                    doneLoading={true}
+                    onStatusChange={(locked: any) => handleLockStatusChange(locked)}
+                />
+            </div>
+
             <div className="flex flex-col gap-y-4">
                 <DataKeysTableHeader />
 
                 <DataTable {...tableProps} />
+
+                {pagination && pagination.totalPages > 1 && (
+                    <div className="flex flex-col gap-2">
+                        <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationPrevious
+                                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                                        className={cn(
+                                            "cursor-pointer",
+                                            currentPage === 1 && "pointer-events-none opacity-50"
+                                        )}
+                                    />
+                                </PaginationItem>
+
+                                {renderPageNumbers()}
+
+                                <PaginationItem>
+                                    <PaginationNext
+                                        onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
+                                        className={cn(
+                                            "cursor-pointer",
+                                            currentPage === pagination.totalPages && "pointer-events-none opacity-50"
+                                        )}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
+
+                        <div className="text-sm text-muted-foreground text-center">
+                            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} entries
+                        </div>
+                    </div>
+                )}
             </div>
 
             <DataKeysTableBottomActions disabled={disabled} />

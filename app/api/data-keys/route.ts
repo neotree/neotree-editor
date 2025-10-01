@@ -13,7 +13,15 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
+        const rawParams = queryString.parse(req.nextUrl.searchParams.toString());
+        
+        const params: GetDataKeysParams = {
+            ...rawParams,
+            pagination: rawParams.limit && rawParams.page ? {
+                limit: parseInt(rawParams.limit as string, 10),
+                page: parseInt(rawParams.page as string, 10),
+            } : undefined,
+        } as GetDataKeysParams;
 
         res = await _getDataKeys(params);
 

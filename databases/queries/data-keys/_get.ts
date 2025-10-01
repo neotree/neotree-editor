@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { dataKeys, dataKeysDrafts, pendingDeletion, } from "@/databases/pg/schema";
+import { dataKeys, dataKeysDrafts, pendingDeletion } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { Pagination } from "@/types";
 
 export type DataKey = typeof dataKeys.$inferSelect & {
     isDraft: boolean;
@@ -16,10 +17,15 @@ export type GetDataKeysParams = {
     uniqueKeys?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    pagination?: {
+        limit: number;
+        page: number;
+    };
 };
 
 export type GetDataKeysResults = {
     data: DataKey[];
+    pagination?: Pagination;
     errors?: string[];
 };
 
@@ -27,105 +33,168 @@ export async function _getDataKeys(
     params?: GetDataKeysParams
 ): Promise<GetDataKeysResults> {
     try {
-        const { 
-            dataKeysIds: _dataKeysIds, 
+        const {
+            dataKeysIds: _dataKeysIds,
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
-            returnDraftsIfExist = true, 
+            returnDraftsIfExist = true,
+            pagination: paginationParam,
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
 
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
         const uniqueKeys = uniqueKeysParam.filter(n => n);
-        
-        // unpublished dataKeys conditions
+
+        // ============================================
+        // STEP 1: Fetch drafts (these are always few)
+        // ============================================
         const whereDataKeysDrafts = [
-            !dataKeysIds?.length ? 
-                undefined 
-                : 
+            !dataKeysIds?.length ?
+                undefined
+                :
                 inArray(dataKeysDrafts.uuid, dataKeysIds.map(id => uuid.validate(id) ? id : uuid.v4())),
-                
-            !names?.length ? 
-                undefined 
-                : 
+
+            !names?.length ?
+                undefined
+                :
                 inArray(sql`lower(${dataKeysDrafts.name})`, names),
 
-            !uniqueKeys?.length ? 
-                undefined 
-                : 
+            !uniqueKeys?.length ?
+                undefined
+                :
                 inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
         const drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
-            where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
+            where: !whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
         });
-        dataKeysIds = dataKeysIds.filter(id => !drafts.map(d => d.uuid).includes(id));
 
-        // published dataKeys conditions
+        const draftUuids = drafts.map(d => d.uuid);
+        dataKeysIds = dataKeysIds.filter(id => !draftUuids.includes(id));
+
+        // ============================================
+        // STEP 2: Build base query for published keys
+        // ============================================
         const whereDataKeys = [
             isNull(dataKeys.deletedAt),
-            isNull(pendingDeletion),
-            !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid)),
-            !dataKeysIds?.length ? 
-                undefined 
-                : 
+            draftUuids.length ? notInArray(dataKeys.uuid, draftUuids) : undefined,
+            !dataKeysIds?.length ?
+                undefined
+                :
                 inArray(dataKeys.uuid, dataKeysIds.filter(id => uuid.validate(id))),
 
-            !names?.length ? 
-                undefined 
-                : 
+            !names?.length ?
+                undefined
+                :
                 inArray(sql`lower(${dataKeys.name})`, names),
 
-            !uniqueKeys?.length ? 
-                undefined 
-                : 
+            !uniqueKeys?.length ?
+                undefined
+                :
                 inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
-        const publishedRes = await db
+        const baseWhere = !whereDataKeys.length ? undefined : and(...whereDataKeys);
+
+        // ============================================
+        // STEP 3: Get total count (optimized)
+        // ============================================
+        const [countResult] = await db
             .select({
-                dataKey: dataKeys,
-                pendingDeletion: pendingDeletion,
+                count: sql<number>`cast(count(*) as integer)`
             })
             .from(dataKeys)
-            .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
-            .where(!whereDataKeys.length ? undefined : and(...whereDataKeys));
+            .where(baseWhere);
+
+        const publishedCount = countResult?.count || 0;
+        const totalCount = publishedCount + drafts.length;
+
+        // Calculate pagination
+        const limit = paginationParam?.limit || totalCount || 10;
+        const page = paginationParam?.page || 1;
+        const offset = (page - 1) * limit;
+        const totalPages = Math.ceil(totalCount / limit);
+
+        // ============================================
+        // STEP 4: Fetch paginated published data
+        // ============================================
+        // Note: We need to handle drafts + published merge, so we fetch enough data
+        // to account for drafts that might be inserted at the beginning
+        const fetchLimit = paginationParam ? limit + drafts.length : undefined;
+
+        const publishedQuery = db
+            .select({
+                dataKey: dataKeys,
+            })
+            .from(dataKeys)
+            .where(baseWhere)
+            .orderBy(sql`lower(${dataKeys.label})`) // Add ORDER BY for consistent pagination
+            .$dynamic();
+
+        // Only apply limit/offset if pagination is requested
+        const publishedRes = paginationParam
+            ? await publishedQuery.limit(fetchLimit!).offset(Math.max(0, offset - drafts.length))
+            : await publishedQuery;
 
         const published = publishedRes.map(s => s.dataKey);
 
-        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
-            where: inArray(pendingDeletion.dataKeyId, published.map(s => s.uuid)),
-            columns: { dataKeyId: true, },
+        // ============================================
+        // STEP 5: Check pending deletions (only for fetched records)
+        // ============================================
+        const allUuids = [...draftUuids, ...published.map(p => p.uuid)];
+
+        const inPendingDeletion = !allUuids.length ? [] : await db.query.pendingDeletion.findMany({
+            where: inArray(pendingDeletion.dataKeyId, allUuids),
+            columns: { dataKeyId: true },
         });
 
-        const responseData = [
+        const pendingDeletionIds = new Set(inPendingDeletion.map(s => s.dataKeyId));
+
+        // ============================================
+        // STEP 6: Merge and sort data
+        // ============================================
+        const allData = [
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
                 isDeleted: false,
-            } as GetDataKeysResults['data'][0])),
+            } as DataKey)),
 
-            ...drafts.map((s => ({
+            ...drafts.map(s => ({
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
-            } as GetDataKeysResults['data'][0])))
+            } as DataKey))
         ]
+            .filter(s => !pendingDeletionIds.has(s.uuid))
             .sort((a, b) => {
-                let returnVal = 0;
-                if(a.label < b.label) returnVal = -1;
-                if(a.label > b.label) returnVal = 1;
-                return returnVal;
-            })
-            .filter(s => !inPendingDeletion.map(s => s.dataKeyId).includes(s.uuid));
+                const labelA = (a.label || '').toLowerCase();
+                const labelB = (b.label || '').toLowerCase();
+                if (labelA < labelB) return -1;
+                if (labelA > labelB) return 1;
+                return 0;
+            });
 
-        return  { 
+        // ============================================
+        // STEP 7: Apply client-side pagination slice
+        // ============================================
+        const responseData = paginationParam
+            ? allData.slice(offset, offset + limit)
+            : allData;
+
+        return {
             data: responseData,
+            pagination: paginationParam ? {
+                limit,
+                page,
+                total: totalCount,
+                totalPages,
+            } : undefined,
         };
     } catch(e: any) {
         logger.error('_getDataKeys ERROR', e.message);
-        return { data: [], errors: [e.message], };
+        return { data: [], errors: [e.message] };
     }
 }
 
@@ -136,57 +205,82 @@ export type GetDataKeyResults = {
 
 export async function _getDataKey(
     params: {
-        dataKeyId: string,
+        dataKeyId: string;
         returnDraftIfExists?: boolean;
-    },
+    }
 ): Promise<GetDataKeyResults> {
-    const { dataKeyId, returnDraftIfExists, } = { ...params };
+    const { dataKeyId, returnDraftIfExists } = params;
 
     try {
         if (!dataKeyId) throw new Error('Missing dataKeyId');
+        if (!uuid.validate(dataKeyId)) throw new Error('Invalid dataKeyId format');
 
-        const whereDataKeyId = uuid.validate(dataKeyId) ? eq(dataKeys.uuid, dataKeyId) : undefined;
-        const whereDataKeyDraftId = !whereDataKeyId ? undefined : eq(dataKeysDrafts.uuid, dataKeyId);
+        const whereDataKeyId = eq(dataKeys.uuid, dataKeyId);
+        const whereDataKeyDraftId = eq(dataKeysDrafts.uuid, dataKeyId);
 
-        let draft = (returnDraftIfExists && whereDataKeyDraftId) ? await db.query.dataKeysDrafts.findFirst({
-            where: whereDataKeyId,
-        }) : undefined;
+        // ============================================
+        // STEP 1: Check for draft first (if requested)
+        // ============================================
+        if (returnDraftIfExists) {
+            const draft = await db.query.dataKeysDrafts.findFirst({
+                where: whereDataKeyDraftId,
+            });
 
-        let responseData = !draft ? null : {
-            ...draft.data,
-            isDraft: false,
-            isDeleted: false,
-        } as GetDataKeyResults['data'];
+            if (draft) {
+                return {
+                    data: {
+                        ...draft.data,
+                        isDraft: true,
+                        isDeleted: false,
+                    }
+                };
+            }
+        }
 
-        if (responseData) return { data: responseData, };
-
+        // ============================================
+        // STEP 2: Fetch published with optional draft
+        // ============================================
         const published = await db.query.dataKeys.findFirst({
             where: and(
                 isNull(dataKeys.deletedAt),
-                whereDataKeyId,
+                whereDataKeyId
             ),
-            with: {
+            with: returnDraftIfExists ? {
                 draft: true,
-            },
+            } : undefined,
         });
 
-        draft = returnDraftIfExists ? published?.draft : undefined;
+        if (!published) {
+            return { data: null };
+        }
 
-        const data = (draft?.data || published) as GetDataKeyResults['data'];
+        // ============================================
+        // STEP 3: Check if in pending deletion
+        // ============================================
+        const isPendingDeletion = await db.query.pendingDeletion.findFirst({
+            where: eq(pendingDeletion.dataKeyId, dataKeyId),
+            columns: { dataKeyId: true },
+        });
 
-        responseData = !data ? null : {
-            ...data,
-            isDraft: false,
-            isDeleted: false,
-        };
+        if (isPendingDeletion) {
+            return { data: null };
+        }
 
-        if (!responseData) return { data: null, };
+        // ============================================
+        // STEP 4: Return draft data if exists, otherwise published
+        // ============================================
+        const draft = returnDraftIfExists ? published?.draft : undefined;
+        const finalData = draft?.data || published;
 
-        return  { 
-            data: responseData, 
+        return {
+            data: {
+                ...finalData,
+                isDraft: !!draft,
+                isDeleted: false,
+            }
         };
     } catch(e: any) {
         logger.error('_getDataKey ERROR', e.message);
-        return { errors: [e.message], };
+        return { errors: [e.message] };
     }
-} 
+}

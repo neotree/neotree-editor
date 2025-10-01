@@ -3,8 +3,6 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import * as actions from '@/app/actions/data-keys';
 import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
-import {useEffect } from 'react';
-import axios from 'axios';
 import { getUpdateAvailability } from "@/app/actions/locks";
 import { DataKeysTable } from '../components/table';
 

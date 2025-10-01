@@ -1,23 +1,24 @@
 'use client';
 
-import { 
-    createContext, 
-    useCallback, 
-    useContext, 
-    useEffect, 
-    useRef, 
-    useState 
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState
 } from "react";
 import axios from 'axios';
 import { useQueryState } from "nuqs";
 import { useRouter } from 'next/navigation';
 
 import { useAlertModal } from "@/hooks/use-alert-modal";
-import { _getDataKeys, } from "@/databases/queries/data-keys";
+import { _getDataKeys, GetDataKeysParams } from "@/databases/queries/data-keys";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { Pagination } from "@/types";
 
 export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
 
@@ -48,6 +49,7 @@ export type tDataKeysCtx = {
     selected: { index: number; uuid: string; }[];
     sort: string;
     filter: string;
+    pagination?: Pagination;
     saveDataKeys: (data: DataKeyFormData[], cb?: ((error?: string) => void)) => Promise<void>;
     deleteDataKeys: (data: string[]) => Promise<void>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
@@ -55,7 +57,7 @@ export type tDataKeysCtx = {
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
-    loadDataKeys: () => Promise<void>;
+    loadDataKeys: (params?: GetDataKeysParams) => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
     extractDataKeys: (uuids: string[], opts?: {
         withNested?: boolean;
@@ -70,10 +72,10 @@ export const useDataKeysCtx = () => {
     return ctx;
 };
 
-export function DataKeysCtxProvider({ 
-    children,  
-    prefetchDataKeys = true,
-}: {
+export function DataKeysCtxProvider({
+                                        children,
+                                        prefetchDataKeys = true,
+                                    }: {
     children: React.ReactNode;
     prefetchDataKeys?: boolean;
 }) {
@@ -93,26 +95,50 @@ export function DataKeysCtxProvider({
     const [filter, setFilter] = useState('');
 
     /*****************************************************
-     ************ LOAD 
-    ******************************************************/
+     ************ LOAD
+     ******************************************************/
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
     const [dataKeys, setDataKeys] = useState<Awaited<ReturnType<typeof _getDataKeys>>>({
         data: [],
     });
-    const [loadingSelectOptions, setLoadingSelectOptions] = useState(false);
+    const [pagination, setPagination] = useState<Pagination | undefined>();
 
-    const loadDataKeys = useCallback(async () => {
+    const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
         setLoadingDataKeys(true);
-        axios
-            .get<typeof dataKeys>('/api/data-keys')
-            .then(res => {
-                res.data.data = sortDataKeys(res.data.data, sort),
-                setDataKeys(res.data);
-            })
-            .catch(e => {
-                setDataKeys({ data: [], errors: [e.message], });
-            })
-            .finally(() => setLoadingDataKeys(false));
+
+        try {
+            // Build query params
+            const queryParams = new URLSearchParams();
+
+            if (params?.pagination) {
+                queryParams.set('limit', params.pagination.limit.toString());
+                queryParams.set('page', params.pagination.page.toString());
+            }
+
+            // Add other filters if needed
+            if (params?.names?.length) {
+                queryParams.set('names', JSON.stringify(params.names));
+            }
+            if (params?.uniqueKeys?.length) {
+                queryParams.set('uniqueKeys', JSON.stringify(params.uniqueKeys));
+            }
+            if (params?.dataKeysIds?.length) {
+                queryParams.set('dataKeysIds', JSON.stringify(params.dataKeysIds));
+            }
+
+            const response = await axios.get<typeof dataKeys>(`/api/data-keys?${queryParams.toString()}`);
+
+            // Apply sorting on client side (since sorting happens after pagination in your current setup)
+            response.data.data = sortDataKeys(response.data.data, sort);
+
+            setDataKeys(response.data);
+            setPagination(response.data.pagination);
+        } catch (e: any) {
+            setDataKeys({ data: [], errors: [e.message] });
+            setPagination(undefined);
+        } finally {
+            setLoadingDataKeys(false);
+        }
     }, [sort]);
 
     useEffect(() => {
@@ -123,17 +149,17 @@ export function DataKeysCtxProvider({
     }, [prefetchDataKeys, loadDataKeys]);
 
     /*****************************************************
-     ************ SAVE 
-    ******************************************************/
+     ************ SAVE
+     ******************************************************/
     const [saving, setSaving] = useState(false);
 
     const saveDataKeys: tDataKeysCtx['saveDataKeys'] = useCallback(async (data, cb) => {
         try {
             setSaving(true);
 
-            const response = await axios.post('/api/data-keys/save', { 
-                data, 
-                broadcastAction: true, 
+            const response = await axios.post('/api/data-keys/save', {
+                data,
+                broadcastAction: true,
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
 
@@ -144,7 +170,7 @@ export function DataKeysCtxProvider({
                     variant: 'error',
                 });
             } else {
-                await loadDataKeys();
+                await loadDataKeys(pagination ? { pagination } : undefined);
                 router.refresh();
                 alert({
                     message: "Data key saved!",
@@ -161,21 +187,20 @@ export function DataKeysCtxProvider({
         } finally {
             setSaving(false);
         }
-    }, [alert, router.refresh, loadDataKeys]);
+    }, [alert, router.refresh, loadDataKeys, pagination]);
 
     /*****************************************************
-     ************ DELETE 
-    ******************************************************/
+     ************ DELETE
+     ******************************************************/
     const [deleting, setDeleting] = useState(false);
 
     const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data) => {
         try {
             setDeleting(true);
 
-            // TODO: Replace this with server action
-            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({ 
-                dataKeysIds: data, 
-                broadcastAction: true, 
+            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({
+                dataKeysIds: data,
+                broadcastAction: true,
             } satisfies DeleteDataKeysParams));
 
             const res = response.data;
@@ -184,7 +209,7 @@ export function DataKeysCtxProvider({
 
             setSelected([]);
 
-            await loadDataKeys();
+            await loadDataKeys(pagination ? { pagination } : undefined);
 
             router.refresh();
 
@@ -202,11 +227,11 @@ export function DataKeysCtxProvider({
         } finally {
             setDeleting(false);
         }
-    }, [router.refresh, alert, loadDataKeys]);
+    }, [router.refresh, alert, loadDataKeys, pagination]);
 
     /*****************************************************
-     ************ EXPORT 
-    ******************************************************/
+     ************ EXPORT
+     ******************************************************/
     const [exporting, setExporting] = useState(false);
 
     const exportDataKeys: tDataKeysCtx['exportDataKeys'] = useCallback(async (data) => {
@@ -217,8 +242,8 @@ export function DataKeysCtxProvider({
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
-            
-            await loadDataKeys();
+
+            await loadDataKeys(pagination ? { pagination } : undefined);
 
             setSelected([]);
 
@@ -236,8 +261,7 @@ export function DataKeysCtxProvider({
         } finally {
             setExporting(false);
         }
-    }, [dataKeys.data, loadDataKeys, alert]);
-   
+    }, [loadDataKeys, alert, pagination]);
 
     /*****************************************************/
 
@@ -290,6 +314,7 @@ export function DataKeysCtxProvider({
                     currentDataKeyUuid,
                     sort,
                     filter,
+                    pagination,
                     extractDataKeys,
                     deleteDataKeys,
                     saveDataKeys,
@@ -309,7 +334,7 @@ export function DataKeysCtxProvider({
 }
 
 function sortDataKeys (
-    dataKeys: DataKey[], 
+    dataKeys: DataKey[],
     sortValue = dataKeysSortOpts[0].value,
 ) {
     let sorted = [...dataKeys];
@@ -407,7 +432,7 @@ function sortDataKeys (
                 key2: new Date(key2.createdAt || '').getTime().toString(),
             }));
             break;
-            
+
         default:
             sorted = dataKeys.sort((key1, key2) => sortFn({
                 sortDirection: 'asc',
@@ -417,4 +442,4 @@ function sortDataKeys (
     }
 
     return sorted;
-};
+}
