@@ -92,10 +92,16 @@ export async function _publishScripts({ userId }: {
         }
 
         if (processedScripts.length) {
-            const publishScreens = await _publishScreens({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            const publishScreens = await _publishScreens({ 
+                userId,
+                scriptsIds: processedScripts.map(s => s.scriptId) 
+            });
             if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
 
-            const publishDiagnoses = await _publishDiagnoses({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            const publishDiagnoses = await _publishDiagnoses({ 
+                userId,
+                scriptsIds: processedScripts.map(s => s.scriptId) 
+            });
             if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(', '));
         }
 
