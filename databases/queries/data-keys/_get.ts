@@ -89,57 +89,54 @@ export async function _getDataKeys(
                 inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
-        // Get total count efficiently
-        const whereCondition = !whereDataKeys.length ? undefined : and(...whereDataKeys);
-        const [{ count: publishedCount }] = await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(dataKeys)
-            .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
-            .where(and(whereCondition, isNull(pendingDeletion.dataKeyId)));
-
-        const totalCount = publishedCount + drafts.length;
-
-        // Calculate pagination
-        const limit = paginationParam?.limit || totalCount || 10;
-        const page = paginationParam?.page || 1;
-        const offset = (page - 1) * limit;
-        const totalPages = Math.ceil(totalCount / limit);
-
-        // Fetch published data with pagination applied at DB level when possible
+        // Fetch all published data (we need to merge with drafts before paginating)
         const publishedRes = await db
             .select({
                 dataKey: dataKeys,
+                pendingDeletion: pendingDeletion,
             })
             .from(dataKeys)
             .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
-            .where(and(whereCondition, isNull(pendingDeletion.dataKeyId)))
-            .orderBy(dataKeys.label)
-            .limit(paginationParam ? (limit + drafts.length) : (limit))
-            .offset(paginationParam ? Math.max(0, offset - drafts.length) : 0);
+            .where(!whereDataKeys.length ? undefined : and(...whereDataKeys));
 
         const published = publishedRes.map(s => s.dataKey);
 
-        const allData = [
-            ...drafts.map((s => ({
-                ...s.data,
-                isDraft: true,
-                isDeleted: false,
-            } as GetDataKeysResults['data'][0]))),
+        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
+            where: inArray(pendingDeletion.dataKeyId, published.map(s => s.uuid)),
+            columns: { dataKeyId: true, },
+        });
 
+        // Merge and sort all data
+        const allData = [
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
                 isDeleted: false,
             } as GetDataKeysResults['data'][0])),
-        ].sort((a, b) => {
-            const labelA = (a.label || '').toLowerCase();
-            const labelB = (b.label || '').toLowerCase();
-            if(labelA < labelB) return -1;
-            if(labelA > labelB) return 1;
-            return 0;
-        });
 
-        // Apply final pagination slice
+            ...drafts.map((s => ({
+                ...s.data,
+                isDraft: true,
+                isDeleted: false,
+            } as GetDataKeysResults['data'][0])))
+        ]
+            .filter(s => !inPendingDeletion.map(pd => pd.dataKeyId).includes(s.uuid))
+            .sort((a, b) => {
+                const labelA = (a.label || '').toLowerCase();
+                const labelB = (b.label || '').toLowerCase();
+                if(labelA < labelB) return -1;
+                if(labelA > labelB) return 1;
+                return 0;
+            });
+
+        const totalCount = allData.length;
+
+        // Apply pagination
+        const limit = paginationParam?.limit || totalCount || 10;
+        const page = paginationParam?.page || 1;
+        const offset = (page - 1) * limit;
+        const totalPages = Math.ceil(totalCount / limit);
+
         const responseData = paginationParam 
             ? allData.slice(offset, offset + limit)
             : allData;
