@@ -203,7 +203,10 @@ export function DataKeysTable({ disabled, locked }: {
                     <PaginationLink
                         onClick={() => handlePageChange(pageNum)}
                         isActive={pageNum === page}
-                        className="cursor-pointer"
+                        className={cn(
+                            "cursor-pointer",
+                            pageNum === page && "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
                     >
                         {pageNum}
                     </PaginationLink>
