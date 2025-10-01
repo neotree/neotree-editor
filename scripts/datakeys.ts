@@ -65,6 +65,7 @@ const scripts = {
         '9dabc437-635e-431f-bded-6eee128e0249',
         '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
     ],
+    demo: [],
 };
 
 main();
@@ -92,7 +93,7 @@ async function main() {
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
             const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: JSON.stringify(scripts[country]),
+                scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
             }));
 
             res.data.data.forEach(s => {
