@@ -59,7 +59,7 @@ type Props = {
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
     screens: Awaited<ReturnType<typeof listScreens>>['data'];
-    script: ScriptType;
+    script?: ScriptType;
 };
 
 export function ScreenForm(props: Props) {
