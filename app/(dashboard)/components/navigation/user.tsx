@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from "react";
-import { LogOut, User as UserIcon, } from "lucide-react"
+import { LogOut, UserCircle2 as UserIcon, } from "lucide-react"
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
@@ -40,6 +40,8 @@ export function User({ user }: Props) {
 
     return (
         <>
+            <span className="font-bold">{user?.displayName || ''}</span>
+
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button 
@@ -50,7 +52,7 @@ export function User({ user }: Props) {
                             usePlainBg ? '' : 'text-primary-foreground hover:bg-primary-foreground/20',
                         )}
                     >
-                        <UserIcon className="h-6 w-6" />
+                        <UserIcon className="h-8 w-8" />
                     </Button>
                 </DropdownMenuTrigger>
 
