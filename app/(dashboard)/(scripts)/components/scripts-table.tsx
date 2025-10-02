@@ -71,7 +71,7 @@ export function ScriptsTable(props: Props) {
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     selectable={!disabled}
-                    sortable={!disabled}
+                    sortable={!disabled && !search.value}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}

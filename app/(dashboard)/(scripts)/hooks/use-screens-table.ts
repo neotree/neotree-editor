@@ -8,9 +8,22 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
+import { 
+    type ScriptsSearchResultsItem, 
+    type ScriptsSearchResultsFilter, 
+    filterScriptsSearchResults, 
+    parseScriptsSearchResults,
+} from "@/lib/scripts-search";
 
 export type UseScreensTableParams = {
     screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
+};
+
+const defaultSearchState = {
+    value: '',
+    filter: 'all' as ScriptsSearchResultsFilter,
+    searching: false,
+    results: [] as ScriptsSearchResultsItem[],
 };
 
 export function useScreensTable({
@@ -20,6 +33,9 @@ export function useScreensTable({
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
     const [screensIdsToCopy, setScreensIdsToCopy] = useState<string[]>([]);
+
+    const [search, setSearch] = useState(defaultSearchState);
+    const clearSearch = useCallback(() => setSearch(defaultSearchState), []);
 
     useEffect(() => { setScreens(screensParam); }, [screensParam]);
 
@@ -99,12 +115,53 @@ export function useScreensTable({
 
     const disabled = useMemo(() => viewOnly, [viewOnly]);
 
+    const onSearch = useCallback(async (value: string) => {
+        try {
+            clearSearch();
+            if (value) {
+                setSearch(prev => ({ ...prev, searching: true, }));
+
+                const results = parseScriptsSearchResults({
+                    searchValue: value,
+                    diagnoses: [],
+                    scripts: [],
+                    screens: screens.data,
+                });
+
+                setSearch(prev => ({
+                    value,
+                    filter: prev.filter,
+                    searching: false,
+                    results,
+                }));
+            }
+        } catch(e: any) {
+            clearSearch();
+        }
+    }, [clearSearch, screens.data]);
+
+    const screensArr = useMemo(() => {
+        return screens.data
+            .filter(s => {
+                if (!search.value) return true;
+
+                const rslts = filterScriptsSearchResults(search.filter, search.results);
+
+                return rslts.find(r => r.screens.map(s => s.screenId).includes(s.screenId));
+            });
+    }, [screens.data, search]);
+
     return {
         screens,
         loading,
         selected,
         disabled,
         screensIdsToCopy, 
+        search, 
+        screensArr,
+        setSearch,
+        clearSearch,
+        onSearch,
         setScreensIdsToCopy,
         onDelete,
         onSort,

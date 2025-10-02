@@ -11,16 +11,20 @@ import { ScreensTableBottomActions } from "./table-bottom-actions";
 import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
 import { CopyScreensModal } from "./copy-modal";
+import { ScriptsTableSearch } from "../scripts-table-search";
 
 type Props = UseScreensTableParams;
 
 export function ScreensTable(props: Props) {
     const {
-        screens,
         loading,
         selected,
         disabled,
         screensIdsToCopy,
+        search,
+        screensArr,
+        setSearch,
+        onSearch,
         setScreensIdsToCopy,
         onDelete,
         onSort,
@@ -44,28 +48,34 @@ export function ScreensTable(props: Props) {
                 />
             )}
 
-            <div className="">
+            <div className="flex flex-col gap-y-4">
+                <div className="pt-4 px-4 text-2xl">Screens</div>
+
+                <div className="px-4">
+                    <ScriptsTableSearch 
+                        onSearch={onSearch}
+                        search={search}
+                        setSearch={setSearch}
+                    />
+                </div>
+
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    title=""
                     selectable={!disabled}
-                    sortable={!disabled}
+                    sortable={!disabled && !search.value}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
                     getRowOptions={({ rowIndex }) => {
-                        const s = screens.data[rowIndex];
+                        const s = screensArr[rowIndex];
                         return !s ? {} : {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
-                    search={{
-                        inputPlaceholder: 'Search screens',
-                    }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                            <div>No screens saved.</div>
+                            <div>{!search.value ? 'No screens saved.' : `No matches for '${search.value}'`}</div>
                         </div>
                     )}
                     columns={[
@@ -97,7 +107,7 @@ export function ScreensTable(props: Props) {
                             align: 'right',
                             cellClassName: cn('w-[100px]', sys.data.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
-                                const s = screens.data[cell.rowIndex];
+                                const s = screensArr[cell.rowIndex];
 
                                 if (!s) return null;
 
@@ -117,7 +127,7 @@ export function ScreensTable(props: Props) {
                             align: 'center',
                             cellClassName: 'w-10',
                             cellRenderer(cell) {
-                                const s = screens.data[cell.rowIndex];
+                                const s = screensArr[cell.rowIndex];
                                 if (!s) return null;
                                 return (
                                     <ScreensTableRowActions 
@@ -130,7 +140,7 @@ export function ScreensTable(props: Props) {
                             },
                         },
                     ]}
-                    data={screens.data.map(s => [
+                    data={screensArr.map(s => [
                         s.position,
                         s.type,
                         s.epicId,
@@ -146,9 +156,8 @@ export function ScreensTable(props: Props) {
             <ScreensTableBottomActions 
                 disabled={viewOnly}
                 selected={selected}
-                screens={screens}
-                onCopy={() => setScreensIdsToCopy(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
-                onDelete={() => onDelete(selected.map(i => screens.data[i]?.screenId).filter(s => s))}
+                onCopy={() => setScreensIdsToCopy(selected.map(i => screensArr[i]?.screenId).filter(s => s))}
+                onDelete={() => onDelete(selected.map(i => screensArr[i]?.screenId).filter(s => s))}
             />
         </>
     )
