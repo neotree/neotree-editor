@@ -1,22 +1,31 @@
 'use client';
 
-import { forwardRef } from "react";
+import { forwardRef, useState, } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = React.ComponentProps<'input'> & {
     hideSearchButton?: boolean;
     searchButton?: React.ComponentProps<'button'>;
+	onSearch?: (searchValue: string) => void;
 };
 
 const SearchInput = forwardRef<HTMLInputElement, Props>(({
 	searchButton,
 	hideSearchButton,
+	onSearch,
 	...props
 }, ref) =>
 {
-	// TODO: Add search functionality
+	const [value, setValue] = useState('');
+
 	return (
-		<>
+		<form
+			onSubmit={e => {
+				e.preventDefault();
+				e.stopPropagation();
+				onSearch?.(value);
+			}}
+		>
 			<div
 				className={cn(
 					'flex w-full'
@@ -31,7 +40,14 @@ const SearchInput = forwardRef<HTMLInputElement, Props>(({
 						ref={ref}
 						type="search"
 						placeholder="Search"
+						value={value}
 						{...props}
+						onChange={e => {
+							const value = e.target.value;
+							setValue(value);
+							props.onChange?.(e);
+							if (!value) onSearch?.(value);
+						}}
 						className={cn(
 							'w-full pl-4 py-2 rounded-l-full border focus:outline-none focus:border-secondary bg-transparent',
 							props.className,
@@ -43,7 +59,7 @@ const SearchInput = forwardRef<HTMLInputElement, Props>(({
 
 				{!hideSearchButton && (
 					<button
-						type="button"
+						type="submit"
 						className={cn(
 							'px-5 py-2.5 transition-colors bg-transparent border border-l-0 rounded-r-full hover:bg-secondary/10 disabled:opacity-50 disabled:cursor-not-allowed',
 							searchButton?.className
@@ -56,7 +72,7 @@ const SearchInput = forwardRef<HTMLInputElement, Props>(({
 					</button>
 				)}
 			</div>
-		</>
+		</form>
 	);
 });
 

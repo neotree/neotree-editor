@@ -11,18 +11,22 @@ import { DiagnosesTableBottomActions } from "./table-bottom-actions";
 import { DiagnosesTableRowActions } from "./table-row-actions";
 import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diagnoses-table';
 import { CopyDiagnosesModal } from "./copy-modal";
+import { ScriptsTableSearch } from "../scripts-table-search";
 
 type Props = UseDiagnosesTableParams;
 
 export function DiagnosesTable(props: Props) {
     const {
-        diagnoses,
         loading,
         selected,
         disabled,
         diagnosesIdsToCopy,
         isScriptLocked,
         scriptLockedByUserId,
+        search,
+        diagnosesArr,
+        setSearch,
+        onSearch,
         setDiagnosesIdsToCopy,
         onDelete,
         onSort,
@@ -46,28 +50,34 @@ export function DiagnosesTable(props: Props) {
                 />
             )}
 
-            <div className="">
+            <div className="flex flex-col gap-y-4">
+                <div className="pt-4 px-4 text-2xl">Diagnoses</div>
+
+                <div className="px-4">
+                    <ScriptsTableSearch 
+                        onSearch={onSearch}
+                        search={search}
+                        setSearch={setSearch}
+                    />
+                </div>
+
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    title=""
                     selectable={!disabled}
-                    sortable={!disabled}
+                    sortable={!disabled && !search.value}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
                     getRowOptions={({ rowIndex }) => {
-                        const s = diagnoses.data[rowIndex];
+                        const s = diagnosesArr[rowIndex];
                         return !s ? {} : {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
-                    search={{
-                        inputPlaceholder: 'Search diagnoses',
-                    }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                            <div>No diagnoses saved.</div>
+                            <div>{!search.value ? 'No diagnoses saved.' : `No matches for '${search.value}'`}</div>
                         </div>
                     )}
                     columns={[
@@ -93,7 +103,7 @@ export function DiagnosesTable(props: Props) {
                             align: 'right',
                             cellClassName: cn('w-[100px]', sys.data.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
-                                const s = diagnoses.data[cell.rowIndex];
+                                const s = diagnosesArr[cell.rowIndex];
 
                                 if (!s) return null;
 
@@ -113,7 +123,7 @@ export function DiagnosesTable(props: Props) {
                             align: 'center',
                             cellClassName: 'w-10',
                             cellRenderer(cell) {
-                                const s = diagnoses.data[cell.rowIndex];
+                                const s = diagnosesArr[cell.rowIndex];
                                 if (!s) return null;
                                 return (
                                     <DiagnosesTableRowActions 
@@ -128,7 +138,7 @@ export function DiagnosesTable(props: Props) {
                             },
                         },
                     ]}
-                    data={diagnoses.data.map(s => [
+                    data={diagnosesArr.map(s => [
                         s.position,
                         s.name,
                         s.description,
@@ -142,9 +152,8 @@ export function DiagnosesTable(props: Props) {
             <DiagnosesTableBottomActions 
                 disabled={viewOnly}
                 selected={selected}
-                diagnoses={diagnoses}
-                onCopy={() => setDiagnosesIdsToCopy(selected.map(i => diagnoses.data[i]?.diagnosisId).filter(s => s))}
-                onDelete={() => onDelete(selected.map(i => diagnoses.data[i]?.diagnosisId).filter(s => s))}
+                onCopy={() => setDiagnosesIdsToCopy(selected.map(i => diagnosesArr[i]?.diagnosisId).filter(s => s))}
+                onDelete={() => onDelete(selected.map(i => diagnosesArr[i]?.diagnosisId).filter(s => s))}
             />
         </>
     )

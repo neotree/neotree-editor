@@ -1,3 +1,5 @@
+import { type TableRowProps } from "@/components/ui/table";
+
 export type TableColumn = {
     name: string;
     colSpan?: number;
@@ -75,4 +77,9 @@ export type DataTableProps = DataTableHeaderProps & {
     onSelect?: (selectedIndexes: number[]) => void;
     getRowOptions?: (params: { rowIndex: number; }) => Partial<React.HTMLAttributes<HTMLTableRowElement>>;
     getCellOptions?: (params: { rowIndex: number; columnIndex: number; }) => Partial<React.HTMLAttributes<HTMLTableCellElement>>;
+    rowRenderer?: (params: {
+        props: TableRowProps;
+        cells: React.ReactElement[];
+        rowIndex: number;
+    }) => React.ReactNode;
 };
