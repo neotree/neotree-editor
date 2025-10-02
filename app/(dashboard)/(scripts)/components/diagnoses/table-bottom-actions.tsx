@@ -8,7 +8,6 @@ import { ActionsBar } from "@/components/actions-bar";
 
 type Props = {
     disabled?: boolean;
-    diagnoses: Awaited<ReturnType<IScriptsContext['getDiagnoses']>>;
     selected: number[];
     onDelete: () => void;
     onCopy: () => void;

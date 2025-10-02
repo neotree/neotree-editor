@@ -8,7 +8,6 @@ import { ActionsBar } from "@/components/actions-bar";
 
 type Props = {
     disabled?: boolean;
-    screens: Awaited<ReturnType<IScriptsContext['getScreens']>>;
     selected: number[];
     onDelete: () => void;
     onCopy: () => void;
