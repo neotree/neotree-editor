@@ -13,3 +13,5 @@ export * from './_get_diagnoses_change_history';
 export * from './_get_scripts_metadata';
 
 export * from './_scripts_get _drugs_library';
+
+export * from './_search';
