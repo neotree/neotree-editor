@@ -9,9 +9,17 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
+import { type ScriptsSearchResultsItem, type ScriptsSearchResultsFilter, filterScriptsSearchResults, } from "@/lib/scripts-search";
 
 export type UseScriptsTableParams = {
     scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>;
+};
+
+const defaultSearchState = {
+    value: '',
+    filter: 'all' as ScriptsSearchResultsFilter,
+    searching: false,
+    results: [] as ScriptsSearchResultsItem[],
 };
 
 export function useScriptsTable({
@@ -21,6 +29,9 @@ export function useScriptsTable({
     const [selected, setSelected] = useState<number[]>([]);
     const [loading, setLoading] = useState(false);
     const [scriptsIdsToExport, setScriptsIdsToExport] = useState<string[]>([]);
+
+    const [search, setSearch] = useState(defaultSearchState);
+    const clearSearch = useCallback(() => setSearch(defaultSearchState), []);
 
     useEffect(() => { setScripts(scriptsParam); }, [scriptsParam]);
 
@@ -158,6 +169,37 @@ export function useScriptsTable({
     const disabled = useMemo(() => viewOnly, [viewOnly]);
     const scriptsToExport = useMemo(() => scripts.data.filter(t => scriptsIdsToExport.includes(t.scriptId)), [scriptsIdsToExport, scripts]);
 
+    const onSearch = useCallback(async (value: string) => {
+        try {
+            clearSearch();
+            if (value) {
+                setSearch(prev => ({ ...prev, searching: true, }));
+
+                const { data: res, } = await axios.get<{ data: ScriptsSearchResultsItem[]; }>(`/api/scripts/search?searchValue=${value}`);
+
+                setSearch(prev => ({
+                    value,
+                    filter: prev.filter,
+                    searching: false,
+                    results: res.data,
+                }));
+            }
+        } catch(e: any) {
+            clearSearch();
+        }
+    }, [clearSearch]);
+
+    const scriptsArr = useMemo(() => {
+        return scripts.data
+            .filter(s => {
+                if (!search.value) return true;
+
+                const rslts = filterScriptsSearchResults(search.filter, search.results);
+
+                return rslts.map(s => s.scriptId).includes(s.scriptId);
+            });
+    }, [scripts.data, search]);
+
     return {
         scripts,
         selected,
@@ -165,6 +207,11 @@ export function useScriptsTable({
         scriptsIdsToExport,
         disabled,
         scriptsToExport,
+        search, 
+        scriptsArr,
+        setSearch,
+        clearSearch,
+        onSearch,
         setScripts,
         setSelected,
         setLoading,
