@@ -51,9 +51,11 @@ const TableFooter = React.forwardRef<
 ))
 TableFooter.displayName = "TableFooter"
 
+export type TableRowProps = React.HTMLAttributes<HTMLTableRowElement>;
+
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement>
+  TableRowProps
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}

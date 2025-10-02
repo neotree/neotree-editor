@@ -1,7 +1,9 @@
 'use client';
 
-import { Edit } from "lucide-react";
+import { Edit, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
+import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
@@ -12,16 +14,21 @@ import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
 import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
+import { Separator } from "@/components/ui/separator";
+import { ScriptsTableSearch } from "./scripts-table-search";
 
 type Props = UseScriptsTableParams;
 
 export function ScriptsTable(props: Props) {
     const {
-        scripts,
         selected,
         loading,
         scriptsIdsToExport,
         disabled,
+        search,
+        scriptsArr,
+        setSearch,
+        onSearch,
         setSelected,
         setScriptsIdsToExport,
         onDelete,
@@ -32,9 +39,11 @@ export function ScriptsTable(props: Props) {
     const { sys, viewOnly } = useAppContext();
     const { hospitals, } = useScriptsContext();
 
+    const displayLoader = loading;
+
     return (
         <>
-            {loading && <Loader overlay />}
+            {displayLoader && <Loader overlay />}
 
             {!!scriptsIdsToExport.length && (
                 <ScriptsExportModal 
@@ -47,30 +56,91 @@ export function ScriptsTable(props: Props) {
 
             <ScriptsFab disabled={disabled} />
 
-            <div className="">
+            <div className="flex flex-col gap-y-4">
+                <div className="pt-4 px-4 text-2xl">Scripts</div>
+
+                <div className="px-4">
+                    <ScriptsTableSearch 
+                        onSearch={onSearch}
+                        search={search}
+                        setSearch={setSearch}
+                    />
+                </div>
+
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    title="Scripts"
                     selectable={!disabled}
                     sortable={!disabled}
                     loading={loading}
                     maxRows={25}
                     onSort={onSort}
-                    // headerActions={<ScriptsTableHeaderActions />}
-                    search={{ inputPlaceholder: 'Search scripts', }}
                     getRowOptions={({ rowIndex }) => {
-                        const s = scripts.data[rowIndex];
+                        const s = scriptsArr[rowIndex];
                         return !s ? {} : {
                             className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
-                    // search={{
-                    //     inputPlaceholder: 'Search scripts',
-                    // }}
+                    rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex, }) => {
+                        const s = scriptsArr[rowIndex];
+                        const searchResults = search.results.find(r => r?.scriptId === s?.scriptId);
+
+                        const items = !searchResults ? [] : [
+                            ...searchResults.screens.map(s => ({
+                                id: s.screenId,
+                                title: s.title,
+                                type: 'screen',
+                                link: `/script/${searchResults.scriptId}/screen/${s.screenId}`,
+                            })),
+                            ...searchResults.diagnoses.map(s => ({
+                                id: s.diagnosisId,
+                                title: s.title,
+                                type: 'diagnosis',
+                                link: `/script/${searchResults.scriptId}/diagnosis/${s.diagnosisId}`,
+                            })),
+                        ];
+
+                        return (
+                            <>
+                                <TableRow {...props}>
+                                    {cells}
+                                </TableRow>
+
+                                {!!items.length && (
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                        <TableCell colSpan={cells.length} className="p-0">
+                                            <div className="flex flex-col gap-y-2">
+                                                {items.map((item, i) => {
+                                                    return (
+                                                        <div key={item.id} className="text-xs">
+                                                            <div className="flex items-center gap-x-2 p-2 px-4">
+                                                                <div>{item.title}</div>
+                                                                <div className="ml-auto flex gap-x-2">
+                                                                    <Link
+                                                                        href={item.link}
+                                                                        target="_blank"
+                                                                        className="flex items-center gap-x-1"
+                                                                    >
+                                                                        {item.type}
+                                                                        <ExternalLink className="h-3 w-3" />
+                                                                    </Link>
+                                                                </div>
+                                                            </div>
+
+                                                            {(i < items.length - 1) && <Separator />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        );
+                    }}
                     noDataMessage={(
                         <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                            <div>No scripts saved.</div>
+                            <div>{!search.value ? 'No scripts saved.' : `No matches for '${search.value}'`}</div>
                         </div>
                     )}
                     columns={[
@@ -89,7 +159,7 @@ export function ScriptsTable(props: Props) {
                         {
                             name: 'Hospital',
                             cellRenderer({ rowIndex }) {
-                                const s = scripts.data[rowIndex];
+                                const s = scriptsArr[rowIndex];
                                 if (!s) return null;
                                 return hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.name || '';
                             },
@@ -99,7 +169,7 @@ export function ScriptsTable(props: Props) {
                             align: 'right',
                             cellClassName: cn('w-[100px]', sys.data.hide_data_table_version === 'yes' && 'hidden'),
                             cellRenderer(cell) {
-                                const s = scripts.data[cell.rowIndex];
+                                const s = scriptsArr[cell.rowIndex];
 
                                 if (!s) return null;
 
@@ -119,7 +189,7 @@ export function ScriptsTable(props: Props) {
                             align: 'right',
                             cellClassName: 'w-10',
                             cellRenderer({ rowIndex, }) {
-                                const s = scripts.data[rowIndex];
+                                const s = scriptsArr[rowIndex];
                                 if (!s) return null;
                                 return (
                                     <ScriptsTableActions 
@@ -133,7 +203,7 @@ export function ScriptsTable(props: Props) {
                             },
                         },
                     ]}
-                    data={scripts.data.map(s => [
+                    data={scriptsArr.map(s => [
                         s.position,
                         s.title || '',
                         s.description || '',
@@ -146,8 +216,8 @@ export function ScriptsTable(props: Props) {
 
             <ScriptsTableBottomActions 
                 selected={selected}
-                onDelete={() => onDelete(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
-                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scripts.data[i].scriptId).filter(s => s))}
+                onDelete={() => onDelete(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
+                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
             />
         </>
     )
