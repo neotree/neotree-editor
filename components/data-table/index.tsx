@@ -2,7 +2,7 @@
 
 import SortableList, { SortableItem, SortableKnob } from 'react-easy-sort';
 import { arrayMoveImmutable } from 'array-move';
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Move } from 'lucide-react';
 
 import {
@@ -12,6 +12,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    type TableRowProps,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,7 @@ export const DataTable = (props: DataTableProps) => {
 
     const searchValue = props.search?.value || internalSearchValue;
     
-    const canSort = !searchValue && sortable;
+    const canSort = !searchValue && sortable && !props.rowRenderer;
 
     return ( 
         <>
@@ -194,8 +195,6 @@ export const DataTable = (props: DataTableProps) => {
                             )}
 
                             {displayRows.map((row) => {
-                                const rowProps = { ...props.getRowOptions?.({ rowIndex: row.rowIndex, }), };
-
                                 if (
                                     searchValue &&
                                     !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
@@ -203,66 +202,86 @@ export const DataTable = (props: DataTableProps) => {
 
                                 if (filter && !filter(row.rowIndex)) return null;
 
+                                let rowProps: TableRowProps = {
+                                    ...props.getRowOptions?.({ rowIndex: row.rowIndex, }),
+                                };
+
+                                rowProps = {
+                                    ...rowProps,
+                                    className: cn(
+                                        props.trClassName,
+                                        'hover:bg-primary/10',
+                                        selected[row.rowIndex] ? 'bg-primary/10' : '',
+                                        tableRowClassname,
+                                        rowProps.className,
+                                    ),
+                                };
+
+                                const rowCells = [
+                                    ...(!selectable ? [] : [
+                                        <TableCell 
+                                            key="select-checkbox"
+                                            className={cn(columns[0]?.cellClassName, 'w-8')}
+                                        >
+                                            <Checkbox
+                                                disabled={loading}
+                                                checked={!!selected[row.rowIndex]}
+                                                onCheckedChange={() => setSelected([row.rowIndex])}
+                                            />
+                                        </TableCell>,
+                                    ]),
+
+                                    ...(!canSort ? [] : [
+                                        <TableCell 
+                                            key="sort-handle"
+                                            className={cn(columns[0]?.cellClassName, 'w-4 cursor-move')}
+                                        >
+                                            <SortableKnob>
+                                                <Move className="w-4 h-4 text-muted-foreground" />
+                                            </SortableKnob>
+                                        </TableCell>,
+                                    ]),
+
+                                    ...row.cells.map(cell => {
+                                        const col = columns[cell.columnIndex];
+                                        const cellProps = { ...props.getCellOptions?.({ rowIndex: row.rowIndex, columnIndex: cell.columnIndex }), };
+
+                                        return (
+                                            <TableCell 
+                                                {...cellProps}
+                                                key={cell.id}
+                                                colSpan={col.colSpan}
+                                                align={col.align}
+                                                className={cn(
+                                                    props.cellClassName, 
+                                                    props.tdClassName, 
+                                                    col.cellClassName, 
+                                                    col.tdClassName,
+                                                    'px-4',
+                                                    cellProps.className,
+                                                    col.hidden ? 'hidden' : '',
+                                                )}
+                                            >
+                                                {loading ? (
+                                                    <Skeleton className="h-4 w-[120px] bg-black/10 dark:bg-white/10" />
+                                                ) : col.cellRenderer?.(cell) || cell.value}
+                                            </TableCell>
+                                        );
+                                    })
+                                ];
+
+                                if (props.rowRenderer) {
+                                    return props.rowRenderer({
+                                        props: rowProps,
+                                        cells: rowCells,
+                                        rowIndex: row.rowIndex,
+                                    });
+                                }
+
                                 return (
                                     <SortableItem key={row.id}>
-                                        <TableRow 
-                                            {...rowProps}
-                                            className={cn(
-                                                props.trClassName,
-                                                'hover:bg-primary/10',
-                                                selected[row.rowIndex] ? 'bg-primary/10' : '',
-                                                tableRowClassname,
-                                                rowProps.className,
-                                            )}
-                                        >
-                                            {selectable && (
-                                                <TableCell 
-                                                    className={cn(columns[0]?.cellClassName, 'w-8')}
-                                                >
-                                                    <Checkbox
-                                                        disabled={loading}
-                                                        checked={!!selected[row.rowIndex]}
-                                                        onCheckedChange={() => setSelected([row.rowIndex])}
-                                                    />
-                                                </TableCell>                
-                                            )}
-
-                                            {canSort && (
-                                                <TableCell 
-                                                    className={cn(columns[0]?.cellClassName, 'w-4 cursor-move')}
-                                                >
-                                                    <SortableKnob>
-                                                        <Move className="w-4 h-4 text-muted-foreground" />
-                                                    </SortableKnob>
-                                                </TableCell>                
-                                            )}
-
-                                            {row.cells.map(cell => {
-                                                const col = columns[cell.columnIndex];
-                                                const cellProps = { ...props.getCellOptions?.({ rowIndex: row.rowIndex, columnIndex: cell.columnIndex }), };
-
-                                                return (
-                                                    <TableCell 
-                                                        {...cellProps}
-                                                        key={cell.id}
-                                                        colSpan={col.colSpan}
-                                                        align={col.align}
-                                                        className={cn(
-                                                            props.cellClassName, 
-                                                            props.tdClassName, 
-                                                            col.cellClassName, 
-                                                            col.tdClassName,
-                                                            'px-4',
-                                                            cellProps.className,
-                                                            col.hidden ? 'hidden' : '',
-                                                        )}
-                                                    >
-                                                        {loading ? (
-                                                            <Skeleton className="h-4 w-[120px] bg-black/10 dark:bg-white/10" />
-                                                        ) : col.cellRenderer?.(cell) || cell.value}
-                                                    </TableCell>
-                                                );
-                                            })}
+                                        <TableRow {...rowProps}>
+                                            {rowCells}
                                         </TableRow>
                                     </SortableItem>
                                 );
