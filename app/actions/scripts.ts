@@ -14,8 +14,7 @@ import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
-import { _getDataKeys } from "@/databases/queries/data-keys";
-import { scrapDataKeys } from "@/lib/data-keys";
+import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -169,18 +168,17 @@ export const saveScripts: typeof mutations._saveScripts = async (...args) => {
 
 type GetScriptsWithItemsResponse = {
     errors?: string[];
-    dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
     data: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
         screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
         diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
         drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
+        dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
     })[];
 };
 
 export async function getScriptsWithItems(params: Parameters<typeof queries._getScripts>[0]): Promise<GetScriptsWithItemsResponse> {
     const data: GetScriptsWithItemsResponse['data'] = [];
     const errors: string[] = [];
-    let dataKeys: GetScriptsWithItemsResponse['dataKeys'] = [];
 
     try {
         const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
@@ -196,90 +194,40 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
             screens.errors?.forEach(e => errors.push(e));
             diagnoses.errors?.forEach(e => errors.push(e));
 
-            data.push({
+            const dataItem: typeof data[0] = {
                 ...s,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
-                drugsLibrary: drugsLibrary.data,
+                dataKeys: [],
+                drugsLibrary: drugsLibrary.data
+                    .filter(d => {
+                        const drugScreens = screens.data.filter(s => ['drugs', 'fluids', 'feeds'].includes(s.type));
+                        return (
+                            !!drugScreens.find(s => (s.drugs || []).map(d => d.key).includes(d.key)) ||
+                            !!drugScreens.find(s => (s.fluids || []).map(d => d.key).includes(d.key)) ||
+                            !!drugScreens.find(s => (s.feeds || []).map(d => d.key).includes(d.key))
+                        );
+                    }),
+            };
+
+            const { data: { dataKeys }, } = await getScriptsDataKeys({
+                scriptsIds: [],
+                scripts: []
+            });
+
+            data.push({
+                ...dataItem,
+                dataKeys,
             });
         }
 
-        const { keys } = scrapDataKeys({
-            screens: data.reduce((acc, item) => {
-                return [...acc, ...item.screens];
-            }, [] as typeof data[0]['screens']),
+        if (errors.length) return { errors, data: [], };
 
-            diagnoses: data.reduce((acc, item) => {
-                return [...acc, ...item.diagnoses];
-            }, [] as typeof data[0]['diagnoses']),
-
-            drugsLibrary: data.reduce((acc, item) => {
-                return [...acc, ...item.drugsLibrary];
-            }, [] as typeof data[0]['drugsLibrary']),
-        });
-
-        if (keys.length) {
-            dataKeys = (await _getDataKeys({ names: keys.map(key => key.name) }))?.data || [];
-        }
-
-        if (errors.length) return { errors, data: [], dataKeys, };
-
-        return { data, dataKeys, };
+        return { data, };
     } catch (e: any) {
         logger.error('getScriptsWithItems ERROR', e.message);
-        return { data: [], dataKeys, errors: [e.message], };
+        return { data: [], errors: [e.message], };
     }
-}
-
-export async function getScriptsKeys(params: Parameters<typeof queries._getScripts>[0]) {
-    const { errors, data } = await getScriptsWithItems(params);
-
-    const scripts = data.map(script => {
-        let keys: { label: string; key: string; }[] = [];
-
-        script.screens.forEach(screen => {
-            screen.fields?.forEach?.(field => {
-                if (field.key) {
-                    const key = field.key;
-                    keys.push({
-                        key,
-                        label: field.label || key,
-                    });
-                }
-            });
-
-            screen.items?.forEach?.(item => {
-                if (item.key) {
-                    const key = item.id || item.key;
-                    keys.push({
-                        key,
-                        label: item.label || key,
-                    });
-                }
-            });
-
-            if (screen.key) {
-                keys.push({
-                    key: screen.key,
-                    label: screen.label || screen.key,
-                });
-            }
-        });
-
-        keys = keys.filter((k, i) => keys.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i);
-
-        return {
-            title: script.title,
-            hospitalId: script.hospitalId,
-            hospitalName: script.hospitalName,
-            keys,
-        };
-    });
-
-    return {
-        errors,
-        data: scripts,
-    };
 }
 
 export async function saveScriptScreens({
@@ -471,8 +419,7 @@ export async function deleteScriptsItems({ scriptsIds, }: {
 
 const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, drugsLibrary: 0, };
 
-export async function saveScriptsWithItems({ data, dataKeys, }: {
-    dataKeys: Awaited<ReturnType<typeof getScriptsWithItems>>['dataKeys'];
+export async function saveScriptsWithItems({ data, }: {
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
     })[];
@@ -511,6 +458,7 @@ export async function saveScriptsWithItems({ data, dataKeys, }: {
                 screens: copiedScreens = [],
                 diagnoses: copiedDiagnoses = [],
                 drugsLibrary = [],
+                dataKeys = [],
                 publishDate,
                 createdAt,
                 updatedAt,
@@ -583,6 +531,8 @@ export async function saveScriptsWithItems({ data, dataKeys, }: {
             // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
+            if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
+
             if (drugsLibrary.length) {
                 const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
                     data: drugsLibrary.map(item => ({
@@ -600,8 +550,6 @@ export async function saveScriptsWithItems({ data, dataKeys, }: {
                 info.drugsLibrary += drugsLibrary.length;
             }
         }
-
-        if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
 
         if (errors.length) return { success: false, errors, info, };
 
@@ -634,7 +582,7 @@ export async function copyScripts(params?: {
     try {
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
-        let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], dataKeys: [], } : await getScriptsWithItems({ scriptsIds });
+        let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], } : await getScriptsWithItems({ scriptsIds });
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
@@ -704,7 +652,6 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
             } else {
                 response = await saveScriptsWithItems({
-                    dataKeys: scripts.dataKeys,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
@@ -844,7 +791,202 @@ export async function copyDiagnoses(params?: {
     }
 }
 
-  
+type Key = {
+    name: string;
+    label: string;
+    dataType: string;
+    refId?: string;
+    uniqueKey?: string;
+};
 
+type GetScriptsDataKeysResponse = {
+    errors?: string[];
+    data: {
+        dataKeys: DataKey[];
+        scripts: {
+            title: string;
+            id: string;
+            keys: Key[];
+            drugsLibrary: (Key & {
+                id: string;
+                displayText: string;
+            })[];
+            diagnoses: (Key & {
+                id: string;
+                displayText: string;
+                symptoms: Key[];
+            })[];
+            screens: (Key & {
+                id: string;
+                displayText: string;
+                fields: (Key & {
+                    items: Key[];
+                })[];
+                items: Key[];
+            })[];
+        }[];
+    },
+}
 
-  
+export async function getScriptsDataKeys({ 
+    scriptsIds = [], 
+    scripts: scriptsParam,
+}: {
+    scriptsIds: string[];
+    scripts?: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
+        screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
+        diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
+        drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
+    })[];
+}): Promise<GetScriptsDataKeysResponse> {
+    try {
+        const { data: scripts, } = scriptsParam ? { data: scriptsParam, } : await getScriptsWithItems({ scriptsIds, });
+
+        let allKeys: GetScriptsDataKeysResponse['data']['scripts'][0]['keys'] = [];
+
+        const scriptsKeys: GetScriptsDataKeysResponse['data']['scripts'] = scripts.map(({ screens, diagnoses, drugsLibrary, ...script }) => {
+            const keys: typeof allKeys = [];
+
+            const dffKeys = drugsLibrary.map(d => {
+                const key: typeof keys[0] = {
+                    name: d.key,
+                    label: d.drug,
+                    dataType: d.type,
+                    uniqueKey: d.keyId,
+                };
+                keys.push(key);
+                return {
+                    ...key,
+                    id: d.itemId,
+                    displayText: d.drug,
+                };
+            });
+
+            const diagnosesKeys = diagnoses.map(d => {
+                let key: typeof keys[0] | null = {
+                    name: d.key || d.name || '',
+                    label: d.name || '',
+                    dataType: 'diagnosis',
+                    uniqueKey: d.keyId,
+                };
+
+                keys.push(key);
+
+                const symptoms = (d.symptoms || []).map(item => {
+                    const key: typeof keys[0] = {
+                        name: item.name || '',
+                        label: item.name || '',
+                        dataType: `diagnosis_symptom_${item.type}`,
+                        uniqueKey: item.keyId,
+                    };
+                    keys.push(key);
+                    return key;
+                });
+
+                return {
+                    ...key!,
+                    symptoms,
+                    id: d.diagnosisId,
+                    displayText: d.name,
+                };
+            });
+
+            const screensKeys = screens.map(s => {
+                let key: typeof keys[0] | null = {
+                    name: s.refId || '',
+                    label: s.refId || '',
+                    dataType: 'ref_id',
+                    refId: s.refId,
+                    uniqueKey: s.keyId,
+                };
+
+                keys.push(key);
+
+                const fields = s.fields.map(f => {
+                    const dataType = `${f.type}`;
+                    const key = {
+                        name: f.key,
+                        label: f.label || '',
+                        dataType: dataType,
+                        uniqueKey: f.keyId,
+                    };
+
+                    keys.push(key);
+                    
+                    const items = (f.items || []).map(f => {
+                        const key: typeof keys[0] = {
+                            name: f.value as string,
+                            label: `${f.label || ''}`,
+                            dataType: `${dataType}_option`,
+                            uniqueKey: f.keyId,
+                        };
+                        keys.push(key);
+                        return key;
+                    });
+
+                    return {
+                        ...key,
+                        items,
+                    };
+                });
+
+                const items = s.items.map(f => {
+                    let dataType = `${s.type}_option`;
+                    if (['diagnosis'].includes(s.type)) dataType = s.type;
+                    const key: typeof keys[0] = {
+                        name: f.key || f.id,
+                        label: f.label || '',
+                        dataType: dataType,
+                        uniqueKey: f.keyId,
+                    };
+                    keys.push(key);
+                    return key;
+                });
+
+                return {
+                    ...key!,
+                    fields,
+                    items,
+                    id: s.screenId,
+                    displayText: s.title,
+                };
+            });
+
+            allKeys = [...allKeys, ...keys];
+
+            return {
+                title: script.title,
+                id: script.scriptId,
+                keys: keys.filter((k, i) => keys.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i).filter(k => k.name || k.refId),
+                drugsLibrary: dffKeys,
+                diagnoses: diagnosesKeys,
+                screens: screensKeys,
+            };
+        });
+
+        const { data: dataKeys, } = await _getDataKeys();
+
+        return { 
+            data: {
+                scripts: scriptsKeys,
+                dataKeys: dataKeys.filter(k => {
+                    return allKeys.map(k => JSON.stringify({
+                        name: k.name,
+                        dataType: k.dataType,
+                    }).toLowerCase()).includes(JSON.stringify({
+                        name: k.name,
+                        dataType: k.dataType,
+                    }).toLowerCase())
+                }),
+            }, 
+        };
+    } catch(e: any) {
+        return {
+            errors: [e.message],
+            data: {
+                scripts: [],
+                dataKeys: [],
+            },
+        };
+    }
+}

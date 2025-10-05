@@ -10,7 +10,7 @@ import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
 import { getDataKeys } from "@/app/actions/data-keys";
 import { useSearchParams } from "@/hooks/use-search-params";
-import { listScreens, getScriptsKeys } from "@/app/actions/scripts";
+import { listScreens, getScriptsDataKeys } from "@/app/actions/scripts";
 
 export interface IScriptsContext extends  
 ScriptsContextProviderProps,
@@ -66,7 +66,7 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
     });
 
     const [keysLoading, setKeysLoading] = useState(false);
-    const [keys, setKeys] = useState<Awaited<ReturnType<typeof getScriptsKeys>>['data'][0]['keys']>([]);
+    const [keys, setKeys] = useState<Awaited<ReturnType<typeof getScriptsDataKeys>>['data']['scripts'][0]['keys']>([]);
 
     const onCancelScriptForm = useCallback(() => {
         router.push('/');
@@ -107,14 +107,16 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         try {
             setKeysLoading(true);
 
-            const res = await axios.get<Awaited<ReturnType<typeof getScriptsKeys>>>('/api/scripts/keys?data='+JSON.stringify({ 
+            const { data: res, } = await axios.get<Awaited<ReturnType<typeof getScriptsDataKeys>>>('/api/scripts/keys?data='+JSON.stringify({ 
                 returnDraftsIfExist: true,
                 scriptsIds: [scriptId], 
             }));
 
-            if (res.data?.errors?.length) throw new Error(res.data.errors.join(', '));
+            if (res?.errors?.length) throw new Error(res.errors.join(', '));
 
-            const _keys = res.data.data.reduce((acc, s) => [...acc, ...s.keys], [] as typeof keys);
+            const { scripts, } = res.data;
+
+            const _keys = scripts.reduce((acc, s) => [...acc, ...s.keys], [] as typeof keys);
 
             setKeys(_keys);
         } catch(e: any) {
