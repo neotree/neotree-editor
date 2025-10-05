@@ -31,6 +31,7 @@ export type PrintSection = {
 
 export type DrugField = {
     key: string;
+    keyId?: string;
     position: number;
 };
 

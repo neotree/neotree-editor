@@ -200,7 +200,15 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
                 ...s,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
-                drugsLibrary: drugsLibrary.data,
+                drugsLibrary: drugsLibrary.data
+                    .filter(d => {
+                        const drugScreens = screens.data.filter(s => ['drugs', 'fluids', 'feeds'].includes(s.type));
+                        return (
+                            !!drugScreens.find(s => (s.drugs || []).map(d => d.key).includes(d.key)) ||
+                            !!drugScreens.find(s => (s.fluids || []).map(d => d.key).includes(d.key)) ||
+                            !!drugScreens.find(s => (s.feeds || []).map(d => d.key).includes(d.key))
+                        );
+                    }),
             });
         }
 

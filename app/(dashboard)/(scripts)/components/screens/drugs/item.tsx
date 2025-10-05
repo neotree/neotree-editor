@@ -109,8 +109,9 @@ export function Item<P = {}>({
 
                                 setSelected(!key ? null : {
                                     ...itemProp?.data,
-                                    key,
+                                    key: key.key,
                                     position,
+                                    keyId: key.keyId,
                                 })
                             }}
                         />
