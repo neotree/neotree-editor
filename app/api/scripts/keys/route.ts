@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { getScriptsKeys } from "@/app/actions/scripts";
+import { getScriptsDataKeys } from "@/app/actions/scripts";
 
 export async function GET(req: NextRequest) {
 	try {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
 		const dataJSON = JSON.parse(req.nextUrl.searchParams.get('data') || '{}');
 
-        const { errors, data } = await getScriptsKeys({ 
+        const { errors, data } = await getScriptsDataKeys({ 
 			...dataJSON, 
 			scriptsIds: scriptsIds || dataJSON.scriptsIds, 
 		});
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 		
 		return NextResponse.json({ data, }, { status: 200, });
 	} catch(e: any) {
-		logger.error('[GET] /api/scripts/with-items', e.message);
+		logger.error('[GET] /api/scripts/keys', e.message);
 		return NextResponse.json({ errors: ['Internal Error'] }, { status: 200, });
 	}
 }
