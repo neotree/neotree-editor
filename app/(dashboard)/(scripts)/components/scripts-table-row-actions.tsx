@@ -83,6 +83,15 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                         </Link>
                     </DropdownMenuItem>
 
+                    <DropdownMenuItem
+                        asChild
+                    >
+                        <Link target="_blank" href={`/script/${item.scriptId}/data-keys`}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            View data keys
+                        </Link>
+                    </DropdownMenuItem>
+
                     {!disabled && (
                         <DropdownMenuItem
                             onClick={() => setTimeout(() => onDelete(), 0)}

@@ -62,11 +62,15 @@ const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     gestationKey: `${item?.gestationKey || ''}`,
     weightKey: `${item?.weightKey || ''}`,
     diagnosisKey: `${item?.diagnosisKey || ''}`,
+    gestationKeyId: `${item?.gestationKeyId || ''}`,
+    weightKeyId: `${item?.weightKeyId || ''}`,
+    diagnosisKeyId: `${item?.diagnosisKeyId || ''}`,
     condition: `${item?.condition || ''}`,
     administrationFrequency: `${item?.administrationFrequency || ''}`,
     drugUnit: `${item?.drugUnit || ''}`,
     routeOfAdministration: `${item?.routeOfAdministration || ''}`,
     ageKey: `${item?.ageKey || ''}`,
+    ageKeyId: `${item?.ageKeyId || ''}`,
     validationType: `${item?.validationType || 'default'}` as ItemType['validationType'],
 });
 
@@ -270,25 +274,12 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div>
                 <Label secondary htmlFor="key">Key *</Label>
-                {/* <Input
+                <Input
                     name="key"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.key}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, key: e.target.value, }))}
-                /> */}
-                <SelectDataKey 
-                    modal
-                    value={`${form.key || ''}`}
-                    disabled={disabled}
-                    onChange={([item]) => {
-                        setForm(prev => ({ 
-                            ...prev, 
-                            key: item.name, 
-                            drug: item.label,
-                            keyId: item?.uniqueKey,
-                        }));
-                    }}
                 />
             </div>
 
@@ -347,12 +338,24 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div>
                 <Label secondary htmlFor="gestationKey">Gestation Key {validateWithCondition ? '' : '*'}</Label>
-                <Input
+                {/* <Input
                     name="gestationKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.gestationKey}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, gestationKey: e.target.value, }))}
+                /> */}
+                <SelectDataKey 
+                    modal
+                    value={`${form.gestationKey || ''}`}
+                    disabled={disabled}
+                    onChange={([item]) => {
+                        setForm(prev => ({ 
+                            ...prev, 
+                            gestationKey: item.name, 
+                            gestationKeyId: item?.uniqueKey,
+                        }));
+                    }}
                 />
             </div>
 
@@ -401,12 +404,24 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div>
                 <Label secondary htmlFor="weightKey">Weight Key {validateWithCondition ? '' : '*'}</Label>
-                <Input
+                {/* <Input
                     name="weightKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.weightKey}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, weightKey: e.target.value, }))}
+                /> */}
+                <SelectDataKey 
+                    modal
+                    value={`${form.weightKey || ''}`}
+                    disabled={disabled}
+                    onChange={([item]) => {
+                        setForm(prev => ({ 
+                            ...prev, 
+                            weightKey: item.name, 
+                            weightKeyId: item?.uniqueKey,
+                        }));
+                    }}
                 />
             </div>
 
@@ -455,12 +470,24 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
             <div>
                 <Label secondary htmlFor="ageKey">Day of Life (Age) Key {validateWithCondition ? '' : '*'}</Label>
-                <Input
+                {/* <Input
                     name="ageKey"
                     className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.ageKey}
                     disabled={disabled}
                     onChange={e => setForm(prev => ({ ...prev, ageKey: e.target.value, }))}
+                /> */}
+                <SelectDataKey 
+                    modal
+                    value={`${form.ageKey || ''}`}
+                    disabled={disabled}
+                    onChange={([item]) => {
+                        setForm(prev => ({ 
+                            ...prev, 
+                            ageKey: item.name, 
+                            ageKeyId: item?.uniqueKey,
+                        }));
+                    }}
                 />
             </div>
 
