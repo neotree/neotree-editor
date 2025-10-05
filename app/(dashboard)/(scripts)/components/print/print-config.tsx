@@ -204,10 +204,10 @@ function HeaderPrintField({
     }, [onClose]);
 
     const selectOpts = keys
-        .filter(k => !headerFields.includes(k.key))
+        .filter(k => !headerFields.includes(k.name))
         .map(k => ({
-            label: k.label,
-            value: k.key,
+            label: k.label || k.name || k.refId,
+            value: k.name || k.refId,
         }));
 
     return (
