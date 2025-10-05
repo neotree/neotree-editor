@@ -66,6 +66,14 @@ export function Field<P = {}>({
     });
 
     const listStyle = form.watch('listStyle');
+    const screenKeyId = form.getValues('keyId');
+    const screenRefIdDataKey = form.getValues('refIdDataKey');
+
+    const screenDataKey = useMemo(() => {
+        const keyId = screenKeyId || screenRefIdDataKey;
+        const [key] = !keyId ? [null] : extractDataKeys([keyId]);
+        return key;
+    }, [screenKeyId, screenRefIdDataKey, extractDataKeys]);
 
     const {
         control,
@@ -282,6 +290,11 @@ export function Field<P = {}>({
                                         modal
                                         value={key}
                                         disabled={disabled}
+                                        filterDataKeys={k => {
+                                            const opts = screenDataKey?.options || [];
+                                            if (!screenDataKey) return true;
+                                            return opts.includes(k.uniqueKey);
+                                        }}
                                         onChange={([item]) => {
                                             setValue('key', item?.name, { shouldDirty: true, });
                                             setValue('keyId', item?.uniqueKey, { shouldDirty: true, });

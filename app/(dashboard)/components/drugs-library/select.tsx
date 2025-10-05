@@ -25,7 +25,7 @@ type Props = {
     selected?: string[];
     unselectable?: string[];
     type: GetDrugsLibraryItemsResults['data'][0]['type'];
-    onChange: (selected: string[]) => void;
+    onChange: (selected: { key: string; keyId?: string; }[]) => void;
 };
 
 export function SelectDrug({ 
@@ -69,8 +69,12 @@ export function SelectDrug({
                         name="drug"
                         onValueChange={v => {
                             const value = v ? [v] : [];
+                            const selectedDrugs = drugs.filter(item => value.includes(item.key!));
                             setSelected(value);
-                            onChange(value);
+                            onChange(selectedDrugs.map(d => ({
+                                key: d.key!,
+                                keyId: d.keyId,
+                            })));
                         }}
                     >
                         <SelectTrigger>
