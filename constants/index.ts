@@ -129,16 +129,16 @@ export const dataKeyTypes: {
     //     label: 'progress',
     //     hasChildren: true,
     // },
-    {
-        value: 'drug',
-        label: 'drug',
-        hasChildren: false,
-    },
-    {
-        value: 'fluid',
-        label: 'fluid',
-        hasChildren: false,
-    },
+    // {
+    //     value: 'drug',
+    //     label: 'drug',
+    //     hasChildren: false,
+    // },
+    // {
+    //     value: 'fluid',
+    //     label: 'fluid',
+    //     hasChildren: false,
+    // },
     {
         value: 'zw_edliz_summary_table_option',
         label: 'zw_edliz_summary_table_option',
