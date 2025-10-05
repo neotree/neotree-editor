@@ -255,81 +255,83 @@ export function ScreenForm(props: Props) {
                     setValue('key', key, { shouldDirty: true, });
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
+                    if (hasItems) setValue('items', [], { shouldDirty: true, });
+                    if (hasFields) setValue('fields', [], { shouldDirty: true, });
 
-                    if (hasItems) {
-                        const items = children.map((k, i) => {
-                            return {
-                                itemId: v4(),
-                                id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
-                                label: k.label,
-                                position: i + 1,
-                                subType: '', // edliz
-                                type: '', // edliz,
-                                exclusive: false,
-                                confidential: false,
-                                checked: false,
-                                enterValueManually: false,
-                                severity_order: '',
-                                summary: '',
-                                key: isChecklistScreen ? k.name : '',
-                                score: (isEdlizScreen ? '' : '') as unknown as number,
-                                dataType: (() => {
-                                    switch (type) {
-                                        //   case 'list':
-                                        //     return 'void';
-                                        case 'checklist':
-                                            return 'boolean';
-                                        case 'single_select':
-                                            return 'id';
-                                        case 'diagnosis':
-                                            return 'diagnosis';
-                                        default:
-                                            return null;
-                                    }
-                                })(),
-                            };
-                        });
+                    // if (hasItems) {
+                    //     const items = children.map((k, i) => {
+                    //         return {
+                    //             itemId: v4(),
+                    //             id: (isChecklistScreen || isProgressScreen) ? '' : k.name,
+                    //             label: k.label,
+                    //             position: i + 1,
+                    //             subType: '', // edliz
+                    //             type: '', // edliz,
+                    //             exclusive: false,
+                    //             confidential: false,
+                    //             checked: false,
+                    //             enterValueManually: false,
+                    //             severity_order: '',
+                    //             summary: '',
+                    //             key: isChecklistScreen ? k.name : '',
+                    //             score: (isEdlizScreen ? '' : '') as unknown as number,
+                    //             dataType: (() => {
+                    //                 switch (type) {
+                    //                     //   case 'list':
+                    //                     //     return 'void';
+                    //                     case 'checklist':
+                    //                         return 'boolean';
+                    //                     case 'single_select':
+                    //                         return 'id';
+                    //                     case 'diagnosis':
+                    //                         return 'diagnosis';
+                    //                     default:
+                    //                         return null;
+                    //                 }
+                    //             })(),
+                    //         };
+                    //     });
 
-                        setValue('items', items, { shouldDirty: true, });
-                    }
+                    //     setValue('items', items, { shouldDirty: true, });
+                    // }
 
-                    if (hasFields) {
-                        const fields = children.filter(k => k.dataType).map((k, i) => {
-                            const f = {
-                                fieldId: v4(),
-                                type: k.dataType!,
-                                key: k.name,
-                                label: (k.label || k.name).trim(),
-                                refKey: '',
-                                calculation: '',
-                                condition: '',
-                                dataType: '',
-                                defaultValue: '',
-                                format: '',
-                                minValue: '',
-                                maxValue: '',
-                                minDate: '',
-                                maxDate: '',
-                                minTime: '',
-                                maxTime: '',
-                                minDateKey: '',
-                                maxDateKey: '',
-                                minTimeKey: '',
-                                maxTimeKey: '',
-                                values: '',
-                                valuesOptions: [],
-                                confidential: false,
-                                optional: false,
-                                printable: false,
-                                prePopulate: [],
-                                editable: false,
-                            } satisfies ScriptField;
+                    // if (hasFields) {
+                    //     const fields = children.filter(k => k.dataType).map((k, i) => {
+                    //         const f = {
+                    //             fieldId: v4(),
+                    //             type: k.dataType!,
+                    //             key: k.name,
+                    //             label: (k.label || k.name).trim(),
+                    //             refKey: '',
+                    //             calculation: '',
+                    //             condition: '',
+                    //             dataType: '',
+                    //             defaultValue: '',
+                    //             format: '',
+                    //             minValue: '',
+                    //             maxValue: '',
+                    //             minDate: '',
+                    //             maxDate: '',
+                    //             minTime: '',
+                    //             maxTime: '',
+                    //             minDateKey: '',
+                    //             maxDateKey: '',
+                    //             minTimeKey: '',
+                    //             maxTimeKey: '',
+                    //             values: '',
+                    //             valuesOptions: [],
+                    //             confidential: false,
+                    //             optional: false,
+                    //             printable: false,
+                    //             prePopulate: [],
+                    //             editable: false,
+                    //         } satisfies ScriptField;
 
-                            return f;
-                        });
+                    //         return f;
+                    //     });
 
-                        setValue('fields', fields, { shouldDirty: true, });
-                    }
+                    //     setValue('fields', fields, { shouldDirty: true, });
+                    // }
                 }}
             />
         );
