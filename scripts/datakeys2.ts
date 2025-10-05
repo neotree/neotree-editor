@@ -1,14 +1,20 @@
 import '@/server/env';
+import db from '@/databases/pg/drizzle';
+import * as schema from '@/databases/pg/schema';
 import { _getScreens } from '@/databases/queries/scripts';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _saveDiagnoses, _saveScreens, } from "@/databases/mutations/scripts";
+import { _saveDataKeys, } from '@/databases/mutations/data-keys';
+import { inArray } from 'drizzle-orm';
 
 main();
 
 async function main() {
     try {
-        const { data: dataKeys } = await _getDataKeys();
+        const dataKeysRes = await _getDataKeys();
+
+        let dataKeys = dataKeysRes.data;
 
         const getDataKeyUniqueKey = (data: {
             name: string;
@@ -29,6 +35,53 @@ async function main() {
 
             return uniqueKey;
         };
+
+        const keysMap: Record<string, typeof dataKeys[0]> = {};
+        const duplicates: Record<string, string> = {};
+
+        dataKeys.forEach(k => {
+            const key = JSON.stringify({
+                name: `${k.name || ''}`.trim(),
+                label: `${k.label || ''}`.trim(),
+                dataType: `${k.dataType || ''}`,
+            }).toLowerCase();
+
+            if (keysMap[key]) {
+                duplicates[k.uniqueKey] = keysMap[key].uniqueKey;
+                k.options.forEach(o => {
+                    if (!keysMap[key].options.includes(o)) {
+                        keysMap[key].options.push(o);
+                    }
+                })
+            }
+
+            keysMap[key] = k;
+        });
+
+        dataKeys = Object.values(keysMap);
+
+        const deleteUniqueKeys = Object.keys(duplicates);
+
+        const updates = dataKeys.filter(k => k.options.find(o => duplicates[o]))
+            .map(k => {
+                let options = k.options.map(o => duplicates[o] || o);
+                options = options.filter((o, i) => options.indexOf(o) === i);
+                return {
+                    ...k,
+                    options,
+                };
+            });
+
+        console.log({
+            updates: updates.length,
+            deletes: deleteUniqueKeys.length,
+            withDuplicates: dataKeysRes.data.length,
+            noDuplicates: dataKeys.length,
+        });
+
+        if (updates.length) await _saveDataKeys({ data: updates, });
+
+        if (deleteUniqueKeys.length) await db.delete(schema.dataKeys).where(inArray(schema.dataKeys.uniqueKey, deleteUniqueKeys));
 
         const res = await getScriptsWithItems({});
 
