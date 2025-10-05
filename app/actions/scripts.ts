@@ -15,7 +15,6 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
-import { scrapDataKeys } from "@/lib/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -194,12 +193,6 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
 
             screens.errors?.forEach(e => errors.push(e));
             diagnoses.errors?.forEach(e => errors.push(e));
-
-            const { keys } = scrapDataKeys({
-                screens: screens.data,
-                diagnoses: diagnoses.data,
-                drugsLibrary: drugsLibrary.data,
-            });
 
             const dataItem: typeof data[0] = {
                 ...s,
