@@ -915,7 +915,7 @@ export async function getScriptsDataKeys({
                     label: s.refId || '',
                     dataType: 'ref_id',
                     refId: s.refId,
-                    uniqueKey: s.keyId,
+                    uniqueKey: s.refIdDataKey,
                 };
 
                 keys.push(key);
