@@ -875,7 +875,7 @@ export async function getScriptsDataKeys({
                 const symptoms = (d.symptoms || []).map(item => {
                     const key: typeof keys[0] = {
                         name: item.name || '',
-                        label: '',
+                        label: item.name || '',
                         dataType: `diagnosis_symptom_${item.type}`,
                         uniqueKey: item.keyId,
                     };

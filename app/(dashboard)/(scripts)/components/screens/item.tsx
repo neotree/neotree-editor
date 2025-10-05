@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { SelectDataKey } from "@/components/select-data-key";
+import { useDataKeysCtx } from "@/contexts/data-keys";
 
 type Props = {
     open: boolean;
@@ -47,12 +48,23 @@ export function Item<P = {}>({
     subTypes = [],
     onClose,
 }: Props & P) {
+    const { extractDataKeys, } = useDataKeysCtx();
+    
     const screenType = form.getValues('type');
+    const screenKeyId = form.getValues('keyId');
+    const screenRefIdDataKey = form.getValues('refIdDataKey');
     const isDiagnosisScreen = screenType === 'diagnosis';
     const isProgressScreen = screenType === 'progress';
     const isChecklistScreen = screenType === 'checklist';
     const isMultiSelectScreen = screenType === 'multi_select';
+    const isSingleSelectScreen = screenType === 'single_select';
     const isEdlizSummaryScreen = ['zw_edliz_summary_table', 'mwi_edliz_summary_table'].includes(screenType!);
+
+    const screenDataKey = useMemo(() => {
+        const keyId = screenKeyId || screenRefIdDataKey;
+        const [key] = !keyId ? [null] : extractDataKeys([keyId]);
+        return key;
+    }, [screenKeyId, screenRefIdDataKey, extractDataKeys]);
 
     const { data: item, index: itemIndex, } = { ...itemProp, };
 
@@ -158,6 +170,15 @@ export function Item<P = {}>({
                 value={key}
                 placeholder={label}
                 disabled={isKeyDisabled}
+                filterDataKeys={k => {
+                    if (isChecklistScreen || isMultiSelectScreen || isSingleSelectScreen) {
+                        const opts = screenDataKey?.options || [];
+                        if (!screenDataKey) return true;
+                        return opts.includes(k.uniqueKey);
+                    } else {
+                        return true;
+                    }
+                }}
                 onChange={([dataKey]) => {
                     const label = dataKey?.label || '';
                     const key = dataKey?.name || '';
