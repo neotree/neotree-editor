@@ -5,12 +5,12 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
-import { getScriptsDataKeys } from "@/app/actions/scripts";
+import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
 
-export function ScriptDataKeysTable({ data: { title, keys, }, }: {
-    data: Awaited<ReturnType<typeof getScriptsDataKeys>>['data']['scripts'][0];
+export function ScriptDataKeysTable({ data: { title, dataKeys, }, }: {
+    data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
 }) {
     return (
         <>
@@ -20,7 +20,7 @@ export function ScriptDataKeysTable({ data: { title, keys, }, }: {
                 <DataTable 
                     search={{ inputPlaceholder: 'Search', }}
                     getRowOptions={({ rowIndex, }) => {
-                        const key = keys[rowIndex];
+                        const key = dataKeys[rowIndex];
 
                         return {
                             className: cn(!key?.uniqueKey && 'bg-red-400/20 hover:bg-red-400/30'),
@@ -39,7 +39,7 @@ export function ScriptDataKeysTable({ data: { title, keys, }, }: {
                         {
                             name: '',
                             cellRenderer({ rowIndex, }) {
-                                const key = keys[rowIndex];
+                                const key = dataKeys[rowIndex];
 
                                 if (!key?.uniqueKey) return null;
 
@@ -53,7 +53,7 @@ export function ScriptDataKeysTable({ data: { title, keys, }, }: {
                             },
                         },
                     ]}
-                    data={keys.map(k => [
+                    data={dataKeys.map(k => [
                         k.name,
                         k.label,
                         k.dataType,

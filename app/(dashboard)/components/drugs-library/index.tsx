@@ -63,6 +63,21 @@ export function DrugsLibrary({}: Props) {
                     <ExportModal 
                         uuids={drugs.filter((_, i) => selected.includes(i)).map(k => k.itemId!)}
                     />
+
+                    <Button
+                        variant="destructive"
+                        onClick={() => setTimeout(() => {
+                            confirm(() => deleteDrugs(drugs.filter((_, i) => selected.includes(i)).map(k => k.itemId!)), {
+                                title: 'Delete drugs',
+                                message: 'Are you sure you want to delete drugs?',
+                                positiveLabel: 'Yes, delete',
+                                negativeLabel: 'Cancel',
+                                danger: true,
+                            });
+                        }, 0)}
+                    >
+                        Delete {selected.length < 2 ? '' : selected.length + ' items'}
+                    </Button>
                 </ActionsBar>
             )}
 
