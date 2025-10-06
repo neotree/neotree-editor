@@ -15,6 +15,7 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
+import { scrapDataKeys } from "@/lib/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -190,7 +191,7 @@ type GetScriptsWithItemsResponse = {
         screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
         diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
         drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
-        dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+        dataKeys: Awaited<ReturnType<typeof scrapDataKeys>>['allKeys'];
     })[];
 };
 
@@ -212,30 +213,33 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
             screens.errors?.forEach(e => errors.push(e));
             diagnoses.errors?.forEach(e => errors.push(e));
 
+            const drugsLibraryItems = drugsLibrary.data
+                .filter(d => {
+                    const drugScreens = screens.data.filter(s => ['drugs', 'fluids', 'feeds'].includes(s.type));
+                    return (
+                        !!drugScreens.find(s => (s.drugs || []).map(d => d.key).includes(d.key)) ||
+                        !!drugScreens.find(s => (s.fluids || []).map(d => d.key).includes(d.key)) ||
+                        !!drugScreens.find(s => (s.feeds || []).map(d => d.key).includes(d.key))
+                    );
+                });
+
             const dataItem: typeof data[0] = {
                 ...s,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
                 dataKeys: [],
-                drugsLibrary: drugsLibrary.data
-                    .filter(d => {
-                        const drugScreens = screens.data.filter(s => ['drugs', 'fluids', 'feeds'].includes(s.type));
-                        return (
-                            !!drugScreens.find(s => (s.drugs || []).map(d => d.key).includes(d.key)) ||
-                            !!drugScreens.find(s => (s.fluids || []).map(d => d.key).includes(d.key)) ||
-                            !!drugScreens.find(s => (s.feeds || []).map(d => d.key).includes(d.key))
-                        );
-                    }),
+                drugsLibrary: drugsLibraryItems,
             };
 
-            const { data: { dataKeys }, } = await getScriptsDataKeys({
-                scriptsIds: [],
-                scripts: []
+            const { allKeys } = await scrapDataKeys({
+                screens: screens.data,
+                diagnoses: diagnoses.data,
+                drugsLibrary: drugsLibraryItems,
             });
 
             data.push({
                 ...dataItem,
-                dataKeys,
+                dataKeys: allKeys,
             });
         }
 
@@ -806,217 +810,5 @@ export async function copyDiagnoses(params?: {
     } catch (e: any) {
         logger.error('copyDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
-    }
-}
-
-type Key = {
-    name: string;
-    label: string;
-    dataType: string;
-    refId?: string;
-    uniqueKey?: string;
-};
-
-type GetScriptsDataKeysResponse = {
-    errors?: string[];
-    data: {
-        dataKeys: DataKey[];
-        scripts: {
-            title: string;
-            id: string;
-            keys: Key[];
-            drugsLibrary: (Key & {
-                id: string;
-                displayText: string;
-            })[];
-            diagnoses: (Key & {
-                id: string;
-                displayText: string;
-                symptoms: Key[];
-            })[];
-            screens: (Key & {
-                id: string;
-                displayText: string;
-                fields: (Key & {
-                    items: Key[];
-                })[];
-                items: Key[];
-            })[];
-        }[];
-    },
-}
-
-export async function getScriptsDataKeys({ 
-    scriptsIds = [], 
-    scripts: scriptsParam,
-}: {
-    scriptsIds: string[];
-    scripts?: (Awaited<ReturnType<typeof queries._getScripts>>['data'][0] & {
-        screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
-        diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
-        drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
-    })[];
-}): Promise<GetScriptsDataKeysResponse> {
-    try {
-        const { data: scripts, } = scriptsParam ? { data: scriptsParam, } : await getScriptsWithItems({ scriptsIds, });
-
-        let allKeys: GetScriptsDataKeysResponse['data']['scripts'][0]['keys'] = [];
-
-        const scriptsKeys: GetScriptsDataKeysResponse['data']['scripts'] = scripts.map(({ screens, diagnoses, drugsLibrary, ...script }) => {
-            const keys: typeof allKeys = [];
-
-            const dffKeys = drugsLibrary.map(d => {
-                const key: typeof keys[0] = {
-                    name: d.key,
-                    label: d.drug,
-                    dataType: d.type,
-                    uniqueKey: d.keyId,
-                };
-                keys.push(key);
-                return {
-                    ...key,
-                    id: d.itemId,
-                    displayText: d.drug,
-                };
-            });
-
-            const diagnosesKeys = diagnoses.map(d => {
-                let key: typeof keys[0] | null = {
-                    name: d.key || d.name || '',
-                    label: d.name || '',
-                    dataType: 'diagnosis',
-                    uniqueKey: d.keyId,
-                };
-
-                keys.push(key);
-
-                const symptoms = (d.symptoms || []).map(item => {
-                    const key: typeof keys[0] = {
-                        name: item.name || '',
-                        label: item.name || '',
-                        dataType: `diagnosis_symptom_${item.type}`,
-                        uniqueKey: item.keyId,
-                    };
-                    keys.push(key);
-                    return key;
-                });
-
-                return {
-                    ...key!,
-                    symptoms,
-                    id: d.diagnosisId,
-                    displayText: d.name,
-                };
-            });
-
-            const screensKeys = screens.map(s => {
-                if (s.refId) {
-                    const key: typeof keys[0] = {
-                        name: s.refId || '',
-                        label: s.refId || '',
-                        dataType: 'ref_id',
-                        refId: s.refId,
-                        uniqueKey: s.refIdDataKey,
-                    };
-
-                    keys.push(key);
-                }
-
-                const key: typeof keys[0] = {
-                    name: s.key || '',
-                    label: s.label || '',
-                    dataType: s.type,
-                    refId: s.refId,
-                    uniqueKey: s.keyId,
-                };
-
-                keys.push(key);
-
-                const fields = s.fields.map(f => {
-                    const dataType = `${f.type}`;
-                    const key = {
-                        name: f.key,
-                        label: f.label || '',
-                        dataType: dataType,
-                        uniqueKey: f.keyId,
-                    };
-
-                    keys.push(key);
-                    
-                    const items = (f.items || []).map(f => {
-                        const key: typeof keys[0] = {
-                            name: f.value as string,
-                            label: `${f.label || ''}`,
-                            dataType: `${dataType}_option`,
-                            uniqueKey: f.keyId,
-                        };
-                        keys.push(key);
-                        return key;
-                    });
-
-                    return {
-                        ...key,
-                        items,
-                    };
-                });
-
-                const items = s.items.map(f => {
-                    let dataType = `${s.type}_option`;
-                    if (['diagnosis'].includes(s.type)) dataType = s.type;
-                    const key: typeof keys[0] = {
-                        name: f.key || f.id,
-                        label: f.label || '',
-                        dataType: dataType,
-                        uniqueKey: f.keyId,
-                    };
-                    keys.push(key);
-                    return key;
-                });
-
-                return {
-                    ...key!,
-                    fields,
-                    items,
-                    id: s.screenId,
-                    displayText: s.title,
-                };
-            });
-
-            allKeys = [...allKeys, ...keys];
-
-            return {
-                title: script.title,
-                id: script.scriptId,
-                keys: keys.filter((k, i) => keys.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i).filter(k => k.name || k.refId),
-                drugsLibrary: dffKeys,
-                diagnoses: diagnosesKeys,
-                screens: screensKeys,
-            };
-        });
-
-        const { data: dataKeys, } = await _getDataKeys();
-
-        return { 
-            data: {
-                scripts: scriptsKeys,
-                dataKeys: dataKeys.filter(k => {
-                    return allKeys.map(k => JSON.stringify({
-                        name: k.name,
-                        dataType: k.dataType,
-                    }).toLowerCase()).includes(JSON.stringify({
-                        name: k.name,
-                        dataType: k.dataType,
-                    }).toLowerCase())
-                }),
-            }, 
-        };
-    } catch(e: any) {
-        return {
-            errors: [e.message],
-            data: {
-                scripts: [],
-                dataKeys: [],
-            },
-        };
     }
 }
