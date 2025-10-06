@@ -1,4 +1,4 @@
-import { getScriptsDataKeys } from "@/app/actions/scripts";
+import { getScriptsWithItems } from "@/app/actions/scripts";
 import { ScriptDataKeysTable } from "./table";
 import { Alert } from "@/components/alert";
 
@@ -10,8 +10,8 @@ type Props = {
 export default async function ScriptDataKeys({ params }: Props) {
     const { scriptId } = await params;
 
-    const [{ data: { scripts, }, }] = await Promise.all([
-        getScriptsDataKeys({
+    const [{ data: scripts, }] = await Promise.all([
+        getScriptsWithItems({
             scriptsIds: [scriptId],
         }),
     ]);

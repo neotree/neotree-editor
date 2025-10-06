@@ -337,6 +337,8 @@ export function ScreenForm(props: Props) {
         );
     }
 
+    console.log(formData)
+
     return (
         <>
             {displayLoader && <Loader overlay />}
@@ -466,32 +468,12 @@ export function ScreenForm(props: Props) {
                         />
                     </div>
 
-                    {/* <div>
+                    <div>
                         <Label secondary htmlFor="refId">Ref *</Label>
                         <Input
                             {...register('refId', { disabled, required: true, })}
                             name="refId"
                             noRing={false}
-                        />
-                    </div> */}
-
-                    <div>
-                        <Label htmlFor="refId">Ref *</Label>
-                        <Controller 
-                            control={control}
-                            name="refId"
-                            render={({ field: { value, onChange, }, }) => {
-                                return (
-                                    <SelectDataKey 
-                                        value={`${value || ''}`}
-                                        disabled={false}
-                                        onChange={([item]) => {
-                                            onChange(item.name);
-                                            setValue('refIdDataKey', item?.uniqueKey, { shouldDirty: true, });
-                                        }}
-                                    />
-                                );
-                            }}
                         />
                     </div>
 
@@ -734,7 +716,7 @@ export function ScreenForm(props: Props) {
                     </>
                 )}
 
-                {(isTimerScreen || isYesNoScreen || isSelectScreen) && (
+                {(isTimerScreen || isYesNoScreen || isSelectScreen || isChecklistScreen) && (
                     <div className={cn('flex flex-col gap-y-5', isTimerScreen && 'sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1')}>
                         <div>
                             <Label secondary htmlFor="key">Input key{!isTimerScreen ? ' *' : ''}</Label>
