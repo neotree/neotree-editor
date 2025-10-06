@@ -53,7 +53,10 @@ function Form({
     const { dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
 
-    const dataKey = useMemo(() => dataKeys.find(k => k.uuid === dataKeyId), [dataKeys, dataKeyId]);
+    const dataKey = useMemo(() => dataKeys.find(k => (
+        (k.uuid === dataKeyId) ||
+        (k.uniqueKey === dataKeyId)
+    )), [dataKeys, dataKeyId]);
 
     const isLocked = useIsLocked({
         isDraft: !!dataKey?.isDraft,
