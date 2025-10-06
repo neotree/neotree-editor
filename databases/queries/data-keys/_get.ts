@@ -14,6 +14,11 @@ export type GetDataKeysParams = {
     dataKeysIds?: string[];
     names?: string[];
     uniqueKeys?: string[];
+    keys?: {
+        name: string;
+        label: string;
+        dataType: string;
+    }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
 };
@@ -28,6 +33,7 @@ export async function _getDataKeys(
 ): Promise<GetDataKeysResults> {
     try {
         const { 
+            keys = [],
             dataKeysIds: _dataKeysIds, 
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
@@ -35,38 +41,71 @@ export async function _getDataKeys(
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
-
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
         const uniqueKeys = uniqueKeysParam.filter(n => n);
-        
-        // unpublished dataKeys conditions
-        const whereDataKeysDrafts = [
-            !dataKeysIds?.length ? 
-                undefined 
-                : 
-                inArray(dataKeysDrafts.uuid, dataKeysIds.map(id => uuid.validate(id) ? id : uuid.v4())),
-                
-            !names?.length ? 
-                undefined 
-                : 
-                inArray(sql`lower(${dataKeysDrafts.name})`, names),
 
-            !uniqueKeys?.length ? 
-                undefined 
-                : 
-                inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
-        ].filter(q => q);
+        let drafts: typeof dataKeysDrafts.$inferSelect[] = [];
 
-        const drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
-            where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
-        });
+        if (keys.length) {
+            drafts = await db.query.dataKeysDrafts.findMany();
+
+            drafts = drafts
+                .filter(d => !dataKeysIds.length ? true : dataKeysIds.includes(d.uuid))
+                .filter(d => !names.length ? true : names.includes(d.name))
+                .filter(d => !uniqueKeys.length ? true : uniqueKeys.includes(d.uniqueKey));
+
+            drafts = drafts.filter(d => {
+                return keys.map(k => JSON.stringify({
+                    name: k.name,
+                    label: k.label,
+                    dataType: k.dataType,
+                }).toLowerCase()).includes(JSON.stringify({
+                    name: d.data.name,
+                    label: d.data.label,
+                    dataType: d.data.dataType,
+                }).toLowerCase());
+            });
+        } else {
+            // unpublished dataKeys conditions
+            const whereDataKeysDrafts = [
+                !dataKeysIds?.length ? 
+                    undefined 
+                    : 
+                    inArray(dataKeysDrafts.uuid, dataKeysIds.map(id => uuid.validate(id) ? id : uuid.v4())),
+                    
+                !names?.length ? 
+                    undefined 
+                    : 
+                    inArray(sql`lower(${dataKeysDrafts.name})`, names),
+
+                !uniqueKeys?.length ? 
+                    undefined 
+                    : 
+                    inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
+            ].filter(q => q);
+
+            drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
+                where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
+            });
+        }
+
         dataKeysIds = dataKeysIds.filter(id => !drafts.map(d => d.uuid).includes(id));
 
         // published dataKeys conditions
         const whereDataKeys = [
             isNull(dataKeys.deletedAt),
             isNull(pendingDeletion),
+
             !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid)),
+
+            !keys.length ?
+                undefined
+                :
+                inArray(
+                    sql`lower(concat(${dataKeys.name},',',${dataKeys.label},',',${dataKeys.dataType}))`, 
+                    keys.map(k => `${k.name},${k.label},${k.dataType}`.toLowerCase()),
+                ),
+
             !dataKeysIds?.length ? 
                 undefined 
                 : 
