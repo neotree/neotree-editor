@@ -5,7 +5,10 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getDataKeys } from '@/databases/queries/data-keys';
+import { _getDataKeys, DataKey } from '@/databases/queries/data-keys';
+import { _saveScreens } from '@/databases/mutations/scripts';
+import { _getScreens } from '@/databases/queries/scripts';
+import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
@@ -32,6 +35,8 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
                 isNewUuid: !item.uuid,
             };
         });
+
+        const uniqueKeys: string[] = [];
 
         // const { data: { drafts, published, }, } = await checkDataKeyName(
         //     data.filter(d => d.name).map(d => d.name!),
@@ -75,7 +80,10 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
                             .set({
                                 data,
                                 name: data.name,
+                                uniqueKey: data.uniqueKey,
                             }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+
+                        if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
                     } else {
                         const uniqueKey = published?.uniqueKey || item.uniqueKey || uuid.v4();
 
@@ -94,6 +102,8 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
                             name: data.name,
                             uniqueKey,
                         });
+
+                        uniqueKeys.push(data.uniqueKey);
                     }
                 }
             } catch(e: any) {
@@ -104,6 +114,11 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
         if (errors.length) {
             response.errors = errors;
         } else {
+            if (uniqueKeys.length) {
+                const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
+                await _updateDataKeysRefs({ dataKeys, broadcastAction, });
+            }
+
             socket.emit('data_changed', 'save_data_keys');
             response.success = true;
         }
