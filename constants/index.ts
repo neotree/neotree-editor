@@ -95,6 +95,11 @@ export const dataKeyTypes: {
     hasChildren: boolean;
 }[] = [
     {
+        value: 'checklist',
+        label: 'checklist',
+        hasChildren: true,
+    },
+    {
         value: 'checklist_option',
         label: 'checklist_option',
         hasChildren: false,
