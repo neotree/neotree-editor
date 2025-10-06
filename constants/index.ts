@@ -95,6 +95,11 @@ export const dataKeyTypes: {
     hasChildren: boolean;
 }[] = [
     {
+        value: 'checklist',
+        label: 'checklist',
+        hasChildren: true,
+    },
+    {
         value: 'checklist_option',
         label: 'checklist_option',
         hasChildren: false,
@@ -152,6 +157,16 @@ export const dataKeyTypes: {
     {
         value: 'diagnosis',
         label: 'diagnosis',
+        hasChildren: false,
+    },
+    {
+        value: 'diagnosis_symptom_sign',
+        label: 'diagnosis_symptom_sign',
+        hasChildren: false,
+    },
+    {
+        value: 'diagnosis_symptom_risk',
+        label: 'diagnosis_symptom_risk',
         hasChildren: false,
     },
     {

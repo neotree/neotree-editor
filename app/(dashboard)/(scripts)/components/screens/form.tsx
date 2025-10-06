@@ -337,6 +337,8 @@ export function ScreenForm(props: Props) {
         );
     }
 
+    console.log(formData)
+
     return (
         <>
             {displayLoader && <Loader overlay />}
@@ -466,32 +468,12 @@ export function ScreenForm(props: Props) {
                         />
                     </div>
 
-                    {/* <div>
+                    <div>
                         <Label secondary htmlFor="refId">Ref *</Label>
                         <Input
                             {...register('refId', { disabled, required: true, })}
                             name="refId"
                             noRing={false}
-                        />
-                    </div> */}
-
-                    <div>
-                        <Label htmlFor="refId">Ref *</Label>
-                        <Controller 
-                            control={control}
-                            name="refId"
-                            render={({ field: { value, onChange, }, }) => {
-                                return (
-                                    <SelectDataKey 
-                                        value={`${value || ''}`}
-                                        disabled={false}
-                                        onChange={([item]) => {
-                                            onChange(item.name);
-                                            setValue('refIdDataKey', item?.uniqueKey, { shouldDirty: true, });
-                                        }}
-                                    />
-                                );
-                            }}
                         />
                     </div>
 
