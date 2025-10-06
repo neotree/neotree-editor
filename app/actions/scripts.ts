@@ -910,12 +910,24 @@ export async function getScriptsDataKeys({
             });
 
             const screensKeys = screens.map(s => {
-                let key: typeof keys[0] | null = {
-                    name: s.refId || '',
-                    label: s.refId || '',
-                    dataType: 'ref_id',
+                if (s.refId) {
+                    const key: typeof keys[0] = {
+                        name: s.refId || '',
+                        label: s.refId || '',
+                        dataType: 'ref_id',
+                        refId: s.refId,
+                        uniqueKey: s.refIdDataKey,
+                    };
+
+                    keys.push(key);
+                }
+
+                const key: typeof keys[0] = {
+                    name: s.key || '',
+                    label: s.label || '',
+                    dataType: s.type,
                     refId: s.refId,
-                    uniqueKey: s.refIdDataKey,
+                    uniqueKey: s.keyId,
                 };
 
                 keys.push(key);

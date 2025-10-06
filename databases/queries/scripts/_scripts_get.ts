@@ -66,7 +66,7 @@ export async function _getScripts(
         let { 
             scriptsIds = [], 
             hospitalIds = [],
-            returnDraftsIfExist, 
+            returnDraftsIfExist = true, 
         } = { ...params };
 
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
