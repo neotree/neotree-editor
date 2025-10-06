@@ -61,63 +61,61 @@ export async function _updateDataKeysRefs({
         });
 
         screens = screens.map(s => {
-                const refIdDataKey = !s.refId ? undefined : getUpdatedDataKey(s.refId);
-                const dataKey = getUpdatedDataKey(s.keyId);
+            const refIdDataKey = !s.refId ? undefined : getUpdatedDataKey(s.refId);
+            const dataKey = getUpdatedDataKey(s.keyId);
 
-                let updated = !!dataKey || !!refIdDataKey;
+            let updated = !!dataKey || !!refIdDataKey;
 
-                const items = s.items.map(f => {
-                    const dataKey = getUpdatedDataKey(f.keyId);
-                    if (dataKey) updated = true;
-                    const keyName = f.key ? 'key' : 'id'; 
-                    return {
-                        ...f,
-                        ...(!dataKey ? {} : {
-                            label: dataKey.label,
-                            [keyName]: dataKey.name,
-                        }),
-                    };
-                });
-
-                const fields = s.fields.map(f => {
-                    const dataKey = getUpdatedDataKey(f.keyId);
-                    if (dataKey) updated = true;
-                    return {
-                        ...f,
-                        ...(!dataKey ? {} : {
-                            key: dataKey.name,
-                            label: dataKey.label,
-                        }),
-                        items: (f.items || []).map(f => {
-                            const dataKey = getUpdatedDataKey(f.keyId);
-                            if (dataKey) updated = true;
-                            return {
-                                ...f,
-                                ...(!dataKey ? {} : {
-                                    value: dataKey.name,
-                                    label: dataKey.label,
-                                }),
-                            };
-                        }),
-                    };
-                });
-
+            const items = s.items.map(f => {
+                const dataKey = getUpdatedDataKey(f.keyId);
+                if (dataKey) updated = true;
+                const keyName = f.key ? 'key' : 'id'; 
                 return {
-                    ...s,
-                    updated,
-                    items,
-                    fields,
+                    ...f,
                     ...(!dataKey ? {} : {
-                        key: dataKey.name,
                         label: dataKey.label,
-                    }),
-                    ...(!refIdDataKey ? {} : {
-                        refId: refIdDataKey.name,
+                        [keyName]: dataKey.name,
                     }),
                 };
             });
 
-        console.log(screens.length, screens.filter(s => s.updated).map(({ updated, ...s }) => s).length);
+            const fields = s.fields.map(f => {
+                const dataKey = getUpdatedDataKey(f.keyId);
+                if (dataKey) updated = true;
+                return {
+                    ...f,
+                    ...(!dataKey ? {} : {
+                        key: dataKey.name,
+                        label: dataKey.label,
+                    }),
+                    items: (f.items || []).map(f => {
+                        const dataKey = getUpdatedDataKey(f.keyId);
+                        if (dataKey) updated = true;
+                        return {
+                            ...f,
+                            ...(!dataKey ? {} : {
+                                value: dataKey.name,
+                                label: dataKey.label,
+                            }),
+                        };
+                    }),
+                };
+            });
+
+            return {
+                ...s,
+                updated,
+                items,
+                fields,
+                ...(!dataKey ? {} : {
+                    key: dataKey.name,
+                    label: dataKey.label,
+                }),
+                ...(!refIdDataKey ? {} : {
+                    refId: refIdDataKey.name,
+                }),
+            };
+        });
 
         diagnoses = diagnoses.filter(s => s.updated).map(({ updated, ...s }) => s);
         screens = screens.filter(s => s.updated).map(({ updated, ...s }) => s);
