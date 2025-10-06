@@ -206,8 +206,8 @@ function HeaderPrintField({
     const selectOpts = keys
         .filter(k => !headerFields.includes(k.name))
         .map(k => ({
-            label: k.label || k.name || k.refId,
-            value: k.name || k.refId,
+            label: k.label || k.name,
+            value: k.name,
         }));
 
     return (
