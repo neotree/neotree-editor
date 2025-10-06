@@ -46,7 +46,7 @@ export async function _getScreens(
             scriptsIds: scriptsIds = [],
             screensIds: screensIds = [], 
             types = [],
-            returnDraftsIfExist, 
+            returnDraftsIfExist = true, 
             withImagesOnly,
         } = { ...params };
 

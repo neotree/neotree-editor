@@ -39,7 +39,7 @@ export async function _getDiagnoses(
         let { 
             scriptsIds: scriptsIds = [],
             diagnosesIds: diagnosesIds = [], 
-            returnDraftsIfExist, 
+            returnDraftsIfExist = true, 
             withImagesOnly,
         } = { ...params };
 
