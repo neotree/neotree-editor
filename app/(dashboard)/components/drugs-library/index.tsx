@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
 import { DataTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
 import { ActionsBar } from "@/components/actions-bar";
@@ -16,6 +18,7 @@ import { DrugsLibraryTableActions } from "./table-actions";
 type Props = {};
 
 export function DrugsLibrary({}: Props) {
+    const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
 
     const [selected, setSelected] = useState<number[]>([]);
