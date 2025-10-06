@@ -155,6 +155,16 @@ export const dataKeyTypes: {
         hasChildren: false,
     },
     {
+        value: 'diagnosis_symptom_sign',
+        label: 'diagnosis_symptom_sign',
+        hasChildren: false,
+    },
+    {
+        value: 'diagnosis_symptom_risk',
+        label: 'diagnosis_symptom_risk',
+        hasChildren: false,
+    },
+    {
         value: 'date',
         label: 'date',
         hasChildren: false,
