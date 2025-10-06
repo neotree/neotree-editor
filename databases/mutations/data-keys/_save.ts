@@ -47,6 +47,9 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, }: SaveD
         let index = 0;
         for (const { uuid: dataKeyUuid, isNewUuid, ...item } of data) {
             try {
+                item.name = `${item.name || ''}`.trim();
+                item.label = `${item.label || ''}`.trim();
+
                 index++;
 
                 if (!errors.length) {
