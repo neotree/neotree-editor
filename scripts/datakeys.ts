@@ -11,6 +11,7 @@ import { _saveDiagnoses, _saveScreens, } from "@/databases/mutations/scripts";
 import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -52,36 +53,8 @@ main();
 
 async function main() {
     try {
-        const country = await askQuestion<keyof typeof scripts>('Country:\n> ');
-
-        if (!scripts[country]) {
-            console.error(`Invalid country. Expecting ${Object.keys(scripts).join(' or ')}`);
-            return;
-        }
-
-        const actions = {
-            1: {
-                prompt: '[1]: processDataKeysRefs',
-                fn: () => processDataKeysRefs(),
-            },
-            2: {
-                prompt: '[2]: processDatakeysOptions',
-                fn: () => processDatakeysOptions(),
-            },
-            3: {
-                prompt: '[3]: processChecklistDatakeys',
-                fn: () => processChecklistDatakeys(country),
-            },
-        };
-
-        const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
-
-        if (!actions[action]) {
-            console.error(`Invalid country. Expecting ${Object.keys(actions).join(' or ')}`);
-            return;
-        }
-
-        await actions[action].fn();
+        const action = await promptAction();
+        await action?.fn();
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
@@ -98,34 +71,108 @@ function askQuestion<T = string>(question: string) {
     });
 }
 
-async function loadData(country: keyof typeof scripts) {
-    console.log(`Fetching ${country} sites`);
-    const sites = await db.query.sites.findMany({
-        where: and(
-            eq(schema.sites.countryISO, country),
-            eq(schema.sites.type, 'webeditor'),
-        ),
-    });
+async function promptCountry() {
+    const selectedCountry = await askQuestion(
+        'Select country: \n' +
+        Object.keys(scripts).map((c, i) => `[${i + 1}]: ${c}`).join('\n') + '\n> '
+    );
 
-    console.log(`Found ${sites.length} sites. Fetching data...`);
+    const country = Object.keys(scripts)[Number(selectedCountry) - 1] as keyof typeof scripts;
+
+    if (!scripts[country]) {
+        console.error(`Invalid country. Expecting ${Object.keys(scripts).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return country;
+}
+
+async function promptSource() {
+    const sources = {
+        '1': '[1]: Local',
+        '2': '[2]: Remote',
+    };
+
+    const source = await askQuestion<keyof typeof sources>(Object.values(sources).map((s) => s).join('\n') + '\n> ');
+
+    if (!sources[source]) {
+        console.error(`Invalid source. Expecting ${Object.keys(sources).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return source;
+}
+
+async function promptAction() {
+    const actions = {
+        '1': {
+            prompt: '[1]: processDataKeysRefs',
+            fn: () => processDataKeysRefs(),
+        },
+        '2': {
+            prompt: '[2]: processDatakeysOptions',
+            fn: () => processDatakeysOptions(),
+        },
+        '3': {
+            prompt: '[3]: processChecklistDatakeys',
+            fn: () => processChecklistDatakeys(),
+        },
+    };
+
+    const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
+
+    if (!actions[action]) {
+        console.error(`Invalid action. Expecting ${Object.keys(actions).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return actions[action];
+}
+
+async function loadData() {
+    const country = await promptCountry();
+    const source = await promptSource();
+
     let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
     let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
     let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
 
-    for (const site of sites) {
-        // if (site.link === 'https://zim-webeditor.neotree.org:10243') continue;
+    if (source === '1') {
+         const { data: screensData, } = await _getScreens();
+         const { data: diagnosesData, } = await _getDiagnoses();
+         const { data: drugsLibraryData, } = await _getDrugsLibraryItems();
 
-        const axiosClient = await getSiteAxiosClient(site.siteId);
-
-        const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
-            scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
-        }));
-
-        res.data.data.forEach(s => {
-            screens = [...screens, ...s.screens];
-            diagnoses = [...diagnoses, ...s.diagnoses];
-            drugsLibrary = [...drugsLibrary, ...s.drugsLibrary];
+        screens = screensData;
+        diagnoses = diagnosesData;
+        drugsLibrary = drugsLibraryData;
+    } 
+    
+    if (source === '2') {
+        console.log(`Fetching ${country} sites`);
+        const sites = await db.query.sites.findMany({
+            where: and(
+                eq(schema.sites.countryISO, country),
+                eq(schema.sites.type, 'webeditor'),
+            ),
         });
+
+        console.log(`Found ${sites.length} sites. Fetching data...`);
+
+        for (const site of sites) {
+            // if (site.link === 'https://zim-webeditor.neotree.org:10243') continue;
+
+            const axiosClient = await getSiteAxiosClient(site.siteId);
+
+            const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
+                scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
+            }));
+
+            res.data.data.forEach(s => {
+                screens = [...screens, ...s.screens];
+                diagnoses = [...diagnoses, ...s.diagnoses];
+                drugsLibrary = [...drugsLibrary, ...s.drugsLibrary];
+            });
+        }
     }
 
     return {
@@ -135,9 +182,9 @@ async function loadData(country: keyof typeof scripts) {
     };
 }
 
-async function processChecklistDatakeys(country: keyof typeof scripts) {
+async function processChecklistDatakeys() {
     try {
-        const { screens, } = await loadData(country);
+        const { screens, } = await loadData();
 
         const checklistScreens = screens.filter(s => s.refIdDataKey).filter(s => s.type === 'checklist');
 
