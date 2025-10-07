@@ -56,6 +56,7 @@ function paginateData<T>(
 // Type for DataKey - define it here instead of importing
 export type DataKey = {
     uuid: string;
+    uniqueKey: string;
     name: string;
     refId: string;
     dataType: string;
@@ -220,11 +221,14 @@ export function DataKeysCtxProvider({
         try {
             setSaving(true);
 
+            // Convert version to number for each data item
+            const dataWithNumberVersion = data.map(d => ({
+                ...d,
+                version: typeof d.version === 'string' ? Number(d.version) : d.version,
+            }));
+
             const response = await axios.post('/api/data-keys/save', { 
-                data: data.map(d => ({
-                    ...d,
-                    version: typeof d.version === 'string' ? Number(d.version) : d.version,
-                })), 
+                data: dataWithNumberVersion, 
                 broadcastAction: true, 
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
@@ -341,7 +345,7 @@ export function DataKeysCtxProvider({
 
     const extractDataKeys: tDataKeysCtx['extractDataKeys'] = useCallback((uuids, opts) => {
         let keys = uuids
-            .map(o => allDataKeys.find(k => (k.uuid === o) || (k.uuid === o))!)
+            .map(o => allDataKeys.find(k => (k.uniqueKey === o) || (k.uuid === o))!)
             .filter(k => k);
 
         if (opts?.withNested) {
@@ -351,7 +355,7 @@ export function DataKeysCtxProvider({
             });
         }
 
-        return keys.filter((k, i) => keys.map(k => k.uuid).indexOf(k.uuid) === i);
+        return keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
     }, [allDataKeys]);
 
     if (errors?.length) {

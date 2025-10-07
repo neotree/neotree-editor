@@ -9,6 +9,7 @@ import { Loader } from '@/components/loader';
 import { DataKeysTableHeader } from './table-header';
 import { DataKeysTableRowActions } from './table-row-actions';
 import { DataKeysTableBottomActions } from './table-bottom-actions';
+import { useMemo } from 'react';
 import {
     Pagination,
     PaginationContent,
@@ -28,6 +29,7 @@ export function DataKeysTable({ disabled, }: {
     disabled = disabled || viewOnly;
 
     const { 
+        allDataKeys,
         dataKeys,
         selected,
         filter: filterValue,
@@ -39,7 +41,61 @@ export function DataKeysTable({ disabled, }: {
         currentPage,
         itemsPerPage,
         setCurrentPage,
+        searchValue,
+        setSearchValue,
     } = useDataKeysCtx();
+
+    // Apply global filtering and search to allDataKeys
+    const filteredDataKeys = useMemo(() => {
+        let filtered = [...allDataKeys];
+
+        // Apply filter
+        if (filterValue) {
+            if (filterValue === dataKeysStatuses[0].value) {
+                filtered = filtered.filter(dataKey => !dataKey?.isDraft);
+            } else if (filterValue === dataKeysStatuses[1].value) {
+                filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
+            } else {
+                filtered = filtered.filter(dataKey => dataKey?.dataType === filterValue);
+            }
+        }
+
+        // Apply search
+        if (searchValue) {
+            const searchLower = searchValue.toLowerCase();
+            filtered = filtered.filter(dataKey => {
+                const searchableFields = [
+                    dataKey.name || '',
+                    dataKey.label || '',
+                    dataKey.refId || '',
+                    dataKey.dataType || '',
+                ].map(field => field.toLowerCase());
+                
+                return searchableFields.some(field => field.includes(searchLower));
+            });
+        }
+
+        return filtered;
+    }, [allDataKeys, filterValue, searchValue]);
+
+    // Calculate pagination based on filtered results
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredDataKeys.slice(startIndex, endIndex);
+    }, [filteredDataKeys, currentPage, itemsPerPage]);
+
+    // Update pagination info
+    const updatedPagination = useMemo(() => {
+        const total = filteredDataKeys.length;
+        const totalPages = Math.ceil(total / itemsPerPage);
+        
+        return {
+            page: currentPage,
+            totalPages,
+            total,
+        };
+    }, [filteredDataKeys.length, itemsPerPage, currentPage]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -51,38 +107,29 @@ export function DataKeysTable({ disabled, }: {
     const tableProps: DataTableProps = {
         selectable: !disabled,
         selectedIndexes: selected.map(s => s.index),
-        filter: rowIndex => {
-            const dataKey = dataKeys[rowIndex];
-            if (!filterValue) {
-                return true;
-            } else if (filterValue === dataKeysStatuses[0].value) {
-                return !dataKey?.isDraft;
-            } else if (filterValue === dataKeysStatuses[1].value) {
-                return !!dataKey?.isDraft;
-            } else {
-                return dataKey?.dataType === filterValue;
-            }
-        },
+        // Remove filter prop since filtering is now done globally
         onSelect: indexes => setSelected(
             indexes
                 .map(i => ({
                     index: i,
-                    uuid: dataKeys[i]?.uuid,
+                    uuid: paginatedData[i]?.uuid,
                 }))
                 .filter(s => s.uuid)
         ),
         getRowOptions({ rowIndex }) {
-            const s = dataKeys[rowIndex];
+            const s = paginatedData[rowIndex];
             return !s ? {} : {
                 className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
             };
         },
         search: {
             inputPlaceholder: 'Search data keys',
+            value: searchValue,
+            setValue: setSearchValue,
         },
         noDataMessage: (
             <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                <div>No data keys saved.</div>
+                <div>No data keys found.</div>
             </div>
         ),
         columns: [
@@ -114,7 +161,7 @@ export function DataKeysTable({ disabled, }: {
                 }
             },
         ],
-        data: dataKeys.map(k => [
+        data: paginatedData.map(k => [
             k.name || '',
             k.label || '',
             k.refId || '',
@@ -124,9 +171,9 @@ export function DataKeysTable({ disabled, }: {
     };
 
     const renderPageNumbers = () => {
-        if (!pagination) return null;
+        if (!updatedPagination) return null;
 
-        const { page, totalPages } = pagination;
+        const { page, totalPages } = updatedPagination;
         const pages: (number | 'ellipsis')[] = [];
 
         pages.push(1);
@@ -186,7 +233,7 @@ export function DataKeysTable({ disabled, }: {
 
                 <DataTable {...tableProps} />
 
-                {pagination && pagination.totalPages > 1 && (
+                {updatedPagination && updatedPagination.totalPages > 1 && (
                     <div className="flex flex-col gap-2">
                         <Pagination>
                             <PaginationContent>
@@ -204,10 +251,10 @@ export function DataKeysTable({ disabled, }: {
 
                                 <PaginationItem>
                                     <PaginationNext
-                                        onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
+                                        onClick={() => handlePageChange(Math.min(updatedPagination.totalPages, currentPage + 1))}
                                         className={cn(
                                             "cursor-pointer",
-                                            currentPage === pagination.totalPages && "pointer-events-none opacity-50"
+                                            currentPage === updatedPagination.totalPages && "pointer-events-none opacity-50"
                                         )}
                                     />
                                 </PaginationItem>
@@ -215,7 +262,7 @@ export function DataKeysTable({ disabled, }: {
                         </Pagination>
 
                         <div className="text-sm text-muted-foreground text-center">
-                            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} entries
+                            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, updatedPagination.total)} of {updatedPagination.total} entries
                         </div>
                     </div>
                 )}
