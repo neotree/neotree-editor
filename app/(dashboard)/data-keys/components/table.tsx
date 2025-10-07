@@ -9,7 +9,16 @@ import { Loader } from '@/components/loader';
 import { DataKeysTableHeader } from './table-header';
 import { DataKeysTableRowActions } from './table-row-actions';
 import { DataKeysTableBottomActions } from './table-bottom-actions';
-import { DataKeyForm } from './form';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
+
 
 export function DataKeysTable({ disabled, }: {
     disabled: boolean;
@@ -26,7 +35,16 @@ export function DataKeysTable({ disabled, }: {
         loadingDataKeys,
         setCurrentDataKeyUuid,
         setSelected,
+        pagination,
+        currentPage,
+        itemsPerPage,
+        setCurrentPage,
     } = useDataKeysCtx();
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        setSelected([]);
+    };
 
     const displayLoader = deleting || loadingDataKeys;
 
@@ -42,7 +60,6 @@ export function DataKeysTable({ disabled, }: {
             } else if (filterValue === dataKeysStatuses[1].value) {
                 return !!dataKey?.isDraft;
             } else {
-                console.log(dataKey?.dataType, filterValue);
                 return dataKey?.dataType === filterValue;
             }
         },
@@ -106,12 +123,102 @@ export function DataKeysTable({ disabled, }: {
         ]),
     };
 
+    const renderPageNumbers = () => {
+        if (!pagination) return null;
+
+        const { page, totalPages } = pagination;
+        const pages: (number | 'ellipsis')[] = [];
+
+        pages.push(1);
+
+        if (totalPages <= 7) {
+            for (let i = 2; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (page > 3) {
+                pages.push('ellipsis');
+            }
+
+            for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+                pages.push(i);
+            }
+
+            if (page < totalPages - 2) {
+                pages.push('ellipsis');
+            }
+
+            if (totalPages > 1) {
+                pages.push(totalPages);
+            }
+        }
+
+        return pages.map((pageNum, idx) => {
+            if (pageNum === 'ellipsis') {
+                return (
+                    <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                    </PaginationItem>
+                );
+            }
+
+            return (
+                <PaginationItem key={pageNum}>
+                    <PaginationLink
+                        onClick={() => handlePageChange(pageNum)}
+                        isActive={pageNum === page}
+                        className={cn(
+                            "cursor-pointer",
+                            pageNum === page && "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
+                    >
+                        {pageNum}
+                    </PaginationLink>
+                </PaginationItem>
+            );
+        });
+    };
+
     return (
         <>
             <div className="flex flex-col gap-y-4">
                 <DataKeysTableHeader />
 
                 <DataTable {...tableProps} />
+
+                {pagination && pagination.totalPages > 1 && (
+                    <div className="flex flex-col gap-2">
+                        <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationPrevious
+                                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                                        className={cn(
+                                            "cursor-pointer",
+                                            currentPage === 1 && "pointer-events-none opacity-50"
+                                        )}
+                                    />
+                                </PaginationItem>
+
+                                {renderPageNumbers()}
+
+                                <PaginationItem>
+                                    <PaginationNext
+                                        onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
+                                        className={cn(
+                                            "cursor-pointer",
+                                            currentPage === pagination.totalPages && "pointer-events-none opacity-50"
+                                        )}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
+
+                        <div className="text-sm text-muted-foreground text-center">
+                            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} entries
+                        </div>
+                    </div>
+                )}
             </div>
 
             <DataKeysTableBottomActions disabled={disabled} />
