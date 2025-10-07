@@ -1,15 +1,4 @@
-export type GetDataKeysParams = {
-    dataKeysIds?: string[];
-    names?: string[];
-    uniqueKeys?: string[];
-    keys?: {
-        name: string;
-        label: string;
-        dataType: string;
-    }[];
-    returnDraftsIfExist?: boolean;
-    withDeleted?: boolean;
-};'use client';
+'use client';
 
 import { 
     createContext, 
@@ -31,7 +20,7 @@ import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { Pagination } from "@/types";
 
-// Client-side pagination helper
+
 function paginateData<T>(
     data: T[], 
     page: number, 
@@ -53,7 +42,6 @@ function paginateData<T>(
     };
 }
 
-// Type for DataKey - define it here instead of importing
 export type DataKey = {
     uuid: string;
     uniqueKey: string;
@@ -87,6 +75,19 @@ export type ExportDataKeysFormData = {
     siteId: string;
 };
 
+export type GetDataKeysParams = {
+    dataKeysIds?: string[];
+    names?: string[];
+    uniqueKeys?: string[];
+    keys?: {
+        name: string;
+        label: string;
+        dataType: string;
+    }[];
+    returnDraftsIfExist?: boolean;
+    withDeleted?: boolean;
+};
+
 export type tDataKeysCtx = {
     currentDataKeyUuid: string;
     loadingDataKeys: boolean;
@@ -94,15 +95,17 @@ export type tDataKeysCtx = {
     exporting: boolean;
     deleting: boolean;
     dataKeys: DataKey[];
-    allDataKeys: DataKey[]; // All data keys without pagination
+    allDataKeys: DataKey[];
     errors?: string[];
     selected: { index: number; uuid: string; }[];
     sort: string;
     filter: string;
+    searchValue: string;
     pagination?: Pagination;
     currentPage: number;
     itemsPerPage: number;
     setCurrentPage: (page: number) => void;
+    setSearchValue: (value: string) => void;
     saveDataKeys: (data: DataKeyFormData[], cb?: ((error?: string) => void)) => Promise<void>;
     deleteDataKeys: (data: string[]) => Promise<void>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
@@ -146,6 +149,7 @@ export function DataKeysCtxProvider({
     const [selected, setSelected] = useState<tDataKeysCtx['selected']>([]);
     const [sort, setSort] = useState(dataKeysSortOpts[0].value);
     const [filter, setFilter] = useState('');
+    const [searchValue, setSearchValue] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(100);
 
@@ -182,7 +186,7 @@ export function DataKeysCtxProvider({
 
             setAllDataKeys(sortedData);
             setErrors(response.data.errors);
-            setCurrentPage(1); // Reset to first page when loading new data
+            setCurrentPage(1);
         } catch (e: any) {
             setAllDataKeys([]);
             setErrors([e.message]);
@@ -191,19 +195,51 @@ export function DataKeysCtxProvider({
         }
     }, [sort]);
 
-    // Client-side pagination - memoized
+    // Apply filters and search to get filtered data
+    const filteredDataKeys = useMemo(() => {
+        let filtered = [...allDataKeys];
+
+        
+        if (filter) {
+            if (filter === 'published') { 
+                filtered = filtered.filter(dataKey => !dataKey?.isDraft);
+            } else if (filter === 'draft') { 
+                filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
+            } else {
+                filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
+            }
+        }
+
+        
+        if (searchValue) {
+            const searchLower = searchValue.toLowerCase();
+            filtered = filtered.filter(dataKey => {
+                const searchableFields = [
+                    dataKey.name || '',
+                    dataKey.label || '',
+                    dataKey.refId || '',
+                    dataKey.dataType || '',
+                ].map(field => field.toLowerCase());
+                
+                return searchableFields.some(field => field.includes(searchLower));
+            });
+        }
+
+        return filtered;
+    }, [allDataKeys, filter, searchValue]);
+
     const { dataKeys, pagination } = useMemo(() => {
-        if (!allDataKeys.length) {
+        if (!filteredDataKeys.length) {
             return { dataKeys: [], pagination: undefined };
         }
 
-        const paginatedResult = paginateData(allDataKeys, currentPage, itemsPerPage);
+        const paginatedResult = paginateData(filteredDataKeys, currentPage, itemsPerPage);
         
         return {
             dataKeys: paginatedResult.data,
             pagination: paginatedResult.pagination,
         };
-    }, [allDataKeys, currentPage, itemsPerPage]);
+    }, [filteredDataKeys, currentPage, itemsPerPage]);
 
     useEffect(() => {
         if (!mounted.current) {
@@ -211,6 +247,12 @@ export function DataKeysCtxProvider({
             if (prefetchDataKeys) loadDataKeys();
         }
     }, [prefetchDataKeys, loadDataKeys]);
+
+    // Reset to page 1 when filter or search changes
+    useEffect(() => {
+        setCurrentPage(1);
+        setSelected([]);
+    }, [filter, searchValue]);
 
     /*****************************************************
      ************ SAVE 
@@ -221,7 +263,6 @@ export function DataKeysCtxProvider({
         try {
             setSaving(true);
 
-            // Convert version to number for each data item
             const dataWithNumberVersion = data.map(d => ({
                 ...d,
                 version: typeof d.version === 'string' ? Number(d.version) : d.version,
@@ -377,17 +418,19 @@ export function DataKeysCtxProvider({
                     saving,
                     exporting,
                     deleting,
-                    dataKeys, // Paginated data
-                    allDataKeys, // All data
+                    dataKeys,
+                    allDataKeys, 
                     errors,
                     selected,
                     currentDataKeyUuid,
                     sort,
                     filter,
+                    searchValue,
                     pagination,
                     currentPage,
                     itemsPerPage,
                     setCurrentPage,
+                    setSearchValue,
                     extractDataKeys,
                     deleteDataKeys,
                     saveDataKeys,
