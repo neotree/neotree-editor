@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems, copyDrugsLibraryItems } from "@/app/actions/drugs-library";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
+import { useDebounce } from "./use-debounce";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
@@ -38,8 +39,11 @@ export function resetDrugsLibraryState() {
 }
 
 export function useDrugsLibrary() {
+    const [searchValueState, setSearchValue] = useState('');
+    const searchValue = useDebounce(searchValueState);
+
     const state = useDrugsLibraryState();
-    const { drugs, } = state;
+    const { drugs: allDrugs, } = state;
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -47,13 +51,41 @@ export function useDrugsLibrary() {
     const { itemId: itemIdParam } = searchParamsObj;
 
     const itemId = useMemo(() => {
-        return drugs.filter(d => (d.itemId === itemIdParam) || (d.key === itemIdParam))[0]?.itemId;
-    }, [itemIdParam, drugs]);
+        return allDrugs.filter(d => (d.itemId === itemIdParam) || (d.key === itemIdParam))[0]?.itemId;
+    }, [itemIdParam, allDrugs]);
 
     const { alert } = useAlertModal();
 
+    const filterDrugs = useCallback(() => {
+        const filteredDrugs: typeof allDrugs = [];
+
+        let tableData = allDrugs.map(item => [
+            item.drug || '',
+            item.type || '',
+            item.key || '',
+            item.dosageText || '',
+            item.itemId!,
+        ]);
+
+        tableData = tableData.filter((row, index) => {
+            const matchesSearchValue = !searchValue ? true : (
+                JSON.stringify(row).toLowerCase().includes(searchValue.toLowerCase())
+            );
+            if (matchesSearchValue) filteredDrugs.push(allDrugs[index]);
+            return matchesSearchValue;
+        });
+
+        return {
+            tableData,
+            filteredDrugs,
+        };
+    }, [allDrugs, searchValue]);
+
+    const { tableData, filteredDrugs, } = useMemo(() => filterDrugs(), [filterDrugs]);
+
     const getDrugs = useCallback(async () => {
         try {
+            setSearchValue('');
             useDrugsLibraryState.setState({ loading: true, });
             const res = await axios.get<Awaited<ReturnType<typeof getDrugsLibraryItems>>>(
                 '/api/drugs-library?data=' + JSON.stringify({ returnDraftsIfExist: true, }),
@@ -123,7 +155,7 @@ export function useDrugsLibrary() {
             const removeReferences: string[] = [];
             const updateReferences: { old: string; new: string; }[] = [];
 
-            let updated = drugs;
+            let updated = allDrugs;
             useDrugsLibraryState.setState(prev => {
                 if (!itemId && item) {
                     updated = [...prev.drugs, item];
@@ -181,7 +213,7 @@ export function useDrugsLibrary() {
         } finally {
             useDrugsLibraryState.setState({ loading: false, });
         }
-    }, [drugs, itemId, router.refresh]);
+    }, [allDrugs, itemId, router.refresh]);
 
     const copyDrugs = useCallback(async (itemsIds: string[]) => {
         try {
@@ -232,7 +264,11 @@ export function useDrugsLibrary() {
 
     return {
         ...state,
+        filteredDrugs,
+        tableData,
         selectedItemId: itemId,
+        searchValue,
+        setSearchValue,
         addLink: (type: string) => `?${queryString.stringify({ ...searchParamsObj, addItem: type, })}`,
         editLink: (itemId: string) => `?${queryString.stringify({ ...searchParamsObj, itemId, })}`,
         getDrugs,

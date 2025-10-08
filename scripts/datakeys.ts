@@ -1,41 +1,22 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
-import { writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { v4 as uuidV4, } from 'uuid';
+import readline from "node:readline";
+import { and, eq, inArray, } from "drizzle-orm";
 import queryString from "query-string";
 
 import '@/server/env';
-import db from "@/databases/pg/drizzle";
-import * as schema from "@/databases/pg/schema";
-import { _getScreens } from '@/databases/queries/scripts';
+import db from '@/databases/pg/drizzle';
+import * as schema from '@/databases/pg/schema';
+import { _getDiagnoses, _getScreens } from '@/databases/queries/scripts';
+import { _getDataKeys } from "@/databases/queries/data-keys";
+import { _saveDiagnoses, _saveScreens, } from "@/databases/mutations/scripts";
+import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
-import { dataKeyTypes } from "@/constants";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 
-const dataTypes = dataKeyTypes.map(t => t.value);
-
-type tKey = {
-    uniqueKey: string;
-    name: string;
-    label: string;
-    refId?: string;
-    dataType?: string;
-    children: tKey[];
-    // children: {
-    //     uniqueKey: string;
-    //     name: string;
-    //     label: string;
-    //     refId?: string;
-    //     dataType?: string;
-    //     children: {
-    //         uniqueKey: string;
-    //         name: string;
-    //         label: string;
-    //         refId?: string;
-    //         dataType?: string;
-    //     }[];
-    // }[];
-};
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
 const scripts = {
     mwi: [
@@ -72,8 +53,101 @@ main();
 
 async function main() {
     try {
-        const country: keyof typeof scripts = 'zw';
+        const action = await promptAction();
+        await action?.fn();
+    } catch(e: any) {
+        console.error('ERROR:');
+        console.error(e);
+    } finally {
+        process.exit();
+    }
+}
 
+function askQuestion<T = string>(question: string) {
+    return new Promise<T>((resolve) => {
+        rl.question(question, (answer) => {
+            resolve(answer as T);
+        });
+    });
+}
+
+async function promptCountry() {
+    const selectedCountry = await askQuestion(
+        'Select country: \n' +
+        Object.keys(scripts).map((c, i) => `[${i + 1}]: ${c}`).join('\n') + '\n> '
+    );
+
+    const country = Object.keys(scripts)[Number(selectedCountry) - 1] as keyof typeof scripts;
+
+    if (!scripts[country]) {
+        console.error(`Invalid country. Expecting ${Object.keys(scripts).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return country;
+}
+
+async function promptSource() {
+    const sources = {
+        '1': '[1]: Local',
+        '2': '[2]: Remote',
+    };
+
+    const source = await askQuestion<keyof typeof sources>(Object.values(sources).map((s) => s).join('\n') + '\n> ');
+
+    if (!sources[source]) {
+        console.error(`Invalid source. Expecting ${Object.keys(sources).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return source;
+}
+
+async function promptAction() {
+    const actions = {
+        '1': {
+            prompt: '[1]: processDataKeysRefs',
+            fn: () => processDataKeysRefs(),
+        },
+        '2': {
+            prompt: '[2]: processDatakeysOptions',
+            fn: () => processDatakeysOptions(),
+        },
+        '3': {
+            prompt: '[3]: processChecklistDatakeys',
+            fn: () => processChecklistDatakeys(),
+        },
+    };
+
+    const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
+
+    if (!actions[action]) {
+        console.error(`Invalid action. Expecting ${Object.keys(actions).join(' or ')}`);
+        process.exit(0);
+    }
+
+    return actions[action];
+}
+
+async function loadData() {
+    const country = await promptCountry();
+    const source = await promptSource();
+
+    let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
+    let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
+    let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
+
+    if (source === '1') {
+         const { data: screensData, } = await _getScreens();
+         const { data: diagnosesData, } = await _getDiagnoses();
+         const { data: drugsLibraryData, } = await _getDrugsLibraryItems();
+
+        screens = screensData;
+        diagnoses = diagnosesData;
+        drugsLibrary = drugsLibraryData;
+    } 
+    
+    if (source === '2') {
         console.log(`Fetching ${country} sites`);
         const sites = await db.query.sites.findMany({
             where: and(
@@ -83,9 +157,6 @@ async function main() {
         });
 
         console.log(`Found ${sites.length} sites. Fetching data...`);
-        let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
-        let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
-        let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
 
         for (const site of sites) {
             // if (site.link === 'https://zim-webeditor.neotree.org:10243') continue;
@@ -102,250 +173,412 @@ async function main() {
                 drugsLibrary = [...drugsLibrary, ...s.drugsLibrary];
             });
         }
+    }
 
-        let keysMap: tKey[] = [];
+    return {
+        screens,
+        diagnoses,
+        drugsLibrary,
+    };
+}
 
-        const screensKeys = screens.map(s => {
-            if (s.refId) {
-                keysMap.push({
-                    uniqueKey: '',
+async function processChecklistDatakeys() {
+    try {
+        const { screens, } = await loadData();
+
+        const checklistScreens = screens.filter(s => s.refIdDataKey).filter(s => s.type === 'checklist');
+
+        const checklistRefIdDataKeys = checklistScreens.map(s => s.refIdDataKey).filter(s => s);
+
+        const { data: checkListDataKeys, } = !checklistRefIdDataKeys.length ? { data: [], } : await _getDataKeys({
+            uniqueKeys: checklistRefIdDataKeys,
+        });
+
+        console.log('checklist datakeys...');
+        if (checkListDataKeys.length) {
+            await db.insert(schema.dataKeysDrafts).values(checkListDataKeys.map(k => {
+                let options: string[] = [];
+
+                checklistScreens.forEach(s => {
+                    if (s.refIdDataKey === k.uniqueKey) {
+                        (s.items || []).filter(item => item.keyId).forEach(item => options.push(item.keyId!));
+                    }
+                });
+
+                options = options.filter((o, i) => options.indexOf(o) === i);
+
+                return {
+                    data: {
+                        ...k,
+                        dataType: 'checklist',
+                        options,
+                    },
+                    uuid: k.uuid,
+                    dataKeyId: k.uuid,
+                    name: k.name,
+                    uniqueKey: k.uniqueKey,
+                };
+            }));
+        }
+
+        console.log('checklist screens...');
+        if (checklistScreens.length) {
+            await db.insert(schema.screensDrafts).values(checklistScreens
+                .filter(s => checkListDataKeys.find(k => k.uniqueKey === s.refIdDataKey))
+                .map(s => {
+                    const dataKey = checkListDataKeys.find(k => k.uniqueKey === s.refIdDataKey)!;
+                    return {
+                        data: {
+                            ...s,
+                            key: dataKey.name,
+                            label: dataKey.label,
+                            keyId: dataKey.uniqueKey,
+                        },
+                        type: s.type,
+                        scriptId: s.scriptId,
+                        screenId: s.screenId,
+                        screenDraftId: s.screenId,
+                        title: s.title,
+                        position: s.position,
+                    };
+                }));
+        }
+    } catch(e: any) {
+        console.error('ERROR:');
+        console.error(e);
+    } finally {
+        process.exit();
+    }
+}
+
+async function processDatakeysOptions() {
+    try {
+        const { data: screens, } = await _getScreens();
+
+        const { data: dataKeysArr, } = await _getDataKeys();
+
+        let dataKeys: (typeof dataKeysArr[0] & { updated?: boolean; opts?: string[]; })[] = dataKeysArr;
+
+        screens.forEach(s => {
+            const dataKeyIndex = !s.keyId ? -1 : dataKeys.map(k => k.uniqueKey).indexOf(s.keyId);
+
+            if (dataKeys[dataKeyIndex]) {
+                if (!dataKeys[dataKeyIndex].opts) dataKeys[dataKeyIndex].opts = [...dataKeys[dataKeyIndex].options];
+                dataKeys[dataKeyIndex].updated = true;
+                dataKeys[dataKeyIndex].options = [
+                    ...dataKeys[dataKeyIndex].options,
+                    ...s.items.filter(item => item.keyId).map(item => item.keyId!),
+                    ...s.fields.filter(item => item.keyId).map(item => item.keyId!),
+                ];
+            }
+
+            s.fields.map(item => {
+                const dataKeyIndex = !item.keyId ? -1 : dataKeys.map(k => k.uniqueKey).indexOf(item.keyId);
+
+                if (dataKeys[dataKeyIndex]) {
+                    if (!dataKeys[dataKeyIndex].opts) dataKeys[dataKeyIndex].opts = [...dataKeys[dataKeyIndex].options];
+                    dataKeys[dataKeyIndex].updated = true;
+                    dataKeys[dataKeyIndex].options = [
+                        ...dataKeys[dataKeyIndex].options,
+                        ...(item.items || []).filter(item => item.keyId).map(item => item.keyId!),
+                    ];
+                } 
+            });
+        });
+
+        dataKeys = dataKeys
+            .filter(k => !!k.options.length)
+            .filter(k => JSON.stringify(k.opts || []) !== JSON.stringify(k.options || []))
+            .filter(k => k.updated).map(({ updated, ...k }) => ({
+                ...k,
+                options: k.options.filter((o, i) => k.options.indexOf(o) === i),
+            }));
+
+        console.log('datakeys options...');
+        if (dataKeys.length) {
+            await db.insert(schema.dataKeysDrafts).values(dataKeys.map(k => ({
+                data: k,
+                uuid: k.uuid,
+                dataKeyId: k.uuid,
+                name: k.name,
+                uniqueKey: k.uniqueKey,
+            })));
+        }
+    } catch(e: any) {
+        console.error('ERROR:');
+        console.error(e);
+    } finally {
+        process.exit();
+    }
+}
+
+async function processDataKeysRefs() {
+    try {
+        const dataKeysRes = await _getDataKeys();
+
+        let dataKeys = dataKeysRes.data;
+
+        const getDataKeyUniqueKey = (data: {
+            name: string;
+            label: string;
+            dataType: string;
+        }) => {
+            const uniqueKey = dataKeys.find(k => JSON.stringify({
+                name: `${k.name || ''}`.trim(),
+                label: `${k.label || ''}`.trim(),
+                dataType: `${k.dataType || ''}`,
+            }).toLowerCase() === JSON.stringify({
+                name: `${data.name || ''}`.trim(),
+                label: `${data.label || ''}`.trim(),
+                dataType: `${data.dataType || ''}`,
+            }).toLowerCase())?.uniqueKey;
+
+            // console.log(uniqueKey, data);
+
+            return uniqueKey;
+        };
+
+        const keysMap: Record<string, typeof dataKeys[0]> = {};
+        const duplicates: Record<string, string> = {};
+
+        dataKeys.forEach(k => {
+            const key = JSON.stringify({
+                name: `${k.name || ''}`.trim(),
+                label: `${k.label || ''}`.trim(),
+                dataType: `${k.dataType || ''}`,
+            }).toLowerCase();
+
+            if (keysMap[key]) {
+                duplicates[k.uniqueKey] = keysMap[key].uniqueKey;
+                k.options.forEach(o => {
+                    if (!keysMap[key].options.includes(o)) {
+                        keysMap[key].options.push(o);
+                    }
+                })
+            }
+
+            keysMap[key] = k;
+        });
+
+        dataKeys = Object.values(keysMap);
+
+        const deleteUniqueKeys = Object.keys(duplicates);
+
+        const updates = dataKeys.filter(k => k.options.find(o => duplicates[o]))
+            .map(k => {
+                let options = k.options.map(o => duplicates[o] || o);
+                options = options.filter((o, i) => options.indexOf(o) === i);
+                return {
+                    ...k,
+                    options,
+                };
+            });
+
+        console.log({
+            updates: updates.length,
+            deletes: deleteUniqueKeys.length,
+            withDuplicates: dataKeysRes.data.length,
+            noDuplicates: dataKeys.length,
+        });
+
+        if (updates.length) await _saveDataKeys({ data: updates, });
+
+        if (deleteUniqueKeys.length) await db.delete(schema.dataKeys).where(inArray(schema.dataKeys.uniqueKey, deleteUniqueKeys));
+
+        const res = await getScriptsWithItems({});
+
+        let scripts = res.data;
+
+        console.log('scripts.length', scripts.length);
+
+        // scripts = scripts.map(({ screens, diagnoses, ...script }) => {
+        //     return {
+        //         ...script,
+
+        //         diagnoses: diagnoses.map(d => {
+        //             const name = d.key || d.name || '';
+        //             const keyId = getDataKeyUniqueKey({
+        //                 name,
+        //                 label: d.name || '',
+        //                 dataType: 'diagnosis',
+        //             });
+
+        //             return {
+        //                 ...d,
+        //                 key: name,
+        //                 keyId: keyId || '',
+        //                 symptoms: (d.symptoms || []).map(item => {
+        //                     const keyId = getDataKeyUniqueKey({
+        //                         name: item.name || '',
+        //                         label: item.name || '',
+        //                         dataType: `diagnosis_symptom_${item.type}`,
+        //                     });
+        //                     return {
+        //                         ...item,
+        //                         keyId: keyId,
+        //                     };
+        //                 }),
+        //             };
+        //         }),
+
+        //         screens: screens.map(s => {
+        //             const refIdDataKey = !s.refId ? undefined : getDataKeyUniqueKey({
+        //                 name: s.refId || '',
+        //                 label: s.refId || '',
+        //                 dataType: 'ref_id',
+        //             });
+
+        //             const keyId = getDataKeyUniqueKey({
+        //                 name: s.key || '',
+        //                 label: s.label || '',
+        //                 dataType: 'diagnosis',
+        //             });
+
+        //             return {
+        //                 ...s,
+        //                 refIdDataKey: refIdDataKey || '',
+        //                 keyId: keyId || '',
+        //                 items: s.items.map(f => {
+        //                     let dataType = `${s.type}_option`;
+        //                     if (['diagnosis'].includes(s.type)) dataType = s.type;
+
+        //                     const keyId = getDataKeyUniqueKey({
+        //                         name: f.key || f.id,
+        //                         label: f.label || '',
+        //                         dataType: dataType,
+        //                     });
+
+        //                     return {
+        //                         ...f,
+        //                         keyId: keyId || '',
+        //                     };
+        //                 }),
+
+        //                 fields: s.fields.map(f => {
+        //                     let dataType = `${f.type}`;
+
+        //                     const keyId = getDataKeyUniqueKey({
+        //                         name: f.key,
+        //                         label: f.label || '',
+        //                         dataType: dataType,
+        //                     });
+                            
+        //                     return {
+        //                         ...f,
+        //                         keyId: keyId || '',
+        //                         items: (f.items || []).map(f => {
+        //                             const keyId = getDataKeyUniqueKey({
+        //                                 name: f.value as string,
+        //                                 label: `${f.label || ''}`,
+        //                                 dataType: `${dataType}_option`,
+        //                             });
+
+        //                             return {
+        //                                 ...f,
+        //                                 keyId: keyId || '',
+        //                             };
+        //                         }),
+        //                     };
+        //                 }),
+        //             };
+        //         }),
+        //     };
+        // });
+
+        for (const s of scripts) {
+            console.log('Saving script: ' + s.title + '...');
+
+            const diagnoses = s.diagnoses.map(d => {
+                const name = d.key || d.name || '';
+                const keyId = getDataKeyUniqueKey({
+                    name,
+                    label: d.name || '',
+                    dataType: 'diagnosis',
+                });
+
+                return {
+                    ...d,
+                    key: name,
+                    keyId: keyId || '',
+                    symptoms: (d.symptoms || []).map(item => {
+                        const keyId = getDataKeyUniqueKey({
+                            name: item.name || '',
+                            label: item.name || '',
+                            dataType: `diagnosis_symptom_${item.type}`,
+                        });
+                        return {
+                            ...item,
+                            keyId: keyId,
+                        };
+                    }),
+                };
+            });
+
+            const screens = s.screens.map(s => {
+                const refIdDataKey = !s.refId ? undefined : getDataKeyUniqueKey({
                     name: s.refId || '',
                     label: s.refId || '',
                     dataType: 'ref_id',
-                    children: [],
                 });
-            }
 
-            const key: tKey = {
-                uniqueKey: '',
-                name: s.key || '',
-                label: s.label || '',
-                refId: s.refId || '',
-                dataType: s.type,
-                children: [],
-            };
-
-            if (dataTypes.filter(t => !t.includes('edliz')).includes(key.dataType!)) {
-                key.label = key.label || s.title;
-                key.name = key.name || key.label;
-            }
-
-            if (['diagnosis', 'checklist'].includes(s.type)) key.dataType = `${s.type}_screen`;
-
-            s.items.forEach(item => {
-                let dataType = `${s.type}_option`;
-                if (s.type === 'diagnosis') dataType = s.type;
-                const k: tKey = {
-                    uniqueKey: '',
-                    name: item.key || item.id || '',
-                    label: item.label || '',
-                    dataType,
-                    children: [],
-                };
-                key.children.push(k);
-            });
-
-            s.fields.forEach(f => {
-                key.children.push({
-                    uniqueKey: '',
-                    name: f.key || '',
-                    label: f.label || '',
-                    dataType: f.type,
-                    children: (f.items || []).map(item => ({
-                        uniqueKey: '',
-                        name: (item.value || '') as string,
-                        label: (item.label || '') as string,
-                        children: [],
-                        dataType: `${f.type}_option`,
-                    })),
+                const keyId = getDataKeyUniqueKey({
+                    name: s.key || '',
+                    label: s.label || '',
+                    dataType: s.type,
                 });
-            });
 
-            keysMap.push(key);
+                return {
+                    ...s,
+                    refIdDataKey: refIdDataKey || '',
+                    keyId: keyId || '',
+                    items: s.items.map(f => {
+                        let dataType = `${s.type}_option`;
+                        if (['diagnosis'].includes(s.type)) dataType = s.type;
 
-            return {
-                screenId: s.screenId,
-                key,
-            };
-        });
-
-        const diagnosesKeys = diagnoses.map(d => {
-            const key: tKey = {
-                uniqueKey: '',
-                name: d.key || d.name || '',
-                label: d.name || '',
-                dataType: 'diagnosis',
-                children: [],
-            };
-
-            (d.symptoms || []).forEach(item => {
-                key.children.push({
-                    uniqueKey: '',
-                    name: item.name || '',
-                    label: '',
-                    dataType: `diagnosis_symptom_${item.type}`,
-                    children: [],
-                });
-            });
-
-            keysMap.push(key);
-
-            return {
-                screenId: d.diagnosisId,
-                key,
-            };
-        });
-
-        const dffKeys = drugsLibrary.map(d => {
-            const key: tKey = {
-                uniqueKey: '',
-                name: d.key || '',
-                label: d.drug || '',
-                dataType: d.type,
-                children: [],
-            };
-
-            keysMap.push(key);
-
-            return {
-                screenId: d.itemId,
-                key,
-            };
-        });
-
-        keysMap = keysMap.filter((k, i) => keysMap.map(k => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i);
-        
-        keysMap = keysMap
-            .reduce<tKey[]>((acc, { uniqueKey, ...k }) => {
-                if (acc.map(({ uniqueKey, ...k }) => JSON.stringify(k)).includes(JSON.stringify(k))) return acc;
-
-                k.children = k.children.map(({ uniqueKey, ...child }) => {
-                    uniqueKey = acc.find(({ uniqueKey, ...k }) => JSON.stringify(k) === JSON.stringify(child))?.uniqueKey || uuidV4();
-                    return {
-                        ...child,
-                        uniqueKey,
-                        children: child.children.map(({ uniqueKey, ...child }) => {
-                            uniqueKey = acc.find(({ uniqueKey, ...k }) => JSON.stringify(k) === JSON.stringify(child))?.uniqueKey || uuidV4();
-                            return {
-                                ...child,
-                                uniqueKey,
-                            };
-                        }),
-                    };
-                });
-                
-                const children: tKey[] = [];
-
-                k.children.forEach(child => {
-                    children.push(child);
-                    child.children.forEach(child2 => {
-                        children.push({
-                            ...child2,
-                            children: [],
+                        const keyId = getDataKeyUniqueKey({
+                            name: f.key || f.id,
+                            label: f.label || '',
+                            dataType: dataType,
                         });
-                    })
-                });
 
-                return [
-                    ...acc,
-                    { ...k, uniqueKey: uuidV4(), },
-                    ...children,
-                ];
-            }, []);
+                        return {
+                            ...f,
+                            keyId: keyId || '',
+                        };
+                    }),
 
-        keysMap = keysMap.filter(({ uniqueKey, ...k }, i) => {
-            return keysMap.map(({ uniqueKey, ...k }) => JSON.stringify(k)).indexOf(JSON.stringify(k)) === i;
-        });
+                    fields: s.fields.map(f => {
+                        let dataType = `${f.type}`;
 
-        let keys = keysMap.map(({ uniqueKey, ...k }) => {
-            const key = { ...k, uniqueKey };
+                        const keyId = getDataKeyUniqueKey({
+                            name: f.key,
+                            label: f.label || '',
+                            dataType: dataType,
+                        });
+                        
+                        return {
+                            ...f,
+                            keyId: keyId || '',
+                            items: (f.items || []).map(f => {
+                                const keyId = getDataKeyUniqueKey({
+                                    name: f.value as string,
+                                    label: `${f.label || ''}`,
+                                    dataType: `${dataType}_option`,
+                                });
 
-            k.children = k.children.map(({ uniqueKey, ...child }) => ({
-                ...child,
-                children: child.children.map(({ uniqueKey, ...child }) => ({
-                    ...child,
-                })),
-            })) as typeof key.children;
-
-            screensKeys.forEach(sk => {
-                const { uniqueKey, ...skKey } = sk.key;
-                skKey.children = skKey.children.map(({ uniqueKey, ...child }) => ({
-                    ...child,
-                    children: child.children.map(({ uniqueKey, ...child }) => ({
-                        ...child,
-                    })),
-                })) as typeof key.children;
-                if (JSON.stringify(skKey) === JSON.stringify(k)) {
-                    sk.key = key;
-                }
+                                return {
+                                    ...f,
+                                    keyId: keyId || '',
+                                };
+                            }),
+                        };
+                    }),
+                };
             });
-
-            diagnosesKeys.forEach(dk => {
-                const { uniqueKey, ...dkKey } = dk.key;
-                dkKey.children = dkKey.children.map(({ uniqueKey, ...child }) => ({
-                    ...child,
-                    children: child.children.map(({ uniqueKey, ...child }) => ({
-                        ...child,
-                    })),
-                })) as typeof key.children;
-                if (JSON.stringify(dkKey) === JSON.stringify(k)) {
-                    dk.key = key;
-                }
-            });
-
-            dffKeys.forEach(dk => {
-                const { uniqueKey, ...dkKey } = dk.key;
-                dkKey.children = dkKey.children.map(({ uniqueKey, ...child }) => ({
-                    ...child,
-                    children: child.children.map(({ uniqueKey, ...child }) => ({
-                        ...child,
-                    })),
-                })) as typeof key.children;
-                if (JSON.stringify(dkKey) === JSON.stringify(k)) {
-                    dk.key = key;
-                }
-            });
-
-            return key;
-        });
-
-        keys = keys.reduce((acc, key) => {
-            const dataType = key.dataType || '';
-            const shouldSpreadChildren = (dataType === 'form') || dataType.includes('edliz') || dataType.includes('_screen');
-
-            return [
-                ...acc,
-                ...(!shouldSpreadChildren ? [key] : (key.children as typeof keys)),
-            ];
-        }, [] as typeof keys);
-
-        keys = keys
-            .map(k => ({ ...k, label: k.label || k.name, }))
-            .filter(k => k.label && k.name);
-
-        keys = keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
-
-        console.log('keys.length', keys.length);
-
-        // await writeFile(path.resolve(__dirname, 'keys.json'), JSON.stringify(keys, null, 4));
-        // await writeFile(path.resolve(__dirname, 'screensKeys.json'), JSON.stringify(screensKeys, null, 4));
-
-        await db.insert(schema.dataKeysDrafts).values(
-            keys.map(({ children, ...k }) => {
-                return { 
-                    uuid: uuidV4(),
-                    name: k.name,
-                    uniqueKey: k.uniqueKey,
-                    data: {
-                        ...k,
-                        uuid: uuidV4(),
-                        version: 1,
-                        options: children.map(k => k.uniqueKey),
-                        metadata: {},
-                    },
-                } satisfies typeof schema.dataKeysDrafts.$inferInsert;
-            }),
-        );
+            
+            await _saveDiagnoses({ data: diagnoses, });
+            await _saveScreens({ data: screens, });
+        }
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
