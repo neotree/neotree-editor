@@ -1,1 +1,0 @@
-self.__NEXT_FONT_MANIFEST='{"pages":{},"app":{"/home/farai/Workbench/Neotree/neotree-editor-master/app/layout":["static/media/47cbc4e2adbc5db9-s.p.woff2"]},"appUsingSizeAdjust":true,"pagesUsingSizeAdjust":false}';
