@@ -15,7 +15,7 @@ export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 export type SaveDataKeysParams = {
     data: SaveDataKeysData[],
     broadcastAction?: boolean,
-    userId?: string;
+    updateRefs?: boolean;
 };
 
 export type SaveDataKeysResponse = { 
@@ -23,7 +23,11 @@ export type SaveDataKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDataKeys({ data: dataParam, broadcastAction, userId, }: SaveDataKeysParams) {
+export async function _saveDataKeys({ 
+    data: dataParam, 
+    broadcastAction, 
+    updateRefs = true,
+}: SaveDataKeysParams) {
     const response: SaveDataKeysResponse = { success: false, };
 
     try {
@@ -102,7 +106,6 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, userId, 
                             dataKeyId: published?.uuid,
                             name: data.name,
                             uniqueKey,
-                            createdByUserId: userId,
                         });
 
                         uniqueKeys.push(data.uniqueKey);
@@ -116,7 +119,7 @@ export async function _saveDataKeys({ data: dataParam, broadcastAction, userId, 
         if (errors.length) {
             response.errors = errors;
         } else {
-            if (uniqueKeys.length) {
+            if (updateRefs && uniqueKeys.length) {
                 const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
                 await _updateDataKeysRefs({ dataKeys, broadcastAction, });
             }
