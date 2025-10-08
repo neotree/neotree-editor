@@ -46,3 +46,5 @@ next-env.d.ts
 # DEPLOY
 deploy.sh
 deploy.command
+build/
+.next/
