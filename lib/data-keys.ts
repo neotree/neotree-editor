@@ -3,7 +3,7 @@ import { v4 as uuidV4 } from "uuid";
 import { _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
-import { diagnoses } from "@/databases/pg/schema";
+import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
 
 type KeyWithoutOptions = {
     name: string;
@@ -26,6 +26,15 @@ type Scrapped = {
     type: 'dff' | 'diagnosis' | 'screen';
     id: string;
 };
+
+export function isDataKeyValid(key: KeyWithoutOptions) {
+    // return true;
+    return !!(
+        key.label && 
+        key.name && 
+        key.dataType
+    );
+}
 
 export function getDataKeysQueryFields(keys: KeyWithoutOptions[]) {
     return keys.map(key => ({
@@ -59,11 +68,15 @@ type ScrapDataKeysParams = {
     diagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     drugsLibrary?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
     importedDataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+    dataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+    linkScrappedToDataKeys?: boolean;
 };
 
 export async function scrapDataKeys({
     screens = [],
     diagnoses = [],
+    dataKeys: dataKeysParam,
+    linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
     let diagnosesKeys: Scrapped[] = diagnoses.map(s => {
         const name = s.key || s.name;
@@ -100,7 +113,7 @@ export async function scrapDataKeys({
                 children: [
                     ...(s.fields || []).map(f => {
                         const name = f.key;
-                        const dataType = f.type;
+                        let dataType = f.type;
                         
                         return {
                             label: f.label,
@@ -137,17 +150,20 @@ export async function scrapDataKeys({
     });
 
     const mergedKeys = mergeScrappedKeys(diagnosesKeys, screensKeys);
-    const scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
+    let scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
 
-    return linkScrappedKeysToDataKeys({ scrappedKeys, });
+    const { data: dataKeys, } = dataKeysParam ? { data: dataKeysParam, } : (
+        !linkScrappedToDataKeys ? { data: [], } : await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), })
+    );
+
+    return linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
 }
 
-export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], }: {
+export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], dataKeys, }: {
     scrappedKeys: KeyWithOptions[];
     importedDataKeys?: ScrapDataKeysParams['importedDataKeys'];
+    dataKeys: DataKey[];
 }) {
-    const { data: dataKeys, } = await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), });
-
     scrappedKeys = scrappedKeys.map(k => {
         const { uniqueKey, uuid, } = { ...pickDataKey(dataKeys, k) };
         return {
@@ -176,17 +192,190 @@ export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKey
     });
 }
 
+export async function parseImportedDataKeys({ 
+    importedScrappedKeys = [], 
+    importedDataKeys = [], 
+    importedScreens = [],
+    importedDiagnoses = [],
+    importedDrugsLibraryItems = [],
+}: {
+    importedDataKeys: DataKey[];
+    importedScrappedKeys: Awaited<ReturnType<typeof scrapDataKeys>>;
+    importedScreens?: Awaited<ReturnType<typeof _getScreens>>['data'];
+    importedDiagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
+    importedDrugsLibraryItems?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
+}) {
+    let { data: localDataKeys, } = await _getDataKeys();
+
+    const importedUniqueIdDataKeyMap: Record<string, DataKey> = {};
+    const importedKeyJsonDataKeyMap: Record<string, DataKey> = {};
+    const importedKeyJsonNewIdsMap: Record<string, {
+        id?: number;
+        uuid: string;
+        uniqueKey: string;
+    }> = {};
+    importedDataKeys.forEach(k => {
+        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
+        importedUniqueIdDataKeyMap[k.uniqueKey] = k;
+        importedKeyJsonDataKeyMap[dataKeyToJSON(k)] = k;
+        importedKeyJsonNewIdsMap[dataKeyToJSON(k)] = {
+            id: localDataKey?.id,
+            uniqueKey: localDataKey?.uniqueKey || uuidV4(),
+            uuid: localDataKey?.uuid || uuidV4(),
+        };
+    });
+
+    const localUniqueIdDataKeyMap: Record<string, DataKey> = {};
+    const localKeyJsonDataKeyMap: Record<string, DataKey> = {};
+    localDataKeys.forEach(k => {
+        localUniqueIdDataKeyMap[k.uniqueKey] = k;
+        localKeyJsonDataKeyMap[dataKeyToJSON(k)] = k;
+    });
+
+    localDataKeys = localDataKeys.map(k => ({
+        ...k,
+        options: k.options.filter(o => importedUniqueIdDataKeyMap[o]),
+    }));
+
+    let parsed = importedDataKeys.map(k => {
+        const key = importedKeyJsonNewIdsMap[dataKeyToJSON(k)];
+        return {
+            ...k,
+            id: key.id,
+            uniqueKey: key.uniqueKey,
+            uuid: key.uuid,
+            isDifferentFromLocal: false,
+            canSave: false,
+            options: k.options.filter(o => importedUniqueIdDataKeyMap[o]).map(o => {
+                const key = importedUniqueIdDataKeyMap[o];
+                return importedKeyJsonNewIdsMap[dataKeyToJSON(key)].uniqueKey;
+            }),
+        };
+    });
+
+    parsed = parsed.map(k => {
+        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
+
+        const isDifferentFromLocal = !localDataKey || (
+            localDataKey &&
+            (
+                (dataKeyToJSON(localDataKey) !== dataKeyToJSON(k)) ||
+                (localDataKey.options.length !== k.options.length) ||
+                !!localDataKey.options.find((o, i) => k.options.indexOf(o) !== i)
+            )
+        );
+
+        let isScrapped = !!importedScrappedKeys.find(sk => dataKeyToJSON(sk) === dataKeyToJSON(k));
+
+        return {
+            ...k,
+            isDifferentFromLocal,
+            canSave: isScrapped && isDifferentFromLocal,
+        };
+    });
+
+    return {
+        dataKeys: parsed,
+
+        drugsLibrary: importedDrugsLibraryItems,
+
+        diagnoses: importedDiagnoses.map(s => {
+            const name = s.key || s.name;
+            const k = {
+                label: s.name,
+                name,
+                dataType: 'diagnosis',
+            }; 
+            const keyId = pickDataKey(parsed, k)?.uniqueKey;
+            return {
+                ...s,
+                keyId,
+                symptoms: (s.symptoms || []).map(f => {
+                    const name = f.key || f.name;
+                    const k = {
+                        label: f.name,
+                        name,
+                        dataType: `diagnosis_symptom_${f.type}`,
+                    };
+                    const keyId = pickDataKey(parsed, k)?.uniqueKey;
+                    return {
+                        ...f,
+                        keyId,
+                    }
+                }),
+            };
+        }),
+
+        screens: importedScreens.map(s => {
+            const k = {
+                label: s.label,
+                name: s.key,
+                dataType: s.type,
+            }; 
+            const keyId = pickDataKey(parsed, k)?.uniqueKey || '';
+            return {
+                ...s,
+                keyId,
+                fields: (s.fields || []).map(f => {
+                    const dataType = f.type;
+                    const k = {
+                        label: f.label,
+                        name: f.key,
+                        dataType,
+                    };
+                    const keyId = pickDataKey(parsed, k)?.uniqueKey;
+                    return {
+                        ...f,
+                        keyId,
+                        items: (f.items || []).map(item => {
+                            const k = {
+                                label: item.label as string,
+                                name: item.value as string,
+                                dataType: `${dataType}_option`,
+                            };
+                            const keyId = pickDataKey(parsed, k)?.uniqueKey;
+                            return {
+                                ...f,
+                                keyId,
+                            };
+                        }),
+                    };
+                }),
+                items: (s.items || []).map(f => {
+                    const name = f.key || f.id;
+                    let dataType = `${s.type}_option`;
+                    if (s.type === 'diagnosis') dataType = 'diagnosis';
+                    const k = {
+                        label: f.label,
+                        name,
+                        dataType,
+                    };
+                    const keyId = pickDataKey(parsed, k)?.uniqueKey;
+                    return {
+                        ...f,
+                        keyId,
+                    };
+                }),
+            };
+        }),
+    };
+}
+
 export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions[] {
     const scrapped = scrappedKeys.reduce((acc, keys) => [...acc, ...keys], [] as Scrapped[]);
 
     return scrapped.reduce((acc, { key: { children, ...k }, }) => {
         let nested2: typeof acc = [];
     
-        const nested1: typeof acc = children.map(({ children, ...k }) => {
-            children.forEach(k => nested2.push({
-                ...k,
-                options: [],
-            }));
+        const nested1: typeof acc = children.filter(k => isDataKeyValid(k)).map(({ children, ...k }) => {
+            children.forEach(k => {
+                if (isDataKeyValid(k)) {
+                    nested2.push({
+                        ...k,
+                        options: [],
+                    });
+                }
+            });
 
             return {
                 ...k,
@@ -196,10 +385,10 @@ export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions
 
         return [
             ...acc,
-            {
+            ...(!isDataKeyValid(k) ? [] : [{
                 ...k,
                 options: nested1,
-            },
+            }]),
             ...nested1,
             ...nested2,
         ];
