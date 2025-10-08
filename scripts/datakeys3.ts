@@ -14,7 +14,7 @@ import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { scrapDataKeys } from "@/lib/data-keys";
+import { parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -40,6 +40,7 @@ async function main() {
         let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
         let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
         let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
+        let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
 
         console.log(`Fetching ${country} sites`);
@@ -62,6 +63,10 @@ async function main() {
                 scriptsIds: !scriptsIds ? undefined : JSON.stringify(scriptsIds.split(',')),
             }));
 
+            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+
+            importedDataKeys = importedDataKeysRes.data;
+
             res.data.data.forEach(s => {
                 screens = [...screens, ...s.screens];
                 diagnoses = [...diagnoses, ...s.diagnoses];
@@ -70,19 +75,22 @@ async function main() {
             });
         }
 
-        // const scrappedDataKeys = await scrapDataKeys({
-        //     screens,
-        //     diagnoses,
-        //     drugsLibrary,
-        // });
+        const {
+            dataKeys: parsedImportedDataKeys,
+        } = await parseImportedDataKeys({
+            importedDataKeys,
+            importedScrappedKeys: scrappedDataKeys,
+        });
 
-        // const { data: dataKeys, } = !scrappedDataKeys.length ? { data: [], } : await _getDataKeys({
-        //     keys: scrappedDataKeys,
-        // });
+        console.log({
+            'importedDataKeys.length': importedDataKeys.length,
+            'parsedImportedDataKeys.length': parsedImportedDataKeys.length,
+            'parsedImportedDataKeys.filter(k => !k.id).length': parsedImportedDataKeys.filter(k => !k.id).length,
+            'parsedImportedDataKeys.filter(k => k.isDifferentFromLocal).length': parsedImportedDataKeys.filter(k => k.isDifferentFromLocal).length,
+            'parsedImportedDataKeys.filter(k => k.canSave).length': parsedImportedDataKeys.filter(k => k.canSave).length,
+        });
 
-        console.log('scrappedDataKeys.length', scrappedDataKeys.length);
-        // console.log('dataKeys.length', dataKeys.length);
-        await writeFile(path.resolve(__dirname, 'keys.json'), JSON.stringify(scrappedDataKeys, null, 4));
+        await writeFile(path.resolve(__dirname, 'keys.json'), JSON.stringify(parsedImportedDataKeys.filter(k => k.isDifferentFromLocal), null, 4));
     } catch(e: any) {
         console.error(e.message);
     } finally {

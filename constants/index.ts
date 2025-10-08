@@ -145,9 +145,19 @@ export const dataKeyTypes: {
     //     hasChildren: false,
     // },
     {
+        value: 'zw_edliz_summary_table',
+        label: 'zw_edliz_summary_table',
+        hasChildren: true,
+    },
+    {
         value: 'zw_edliz_summary_table_option',
         label: 'zw_edliz_summary_table_option',
         hasChildren: false,
+    },
+    {
+        value: 'mwi_edliz_summary_table',
+        label: 'mwi_edliz_summary_table',
+        hasChildren: true,
     },
     {
         value: 'mwi_edliz_summary_table_option',
@@ -157,7 +167,7 @@ export const dataKeyTypes: {
     {
         value: 'diagnosis',
         label: 'diagnosis',
-        hasChildren: false,
+        hasChildren: true,
     },
     {
         value: 'diagnosis_symptom_sign',
