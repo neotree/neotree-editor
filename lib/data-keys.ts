@@ -27,6 +27,15 @@ type Scrapped = {
     id: string;
 };
 
+export function isDataKeyValid(key: KeyWithoutOptions) {
+    // return true;
+    return !!(
+        key.label && 
+        key.name && 
+        key.dataType
+    );
+}
+
 export function getDataKeysQueryFields(keys: KeyWithoutOptions[]) {
     return keys.map(key => ({
         name: (key.name || '').trim(),
@@ -59,11 +68,15 @@ type ScrapDataKeysParams = {
     diagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     drugsLibrary?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
     importedDataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+    dataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+    linkScrappedToDataKeys?: boolean;
 };
 
 export async function scrapDataKeys({
     screens = [],
     diagnoses = [],
+    dataKeys: dataKeysParam = [],
+    linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
     let diagnosesKeys: Scrapped[] = diagnoses.map(s => {
         const name = s.key || s.name;
@@ -100,7 +113,7 @@ export async function scrapDataKeys({
                 children: [
                     ...(s.fields || []).map(f => {
                         const name = f.key;
-                        const dataType = f.type;
+                        let dataType = f.type;
                         
                         return {
                             label: f.label,
@@ -137,17 +150,20 @@ export async function scrapDataKeys({
     });
 
     const mergedKeys = mergeScrappedKeys(diagnosesKeys, screensKeys);
-    const scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
+    let scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
 
-    return linkScrappedKeysToDataKeys({ scrappedKeys, });
+    const { data: dataKeys, } = dataKeysParam ? { data: dataKeysParam, } : (
+        !linkScrappedToDataKeys ? { data: [], } : await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), })
+    );
+
+    return linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
 }
 
-export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], }: {
+export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], dataKeys, }: {
     scrappedKeys: KeyWithOptions[];
     importedDataKeys?: ScrapDataKeysParams['importedDataKeys'];
+    dataKeys: DataKey[];
 }) {
-    const { data: dataKeys, } = await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), });
-
     scrappedKeys = scrappedKeys.map(k => {
         const { uniqueKey, uuid, } = { ...pickDataKey(dataKeys, k) };
         return {
@@ -351,11 +367,15 @@ export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions
     return scrapped.reduce((acc, { key: { children, ...k }, }) => {
         let nested2: typeof acc = [];
     
-        const nested1: typeof acc = children.map(({ children, ...k }) => {
-            children.forEach(k => nested2.push({
-                ...k,
-                options: [],
-            }));
+        const nested1: typeof acc = children.filter(k => isDataKeyValid(k)).map(({ children, ...k }) => {
+            children.forEach(k => {
+                if (isDataKeyValid(k)) {
+                    nested2.push({
+                        ...k,
+                        options: [],
+                    });
+                }
+            });
 
             return {
                 ...k,
@@ -365,10 +385,10 @@ export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions
 
         return [
             ...acc,
-            {
+            ...(!isDataKeyValid(k) ? [] : [{
                 ...k,
                 options: nested1,
-            },
+            }]),
             ...nested1,
             ...nested2,
         ];
