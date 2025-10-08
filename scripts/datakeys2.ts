@@ -19,7 +19,7 @@ type tKey = {
     name: string;
     label: string;
     refId?: string;
-    dataType?: string;
+    dataType: string;
     children: tKey[];
     // children: {
     //     uniqueKey: string;

@@ -191,7 +191,7 @@ type GetScriptsWithItemsResponse = {
         screens: Awaited<ReturnType<typeof queries._getScreens>>['data'][0][];
         diagnoses: Awaited<ReturnType<typeof queries._getDiagnoses>>['data'][0][];
         drugsLibrary: Awaited<ReturnType<typeof queries._getScriptsDrugsLibrary>>['data'][0][];
-        dataKeys: Awaited<ReturnType<typeof scrapDataKeys>>['allKeys'];
+        dataKeys: Awaited<ReturnType<typeof scrapDataKeys>>;
     })[];
 };
 
@@ -231,7 +231,7 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
                 drugsLibrary: drugsLibraryItems,
             };
 
-            const { allKeys } = await scrapDataKeys({
+            const allKeys = await scrapDataKeys({
                 screens: screens.data,
                 diagnoses: diagnoses.data,
                 drugsLibrary: drugsLibraryItems,
@@ -614,8 +614,9 @@ export async function copyScripts(params?: {
             const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: JSON.stringify(scriptsIds),
             }));
-
             const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+
+            const { data: { data: importedDataKeys, } } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
 
             if (resData.errors) return { success: false, errors: resData.errors, info, };
 
