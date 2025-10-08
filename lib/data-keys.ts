@@ -75,7 +75,7 @@ type ScrapDataKeysParams = {
 export async function scrapDataKeys({
     screens = [],
     diagnoses = [],
-    dataKeys: dataKeysParam = [],
+    dataKeys: dataKeysParam,
     linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
     let diagnosesKeys: Scrapped[] = diagnoses.map(s => {
