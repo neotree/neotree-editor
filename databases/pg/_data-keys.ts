@@ -17,7 +17,7 @@ export const dataKeys = pgTable('nt_data_keys', {
     name: text('name').notNull(),
     label: text('label').default('').notNull(),
     refId: text('ref_id'),
-    dataType: text('data_type'),
+    dataType: text('data_type').notNull(),
     options: jsonb('options').default([]).$type<string[]>().notNull(),
     metadata: jsonb('metadata').default({}).$type<Record<string, any>>().notNull(),
     version: integer('version').notNull(),
