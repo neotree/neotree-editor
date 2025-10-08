@@ -157,7 +157,7 @@ export const dataKeyTypes: {
     {
         value: 'diagnosis',
         label: 'diagnosis',
-        hasChildren: false,
+        hasChildren: true,
     },
     {
         value: 'diagnosis_symptom_sign',
