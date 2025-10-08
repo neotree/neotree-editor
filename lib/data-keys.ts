@@ -1,73 +1,70 @@
+import { v4 as uuidV4 } from "uuid";
+
 import { _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { _getDataKeys } from "@/databases/queries/data-keys";
+import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses } from "@/databases/pg/schema";
 
-type Key = {
+type KeyWithoutOptions = {
     name: string;
     label: string;
     dataType: string;
+    uuid?: string;
     uniqueKey?: string;
 };
 
+type KeyWithOptions = KeyWithoutOptions & {
+    options: KeyWithoutOptions[];
+};
+
 type Scrapped = {
-    key: Key & {
-        children: (Key & {
-            children: Key[];
+    key: KeyWithoutOptions & {
+        children: (KeyWithoutOptions & {
+            children: KeyWithoutOptions[];
         })[];
     };
     type: 'dff' | 'diagnosis' | 'screen';
     id: string;
 };
 
-export function dataKeyToJSON(key: Key, opts?: {
-    lowerCase?: boolean;
-}) {
-    const lowerCase = opts?.lowerCase !== false;
-
-    let json = JSON.stringify({
+export function getDataKeysQueryFields(keys: KeyWithoutOptions[]) {
+    return keys.map(key => ({
         name: (key.name || '').trim(),
         label: (key.label || '').trim(),
         dataType: (key.dataType || '').trim(),
-    });
+    }));
+}
 
+export function dataKeyToJSON(key: KeyWithoutOptions, opts?: {
+    lowerCase?: boolean;
+}) {
+    const lowerCase = opts?.lowerCase !== false;
+    let json = JSON.stringify(getDataKeysQueryFields([key])[0]);
     if (lowerCase) json = json.toLowerCase();
-
     return json;
 }
 
-export function removeDuplicateDataKeys(keys: Key[]) {
+export function removeDuplicateDataKeys(keys: KeyWithoutOptions[]) {
     return keys
         .filter((k, i) => keys.map(k => dataKeyToJSON(k)).indexOf(dataKeyToJSON(k)) === i);
 }
 
-export function pickDataKey(keys: Key[], key: Key) {
+export function pickDataKey(keys: (KeyWithoutOptions & { options: string[]; })[], key: KeyWithoutOptions) {
     const found = keys.find(k => dataKeyToJSON(k) === dataKeyToJSON(key));
     return found;
 }
 
-export async function scrapDataKeys({
-    screens = [],
-    diagnoses = [],
-    // drugsLibrary = [],
-}: {
+type ScrapDataKeysParams = {
     screens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     diagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     drugsLibrary?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
-}) {
-    // let dffKeys: Scrapped[] = drugsLibrary.map(s => {
-    //     return {
-    //         id: s.itemId,
-    //         type: 'dff',
-    //         key: {
-    //             label: s.drug,
-    //             name: s.key,
-    //             dataType: s.type,
-    //             children: [],
-    //         },
-    //     }
-    // });
+    importedDataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
+};
 
+export async function scrapDataKeys({
+    screens = [],
+    diagnoses = [],
+}: ScrapDataKeysParams) {
     let diagnosesKeys: Scrapped[] = diagnoses.map(s => {
         const name = s.key || s.name;
         return {
@@ -139,86 +136,74 @@ export async function scrapDataKeys({
         };
     });
 
-    let allKeys = [
-        // ...dffKeys,
-        ...diagnosesKeys,
-        ...screensKeys,
-    ].reduce((acc, { key: { children, ...k }, }) => {
-        let nested2: Key[] = [];
+    const mergedKeys = mergeScrappedKeys(diagnosesKeys, screensKeys);
+    const scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
+
+    return linkScrappedKeysToDataKeys({ scrappedKeys, });
+}
+
+export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], }: {
+    scrappedKeys: KeyWithOptions[];
+    importedDataKeys?: ScrapDataKeysParams['importedDataKeys'];
+}) {
+    const { data: dataKeys, } = await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), });
+
+    scrappedKeys = scrappedKeys.map(k => {
+        const { uniqueKey, uuid, } = { ...pickDataKey(dataKeys, k) };
+        return {
+            ...k,
+            uniqueKey,
+            uuid: uuid || uuidV4(),
+        };
+    });
+
+    return scrappedKeys.map(k => {
+        const imported = pickDataKey(importedDataKeys, k) as DataKey;
+
+        if (imported) console.log(imported.name);
+
+        const options = imported?.options || k.options
+            .map(o => {
+                const { uniqueKey, uuid, } = { ...scrappedKeys.find(k => dataKeyToJSON(k) === dataKeyToJSON(o)), };
+                return uniqueKey || uuid!;
+            })
+            .filter(o => o);
+
+        return {
+            ...k,
+            options,
+        };
+    });
+}
+
+export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions[] {
+    const scrapped = scrappedKeys.reduce((acc, keys) => [...acc, ...keys], [] as Scrapped[]);
+
+    return scrapped.reduce((acc, { key: { children, ...k }, }) => {
+        let nested2: typeof acc = [];
     
-        const nested1 = children.map(({ children, ...k }) => {
-            children.forEach(k => nested2.push(k));
-            return k;
+        const nested1: typeof acc = children.map(({ children, ...k }) => {
+            children.forEach(k => nested2.push({
+                ...k,
+                options: [],
+            }));
+
+            return {
+                ...k,
+                options: nested2,
+            };
         });
 
         return [
             ...acc,
-            k,
+            {
+                ...k,
+                options: nested1,
+            },
             ...nested1,
             ...nested2,
         ];
-    }, [] as Key[]);
-
-    allKeys = removeDuplicateDataKeys(allKeys).filter(k => k.name);
-
-    const { data: dataKeys } = await _getDataKeys({ keys: allKeys, });
-
-    return {
-        dataKeys,
-
-        allKeys: allKeys.map(k => {
-            const uniqueKey = pickDataKey(dataKeys as Key[], k)?.uniqueKey;
-            return {
-                ...k,
-                uniqueKey,
-            };
-        }),
-
-        // dffKeys,
-
-        screens: screensKeys.map(k => {
-            const uniqueKey = pickDataKey(dataKeys as Key[], k.key)?.uniqueKey;
-
-            return {
-                ...k,
-                key: {
-                    ...k.key,
-                    uniqueKey,
-                    children: k.key.children.map(k => {
-                        const uniqueKey = pickDataKey(dataKeys as Key[], k)?.uniqueKey;
-                        return {
-                            ...k,
-                            uniqueKey,
-                            children: k.children.map(k => {
-                                const uniqueKey = pickDataKey(dataKeys as Key[], k)?.uniqueKey;
-                                return {
-                                    ...k,
-                                    uniqueKey,
-                                };
-                            }),
-                        };
-                    }),
-                },
-            };
-        }),
-
-        diagnoses: diagnosesKeys.map(k => {
-            const uniqueKey = pickDataKey(dataKeys as Key[], k.key)?.uniqueKey;
-
-            return {
-                ...k,
-                key: {
-                    ...k.key,
-                    uniqueKey,
-                    children: k.key.children.map(k => {
-                        const uniqueKey = pickDataKey(dataKeys as Key[], k)?.uniqueKey;
-                        return {
-                            ...k,
-                            uniqueKey,
-                        };
-                    }),
-                },
-            };
-        }),
-    };
+    }, [] as (KeyWithoutOptions & {
+        options: KeyWithoutOptions[];
+    })[]);
 }
