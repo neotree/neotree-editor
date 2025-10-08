@@ -1,6 +1,8 @@
 import readline from "node:readline";
 import { and, eq, inArray, } from "drizzle-orm";
 import queryString from "query-string";
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import '@/server/env';
 import db from '@/databases/pg/drizzle';
@@ -12,6 +14,7 @@ import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
+import { pickDataKey, scrapDataKeys } from "@/lib/data-keys";
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -117,6 +120,14 @@ async function promptAction() {
             prompt: '[3]: processChecklistDatakeys',
             fn: () => processChecklistDatakeys(),
         },
+        '4': {
+            prompt: '[4]: sanitizeDataKeys',
+            fn: () => sanitizeDataKeys(),
+        },
+        '5': {
+            prompt: '[5]: initialiseDataKeys',
+            fn: () => initialiseDataKeys(),
+        },
     };
 
     const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
@@ -136,6 +147,7 @@ async function loadData() {
     let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
     let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
     let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
+    let dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
 
     if (source === '1') {
          const { data: screensData, } = await _getScreens();
@@ -163,6 +175,9 @@ async function loadData() {
 
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
+            const { data: dataKeysRes, } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            dataKeys = dataKeysRes.data;
+
             const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
             }));
@@ -179,6 +194,7 @@ async function loadData() {
         screens,
         diagnoses,
         drugsLibrary,
+        dataKeys,
     };
 }
 
@@ -243,6 +259,31 @@ async function processChecklistDatakeys() {
                     };
                 }));
         }
+    } catch(e: any) {
+        console.error('ERROR:');
+        console.error(e);
+    } finally {
+        process.exit();
+    }
+}
+
+async function initialiseDataKeys() {
+    try {
+        const { diagnoses, screens, drugsLibrary, } = await loadData();
+
+        const { data: dataKeys, } = await _getDataKeys();
+
+        const scrappedKeys = await scrapDataKeys({
+            screens,
+            diagnoses,
+            dataKeys,
+            drugsLibrary,
+        });
+
+        await _saveDataKeys({
+            updateRefs: false,
+            data: scrappedKeys.filter(k => !pickDataKey(dataKeys, k)),
+        });
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
@@ -585,4 +626,122 @@ async function processDataKeysRefs() {
     } finally {
         process.exit();
     }
+}
+
+async function sanitizeDataKeys() {
+    console.log('loading data...');
+    const { data: dataKeys, } = await _getDataKeys();
+    const { data: screens } = await _getScreens();
+    const { data: diagnoses, } = await _getDiagnoses();
+
+    console.log('sanitising...');
+
+    const parsedDataKeys = dataKeys.map(k => {
+        return {
+            ...k,
+            name: `${k.name || ''}`.trim(),
+            label: `${k.label || ''}`.trim(),
+            options: k.options.filter(o => dataKeys.find(k => k.uniqueKey === o)),
+        };
+    });
+
+    const parsedDiagnoses = diagnoses.map(diagnosis => {
+        const name = `${diagnosis.key || diagnosis.name || ''}`.trim();
+        const k = {
+            label: `${diagnosis.name || ''}`,
+            name,
+            dataType: 'diagnosis',
+        }; 
+        const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
+        return {
+            ...diagnosis,
+            keyId,
+            name: (diagnosis.name || '').trim(),
+            key: (diagnosis.key || '').trim(),
+            symptoms: (diagnosis.symptoms || []).map(f => {
+                const name = `${f.key || f.name || ''}`.trim();
+                const k = {
+                    label: `${f.name || ''}`.trim(),
+                    name,
+                    dataType: `diagnosis_symptom_${f.type}`,
+                };
+                const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
+                return {
+                    ...f,
+                    keyId,
+                }
+            }),
+        };
+    });
+
+    const parsedScreens = screens.map(screen => {
+        const k = {
+            label: screen.label,
+            name: screen.key,
+            dataType: screen.type,
+        }; 
+        const keyId = pickDataKey(dataKeys, k)?.uniqueKey || '';
+        return {
+            ...screen,
+            label: `${screen.label || ''}`.trim(),
+            key: `${screen.key || ''}`.trim(),
+            keyId,
+            fields: (screen.fields || []).map(f => {
+                const dataType = f.type;
+                const k = {
+                    label: f.label,
+                    name: f.key,
+                    dataType,
+                };
+                const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
+                return {
+                    ...f,
+                    label: `${f.label || ''}`.trim(),
+                    key: `${f.key || ''}`.trim(),
+                    keyId,
+                    items: (f.items || []).map(item => {
+                        const k = {
+                            label: item.label as string,
+                            name: item.value as string,
+                            dataType: `${dataType}_option`,
+                        };
+                        const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
+                        return {
+                            ...f,
+                            label: `${item.label || ''}`.trim(),
+                            key: `${item.value || ''}`.trim(),
+                            keyId,
+                        };
+                    }),
+                };
+            }),
+            items: (screen.items || []).map(f => {
+                const name = f.key || f.id;
+                let dataType = `${screen.type}_option`;
+                if (screen.type === 'diagnosis') dataType = 'diagnosis';
+                const k = {
+                    label: f.label,
+                    name,
+                    dataType,
+                };
+                const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
+                return {
+                    ...f,
+                    label: `${f.label || ''}`.trim(),
+                    key: `${f.key || ''}`.trim(),
+                    id: `${f.id || ''}`.trim(),
+                    keyId,
+                };
+            }),
+        };
+    });
+
+    console.log('dataKeys...');
+    await _saveDataKeys({ data: parsedDataKeys, updateRefs: false, });
+
+    console.log('screens...');
+    await _saveScreens({ data: parsedScreens as unknown as Parameters<typeof _saveScreens>[0]['data'], });
+
+    console.log('diagnoses...');
+    await _saveDiagnoses({ data: parsedDiagnoses as unknown as Parameters<typeof _saveDiagnoses>[0]['data'], });
 }

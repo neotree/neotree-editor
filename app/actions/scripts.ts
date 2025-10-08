@@ -6,7 +6,7 @@ import queryString from "query-string";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library";
-import { _saveDataKeysIfNotExist } from "@/databases/mutations/data-keys";
+import { _saveDataKeys, _saveDataKeysIfNotExist } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
@@ -15,7 +15,7 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
-import { scrapDataKeys } from "@/lib/data-keys";
+import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -535,7 +535,7 @@ export async function saveScriptsWithItems({ data, }: {
             // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
-            if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
+            // if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
 
             if (drugsLibrary.length) {
                 const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
@@ -584,6 +584,9 @@ export async function copyScripts(params?: {
     } = { ...params };
 
     try {
+        let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
+        let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
+
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
         let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], } : await getScriptsWithItems({ scriptsIds });
@@ -593,12 +596,13 @@ export async function copyScripts(params?: {
         if (fromRemoteSiteId) {
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
+            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            importedDataKeys = importedDataKeysRes.data;
+
             const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: JSON.stringify(scriptsIds),
             }));
             const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
-
-            const { data: { data: importedDataKeys, } } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
 
             if (resData.errors) return { success: false, errors: resData.errors, info, };
 
@@ -606,13 +610,15 @@ export async function copyScripts(params?: {
 
             console.log('axiosClient', res.config.baseURL)
 
-            scripts.data.forEach(({ screens, diagnoses }, i) => {
+            scripts.data.forEach(({ screens, diagnoses, dataKeys }, i) => {
                 const getImageUrl = (suffix: string) => {
                     let host = res.config.baseURL || '';
                     if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
                     if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length);
                     return [host, suffix].filter(s => s).join('/');
                 };
+
+                scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
 
                 screens.forEach((d, j) => {
                     if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
@@ -638,6 +644,32 @@ export async function copyScripts(params?: {
                     }
                 });
             });
+
+            let index = -1;
+            const dataKeysToSave: Awaited<ReturnType<typeof parseImportedDataKeys>>['dataKeys'] = [];
+
+            for (const s of scripts.data) {
+                index++;
+                const { dataKeys, screens, diagnoses, drugsLibrary, } = await parseImportedDataKeys({
+                    importedDataKeys,
+                    importedScrappedKeys: scrappedDataKeys,
+                    importedScreens: s.screens,
+                    importedDiagnoses: s.diagnoses,
+                    importedDrugsLibraryItems: s.drugsLibrary,
+                });
+                console.log('scripts.data[index]', scripts.data[index], scripts.data[index]?.screens?.length, screens.length);
+                scripts.data[index].screens = screens as unknown as typeof s.screens;
+                scripts.data[index].diagnoses = diagnoses as unknown as typeof s.diagnoses;
+                scripts.data[index].drugsLibrary = drugsLibrary as unknown as typeof s.drugsLibrary;
+                
+                dataKeys.filter(k => k.canSave).forEach(k => {
+                    if (!dataKeysToSave.find(k2 => dataKeyToJSON(k2) === dataKeyToJSON(k))) {
+                        dataKeysToSave.push(k);
+                    }
+                });
+            }
+
+            if (dataKeysToSave.length) await _saveDataKeys({ data: dataKeysToSave, });
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> = { success: true, info, };
