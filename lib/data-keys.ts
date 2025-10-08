@@ -326,11 +326,12 @@ export async function parseImportedDataKeys({
                     };
                 }),
                 items: (s.items || []).map(f => {
+                    const name = f.key || f.id;
                     let dataType = `${s.type}_option`;
                     if (s.type === 'diagnosis') dataType = 'diagnosis';
                     const k = {
                         label: f.label,
-                        name: f.key,
+                        name,
                         dataType,
                     };
                     const keyId = pickDataKey(parsed, k)?.uniqueKey;
