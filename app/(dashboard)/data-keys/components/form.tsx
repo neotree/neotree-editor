@@ -31,7 +31,6 @@ import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
 import { SelectModal } from "@/components/select-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useIsLocked } from '@/hooks/use-is-locked';
 
 export function DataKeyForm(props: {
     disabled?: boolean;
@@ -57,13 +56,6 @@ function Form({
         (k.uuid === dataKeyId) ||
         (k.uniqueKey === dataKeyId)
     )), [dataKeys, dataKeyId]);
-
-    const isLocked = useIsLocked({
-        isDraft: !!dataKey?.isDraft,
-        userId: dataKey?.draftCreatedByUserId,
-    });
-
-    disabled = disabled || isLocked;
 
     const {
         control,
@@ -129,7 +121,6 @@ function Form({
                                             <Select
                                                 value={value}
                                                 name="name"
-                                                disabled={isFormDisabled}
                                                 onValueChange={val => {
                                                     onChange(val);
 
