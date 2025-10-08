@@ -1,6 +1,8 @@
 import readline from "node:readline";
 import { and, eq, inArray, } from "drizzle-orm";
 import queryString from "query-string";
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import '@/server/env';
 import db from '@/databases/pg/drizzle';
@@ -12,7 +14,7 @@ import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { pickDataKey } from "@/lib/data-keys";
+import { pickDataKey, scrapDataKeys } from "@/lib/data-keys";
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -122,6 +124,10 @@ async function promptAction() {
             prompt: '[4]: sanitizeDataKeys',
             fn: () => sanitizeDataKeys(),
         },
+        '5': {
+            prompt: '[5]: initialiseDataKeys',
+            fn: () => initialiseDataKeys(),
+        },
     };
 
     const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
@@ -141,6 +147,7 @@ async function loadData() {
     let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
     let diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'] = [];
     let drugsLibrary: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
+    let dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
 
     if (source === '1') {
          const { data: screensData, } = await _getScreens();
@@ -168,6 +175,9 @@ async function loadData() {
 
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
+            const { data: dataKeysRes, } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            dataKeys = dataKeysRes.data;
+
             const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
             }));
@@ -184,6 +194,7 @@ async function loadData() {
         screens,
         diagnoses,
         drugsLibrary,
+        dataKeys,
     };
 }
 
@@ -248,6 +259,31 @@ async function processChecklistDatakeys() {
                     };
                 }));
         }
+    } catch(e: any) {
+        console.error('ERROR:');
+        console.error(e);
+    } finally {
+        process.exit();
+    }
+}
+
+async function initialiseDataKeys() {
+    try {
+        const { diagnoses, screens, drugsLibrary, } = await loadData();
+
+        const { data: dataKeys, } = await _getDataKeys();
+
+        const scrappedKeys = await scrapDataKeys({
+            screens,
+            diagnoses,
+            dataKeys,
+            drugsLibrary,
+        });
+
+        await _saveDataKeys({
+            updateRefs: false,
+            data: scrappedKeys.filter(k => !pickDataKey(dataKeys, k)),
+        });
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
