@@ -36,8 +36,11 @@ export function DrugsLibrary({}: Props) {
     // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
 
     const { 
-        drugs, 
+        filteredDrugs: drugs, 
+        tableData,
         loading, 
+        searchValue,
+        setSearchValue,
         addLink,
         selectedItemId: itemId, 
         editLink,
@@ -87,6 +90,8 @@ export function DrugsLibrary({}: Props) {
                 title="Drugs & Fluids Library"
                 search={{
                     inputPlaceholder: 'Search',
+                    value: searchValue,
+                    setValue: searchValue => setSearchValue(searchValue),
                 }}
                 headerActions={(
                     <>
@@ -189,13 +194,7 @@ export function DrugsLibrary({}: Props) {
                         },
                     }
                 ]}
-                data={drugs.map(item => [
-                    item.drug || '',
-                    item.type || '',
-                    item.key || '',
-                    item.dosageText || '',
-                    item.itemId!,
-                ])}
+                data={tableData}
             />
         </>
     );
