@@ -18,6 +18,7 @@ import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 
 
@@ -42,22 +43,8 @@ function paginateData<T>(
     };
 }
 
-export type DataKey = {
-    uuid: string;
-    uniqueKey: string;
-    name: string;
-    refId: string;
-    dataType: string;
-    label: string;
-    options: any[];
-    metadata: any;
-    version: string;
-    createdAt: string;
-    updatedAt: string;
-    deletedAt: string | null;
-    isDraft: boolean;
-    isDeleted: boolean;
-};
+
+export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
 
 export type DataKeyFormData = {
     name: DataKey['name'];
