@@ -4,6 +4,8 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { Pagination } from "@/types";
+
 
 export type DataKey = typeof dataKeys.$inferSelect & {
     isDraft: boolean;
@@ -22,12 +24,46 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    pagination?: {
+        limit: number;
+        page: number;
+    }
 };
 
 export type GetDataKeysResults = {
     data: DataKey[];
+    pagination?: Pagination;
     errors?: string[];
 };
+
+export function batchData<T>(data: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < data.length; i += batchSize) {
+        batches.push(data.slice(i, i + batchSize));
+    }
+    return batches;
+}
+
+export function paginateData<T>(
+    data: T[], 
+    page: number, 
+    limit: number
+): { data: T[], pagination: Pagination } {
+    const total = data.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    
+    return {
+        data: data.slice(startIndex, endIndex),
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+        }
+    };
+}
 
 export async function _getDataKeys(
     params?: GetDataKeysParams
@@ -39,6 +75,7 @@ export async function _getDataKeys(
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
+            pagination: paginationParam,
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
@@ -139,7 +176,7 @@ export async function _getDataKeys(
             columns: { dataKeyId: true, },
         });
 
-        const responseData = [
+        const allData = [
             ...published.map(s => ({
                 ...s,
                 isDraft: false,
@@ -161,11 +198,49 @@ export async function _getDataKeys(
             })
             .filter(s => !inPendingDeletion.map(s => s.dataKeyId).includes(s.uuid));
 
-        return  { 
-            data: responseData,
+        // Apply pagination if requested
+        if (paginationParam) {
+            const { limit, page } = paginationParam;
+            const paginatedResult = paginateData(allData, page, limit);
+            
+            return {
+                data: paginatedResult.data,
+                pagination: paginatedResult.pagination,
+            };
+        }
+
+        // Return all data without pagination
+        return { 
+            data: allData,
         };
     } catch(e: any) {
         logger.error('_getDataKeys ERROR', e.message);
+        return { data: [], errors: [e.message], };
+    }
+}
+
+export async function _getDataKeysInBatches(
+    params?: GetDataKeysParams & { batchSize?: number }
+): Promise<GetDataKeysResults & { batches?: DataKey[][] }> {
+    try {
+        const { batchSize = 50, ...restParams } = { ...params };
+        
+        // Get all data at once without pagination
+        const result = await _getDataKeys({ ...restParams, pagination: undefined });
+        
+        if (result.errors || !result.data) {
+            return result;
+        }
+
+        // Split data into batches
+        const batches = batchData(result.data, batchSize);
+        
+        return {
+            data: result.data,
+            batches,
+        };
+    } catch(e: any) {
+        logger.error('_getDataKeysInBatches ERROR', e.message);
         return { data: [], errors: [e.message], };
     }
 }
@@ -232,4 +307,4 @@ export async function _getDataKey(
         logger.error('_getDataKey ERROR', e.message);
         return { errors: [e.message], };
     }
-} 
+}
