@@ -215,6 +215,10 @@ async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
             drugsLibrary,
         });
 
+        await db.delete(schema.dataKeysHistory);
+        await db.delete(schema.dataKeysDrafts);
+        await db.delete(schema.dataKeys);
+
         await _saveDataKeys({
             updateRefs: false,
             data: scrappedKeys,
