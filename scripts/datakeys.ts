@@ -117,8 +117,8 @@ async function promptAction() {
             fn: () => processDatakeysOptions(),
         },
         '3': {
-            prompt: '[3]: processChecklistDatakeys',
-            fn: () => processChecklistDatakeys(),
+            prompt: '[3]: resetDataKeys',
+            fn: () => resetDataKeys(),
         },
         '4': {
             prompt: '[4]: sanitizeDataKeys',
@@ -127,6 +127,11 @@ async function promptAction() {
         '5': {
             prompt: '[5]: initialiseDataKeys',
             fn: () => initialiseDataKeys(),
+        },
+
+        '6': {
+            prompt: '[6]: resetZimDataKeys',
+            fn: () => resetZimDataKeys(),
         },
     };
 
@@ -140,7 +145,7 @@ async function promptAction() {
     return actions[action];
 }
 
-async function loadData() {
+async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     const country = await promptCountry();
     const source = await promptSource();
 
@@ -165,6 +170,7 @@ async function loadData() {
             where: and(
                 eq(schema.sites.countryISO, country),
                 eq(schema.sites.type, 'webeditor'),
+                !env ? undefined : eq(schema.sites.env, env),
             ),
         });
 
@@ -198,73 +204,35 @@ async function loadData() {
     };
 }
 
-async function processChecklistDatakeys() {
+async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
     try {
-        const { screens, } = await loadData();
+        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData(env);
 
-        const checklistScreens = screens.filter(s => s.refIdDataKey).filter(s => s.type === 'checklist');
-
-        const checklistRefIdDataKeys = checklistScreens.map(s => s.refIdDataKey).filter(s => s);
-
-        const { data: checkListDataKeys, } = !checklistRefIdDataKeys.length ? { data: [], } : await _getDataKeys({
-            uniqueKeys: checklistRefIdDataKeys,
+        const scrappedKeys = await scrapDataKeys({
+            dataKeys,
+            screens,
+            diagnoses,
+            drugsLibrary,
         });
 
-        console.log('checklist datakeys...');
-        if (checkListDataKeys.length) {
-            await db.insert(schema.dataKeysDrafts).values(checkListDataKeys.map(k => {
-                let options: string[] = [];
+        await db.delete(schema.dataKeysHistory);
+        await db.delete(schema.dataKeysDrafts);
+        await db.delete(schema.dataKeys);
 
-                checklistScreens.forEach(s => {
-                    if (s.refIdDataKey === k.uniqueKey) {
-                        (s.items || []).filter(item => item.keyId).forEach(item => options.push(item.keyId!));
-                    }
-                });
-
-                options = options.filter((o, i) => options.indexOf(o) === i);
-
-                return {
-                    data: {
-                        ...k,
-                        dataType: 'checklist',
-                        options,
-                    },
-                    uuid: k.uuid,
-                    dataKeyId: k.uuid,
-                    name: k.name,
-                    uniqueKey: k.uniqueKey,
-                };
-            }));
-        }
-
-        console.log('checklist screens...');
-        if (checklistScreens.length) {
-            await db.insert(schema.screensDrafts).values(checklistScreens
-                .filter(s => checkListDataKeys.find(k => k.uniqueKey === s.refIdDataKey))
-                .map(s => {
-                    const dataKey = checkListDataKeys.find(k => k.uniqueKey === s.refIdDataKey)!;
-                    return {
-                        data: {
-                            ...s,
-                            key: dataKey.name,
-                            label: dataKey.label,
-                            keyId: dataKey.uniqueKey,
-                        },
-                        type: s.type,
-                        scriptId: s.scriptId,
-                        screenId: s.screenId,
-                        screenDraftId: s.screenId,
-                        title: s.title,
-                        position: s.position,
-                    };
-                }));
-        }
+        await _saveDataKeys({
+            updateRefs: false,
+            data: scrappedKeys,
+        });
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
     } finally {
         process.exit();
     }
+}
+
+async function resetZimDataKeys() {
+    await resetDataKeys('stage');
 }
 
 async function initialiseDataKeys() {
@@ -707,9 +675,9 @@ async function sanitizeDataKeys() {
                         };
                         const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
                         return {
-                            ...f,
+                            ...item,
                             label: `${item.label || ''}`.trim(),
-                            key: `${item.value || ''}`.trim(),
+                            value: `${item.value || ''}`.trim(),
                             keyId,
                         };
                     }),
