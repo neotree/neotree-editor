@@ -43,7 +43,6 @@ function paginateData<T>(
     };
 }
 
-
 export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
 
 export type DataKeyFormData = {
