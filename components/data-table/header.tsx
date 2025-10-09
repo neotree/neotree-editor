@@ -65,7 +65,7 @@ export function DataTableHeader({
                                         if (!val) search?.setValue?.(val);
                                     }}
                                     searchButton={{
-                                        type: 'button',
+                                        type: 'submit',
                                         // onClick: () => searchValue && search?.setValue?.(searchValue),
                                     }}
                                 />

@@ -109,13 +109,14 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, broadcastActi
 
             data = data.map(item => {
                 const found = existing.data.find(k => `${k.key}`.toLowerCase() === `${item.key}`.toLowerCase());
+
                 return {
                     ...item,
                     itemId: found?.itemId || item.itemId,
-                    createdAt: found?.createdAt || item.createdAt,
-                    updatedAt: found?.updatedAt || item.updatedAt,
-                    deletedAt: found?.deletedAt || item.deletedAt,
-                    publishDate: found?.publishDate || item.publishDate,
+                    createdAt: undefined,
+                    updatedAt: undefined,
+                    deletedAt: undefined,
+                    publishDate: undefined,
                     id: found?.id || item.id,
                     position: found?.position || item.position,
                     version: found?.version || item.version,
