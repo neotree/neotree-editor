@@ -707,9 +707,9 @@ async function sanitizeDataKeys() {
                         };
                         const keyId = pickDataKey(dataKeys, k)?.uniqueKey;
                         return {
-                            ...f,
+                            ...item,
                             label: `${item.label || ''}`.trim(),
-                            key: `${item.value || ''}`.trim(),
+                            value: `${item.value || ''}`.trim(),
                             keyId,
                         };
                     }),
