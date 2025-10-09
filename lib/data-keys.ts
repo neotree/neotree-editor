@@ -274,6 +274,21 @@ export async function parseImportedDataKeys({
         };
     });
 
+    parsed = parsed.map(k => {
+        let canSave = k.canSave;
+        if (k.isDifferentFromLocal) {
+            parsed.forEach(k2 => {
+                if (k2.canSave) {
+                    canSave = canSave || k2.options.includes(k.uniqueKey);
+                }
+            });
+        }
+        return {
+            ...k,
+            canSave,
+        };
+    });
+
     return {
         dataKeys: parsed,
 
