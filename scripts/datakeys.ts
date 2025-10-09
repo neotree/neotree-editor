@@ -204,9 +204,9 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     };
 }
 
-async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
+async function resetDataKeys() {
     try {
-        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData(env);
+        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData();
 
         let scrappedKeys = await scrapDataKeys({
             dataKeys,
@@ -244,7 +244,23 @@ async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
 }
 
 async function resetZimDataKeys() {
-    await resetDataKeys('stage');
+    const { dataKeys, } = await loadData('stage');
+
+    await db.delete(schema.dataKeysHistory);
+    await db.delete(schema.dataKeysDrafts);
+    await db.delete(schema.dataKeys);
+
+    await _saveDataKeys({
+        updateRefs: false,
+        data: dataKeys.map(k => ({
+            uuid: k.uuid,
+            uniqueKey: k.uniqueKey,
+            name: k.name,
+            label: k.label,
+            options: k.options,
+            dataType: k.dataType,
+        })),
+    });
 }
 
 async function initialiseDataKeys() {
