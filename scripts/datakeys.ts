@@ -128,6 +128,11 @@ async function promptAction() {
             prompt: '[5]: initialiseDataKeys',
             fn: () => initialiseDataKeys(),
         },
+
+        '6': {
+            prompt: '[6]: resetZimDataKeys',
+            fn: () => resetZimDataKeys(),
+        },
     };
 
     const action = await askQuestion<keyof typeof actions>(Object.values(actions).map(a => a.prompt).join('\n') + '\n> ');
@@ -140,7 +145,7 @@ async function promptAction() {
     return actions[action];
 }
 
-async function loadData() {
+async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     const country = await promptCountry();
     const source = await promptSource();
 
@@ -165,6 +170,7 @@ async function loadData() {
             where: and(
                 eq(schema.sites.countryISO, country),
                 eq(schema.sites.type, 'webeditor'),
+                !env ? undefined : eq(schema.sites.env, env),
             ),
         });
 
@@ -198,9 +204,9 @@ async function loadData() {
     };
 }
 
-async function resetDataKeys() {
+async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
     try {
-        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData();
+        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData(env);
 
         const scrappedKeys = await scrapDataKeys({
             dataKeys,
@@ -219,6 +225,10 @@ async function resetDataKeys() {
     } finally {
         process.exit();
     }
+}
+
+async function resetZimDataKeys() {
+    await resetDataKeys('stage');
 }
 
 async function initialiseDataKeys() {
