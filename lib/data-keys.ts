@@ -156,7 +156,14 @@ export async function scrapDataKeys({
         !linkScrappedToDataKeys ? { data: [], } : await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), })
     );
 
-    return linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
+    let keys = await linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
+
+    keys = keys.map(k => ({
+        ...k,
+        options: k.options.filter((o, i) => k.options.indexOf(o) === i),
+    }))
+
+    return keys;
 }
 
 export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], dataKeys, }: {
