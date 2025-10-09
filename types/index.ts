@@ -170,3 +170,10 @@ export type ScreenReviewField = {
     value: string;
     key: string;
  }
+
+export type Pagination = {
+    limit: number;
+    page: number;
+    total: number; 
+    totalPages: number;
+}
