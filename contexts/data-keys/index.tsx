@@ -18,8 +18,8 @@ import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
-import { _getDataKeys } from "@/databases/queries/data-keys";
 
 
 function paginateData<T>(
