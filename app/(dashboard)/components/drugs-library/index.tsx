@@ -30,8 +30,6 @@ export function DrugsLibrary({}: Props) {
         filteredDrugs: drugs, 
         tableData,
         loading, 
-        searchValue,
-        setSearchValue,
         addLink,
         selectedItemId: itemId, 
         editLink,
@@ -81,8 +79,6 @@ export function DrugsLibrary({}: Props) {
                 title="Drugs & Fluids Library"
                 search={{
                     inputPlaceholder: 'Search',
-                    value: searchValue,
-                    setValue: searchValue => setSearchValue(searchValue),
                 }}
                 headerActions={(
                     <>
