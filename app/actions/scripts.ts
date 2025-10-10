@@ -16,6 +16,7 @@ import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -421,7 +422,13 @@ export async function deleteScriptsItems({ scriptsIds, }: {
     }
 }
 
-const saveScriptsWithItemsInfo = { scripts: 0, screens: 0, diagnoses: 0, drugsLibrary: 0, };
+const saveScriptsWithItemsInfo = { 
+    scripts: 0, 
+    screens: 0, 
+    diagnoses: 0, 
+    dffItems: 0,
+    dataKeys: 0,
+};
 
 export async function saveScriptsWithItems({ data, }: {
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
@@ -534,25 +541,6 @@ export async function saveScriptsWithItems({ data, }: {
             const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, });
             // saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
-
-            // if (dataKeys.length) await _saveDataKeysIfNotExist({ data: dataKeys, });
-
-            if (drugsLibrary.length) {
-                const saveDrugsLibrary = await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ 
-                    data: drugsLibrary.map(item => ({
-                        ...item,
-                        itemId: v4(),
-                        createdAt: undefined!,
-                        updatedAt: undefined!,
-                        deletedAt: undefined!,
-                        publishDate: undefined!,
-                        id: undefined!,
-                        position: undefined,
-                    })),
-                });
-                // saveDrugsLibrary.errors?.forEach(e => errors.push(e));
-                info.drugsLibrary += drugsLibrary.length;
-            }
         }
 
         if (errors.length) return { success: false, errors, info, };
@@ -571,6 +559,8 @@ export async function copyScripts(params?: {
     fromRemoteSiteId?: string;
     overWriteScriptWithId?: string;
     broadcastAction?: boolean;
+    overwriteDataKeys?: boolean;
+    overwriteDrugsLibraryItems?: boolean;
 }): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>>> {
     const info = { ...saveScriptsWithItemsInfo };
 
@@ -581,6 +571,8 @@ export async function copyScripts(params?: {
         fromRemoteSiteId,
         broadcastAction,
         overWriteScriptWithId,
+        overwriteDataKeys,
+        overwriteDrugsLibraryItems,
     } = { ...params };
 
     try {
@@ -590,6 +582,8 @@ export async function copyScripts(params?: {
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
         let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], } : await getScriptsWithItems({ scriptsIds });
+        let dataKeysToSave: Awaited<ReturnType<typeof parseImportedDataKeys>>['dataKeys'] = [];
+        let dffItemsToSave: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
@@ -610,7 +604,7 @@ export async function copyScripts(params?: {
 
             console.log('axiosClient', res.config.baseURL)
 
-            scripts.data.forEach(({ screens, diagnoses, dataKeys }, i) => {
+            scripts.data.forEach(({ screens, diagnoses, dataKeys, drugsLibrary }, i) => {
                 const getImageUrl = (suffix: string) => {
                     let host = res.config.baseURL || '';
                     if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
@@ -619,6 +613,7 @@ export async function copyScripts(params?: {
                 };
 
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
+                dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
 
                 screens.forEach((d, j) => {
                     if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
@@ -646,8 +641,6 @@ export async function copyScripts(params?: {
             });
 
             let index = -1;
-            const dataKeysToSave: Awaited<ReturnType<typeof parseImportedDataKeys>>['dataKeys'] = [];
-
             for (const s of scripts.data) {
                 index++;
                 const { dataKeys, screens, diagnoses, drugsLibrary, } = await parseImportedDataKeys({
@@ -657,7 +650,6 @@ export async function copyScripts(params?: {
                     importedDiagnoses: s.diagnoses,
                     importedDrugsLibraryItems: s.drugsLibrary,
                 });
-                console.log('scripts.data[index]', scripts.data[index], scripts.data[index]?.screens?.length, screens.length);
                 scripts.data[index].screens = screens as unknown as typeof s.screens;
                 scripts.data[index].diagnoses = diagnoses as unknown as typeof s.diagnoses;
                 scripts.data[index].drugsLibrary = drugsLibrary as unknown as typeof s.drugsLibrary;
@@ -667,9 +659,11 @@ export async function copyScripts(params?: {
                         dataKeysToSave.push(k);
                     }
                 });
-            }
 
-            if (dataKeysToSave.length) await _saveDataKeys({ data: dataKeysToSave, });
+                dataKeysToSave = dataKeysToSave.filter(k => {
+                    return overwriteDrugsLibraryItems || k.isNew;
+                });
+            }
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> = { success: true, info, };
@@ -697,6 +691,20 @@ export async function copyScripts(params?: {
                     })),
                 });
             }
+        }
+
+        if (dffItemsToSave.length) {
+            const { data: dffItems, } = await _getDrugsLibraryItems();
+            const res = overwriteDrugsLibraryItems ? 
+                await drugsLibraryMutations._saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, })
+                :
+                await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, });
+            if (res.success) response.info.dffItems = dffItemsToSave.length;
+        }
+
+        if (dataKeysToSave.length) {
+            const res = await _saveDataKeys({ data: dataKeysToSave, });
+            if (res.success) response.info.dataKeys = dataKeysToSave.length;
         }
 
         if (broadcastAction && !response?.errors?.length) socket.emit('data_changed', 'copy_scripts');

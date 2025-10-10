@@ -246,6 +246,7 @@ export async function parseImportedDataKeys({
 
     let parsed = importedDataKeys.map(k => {
         const key = importedKeyJsonNewIdsMap[dataKeyToJSON(k)];
+        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
         return {
             ...k,
             id: key.id,
@@ -253,6 +254,7 @@ export async function parseImportedDataKeys({
             uuid: key.uuid,
             isDifferentFromLocal: false,
             canSave: false,
+            isNew: !localDataKey,
             options: k.options.filter(o => importedUniqueIdDataKeyMap[o]).map(o => {
                 const key = importedUniqueIdDataKeyMap[o];
                 return importedKeyJsonNewIdsMap[dataKeyToJSON(key)].uniqueKey;
