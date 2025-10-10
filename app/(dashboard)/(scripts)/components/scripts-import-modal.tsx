@@ -27,6 +27,14 @@ import { cn } from "@/lib/utils";
 import { useSites } from "@/hooks/use-sites";
 import { ErrorCard } from "@/components/error-card";
 
+const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
+    siteId: '',
+    scriptId: '',
+    confirmed: overWriteScriptWithId ? false : true,
+    overwriteDataKeys: true,
+    overwriteDrugsLibraryItems: true,
+});
+
 export function ScriptsImportModal({ 
     open, 
     overWriteScriptWithId,
@@ -62,14 +70,12 @@ export function ScriptsImportModal({
         register,
         handleSubmit,
     } = useForm({
-        defaultValues: {
-            siteId: '',
-            scriptId: '',
-            confirmed: overWriteScriptWithId ? false : true,
-        },
+        defaultValues: getDefaultFormFields(overWriteScriptWithId),
     });
 
     const confirmed = watch('confirmed');
+    const overwriteDataKeys = watch('overwriteDataKeys');
+    const overwriteDrugsLibraryItems = watch('overwriteDrugsLibraryItems');
 
     const importScripts = handleSubmit(async (data) => {
         try {
@@ -89,6 +95,8 @@ export function ScriptsImportModal({
             // TODO: Replace this with server action
             const response = await axios.post('/api/scripts/copy', { 
                 fromRemoteSiteId: data.siteId, 
+                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems, 
+                overwriteDataKeys: data.overwriteDataKeys, 
                 scriptsIds: [data.scriptId], 
                 overWriteScriptWithId: overWriteScriptWithId,
                 broadcastAction: true,
@@ -105,7 +113,7 @@ export function ScriptsImportModal({
                 message: 'Script imported successfully!',
                 onClose: () => {
                     onImportSuccess?.();
-                    resetForm({ siteId: '', scriptId: '', confirmed: false, });
+                    resetForm(getDefaultFormFields(overWriteScriptWithId));
                     onOpenChange(false);
                 },
             });
@@ -128,6 +136,7 @@ export function ScriptsImportModal({
                 open={open}
                 onOpenChange={() => {
                     onOpenChange(false);
+                    resetForm(getDefaultFormFields(overWriteScriptWithId));
                 }}
                 title="Import script"
                 actions={(
@@ -157,13 +166,8 @@ export function ScriptsImportModal({
             >
                 <div className="flex flex-col gap-y-5">
                     <ErrorCard>
-                        <div className="py-2 px-4 text-sm">
-                            <ol className="list-decimal">
-                                <li>New data keys <b>will be appended</b> to the data-keys library</li>
-                                <li>Incoming data keys <b>will overwrite existing</b> data keys if they differ</li>
-                                <li>New drugs/fluids <b>will be appended</b> to the dff library</li>
-                                <li>Incoming drugs/fluids will <b>NOT overwrite</b> existing ones even if they differ</li>
-                            </ol>
+                        <div className="p-2 text-sm">
+                            New data keys, drugs, feeds & fluids <b>will be appended</b> to the library
                         </div>
                     </ErrorCard>
 
@@ -200,6 +204,28 @@ export function ScriptsImportModal({
                             name="scriptId"
                         />
                         {!!errors.scriptId?.message && <div className="text-xs text-danger mt-1">{errors.scriptId.message}</div>}
+                    </div>
+
+                    <div className={cn("flex gap-x-2")}>
+                        <Checkbox 
+                            name="overwriteDataKeys"
+                            id="overwriteDataKeys"
+                            disabled={disabled}
+                            checked={overwriteDataKeys}
+                            onCheckedChange={() => setValue('overwriteDataKeys', !overwriteDataKeys, { shouldDirty: true, })}
+                        />
+                        <Label secondary htmlFor="overwriteDataKeys">Overwrite datakeys</Label>
+                    </div>
+
+                    <div className={cn("flex gap-x-2")}>
+                        <Checkbox 
+                            name="overwriteDrugsLibraryItems"
+                            id="overwriteDrugsLibraryItems"
+                            disabled={disabled}
+                            checked={overwriteDrugsLibraryItems}
+                            onCheckedChange={() => setValue('overwriteDrugsLibraryItems', !overwriteDrugsLibraryItems, { shouldDirty: true, })}
+                        />
+                        <Label secondary htmlFor="overwriteDrugsLibraryItems">Overwrite drugs, fluids & feeds</Label>
                     </div>
 
                     <div className={cn("flex gap-x-2", !overWriteScriptWithId && 'hidden')}>
