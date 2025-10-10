@@ -2,7 +2,7 @@
 
 import SortableList, { SortableItem, SortableKnob } from 'react-easy-sort';
 import { arrayMoveImmutable } from 'array-move';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Move } from 'lucide-react';
 
 import {
@@ -44,7 +44,14 @@ export const DataTable = (props: DataTableProps) => {
     const table = useTable({ props });
 
     const { 
-        state: { columns, rows, skeletonRows, selected, }, 
+        searchValue,
+        state: { 
+            columns, 
+            rows, 
+            skeletonRows, 
+            selected, 
+        }, 
+        setSearchValue,
         setState,
         setFilter,
         setSelected,
@@ -69,10 +76,6 @@ export const DataTable = (props: DataTableProps) => {
         onSort?.(oldIndex, newIndex, sorted);
         setSelected([]);
     }, [setState, onSort, setSelected]);
-
-    const [internalSearchValue, setInternalSearchValue] = useState(''); 
-
-    const searchValue = props.search?.value || internalSearchValue;
     
     const canSort = !searchValue && sortable && !props.rowRenderer;
 
@@ -82,8 +85,8 @@ export const DataTable = (props: DataTableProps) => {
                 {...props} 
                 search={!props.search ? undefined : {
                     ...props.search,
-                    value: props.search?.value === undefined ? internalSearchValue : props.search.value,
-                    setValue: props.search?.setValue || setInternalSearchValue,
+                    value: searchValue,
+                    setValue: setSearchValue,
                 }}
             />
 
@@ -195,11 +198,6 @@ export const DataTable = (props: DataTableProps) => {
                             )}
 
                             {displayRows.map((row) => {
-                                if (
-                                    searchValue &&
-                                    !JSON.stringify(row.cells.map(r => `${r.value}`.toLowerCase())).includes(searchValue.toLowerCase())
-                                ) return null;
-
                                 if (filter && !filter(row.rowIndex)) return null;
 
                                 let rowProps: TableRowProps = {
@@ -264,7 +262,7 @@ export const DataTable = (props: DataTableProps) => {
                                             >
                                                 {loading ? (
                                                     <Skeleton className="h-4 w-[120px] bg-black/10 dark:bg-white/10" />
-                                                ) : col.cellRenderer?.(cell) || cell.value}
+                                                ) : col.cellRenderer ? col.cellRenderer(cell) : cell.value}
                                             </TableCell>
                                         );
                                     })
