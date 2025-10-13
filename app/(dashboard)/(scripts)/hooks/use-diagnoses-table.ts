@@ -29,6 +29,7 @@ const defaultSearchState = {
     filter: 'all' as ScriptsSearchResultsFilter,
     searching: false,
     results: [] as ScriptsSearchResultsItem[],
+    unfilteredResults: [] as ScriptsSearchResultsItem[],
 };
 
 export function useDiagnosesTable({
@@ -154,6 +155,7 @@ export function useDiagnosesTable({
                     filter: prev.filter,
                     searching: false,
                     results,
+                    unfilteredResults: results,
                 }));
             }
         } catch(e: any) {
