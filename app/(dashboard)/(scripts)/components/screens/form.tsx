@@ -321,8 +321,6 @@ export function ScreenForm({
         );
     }
 
-    console.log(formData)
-
     return (
         <>
             {displayLoader && <Loader overlay />}
