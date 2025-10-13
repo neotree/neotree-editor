@@ -65,6 +65,7 @@ export async function _searchScripts({
             isNull(schema.screens.deletedAt),
             !screensDrafts.length ? undefined : notInArray(schema.screens.screenId, screensDrafts.map(d => d.screenDraftId)),
             or(
+                sql`lower(${schema.screens.condition}::text) like ${`%${searchValue}%`}`,
                 sql`lower(${schema.screens.sectionTitle}::text) like ${`%${searchValue}%`}`,
                 sql`lower(${schema.screens.previewTitle}::text) like ${`%${searchValue}%`}`,
                 sql`lower(${schema.screens.previewPrintTitle}::text) like ${`%${searchValue}%`}`,
@@ -97,6 +98,7 @@ export async function _searchScripts({
             !diagnosesDrafts.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesDrafts.map(d => d.diagnosisDraftId)),
             or(
                 sql`lower(${schema.diagnoses.name}::text) like ${`%${searchValue}%`}`,
+                sql`lower(${schema.diagnoses.expression}::text) like ${`%${searchValue}%`}`,
                 sql`lower(${schema.diagnoses.symptoms}::text) like ${`%${searchValue}%`}`,
                 sql`lower(${schema.diagnoses.key}::text) like ${`%${searchValue}%`}`,
             ),
