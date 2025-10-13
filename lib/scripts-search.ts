@@ -25,12 +25,14 @@ export type ScriptsSearchResultsItem = {
         title: string;
         isDraft: boolean;
         screenId: string;
+        fields: { label: string; type: string, }[];
         matches: ScriptsSearchResultsItem['matches'];
     }[];
     diagnoses: {
         title: string;
         isDraft: boolean;
         diagnosisId: string;
+        fields: { label: string; type: string, }[];
         matches: ScriptsSearchResultsItem['matches'];
     }[];
 };
@@ -132,6 +134,13 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.condition || ''}`.toLowerCase().match(searchValue)) {
+            matches.push({
+                field: 'condition',
+                fieldValue: s.condition!,
+            });
+        }
+
         (s.fields || []).map((f: ScriptField, i) => {
             if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
                 matches.push({
@@ -146,6 +155,14 @@ export function parseScriptsSearchResults({
                     field: 'field_label',
                     fieldIndex: i,
                     fieldValue: f.label,
+                });
+            }
+
+            if (`${f.condition || ''}`.toLowerCase().match(searchValue)) {
+                matches.push({
+                    field: 'field_condition',
+                    fieldIndex: i,
+                    fieldValue: f.condition,
                 });
             }
         });
@@ -220,6 +237,16 @@ export function parseScriptsSearchResults({
                 matches,
                 screenId: s.screenId,
                 isDraft: s.isDraft,
+                fields: [
+                    ...s.items.map(f => ({
+                        label: f.label,
+                        type: 'item',
+                    })),
+                    ...s.fields.map(f => ({
+                        label: f.label,
+                        type: 'field',
+                    })),
+                ],
             });
         }
     });
@@ -241,6 +268,13 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.expression || ''}`.toLowerCase().match(searchValue)) {
+            matches.push({
+                field: 'expression',
+                fieldValue: s.expression!,
+            });
+        }
+
         (s.symptoms || []).map((f, i) => {
             if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
                 matches.push({
@@ -255,6 +289,14 @@ export function parseScriptsSearchResults({
                     field: 'diagnosis_symptom_name',
                     fieldIndex: i,
                     fieldValue: f.name,
+                });
+            }
+
+            if (`${f.expression || ''}`.toLowerCase().match(searchValue)) {
+                matches.push({
+                    field: 'diagnosis_symptom_expression',
+                    fieldIndex: i,
+                    fieldValue: f.expression,
                 });
             }
         });
@@ -273,6 +315,12 @@ export function parseScriptsSearchResults({
                 matches,
                 diagnosisId: s.diagnosisId,
                 isDraft: s.isDraft,
+                fields: [
+                    ...s.symptoms.map(f => ({
+                        label: f.name,
+                        type: 'diagnosis_symptom',
+                    })),
+                ],
             });
         }
     });
@@ -287,7 +335,7 @@ export const scriptsSearchResultsFilters = [
     },
     {
         value: 'ref_id',
-        label: 'Ref only',
+        label: 'Ref ID only',
     },
     {
         value: 'data_key',
@@ -301,55 +349,64 @@ export const scriptsSearchResultsFilters = [
         value: 'title',
         label: 'Title only',
     },
+    {
+        value: 'condition',
+        label: 'Conditional expression only',
+    },
 ] as const;
 
 export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResultsFilters>['value'];
 
-export function filterScriptsSearchResults(
-    filter: ScriptsSearchResultsFilter,
-    results: ScriptsSearchResultsItem[],
-) {
+const matchedFieldFilterMap: Record<string, string> = {
+    key: 'data_key',
+    field_key: 'data_key',
+    field_id: 'data_key',
+    item_id: 'data_key',
+    item_key: 'data_key',
+    refId: 'ref_id',
+    title: 'title',
+    label: 'label',
+    field_label: 'label',
+    item_label: 'label',
+    condition: 'condition',
+    field_condition: 'condition',
+    item_condition: 'condition',
+};
+
+export function filterScriptsSearchResults({ searchValue, filter, results, }: {
+    searchValue: string;
+    filter: ScriptsSearchResultsFilter;
+    results: ScriptsSearchResultsItem[];
+}) {
     if (filter === 'all') return results;
     
     const filterFn = (m: ScriptsSearchResultsItem['matches'][0]) => {
-        if (filter === 'data_key') {
-            return (
-                m.field === 'key' ||
-                m.field === 'field_key' ||
-                m.field === 'field_id' ||
-                m.field === 'item_id' ||
-                m.field === 'item_key'
-            );
-        }
-
-        if (filter === 'ref_id') {
-            return (
-                m.field === 'refId'
-            );
-        }
-
-        if (filter === 'title') {
-            return (
-                m.field === 'title'
-            );
-        }
-
-        if (filter === 'label') {
-            return (
-                m.field === 'label'
-            );
-        }
+        if (matchedFieldFilterMap[m.field] !== filter) return false;
+        if (!`${m.fieldValue || ''}`.toLowerCase().includes(`${searchValue || ''}`.toLowerCase())) return false;
+        return true;
     }
-    return results.map(r => {
+    const filtered = results.map(r => {
         return !filter ? r : {
             ...r,
             matches: r.matches.filter(m => filterFn(m)),
-            screens: r.screens.filter(s => s.matches.find(m => filterFn(m))),
-            diagnoses: r.diagnoses.filter(s => s.matches.find(m => filterFn(m))),  
+            screens: r.screens.filter(s => s.matches.find(m => filterFn(m))).map(s => {
+                return {
+                    ...s,
+                    matches: s.matches.filter(m => filterFn(m)),
+                };
+            }),
+            diagnoses: r.diagnoses.filter(s => s.matches.find(m => filterFn(m))).map(s => {
+                return {
+                    ...s,
+                    matches: s.matches.filter(m => filterFn(m)),
+                };
+            }),  
         };
     }).filter(r => (
         r.matches.length ||
         r.screens.length ||
         r.diagnoses.length
     ));
+
+    return filtered;
 }

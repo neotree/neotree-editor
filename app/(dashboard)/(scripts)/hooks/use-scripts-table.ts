@@ -9,7 +9,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useScriptsContext, IScriptsContext } from "@/contexts/scripts";
 import { useAppContext } from "@/contexts/app";
-import { type ScriptsSearchResultsItem, type ScriptsSearchResultsFilter, filterScriptsSearchResults, } from "@/lib/scripts-search";
+import { type ScriptsSearchResultsItem, type ScriptsSearchResultsFilter, } from "@/lib/scripts-search";
 
 export type UseScriptsTableParams = {
     scripts: Awaited<ReturnType<IScriptsContext['getScripts']>>;
@@ -20,6 +20,7 @@ const defaultSearchState = {
     filter: 'all' as ScriptsSearchResultsFilter,
     searching: false,
     results: [] as ScriptsSearchResultsItem[],
+    unfilteredResults: [] as ScriptsSearchResultsItem[],
 };
 
 export function useScriptsTable({
@@ -182,6 +183,7 @@ export function useScriptsTable({
                     filter: prev.filter,
                     searching: false,
                     results: res.data,
+                    unfilteredResults: res.data,
                 }));
             }
         } catch(e: any) {
@@ -193,10 +195,7 @@ export function useScriptsTable({
         return scripts.data
             .filter(s => {
                 if (!search.value) return true;
-
-                const rslts = filterScriptsSearchResults(search.filter, search.results);
-
-                return rslts.map(s => s.scriptId).includes(s.scriptId);
+                return search.results.map(s => s.scriptId).includes(s.scriptId);
             });
     }, [scripts.data, search]);
 

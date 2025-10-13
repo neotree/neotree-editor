@@ -337,8 +337,6 @@ export function ScreenForm(props: Props) {
         );
     }
 
-    console.log(formData)
-
     return (
         <>
             {displayLoader && <Loader overlay />}

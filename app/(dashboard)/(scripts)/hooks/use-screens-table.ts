@@ -166,7 +166,11 @@ export function useScreensTable({
             .filter(s => {
                 if (!search.value) return true;
 
-                const rslts = filterScriptsSearchResults(search.filter, search.results);
+                const rslts = filterScriptsSearchResults({
+                    searchValue: search.value, 
+                    filter: search.filter, 
+                    results: search.results
+                });
 
                 return rslts.find(r => r.screens.map(s => s.screenId).includes(s.screenId));
             });
