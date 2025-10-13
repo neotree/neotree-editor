@@ -166,7 +166,11 @@ export function useDiagnosesTable({
             .filter(s => {
                 if (!search.value) return true;
 
-                const rslts = filterScriptsSearchResults(search.filter, search.results);
+                const rslts = filterScriptsSearchResults({
+                    searchValue: search.value, 
+                    filter: search.filter, 
+                    results: search.results
+                });
 
                 return rslts.find(r => r.diagnoses.map(s => s.diagnosisId).includes(s.diagnosisId));
             });
