@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { scriptsSearchResultsFilters, } from "@/lib/scripts-search";
+import { filterScriptsSearchResults, scriptsSearchResultsFilters, } from "@/lib/scripts-search";
 
 type Props = {
     search: ReturnType<typeof useScriptsTable>['search'];
@@ -39,10 +39,18 @@ export function ScriptsTableSearch({
                     <div className="w-[120px]">
                         <Select
                             value={search.filter}
-                            onValueChange={val => setSearch(prev => ({
-                                ...prev,
-                                filter: val as typeof search.filter,
-                            }))}
+                            onValueChange={val => setSearch(prev => {
+                                const filter = val as typeof search.filter;
+                                return {
+                                    ...prev,
+                                    filter,
+                                    results: filterScriptsSearchResults({
+                                        results: prev.unfilteredResults,
+                                        filter,
+                                        searchValue: prev.value,
+                                    }),
+                                };
+                            })}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="All matches" />
