@@ -3,6 +3,7 @@
 import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
+import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import { useScriptsContext } from "@/contexts/scripts";
@@ -86,18 +87,44 @@ export function ScriptsTable(props: Props) {
                         const searchResults = search.results.find(r => r?.scriptId === s?.scriptId);
 
                         const items = !searchResults ? [] : [
-                            ...searchResults.screens.map(s => ({
-                                id: s.screenId,
-                                title: s.title,
-                                type: 'screen',
-                                link: `/script/${searchResults.scriptId}/screen/${s.screenId}`,
-                            })),
-                            ...searchResults.diagnoses.map(s => ({
-                                id: s.diagnosisId,
-                                title: s.title,
-                                type: 'diagnosis',
-                                link: `/script/${searchResults.scriptId}/diagnosis/${s.diagnosisId}`,
-                            })),
+                            ...searchResults.screens.map(s => {
+                                const link = `/script/${searchResults.scriptId}/screen/${s.screenId}`;
+                                return {
+                                    id: s.screenId,
+                                    title: s.title,
+                                    type: 'screen',
+                                    link,
+                                    fields: s.fields.map((f, i) => {
+                                        const isMatch = !!s.matches.find(m => m.fieldIndex === i);
+                                        return {
+                                            id: i,
+                                            title: f.label,
+                                            type: f.type,
+                                            link: `${link}?${f.type}=${i}`,
+                                            isMatch,
+                                        };
+                                    }).filter(f => f.isMatch),
+                                };
+                            }),
+                            ...searchResults.diagnoses.map(s => {
+                                const link = `/script/${searchResults.scriptId}/diagnosis/${s.diagnosisId}`;
+                                return {
+                                    id: s.diagnosisId,
+                                    title: s.title,
+                                    type: 'diagnosis',
+                                    link,
+                                    fields: s.fields.map((f, i) => {
+                                        const isMatch = !!s.matches.find(m => m.fieldIndex === i);
+                                        return {
+                                            id: i,
+                                            title: f.label,
+                                            type: f.type,
+                                            link: `${link}?`,
+                                            isMatch,
+                                        };
+                                    }).filter(f => f.isMatch),
+                                };
+                            }),
                         ];
 
                         return (
@@ -126,6 +153,45 @@ export function ScriptsTable(props: Props) {
                                                                     </Link>
                                                                 </div>
                                                             </div>
+
+                                                            {!item.fields.length ? null : (
+                                                                <div className="p-4">
+                                                                    <Card>
+                                                                        <DataTable 
+                                                                            columns={[
+                                                                                {
+                                                                                    name: 'Label',
+                                                                                    thClassName: 'hidden',
+                                                                                },
+                                                                                {
+                                                                                    name: '',
+                                                                                    align: 'right',
+                                                                                    cellClassName: 'w-20 text-right',
+                                                                                    thClassName: 'hidden',
+                                                                                    cellRenderer({ rowIndex }) {
+                                                                                        const _item = item.fields[rowIndex];
+                                                                                        if (!_item) return null;
+                                                                                        return (
+                                                                                            <Link
+                                                                                                href={_item.link}
+                                                                                                target="_blank"
+                                                                                                className="flex items-center gap-x-1"
+                                                                                            >
+                                                                                                {_item.type}
+                                                                                                <ExternalLink className="h-3 w-3" />
+                                                                                            </Link>
+                                                                                        );
+                                                                                    }
+                                                                                }
+                                                                            ]}
+                                                                            data={item.fields.map(f => [
+                                                                                f.title,
+                                                                                '',
+                                                                            ])}
+                                                                        />
+                                                                    </Card>
+                                                                </div>
+                                                            )}
 
                                                             {(i < items.length - 1) && <Separator />}
                                                         </div>
