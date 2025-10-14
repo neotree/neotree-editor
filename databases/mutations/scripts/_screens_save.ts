@@ -17,9 +17,10 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScreens({ data, broadcastAction, }: {
+export async function _saveScreens({ data, broadcastAction, userId, }: {
     data: SaveScreensData[],
-    broadcastAction?: boolean,
+    broadcastAction?: boolean;
+    userId?: string;
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -103,6 +104,7 @@ export async function _saveScreens({ data, broadcastAction, }: {
                                     screenDraftId: screenId,
                                     position: data.position,
                                     screenId: published?.screenId,
+                                    createdByUserId: userId,
                                 });
 
                                 info.query = q.toSQL();

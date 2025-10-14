@@ -10,6 +10,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
+import { PublishDrafts } from "./publish-drafts";
 
 type Props = {
 
@@ -127,31 +128,8 @@ export function TopBar({}: Props) {
 
                     {(mode === 'development') && shouldPublishData && (isSuperUser || isAdmin) && (
                         <>
-                            <Button
-                                variant="destructive"
-                                className="h-auto text-xs px-2 py-1"
-                                onClick={() => confirm(discardDrafts, {
-                                    title: 'Discard changes',
-                                    message: 'Are you sure you want to discard changes?',
-                                    negativeLabel: 'Cancel',
-                                    positiveLabel: 'Discard',
-                                    danger: true,
-                                })}
-                            >
-                                Discard changes
-                            </Button>
-
-                            <Button
-                                className="h-auto text-xs px-4 py-1"
-                                onClick={() => confirm(publishData, {
-                                    title: 'Publish data',
-                                    message: 'Are you sure you want to publish data?',
-                                    negativeLabel: 'Cancel',
-                                    positiveLabel: 'Publish',
-                                })}
-                            >
-                                Publish
-                            </Button>
+                            <PublishDrafts variant="publish" />
+                            <PublishDrafts variant="discard" />
                         </>
                     )}
                 </div>
