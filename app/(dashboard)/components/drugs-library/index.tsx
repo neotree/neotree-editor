@@ -95,7 +95,6 @@ export function DrugsLibrary({}: Props) {
 
             <Separator />
 
-
             <DataTable 
                 onSelect={setSelected}
                 selectable={!disabled}
