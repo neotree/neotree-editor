@@ -25,6 +25,7 @@ import { Modal } from "@/components/modal";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSites } from "@/hooks/use-sites";
+import { ErrorCard } from "@/components/error-card";
 
 export function ScriptsImportModal({ 
     open, 
@@ -155,6 +156,17 @@ export function ScriptsImportModal({
                 )}
             >
                 <div className="flex flex-col gap-y-5">
+                    <ErrorCard>
+                        <div className="py-2 px-4 text-sm">
+                            <ol className="list-decimal">
+                                <li>New data keys <b>will be appended</b> to the data-keys library</li>
+                                <li>Incoming data keys <b>will overwrite existing</b> data keys if they differ</li>
+                                <li>New drugs/fluids <b>will be appended</b> to the dff library</li>
+                                <li>Incoming drugs/fluids will <b>NOT overwrite</b> existing ones even if they differ</li>
+                            </ol>
+                        </div>
+                    </ErrorCard>
+
                     <div>
                         <Label htmlFor="siteId">Site *</Label>
                         <Select

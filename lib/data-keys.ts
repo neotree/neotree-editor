@@ -156,7 +156,14 @@ export async function scrapDataKeys({
         !linkScrappedToDataKeys ? { data: [], } : await _getDataKeys({ keys: scrappedKeys.map(({ options, ...o }) => o), })
     );
 
-    return linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
+    let keys = await linkScrappedKeysToDataKeys({ scrappedKeys, dataKeys, });
+
+    keys = keys.map(k => ({
+        ...k,
+        options: k.options.filter((o, i) => k.options.indexOf(o) === i),
+    }))
+
+    return keys;
 }
 
 export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKeys = [], dataKeys, }: {
@@ -271,6 +278,21 @@ export async function parseImportedDataKeys({
             ...k,
             isDifferentFromLocal,
             canSave: isScrapped && isDifferentFromLocal,
+        };
+    });
+
+    parsed = parsed.map(k => {
+        let canSave = k.canSave;
+        if (k.isDifferentFromLocal) {
+            parsed.forEach(k2 => {
+                if (k2.canSave) {
+                    canSave = canSave || k2.options.includes(k.uniqueKey);
+                }
+            });
+        }
+        return {
+            ...k,
+            canSave,
         };
     });
 
