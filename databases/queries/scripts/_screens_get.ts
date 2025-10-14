@@ -30,6 +30,7 @@ export type ScreenType = typeof screens.$inferSelect & {
     image3: null | ScriptImage;
     scriptTitle?: string;
     hospitalName?: string;
+    draftCreatedByUserId?: string | null;
 };
 
 export type GetScreensResults = {
@@ -146,6 +147,7 @@ export async function _getScreens(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -186,7 +188,8 @@ export async function _getScreen(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetScreenResults['data'];
 
@@ -218,7 +221,8 @@ export async function _getScreen(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 
@@ -337,6 +341,7 @@ export async function _listScreens(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as ListScreensResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)

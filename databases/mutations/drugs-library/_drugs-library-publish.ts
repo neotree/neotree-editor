@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -8,13 +8,17 @@ import { v4 } from "uuid";
 
 export async function _publishDrugsLibraryItems(opts?: {
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
 
     try {
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.drugsLibraryItemId),
+            where: and(
+                isNotNull(pendingDeletion.drugsLibraryItemId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { drugsLibraryItemId: true, },
             with: {
                 drugsLibraryItem: {
@@ -52,15 +56,20 @@ export async function _publishDrugsLibraryItems(opts?: {
             }));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.drugsLibraryItemId),
-            isNotNull(pendingDeletion.drugsLibraryItemDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.drugsLibraryItemId),
+                isNotNull(pendingDeletion.drugsLibraryItemDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         let updates: (typeof drugsLibraryDrafts.$inferSelect)[] = [];
         let inserts: (typeof drugsLibraryDrafts.$inferSelect)[] = [];
 
-        const res = await db.query.drugsLibraryDrafts.findMany();
+        const res = await db.query.drugsLibraryDrafts.findMany({
+            where: !opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts?.userId),
+        });
 
         updates = res.filter(s => s.itemId);
         inserts = res.filter(s => !s.itemId);

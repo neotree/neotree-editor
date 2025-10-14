@@ -50,6 +50,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
                     scriptId={scriptId}
                     formData={screen.data} 
                     screens={screens.data}
+                    script={script.data}
                 />
             </PageContainer>
         </>

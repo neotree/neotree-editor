@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -8,13 +8,17 @@ import { v4 } from "uuid";
 
 export async function _publishDataKeys(opts?: {
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
 
     try {
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.dataKeyId),
+            where: and(
+                isNotNull(pendingDeletion.dataKeyId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { dataKeyId: true, },
             with: {
                 dataKey: {
@@ -48,15 +52,20 @@ export async function _publishDataKeys(opts?: {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.dataKeyId),
-            isNotNull(pendingDeletion.dataKeyDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.dataKeyId),
+                isNotNull(pendingDeletion.dataKeyDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         let updates: (typeof dataKeysDrafts.$inferSelect)[] = [];
         let inserts: (typeof dataKeysDrafts.$inferSelect)[] = [];
 
-        const res = await db.query.dataKeysDrafts.findMany();
+        const res = await db.query.dataKeysDrafts.findMany({
+            where: !opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts?.userId),
+        });
 
         updates = res.filter(s => s.dataKeyId);
         inserts = res.filter(s => !s.dataKeyId);

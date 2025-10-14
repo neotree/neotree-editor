@@ -51,34 +51,39 @@ import { Fields } from "./fields";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
+import { LockStatus } from "@/components/lock-status";
+import { ScriptType } from "@/databases/queries/scripts";
 
 type Props = {
     scriptId: string;
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
     screens: Awaited<ReturnType<typeof listScreens>>['data'];
+    script?: ScriptType;
 };
 
-export function ScreenForm({
-    formData,
-    scriptId,
-    countDiagnosesScreens,
-    screens,
-}: Props) {
+export function ScreenForm(props: Props) {
+    const {
+        formData,
+        scriptId,
+        countDiagnosesScreens,
+        screens,
+    } = props;
+
     const router = useRouter();
     const [showForm, setShowForm] = useState(!!formData);
 
-    const form = useScreenForm({
-        formData,
-        scriptId,
-    });
+    const form = useScreenForm(props);
 
     const {
+        isLocked,
         control,
         formIsDirty,
         saving,
         scriptPageHref,
         disabled,
+        isScriptLocked,
+        scriptLockedByUserId,
         register,
         watch,
         setValue,
@@ -119,6 +124,17 @@ export function ScreenForm({
     useEffect(() => {
         getAlias(key)
     }, [getAlias,key]);
+
+    const lockStatus = !(isLocked || isScriptLocked) ? null : (
+        <div>
+            <LockStatus 
+                card
+                isDraft={!!formData?.isDraft || isScriptLocked}
+                userId={formData?.draftCreatedByUserId || scriptLockedByUserId}
+                dataType="screen"
+            />
+        </div>
+    );
 
     if (!showForm) {
         return (
@@ -326,6 +342,8 @@ export function ScreenForm({
             {displayLoader && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
+                {lockStatus}
+
                 <Title>Type</Title>
 
                 <div>

@@ -19,6 +19,7 @@ import {
     SheetDescription,
     SheetFooter,
 } from "@/components/ui/sheet";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 type Props = {
     formData?: FormDataType;
@@ -26,7 +27,14 @@ type Props = {
 };
 
 function FormComponent({ formData }: Props) {
-    const { disabled, onSave, } = useConfigKeysContext();
+    const isLocked = useIsLocked({
+        isDraft: !!formData?.isDraft,
+        userId: formData?.draftCreatedByUserId,
+    });
+
+    const { disabled: _disabled, onSave, } = useConfigKeysContext();
+
+    const disabled = _disabled || isLocked;
 
     const {
         register,

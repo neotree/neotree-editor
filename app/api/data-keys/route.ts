@@ -32,7 +32,10 @@ export async function DELETE(req: NextRequest) {
 
         const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
 
-        const res = await _deleteDataKeys(params);
+        const res = await _deleteDataKeys({
+            ...params,
+            userId: isAuthorised.user?.userId,
+        });
 
 		return NextResponse.json(res);
 	} catch(e: any) {
