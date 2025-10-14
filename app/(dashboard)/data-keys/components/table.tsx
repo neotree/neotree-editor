@@ -159,7 +159,6 @@ export function DataKeysTable({ disabled, }: {
                         isActive={pageNum === page}
                         className={cn(
                             "cursor-pointer",
-                            pageNum === page && "bg-primary text-primary-foreground hover:bg-primary/90"
                         )}
                     >
                         {pageNum}
