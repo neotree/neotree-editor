@@ -55,7 +55,7 @@ export async function _saveDataKeys({
         // }
 
         let index = 0;
-        for (const { uuid: dataKeyUuid, isNewUuid, ...item } of data) {
+        for (const { uuid: dataKeyUuid, isNewUuid, createdAt, publishDate, deletedAt, updatedAt, ...item } of data) {
             try {
                 item.name = `${item.name || ''}`.trim();
                 item.label = `${item.label || ''}`.trim();
