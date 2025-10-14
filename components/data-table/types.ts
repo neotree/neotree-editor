@@ -38,6 +38,7 @@ export type TableStateDataColumn = TableColumn & {
 
 export type TableState = {
     columns: TableStateDataColumn[],
+    unfilteredRows: TableStateDataRow[],
     rows: TableStateDataRow[];
     skeletonRows: TableStateDataRow[];
     selected: { [key: string]: boolean; };
@@ -72,6 +73,7 @@ export type DataTableProps = DataTableHeaderProps & {
     tableRowClassname?: string;
     tableBodyClassname?: string;
     noDataMessage?: React.ReactNode;
+    onFilteredRowsChange?: (rows: { rowIndex: number; }[]) => void;
     filter?: (rowIndex: number) => boolean;
     onSort?: (oldIndex: number, newIndex: number, sorted: { oldIndex: number, newIndex: number; }[]) => void;
     onSelect?: (selectedIndexes: number[]) => void;

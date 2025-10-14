@@ -14,7 +14,7 @@ import { _saveDataKeys, } from '@/databases/mutations/data-keys';
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { pickDataKey, scrapDataKeys } from "@/lib/data-keys";
+import { pickDataKey, removeDuplicateDataKeys, scrapDataKeys } from "@/lib/data-keys";
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -182,7 +182,7 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
             const { data: dataKeysRes, } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
-            dataKeys = dataKeysRes.data;
+            dataKeys = removeDuplicateDataKeys([...dataKeys, ...dataKeysRes.data]) as typeof dataKeys;
 
             const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
@@ -204,16 +204,28 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     };
 }
 
-async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
+async function resetDataKeys() {
     try {
-        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData(env);
+        const { screens, diagnoses, drugsLibrary, dataKeys, } = await loadData();
 
-        const scrappedKeys = await scrapDataKeys({
+        let scrappedKeys = await scrapDataKeys({
             dataKeys,
             screens,
             diagnoses,
             drugsLibrary,
         });
+
+        scrappedKeys = removeDuplicateDataKeys([
+            ...scrappedKeys,
+            // ...(dataKeys.map(k => ({
+            //     uuid: k.uuid,
+            //     uniqueKey: k.uniqueKey,
+            //     name: k.name,
+            //     label: k.label,
+            //     options: k.options,
+            //     dataType: k.dataType,
+            // })) satisfies typeof scrappedKeys),
+        ]) as typeof scrappedKeys;
 
         await db.delete(schema.dataKeysHistory);
         await db.delete(schema.dataKeysDrafts);
@@ -232,7 +244,23 @@ async function resetDataKeys(env?: Parameters<typeof loadData>[0]) {
 }
 
 async function resetZimDataKeys() {
-    await resetDataKeys('stage');
+    const { dataKeys, } = await loadData('stage');
+
+    await db.delete(schema.dataKeysHistory);
+    await db.delete(schema.dataKeysDrafts);
+    await db.delete(schema.dataKeys);
+
+    await _saveDataKeys({
+        updateRefs: false,
+        data: dataKeys.map(k => ({
+            uuid: k.uuid,
+            uniqueKey: k.uniqueKey,
+            name: k.name,
+            label: k.label,
+            options: k.options,
+            dataType: k.dataType,
+        })),
+    });
 }
 
 async function initialiseDataKeys() {
@@ -262,9 +290,10 @@ async function initialiseDataKeys() {
 
 async function processDatakeysOptions() {
     try {
-        const { data: screens, } = await _getScreens();
+        const { screens, dataKeys: dataKeysArr, } = await loadData();
+        // const { data: screens, } = await _getScreens();
 
-        const { data: dataKeysArr, } = await _getDataKeys();
+        // const { data: dataKeysArr, } = await _getDataKeys();
 
         let dataKeys: (typeof dataKeysArr[0] & { updated?: boolean; opts?: string[]; })[] = dataKeysArr;
 

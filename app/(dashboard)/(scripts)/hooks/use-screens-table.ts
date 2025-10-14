@@ -24,6 +24,7 @@ const defaultSearchState = {
     filter: 'all' as ScriptsSearchResultsFilter,
     searching: false,
     results: [] as ScriptsSearchResultsItem[],
+    unfilteredResults: [] as ScriptsSearchResultsItem[],
 };
 
 export function useScreensTable({
@@ -133,6 +134,7 @@ export function useScreensTable({
                     filter: prev.filter,
                     searching: false,
                     results,
+                    unfilteredResults: results,
                 }));
             }
         } catch(e: any) {
@@ -145,7 +147,11 @@ export function useScreensTable({
             .filter(s => {
                 if (!search.value) return true;
 
-                const rslts = filterScriptsSearchResults(search.filter, search.results);
+                const rslts = filterScriptsSearchResults({
+                    searchValue: search.value, 
+                    filter: search.filter, 
+                    results: search.results
+                });
 
                 return rslts.find(r => r.screens.map(s => s.screenId).includes(s.screenId));
             });
