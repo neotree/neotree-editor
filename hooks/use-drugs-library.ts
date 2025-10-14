@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -9,7 +9,6 @@ import { create } from "zustand";
 import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems, copyDrugsLibraryItems } from "@/app/actions/drugs-library";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
-import { useDebounce } from "./use-debounce";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
@@ -38,9 +37,6 @@ export function resetDrugsLibraryState() {
 }
 
 export function useDrugsLibrary() {
-    const [searchValueState, setSearchValue] = useState('');
-    const searchValue = useDebounce(searchValueState);
-
     const state = useDrugsLibraryState();
     const { drugs: allDrugs, } = state;
 
@@ -67,24 +63,21 @@ export function useDrugsLibrary() {
         ]);
 
         tableData = tableData.filter((row, index) => {
-            const matchesSearchValue = !searchValue ? true : (
-                JSON.stringify(row).toLowerCase().includes(searchValue.toLowerCase())
-            );
-            if (matchesSearchValue) filteredDrugs.push(allDrugs[index]);
-            return matchesSearchValue;
+            const matchedFilters = true;
+            if (matchedFilters) filteredDrugs.push(allDrugs[index]);
+            return matchedFilters;
         });
 
         return {
             tableData,
             filteredDrugs,
         };
-    }, [allDrugs, searchValue]);
+    }, [allDrugs]);
 
     const { tableData, filteredDrugs, } = useMemo(() => filterDrugs(), [filterDrugs]);
 
     const getDrugs = useCallback(async () => {
         try {
-            setSearchValue('');
             useDrugsLibraryState.setState({ loading: true, });
             const res = await axios.get<Awaited<ReturnType<typeof getDrugsLibraryItems>>>(
                 '/api/drugs-library?data=' + JSON.stringify({ returnDraftsIfExist: true, }),
@@ -266,8 +259,6 @@ export function useDrugsLibrary() {
         filteredDrugs,
         tableData,
         selectedItemId: itemId,
-        searchValue,
-        setSearchValue,
         addLink: (type: string) => `?${queryString.stringify({ ...searchParamsObj, addItem: type, })}`,
         editLink: (itemId: string) => `?${queryString.stringify({ ...searchParamsObj, itemId, })}`,
         getDrugs,

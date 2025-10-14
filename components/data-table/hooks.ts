@@ -3,17 +3,58 @@ import clsx from "clsx";
 
 import { DataTableProps, FilterValue, TableState } from "./types";
 import { sortRows } from "./utils/sortRows";
+import { useDebounce } from "@/hooks/use-debounce";
+
+function getFilteredRows({
+    rows,
+    searchValue,
+}: {
+    searchValue?: string;
+    rows: TableState['rows'];
+}) {
+    const filtered = rows
+        .filter(row => {
+            const json = JSON.stringify(row.cells.map(c => c.value));
+            if (!searchValue) return true;
+            return json.toLowerCase().includes(searchValue.toLowerCase());
+        });
+
+    return filtered;
+}
 
 export function useTable({ props: _props }: {
     props: DataTableProps;
 }) {
     const mounted = useRef(false);
 
-    const { selectable, sortable, selectedIndexes, columns, data, maxRows, onSelect } = _props;
+    const { 
+        selectable, 
+        sortable, 
+        selectedIndexes, 
+        columns, 
+        data, 
+        maxRows, 
+        search,
+        onFilteredRowsChange,
+        onSelect 
+    } = _props;
+
+    const [internalSearchValue, setInternalSearchValue] = useState(''); 
+    const searchValue = useDebounce(search?.value || internalSearchValue);
+    const setSearchValue = useCallback((value = '') => {
+        // if (search?.setValue) {
+        //     search?.setValue(value);
+        // } else {
+        //     setInternalSearchValue(value);
+        // }
+        setInternalSearchValue(value);
+        search?.setValue?.(value);
+    }, [search]);
 
     const [state, setState] = useState<TableState>({
         selected: {},
         columns: [],
+        unfilteredRows: [],
         rows: [],
         skeletonRows: [],
     });
@@ -43,23 +84,8 @@ export function useTable({ props: _props }: {
             });
         }
 
-        setState(prev => ({
-            ...prev,
-
-            columns: columns.map((c, columnIndex) => {
-                return {
-                    ...c,
-                    id: `${columnIndex}`,
-                    columnIndex,
-                    filter: null,
-                    hidden: false,
-                    cellClassName: clsx(c.cellClassName, 'py-2'),
-                };
-            }),
-
-            skeletonRows,
-
-            rows: data.map((cells, rowIndex) => {
+        setState(prev => {
+            const rows: TableState['rows'] = data.map((cells, rowIndex) => {
                 return {
                     id: `${rowIndex}`,
                     rowIndex,
@@ -72,11 +98,44 @@ export function useTable({ props: _props }: {
                         };
                     }),
                 };
-            }),
-        }));
+            });
+
+            return {
+                ...prev,
+                skeletonRows,
+                rows,
+                unfilteredRows: rows,
+                columns: columns.map((c, columnIndex) => {
+                    return {
+                        ...c,
+                        id: `${columnIndex}`,
+                        columnIndex,
+                        filter: null,
+                        hidden: false,
+                        cellClassName: clsx(c.cellClassName, 'py-2'),
+                    };
+                }),
+            };
+        });
 
         if (!mounted.current) mounted.current = true;
     }, [columns, data, maxRows]);
+
+    useEffect(() => {
+        if (mounted.current) {
+            let filteredRows: undefined | Parameters<NonNullable<DataTableProps['onFilteredRowsChange']>>[0] = undefined;
+            setState(prev => {
+                const rows = getFilteredRows({ rows: prev.unfilteredRows, searchValue, });
+                if (JSON.stringify(prev.rows) === (JSON.stringify(rows))) return prev;
+                filteredRows = rows.map(r => ({ rowIndex: r.rowIndex, }));
+                return {
+                    ...prev,
+                    rows,
+                };
+            });
+            if (filteredRows) onFilteredRowsChange?.(filteredRows);
+        }
+    }, [state.rows, searchValue]);
 
     useEffect(() => {
         setState(prev => ({
@@ -105,11 +164,10 @@ export function useTable({ props: _props }: {
 
     return {
         state,
-
+        searchValue,
+        setSearchValue,
         setState,
-
         setSelected,
-
         toggleColumn: (colIndex: number) => setState(prev => {
             const columns = [...prev.columns]
                 .map(col => {
@@ -125,7 +183,6 @@ export function useTable({ props: _props }: {
                 columns,
             };
         }),
-
         setFilter: (colIndex: number, value: FilterValue) => setState(prev => {
             const columns = [...prev.columns]
                 .map(col => {
