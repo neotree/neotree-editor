@@ -359,7 +359,7 @@ export async function parseImportedDataKeys({
                             };
                             const keyId = pickDataKey(parsed, k)?.uniqueKey;
                             return {
-                                ...f,
+                                ...item,
                                 keyId,
                             };
                         }),
