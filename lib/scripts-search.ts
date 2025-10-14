@@ -19,6 +19,7 @@ export type ScriptsSearchResultsItem = {
     matches: {
         field: string;
         fieldIndex?: number;
+        fieldItemIndex?: number;
         fieldValue: string;
     }[];
     screens: {
@@ -165,6 +166,26 @@ export function parseScriptsSearchResults({
                     fieldValue: f.condition,
                 });
             }
+
+            (f.items || []).map((f, j) => {
+                if (`${f.value || ''}`.toLowerCase().match(searchValue)) {
+                    matches.push({
+                        field: 'field_item_key',
+                        fieldIndex: i,
+                        fieldItemIndex: j,
+                        fieldValue: f.value as string,
+                    });
+                }
+
+                if (`${f.label || ''}`.toLowerCase().match(searchValue)) {
+                    matches.push({
+                        field: 'field_item_label',
+                        fieldIndex: i,
+                        fieldItemIndex: j,
+                        fieldValue: f.label as string,
+                    });
+                }
+            });
         });
 
         (s.items || []).map((f, i) => {
@@ -360,6 +381,7 @@ export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResult
 const matchedFieldFilterMap: Record<string, string> = {
     key: 'data_key',
     field_key: 'data_key',
+    field_item_key: 'data_key',
     field_id: 'data_key',
     item_id: 'data_key',
     item_key: 'data_key',
@@ -367,6 +389,7 @@ const matchedFieldFilterMap: Record<string, string> = {
     title: 'title',
     label: 'label',
     field_label: 'label',
+    field_item_label: 'label',
     item_label: 'label',
     condition: 'condition',
     field_condition: 'condition',
@@ -382,7 +405,7 @@ export function filterScriptsSearchResults({ searchValue, filter, results, }: {
     
     const filterFn = (m: ScriptsSearchResultsItem['matches'][0]) => {
         if (matchedFieldFilterMap[m.field] !== filter) return false;
-        if (!`${m.fieldValue || ''}`.toLowerCase().includes(`${searchValue || ''}`.toLowerCase())) return false;
+        // if (!`${m.fieldValue || ''}`.toLowerCase().includes(`${searchValue || ''}`.toLowerCase())) return false;
         return true;
     }
     const filtered = results.map(r => {
