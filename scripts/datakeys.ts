@@ -217,14 +217,14 @@ async function resetDataKeys() {
 
         scrappedKeys = removeDuplicateDataKeys([
             ...scrappedKeys,
-            ...(dataKeys.map(k => ({
-                uuid: k.uuid,
-                uniqueKey: k.uniqueKey,
-                name: k.name,
-                label: k.label,
-                options: k.options,
-                dataType: k.dataType,
-            })) satisfies typeof scrappedKeys),
+            // ...(dataKeys.map(k => ({
+            //     uuid: k.uuid,
+            //     uniqueKey: k.uniqueKey,
+            //     name: k.name,
+            //     label: k.label,
+            //     options: k.options,
+            //     dataType: k.dataType,
+            // })) satisfies typeof scrappedKeys),
         ]) as typeof scrappedKeys;
 
         await db.delete(schema.dataKeysHistory);
@@ -290,9 +290,10 @@ async function initialiseDataKeys() {
 
 async function processDatakeysOptions() {
     try {
-        const { data: screens, } = await _getScreens();
+        const { screens, dataKeys: dataKeysArr, } = await loadData();
+        // const { data: screens, } = await _getScreens();
 
-        const { data: dataKeysArr, } = await _getDataKeys();
+        // const { data: dataKeysArr, } = await _getDataKeys();
 
         let dataKeys: (typeof dataKeysArr[0] & { updated?: boolean; opts?: string[]; })[] = dataKeysArr;
 
