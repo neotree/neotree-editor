@@ -28,17 +28,18 @@ export function SelectDataKey({
     filterDataKeys?: (dataKey: DataKey) => boolean;
     onChange?: (value: OnChangeValue[]) => void
 }) {
-    const { dataKeys, extractDataKeys } = useDataKeysCtx();
+   
+    const { allDataKeys, extractDataKeys } = useDataKeysCtx();
 
     const options = useMemo(() => {
-        const keys = dataKeys.filter(k => !filterDataKeys ? true : filterDataKeys(k));
+        const keys = allDataKeys.filter(k => !filterDataKeys ? true : filterDataKeys(k));
         return keys.map(k => ({
             label: k.name,
             value: k.uniqueKey,
             caption: k.dataType || '',
             description: k.label,
         } satisfies SelectModalOption));
-    }, [dataKeys, filterDataKeys]);
+    }, [allDataKeys, filterDataKeys]);
 
     return (
         <>
