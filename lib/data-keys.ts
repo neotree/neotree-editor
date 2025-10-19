@@ -200,43 +200,35 @@ export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKey
 }
 
 export async function parseImportedDataKeys({ 
+    localDataKeys = [],
     importedScrappedKeys = [], 
     importedDataKeys = [], 
     importedScreens = [],
     importedDiagnoses = [],
     importedDrugsLibraryItems = [],
 }: {
+    localDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
     importedDataKeys: DataKey[];
     importedScrappedKeys: Awaited<ReturnType<typeof scrapDataKeys>>;
     importedScreens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     importedDiagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     importedDrugsLibraryItems?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
 }) {
-    let { data: localDataKeys, } = await _getDataKeys();
-
     const importedUniqueIdDataKeyMap: Record<string, DataKey> = {};
-    const importedKeyJsonDataKeyMap: Record<string, DataKey> = {};
-    const importedKeyJsonNewIdsMap: Record<string, {
+    const importedUniqueIdNewIdsMap: Record<string, {
         id?: number;
         uuid: string;
         uniqueKey: string;
     }> = {};
+    
     importedDataKeys.forEach(k => {
-        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
+        const localDataKey = localDataKeys.find(lk => lk.uniqueKey === k.uniqueKey);
         importedUniqueIdDataKeyMap[k.uniqueKey] = k;
-        importedKeyJsonDataKeyMap[dataKeyToJSON(k)] = k;
-        importedKeyJsonNewIdsMap[dataKeyToJSON(k)] = {
+        importedUniqueIdNewIdsMap[k.uniqueKey] = {
             id: localDataKey?.id,
-            uniqueKey: localDataKey?.uniqueKey || uuidV4(),
+            uniqueKey: localDataKey?.uniqueKey || k.uniqueKey || uuidV4(), // TODO: Deleted keys might cause duplicate issue!!!
             uuid: localDataKey?.uuid || uuidV4(),
         };
-    });
-
-    const localUniqueIdDataKeyMap: Record<string, DataKey> = {};
-    const localKeyJsonDataKeyMap: Record<string, DataKey> = {};
-    localDataKeys.forEach(k => {
-        localUniqueIdDataKeyMap[k.uniqueKey] = k;
-        localKeyJsonDataKeyMap[dataKeyToJSON(k)] = k;
     });
 
     localDataKeys = localDataKeys.map(k => ({
@@ -245,8 +237,8 @@ export async function parseImportedDataKeys({
     }));
 
     let parsed = importedDataKeys.map(k => {
-        const key = importedKeyJsonNewIdsMap[dataKeyToJSON(k)];
-        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
+        const key = importedUniqueIdNewIdsMap[k.uniqueKey];
+        const localDataKey = localDataKeys.find(lk => lk.uniqueKey === k.uniqueKey);
         return {
             ...k,
             id: key.id,
@@ -257,13 +249,13 @@ export async function parseImportedDataKeys({
             isNew: !localDataKey,
             options: k.options.filter(o => importedUniqueIdDataKeyMap[o]).map(o => {
                 const key = importedUniqueIdDataKeyMap[o];
-                return importedKeyJsonNewIdsMap[dataKeyToJSON(key)].uniqueKey;
+                return importedUniqueIdNewIdsMap[key.uniqueKey].uniqueKey;
             }),
         };
     });
 
     parsed = parsed.map(k => {
-        const localDataKey = pickDataKey(localDataKeys, k) as undefined | DataKey;
+        const localDataKey = localDataKeys.find(lk => lk.uniqueKey === k.uniqueKey);
 
         const isDifferentFromLocal = !localDataKey || (
             localDataKey &&
