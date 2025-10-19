@@ -23,31 +23,53 @@ const rl = readline.createInterface({
 
 const scripts = {
     mwi: [
-        'c04f628d-3d1a-46f1-8d9a-14c203a45463',
-        'e6b6c37c-7583-440b-8f7e-eea62cd951df',
-        '1a911540-24ad-4220-8745-1fdb83246427',
-        '1a911540-24ad-4220-8745-1fdb83246427',
-        '0dd4ab66-b693-49b1-8363-5a4d5beeee8c',
-        'c06d63a4-0da4-463e-9024-422a10a5d19b',
-        '2173593d-8ac3-4c67-a880-8390728279bb',
-        '0acf7627-ef74-4dc0-8c74-f51fc5b9a4ad',
+        // 'c04f628d-3d1a-46f1-8d9a-14c203a45463',
+        // 'e6b6c37c-7583-440b-8f7e-eea62cd951df',
+        // '1a911540-24ad-4220-8745-1fdb83246427',
+        // '1a911540-24ad-4220-8745-1fdb83246427',
+        // '0dd4ab66-b693-49b1-8363-5a4d5beeee8c',
+        // 'c06d63a4-0da4-463e-9024-422a10a5d19b',
+        // '2173593d-8ac3-4c67-a880-8390728279bb',
+        // '0acf7627-ef74-4dc0-8c74-f51fc5b9a4ad',
+        "c04f628d-3d1a-46f1-8d9a-14c203a45463",
+        "e6b6c37c-7583-440b-8f7e-eea62cd951df",
+        "1a911540-24ad-4220-8745-1fdb83246427",
+        "1a911540-24ad-4220-8745-1fdb83246427",
+        "0dd4ab66-b693-49b1-8363-5a4d5beeee8c",
+        "c06d63a4-0da4-463e-9024-422a10a5d19b",
+        "2173593d-8ac3-4c67-a880-8390728279bb",
+        "8069ef0c-3a82-4e7d-a6ec-65e1c3c61613",
     ],
     zw: [
-        'c021e05a-a562-48b0-b495-34529ee51d0a',
-        '3b953d22-8a46-45bc-8234-9521334221a3',
-        '21940a83-8d97-41d1-a0ec-5dad7fb2f3db',
-        '7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6',
-        'fea2c220-f9dc-4363-a35f-13b2b4bfed26',
-        'afa5984e-c07d-4025-8150-de25bb37144a',
-        '0cbb1921-c1b3-4a4c-a516-45397e01a801',
-        '488c51f9-9f75-4dcf-a527-aed0ae16e9b6',
-        'e06666f2-2147-4391-86a2-160d86d3b72b',
-        '910a2d2f-df69-4917-b0cf-d275d511bb3e',
-        '678cbcfd-37df-42c3-96bf-c290dfa3ec69',
-        '5e72aa19-79d3-4676-9435-c5759d762e5a',
-        '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
-        '9dabc437-635e-431f-bded-6eee128e0249',
-        '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
+        // 'c021e05a-a562-48b0-b495-34529ee51d0a',
+        // '3b953d22-8a46-45bc-8234-9521334221a3',
+        // '21940a83-8d97-41d1-a0ec-5dad7fb2f3db',
+        // '7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6',
+        // 'fea2c220-f9dc-4363-a35f-13b2b4bfed26',
+        // 'afa5984e-c07d-4025-8150-de25bb37144a',
+        // '0cbb1921-c1b3-4a4c-a516-45397e01a801',
+        // '488c51f9-9f75-4dcf-a527-aed0ae16e9b6',
+        // 'e06666f2-2147-4391-86a2-160d86d3b72b',
+        // '910a2d2f-df69-4917-b0cf-d275d511bb3e',
+        // '678cbcfd-37df-42c3-96bf-c290dfa3ec69',
+        // '5e72aa19-79d3-4676-9435-c5759d762e5a',
+        // '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
+        // '9dabc437-635e-431f-bded-6eee128e0249',
+        // '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
+        "c021e05a-a562-48b0-b495-34529ee51d0a",
+        "3b953d22-8a46-45bc-8234-9521334221a3",
+        "fea2c220-f9dc-4363-a35f-13b2b4bfed26",
+        "afa5984e-c07d-4025-8150-de25bb37144a",
+        "0cbb1921-c1b3-4a4c-a516-45397e01a801",
+        "488c51f9-9f75-4dcf-a527-aed0ae16e9b6",
+        "e06666f2-2147-4391-86a2-160d86d3b72b",
+        "910a2d2f-df69-4917-b0cf-d275d511bb3e",
+        "678cbcfd-37df-42c3-96bf-c290dfa3ec69",
+        "5e72aa19-79d3-4676-9435-c5759d762e5a",
+        "7ff273e5-b9b5-4a8f-9df9-d198bf0af13b",
+        "9dabc437-635e-431f-bded-6eee128e0249",
+        "df3b51f5-b0a2-4992-92c4-adcab0455e99",
+        "7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6",
     ],
     demo: [],
 };
@@ -130,8 +152,8 @@ async function promptAction() {
         },
 
         '6': {
-            prompt: '[6]: resetZimDataKeys',
-            fn: () => resetZimDataKeys(),
+            prompt: '[6]: resetProdDataKeys',
+            fn: () => resetProdDataKeys(),
         },
     };
 
@@ -182,7 +204,7 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
             const { data: dataKeysRes, } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
-            dataKeys = removeDuplicateDataKeys([...dataKeys, ...dataKeysRes.data]) as typeof dataKeys;
+            dataKeys = dataKeysRes.data;
 
             const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
@@ -243,7 +265,7 @@ async function resetDataKeys() {
     }
 }
 
-async function resetZimDataKeys() {
+async function resetProdDataKeys() {
     const { dataKeys, } = await loadData('stage');
 
     await db.delete(schema.dataKeysHistory);
@@ -267,18 +289,23 @@ async function initialiseDataKeys() {
     try {
         const { diagnoses, screens, drugsLibrary, } = await loadData();
 
-        const { data: dataKeys, } = await _getDataKeys();
-
         const scrappedKeys = await scrapDataKeys({
             screens,
             diagnoses,
-            dataKeys,
+            dataKeys: [],
             drugsLibrary,
         });
 
+        await db.delete(schema.dataKeysHistory);
+        await db.delete(schema.dataKeysDrafts);
+        await db.delete(schema.dataKeys);
+
         await _saveDataKeys({
             updateRefs: false,
-            data: scrappedKeys.filter(k => !pickDataKey(dataKeys, k)),
+            data: scrappedKeys.map(k => ({
+                ...k,
+                uniqueKey: k.uniqueKey || k.uuid,
+            })),
         });
     } catch(e: any) {
         console.error('ERROR:');
