@@ -23,31 +23,53 @@ const rl = readline.createInterface({
 
 const scripts = {
     mwi: [
-        'c04f628d-3d1a-46f1-8d9a-14c203a45463',
-        'e6b6c37c-7583-440b-8f7e-eea62cd951df',
-        '1a911540-24ad-4220-8745-1fdb83246427',
-        '1a911540-24ad-4220-8745-1fdb83246427',
-        '0dd4ab66-b693-49b1-8363-5a4d5beeee8c',
-        'c06d63a4-0da4-463e-9024-422a10a5d19b',
-        '2173593d-8ac3-4c67-a880-8390728279bb',
-        '0acf7627-ef74-4dc0-8c74-f51fc5b9a4ad',
+        // 'c04f628d-3d1a-46f1-8d9a-14c203a45463',
+        // 'e6b6c37c-7583-440b-8f7e-eea62cd951df',
+        // '1a911540-24ad-4220-8745-1fdb83246427',
+        // '1a911540-24ad-4220-8745-1fdb83246427',
+        // '0dd4ab66-b693-49b1-8363-5a4d5beeee8c',
+        // 'c06d63a4-0da4-463e-9024-422a10a5d19b',
+        // '2173593d-8ac3-4c67-a880-8390728279bb',
+        // '0acf7627-ef74-4dc0-8c74-f51fc5b9a4ad',
+        "c04f628d-3d1a-46f1-8d9a-14c203a45463",
+        "e6b6c37c-7583-440b-8f7e-eea62cd951df",
+        "1a911540-24ad-4220-8745-1fdb83246427",
+        "1a911540-24ad-4220-8745-1fdb83246427",
+        "0dd4ab66-b693-49b1-8363-5a4d5beeee8c",
+        "c06d63a4-0da4-463e-9024-422a10a5d19b",
+        "2173593d-8ac3-4c67-a880-8390728279bb",
+        "8069ef0c-3a82-4e7d-a6ec-65e1c3c61613",
     ],
     zw: [
-        'c021e05a-a562-48b0-b495-34529ee51d0a',
-        '3b953d22-8a46-45bc-8234-9521334221a3',
-        '21940a83-8d97-41d1-a0ec-5dad7fb2f3db',
-        '7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6',
-        'fea2c220-f9dc-4363-a35f-13b2b4bfed26',
-        'afa5984e-c07d-4025-8150-de25bb37144a',
-        '0cbb1921-c1b3-4a4c-a516-45397e01a801',
-        '488c51f9-9f75-4dcf-a527-aed0ae16e9b6',
-        'e06666f2-2147-4391-86a2-160d86d3b72b',
-        '910a2d2f-df69-4917-b0cf-d275d511bb3e',
-        '678cbcfd-37df-42c3-96bf-c290dfa3ec69',
-        '5e72aa19-79d3-4676-9435-c5759d762e5a',
-        '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
-        '9dabc437-635e-431f-bded-6eee128e0249',
-        '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
+        // 'c021e05a-a562-48b0-b495-34529ee51d0a',
+        // '3b953d22-8a46-45bc-8234-9521334221a3',
+        // '21940a83-8d97-41d1-a0ec-5dad7fb2f3db',
+        // '7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6',
+        // 'fea2c220-f9dc-4363-a35f-13b2b4bfed26',
+        // 'afa5984e-c07d-4025-8150-de25bb37144a',
+        // '0cbb1921-c1b3-4a4c-a516-45397e01a801',
+        // '488c51f9-9f75-4dcf-a527-aed0ae16e9b6',
+        // 'e06666f2-2147-4391-86a2-160d86d3b72b',
+        // '910a2d2f-df69-4917-b0cf-d275d511bb3e',
+        // '678cbcfd-37df-42c3-96bf-c290dfa3ec69',
+        // '5e72aa19-79d3-4676-9435-c5759d762e5a',
+        // '7ff273e5-b9b5-4a8f-9df9-d198bf0af13b',
+        // '9dabc437-635e-431f-bded-6eee128e0249',
+        // '5bb6430c-eb0e-4afe-a44d-1aae3b00f7b3',
+        "c021e05a-a562-48b0-b495-34529ee51d0a",
+        "3b953d22-8a46-45bc-8234-9521334221a3",
+        "fea2c220-f9dc-4363-a35f-13b2b4bfed26",
+        "afa5984e-c07d-4025-8150-de25bb37144a",
+        "0cbb1921-c1b3-4a4c-a516-45397e01a801",
+        "488c51f9-9f75-4dcf-a527-aed0ae16e9b6",
+        "e06666f2-2147-4391-86a2-160d86d3b72b",
+        "910a2d2f-df69-4917-b0cf-d275d511bb3e",
+        "678cbcfd-37df-42c3-96bf-c290dfa3ec69",
+        "5e72aa19-79d3-4676-9435-c5759d762e5a",
+        "7ff273e5-b9b5-4a8f-9df9-d198bf0af13b",
+        "9dabc437-635e-431f-bded-6eee128e0249",
+        "df3b51f5-b0a2-4992-92c4-adcab0455e99",
+        "7c4f5b8f-ed1f-4e6e-8bce-bf3978e410a6",
     ],
     demo: [],
 };
@@ -130,8 +152,8 @@ async function promptAction() {
         },
 
         '6': {
-            prompt: '[6]: resetZimDataKeys',
-            fn: () => resetZimDataKeys(),
+            prompt: '[6]: resetProdDataKeys',
+            fn: () => resetProdDataKeys(),
         },
     };
 
@@ -145,8 +167,13 @@ async function promptAction() {
     return actions[action];
 }
 
-async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
-    const country = await promptCountry();
+async function loadData(opts?: {
+    env?: typeof schema.sites.$inferSelect['env'];
+    country?: Awaited<ReturnType<typeof promptCountry>>;
+    exclude?: ('screens' | 'diagnoses' | 'dff' | 'data-keys')[];
+}) {
+    const exclude = opts?.exclude || [];
+    const country = opts?.country || await promptCountry();
     const source = await promptSource();
 
     let screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'] = [];
@@ -155,13 +182,15 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     let dataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
 
     if (source === '1') {
-         const { data: screensData, } = await _getScreens();
-         const { data: diagnosesData, } = await _getDiagnoses();
-         const { data: drugsLibraryData, } = await _getDrugsLibraryItems();
+         const { data: screensData, } = exclude.includes('screens') ? { data: [], } : await _getScreens();
+         const { data: diagnosesData, } = exclude.includes('diagnoses') ? { data: [], } : await _getDiagnoses();
+         const { data: drugsLibraryData, } = exclude.includes('dff') ? { data: [], } : await _getDrugsLibraryItems();
+         const { data: dataKeysData, } = exclude.includes('data-keys') ? { data: [], } : await _getDataKeys();
 
         screens = screensData;
         diagnoses = diagnosesData;
         drugsLibrary = drugsLibraryData;
+        dataKeys = dataKeysData;
     } 
     
     if (source === '2') {
@@ -170,7 +199,7 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
             where: and(
                 eq(schema.sites.countryISO, country),
                 eq(schema.sites.type, 'webeditor'),
-                !env ? undefined : eq(schema.sites.env, env),
+                !opts?.env ? undefined : eq(schema.sites.env, opts?.env),
             ),
         });
 
@@ -181,12 +210,22 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
 
             const axiosClient = await getSiteAxiosClient(site.siteId);
 
-            const { data: dataKeysRes, } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
-            dataKeys = removeDuplicateDataKeys([...dataKeys, ...dataKeysRes.data]) as typeof dataKeys;
+            const { data: dataKeysRes, } = exclude.includes('data-keys') ? 
+                { data: { data: [], }, } 
+                :
+                await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            dataKeys = dataKeysRes.data;
 
-            const res = await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
-            }));
+            const res = (
+                exclude.includes('screens') ||
+                exclude.includes('diagnoses') ||
+                exclude.includes('dff')
+            ) ? 
+                { data: { data: [], }, } 
+                : 
+                await axiosClient.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/with-items?' + queryString.stringify({
+                    scriptsIds: !scripts[country].length ? undefined : JSON.stringify(scripts[country]),
+                }));
 
             res.data.data.forEach(s => {
                 screens = [...screens, ...s.screens];
@@ -197,6 +236,7 @@ async function loadData(env?: typeof schema.sites.$inferSelect['env']) {
     }
 
     return {
+        country,
         screens,
         diagnoses,
         drugsLibrary,
@@ -243,8 +283,8 @@ async function resetDataKeys() {
     }
 }
 
-async function resetZimDataKeys() {
-    const { dataKeys, } = await loadData('stage');
+async function resetProdDataKeys() {
+    const { dataKeys, } = await loadData({ env: 'stage', });
 
     await db.delete(schema.dataKeysHistory);
     await db.delete(schema.dataKeysDrafts);
@@ -261,13 +301,17 @@ async function resetZimDataKeys() {
             dataType: k.dataType,
         })),
     });
+
+    await processDataKeysRefs();
 }
 
 async function initialiseDataKeys() {
     try {
-        const { diagnoses, screens, drugsLibrary, } = await loadData();
+        const { diagnoses, screens, drugsLibrary, country, } = await loadData();
 
-        const { data: dataKeys, } = await _getDataKeys();
+        let dataKeys: Awaited<ReturnType<typeof loadData>>['dataKeys'] = [];
+
+        if (country !== 'zw') dataKeys = (await loadData({ country: 'zw', env: 'stage', exclude: ['screens', 'diagnoses', 'dff'], })).dataKeys;
 
         const scrappedKeys = await scrapDataKeys({
             screens,
@@ -276,10 +320,19 @@ async function initialiseDataKeys() {
             drugsLibrary,
         });
 
+        await db.delete(schema.dataKeysHistory);
+        await db.delete(schema.dataKeysDrafts);
+        await db.delete(schema.dataKeys);
+
         await _saveDataKeys({
             updateRefs: false,
-            data: scrappedKeys.filter(k => !pickDataKey(dataKeys, k)),
+            data: scrappedKeys.map(k => ({
+                ...k,
+                uniqueKey: k.uniqueKey || k.uuid,
+            })),
         });
+
+        await processDataKeysRefs();
     } catch(e: any) {
         console.error('ERROR:');
         console.error(e);
@@ -428,100 +481,6 @@ async function processDataKeysRefs() {
         let scripts = res.data;
 
         console.log('scripts.length', scripts.length);
-
-        // scripts = scripts.map(({ screens, diagnoses, ...script }) => {
-        //     return {
-        //         ...script,
-
-        //         diagnoses: diagnoses.map(d => {
-        //             const name = d.key || d.name || '';
-        //             const keyId = getDataKeyUniqueKey({
-        //                 name,
-        //                 label: d.name || '',
-        //                 dataType: 'diagnosis',
-        //             });
-
-        //             return {
-        //                 ...d,
-        //                 key: name,
-        //                 keyId: keyId || '',
-        //                 symptoms: (d.symptoms || []).map(item => {
-        //                     const keyId = getDataKeyUniqueKey({
-        //                         name: item.name || '',
-        //                         label: item.name || '',
-        //                         dataType: `diagnosis_symptom_${item.type}`,
-        //                     });
-        //                     return {
-        //                         ...item,
-        //                         keyId: keyId,
-        //                     };
-        //                 }),
-        //             };
-        //         }),
-
-        //         screens: screens.map(s => {
-        //             const refIdDataKey = !s.refId ? undefined : getDataKeyUniqueKey({
-        //                 name: s.refId || '',
-        //                 label: s.refId || '',
-        //                 dataType: 'ref_id',
-        //             });
-
-        //             const keyId = getDataKeyUniqueKey({
-        //                 name: s.key || '',
-        //                 label: s.label || '',
-        //                 dataType: 'diagnosis',
-        //             });
-
-        //             return {
-        //                 ...s,
-        //                 refIdDataKey: refIdDataKey || '',
-        //                 keyId: keyId || '',
-        //                 items: s.items.map(f => {
-        //                     let dataType = `${s.type}_option`;
-        //                     if (['diagnosis'].includes(s.type)) dataType = s.type;
-
-        //                     const keyId = getDataKeyUniqueKey({
-        //                         name: f.key || f.id,
-        //                         label: f.label || '',
-        //                         dataType: dataType,
-        //                     });
-
-        //                     return {
-        //                         ...f,
-        //                         keyId: keyId || '',
-        //                     };
-        //                 }),
-
-        //                 fields: s.fields.map(f => {
-        //                     let dataType = `${f.type}`;
-
-        //                     const keyId = getDataKeyUniqueKey({
-        //                         name: f.key,
-        //                         label: f.label || '',
-        //                         dataType: dataType,
-        //                     });
-                            
-        //                     return {
-        //                         ...f,
-        //                         keyId: keyId || '',
-        //                         items: (f.items || []).map(f => {
-        //                             const keyId = getDataKeyUniqueKey({
-        //                                 name: f.value as string,
-        //                                 label: `${f.label || ''}`,
-        //                                 dataType: `${dataType}_option`,
-        //                             });
-
-        //                             return {
-        //                                 ...f,
-        //                                 keyId: keyId || '',
-        //                             };
-        //                         }),
-        //                     };
-        //                 }),
-        //             };
-        //         }),
-        //     };
-        // });
 
         for (const s of scripts) {
             console.log('Saving script: ' + s.title + '...');
