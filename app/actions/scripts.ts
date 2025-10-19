@@ -185,6 +185,7 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
     try {
         const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
         const scripts = await queries._getScripts({ ...params, returnDraftsIfExist });
+        const { data: dataKeys, } = await _getDataKeys();
 
         scripts.errors?.forEach(e => errors.push(e));
 
@@ -206,23 +207,19 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
                     );
                 });
 
-            const dataItem: typeof data[0] = {
-                ...s,
-                screens: screens.data,
-                diagnoses: diagnoses.data,
-                dataKeys: [],
-                drugsLibrary: drugsLibraryItems,
-            };
-
-            const allKeys = await scrapDataKeys({
+            const scrappedDataKeys = await scrapDataKeys({
+                dataKeys,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
                 drugsLibrary: drugsLibraryItems,
             });
 
             data.push({
-                ...dataItem,
-                dataKeys: allKeys,
+                ...s,
+                screens: screens.data,
+                diagnoses: diagnoses.data,
+                dataKeys: scrappedDataKeys,
+                drugsLibrary: drugsLibraryItems,
             });
         }
 
@@ -562,6 +559,7 @@ export async function copyScripts(params?: {
     overwriteDataKeys?: boolean;
     overwriteDrugsLibraryItems?: boolean;
 }): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>>> {
+    const { data: localDataKeys, } = await _getDataKeys();
     const info = { ...saveScriptsWithItemsInfo };
 
     const {
@@ -644,6 +642,7 @@ export async function copyScripts(params?: {
             for (const s of scripts.data) {
                 index++;
                 const { dataKeys, screens, diagnoses, drugsLibrary, } = await parseImportedDataKeys({
+                    localDataKeys,
                     importedDataKeys,
                     importedScrappedKeys: scrappedDataKeys,
                     importedScreens: s.screens,
@@ -654,14 +653,10 @@ export async function copyScripts(params?: {
                 scripts.data[index].diagnoses = diagnoses as unknown as typeof s.diagnoses;
                 scripts.data[index].drugsLibrary = drugsLibrary as unknown as typeof s.drugsLibrary;
                 
-                dataKeys.filter(k => k.canSave).forEach(k => {
-                    if (!dataKeysToSave.find(k2 => dataKeyToJSON(k2) === dataKeyToJSON(k))) {
-                        dataKeysToSave.push(k);
-                    }
-                });
+                dataKeys.filter(k => k.canSave).forEach(k => dataKeysToSave.push(k));
 
                 dataKeysToSave = dataKeysToSave.filter(k => {
-                    return overwriteDrugsLibraryItems || k.isNew;
+                    return overwriteDataKeys || k.isNew;
                 });
             }
         }
