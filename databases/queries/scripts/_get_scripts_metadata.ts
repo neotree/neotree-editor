@@ -29,12 +29,8 @@ export type GetScriptsMetadataResponse = {
                 value: any;
                 valueLabel: null | string;
                 optional?: boolean;
-                minValue?: number | null;
-                maxValue?: number | null;
-                minDate?: string | null;
-                maxDate?: string | null;
-                minTime?: string | null;
-                maxTime?: string | null;
+                minValue?: string | number | null;
+                maxValue?: string | number | null;
             }[];
         }[];
     }[],
@@ -268,9 +264,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     });
                                 }
 
-                                const minValue = (f.minValue !== undefined && f.minValue !== null && f.minValue !== '') ? Number(f.minValue) : null;
-                                const maxValue = (f.maxValue !== undefined && f.maxValue !== null && f.maxValue !== '') ? Number(f.maxValue) : null;
-
                                 return [{
                                     label: f.label,
                                     key: f.key,
@@ -279,12 +272,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     value: null,
                                     valueLabel: null,
                                     optional: f.optional,
-                                    minValue,
-                                    maxValue,
-                                    minDate: f.minDate ?? null,
-                                    maxDate: f.maxDate ?? null,
-                                    minTime: f.minTime ?? null,
-                                    maxTime: f.maxTime ?? null,
+                                    minValue: f.minValue ?? f.minDate ?? f.minTime,
+                                    maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
                                 }];
                             });
                             fields = formFields.reduce((acc, f) => {
