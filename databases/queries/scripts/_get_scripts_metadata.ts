@@ -28,6 +28,13 @@ export type GetScriptsMetadataResponse = {
                 dataType: string | null;
                 value: any;
                 valueLabel: null | string;
+                optional?: boolean;
+                minValue?: number | null;
+                maxValue?: number | null;
+                minDate?: string | null;
+                maxDate?: string | null;
+                minTime?: string | null;
+                maxTime?: string | null;
             }[];
         }[];
     }[],
@@ -131,19 +138,23 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];
 
-                    let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0] & {
-                        dataType: string | null;
-                    })[] = [{
+                    let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0])[] = [{
                         label: screen.label,
                         key: screen.key,
                         type: screen.type,
                         ...(() => {
                             switch (screen.type) {
                                 default:
+
+                                    console.log("SCREEN", screen);
+
                                     return {
                                         dataType: screen.dataType,
                                         value: null,
                                         valueLabel: null,
+                                        optional: screen.skippable,
+                                        minValue: screen.minValue,
+                                        maxValue: screen.maxValue,
                                     };
                             }
                         })(),
@@ -170,6 +181,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     dataType: 'boolean',
                                     value: o.value,
                                     valueLabel: o.label,
+                                    optional: screen.skippable,
                                 };
                             });
                             break;
@@ -182,6 +194,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 key: item.id,
                                 type: screen.type,
                                 dataType: 'diagnosis',
+                                optional: screen.skippable,
                             }));
                             break;
 
@@ -193,6 +206,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 key: item.key,
                                 type: screen.type,
                                 dataType: null,
+                                optional: screen.skippable,
                             }));
                             break;
 
@@ -249,9 +263,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                             dataType,
                                             value: o.value,
                                             valueLabel: o.label,
+                                            optional: f.optional,
                                         };
                                     });
                                 }
+
+                                const minValue = (f.minValue !== undefined && f.minValue !== null && f.minValue !== '') ? Number(f.minValue) : null;
+                                const maxValue = (f.maxValue !== undefined && f.maxValue !== null && f.maxValue !== '') ? Number(f.maxValue) : null;
 
                                 return [{
                                     label: f.label,
@@ -260,6 +278,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     dataType,
                                     value: null,
                                     valueLabel: null,
+                                    optional: f.optional,
+                                    minValue,
+                                    maxValue,
+                                    minDate: f.minDate ?? null,
+                                    maxDate: f.maxDate ?? null,
+                                    minTime: f.minTime ?? null,
+                                    maxTime: f.maxTime ?? null,
                                 }];
                             });
                             fields = formFields.reduce((acc, f) => {
@@ -275,6 +300,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'single_select_option',
                                 value: item.id,
                                 valueLabel: item.label,
+                                optional: screen.skippable,
                             }));
                             break;
 
@@ -286,6 +312,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'multi_select_option',
                                 value: item.id,
                                 valueLabel: item.label,
+                                optional: screen.skippable,
                             }));
                             break;
                         default:
