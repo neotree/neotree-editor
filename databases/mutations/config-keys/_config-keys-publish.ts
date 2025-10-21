@@ -77,7 +77,9 @@ export async function _publishConfigKeys(opts?: {
             await _saveConfigKeysHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(configKeysDrafts);
+        await db.delete(configKeysDrafts).where(
+            !opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts.userId)
+        );
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: and(

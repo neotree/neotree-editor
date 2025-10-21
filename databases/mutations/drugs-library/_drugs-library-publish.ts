@@ -127,7 +127,9 @@ export async function _publishDrugsLibraryItems(opts?: {
             await _saveDrugsLibraryItemsHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(drugsLibraryDrafts);
+        await db.delete(drugsLibraryDrafts).where(
+            !opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId)
+        );
 
         const published = [
             // ...inserts.map(c => c.itemId! || c.drugsLibraryItemDraftId),

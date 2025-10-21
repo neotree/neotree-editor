@@ -120,7 +120,7 @@ export async function publishData({ scope }: {
         const publishScripts = await scriptsMutations._publishScripts({ userId, });
         const publishScreens = await scriptsMutations._publishScreens({ userId, });
         const publishDiagnoses = await scriptsMutations._publishDiagnoses({ userId, });
-        const processPendingDeletion = await _processPendingDeletion();
+        const processPendingDeletion = await _processPendingDeletion({ userId, });
         
         if (publishDataKeys.errors) {
             results.success = false;
