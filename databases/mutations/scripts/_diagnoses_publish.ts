@@ -101,7 +101,9 @@ export async function _publishDiagnoses(opts?: {
             await _saveDiagnosesHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(diagnosesDrafts);
+        await db.delete(diagnosesDrafts).where(
+            !opts?.userId ? undefined : eq(diagnosesDrafts.createdByUserId, opts.userId)
+        );
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: and(

@@ -120,7 +120,9 @@ export async function _publishScripts({ userId }: {
             },
         });
 
-        await db.delete(scriptsDrafts);
+        await db.delete(scriptsDrafts).where(
+            !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId)
+        );
 
         deleted = deleted.filter(c => c.script);
 

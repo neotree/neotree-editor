@@ -105,7 +105,9 @@ export async function _publishScreens(opts?: {
             await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(screensDrafts);
+        await db.delete(screensDrafts).where(
+            !opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId)
+        );
 
         let deleted = await db.query.pendingDeletion.findMany({
             where: and(
