@@ -290,6 +290,7 @@ export function Field<P = {}>({
                                         modal
                                         value={key}
                                         disabled={disabled}
+                                        type={type} 
                                         filterDataKeys={k => {
                                             const opts = screenDataKey?.options || [];
                                             if (!screenDataKey) return true;
