@@ -56,20 +56,26 @@ export const getScreen: typeof queries._getScreen = async (...args) => {
     return await queries._getScreen(...args);
 };
 
-export const deleteScreens: typeof mutations._deleteScreens = async (...args) => {
+export const deleteScreens: typeof mutations._deleteScreens = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteScreens(...args);
+        const session = await isAllowed();
+        return await mutations._deleteScreens({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveScreens: typeof mutations._saveScreens = async (...args) => {
+export const saveScreens: typeof mutations._saveScreens = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScreens(...args);
+        const session = await isAllowed();
+        return await mutations._saveScreens({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -102,20 +108,26 @@ export const getDiagnosis: typeof queries._getDiagnosis = async (...args) => {
     return await queries._getDiagnosis(...args);
 };
 
-export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async (...args) => {
+export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteDiagnoses(...args);
+        const session = await isAllowed();
+        return await mutations._deleteDiagnoses({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveDiagnoses: typeof mutations._saveDiagnoses = async (...args) => {
+export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveDiagnoses(...args);
+        const session = await isAllowed();
+        return await mutations._saveDiagnoses({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -148,22 +160,28 @@ export const getScript: typeof queries._getScript = async (...args) => {
     return await queries._getScript(...args);
 };
 
-export const deleteScripts: typeof mutations._deleteScripts = async (...args) => {
+export const deleteScripts: typeof mutations._deleteScripts = async params => {
     try {
-        await isAllowed();
-        return await mutations._deleteScripts(...args);
+        const session = await isAllowed();
+        return await mutations._deleteScripts({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
         logger.error('deleteScripts ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveScripts: typeof mutations._saveScripts = async (...args) => {
+export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
-        await isAllowed();
-        return await mutations._saveScripts(...args);
+        const session = await isAllowed();
+        return await mutations._saveScripts({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch (e: any) {
-        logger.error('getSys ERROR', e.message);
+        logger.error('saveScripts ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
     }
 };

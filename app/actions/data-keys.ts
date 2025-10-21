@@ -3,8 +3,21 @@
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, } from '@/databases/mutations/data-keys';
 import { getSiteAxiosClient } from "@/lib/server/axios";
+import logger from "@/lib/logger";
+import { isAllowed } from './is-allowed';
 
-export const saveDataKeys = _saveDataKeys;
+export const saveDataKeys: typeof _saveDataKeys = async params => {
+    try {
+        const session = await isAllowed();
+        return await _saveDataKeys({
+            ...params,
+            userId: session.user?.userId,
+        });
+    } catch (e: any) {
+        logger.error('saveDataKeys ERROR', e.message);
+        return { errors: [e.message], data: undefined, success: false, };
+    }
+}
 
 export const saveDataKeysIfNotExist = _saveDataKeysIfNotExist;
 

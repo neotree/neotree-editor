@@ -11,6 +11,7 @@ import {
 import { 
     _getFullUser, 
     _getUser, 
+    _getUserMini,
     _getUsers, 
     _getUsersDefaultResults, 
     GetUserParams, 
@@ -41,8 +42,19 @@ export async function getUser(params: GetUserParams) {
         const user = await _getUser(params);
         return user || null;
     } catch(e) {
-        console.log('getUser XOXO', { params, }, e)
         logger.error('getUser ERROR:', e);
+        return null;
+    }
+}
+
+export async function getUserMini(params: GetUserParams) {
+    try {
+        await isAllowed('get_user');
+
+        const user = await _getUserMini(params);
+        return user || null;
+    } catch(e) {
+        logger.error('getUserMini ERROR:', e);
         return null;
     }
 }

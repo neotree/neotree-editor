@@ -8,6 +8,7 @@ import logger from "@/lib/logger";
 export type DataKey = typeof dataKeys.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
+    draftCreatedByUserId?: string | null;
 };
 
 export type GetDataKeysParams = {
@@ -149,6 +150,7 @@ export async function _getDataKeys(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetDataKeysResults['data'][0])))
         ]
             .sort((a, b) => {
@@ -193,7 +195,8 @@ export async function _getDataKey(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetDataKeyResults['data'];
 
@@ -215,7 +218,8 @@ export async function _getDataKey(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 

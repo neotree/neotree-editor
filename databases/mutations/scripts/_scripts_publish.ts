@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { v4 } from "uuid";
 
 import logger from "@/lib/logger";
@@ -8,11 +8,15 @@ import { _saveScriptsHistory } from "./_scripts_history";
 import { _publishScreens } from "./_screens_publish";
 import { _publishDiagnoses } from "./_diagnoses_publish";
 
-export async function _publishScripts() {
+export async function _publishScripts({ userId }: {
+    userId?: string | null;
+}) {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
 
     try {
-        const drafts = await db.query.scriptsDrafts.findMany();
+        const drafts = await db.query.scriptsDrafts.findMany({
+            where: !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
+        });
         let inserts = drafts.filter(c => !c.scriptId).map(s => ({
             ...s,
             scriptId: s.data.scriptId || v4(),
@@ -88,15 +92,24 @@ export async function _publishScripts() {
         }
 
         if (processedScripts.length) {
-            const publishScreens = await _publishScreens({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            const publishScreens = await _publishScreens({ 
+                userId,
+                scriptsIds: processedScripts.map(s => s.scriptId) 
+            });
             if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
 
-            const publishDiagnoses = await _publishDiagnoses({ scriptsIds: processedScripts.map(s => s.scriptId) });
+            const publishDiagnoses = await _publishDiagnoses({ 
+                userId,
+                scriptsIds: processedScripts.map(s => s.scriptId) 
+            });
             if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(', '));
         }
 
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.scriptId),
+            where: and(
+                isNotNull(pendingDeletion.scriptId),
+                !userId ? undefined : eq(pendingDeletion.createdByUserId, userId),
+            ),
             columns: { scriptId: true, },
             with: {
                 script: {
@@ -107,7 +120,9 @@ export async function _publishScripts() {
             },
         });
 
-        await db.delete(scriptsDrafts);
+        await db.delete(scriptsDrafts).where(
+            !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId)
+        );
 
         deleted = deleted.filter(c => c.script);
 
@@ -130,9 +145,12 @@ export async function _publishScripts() {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.scriptId),
-            isNotNull(pendingDeletion.scriptDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.scriptId),
+                isNotNull(pendingDeletion.scriptDraftId),
+            ),
+            !userId ? undefined : eq(pendingDeletion.createdByUserId, userId),
         ));
 
         const published = [

@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
     broadcastAction?: boolean;
+    userId?: string | null;
 };
 
 export type DeleteDataKeysResponse = { 
@@ -15,9 +16,11 @@ export type DeleteDataKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllDataKeysDrafts(): Promise<boolean> {
+export async function _deleteAllDataKeysDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(dataKeysDrafts);
+        await db.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;
@@ -25,7 +28,7 @@ export async function _deleteAllDataKeysDrafts(): Promise<boolean> {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, }: DeleteDataKeysParams,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 
@@ -46,7 +49,11 @@ export async function _deleteDataKeys(
                 .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
                 .where(inArray(dataKeys.uuid, dataKeysIds));
 
-            const pendingDeletionInsertData = dataKeysArr.filter(s => !s.pendingDeletion);
+            const pendingDeletionInsertData = dataKeysArr.filter(s => !s.pendingDeletion).map(s => ({
+                ...s,
+                createdByUserId: userId,
+            }));
+            
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
         }
 

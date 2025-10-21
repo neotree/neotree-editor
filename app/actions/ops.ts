@@ -94,10 +94,12 @@ export const countAllDrafts = async () => {
     }
 };
 
-export async function publishData() {
+export async function publishData({ scope }: {
+    scope: number;
+}) {
     const results: { success: boolean; errors?: string[]; } = { success: true, };
     try {
-        await isAllowed([
+        const session = await isAllowed([
             'create_config_keys', 
             'update_config_keys', 
             'create_scripts', 
@@ -108,13 +110,17 @@ export async function publishData() {
             'update_screens',
         ]);
 
-        const publishConfigKeys = await configKeysMutations._publishConfigKeys();
-        const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems();
-        const publishDataKeys = await dataKeysMutations._publishDataKeys();
-        const publishScripts = await scriptsMutations._publishScripts();
-        const publishScreens = await scriptsMutations._publishScreens();
-        const publishDiagnoses = await scriptsMutations._publishDiagnoses();
-        const processPendingDeletion = await _processPendingDeletion();
+        let userId = session?.user?.userId;
+
+        if (scope === 1) userId = undefined;
+
+        const publishConfigKeys = await configKeysMutations._publishConfigKeys({ userId, });
+        const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({ userId, });
+        const publishDataKeys = await dataKeysMutations._publishDataKeys({ userId, });
+        const publishScripts = await scriptsMutations._publishScripts({ userId, });
+        const publishScreens = await scriptsMutations._publishScreens({ userId, });
+        const publishDiagnoses = await scriptsMutations._publishDiagnoses({ userId, });
+        const processPendingDeletion = await _processPendingDeletion({ userId, });
         
         if (publishDataKeys.errors) {
             results.success = false;
@@ -167,23 +173,29 @@ export async function publishData() {
     }
 }
 
-export async function discardDrafts() {
+export async function discardDrafts({ scope }: {
+    scope: number;
+}) {
     const results: { success: boolean; errors?: string[]; } = { success: true, };
     try {
-        await isAllowed([
+        const session = await isAllowed([
             'delete_config_keys', 
             'delete_scripts', 
             'delete_diagnoses',
             'delete_screens',
         ]);
 
-         await configKeysMutations._deleteAllConfigKeysDrafts();
-         await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts();
-         await dataKeysMutations._deleteAllDataKeysDrafts();
-         await scriptsMutations._deleteAllScriptsDrafts();
-         await scriptsMutations._deleteAllScreensDrafts();
-         await scriptsMutations._deleteAllDiagnosesDrafts();
-         await _clearPendingDeletion();
+        let userId = session?.user?.userId;
+
+        if (scope === 1) userId = undefined;
+
+         await configKeysMutations._deleteAllConfigKeysDrafts({ userId, });
+         await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts({ userId, });
+         await dataKeysMutations._deleteAllDataKeysDrafts({ userId, });
+         await scriptsMutations._deleteAllScriptsDrafts({ userId, });
+         await scriptsMutations._deleteAllScreensDrafts({ userId, });
+         await scriptsMutations._deleteAllDiagnosesDrafts({ userId, });
+         await _clearPendingDeletion({ userId, });
 
         socket.emit('data_changed', 'discard_drafts');
     } catch(e: any) {

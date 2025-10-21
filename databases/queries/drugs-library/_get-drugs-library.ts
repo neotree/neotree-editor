@@ -18,6 +18,7 @@ export type GetDrugsLibraryItemsResults = {
         isDraft: boolean;
         isDeleted: boolean;
         preferences: Preferences;
+        draftCreatedByUserId?: string | null;
     })[];
     errors?: string[];
 };
@@ -99,6 +100,7 @@ export async function _getDrugsLibraryItems(
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                draftCreatedByUserId: s.createdByUserId,
             } as GetDrugsLibraryItemsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
@@ -117,6 +119,7 @@ export type GetDrugsLibraryItemResults = {
     data?: null | typeof drugsLibrary.$inferSelect & {
         isDraft: boolean;
         isDeleted: boolean;
+        draftCreatedByUserId?: string | null;
     };
     errors?: string[];
 };
@@ -141,7 +144,8 @@ export async function _getDrugsLibraryItem(
 
         let responseData = !draft ? null : {
             ...draft.data,
-            isDraft: false,
+            draftCreatedByUserId: draft.createdByUserId,
+            isDraft: true,
             isDeleted: false,
         } as GetDrugsLibraryItemResults['data'];
 
@@ -162,7 +166,8 @@ export async function _getDrugsLibraryItem(
 
         responseData = !data ? null : {
             ...data,
-            isDraft: false,
+            draftCreatedByUserId: draft?.createdByUserId,
+            isDraft: !!draft?.data,
             isDeleted: false,
         };
 
