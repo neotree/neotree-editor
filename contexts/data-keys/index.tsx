@@ -167,7 +167,7 @@ export function DataKeysCtxProvider({
 
             const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys?${queryParams.toString()}`);
 
-            // Apply sorting on client side
+            // Apply sorting on client side using current sort value
             const sortedData = sortDataKeys(response.data.data, sort);
 
             setAllDataKeys(sortedData);
@@ -179,7 +179,7 @@ export function DataKeysCtxProvider({
         } finally {
             setLoadingDataKeys(false);
         }
-    }, [sort]);
+    }, [sort]); // Include sort in dependencies
 
     // Apply filters and search to get filtered data
     const filteredDataKeys = useMemo(() => {
@@ -239,6 +239,16 @@ export function DataKeysCtxProvider({
         setCurrentPage(1);
         setSelected([]);
     }, [filter, searchValue]);
+
+    // Re-sort data when sort value changes and we have data
+    useEffect(() => {
+        if (mounted.current && allDataKeys.length > 0) {
+            const sortedData = sortDataKeys([...allDataKeys], sort);
+            setAllDataKeys(sortedData);
+            setCurrentPage(1);
+            setSelected([]);
+        }
+    }, [sort]); // This effect handles sorting when sort state changes
 
     /*****************************************************
      ************ SAVE 
@@ -366,8 +376,7 @@ export function DataKeysCtxProvider({
     const onSort = useCallback((sortValue = dataKeysSortOpts[0].value) => {
         setSort(sortValue);
         setSelected([]);
-        setAllDataKeys(prev => sortDataKeys(prev, sortValue));
-        setCurrentPage(1); // Reset to first page when sorting
+        setCurrentPage(1);
     }, []);
 
     const extractDataKeys: tDataKeysCtx['extractDataKeys'] = useCallback((uuids, opts) => {
