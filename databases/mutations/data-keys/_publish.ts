@@ -123,7 +123,9 @@ export async function _publishDataKeys(opts?: {
             await _saveDataKeysHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(dataKeysDrafts);
+        await db.delete(dataKeysDrafts).where(
+            !opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId)
+        );
 
         const published = [
             // ...inserts.map(c => c.dataKeyId! || c.dataKeyDraftId),
