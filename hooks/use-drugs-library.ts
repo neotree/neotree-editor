@@ -20,6 +20,10 @@ export type DrugsLibraryState = {
     loading: boolean;
     keys: string[];
     drugs: Drug[];
+    searchQuery: string;
+    typeFilter: string;
+    statusFilter: string;
+    sortBy: string;
 };
 
 const defaultState: DrugsLibraryState = {
@@ -27,6 +31,10 @@ const defaultState: DrugsLibraryState = {
     loading: false,
     keys: [],
     drugs: [],
+    searchQuery: '',
+    typeFilter: '',
+    statusFilter: '',
+    sortBy: 'name-asc',
 };
 
 const useDrugsLibraryState = create<DrugsLibraryState>(set => {
@@ -39,7 +47,7 @@ export function resetDrugsLibraryState() {
 
 export function useDrugsLibrary() {
     const state = useDrugsLibraryState();
-    const { drugs: allDrugs, } = state;
+    const { drugs: allDrugs, searchQuery, typeFilter, statusFilter, sortBy } = state;
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -64,16 +72,72 @@ export function useDrugsLibrary() {
         ]);
 
         tableData = tableData.filter((row, index) => {
-            const matchedFilters = true;
+            const item = allDrugs[index];
+            let matchedFilters = true;
+
+            // Search filter
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const searchableText = [
+                    item.drug,
+                    item.type,
+                    item.key,
+                    item.dosageText,
+                ].join(' ').toLowerCase();
+                
+                matchedFilters = matchedFilters && searchableText.includes(query);
+            }
+
+            // Type filter (drug/fluid)
+            if (typeFilter && typeFilter !== 'all') {
+                matchedFilters = matchedFilters && item.type?.toLowerCase() === typeFilter.toLowerCase();
+            }
+
+            // Status filter (draft/published)
+            if (statusFilter && statusFilter !== 'all') {
+                if (statusFilter === 'draft') {
+                    matchedFilters = matchedFilters && item.isDraft === true;
+                } else if (statusFilter === 'published') {
+                    matchedFilters = matchedFilters && !item.isDraft;
+                }
+            }
+
             if (matchedFilters) filteredDrugs.push(allDrugs[index]);
             return matchedFilters;
         });
 
+        // Apply sorting
+        const sortedData = [...tableData];
+        const sortedDrugs = [...filteredDrugs];
+        
+        const sortPairs = sortedData.map((row, idx) => ({ row, drug: sortedDrugs[idx] }));
+
+        switch (sortBy) {
+            case 'name-asc':
+                sortPairs.sort((a, b) => (a.drug.drug || '').localeCompare(b.drug.drug || ''));
+                break;
+            case 'name-desc':
+                sortPairs.sort((a, b) => (b.drug.drug || '').localeCompare(a.drug.drug || ''));
+                break;
+            case 'type-asc':
+                sortPairs.sort((a, b) => (a.drug.type || '').localeCompare(b.drug.type || ''));
+                break;
+            case 'type-desc':
+                sortPairs.sort((a, b) => (b.drug.type || '').localeCompare(a.drug.type || ''));
+                break;
+            case 'key-asc':
+                sortPairs.sort((a, b) => (a.drug.key || '').localeCompare(b.drug.key || ''));
+                break;
+            case 'key-desc':
+                sortPairs.sort((a, b) => (b.drug.key || '').localeCompare(a.drug.key || ''));
+                break;
+        }
+
         return {
-            tableData,
-            filteredDrugs,
+            tableData: sortPairs.map(p => p.row),
+            filteredDrugs: sortPairs.map(p => p.drug),
         };
-    }, [allDrugs]);
+    }, [allDrugs, searchQuery, typeFilter, statusFilter, sortBy]);
 
     const { tableData, filteredDrugs, } = useMemo(() => filterDrugs(), [filterDrugs]);
 
@@ -255,6 +319,23 @@ export function useDrugsLibrary() {
         useDrugsLibraryState.setState(defaultState);
     }, []);
 
+    // Filter setters
+    const setSearchQuery = useCallback((query: string) => {
+        useDrugsLibraryState.setState({ searchQuery: query });
+    }, []);
+
+    const setTypeFilter = useCallback((type: string) => {
+        useDrugsLibraryState.setState({ typeFilter: type });
+    }, []);
+
+    const setStatusFilter = useCallback((status: string) => {
+        useDrugsLibraryState.setState({ statusFilter: status });
+    }, []);
+
+    const setSortBy = useCallback((sort: string) => {
+        useDrugsLibraryState.setState({ sortBy: sort });
+    }, []);
+
     return {
         ...state,
         filteredDrugs,
@@ -266,5 +347,9 @@ export function useDrugsLibrary() {
         deleteDrugs,
         saveDrugs,
         copyDrugs,
+        setSearchQuery,
+        setTypeFilter,
+        setStatusFilter,
+        setSortBy,
     };
 }

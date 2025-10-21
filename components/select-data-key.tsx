@@ -11,6 +11,7 @@ type OnChangeValue = DataKey & {
 
 export function SelectDataKey({
     value,
+    type,
     disabled,
     modal,
     multiple,
@@ -20,6 +21,7 @@ export function SelectDataKey({
     filterDataKeys,
 }: {
     value?: string;
+    type?: string;
     disabled?: boolean;
     modal?: boolean;
     multiple?: boolean;
@@ -28,17 +30,29 @@ export function SelectDataKey({
     filterDataKeys?: (dataKey: DataKey) => boolean;
     onChange?: (value: OnChangeValue[]) => void
 }) {
-    const { dataKeys, extractDataKeys } = useDataKeysCtx();
+   
+    const { allDataKeys, extractDataKeys } = useDataKeysCtx();
 
     const options = useMemo(() => {
-        const keys = dataKeys.filter(k => !filterDataKeys ? true : filterDataKeys(k));
+        let keys = allDataKeys;
+        
+        // Filter by type if provided
+        if (type && type.trim() !== '') {
+            keys = keys.filter(k => k.dataType === type);
+        }
+        
+        // Apply custom filter if provided
+        if (filterDataKeys) {
+            keys = keys.filter(filterDataKeys);
+        }
+        
         return keys.map(k => ({
             label: k.name,
             value: k.uniqueKey,
             caption: k.dataType || '',
             description: k.label,
         } satisfies SelectModalOption));
-    }, [dataKeys, filterDataKeys]);
+    }, [allDataKeys, type, filterDataKeys]);
 
     return (
         <>

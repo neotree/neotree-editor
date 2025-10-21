@@ -16,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -50,7 +51,7 @@ function Form({
 }) {
     const { dataKeyId, } = useParams();
 
-    const { dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
+    const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
 
     const dataKey = useMemo(() => dataKeys.find(k => (

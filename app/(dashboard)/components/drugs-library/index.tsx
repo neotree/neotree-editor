@@ -1,18 +1,20 @@
 'use client';
 
 import { useMemo, useState } from "react";
-
+import { MoreVertical, Trash, Edit, Eye, Plus, CopyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
 import { ActionsBar } from "@/components/actions-bar";
 import { DrugsLibraryForm } from "./form";
 import { Add } from "./add";
 import { ExportModal } from "./export-modal";
+import { DrugsLibraryHeader } from "../../drugs-fluids-and-feeds/components/table-header";
 import { DrugsLibraryTableActions } from "./table-actions";
 
 type Props = {};
@@ -22,9 +24,6 @@ export function DrugsLibrary({}: Props) {
     const { viewOnly } = useAppContext();
 
     const [selected, setSelected] = useState<number[]>([]);
-
-    // const searchParams = useSearchParams();
-    // const searchParamsObj = useMemo(() => queryString.parse(searchParams.toString()), [searchParams]);
 
     const { 
         filteredDrugs: drugs, 
@@ -36,9 +35,22 @@ export function DrugsLibrary({}: Props) {
         saveDrugs, 
         deleteDrugs,
         copyDrugs,
+        searchQuery,
+        typeFilter,
+        statusFilter,
+        sortBy,
+        setSearchQuery,
+        setTypeFilter,
+        setStatusFilter,
+        setSortBy,
     } = useDrugsLibrary();
 
     const disabled = useMemo(() => viewOnly, [viewOnly]);
+
+    const handleFilterChange = (type: string, status: string) => {
+        setTypeFilter(type);
+        setStatusFilter(status);
+    };
 
     return (
         <>
@@ -73,10 +85,19 @@ export function DrugsLibrary({}: Props) {
                 </ActionsBar>
             )}
 
+            <DrugsLibraryHeader
+                sortBy={sortBy}
+                typeFilter={typeFilter}
+                statusFilter={statusFilter}
+                onSortChange={setSortBy}
+                onFilterChange={handleFilterChange}
+            />
+
+            <Separator />
+
             <DataTable 
                 onSelect={setSelected}
                 selectable={!disabled}
-                title="Drugs & Fluids Library"
                 search={{
                     inputPlaceholder: 'Search',
                 }}
