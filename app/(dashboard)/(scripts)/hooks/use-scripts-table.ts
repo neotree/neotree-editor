@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { arrayMoveImmutable } from "array-move";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -85,19 +86,29 @@ export function useScriptsTable({
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
         const payload: { scriptId: string; position: number; }[] = [];
-        const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
-            const s = scripts.data[oldIndex];
-            let position = s.position;
-            if (oldIndex !== newIndex) {
-                // position = newIndex + 1;
-                position = scripts.data[newIndex].position;
-                payload.push({ scriptId: s.scriptId, position, });
-            }
+
+        const sorted = arrayMoveImmutable([...scripts.data], oldIndex, newIndex).map((s, i) => {
+            const newPosition = scripts.data[i].position;
+            if (newPosition !== s.position) payload.push({ scriptId: s.scriptId, position: newPosition, });
             return {
                 ...s,
-                position,
+                position: newPosition,
             };
-        }).sort((a, b) => a.position - b.position);
+        });
+
+        // const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
+        //     const s = scripts.data[oldIndex];
+        //     let position = s.position;
+        //     if (oldIndex !== newIndex) {
+        //         // position = newIndex + 1;
+        //         position = scripts.data[newIndex].position;
+        //         payload.push({ scriptId: s.scriptId, position, });
+        //     }
+        //     return {
+        //         ...s,
+        //         position,
+        //     };
+        // }).sort((a, b) => a.position - b.position);
 
         setScripts(prev => ({ ...prev, data: sorted, }));
         

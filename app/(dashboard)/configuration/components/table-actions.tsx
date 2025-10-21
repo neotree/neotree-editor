@@ -10,18 +10,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { IConfigKeysContext, useConfigKeysContext } from "@/contexts/config-keys";
+import { LockStatus, type LockStatusProps } from "@/components/lock-status";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 export function ConfigKeysTableActions({ item }: {
     item: Awaited<ReturnType<IConfigKeysContext['getConfigKeys']>>['data'][0];
 }) {
     const { 
-        disabled,
+        disabled: _disabled,
         onDelete, 
         setActiveItemId, 
     } = useConfigKeysContext();
 
+    const lockStatusParams: LockStatusProps = {
+        isDraft: item.isDraft,
+        userId: item.draftCreatedByUserId,
+        dataType: 'config key',
+    };
+
+    const isLocked = useIsLocked(lockStatusParams);
+
+    const disabled = _disabled || isLocked;
+
     return (
-        <>
+        <div className="flex gap-x-2">
+            <LockStatus {...lockStatusParams} />
+            
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button 
@@ -51,6 +65,6 @@ export function ConfigKeysTableActions({ item }: {
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
-        </>
+        </div>
     );
 }

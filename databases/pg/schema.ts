@@ -30,6 +30,13 @@ export const bytea = customType<{ data: Buffer; notNull: false; default: false }
     },
 });
 
+export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
+    createdBy: one(users, {
+        fields: [dataKeysDrafts.createdByUserId],
+        references: [users.userId],
+    }),
+}));
+
 // MAILER SETTINGS ENUM
 export const mailerServiceEnum = pgEnum('mailer_service', ['gmail', 'smtp']);
 
@@ -369,6 +376,7 @@ export const configKeysDrafts = pgTable(
         configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof configKeys.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -379,6 +387,10 @@ export const configKeysDraftsRelations = relations(configKeysDrafts, ({ one }) =
     configKey: one(configKeys, {
         fields: [configKeysDrafts.configKeyId],
         references: [configKeys.configKeyId],
+    }),
+    createdBy: one(users, {
+        fields: [configKeysDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -480,9 +492,12 @@ export const scriptsDrafts = pgTable(
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         hospitalId: uuid('hospital_id').references(() => hospitals.hospitalId, { onDelete: 'set null', }),
-        data: jsonb('data').$type<typeof scripts.$inferInsert
-         & { nuidSearchFields: ScriptField[]; } 
-         &{ reviewConfigurations: ScreenReviewField[]; }>().notNull(),
+        data: jsonb('data').$type<
+            typeof scripts.$inferInsert
+            & { nuidSearchFields: ScriptField[]; } 
+            &{ reviewConfigurations: ScreenReviewField[]; }
+        >().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -495,6 +510,10 @@ export const scriptsDraftsRelations = relations(scriptsDrafts, ({ one, many, }) 
     script: one(scripts, {
         fields: [scriptsDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [scriptsDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -635,6 +654,7 @@ export const screensDrafts = pgTable(
         type: screenTypeEnum('type').notNull(),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof screens.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -653,6 +673,10 @@ export const screensDraftsRelations = relations(screensDrafts, ({ one }) => ({
     script: one(scripts, {
         fields: [screensDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [screensDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -750,6 +774,7 @@ export const diagnosesDrafts = pgTable(
         scriptDraftId: uuid('script_draft_id').references(() => scriptsDrafts.scriptDraftId, { onDelete: 'cascade', }),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof diagnoses.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -768,6 +793,10 @@ export const diagnosesDraftsRelations = relations(diagnosesDrafts, ({ one }) => 
     script: one(scripts, {
         fields: [diagnosesDrafts.scriptId],
         references: [scripts.scriptId],
+    }),
+    createdBy: one(users, {
+        fields: [diagnosesDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -861,6 +890,7 @@ export const drugsLibraryDrafts = pgTable(
         type: drugTypeEnum('type').notNull().default('drug'),
         position: integer('position').notNull(),
         data: jsonb('data').$type<typeof drugsLibrary.$inferInsert>().notNull(),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
@@ -871,6 +901,10 @@ export const drugsLibraryDraftsRelations = relations(drugsLibraryDrafts, ({ one 
     item: one(drugsLibrary, {
         fields: [drugsLibraryDrafts.itemId],
         references: [drugsLibrary.itemId],
+    }),
+    createdBy: one(users, {
+        fields: [drugsLibraryDrafts.createdByUserId],
+        references: [users.userId],
     }),
 }));
 
@@ -916,6 +950,7 @@ export const pendingDeletion = pgTable(
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         dataKeyDraftId: uuid('data_key_draft_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade', }),
+        createdByUserId: uuid('created_by_user_id').references(() => users.userId, { onDelete: 'set null', }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
 );
@@ -980,5 +1015,9 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     alias: one(aliases, {
         fields: [pendingDeletion.aliasId],
         references: [aliases.uuid],
+    }),
+    createdBy: one(users, {
+        fields: [pendingDeletion.createdByUserId],
+        references: [users.userId],
     }),
 }));
