@@ -384,18 +384,21 @@ export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions
         let nested2: typeof acc = [];
     
         const nested1: typeof acc = children.filter(k => isDataKeyValid(k)).map(({ children, ...k }) => {
+            const options: typeof nested2 = [];
             children.forEach(k => {
                 if (isDataKeyValid(k)) {
-                    nested2.push({
+                    const o = {
                         ...k,
                         options: [],
-                    });
+                    };
+                    nested2.push(o);
+                    options.push(o);
                 }
             });
 
             return {
                 ...k,
-                options: nested2,
+                options,
             };
         });
 
