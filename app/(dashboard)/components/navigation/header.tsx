@@ -106,7 +106,7 @@ export function Header({
 
                     <HeaderDesktopMenu />
 
-                    <div className="my-auto">
+                    <div className="flex gap-x-2 items-center my-auto">
                         <User user={user} />
                     </div>
 

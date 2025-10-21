@@ -48,6 +48,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
                 <DiagnosisForm 
                     scriptId={scriptId}
                     formData={diagnosis.data} 
+                    script={script.data}
                 />
             </PageContainer>
         </>

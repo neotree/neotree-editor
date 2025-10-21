@@ -3,6 +3,7 @@ import { _saveScreens } from "@/databases/mutations/scripts";
 
 export type RemoveDrugLibraryItemsReferencesParams = {
     keys: string[];
+    userId?: string;
 };
 
 export type RemoveDrugLibraryItemsReferencesResponse = {
@@ -12,6 +13,7 @@ export type RemoveDrugLibraryItemsReferencesResponse = {
 
 export async function _removeDrugLibraryItemsReferences({
     keys,
+    userId,
 }: RemoveDrugLibraryItemsReferencesParams): Promise<RemoveDrugLibraryItemsReferencesResponse> {
     try {
         const screens = await _getScreens({
@@ -30,7 +32,7 @@ export async function _removeDrugLibraryItemsReferences({
             if (feeds.length !== screen.feeds.length) updated.push({ ...screen, feeds });
         });
 
-        if (updated.length) await _saveScreens({ data: updated, });
+        if (updated.length) await _saveScreens({ data: updated, userId, });
 
         return { data: { success: true, } };
     } catch(e: any) {

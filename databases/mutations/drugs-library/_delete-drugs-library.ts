@@ -6,12 +6,12 @@ import { drugsLibraryDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import { _getScreens } from '@/databases/queries/scripts';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
-import { _saveScreens } from '@/databases/mutations/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
     broadcastAction?: boolean;
+    userId?: string;
 };
 
 export type DeleteDrugsLibraryItemsResponse = { 
@@ -19,9 +19,11 @@ export type DeleteDrugsLibraryItemsResponse = {
     errors?: string[]; 
 };
 
-export async function _deleteAllDrugsLibraryItemsDrafts(): Promise<boolean> {
+export async function _deleteAllDrugsLibraryItemsDrafts(opts?: {
+    userId?: string | null;
+}): Promise<boolean> {
     try {
-        await db.delete(drugsLibraryDrafts);
+        await db.delete(drugsLibraryDrafts).where(!opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;
@@ -29,7 +31,7 @@ export async function _deleteAllDrugsLibraryItemsDrafts(): Promise<boolean> {
 }
 
 export async function _deleteDrugsLibraryItems(
-    { itemsIds: itemsIdsParam, broadcastAction, }: DeleteDrugsLibraryItemsData,
+    { itemsIds: itemsIdsParam, broadcastAction, userId, }: DeleteDrugsLibraryItemsData,
 ) {
     const response: DeleteDrugsLibraryItemsResponse = { success: false, };
 
@@ -44,10 +46,12 @@ export async function _deleteDrugsLibraryItems(
 
             const pendingDeletionInsertData = drugsLibraryItems.data.filter(s => !s.isDraft).map(s => ({
                 drugsLibraryItemId: s.itemId,
+                createdByUserId: userId,
             }));
+            
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
 
-            await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), });
+            await _removeDrugLibraryItemsReferences({ keys: drugsLibraryItems.data.map(d => d.key), userId, });
         }
 
         response.success = true;

@@ -16,6 +16,7 @@ import { SelectDataKey } from "@/components/select-data-key";
 import { useDiagnosisForm, UseDiagnosisFormParams } from "../../hooks/use-diagnosis-form";
 import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
+import { LockStatus } from "@/components/lock-status";
 
 type Props = UseDiagnosisFormParams;
 
@@ -25,10 +26,13 @@ export function DiagnosisForm(props: Props) {
     const form = useDiagnosisForm(props);
 
     const {
+        isLocked,
         control,
         saving,
         scriptPageHref,
         disabled,
+        isScriptLocked,
+        scriptLockedByUserId,
         register,
         watch,
         setValue,
@@ -49,6 +53,17 @@ export function DiagnosisForm(props: Props) {
             {saving && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
+                {(isLocked || isScriptLocked) && (
+                    <div>
+                        <LockStatus 
+                            card
+                            isDraft={!!props.formData?.isDraft || isScriptLocked}
+                            userId={props.formData?.draftCreatedByUserId || scriptLockedByUserId}
+                            dataType="diagnosis"
+                        />
+                    </div>
+                )}
+
                 <div>
                     <Label htmlFor="key" error={!disabled && !key}>Key *</Label>
                     {/* <Input 
