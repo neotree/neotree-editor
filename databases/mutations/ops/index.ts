@@ -1,4 +1,4 @@
-import { isNotNull, and, isNull, inArray, sql } from "drizzle-orm";
+import { isNotNull, and, isNull, inArray, sql, eq } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { configKeys, dataKeys, diagnoses, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
@@ -8,6 +8,7 @@ import socket from "@/lib/socket";
 export async function _clearPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
+    userId?: string | null;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
         const { items, broadcastAction, } = { ...params };
@@ -23,6 +24,7 @@ export async function _clearPendingDeletion(params?: {
             ) : undefined,
             items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
             items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
+            !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
         ];
 
         await db.delete(pendingDeletion).where(!where.length ? undefined : and(...where));
@@ -39,12 +41,16 @@ export async function _clearPendingDeletion(params?: {
 export async function _processPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
+    userId?: string | null;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
         const { items, } = { ...params };
 
         const _configKeys = await db.query.pendingDeletion.findMany({
-            where: items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
+            where: and(
+                items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
         });
 
         if (_configKeys.length) {
@@ -54,11 +60,17 @@ export async function _processPendingDeletion(params?: {
         }
 
         const _drugsLibraryItems = await db.query.pendingDeletion.findMany({
-            where: items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
+            where: and(
+                items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
         });
 
         const _dataKeys = await db.query.pendingDeletion.findMany({
-            where: items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
+            where: and(
+                items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
         });
 
         if (_dataKeys.length) {
@@ -84,6 +96,7 @@ export async function _processPendingDeletion(params?: {
                 isNotNull(pendingDeletion.scriptId),
                 isNull(pendingDeletion.screenId),
                 isNull(pendingDeletion.diagnosisId),
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
             ) : undefined,
         });
 
@@ -102,7 +115,10 @@ export async function _processPendingDeletion(params?: {
         }
 
         const _screens = await db.query.pendingDeletion.findMany({
-            where: items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
+            where: and(
+                items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
         });
 
         if (_screens.length) {
@@ -112,7 +128,10 @@ export async function _processPendingDeletion(params?: {
         }
 
         const _diagnoses = await db.query.pendingDeletion.findMany({
-            where: items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
+            where: and(
+                items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
         });
 
         if (_diagnoses.length) {

@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
@@ -8,6 +8,7 @@ import { v4 } from "uuid";
 
 export async function _publishConfigKeys(opts?: {
     broadcastAction?: boolean;
+    userId?: string | null;
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
@@ -16,7 +17,9 @@ export async function _publishConfigKeys(opts?: {
         let updates: (typeof configKeysDrafts.$inferSelect)[] = [];
         let inserts: (typeof configKeysDrafts.$inferSelect)[] = [];
 
-        const res = await db.query.configKeysDrafts.findMany();
+        const res = await db.query.configKeysDrafts.findMany({
+            where: !opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts?.userId),
+        });
 
         updates = res.filter(s => s.configKeyId);
         inserts = res.filter(s => !s.configKeyId);
@@ -74,10 +77,15 @@ export async function _publishConfigKeys(opts?: {
             await _saveConfigKeysHistory({ drafts: inserts, previous: dataBefore, });
         }
 
-        await db.delete(configKeysDrafts);
+        await db.delete(configKeysDrafts).where(
+            !opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts.userId)
+        );
 
         let deleted = await db.query.pendingDeletion.findMany({
-            where: isNotNull(pendingDeletion.configKeyId),
+            where: and(
+                isNotNull(pendingDeletion.configKeyId),
+                !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+            ),
             columns: { configKeyId: true, },
             with: {
                 configKey: {
@@ -109,9 +117,12 @@ export async function _publishConfigKeys(opts?: {
             })));
         }
 
-        await db.delete(pendingDeletion).where(or(
-            isNotNull(pendingDeletion.configKeyId),
-            isNotNull(pendingDeletion.configKeyDraftId),
+        await db.delete(pendingDeletion).where(and(
+            or(
+                isNotNull(pendingDeletion.configKeyId),
+                isNotNull(pendingDeletion.configKeyDraftId),
+            ),
+            !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
         ));
 
         const published = [

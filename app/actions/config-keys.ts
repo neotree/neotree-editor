@@ -5,10 +5,13 @@ import { _getConfigKey, _getConfigKeys, _countConfigKeys, _defaultConfigKeysCoun
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 
-export const deleteConfigKeys: typeof _deleteConfigKeys = async (...args) => {
+export const deleteConfigKeys: typeof _deleteConfigKeys = async params => {
     try {
-        await isAllowed();
-        return await _deleteConfigKeys(...args);
+        const session = await isAllowed();
+        return await _deleteConfigKeys({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('deleteConfigKeys ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -40,10 +43,13 @@ export const getConfigKey: typeof _getConfigKey = async (...args) => {
     return await _getConfigKey(...args);
 };
 
-export const saveConfigKeys: typeof _saveConfigKeys = async (...args) => {
+export const saveConfigKeys: typeof _saveConfigKeys = async (params) => {
     try {
-        await isAllowed();
-        return await _saveConfigKeys(...args);
+        const session = await isAllowed();
+        return await _saveConfigKeys({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };

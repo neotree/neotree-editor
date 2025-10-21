@@ -12,17 +12,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { IScriptsContext } from "@/contexts/scripts";
+import { LockStatus, type LockStatusProps } from "@/components/lock-status";
+import { useIsLocked } from "@/hooks/use-is-locked";
 
 type Props = {
     disabled: boolean;
     diagnosis: Awaited<ReturnType<IScriptsContext['getDiagnoses']>>['data'][0];
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
     onDelete: () => void;
     onCopy: () => void;
 };
 
 export function DiagnosesTableRowActions({ 
     disabled,
-    diagnosis: { diagnosisId },
+    isScriptLocked,
+    scriptLockedByUserId,
+    diagnosis: { diagnosisId, isDraft, draftCreatedByUserId, },
     onDelete, 
     onCopy,
 }: Props) {
@@ -30,8 +36,20 @@ export function DiagnosesTableRowActions({
 
     const editHref = `/script/${scriptId}/diagnosis/${diagnosisId}`;
 
+    const lockStatusParams: LockStatusProps = {
+        isDraft: isDraft || !!isScriptLocked,
+        userId: draftCreatedByUserId || scriptLockedByUserId,
+        dataType: 'diagnosis',
+    };
+
+    const isLocked = useIsLocked(lockStatusParams);
+
+    disabled = disabled || isLocked;
+
     return (
-        <>
+        <div className="flex gap-x-2">
+            <LockStatus {...lockStatusParams} />
+            
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button 
@@ -73,6 +91,6 @@ export function DiagnosesTableRowActions({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
-        </>
+        </div>
     );
 }

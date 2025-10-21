@@ -1,8 +1,13 @@
 import { Loader as LoadingComponent } from "lucide-react";
 
-export function Loader({ overlay, transparent, }: {
+export function Loader({ 
+    overlay, 
+    transparent, 
+    padding = '50px 0', 
+}: {
     overlay?: boolean;
     transparent?: boolean;
+    padding?: number | string;
 }) {
     return ( 
         <>
@@ -21,7 +26,7 @@ export function Loader({ overlay, transparent, }: {
                         zIndex: 999,
                         backgroundColor: transparent ? 'transparent' : 'rgba(255,255,255,.6)',
                     } : {
-                        padding: '50px 0',
+                        padding,
                     }),
                 }}
             >

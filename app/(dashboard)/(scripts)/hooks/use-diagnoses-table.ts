@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { arrayMoveImmutable } from "array-move";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -16,7 +17,11 @@ import {
 } from "@/lib/scripts-search";
 
 export type UseDiagnosesTableParams = {
+    disabled?: boolean;
     diagnoses: Awaited<ReturnType<IScriptsContext['getDiagnoses']>>;
+    isScriptLocked?: boolean;
+    scriptLockedByUserId?: string | null;
+    loadDiagnoses: () => Promise<void>;
 };
 
 const defaultSearchState = {
@@ -28,7 +33,11 @@ const defaultSearchState = {
 };
 
 export function useDiagnosesTable({
+    disabled: disabledProp,
+    isScriptLocked,
+    scriptLockedByUserId,
     diagnoses: diagnosesParam,
+    loadDiagnoses,
 }: UseDiagnosesTableParams) {
     const [diagnoses, setDiagnoses] = useState(diagnosesParam);
     const [loading, setLoading] = useState(false);
@@ -90,19 +99,29 @@ export function useDiagnosesTable({
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number, newIndex: number, }[]) => {
         const payload: { diagnosisId: string; position: number; }[] = [];
-        const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
-            const s = diagnoses.data[oldIndex];
-            let position = s.position;
-            if (oldIndex !== newIndex) {
-                // position = newIndex + 1;
-                position = diagnoses.data[newIndex].position;
-                payload.push({ diagnosisId: s.diagnosisId, position, });
-            }
+
+        const sorted = arrayMoveImmutable([...diagnoses.data], oldIndex, newIndex).map((s, i) => {
+            const newPosition = diagnoses.data[i].position;
+            if (newPosition !== s.position) payload.push({ diagnosisId: s.diagnosisId, position: newPosition, });
             return {
                 ...s,
-                position,
+                position: newPosition,
             };
-        }).sort((a, b) => a.position - b.position);
+        });
+
+        // const sorted = sortedIndexes.map(({ oldIndex, newIndex }) => {
+        //     const s = diagnoses.data[oldIndex];
+        //     let position = s.position;
+        //     if (oldIndex !== newIndex) {
+        //         // position = newIndex + 1;
+        //         position = diagnoses.data[newIndex].position;
+        //         payload.push({ diagnosisId: s.diagnosisId, position, });
+        //     }
+        //     return {
+        //         ...s,
+        //         position,
+        //     };
+        // }).sort((a, b) => a.position - b.position);
 
         setDiagnoses(prev => ({ ...prev, data: sorted, }));
         
@@ -111,10 +130,12 @@ export function useDiagnosesTable({
         // TODO: Replace this with server action
         await axios.post('/api/diagnoses/save', { data: payload, broadcastAction: true, });
 
-        router.refresh();
-    }, [saveDiagnoses, diagnoses, router]);
+        await loadDiagnoses();
 
-    const disabled = useMemo(() => viewOnly, [viewOnly]);
+        router.refresh();
+    }, [saveDiagnoses, loadDiagnoses, diagnoses, router]);
+
+    const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly]);
 
     const onSearch = useCallback(async (value: string) => {
         try {
@@ -163,6 +184,8 @@ export function useDiagnosesTable({
         selected,
         disabled,
         diagnosesIdsToCopy, 
+        isScriptLocked,
+        scriptLockedByUserId,
         search, 
         diagnosesArr,
         setSearch,

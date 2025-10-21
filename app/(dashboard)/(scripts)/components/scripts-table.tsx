@@ -79,7 +79,7 @@ export function ScriptsTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = scriptsArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(!viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30')
                         };
                     }}
                     rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex, }) => {
