@@ -1048,22 +1048,21 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     }),
 }));
 
-
-// CHANGE LOGS - UPDATED SCHEMA
+// CHANGE LOGS
 export const changeLogs = pgTable(
     'nt_change_logs',
     {
         id: serial('id').primaryKey(),
         changeLogId: uuid('change_log_id').notNull().unique().defaultRandom(),
         
-        // Version tracking - UPDATED
+        // Version tracking
         version: integer('version').notNull(),
         
         // Entity tracking
         entityType: changeLogEntityEnum('entity_type').notNull(),
         entityId: uuid('entity_id').notNull(),
         
-        // Parent version tracking - NEW
+        // Parent version tracking
         parentVersion: integer('parent_version'),
         mergedFromVersion: integer('merged_from_version'),
         
@@ -1089,7 +1088,7 @@ export const changeLogs = pgTable(
             mergedFrom?: 'parent' | 'merged_version';
         }[]>().default([]).notNull(),
         
-        // Complete snapshot - SIMPLIFIED
+        // Complete snapshot of the entity after change
         fullSnapshot: jsonb('full_snapshot').$type<any>().notNull(),
         
         // Context and metadata
@@ -1109,11 +1108,7 @@ export const changeLogs = pgTable(
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
     table => ({
-        // Ensure one version per entity - UNIQUE CONSTRAINT
-        uniqueVersionPerEntity: uniqueIndex('unique_version_per_entity')
-            .on(table.entityId, table.version),
-        
-        // Fast lookups
+        uniqueVersionPerEntity: uniqueIndex('unique_version_per_entity').on(table.entityId, table.version),
         activeVersionIndex: index('active_version_index').on(table.entityId, table.isActive),
         entityIndex: index('change_logs_entity_index').on(table.entityType, table.entityId),
         versionChainIndex: index('version_chain_index').on(table.entityId, table.parentVersion),
