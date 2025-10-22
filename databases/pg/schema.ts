@@ -11,6 +11,7 @@ import {
     serial, 
     text, 
     timestamp, 
+    uniqueIndex, 
     uuid,
 } from "drizzle-orm/pg-core";
 import { v4 as uuidv4 } from "uuid";
@@ -84,7 +85,8 @@ export const changeLogActionEnum = pgEnum('change_log_action', [
     'delete',
     'publish',
     'restore',
-    'revert'
+    'rollback',
+    'merge'
 ]);
 
 
@@ -1047,20 +1049,23 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
 }));
 
 
-// CHANGE LOGS
+// CHANGE LOGS - UPDATED SCHEMA
 export const changeLogs = pgTable(
     'nt_change_logs',
     {
         id: serial('id').primaryKey(),
         changeLogId: uuid('change_log_id').notNull().unique().defaultRandom(),
         
-        // Version tracking
-        currentVersion: integer('current_version').notNull(),
-        nextVersion: integer('next_version').notNull(),
+        // Version tracking - UPDATED
+        version: integer('version').notNull(),
         
         // Entity tracking
         entityType: changeLogEntityEnum('entity_type').notNull(),
         entityId: uuid('entity_id').notNull(),
+        
+        // Parent version tracking - NEW
+        parentVersion: integer('parent_version'),
+        mergedFromVersion: integer('merged_from_version'),
         
         // Script/Screen specific tracking
         scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade' }),
@@ -1081,21 +1086,20 @@ export const changeLogs = pgTable(
             previousValue: any;
             newValue: any;
             dataType?: string;
+            mergedFrom?: 'parent' | 'merged_version';
         }[]>().default([]).notNull(),
         
-        // Complete snapshots for reliable reverting
-        previousSnapshot: jsonb('previous_snapshot').$type<any>().notNull(),
-        newSnapshot: jsonb('new_snapshot').$type<any>().notNull(),
+        // Complete snapshot - SIMPLIFIED
+        fullSnapshot: jsonb('full_snapshot').$type<any>().notNull(),
         
         // Context and metadata
         description: text('description').notNull().default(''),
         changeReason: text('change_reason').notNull().default(''),
         
-        // Revert tracking
-        isReverted: boolean('is_reverted').default(false).notNull(),
-        revertedAt: timestamp('reverted_at'),
-        revertedByUserId: uuid('reverted_by_user_id').references(() => users.userId, { onDelete: 'set null' }),
-        revertedToChangeLogId: uuid('reverted_to_change_log_id'),
+        // Version state - NEW
+        isActive: boolean('is_active').default(true).notNull(),
+        supersededBy: integer('superseded_by'),
+        supersededAt: timestamp('superseded_at'),
         
         // User tracking
         userId: uuid('user_id').references(() => users.userId, { onDelete: 'set null' }).notNull(),
@@ -1105,27 +1109,24 @@ export const changeLogs = pgTable(
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },
     table => ({
+        // Ensure one version per entity - UNIQUE CONSTRAINT
+        uniqueVersionPerEntity: uniqueIndex('unique_version_per_entity')
+            .on(table.entityId, table.version),
+        
+        // Fast lookups
+        activeVersionIndex: index('active_version_index').on(table.entityId, table.isActive),
         entityIndex: index('change_logs_entity_index').on(table.entityType, table.entityId),
-        scriptIndex: index('change_logs_script_index').on(table.scriptId),
-        screenIndex: index('change_logs_screen_index').on(table.screenId),
-        versionIndex: index('change_logs_version_index').on(table.entityId, table.currentVersion),
+        versionChainIndex: index('version_chain_index').on(table.entityId, table.parentVersion),
         userIndex: index('change_logs_user_index').on(table.userId),
         dateIndex: index('change_logs_date_index').on(table.dateOfChange),
-        revertIndex: index('change_logs_revert_index').on(table.isReverted, table.entityId),
     })
 );
-
 
 export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
     user: one(users, {
         fields: [changeLogs.userId],
         references: [users.userId],
         relationName: 'changeLogUser',
-    }),
-    revertedBy: one(users, {
-        fields: [changeLogs.revertedByUserId],
-        references: [users.userId],
-        relationName: 'changeLogRevertedBy',
     }),
     script: one(scripts, {
         fields: [changeLogs.scriptId],
@@ -1156,3 +1157,4 @@ export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
         references: [aliases.uuid],
     }),
 }));
+
