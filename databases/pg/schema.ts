@@ -76,6 +76,30 @@ export const drugTypeEnum = pgEnum('drug_type', ['drug', 'fluid', 'feed']);
 // LIST STYLE ENUM
 export const listStyleEnum = pgEnum('list_style', ['none', 'number', 'bullet']);
 
+
+// CHANGE LOGS ACTION ENUM
+export const changeLogActionEnum = pgEnum('change_log_action', [
+    'create',
+    'update',
+    'delete',
+    'publish',
+    'restore',
+    'revert'
+]);
+
+
+// CHANGE LOGS ENTITY ENUM
+export const changeLogEntityEnum = pgEnum('change_log_entity', [
+    'script',
+    'screen',
+    'diagnosis',
+    'config_key',
+    'drugs_library',
+    'data_key',
+    'alias'
+]);
+
+
 // MAILER SETTINGS
 export const mailerSettings = pgTable('nt_mailer_settings', {
     id: serial('id').primaryKey(),
@@ -1019,5 +1043,116 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     createdBy: one(users, {
         fields: [pendingDeletion.createdByUserId],
         references: [users.userId],
+    }),
+}));
+
+
+// CHANGE LOGS
+export const changeLogs = pgTable(
+    'nt_change_logs',
+    {
+        id: serial('id').primaryKey(),
+        changeLogId: uuid('change_log_id').notNull().unique().defaultRandom(),
+        
+        // Version tracking
+        currentVersion: integer('current_version').notNull(),
+        nextVersion: integer('next_version').notNull(),
+        
+        // Entity tracking
+        entityType: changeLogEntityEnum('entity_type').notNull(),
+        entityId: uuid('entity_id').notNull(),
+        
+        // Script/Screen specific tracking
+        scriptId: uuid('script_id').references(() => scripts.scriptId, { onDelete: 'cascade' }),
+        screenId: uuid('screen_id').references(() => screens.screenId, { onDelete: 'cascade' }),
+        diagnosisId: uuid('diagnosis_id').references(() => diagnoses.diagnosisId, { onDelete: 'cascade' }),
+        configKeyId: uuid('config_key_id').references(() => configKeys.configKeyId, { onDelete: 'cascade' }),
+        drugsLibraryItemId: uuid('drugs_library_item_id').references(() => drugsLibrary.itemId, { onDelete: 'cascade' }),
+        dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade' }),
+        aliasId: uuid('alias_id').references(() => aliases.uuid, { onDelete: 'cascade' }),
+        
+        // Action tracking
+        action: changeLogActionEnum('action').notNull(),
+        
+        // Change details - field by field tracking
+        changes: jsonb('changes').$type<{
+            field: string;
+            fieldPath?: string;
+            previousValue: any;
+            newValue: any;
+            dataType?: string;
+        }[]>().default([]).notNull(),
+        
+        // Complete snapshots for reliable reverting
+        previousSnapshot: jsonb('previous_snapshot').$type<any>().notNull(),
+        newSnapshot: jsonb('new_snapshot').$type<any>().notNull(),
+        
+        // Context and metadata
+        description: text('description').notNull().default(''),
+        changeReason: text('change_reason').notNull().default(''),
+        
+        // Revert tracking
+        isReverted: boolean('is_reverted').default(false).notNull(),
+        revertedAt: timestamp('reverted_at'),
+        revertedByUserId: uuid('reverted_by_user_id').references(() => users.userId, { onDelete: 'set null' }),
+        revertedToChangeLogId: uuid('reverted_to_change_log_id'),
+        
+        // User tracking
+        userId: uuid('user_id').references(() => users.userId, { onDelete: 'set null' }).notNull(),
+        
+        // Timestamps
+        dateOfChange: timestamp('date_of_change').defaultNow().notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    table => ({
+        entityIndex: index('change_logs_entity_index').on(table.entityType, table.entityId),
+        scriptIndex: index('change_logs_script_index').on(table.scriptId),
+        screenIndex: index('change_logs_screen_index').on(table.screenId),
+        versionIndex: index('change_logs_version_index').on(table.entityId, table.currentVersion),
+        userIndex: index('change_logs_user_index').on(table.userId),
+        dateIndex: index('change_logs_date_index').on(table.dateOfChange),
+        revertIndex: index('change_logs_revert_index').on(table.isReverted, table.entityId),
+    })
+);
+
+
+export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
+    user: one(users, {
+        fields: [changeLogs.userId],
+        references: [users.userId],
+        relationName: 'changeLogUser',
+    }),
+    revertedBy: one(users, {
+        fields: [changeLogs.revertedByUserId],
+        references: [users.userId],
+        relationName: 'changeLogRevertedBy',
+    }),
+    script: one(scripts, {
+        fields: [changeLogs.scriptId],
+        references: [scripts.scriptId],
+    }),
+    screen: one(screens, {
+        fields: [changeLogs.screenId],
+        references: [screens.screenId],
+    }),
+    diagnosis: one(diagnoses, {
+        fields: [changeLogs.diagnosisId],
+        references: [diagnoses.diagnosisId],
+    }),
+    configKey: one(configKeys, {
+        fields: [changeLogs.configKeyId],
+        references: [configKeys.configKeyId],
+    }),
+    drugsLibraryItem: one(drugsLibrary, {
+        fields: [changeLogs.drugsLibraryItemId],
+        references: [drugsLibrary.itemId],
+    }),
+    dataKey: one(dataKeys, {
+        fields: [changeLogs.dataKeyId],
+        references: [dataKeys.uuid],
+    }),
+    alias: one(aliases, {
+        fields: [changeLogs.aliasId],
+        references: [aliases.uuid],
     }),
 }));
