@@ -29,6 +29,7 @@ export type GetScriptsMetadataResponse = {
                 value: any;
                 valueLabel: null | string;
                 optional?: boolean;
+                confidential: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
             }[];
@@ -142,13 +143,14 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             switch (screen.type) {
                                 default:
 
-                                    console.log("SCREEN", screen);
+                                    // console.log("SCREEN", screen);
 
                                     return {
                                         dataType: screen.dataType,
                                         value: null,
                                         valueLabel: null,
                                         optional: screen.skippable,
+                                        confidential: screen.confidential,
                                         minValue: screen.minValue,
                                         maxValue: screen.maxValue,
                                     };
@@ -178,6 +180,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     value: o.value,
                                     valueLabel: o.label,
                                     optional: screen.skippable,
+                                    confidential: screen.confidential,
                                 };
                             });
                             break;
@@ -191,6 +194,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 type: screen.type,
                                 dataType: 'diagnosis',
                                 optional: screen.skippable,
+                                confidential: screen.confidential,
                             }));
                             break;
 
@@ -203,6 +207,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 type: screen.type,
                                 dataType: null,
                                 optional: screen.skippable,
+                                confidential: screen.confidential,
                             }));
                             break;
 
@@ -260,6 +265,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                             value: o.value,
                                             valueLabel: o.label,
                                             optional: f.optional,
+                                            confidential: f.confidential,
                                         };
                                     });
                                 }
@@ -272,6 +278,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     value: null,
                                     valueLabel: null,
                                     optional: f.optional,
+                                    confidential: f.confidential,
                                     minValue: f.minValue ?? f.minDate ?? f.minTime,
                                     maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
                                 }];
@@ -290,6 +297,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 value: item.id,
                                 valueLabel: item.label,
                                 optional: screen.skippable,
+                                confidential: screen.confidential,
                             }));
                             break;
 
@@ -302,6 +310,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 value: item.id,
                                 valueLabel: item.label,
                                 optional: screen.skippable,
+                                confidential: screen.confidential,
                             }));
                             break;
                         default:
