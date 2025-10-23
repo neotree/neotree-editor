@@ -92,7 +92,7 @@ export async function _rollbackChangeLog({
       screenId: targetVersion.screenId,
       diagnosisId: targetVersion.diagnosisId,
       configKeyId: targetVersion.configKeyId,
-      drugsLibraryId: targetVersion.drugsLibraryId,
+      drugsLibraryItemId: targetVersion.drugsLibraryItemId,
       dataKeyId: targetVersion.dataKeyId,
       aliasId: targetVersion.aliasId,
     }
