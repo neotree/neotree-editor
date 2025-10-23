@@ -378,40 +378,31 @@ export async function parseImportedDataKeys({
 }
 
 export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions[] {
-    const scrapped = scrappedKeys.reduce((acc, keys) => [...acc, ...keys], [] as Scrapped[]);
+    const _scrapped = scrappedKeys.reduce((acc, keys) => [...acc, ...keys], [] as Scrapped[]);
 
-    return scrapped.reduce((acc, { key: { children, ...k }, }) => {
-        let nested2: typeof acc = [];
-    
-        const nested1: typeof acc = children.filter(k => isDataKeyValid(k)).map(({ children, ...k }) => {
-            const options: typeof nested2 = [];
-            children.forEach(k => {
-                if (isDataKeyValid(k)) {
-                    const o = {
-                        ...k,
-                        options: [],
-                    };
-                    nested2.push(o);
-                    options.push(o);
-                }
-            });
+    let scrapped = [
+        ..._scrapped.reduce((acc, k) => [...acc, k.key], [] as typeof _scrapped[0]['key'][]).filter(k => isDataKeyValid(k)),
+        ..._scrapped.reduce((acc, k) => [...acc, ...k.key.children], [] as typeof _scrapped[0]['key']['children']).filter(k => isDataKeyValid(k)),
+        ..._scrapped.reduce((acc, k) => [
+            ...acc, 
+            ...k.key.children.reduce((acc, k) => [...acc, ...k.children || []], [] as typeof k.key.children[0]['children']),
+        ], [] as typeof _scrapped[0]['key']['children'][0]['children']).filter(k => isDataKeyValid(k)),
+    ] as unknown as (KeyWithoutOptions & {
+        children: KeyWithoutOptions[];
+    })[];
 
-            return {
-                ...k,
-                options,
-            };
-        });
-
-        return [
-            ...acc,
-            ...(!isDataKeyValid(k) ? [] : [{
-                ...k,
-                options: nested1,
-            }]),
-            ...nested1,
-            ...nested2,
-        ];
-    }, [] as (KeyWithoutOptions & {
+    const merged: (KeyWithoutOptions & {
         options: KeyWithoutOptions[];
-    })[]);
+    })[] = scrapped.map(k => {
+        return {
+            ...k,
+            options: removeDuplicateDataKeys(
+                scrapped
+                    .filter(k2 => dataKeyToJSON(k2) === dataKeyToJSON(k))
+                    .reduce((acc, k2) => [...acc, ...k2.children || []], [] as KeyWithoutOptions[]),
+            ),
+        };
+    });
+
+    return merged;
 }
