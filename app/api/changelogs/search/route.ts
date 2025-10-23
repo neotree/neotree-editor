@@ -20,3 +20,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ errors: ["Internal Error"] })
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const isAuthorised = await isAuthenticated()
+
+    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] })
+
+    const body = await req.json()
+    const data = await searchChangeLogs(body)
+
+    return NextResponse.json(data)
+  } catch (e: any) {
+    logger.error("[POST] /api/changelogs/search", e.message)
+    return NextResponse.json({ errors: [e.message] }, { status: 500 })
+  }
+}
