@@ -15,7 +15,7 @@ interface PendingChangesIndicatorProps {
   entityType?: string
   className?: string
   showDetails?: boolean
-  onClick?: () => void // New prop for handling clicks
+  onClick?: () => void
 }
 
 export function PendingChangesIndicator({
@@ -41,7 +41,12 @@ export function PendingChangesIndicator({
       <Badge 
         variant="secondary" 
         className={cn("gap-1 cursor-pointer hover:bg-secondary/80 transition-colors", className)}
-        onClick={onClick}
+        onClick={(e) => {
+          "PENDING INDICATOR CLICK"
+          e.preventDefault()
+          e.stopPropagation()
+          onClick?.()
+        }}
       >
         <Clock className="h-3 w-3" />
         {changeCount} unsaved {changeCount === 1 ? "change" : "changes"}
@@ -106,7 +111,6 @@ export function PendingChangesIndicator({
             </div>
           </ScrollArea>
 
-          {/* Add button to view full history if onClick is provided */}
           {onClick && (
             <>
               <Separator />
@@ -114,7 +118,11 @@ export function PendingChangesIndicator({
                 variant="outline" 
                 size="sm" 
                 className="w-full"
-                onClick={onClick}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onClick()
+                }}
               >
                 View Full History
               </Button>
