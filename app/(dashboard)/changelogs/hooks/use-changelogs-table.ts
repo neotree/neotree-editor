@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 
@@ -14,24 +14,56 @@ export type UseChangelogsTableParams = {
 
 export type ChangeLogType = Awaited<ReturnType<typeof getChangeLogs>>["data"][0]
 
-const defaultFilters = {
-  searchTerm: "",
-  entityType: "all",
-  action: "all",
-  startDate: null as Date | null,
-  endDate: null as Date | null,
-  isActiveOnly: false,
+type Pagination = {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+const sortOptions = [
+  { value: "dateOfChange.desc", label: "Date (Newest)" },
+  { value: "dateOfChange.asc", label: "Date (Oldest)" },
+  { value: "version.desc", label: "Version (High to Low)" },
+  { value: "version.asc", label: "Version (Low to High)" },
+]
+
+function paginateData<T>(
+  data: T[],
+  page: number,
+  limit: number
+): { data: T[]; pagination: Pagination } {
+  const total = data.length
+  const totalPages = Math.ceil(total / limit)
+  const startIndex = (page - 1) * limit
+  const endIndex = startIndex + limit
+
+  return {
+    data: data.slice(startIndex, endIndex),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  }
 }
 
 export function useChangelogsTable({ initialChangelogs }: UseChangelogsTableParams) {
-  const [changelogs, setChangelogs] = useState<ChangeLogType[]>(initialChangelogs)
+  const [allChangelogs, setAllChangelogs] = useState<ChangeLogType[]>(initialChangelogs)
   const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState<number[]>([])
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [selectedChangelog, setSelectedChangelog] = useState<ChangeLogType | null>(null)
   const [entityHistory, setEntityHistory] = useState<ChangeLogType[]>([])
 
-  const [filters, setFilters] = useState(defaultFilters)
+  const [searchValue, setSearchValue] = useState("")
+  const [entityType, setEntityType] = useState("all")
+  const [action, setAction] = useState("all")
+  const [isActiveOnly, setIsActiveOnly] = useState(false)
+  const [sort, setSort] = useState(sortOptions[0].value)
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(50)
 
   const router = useRouter()
   const { confirm } = useConfirmModal()
@@ -42,7 +74,7 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
       setLoading(true)
 
       const params: any = {
-        limit: 100,
+        limit: 1000, // Load all for client-side filtering
         sortBy: "dateOfChange",
         sortOrder: "desc",
       }
@@ -50,9 +82,16 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
       const res = await axios.post("/api/changelogs/get", params)
       const { errors, data } = res.data
 
-      if (errors?.length) throw new Error(errors.join(", "))
+      if (errors?.length) {
+        alert({
+          title: "Error",
+          message: "Failed to load changelogs: " + errors.join(", "),
+          variant: "error",
+        })
+        return
+      }
 
-      setChangelogs(data)
+      setAllChangelogs(data)
     } catch (e: any) {
       alert({
         title: "Error",
@@ -64,45 +103,73 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     }
   }, [alert])
 
-  const onSearch = useCallback(async () => {
-    try {
-      setLoading(true)
+  // Apply filters and search
+  const filteredChangelogs = useMemo(() => {
+    let filtered = [...allChangelogs]
 
-      const params: any = {
-        searchTerm: filters.searchTerm || undefined,
-        entityTypes: filters.entityType !== "all" ? [filters.entityType] : undefined,
-        actions: filters.action !== "all" ? [filters.action] : undefined,
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined,
-        isActiveOnly: filters.isActiveOnly,
-        limit: 100,
-      }
+    // Apply search
+    if (searchValue) {
+      const searchLower = searchValue.toLowerCase()
+      filtered = filtered.filter((changelog) => {
+        const searchableFields = [
+          changelog.description || "",
+          changelog.userName || "",
+          changelog.entityId || "",
+          changelog.changeReason || "",
+        ].map((field) => field.toLowerCase())
 
-      const res = await axios.post("/api/changelogs/search", params)
-      const { errors, data } = res.data
-
-      if (errors?.length) throw new Error(errors.join(", "))
-
-      setChangelogs(data)
-    } catch (e: any) {
-      alert({
-        title: "Error",
-        message: "Failed to search changelogs: " + e.message,
-        variant: "error",
+        return searchableFields.some((field) => field.includes(searchLower))
       })
-    } finally {
-      setLoading(false)
     }
-  }, [alert, filters])
+
+    // Apply entity type filter
+    if (entityType !== "all") {
+      filtered = filtered.filter((changelog) => changelog.entityType === entityType)
+    }
+
+    // Apply action filter
+    if (action !== "all") {
+      filtered = filtered.filter((changelog) => changelog.action === action)
+    }
+
+    // Apply active only filter
+    if (isActiveOnly) {
+      filtered = filtered.filter((changelog) => changelog.isActive)
+    }
+
+    // Apply sorting
+    const sortedData = sortChangelogs(filtered, sort)
+
+    return sortedData
+  }, [allChangelogs, searchValue, entityType, action, isActiveOnly, sort])
+
+  // Paginate filtered data
+  const { changelogs, pagination } = useMemo(() => {
+    if (!filteredChangelogs.length) {
+      return { changelogs: [], pagination: undefined }
+    }
+
+    const paginatedResult = paginateData(filteredChangelogs, currentPage, itemsPerPage)
+
+    return {
+      changelogs: paginatedResult.data,
+      pagination: paginatedResult.pagination,
+    }
+  }, [filteredChangelogs, currentPage, itemsPerPage])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchValue, entityType, action, isActiveOnly, sort])
 
   const loadEntityHistory = useCallback(
-    async (entityId: string, entityType: string) => {
+    async (entityId: string, entityTypeParam: string) => {
       try {
         setLoading(true)
 
         const res = await axios.post("/api/changelogs/entity-history", {
           entityId,
-          entityType,
+          entityType: entityTypeParam,
           includeInactive: true,
           limit: 50,
         })
@@ -122,7 +189,7 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
         setLoading(false)
       }
     },
-    [alert],
+    [alert]
   )
 
   const onRollback = useCallback(
@@ -167,10 +234,10 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
           title: "Rollback to version " + version,
           message: `Are you sure you want to rollback to version ${version}? This will create a new version with the previous state.`,
           positiveLabel: "Yes, rollback",
-        },
+        }
       )
     },
-    [confirm, alert, router, loadChangelogs],
+    [confirm, alert, router, loadChangelogs]
   )
 
   const onExport = useCallback((changelog: ChangeLogType) => {
@@ -196,41 +263,48 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     })
   }, [])
 
-  const viewDetails = useCallback((changelog: ChangeLogType) => {
-    setSelectedChangelog(changelog)
-  }, [])
+  const viewDetails = useCallback(
+    (changelog: ChangeLogType) => {
+      setSelectedChangelog(changelog)
+      loadEntityHistory(changelog.entityId, changelog.entityType)
+    },
+    [loadEntityHistory]
+  )
 
   const clearFilters = useCallback(() => {
-    setFilters(defaultFilters)
-    loadChangelogs()
-  }, [loadChangelogs])
-
-  useEffect(() => {
-    if (selectedChangelog) {
-      loadEntityHistory(selectedChangelog.entityId, selectedChangelog.entityType)
-    }
-  }, [selectedChangelog, loadEntityHistory])
-
-  const disabled = useMemo(() => false, [])
+    setSearchValue("")
+    setEntityType("all")
+    setAction("all")
+    setIsActiveOnly(false)
+    setSort(sortOptions[0].value)
+    setCurrentPage(1)
+  }, [])
 
   return {
     changelogs,
     loading,
-    selected,
-    disabled,
     expandedItems,
     selectedChangelog,
     entityHistory,
-    filters,
-    setChangelogs,
-    setLoading,
-    setSelected,
+    searchValue,
+    entityType,
+    action,
+    isActiveOnly,
+    sort,
+    pagination,
+    currentPage,
+    itemsPerPage,
+    sortOptions,
+    setSearchValue,
+    setEntityType,
+    setAction,
+    setIsActiveOnly,
+    setSort,
+    setCurrentPage,
     setExpandedItems,
     setSelectedChangelog,
     setEntityHistory,
-    setFilters,
     loadChangelogs,
-    onSearch,
     loadEntityHistory,
     onRollback,
     onExport,
@@ -238,4 +312,83 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     viewDetails,
     clearFilters,
   }
+}
+
+function sortChangelogs(changelogs: ChangeLogType[], sortValue: string) {
+  let sorted = [...changelogs]
+
+  const sortFn = ({
+    key1,
+    key2,
+    sortDirection,
+  }: {
+    sortDirection: "asc" | "desc"
+    key1: string | number
+    key2: string | number
+  }) => {
+    let returnVal = 0
+
+    if (sortDirection === "asc") {
+      if (key1 < key2) returnVal = -1
+      if (key1 > key2) returnVal = 1
+    } else {
+      if (key1 > key2) returnVal = -1
+      if (key1 < key2) returnVal = 1
+    }
+
+    return returnVal
+  }
+
+  switch (sortValue) {
+    case "dateOfChange.asc":
+      sorted = changelogs.sort((c1, c2) =>
+        sortFn({
+          sortDirection: "asc",
+          key1: new Date(c1.dateOfChange).getTime(),
+          key2: new Date(c2.dateOfChange).getTime(),
+        })
+      )
+      break
+
+    case "dateOfChange.desc":
+      sorted = changelogs.sort((c1, c2) =>
+        sortFn({
+          sortDirection: "desc",
+          key1: new Date(c1.dateOfChange).getTime(),
+          key2: new Date(c2.dateOfChange).getTime(),
+        })
+      )
+      break
+
+    case "version.asc":
+      sorted = changelogs.sort((c1, c2) =>
+        sortFn({
+          sortDirection: "asc",
+          key1: c1.version,
+          key2: c2.version,
+        })
+      )
+      break
+
+    case "version.desc":
+      sorted = changelogs.sort((c1, c2) =>
+        sortFn({
+          sortDirection: "desc",
+          key1: c1.version,
+          key2: c2.version,
+        })
+      )
+      break
+
+    default:
+      sorted = changelogs.sort((c1, c2) =>
+        sortFn({
+          sortDirection: "desc",
+          key1: new Date(c1.dateOfChange).getTime(),
+          key2: new Date(c2.dateOfChange).getTime(),
+        })
+      )
+  }
+
+  return sorted
 }
