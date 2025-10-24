@@ -13,17 +13,14 @@ import { MobileMenu } from "./mobile-menu"
 import { User } from "./user"
 import { TopBar } from "./top-bar"
 import { PendingChangesIndicator } from "@/components/changelog/pending-changes-indicator"
-import { ChangeLogPanel } from "@/components/changelog/changelog-panel"
+import { usePendingChanges } from "@/hooks/use-pending-changes"
+import { GlobalChangeLogPanel } from "@/components/changelog/changelog-panel"
 
 type Props = {
   user: IAppContext["authenticatedUser"]
   showTopBar: boolean
   showSidebar: boolean
   showThemeToggle: boolean
-  currentEntityId?: string
-  currentEntityType?: string
-  currentEntityName?: string
-  getEntityHistory?: (entityId: string) => Promise<{ data: any[]; errors?: string[] }>
 }
 
 export function Header({ 
@@ -31,15 +28,16 @@ export function Header({
   showSidebar, 
   showTopBar, 
   showThemeToggle,
-  currentEntityId,
-  currentEntityType,
-  currentEntityName,
-  getEntityHistory,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   const [isChangeLogOpen, setIsChangeLogOpen] = useState(false)
 
   const { sys, info } = useAppContext()
+  
+  // Get all pending changes globally (no entityId specified)
+  const { allChangesByEntity, hasChanges } = usePendingChanges({
+    autoTrack: false,
+  })
 
   const usePlainBg = sys.data.use_plain_background === "yes"
 
@@ -48,6 +46,12 @@ export function Header({
   })
 
   if (!mounted) return null
+
+  // Calculate total changes across all entities
+  const totalChanges = Object.values(allChangesByEntity || {}).reduce(
+    (sum, changes) => sum + changes.length, 
+    0
+  )
 
   return (
     <>
@@ -117,14 +121,14 @@ export function Header({
 
           <HeaderDesktopMenu />
 
-          <div className="my-auto">
-            <PendingChangesIndicator 
-              entityId={currentEntityId}
-              entityType={currentEntityType}
-              showDetails={false}
-              onClick={() => setIsChangeLogOpen(true)}
-            />
-          </div>
+          {hasChanges && totalChanges > 0 && (
+            <div className="my-auto">
+              <PendingChangesIndicator 
+                showDetails={false}
+                onClick={() => setIsChangeLogOpen(true)}
+              />
+            </div>
+          )}
 
           <div className="flex gap-x-2 items-center my-auto">
             <User user={user} />
@@ -136,17 +140,12 @@ export function Header({
         </Content>
       </div>
 
-      {/* ChangeLog Panel */}
-      {currentEntityId && currentEntityType && getEntityHistory && (
-        <ChangeLogPanel
-          entityId={currentEntityId}
-          entityType={currentEntityType}
-          entityName={currentEntityName}
-          isOpen={isChangeLogOpen}
-          onClose={() => setIsChangeLogOpen(false)}
-          getEntityHistory={getEntityHistory}
-        />
-      )}
+      {/* Global ChangeLog Panel - shows all pending changes */}
+      <GlobalChangeLogPanel
+        isOpen={isChangeLogOpen}
+        onClose={() => setIsChangeLogOpen(false)}
+        allChangesByEntity={allChangesByEntity}
+      />
     </>
   )
 }

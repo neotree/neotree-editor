@@ -45,10 +45,6 @@ export function DashboardNavigation(props: Props) {
                 showTopBar={showTopBar}
                 showSidebar={showSidebar}
                 showThemeToggle={showThemeToggle}
-                currentEntityId={props.currentEntityId}
-                currentEntityType={props.currentEntityType}
-                currentEntityName={props.currentEntityName}
-                getEntityHistory={props.getEntityHistory}
             />
         </>
     );
