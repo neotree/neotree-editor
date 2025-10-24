@@ -15,6 +15,7 @@ interface PendingChangesIndicatorProps {
   entityType?: string
   className?: string
   showDetails?: boolean
+  onClick?: () => void // New prop for handling clicks
 }
 
 export function PendingChangesIndicator({
@@ -22,6 +23,7 @@ export function PendingChangesIndicator({
   entityType,
   className,
   showDetails = true,
+  onClick,
 }: PendingChangesIndicatorProps) {
   const { pendingChanges, changeCount, hasChanges, getChangesSummary } = usePendingChanges({
     entityId,
@@ -33,15 +35,21 @@ export function PendingChangesIndicator({
 
   const summary = getChangesSummary()
 
+  // Simple clickable badge when showDetails is false
   if (!showDetails) {
     return (
-      <Badge variant="secondary" className={cn("gap-1", className)}>
+      <Badge 
+        variant="secondary" 
+        className={cn("gap-1 cursor-pointer hover:bg-secondary/80 transition-colors", className)}
+        onClick={onClick}
+      >
         <Clock className="h-3 w-3" />
         {changeCount} unsaved {changeCount === 1 ? "change" : "changes"}
       </Badge>
     )
   }
 
+  // Detailed popover view when showDetails is true
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -97,6 +105,21 @@ export function PendingChangesIndicator({
               ))}
             </div>
           </ScrollArea>
+
+          {/* Add button to view full history if onClick is provided */}
+          {onClick && (
+            <>
+              <Separator />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={onClick}
+              >
+                View Full History
+              </Button>
+            </>
+          )}
         </div>
       </PopoverContent>
     </Popover>

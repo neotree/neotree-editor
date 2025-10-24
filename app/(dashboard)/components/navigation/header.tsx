@@ -13,16 +13,31 @@ import { MobileMenu } from "./mobile-menu"
 import { User } from "./user"
 import { TopBar } from "./top-bar"
 import { PendingChangesIndicator } from "@/components/changelog/pending-changes-indicator"
+import { ChangeLogPanel } from "@/components/changelog/changelog-panel"
 
 type Props = {
   user: IAppContext["authenticatedUser"]
   showTopBar: boolean
   showSidebar: boolean
   showThemeToggle: boolean
+  currentEntityId?: string
+  currentEntityType?: string
+  currentEntityName?: string
+  getEntityHistory?: (entityId: string) => Promise<{ data: any[]; errors?: string[] }>
 }
 
-export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props) {
+export function Header({ 
+  user, 
+  showSidebar, 
+  showTopBar, 
+  showThemeToggle,
+  currentEntityId,
+  currentEntityType,
+  currentEntityName,
+  getEntityHistory,
+}: Props) {
   const [mounted, setMounted] = useState(false)
+  const [isChangeLogOpen, setIsChangeLogOpen] = useState(false)
 
   const { sys, info } = useAppContext()
 
@@ -42,14 +57,14 @@ export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props
         <div
           className={cn(
             `
-                            fixed 
-                            top-0 
-                            left-0
-                            border-b
-                            h-8
-                            w-full
-                            z-[1]
-                        `,
+              fixed 
+              top-0 
+              left-0
+              border-b
+              h-8
+              w-full
+              z-[1]
+            `,
             usePlainBg ? "bg-background border-b-border" : "bg-secondary border-b-border/5",
           )}
         >
@@ -60,17 +75,17 @@ export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props
       <div
         className={cn(
           `
-                        fixed
-                        top-0
-                        left-0
-                        w-full
-                        h-16
-                        shadow-md
-                        dark:shadow-foreground/10
-                        flex
-                        justify-center
-                        z-[1]
-                    `,
+            fixed
+            top-0
+            left-0
+            w-full
+            h-16
+            shadow-md
+            dark:shadow-foreground/10
+            flex
+            justify-center
+            z-[1]
+          `,
           usePlainBg
             ? "bg-primary-foreground dark:bg-background"
             : "bg-primary text-primary-foreground dark:bg-background",
@@ -80,11 +95,11 @@ export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props
         <Content
           className={cn(
             `
-                            flex
-                            flex-1
-                            gap-x-4
-                            py-0
-                        `,
+              flex
+              flex-1
+              gap-x-4
+              py-0
+            `,
             showSidebar && "max-w-full",
           )}
         >
@@ -103,7 +118,12 @@ export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props
           <HeaderDesktopMenu />
 
           <div className="my-auto">
-            <PendingChangesIndicator showDetails={false} />
+            <PendingChangesIndicator 
+              entityId={currentEntityId}
+              entityType={currentEntityType}
+              showDetails={false}
+              onClick={() => setIsChangeLogOpen(true)}
+            />
           </div>
 
           <div className="flex gap-x-2 items-center my-auto">
@@ -115,6 +135,18 @@ export function Header({ user, showSidebar, showTopBar, showThemeToggle }: Props
           </div>
         </Content>
       </div>
+
+      {/* ChangeLog Panel */}
+      {currentEntityId && currentEntityType && getEntityHistory && (
+        <ChangeLogPanel
+          entityId={currentEntityId}
+          entityType={currentEntityType}
+          entityName={currentEntityName}
+          isOpen={isChangeLogOpen}
+          onClose={() => setIsChangeLogOpen(false)}
+          getEntityHistory={getEntityHistory}
+        />
+      )}
     </>
   )
 }
