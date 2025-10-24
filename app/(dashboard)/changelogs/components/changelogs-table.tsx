@@ -1,12 +1,13 @@
 "use client"
 
 import { format } from "date-fns"
-import { History, AlertCircle, ChevronDown, ChevronRight, RotateCcw } from "lucide-react"
+import { History, AlertCircle, ChevronDown, ChevronRight, RotateCcw, Search } from "lucide-react"
 
 import { Loader } from "@/components/loader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -155,143 +156,148 @@ export function ChangelogsTable(props: Props) {
           loading={loading}
         />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Changelog History
-            </CardTitle>
-            <CardDescription>
-              {pagination ? pagination.total : changelogs.length} changelog
-              {(pagination ? pagination.total : changelogs.length) !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[600px] pr-4">
-              {changelogs.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No changelogs found</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {changelogs.map((changelog) => {
-                    const isExpanded = expandedItems.has(changelog.changeLogId)
-                    return (
-                      <Card
-                        key={changelog.changeLogId}
-                        className={cn("transition-colors", !changelog.isActive && "opacity-60")}
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className={actionColors[changelog.action]}>
-                                  {changelog.action}
-                                </Badge>
-                                <Badge variant="outline">
-                                  {entityTypeLabels[changelog.entityType as keyof typeof entityTypeLabels]}
-                                </Badge>
-                                <Badge variant="outline">v{changelog.version}</Badge>
-                                {!changelog.isActive && (
-                                  <Badge variant="outline" className="bg-gray-500/10">
-                                    Superseded
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {changelog.description || "No description"}
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <span>{changelog.userName || "Unknown user"}</span>
-                                <span>•</span>
-                                <span>{format(new Date(changelog.dateOfChange), "PPp")}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <ChangelogsTableRowActions
-                                changelog={changelog}
-                                onView={() => viewDetails(changelog)}
-                                onRollback={() => onRollback(changelog.entityId, changelog.version)}
-                                onExport={() => onExport(changelog)}
-                              />
-                              <Button size="sm" variant="ghost" onClick={() => toggleExpanded(changelog.changeLogId)}>
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
+        <div className="px-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search changelogs..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="px-4">
+          <div className="text-sm text-muted-foreground mb-4">
+            {pagination ? pagination.total : changelogs.length} changelog
+            {(pagination ? pagination.total : changelogs.length) !== 1 ? "s" : ""} found
+          </div>
+
+          {changelogs.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No changelogs found</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {changelogs.map((changelog) => {
+                const isExpanded = expandedItems.has(changelog.changeLogId)
+                return (
+                  <Card
+                    key={changelog.changeLogId}
+                    className={cn("transition-colors", !changelog.isActive && "opacity-60")}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className={actionColors[changelog.action]}>
+                              {changelog.action}
+                            </Badge>
+                            <Badge variant="outline">
+                              {entityTypeLabels[changelog.entityType as keyof typeof entityTypeLabels]}
+                            </Badge>
+                            <Badge variant="outline">v{changelog.version}</Badge>
+                            {!changelog.isActive && (
+                              <Badge variant="outline" className="bg-gray-500/10">
+                                Superseded
+                              </Badge>
+                            )}
                           </div>
-                        </CardHeader>
-                        {isExpanded && (
-                          <CardContent className="pt-0">
-                            <Separator className="mb-4" />
-                            <div className="space-y-4">
-                              {changelog.changeReason && (
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">Reason</Label>
-                                  <p className="text-sm mt-1">{changelog.changeReason}</p>
-                                </div>
-                              )}
-
-                              {changelog.changes && changelog.changes.length > 0 && (
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">
-                                    Changes ({changelog.changes.length})
-                                  </Label>
-                                  <div className="mt-2 space-y-2">
-                                    {changelog.changes.map((change: any, idx: number) => (
-                                      <div key={idx} className="p-3 bg-muted/50 rounded-lg text-sm">
-                                        <div className="font-medium mb-1">{change.field || change.fieldPath}</div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                          <div>
-                                            <span className="text-muted-foreground">Previous:</span>
-                                            <pre className="mt-1 p-2 bg-background rounded overflow-auto">
-                                              {JSON.stringify(change.previousValue, null, 2)}
-                                            </pre>
-                                          </div>
-                                          <div>
-                                            <span className="text-muted-foreground">New:</span>
-                                            <pre className="mt-1 p-2 bg-background rounded overflow-auto">
-                                              {JSON.stringify(change.newValue, null, 2)}
-                                            </pre>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {changelog.parentVersion !== null && (
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">Parent Version</Label>
-                                  <p className="text-sm mt-1">v{changelog.parentVersion}</p>
-                                </div>
-                              )}
-
-                              {changelog.mergedFromVersion !== null && (
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">Merged From Version</Label>
-                                  <p className="text-sm mt-1">v{changelog.mergedFromVersion}</p>
-                                </div>
-                              )}
+                          <div className="text-sm text-muted-foreground">
+                            {changelog.description || "No description"}
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>{changelog.userName || "Unknown user"}</span>
+                            <span>•</span>
+                            <span>{format(new Date(changelog.dateOfChange), "PPp")}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <ChangelogsTableRowActions
+                            changelog={changelog}
+                            onView={() => viewDetails(changelog)}
+                            onRollback={() => onRollback(changelog.entityId, changelog.version)}
+                            onExport={() => onExport(changelog)}
+                          />
+                          <Button size="sm" variant="ghost" onClick={() => toggleExpanded(changelog.changeLogId)}>
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    {isExpanded && (
+                      <CardContent className="pt-0">
+                        <Separator className="mb-4" />
+                        <div className="space-y-4">
+                          {changelog.changeReason && (
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Reason</Label>
+                              <p className="text-sm mt-1">{changelog.changeReason}</p>
                             </div>
-                          </CardContent>
-                        )}
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                          )}
+
+                          {changelog.changes && changelog.changes.length > 0 && (
+                            <div>
+                              <Label className="text-xs text-muted-foreground">
+                                Changes ({changelog.changes.length})
+                              </Label>
+                              <div className="mt-2 space-y-2">
+                                {changelog.changes.map((change: any, idx: number) => (
+                                  <div key={idx} className="p-3 bg-muted/50 rounded-lg text-sm">
+                                    <div className="font-medium mb-1">{change.field || change.fieldPath}</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      <div>
+                                        <span className="text-muted-foreground">Previous:</span>
+                                        <pre className="mt-1 p-2 bg-background rounded overflow-auto">
+                                          {JSON.stringify(change.previousValue, null, 2)}
+                                        </pre>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">New:</span>
+                                        <pre className="mt-1 p-2 bg-background rounded overflow-auto">
+                                          {JSON.stringify(change.newValue, null, 2)}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {changelog.parentVersion !== null && (
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Parent Version</Label>
+                              <p className="text-sm mt-1">v{changelog.parentVersion}</p>
+                            </div>
+                          )}
+
+                          {changelog.mergedFromVersion !== null && (
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Merged From Version</Label>
+                              <p className="text-sm mt-1">v{changelog.mergedFromVersion}</p>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {pagination && pagination.totalPages > 1 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 px-4">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
