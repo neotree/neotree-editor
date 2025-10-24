@@ -1,21 +1,25 @@
 "use client"
 
-import { Search, Filter } from "lucide-react"
+import { Filter } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { DateTimePicker } from "@/components/datetime-picker"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useChangelogsTable } from "../hooks/use-changelogs-table"
-
+import { Separator } from "@/components/ui/separator"
 
 type Props = {
-  filters: ReturnType<typeof useChangelogsTable>["filters"]
-  setFilters: ReturnType<typeof useChangelogsTable>["setFilters"]
-  onSearch: ReturnType<typeof useChangelogsTable>["onSearch"]
-  clearFilters: ReturnType<typeof useChangelogsTable>["clearFilters"]
+  searchValue: string
+  entityType: string
+  action: string
+  isActiveOnly: boolean
+  sort: string
+  sortOptions: { value: string; label: string }[]
+  setSearchValue: (value: string) => void
+  setEntityType: (value: string) => void
+  setAction: (value: string) => void
+  setIsActiveOnly: (value: boolean) => void
+  setSort: (value: string) => void
+  clearFilters: () => void
   loading: boolean
 }
 
@@ -29,118 +33,109 @@ const entityTypeLabels = {
   alias: "Alias",
 }
 
-export function ChangelogsTableHeader({ filters, setFilters, onSearch, clearFilters, loading }: Props) {
+export function ChangelogsTableHeader({
+  searchValue,
+  entityType,
+  action,
+  isActiveOnly,
+  sort,
+  sortOptions,
+  setSearchValue,
+  setEntityType,
+  setAction,
+  setIsActiveOnly,
+  setSort,
+  clearFilters,
+  loading,
+}: Props) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Filter className="h-5 w-5" />
-          Filters
-        </CardTitle>
-        <CardDescription>Filter and search through changelog history</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <Label>Search</Label>
-            <Input
-              placeholder="Search changelogs..."
-              value={filters.searchTerm}
-              onChange={(e) => setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
-            />
-          </div>
+    <>
+      <div className="p-4 flex flex-col gap-y-4">
+        <div className="flex flex-wrap items-center">
+          <div className="text-2xl">Changelogs</div>
+          <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4">
+            <div className="w-[200px]">
+              <Input
+                placeholder="Search changelogs..."
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+              />
+            </div>
 
-          <div>
-            <Label>Entity Type</Label>
-            <Select
-              value={filters.entityType}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, entityType: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {Object.entries(entityTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
+            <div>
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
                     </SelectItem>
                   ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label>Action</Label>
-            <Select
-              value={filters.action}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, action: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">All Actions</SelectItem>
-                  <SelectItem value="create">Create</SelectItem>
-                  <SelectItem value="update">Update</SelectItem>
-                  <SelectItem value="delete">Delete</SelectItem>
-                  <SelectItem value="publish">Publish</SelectItem>
-                  <SelectItem value="restore">Restore</SelectItem>
-                  <SelectItem value="rollback">Rollback</SelectItem>
-                  <SelectItem value="merge">Merge</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+            <div>
+              <Select value={entityType} onValueChange={setEntityType}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Entity Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {Object.entries(entityTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label>Start Date</Label>
-            <DateTimePicker
-              type="date"
-              value={filters.startDate}
-              max={new Date()}
-              onChange={(value) => setFilters((prev) => ({ ...prev, startDate: value.date! }))}
-            />
-          </div>
+            <div>
+              <Select value={action} onValueChange={setAction}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">All Actions</SelectItem>
+                    <SelectItem value="create">Create</SelectItem>
+                    <SelectItem value="update">Update</SelectItem>
+                    <SelectItem value="delete">Delete</SelectItem>
+                    <SelectItem value="publish">Publish</SelectItem>
+                    <SelectItem value="restore">Restore</SelectItem>
+                    <SelectItem value="rollback">Rollback</SelectItem>
+                    <SelectItem value="merge">Merge</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label>End Date</Label>
-            <DateTimePicker
-              type="date"
-              disabled={!filters.startDate}
-              min={filters.startDate || undefined}
-              max={new Date()}
-              value={filters.endDate}
-              onChange={(value) => setFilters((prev) => ({ ...prev, endDate: value.date! }))}
-            />
-          </div>
+            <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isActiveOnly}
+                  onChange={(e) => setIsActiveOnly(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm whitespace-nowrap">Active only</span>
+              </label>
+            </div>
 
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.isActiveOnly}
-                onChange={(e) => setFilters((prev) => ({ ...prev, isActiveOnly: e.target.checked }))}
-                className="rounded"
-              />
-              <span className="text-sm">Active versions only</span>
-            </label>
+            <Button variant="outline" onClick={clearFilters} disabled={loading}>
+              <Filter className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
           </div>
         </div>
+      </div>
 
-        <div className="flex gap-2 mt-4">
-          <Button onClick={onSearch} disabled={loading}>
-            <Search className="h-4 w-4 mr-2" />
-            Search
-          </Button>
-          <Button variant="outline" onClick={clearFilters} disabled={loading}>
-            Clear Filters
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <Separator />
+    </>
   )
 }
