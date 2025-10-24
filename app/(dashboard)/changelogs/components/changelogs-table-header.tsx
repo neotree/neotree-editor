@@ -3,7 +3,6 @@
 import { Filter } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 
@@ -34,13 +33,11 @@ const entityTypeLabels = {
 }
 
 export function ChangelogsTableHeader({
-  searchValue,
   entityType,
   action,
   isActiveOnly,
   sort,
   sortOptions,
-  setSearchValue,
   setEntityType,
   setAction,
   setIsActiveOnly,
@@ -54,14 +51,7 @@ export function ChangelogsTableHeader({
         <div className="flex flex-wrap items-center">
           <div className="text-2xl">Changelogs</div>
           <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4">
-            <div className="w-[200px]">
-              <Input
-                placeholder="Search changelogs..."
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-              />
-            </div>
-
+        
             <div>
               <Select value={sort} onValueChange={setSort}>
                 <SelectTrigger className="w-[180px]">
