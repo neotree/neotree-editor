@@ -54,6 +54,14 @@ export const pendingChangesAPI = {
     })
   },
 
+  async updateChange(id: number, updates: Partial<Omit<PendingChange, "id">>) {
+    return await changeLogDB.pendingChanges.update(id, updates)
+  },
+
+  async deleteChange(id: number) {
+    return await changeLogDB.pendingChanges.delete(id)
+  },
+
   // Get all pending changes for an entity
   async getEntityChanges(entityId: string, entityType?: string) {
     const query = changeLogDB.pendingChanges.where("entityId").equals(entityId)
