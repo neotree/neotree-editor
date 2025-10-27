@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import axios from "axios"
@@ -34,10 +34,10 @@ export function useScriptForm(params: UseScriptFormParams) {
     entityId: formData?.scriptId,
     entityType: "script",
     userId: authenticatedUser?.userId,
-    autoTrack: true,
+    autoTrack: false,
   })
 
-  const [changeTracker] = useState(() =>
+  const changeTrackerRef = useRef(
     formData?.scriptId
       ? createChangeTracker({
           entityId: formData.scriptId,
@@ -48,6 +48,8 @@ export function useScriptForm(params: UseScriptFormParams) {
       : null,
   )
 
+  const originalSnapshotRef = useRef<ScriptFormDataType | null>(null)
+
   useEffect(() => {
     return () => {
       resetDrugsLibraryState()
@@ -55,10 +57,12 @@ export function useScriptForm(params: UseScriptFormParams) {
   }, [])
 
   useEffect(() => {
-    if (changeTracker && formData) {
-      changeTracker.setSnapshot(formData)
+    if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
+      console.log("Initializing original snapshot for script:", formData.scriptId)
+      originalSnapshotRef.current = formData
+      changeTrackerRef.current.setSnapshot(formData)
     }
-  }, [changeTracker, formData]) // Updated to include formData directly
+  }, [formData])
 
   const getDefaultFormValues = useCallback(() => {
     return {
@@ -115,18 +119,14 @@ export function useScriptForm(params: UseScriptFormParams) {
 
   const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields])
 
-  useEffect(() => {
-    if (!changeTracker || !formIsDirty) return
-
-    const subscription = watch((value) => {
-      changeTracker.trackChanges(value, "Form field updated")
-    })
-
-    return () => subscription.unsubscribe()
-  }, [watch, changeTracker, formIsDirty])
-
   const onSubmit = handleSubmit(async (data) => {
     setLoading(true)
+
+    // Track changes before saving
+    if (changeTrackerRef.current && originalSnapshotRef.current) {
+      console.log("Tracking changes on save draft")
+      await changeTrackerRef.current.trackChanges(data, "Draft saved")
+    }
 
     // const res = await saveScripts({ data: [data], broadcastAction: true, });
 
@@ -141,14 +141,11 @@ export function useScriptForm(params: UseScriptFormParams) {
         variant: "error",
       })
     } else {
-      await clearChanges()
-
       router.refresh()
       alert({
         title: "Success",
-        message: "Scripts saved successfully!",
+        message: "Draft saved successfully!",
         variant: "success",
-        onClose: () => router.push("/"),
       })
     }
 
