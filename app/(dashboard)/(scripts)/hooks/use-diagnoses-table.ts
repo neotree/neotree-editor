@@ -59,6 +59,7 @@ export function useDiagnosesTable({
 
   const { deleteDiagnoses, saveDiagnoses } = useScriptsContext()
 
+  
   const onDelete = useCallback(
     async (diagnosesIds: string[]) => {
       confirm(
