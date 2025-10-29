@@ -7,6 +7,7 @@ import { DataKey } from "@/databases/queries/data-keys";
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
     dataKeys: DataKey[];
+    userId?: string;
 };
 
 export type UpdateDataKeysRefsResponse = {
@@ -17,6 +18,7 @@ export type UpdateDataKeysRefsResponse = {
 export async function _updateDataKeysRefs({
     dataKeys,
     broadcastAction,
+    userId,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
         const getUpdatedDataKey = (uniqueKey?: string) => {
@@ -120,8 +122,8 @@ export async function _updateDataKeysRefs({
         diagnoses = diagnoses.filter(s => s.updated).map(({ updated, ...s }) => s);
         screens = screens.filter(s => s.updated).map(({ updated, ...s }) => s);
 
-        if (diagnoses.length) await _saveDiagnoses({ data: diagnoses, });
-        if (screens.length) await _saveScreens({ data: screens, });
+        if (diagnoses.length) await _saveDiagnoses({ data: diagnoses, userId, });
+        if (screens.length) await _saveScreens({ data: screens, userId, });
 
         const saved = diagnoses.length || screens.length;
 
