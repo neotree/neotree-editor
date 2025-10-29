@@ -90,12 +90,12 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                             Duplicate
                         </DropdownMenuItem>
 
-                        <DropdownMenuItem
+                        {/* <DropdownMenuItem
                             onClick={() => setTimeout(() => setScriptsIdsToExport(), 0)}
                         >
                             <Upload className="mr-2 h-4 w-4" />
                             Export
-                        </DropdownMenuItem>
+                        </DropdownMenuItem> */}
 
                         <DropdownMenuItem
                             asChild
