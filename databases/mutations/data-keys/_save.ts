@@ -124,7 +124,7 @@ export async function _saveDataKeys({
         } else {
             if (updateRefs && uniqueKeys.length) {
                 const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
-                await _updateDataKeysRefs({ dataKeys, broadcastAction, });
+                await _updateDataKeysRefs({ dataKeys, broadcastAction, userId, });
             }
 
             socket.emit('data_changed', 'save_data_keys');
