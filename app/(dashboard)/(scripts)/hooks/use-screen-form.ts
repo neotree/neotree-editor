@@ -13,7 +13,6 @@ import { useAppContext } from "@/contexts/app"
 import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
-import { usePendingChanges } from "@/hooks/use-pending-changes"
 import { createChangeTracker } from "@/lib/change-tracker"
 
 export type UseScreenFormParams = {
@@ -34,14 +33,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
   const scriptPageHref = useMemo(() => `/script/${scriptId}?section=screens`, [scriptId])
 
-  const { trackChange, clearChanges } = usePendingChanges({
-    entityId: formData?.screenId,
-    entityType: "screen",
-    userId: authenticatedUser?.userId,
-    autoTrack: true,
-  })
-
-  const [changeTracker] = useState(() =>
+  const changeTrackerRef = useRef(
     formData?.screenId
       ? createChangeTracker({
           entityId: formData.screenId,
@@ -51,6 +43,8 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
         })
       : null,
   )
+
+  const originalSnapshotRef = useRef<ScreenFormDataType | null>(null)
 
   const getDefaultValues = useCallback(() => {
     return {
@@ -126,10 +120,12 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
   })
 
   useEffect(() => {
-    if (changeTracker && formData) {
-      changeTracker.setSnapshot(formData)
+    if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
+      console.log("[v0] Initializing original snapshot for screen:", formData.screenId)
+      originalSnapshotRef.current = formData
+      changeTrackerRef.current.setSnapshot(formData)
     }
-  }, [changeTracker, formData])
+  }, [formData])
 
   useEffect(() => {
     if (mounted.current) {
@@ -142,20 +138,9 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
   const {
     formState: { dirtyFields },
     handleSubmit,
-    watch,
   } = form
 
   const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields])
-
-  useEffect(() => {
-    if (!changeTracker || !formIsDirty) return
-
-    const subscription = watch((value) => {
-      changeTracker.trackChanges(value, "Form field updated")
-    })
-
-    return () => subscription.unsubscribe()
-  }, [watch, changeTracker, formIsDirty])
 
   const save = handleSubmit(async (data) => {
     try {
@@ -171,6 +156,11 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
       if (!payloadData.scriptId) throw new Error("Screen is missing script reference!")
 
+      if (changeTrackerRef.current && originalSnapshotRef.current) {
+        console.log("[v0] Tracking changes on save screen draft")
+        await changeTrackerRef.current.trackChanges(payloadData, "Screen draft saved")
+      }
+
       // const res = await saveScreens({ data: [payloadData], broadcastAction: true, });
 
       // TODO: Replace this with server action
@@ -178,8 +168,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       const res = response.data as Awaited<ReturnType<typeof saveScreens>>
 
       if (res.errors?.length) throw new Error(res.errors.join(", "))
-
-      await clearChanges()
 
       router.refresh()
       alert({
