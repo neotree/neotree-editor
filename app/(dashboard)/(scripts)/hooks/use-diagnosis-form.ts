@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState, useEffect } from "react"
+import { useCallback, useMemo, useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { v4 as uuidv4 } from "uuid"
@@ -12,7 +12,6 @@ import { useAppContext } from "@/contexts/app"
 import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
-import { usePendingChanges } from "@/hooks/use-pending-changes"
 import { createChangeTracker } from "@/lib/change-tracker"
 
 export type UseDiagnosisFormParams = {
@@ -32,14 +31,7 @@ export function useDiagnosisForm({ formData, scriptId, script }: UseDiagnosisFor
 
   const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId])
 
-  const { trackChange, clearChanges } = usePendingChanges({
-    entityId: formData?.diagnosisId,
-    entityType: "diagnosis",
-    userId: authenticatedUser?.userId,
-    autoTrack: true,
-  })
-
-  const [changeTracker] = useState(() =>
+  const changeTrackerRef = useRef(
     formData?.diagnosisId
       ? createChangeTracker({
           entityId: formData.diagnosisId,
@@ -49,6 +41,8 @@ export function useDiagnosisForm({ formData, scriptId, script }: UseDiagnosisFor
         })
       : null,
   )
+
+  const originalSnapshotRef = useRef<DiagnosisFormDataType | null>(null)
 
   const getDefaultValues = useCallback(() => {
     return {
@@ -78,34 +72,23 @@ export function useDiagnosisForm({ formData, scriptId, script }: UseDiagnosisFor
   })
 
   useEffect(() => {
-    if (changeTracker && formData) {
-      changeTracker.setSnapshot(formData)
+    if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
+      console.log("[v0] Setting original snapshot for diagnosis:", formData.diagnosisId)
+      originalSnapshotRef.current = formData
+      changeTrackerRef.current.setSnapshot(formData)
     }
-  }, [changeTracker, formData])
+  }, [formData])
 
   const {
     formState: { dirtyFields },
     handleSubmit,
-    watch,
   } = form
 
   const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields])
 
-  useEffect(() => {
-    if (!changeTracker || !formIsDirty) return
-
-    const subscription = watch((value) => {
-      changeTracker.trackChanges(value, "Form field updated")
-    })
-
-    return () => subscription.unsubscribe()
-  }, [watch, changeTracker, formIsDirty])
-
   const save = handleSubmit(async (data) => {
     try {
       setSaving(true)
-
-      const errors: string[] = []
 
       const payloadData = {
         ...data,
@@ -114,6 +97,11 @@ export function useDiagnosisForm({ formData, scriptId, script }: UseDiagnosisFor
 
       if (!payloadData.scriptId) throw new Error("Diagnosis is missing script reference!")
 
+      if (changeTrackerRef.current) {
+        console.log("[v0] Tracking diagnosis changes on save")
+        await changeTrackerRef.current.trackChanges(payloadData, "Diagnosis draft saved")
+      }
+
       // const res = await saveDiagnoses({ data: [payloadData], broadcastAction: true, });
 
       // TODO: Replace this with server action
@@ -121,8 +109,6 @@ export function useDiagnosisForm({ formData, scriptId, script }: UseDiagnosisFor
       const res = response.data as Awaited<ReturnType<typeof saveDiagnoses>>
 
       if (res.errors?.length) throw new Error(res.errors.join(", "))
-
-      await clearChanges()
 
       router.refresh()
       alert({
