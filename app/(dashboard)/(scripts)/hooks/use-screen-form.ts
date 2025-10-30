@@ -127,7 +127,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
   useEffect(() => {
     if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
-      console.log("[v0] Initializing original snapshot for screen:", formData.screenId)
+      console.log("Initializing original snapshot for screen:", formData.screenId)
       originalSnapshotRef.current = formData
       changeTrackerRef.current.setSnapshot(formData)
     }
@@ -165,9 +165,9 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       if (!payloadData.scriptId) throw new Error("Screen is missing script reference!")
 
       if (isNewScreen) {
-        console.log("[v0] New screen will be tracked after creation")
+        console.log("New screen will be tracked after creation")
       } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-        console.log("[v0] Tracking changes on save screen draft")
+        console.log("Tracking changes on save screen draft")
         await changeTrackerRef.current.trackChanges(payloadData, "Screen draft saved")
       }
 
@@ -180,7 +180,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       if (res.errors?.length) throw new Error(res.errors.join(", "))
 
       if (isNewScreen) {
-        console.log("[v0] Tracking new screen creation:", screenId)
+        console.log("Tracking new screen creation:", screenId)
 
         await pendingChangesAPI.addChange({
           entityType: "screen",
