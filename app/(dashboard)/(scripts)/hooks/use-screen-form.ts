@@ -14,6 +14,7 @@ import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
 import { createChangeTracker } from "@/lib/change-tracker"
+import { pendingChangesAPI } from "@/lib/indexed-db"
 
 export type UseScreenFormParams = {
   scriptId: string
@@ -32,6 +33,11 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
   const { viewOnly, authenticatedUser } = useAppContext()
 
   const scriptPageHref = useMemo(() => `/script/${scriptId}?section=screens`, [scriptId])
+  const isNewScreen = !formData?.screenId
+  const generateScreenId = useCallback(
+    () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()),
+    [],
+  )
 
   const changeTrackerRef = useRef(
     formData?.screenId
@@ -50,7 +56,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     return {
       version: formData?.version || 1,
       scriptId: formData?.scriptId || scriptId,
-      screenId: formData?.screenId || uuidv4(),
+      screenId: formData?.screenId || generateScreenId(),
       type: (formData?.type || "") as ScreenFormDataType["type"],
       sectionTitle: formData?.sectionTitle || "",
       previewTitle: formData?.previewTitle || "",
@@ -113,7 +119,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       collectionLabel: formData?.collectionLabel || "",
       listStyle: formData?.listStyle || "none",
     } satisfies ScreenFormDataType
-  }, [formData, scriptId])
+  }, [formData, scriptId, generateScreenId])
 
   const form = useForm({
     defaultValues: getDefaultValues(),
@@ -146,8 +152,10 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     try {
       setSaving(true)
 
+      const screenId = data.screenId || generateScreenId()
       const payloadData = {
         ...data,
+        screenId,
         timerValue: data.timerValue ? Number(data.timerValue) : null,
         multiplier: data.multiplier ? Number(data.multiplier) : null,
         minValue: data.minValue ? Number(data.minValue) : null,
@@ -156,7 +164,9 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
       if (!payloadData.scriptId) throw new Error("Screen is missing script reference!")
 
-      if (changeTrackerRef.current && originalSnapshotRef.current) {
+      if (isNewScreen) {
+        console.log("[v0] New screen will be tracked after creation")
+      } else if (changeTrackerRef.current && originalSnapshotRef.current) {
         console.log("[v0] Tracking changes on save screen draft")
         await changeTrackerRef.current.trackChanges(payloadData, "Screen draft saved")
       }
@@ -168,6 +178,20 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       const res = response.data as Awaited<ReturnType<typeof saveScreens>>
 
       if (res.errors?.length) throw new Error(res.errors.join(", "))
+
+      if (isNewScreen) {
+        console.log("[v0] Tracking new screen creation:", screenId)
+
+        await pendingChangesAPI.addChange({
+          entityType: "screen",
+          entityId: screenId,
+          action: "create",
+          fieldPath: "screen",
+          fieldName: "New Screen",
+          oldValue: null,
+          newValue: payloadData.title || "Untitled Screen",
+        })
+      }
 
       router.refresh()
       alert({

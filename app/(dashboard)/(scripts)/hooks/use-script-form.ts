@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import axios from "axios"
+import { v4 as uuidv4 } from "uuid"
 
 import { useScriptsContext, type ScriptFormDataType, type IScriptsContext } from "@/contexts/scripts"
 import { defaultNuidSearchFields } from "@/constants/fields"
@@ -15,6 +16,7 @@ import { resetDrugsLibraryState } from "@/hooks/use-drugs-library"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import { usePendingChanges } from "@/hooks/use-pending-changes"
 import { createChangeTracker } from "@/lib/change-tracker"
+import { pendingChangesAPI } from "@/lib/indexed-db"
 
 export type UseScriptFormParams = {
   formData?: ScriptFormDataType
@@ -29,6 +31,8 @@ export function useScriptForm(params: UseScriptFormParams) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const { saveScripts } = useScriptsContext()
+
+  const isNewScript = !formData?.scriptId
 
   const { trackChange, clearChanges } = usePendingChanges({
     entityId: formData?.scriptId,
@@ -122,8 +126,19 @@ export function useScriptForm(params: UseScriptFormParams) {
   const onSubmit = handleSubmit(async (data) => {
     setLoading(true)
 
-    // Track changes before saving
-    if (changeTrackerRef.current && originalSnapshotRef.current) {
+    const generateScriptId = () =>
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()
+
+    const scriptId = data.scriptId ?? (isNewScript ? generateScriptId() : undefined)
+    const payload: typeof data = {
+      ...data,
+      scriptId,
+    }
+
+    if (isNewScript) {
+      // For new scripts, we'll track the creation after we get the scriptId from the server
+      console.log("New script will be tracked after creation")
+    } else if (changeTrackerRef.current && originalSnapshotRef.current) {
       console.log("Tracking changes on save draft")
       await changeTrackerRef.current.trackChanges(data, "Draft saved")
     }
@@ -131,7 +146,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     // const res = await saveScripts({ data: [data], broadcastAction: true, });
 
     // TODO: Replace this with server action
-    const response = await axios.post("/api/scripts/save", { data: [data], broadcastAction: true })
+    const response = await axios.post("/api/scripts/save", { data: [payload], broadcastAction: true })
     const res = response.data as Awaited<ReturnType<typeof saveScripts>>
 
     if (res.errors?.length) {
@@ -141,6 +156,22 @@ export function useScriptForm(params: UseScriptFormParams) {
         variant: "error",
       })
     } else {
+      if (isNewScript && scriptId) {
+        const newScriptId = scriptId
+        console.log("Tracking new script creation:", newScriptId)
+
+        // Track the creation of the new script
+        await pendingChangesAPI.addChange({
+          entityType: "script",
+          entityId: newScriptId,
+          action: "create",
+          fieldPath: "script",
+          fieldName: "New Script",
+          oldValue: null,
+          newValue: payload.title || "Untitled Script",
+        })
+      }
+
       router.refresh()
       alert({
         title: "Success",
