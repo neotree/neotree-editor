@@ -543,6 +543,22 @@ function sortDataKeys (
                 key2: new Date(key2.createdAt || '').getTime().toString(),
             }));
             break;
+
+        case 'updatedAt.asc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'asc',
+                key1: new Date(key1.updatedAt || '').getTime().toString(),
+                key2: new Date(key2.updatedAt || '').getTime().toString(),
+            }));
+            break;
+
+        case 'updatedAt.desc':
+            sorted = dataKeys.sort((key1, key2) => sortFn({
+                sortDirection: 'desc',
+                key1: new Date(key1.updatedAt || '').getTime().toString(),
+                key2: new Date(key2.updatedAt || '').getTime().toString(),
+            }));
+            break;
             
         default:
             sorted = dataKeys.sort((key1, key2) => sortFn({
