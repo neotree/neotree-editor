@@ -264,12 +264,22 @@ export const dataKeysSortOpts = [
     },
     {
         value: 'createdAt.asc',
-        label: 'Date (asc)',
+        label: 'Creation date (asc)',
         Icon: SortAsc,
     },
     {
         value: 'createdAt.desc',
-        label: 'Date (desc)',
+        label: 'Creation date (desc)',
+        Icon: SortDesc,
+    },
+    {
+        value: 'updatedAt.asc',
+        label: 'Update date (asc)',
+        Icon: SortAsc,
+    },
+    {
+        value: 'updatedAt.desc',
+        label: 'Update date (desc)',
         Icon: SortDesc,
     },
 ];

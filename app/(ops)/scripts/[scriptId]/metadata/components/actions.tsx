@@ -46,7 +46,36 @@ export function ScriptMetaActions({ data }: {
             });
 
             const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, `${script.title || ''}`.substring(0, 31));
+            XLSX.utils.book_append_sheet(workbook, worksheet, `Screens - ${script.title || ''}`.substring(0, 31));
+        });
+
+        data.forEach(script => {
+            const worksheetData = [] as {
+                Script: string;
+                Hospital: string;
+                'Diagnosis Name': string;
+                Key: string;
+                Label: string;
+                'Data Type': string;
+                'Value': string;
+                'Value Label': string;
+            }[];
+
+            script.diagnoses.forEach(d => {
+                worksheetData.push({
+                    Script: script.title,
+                    Hospital: script.hospitalName || '',
+                    'Diagnosis Name': d.name,
+                    Key: d.key,
+                    Label: d.name,
+                    'Data Type': 'diagnosis',
+                    Value: d.key,
+                    'Value Label': d.name,
+                });
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            XLSX.utils.book_append_sheet(workbook, worksheet, `Diagnoses - ${script.title || ''}`.substring(0, 31));
         });
 
         XLSX.writeFile(workbook, "metadata.xlsx");
