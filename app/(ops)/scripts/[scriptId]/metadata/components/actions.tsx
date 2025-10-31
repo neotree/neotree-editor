@@ -55,6 +55,10 @@ export function ScriptMetaActions({ data }: {
                 Hospital: string;
                 'Diagnosis Name': string;
                 Key: string;
+                Label: string;
+                'Data Type': string;
+                'Value': string;
+                'Value Label': string;
             }[];
 
             script.diagnoses.forEach(d => {
@@ -63,6 +67,10 @@ export function ScriptMetaActions({ data }: {
                     Hospital: script.hospitalName || '',
                     'Diagnosis Name': d.name,
                     Key: d.key,
+                    Label: d.name,
+                    'Data Type': 'diagnosis',
+                    Value: d.key,
+                    'Value Label': d.name,
                 });
             });
 
