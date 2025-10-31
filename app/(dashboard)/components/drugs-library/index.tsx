@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo, useState } from "react";
-import { MoreVertical, Trash, Edit, Eye, Plus, CopyIcon } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
@@ -16,6 +15,9 @@ import { Add } from "./add";
 import { ExportModal } from "./export-modal";
 import { DrugsLibraryHeader } from "../../drugs-fluids-and-feeds/components/table-header";
 import { DrugsLibraryTableActions } from "./table-actions";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
+import { DrugsLibrarySearch } from "./search";
 
 type Props = {};
 
@@ -35,11 +37,12 @@ export function DrugsLibrary({}: Props) {
         saveDrugs, 
         deleteDrugs,
         copyDrugs,
-        searchQuery,
+        search,
+        setSearch,
+        onSearch,
         typeFilter,
         statusFilter,
         sortBy,
-        setSearchQuery,
         setTypeFilter,
         setStatusFilter,
         setSortBy,
@@ -51,6 +54,42 @@ export function DrugsLibrary({}: Props) {
         setTypeFilter(type);
         setStatusFilter(status);
     };
+
+    const searchResults = search.results;
+
+    const searchResultsById = useMemo(() => {
+        const map = new Map<string, typeof searchResults[number]>();
+        searchResults.forEach(result => {
+            if (result?.itemId) map.set(result.itemId, result);
+        });
+        return map;
+    }, [searchResults]);
+
+    const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const highlightMatch = useCallback((value: string): ReactNode => {
+        const text = `${value ?? ''}`;
+        if (!search.value) return text;
+
+        const lowerQuery = search.value.toLowerCase();
+        if (!text.toLowerCase().includes(lowerQuery)) return text;
+
+        const regex = new RegExp(`(${escapeRegExp(search.value)})`, 'gi');
+        const parts = text.split(regex);
+
+        return parts.map((part, index) => {
+            if (!part) return null;
+
+            const isMatch = part.toLowerCase() === lowerQuery;
+            return isMatch ? (
+                <mark key={index} className="rounded bg-yellow-200 px-1">
+                    {part}
+                </mark>
+            ) : (
+                <span key={index}>{part}</span>
+            );
+        });
+    }, [search.value]);
 
     return (
         <>
@@ -93,14 +132,19 @@ export function DrugsLibrary({}: Props) {
                 onFilterChange={handleFilterChange}
             />
 
+            <div className="px-4 pb-4">
+                <DrugsLibrarySearch 
+                    search={search}
+                    setSearch={setSearch}
+                    onSearch={onSearch}
+                />
+            </div>
+
             <Separator />
 
             <DataTable 
                 onSelect={setSelected}
                 selectable={!disabled}
-                search={{
-                    inputPlaceholder: 'Search',
-                }}
                 headerActions={(
                     <>
                         <Add 
@@ -109,6 +153,46 @@ export function DrugsLibrary({}: Props) {
                         />
                     </>
                 )}
+                rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex }) => {
+                    const item = drugs[rowIndex];
+                    const result = item ? searchResultsById.get(item.itemId!) : undefined;
+
+                    return (
+                        <>
+                            <TableRow {...props}>
+                                {cells}
+                            </TableRow>
+
+                            {!result || !result.matches.length ? null : (
+                                <TableRow
+                                    {...props}
+                                    className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50')}
+                                >
+                                    <TableCell colSpan={cells.length} className="border-t p-0">
+                                        <Card className="m-4 border-none bg-white shadow-none">
+                                            <div className="flex flex-col divide-y text-xs">
+                                                {result.matches.map((match, idx) => (
+                                                    <div
+                                                        key={`${match.field}-${idx}-${match.fieldValue}`}
+                                                        className="flex flex-col gap-y-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-x-4"
+                                                    >
+                                                        <span className="font-medium text-muted-foreground">
+                                                            {match.fieldLabel}
+                                                            {match.context ? ` (${match.context})` : ''}
+                                                        </span>
+                                                        <span className="text-foreground sm:ml-auto sm:text-right">
+                                                            {highlightMatch(match.fieldValue)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </>
+                    );
+                }}
                 getRowOptions={({ rowIndex }) => {
                     const s = drugs[rowIndex];
                     return !s ? {} : {
