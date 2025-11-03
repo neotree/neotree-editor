@@ -109,11 +109,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             with: {
                 draft: !returnDraftsIfExist ? undefined : true,
                 screens: {
+                    where: isNull(screens.deletedAt),
                     with: {
                         draft: !returnDraftsIfExist ? undefined : true,
                     },
                 },
                 diagnoses: {
+                    where: isNull(screens.deletedAt),
                     with: {
                         draft: !returnDraftsIfExist ? undefined : true,
                     },
