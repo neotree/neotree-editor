@@ -1208,9 +1208,9 @@
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/factor.js": {
-    "id": 98023,
+    "id": 60662,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_factor.2ce88bb851ad0e34.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_factor.6a3ac35733957525.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/false.js": {
