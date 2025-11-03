@@ -1,17 +1,21 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
-import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion } from "@/databases/pg/schema";
-import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history";
-import { v4 } from "uuid";
+import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion } from "@/databases/pg/schema"
+import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history"
+import { v4 } from "uuid"
+import { removeHexCharacters } from "@/databases/utils";
 
 export async function _publishDrugsLibraryItems(opts?: {
     broadcastAction?: boolean;
     userId?: string | null;
+    publisherUserId?: string | null;
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
+    const changeLogs: SaveChangeLogData[] = [];
 
     try {
         let deleted = await db.query.pendingDeletion.findMany({
@@ -21,12 +25,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             ),
             columns: { drugsLibraryItemId: true, },
             with: {
-                drugsLibraryItem: {
-                    columns: {
-                        version: true,
-                        key: true,
-                    },
-                },
+                drugsLibraryItem: true,
             },
         });
 
@@ -42,18 +41,45 @@ export async function _publishDrugsLibraryItems(opts?: {
                 })
                 .where(inArray(drugsLibrary.itemId, deleted.map(c => c.drugsLibraryItemId!)));
 
-            await db.insert(drugsLibraryHistory).values(deleted.map(c => {
-                return {
-                    version: c.drugsLibraryItem!.version,
-                    itemId: c.drugsLibraryItemId!,
-                    changes: {
-                        action: 'delete_drugs_library_item',
-                        description: 'Delete drugs library item',
-                        oldValues: [{ deletedAt: null, key: c.drugsLibraryItem!.key, }],
-                        newValues: [{ deletedAt, key: `${c.drugsLibraryItem!.key}_${c.drugsLibraryItemId}`, }],
-                    },
-                };
+            const historyPayload = deleted.map(c => ({
+                version: c.drugsLibraryItem!.version,
+                itemId: c.drugsLibraryItemId!,
+                changes: {
+                    action: 'delete_drugs_library_item',
+                    description: 'Delete drugs library item',
+                    oldValues: [{ deletedAt: null, key: c.drugsLibraryItem!.key, }],
+                    newValues: [{ deletedAt, key: `${c.drugsLibraryItem!.key}_${c.drugsLibraryItemId}`, }],
+                },
             }));
+
+            await db.insert(drugsLibraryHistory).values(historyPayload);
+
+            if (opts?.publisherUserId) {
+                for (let index = 0; index < deleted.length; index++) {
+                    const entry = deleted[index];
+                    const history = historyPayload[index];
+                    if (!entry?.drugsLibraryItemId) continue;
+
+                    const snapshot = removeHexCharacters({
+                        ...(entry.drugsLibraryItem ?? {}),
+                        deletedAt,
+                        key: `${entry.drugsLibraryItem?.key ?? ''}_${entry.drugsLibraryItemId}`,
+                    });
+
+                    changeLogs.push({
+                        entityId: entry.drugsLibraryItemId,
+                        entityType: "drugs_library",
+                        action: "delete",
+                        version: history.version || 1,
+                        changes: history.changes,
+                        fullSnapshot: snapshot,
+                        description: history.changes.description,
+                        userId: opts.publisherUserId,
+                        drugsLibraryItemId: entry.drugsLibraryItemId,
+                        isActive: false,
+                    });
+                }
+            }
         }
 
         await db.delete(pendingDeletion).where(and(
@@ -100,7 +126,12 @@ export async function _publishDrugsLibraryItems(opts?: {
                     .returning();
             }
 
-            await _saveDrugsLibraryItemsHistory({ drafts: updates, previous: dataBefore, });
+            const updateChangeLogs = await _saveDrugsLibraryItemsHistory({
+                drafts: updates,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...updateChangeLogs);
         }
 
         if (inserts.length) {
@@ -124,7 +155,12 @@ export async function _publishDrugsLibraryItems(opts?: {
                 await db.insert(drugsLibrary).values(payload);
             }
 
-            await _saveDrugsLibraryItemsHistory({ drafts: inserts, previous: dataBefore, });
+            const insertChangeLogs = await _saveDrugsLibraryItemsHistory({
+                drafts: inserts,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...insertChangeLogs);
         }
 
         await db.delete(drugsLibraryDrafts).where(
@@ -141,6 +177,10 @@ export async function _publishDrugsLibraryItems(opts?: {
             await db.update(drugsLibrary)
                 .set({ version: sql`${drugsLibrary.version} + 1`, }).
                 where(inArray(drugsLibrary.itemId, published));
+        }
+
+        if (changeLogs.length) {
+            await _saveChangeLogs({ data: changeLogs });
         }
 
         results.success = true;

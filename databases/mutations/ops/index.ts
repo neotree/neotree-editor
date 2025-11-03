@@ -42,6 +42,7 @@ export async function _processPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
     userId?: string | null;
+    publisherUserId?: string | null;
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
         const { items, } = { ...params };

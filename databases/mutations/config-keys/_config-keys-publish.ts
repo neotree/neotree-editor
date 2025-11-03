@@ -1,17 +1,20 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
-import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema";
-import { _saveConfigKeysHistory } from "./_config-keys-history";
-import { v4 } from "uuid";
+import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema"
+import { _saveConfigKeysHistory } from "./_config-keys-history"
+import { v4 } from "uuid"
 
 export async function _publishConfigKeys(opts?: {
-    broadcastAction?: boolean;
-    userId?: string | null;
+  broadcastAction?: boolean
+  userId?: string | null
+  publisherUserId?: string | null
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
+    const changeLogs: SaveChangeLogData[] = [];
 
     try {
         let updates: (typeof configKeysDrafts.$inferSelect)[] = [];
@@ -50,7 +53,12 @@ export async function _publishConfigKeys(opts?: {
                     .returning();
             }
 
-            await _saveConfigKeysHistory({ drafts: updates, previous: dataBefore, });
+            const updateChangeLogs = await _saveConfigKeysHistory({
+                drafts: updates,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...updateChangeLogs);
         }
 
         if (inserts.length) {
@@ -74,7 +82,12 @@ export async function _publishConfigKeys(opts?: {
                 await db.insert(configKeys).values(payload);
             }
 
-            await _saveConfigKeysHistory({ drafts: inserts, previous: dataBefore, });
+            const insertChangeLogs = await _saveConfigKeysHistory({
+                drafts: inserts,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...insertChangeLogs);
         }
 
         await db.delete(configKeysDrafts).where(
@@ -88,11 +101,7 @@ export async function _publishConfigKeys(opts?: {
             ),
             columns: { configKeyId: true, },
             with: {
-                configKey: {
-                    columns: {
-                        version: true,
-                    },
-                },
+                configKey: true,
             },
         });
 
@@ -105,7 +114,7 @@ export async function _publishConfigKeys(opts?: {
                 .set({ deletedAt, })
                 .where(inArray(configKeys.configKeyId, deleted.map(c => c.configKeyId!)));
 
-            await db.insert(configKeysHistory).values(deleted.map(c => ({
+            const historyPayload = deleted.map(c => ({
                 version: c.configKey!.version,
                 configKeyId: c.configKeyId!,
                 changes: {
@@ -114,7 +123,35 @@ export async function _publishConfigKeys(opts?: {
                     oldValues: [{ deletedAt: null, }],
                     newValues: [{ deletedAt, }],
                 },
-            })));
+            }));
+
+            await db.insert(configKeysHistory).values(historyPayload);
+
+            if (opts?.publisherUserId) {
+                for (let index = 0; index < deleted.length; index++) {
+                    const entry = deleted[index];
+                    const history = historyPayload[index];
+                    if (!entry?.configKeyId) continue;
+
+                    const snapshot = {
+                        ...(entry.configKey ?? {}),
+                        deletedAt,
+                    };
+
+                    changeLogs.push({
+                        entityId: entry.configKeyId,
+                        entityType: "config_key",
+                        action: "delete",
+                        version: history.version || 1,
+                        changes: history.changes,
+                        fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
+                        description: history.changes.description,
+                        userId: opts.publisherUserId,
+                        configKeyId: entry.configKeyId,
+                        isActive: false,
+                    });
+                }
+            }
         }
 
         await db.delete(pendingDeletion).where(and(
@@ -135,6 +172,10 @@ export async function _publishConfigKeys(opts?: {
             await db.update(configKeys)
                 .set({ version: sql`${configKeys.version} + 1`, }).
                 where(inArray(configKeys.configKeyId, published));
+        }
+
+        if (changeLogs.length) {
+            await _saveChangeLogs({ data: changeLogs });
         }
 
         results.success = true;

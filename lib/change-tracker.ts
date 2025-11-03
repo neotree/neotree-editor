@@ -18,6 +18,13 @@ const IGNORED_FIELDS = new Set([
   "oldConfigKeyId",
   "version",
   "publishDate",
+  "isDraft",
+  "isDeleted",
+  "draftCreatedByUserId",
+  "createdByUserId",
+  "updatedByUserId",
+  "createdBy",
+  "updatedBy",
 ])
 
 export class ChangeTracker {
