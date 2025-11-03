@@ -34,6 +34,23 @@ export type GetScriptsMetadataResponse = {
                 maxValue?: string | number | null;
             }[];
         }[];
+        diagnoses: {
+            diagnosisId: string;
+            name: string;
+            key: string;
+            fields: {
+                label: string;
+                key: string;
+                type: string;
+                dataType: string | null;
+                value: any;
+                valueLabel: null | string;
+                optional?: boolean;
+                confidential: boolean;
+                minValue?: string | number | null;
+                maxValue?: string | number | null;
+            }[];
+        }[];
     }[],
     errors?: string[];
 };
@@ -80,6 +97,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             ),
             with: {
                 screensDrafts: true,
+                diagnosesDrafts: true,
             }
         });
 
@@ -91,6 +109,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             with: {
                 draft: !returnDraftsIfExist ? undefined : true,
                 screens: {
+                    where: isNull(screens.deletedAt),
+                    with: {
+                        draft: !returnDraftsIfExist ? undefined : true,
+                    },
+                },
+                diagnoses: {
+                    where: isNull(screens.deletedAt),
                     with: {
                         draft: !returnDraftsIfExist ? undefined : true,
                     },
@@ -103,6 +128,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             ...(returnDraftsIfExist && s.draft ? s.draft.data : null),
             screens: s.screens
                 .sort((a, b) => a.position - b.position),
+            diagnoses: s.diagnoses
+                .sort((a, b) => a.position - b.position),
         }));
 
         const unpublisedScripts = unpublisedScriptsRes.map(s => {
@@ -112,6 +139,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 screens: s.screensDrafts.map(screenDraft => ({
                     ...screenDraft.data,
                     screenId: screenDraft.screenDraftId,
+                })),
+                diagnoses: s.diagnosesDrafts.map(diagnosisDraft => ({
+                    ...diagnosisDraft.data,
+                    diagnosisId: diagnosisDraft.diagnosisDraftId,
                 }))
             }
         }) as typeof publishedScripts;
@@ -131,6 +162,14 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 scriptId: script.scriptId,
                 title: script.title,
                 hospitalName: hospital?.name || '',
+                diagnoses: script.diagnoses.map(d => {
+                    return {
+                        diagnosisId: d.diagnosisId,
+                        name: d.name,
+                        key: d.key || d.name,
+                        fields: [],
+                    };
+                }),
                 screens: script.screens.map(screen => {
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];

@@ -50,7 +50,7 @@ export function DataKeysTableHeader() {
                                                 key={o.value}
                                                 value={o.value}
                                             >
-                                                <div className="flex items-center gap-x-2 w-[120px]">
+                                                <div className="flex items-center gap-x-2 w-[160px]">
                                                     <o.Icon className="size-4" />
                                                     <span>{o.label}</span>
                                                 </div>
