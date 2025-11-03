@@ -1,17 +1,31 @@
-import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
-import { v4 } from "uuid";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
+import { v4 } from "uuid"
 
-import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { scripts, screensDrafts, diagnosesDrafts, pendingDeletion, scriptsHistory, scriptsDrafts } from "@/databases/pg/schema";
-import { _saveScriptsHistory } from "./_scripts_history";
-import { _publishScreens } from "./_screens_publish";
-import { _publishDiagnoses } from "./_diagnoses_publish";
+import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import {
+  scripts,
+  screensDrafts,
+  diagnosesDrafts,
+  pendingDeletion,
+  scriptsHistory,
+  scriptsDrafts,
+} from "@/databases/pg/schema"
+import { removeHexCharacters } from "@/databases/utils";
+import { _saveScriptsHistory } from "./_scripts_history"
+import { _publishScreens } from "./_screens_publish"
+import { _publishDiagnoses } from "./_diagnoses_publish"
 
-export async function _publishScripts({ userId }: {
-    userId?: string | null;
+export async function _publishScripts({
+  userId,
+  publisherUserId,
+}: {
+  userId?: string | null
+  publisherUserId?: string | null
 }) {
     const results: { success: boolean; errors?: string[]; } = { success: false, };
+    const changeLogs: SaveChangeLogData[] = [];
 
     try {
         const drafts = await db.query.scriptsDrafts.findMany({
@@ -58,7 +72,12 @@ export async function _publishScripts({ userId }: {
                 processedScripts.push({ scriptId, });
             }
 
-            await _saveScriptsHistory({ drafts: updates, previous: dataBefore, });
+            const updateChangeLogs = await _saveScriptsHistory({
+                drafts: updates,
+                previous: dataBefore,
+                userId: publisherUserId,
+            });
+            changeLogs.push(...updateChangeLogs);
         }
 
         if (inserts.length) {
@@ -89,17 +108,25 @@ export async function _publishScripts({ userId }: {
                     eq(diagnosesDrafts.scriptDraftId, scriptId)
                 ));
             }
+            const insertChangeLogs = await _saveScriptsHistory({
+                drafts: inserts,
+                previous: dataBefore,
+                userId: publisherUserId,
+            });
+            changeLogs.push(...insertChangeLogs);
         }
 
         if (processedScripts.length) {
             const publishScreens = await _publishScreens({ 
                 userId,
+                publisherUserId,
                 scriptsIds: processedScripts.map(s => s.scriptId) 
             });
             if (publishScreens.errors) throw new Error(publishScreens.errors.join(', '));
 
             const publishDiagnoses = await _publishDiagnoses({ 
                 userId,
+                publisherUserId,
                 scriptsIds: processedScripts.map(s => s.scriptId) 
             });
             if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(', '));
@@ -112,11 +139,7 @@ export async function _publishScripts({ userId }: {
             ),
             columns: { scriptId: true, },
             with: {
-                script: {
-                    columns: {
-                        version: true,
-                    },
-                },
+                script: true,
             },
         });
 
@@ -133,7 +156,7 @@ export async function _publishScripts({ userId }: {
                 .set({ deletedAt, })
                 .where(inArray(scripts.scriptId, deleted.map(c => c.scriptId!)));
 
-            await db.insert(scriptsHistory).values(deleted.map(c => ({
+            const historyPayload = deleted.map(c => ({
                 version: c.script!.version,
                 scriptId: c.scriptId!,
                 changes: {
@@ -142,7 +165,35 @@ export async function _publishScripts({ userId }: {
                     oldValues: [{ deletedAt: null, }],
                     newValues: [{ deletedAt, }],
                 },
-            })));
+            }));
+
+            await db.insert(scriptsHistory).values(historyPayload);
+
+            if (publisherUserId) {
+                for (let index = 0; index < deleted.length; index++) {
+                    const entry = deleted[index];
+                    const history = historyPayload[index];
+                    if (!entry?.scriptId) continue;
+
+                    const snapshot = removeHexCharacters({
+                        ...(entry.script ?? {}),
+                        deletedAt,
+                    });
+
+                    changeLogs.push({
+                        entityId: entry.scriptId,
+                        entityType: "script",
+                        action: "delete",
+                        version: history.version || 1,
+                        changes: history.changes,
+                        fullSnapshot: snapshot,
+                        description: history.changes.description,
+                        userId: publisherUserId,
+                        scriptId: entry.scriptId,
+                        isActive: false,
+                    });
+                }
+            }
         }
 
         await db.delete(pendingDeletion).where(and(
@@ -163,6 +214,10 @@ export async function _publishScripts({ userId }: {
             await db.update(scripts)
                 .set({ version: sql`${scripts.version} + 1`,}).
                 where(inArray(scripts.scriptId, published));
+        }
+
+        if (changeLogs.length) {
+            await _saveChangeLogs({ data: changeLogs });
         }
 
         results.success = true;

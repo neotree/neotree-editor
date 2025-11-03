@@ -1,21 +1,25 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
-import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@/databases/pg/schema";
-import { _saveDiagnosesHistory } from "./_diagnoses_history";
-import { v4 } from "uuid";
+import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@/databases/pg/schema"
+import { _saveDiagnosesHistory } from "./_diagnoses_history"
+import { v4 } from "uuid"
+import { removeHexCharacters } from "@/databases/utils";
 
 export async function _publishDiagnoses(opts?: {
-    scriptsIds?: string[];
-    diagnosesIds?: string[];
-    broadcastAction?: boolean;
-    userId?: string | null;
+  scriptsIds?: string[]
+  diagnosesIds?: string[]
+  broadcastAction?: boolean
+  userId?: string | null
+  publisherUserId?: string | null
 }) {
     const { scriptsIds, diagnosesIds, } = { ...opts, };
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
+    const changeLogs: SaveChangeLogData[] = [];
 
     try {
         let updates: (typeof diagnosesDrafts.$inferSelect)[] = [];
@@ -73,7 +77,12 @@ export async function _publishDiagnoses(opts?: {
                     .returning();
             }
 
-            await _saveDiagnosesHistory({ drafts: updates, previous: dataBefore, });
+            const updateChangeLogs = await _saveDiagnosesHistory({
+                drafts: updates,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...updateChangeLogs);
         }
 
         if (inserts.length) {
@@ -98,7 +107,12 @@ export async function _publishDiagnoses(opts?: {
                 await db.insert(diagnoses).values(payload);
             }
 
-            await _saveDiagnosesHistory({ drafts: inserts, previous: dataBefore, });
+            const insertChangeLogs = await _saveDiagnosesHistory({
+                drafts: inserts,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...insertChangeLogs);
         }
 
         await db.delete(diagnosesDrafts).where(
@@ -112,12 +126,7 @@ export async function _publishDiagnoses(opts?: {
             ),
             columns: { diagnosisId: true, },
             with: {
-                diagnosis: {
-                    columns: {
-                        version: true,
-                        scriptId: true,
-                    },
-                },
+                diagnosis: true,
             },
         });
 
@@ -130,7 +139,7 @@ export async function _publishDiagnoses(opts?: {
                 .set({ deletedAt, })
                 .where(inArray(diagnoses.diagnosisId, deleted.map(c => c.diagnosisId!)));
 
-            await db.insert(diagnosesHistory).values(deleted.map(c => ({
+            const historyPayload = deleted.map(c => ({
                 version: c.diagnosis!.version,
                 diagnosisId: c.diagnosisId!,
                 scriptId: c.diagnosis!.scriptId,
@@ -140,7 +149,36 @@ export async function _publishDiagnoses(opts?: {
                     oldValues: [{ deletedAt: null, }],
                     newValues: [{ deletedAt, }],
                 },
-            })));
+            }));
+
+            await db.insert(diagnosesHistory).values(historyPayload);
+
+            if (opts?.publisherUserId) {
+                for (let index = 0; index < deleted.length; index++) {
+                    const entry = deleted[index];
+                    const history = historyPayload[index];
+                    if (!entry?.diagnosisId) continue;
+
+                    const snapshot = removeHexCharacters({
+                        ...(entry.diagnosis ?? {}),
+                        deletedAt,
+                    });
+
+                    changeLogs.push({
+                        entityId: entry.diagnosisId,
+                        entityType: "diagnosis",
+                        action: "delete",
+                        version: history.version || 1,
+                        changes: history.changes,
+                        fullSnapshot: snapshot,
+                        description: history.changes.description,
+                        userId: opts.publisherUserId,
+                        scriptId: entry.diagnosis?.scriptId || null,
+                        diagnosisId: entry.diagnosisId,
+                        isActive: false,
+                    });
+                }
+            }
         }
 
         await db.delete(pendingDeletion).where(and(
@@ -161,6 +199,10 @@ export async function _publishDiagnoses(opts?: {
             await db.update(diagnoses)
                 .set({ version: sql`${diagnoses.version} + 1`, }).
                 where(inArray(diagnoses.diagnosisId, published));
+        }
+
+        if (changeLogs.length) {
+            await _saveChangeLogs({ data: changeLogs });
         }
 
         results.success = true;

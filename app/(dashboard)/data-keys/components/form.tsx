@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from "react";
 import { useForm, Controller } from 'react-hook-form';
 import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { v4 as uuidv4 } from "uuid";
 
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -33,6 +34,36 @@ import { Loader } from '@/components/loader';
 import { SelectModal } from "@/components/select-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIsLocked } from '@/hooks/use-is-locked';
+import { useAppContext } from "@/contexts/app";
+import { createChangeTracker } from "@/lib/change-tracker";
+import { pendingChangesAPI } from "@/lib/indexed-db";
+
+const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
+    uuid?: string;
+    uniqueKey?: string | null;
+    options?: DataKeyFormData["options"];
+    metadata?: DataKeyFormData["metadata"];
+    version?: number | string | null;
+}) => {
+    if (!source) return null;
+
+    const version =
+        typeof source.version === "string"
+            ? Number(source.version)
+            : source.version ?? null;
+
+    return {
+        uuid: source.uuid ?? "",
+        uniqueKey: source.uniqueKey ?? "",
+        name: source.name ?? "",
+        refId: source.refId ?? "",
+        dataType: source.dataType ?? "",
+        label: source.label ?? "",
+        options: Array.isArray(source.options) ? source.options : [],
+        metadata: source.metadata ?? {},
+        version,
+    };
+};
 
 export function DataKeyForm(props: {
     disabled?: boolean;
@@ -53,6 +84,7 @@ function Form({
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
+    const { authenticatedUser } = useAppContext();
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -85,14 +117,98 @@ function Form({
         },
     });
 
+    const changeTrackerRef = useRef<ReturnType<typeof createChangeTracker> | null>(null);
+    const originalSnapshotRef = useRef<ReturnType<typeof buildTrackableDataKey>>(null);
+    const lastTrackedIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!dataKey?.uuid) {
+            changeTrackerRef.current = null;
+            originalSnapshotRef.current = null;
+            lastTrackedIdRef.current = null;
+            return;
+        }
+
+        if (lastTrackedIdRef.current === dataKey.uuid && changeTrackerRef.current) {
+            return;
+        }
+
+        const tracker = createChangeTracker({
+            entityId: dataKey.uuid,
+            entityType: "dataKey",
+            userId: authenticatedUser?.userId,
+            userName: authenticatedUser?.displayName,
+        });
+
+        const snapshot = buildTrackableDataKey(dataKey);
+
+        if (snapshot) {
+            tracker.setSnapshot(snapshot);
+            originalSnapshotRef.current = snapshot;
+        }
+
+        changeTrackerRef.current = tracker;
+        lastTrackedIdRef.current = dataKey.uuid;
+    }, [dataKey, authenticatedUser?.userId, authenticatedUser?.displayName]);
+
     const dataType = watch('dataType');
     const options = watch('options');
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
-    const onSave = handleSubmit(async data => {
-        await saveDataKeys([data as DataKeyFormData], err => {
-            if (!err) window.location.href = '/data-keys';
+    const onSave = handleSubmit(async (data) => {
+        const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
+        const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
+        const payload = {
+            ...data,
+            uuid,
+            uniqueKey,
+            version: typeof data.version === "string" ? Number(data.version) : data.version,
+        } as DataKeyFormData & {
+            uuid: string;
+            uniqueKey?: string | null;
+        };
+
+        setValue("uuid" as any, uuid);
+        if (uniqueKey) {
+            setValue("uniqueKey" as any, uniqueKey);
+        }
+
+        const trackablePayload = buildTrackableDataKey(payload);
+
+        if (!dataKey && trackablePayload) {
+            const existingChanges = await pendingChangesAPI.getEntityChanges(uuid, "dataKey");
+            const existingCreate = existingChanges.find((change) => change.action === "create");
+
+            if (existingCreate?.id) {
+                await pendingChangesAPI.updateChange(existingCreate.id, {
+                    fieldName: payload.name || "New Data Key",
+                    newValue: trackablePayload,
+                    timestamp: Date.now(),
+                    userId: authenticatedUser?.userId,
+                    userName: authenticatedUser?.displayName,
+                    fullSnapshot: trackablePayload,
+                });
+            } else {
+                await pendingChangesAPI.addChange({
+                    entityType: "dataKey",
+                    entityId: uuid,
+                    action: "create",
+                    fieldPath: "dataKey",
+                    fieldName: payload.name || "New Data Key",
+                    oldValue: null,
+                    newValue: trackablePayload,
+                    userId: authenticatedUser?.userId,
+                    userName: authenticatedUser?.displayName,
+                    fullSnapshot: trackablePayload,
+                });
+            }
+        } else if (changeTrackerRef.current && originalSnapshotRef.current && trackablePayload) {
+            await changeTrackerRef.current.trackChanges(trackablePayload, "Data key saved");
+        }
+
+        await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }], (err) => {
+            if (!err) window.location.href = "/data-keys";
         });
     });
 

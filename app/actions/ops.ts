@@ -110,17 +110,19 @@ export async function publishData({ scope }: {
             'update_screens',
         ]);
 
-        let userId = session?.user?.userId;
+        const publisherUserId = session?.user?.userId || null;
+
+        let userId = publisherUserId;
 
         if (scope === 1) userId = undefined;
 
-        const publishConfigKeys = await configKeysMutations._publishConfigKeys({ userId, });
-        const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({ userId, });
-        const publishDataKeys = await dataKeysMutations._publishDataKeys({ userId, });
-        const publishScripts = await scriptsMutations._publishScripts({ userId, });
-        const publishScreens = await scriptsMutations._publishScreens({ userId, });
-        const publishDiagnoses = await scriptsMutations._publishDiagnoses({ userId, });
-        const processPendingDeletion = await _processPendingDeletion({ userId, });
+        const publishConfigKeys = await configKeysMutations._publishConfigKeys({ userId, publisherUserId });
+        const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({ userId, publisherUserId });
+        const publishDataKeys = await dataKeysMutations._publishDataKeys({ userId, publisherUserId });
+        const publishScripts = await scriptsMutations._publishScripts({ userId, publisherUserId });
+        const publishScreens = await scriptsMutations._publishScreens({ userId, publisherUserId });
+        const publishDiagnoses = await scriptsMutations._publishDiagnoses({ userId, publisherUserId });
+        const processPendingDeletion = await _processPendingDeletion({ userId, publisherUserId: publisherUserId || undefined });
         
         if (publishDataKeys.errors) {
             results.success = false;

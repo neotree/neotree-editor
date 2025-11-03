@@ -1,17 +1,20 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
-import logger from "@/lib/logger";
-import db from "@/databases/pg/drizzle";
-import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema";
-import { _saveScreensHistory } from "./_screens_history";
-import { v4 } from "uuid";
-import { _generateScreenAliases } from "../aliases/_aliases_save";
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema"
+import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import { _saveScreensHistory } from "./_screens_history"
+import { v4 } from "uuid"
+import { _generateScreenAliases } from "../aliases/_aliases_save"
+import { removeHexCharacters } from "@/databases/utils";
 
 export async function _publishScreens(opts?: {
-    scriptsIds?: string[];
-    screensIds?: string[];
-    broadcastAction?: boolean;
-    userId?: string | null;
+  scriptsIds?: string[]
+  screensIds?: string[]
+  broadcastAction?: boolean
+  userId?: string | null
+  publisherUserId?: string | null
 }) {
     const { scriptsIds, screensIds, } = { ...opts, };
 
@@ -20,6 +23,7 @@ export async function _publishScreens(opts?: {
 
     const results: { success: boolean; errors?: string[]; } = { success: false };
     const errors: string[] = [];
+    const changeLogs: SaveChangeLogData[] = [];
 
     try {
         let updates: (typeof screensDrafts.$inferSelect)[] = [];
@@ -77,7 +81,12 @@ export async function _publishScreens(opts?: {
                     .returning();
             }
 
-            await _saveScreensHistory({ drafts: updates, previous: dataBefore, });
+            const updateChangeLogs = await _saveScreensHistory({
+                drafts: updates,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...updateChangeLogs);
         }
 
         if (inserts.length) {
@@ -102,7 +111,12 @@ export async function _publishScreens(opts?: {
                 await db.insert(screens).values(payload);
             }
 
-            await _saveScreensHistory({ drafts: inserts, previous: dataBefore, });
+            const insertChangeLogs = await _saveScreensHistory({
+                drafts: inserts,
+                previous: dataBefore,
+                userId: opts?.publisherUserId,
+            });
+            changeLogs.push(...insertChangeLogs);
         }
 
         await db.delete(screensDrafts).where(
@@ -116,12 +130,7 @@ export async function _publishScreens(opts?: {
             ),
             columns: { screenId: true, },
             with: {
-                screen: {
-                    columns: {
-                        version: true,
-                        scriptId: true,
-                    },
-                },
+                screen: true,
             },
         });
 
@@ -134,7 +143,7 @@ export async function _publishScreens(opts?: {
                 .set({ deletedAt, })
                 .where(inArray(screens.screenId, deleted.map(c => c.screenId!)));
 
-            await db.insert(screensHistory).values(deleted.map(c => ({
+            const historyPayload = deleted.map(c => ({
                 version: c.screen!.version,
                 screenId: c.screenId!,
                 scriptId: c.screen!.scriptId,
@@ -144,7 +153,36 @@ export async function _publishScreens(opts?: {
                     oldValues: [{ deletedAt: null, }],
                     newValues: [{ deletedAt, }],
                 },
-            })));
+            }));
+
+            await db.insert(screensHistory).values(historyPayload);
+
+            if (opts?.publisherUserId) {
+                for (let index = 0; index < deleted.length; index++) {
+                    const entry = deleted[index];
+                    const history = historyPayload[index];
+                    if (!entry?.screenId) continue;
+
+                    const snapshot = removeHexCharacters({
+                        ...(entry.screen ?? {}),
+                        deletedAt,
+                    });
+
+                    changeLogs.push({
+                        entityId: entry.screenId,
+                        entityType: "screen",
+                        action: "delete",
+                        version: history.version || 1,
+                        changes: history.changes,
+                        fullSnapshot: snapshot,
+                        description: history.changes.description,
+                        userId: opts.publisherUserId,
+                        scriptId: entry.screen?.scriptId || null,
+                        screenId: entry.screenId,
+                        isActive: false,
+                    });
+                }
+            }
         }
 
         await db.delete(pendingDeletion).where(and(
@@ -176,6 +214,10 @@ export async function _publishScreens(opts?: {
             await db.update(screens)
                 .set({ version: sql`${screens.version} + 1`, }).
                 where(inArray(screens.screenId, published));
+        }
+
+        if (changeLogs.length) {
+            await _saveChangeLogs({ data: changeLogs });
         }
 
         results.success = true;

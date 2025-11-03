@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
@@ -11,6 +11,7 @@ import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { ScriptType } from "@/databases/queries/scripts";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import { createChangeTracker } from "@/lib/change-tracker";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
@@ -29,7 +30,7 @@ export function useDiagnosisForm({
 
     const { saveDiagnoses } = useScriptsContext();
     const { alert } = useAlertModal();
-    const { viewOnly } = useAppContext();
+    const { viewOnly, authenticatedUser } = useAppContext();
 
     const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
     const isNewDiagnosis = !formData?.diagnosisId;
@@ -37,6 +38,19 @@ export function useDiagnosisForm({
         () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()),
         [],
     );
+
+    const changeTrackerRef = useRef(
+        formData?.diagnosisId
+            ? createChangeTracker({
+                entityId: formData.diagnosisId,
+                entityType: "diagnosis",
+                userId: authenticatedUser?.userId,
+                userName: authenticatedUser?.displayName,
+            })
+            : null,
+    );
+
+    const originalSnapshotRef = useRef<DiagnosisFormDataType | null>(null);
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -64,6 +78,13 @@ export function useDiagnosisForm({
     const form = useForm({
         defaultValues: getDefaultValues(),
     });
+
+    useEffect(() => {
+        if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
+            originalSnapshotRef.current = formData;
+            changeTrackerRef.current.setSnapshot(formData);
+        }
+    }, [formData]);
 
     const {
         formState: { dirtyFields, },
@@ -106,7 +127,12 @@ export function useDiagnosisForm({
                     fieldName: "New Diagnosis",
                     oldValue: null,
                     newValue: payloadData.name || "Untitled Diagnosis",
+                    userId: authenticatedUser?.userId,
+                    userName: authenticatedUser?.displayName,
                 });
+            } else if (changeTrackerRef.current && originalSnapshotRef.current) {
+                console.log("Tracking diagnosis changes on save draft");
+                await changeTrackerRef.current.trackChanges(payloadData, "Diagnosis draft saved");
             }
 
             router.refresh();
@@ -157,4 +183,3 @@ export function useDiagnosisForm({
         getDefaultValues,
     }
 }
-
