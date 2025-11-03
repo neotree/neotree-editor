@@ -52,7 +52,6 @@ function paginateData<T>(
 export function useChangelogsTable({ initialChangelogs }: UseChangelogsTableParams) {
   const [allChangelogs, setAllChangelogs] = useState<ChangeLogType[]>(initialChangelogs)
   const [loading, setLoading] = useState(false)
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [selectedChangelog, setSelectedChangelog] = useState<ChangeLogType | null>(null)
   const [entityHistory, setEntityHistory] = useState<ChangeLogType[]>([])
 
@@ -251,18 +250,6 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     URL.revokeObjectURL(url)
   }, [])
 
-  const toggleExpanded = useCallback((id: string) => {
-    setExpandedItems((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }, [])
-
   const viewDetails = useCallback(
     (changelog: ChangeLogType) => {
       setSelectedChangelog(changelog)
@@ -283,7 +270,6 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
   return {
     changelogs,
     loading,
-    expandedItems,
     selectedChangelog,
     entityHistory,
     searchValue,
@@ -301,14 +287,12 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     setIsActiveOnly,
     setSort,
     setCurrentPage,
-    setExpandedItems,
     setSelectedChangelog,
     setEntityHistory,
     loadChangelogs,
     loadEntityHistory,
     onRollback,
     onExport,
-    toggleExpanded,
     viewDetails,
     clearFilters,
   }

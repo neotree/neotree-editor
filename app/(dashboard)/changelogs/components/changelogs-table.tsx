@@ -1,17 +1,18 @@
 "use client"
 
+import { useState } from "react"
 import { format } from "date-fns"
-import { History, AlertCircle, ChevronDown, ChevronRight, RotateCcw, Search } from "lucide-react"
+import { History, AlertCircle, RotateCcw, Search } from "lucide-react"
 
 import { Loader } from "@/components/loader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Card, CardHeader } from "@/components/ui/card"
 import {
   Pagination,
   PaginationContent,
@@ -21,10 +22,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { ChangelogsTableRowActions } from "./changelogs-table-row-actions"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
-import { type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import { type UseChangelogsTableParams, type ChangeLogType, useChangelogsTable } from "../hooks/use-changelogs-table"
 
 type Props = UseChangelogsTableParams
 
@@ -48,11 +50,36 @@ const entityTypeLabels = {
   alias: "Alias",
 }
 
+function toNumericVersion(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function getEditorVersion(changelog: ChangeLogType): number {
+  const explicitVersion = toNumericVersion((changelog as any)?.editorVersion ?? (changelog as any)?.dataVersion)
+  const snapshotVersion = toNumericVersion(changelog?.fullSnapshot?.editorVersion ?? changelog?.fullSnapshot?.dataVersion)
+  return explicitVersion ?? snapshotVersion ?? changelog.version
+}
+
+function formatChangeValue(value: unknown): string {
+  if (value === null) return "null"
+  if (value === undefined) return "—"
+  if (typeof value === "string") return value.length ? value : '""'
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch (error) {
+    return String(value)
+  }
+}
+
 export function ChangelogsTable(props: Props) {
+  const [versionPreview, setVersionPreview] = useState<ChangeLogType | null>(null)
+
   const {
     changelogs,
     loading,
-    expandedItems,
     selectedChangelog,
     entityHistory,
     searchValue,
@@ -64,7 +91,6 @@ export function ChangelogsTable(props: Props) {
     pagination,
     currentPage,
     itemsPerPage,
-    toggleExpanded,
     viewDetails,
     onRollback,
     onExport,
@@ -182,117 +208,105 @@ export function ChangelogsTable(props: Props) {
               <p>No changelogs found</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {changelogs.map((changelog) => {
-                const isExpanded = expandedItems.has(changelog.changeLogId)
-                return (
-                  <Card
-                    key={changelog.changeLogId}
-                    className={cn("transition-colors", !changelog.isActive && "opacity-60")}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className={actionColors[changelog.action]}>
-                              {changelog.action}
-                            </Badge>
-                            <Badge variant="outline">
-                              {entityTypeLabels[changelog.entityType as keyof typeof entityTypeLabels]}
-                            </Badge>
-                            <Badge variant="outline">v{changelog.version}</Badge>
-                            {!changelog.isActive && (
-                              <Badge variant="outline" className="bg-gray-500/10">
-                                Superseded
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {changelog.description || "No description"}
-                          </div>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span>{changelog.userName || "Unknown user"}</span>
-                            <span>•</span>
-                            <span>{format(new Date(changelog.dateOfChange), "PPp")}</span>
-                          </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[140px]">Editor Version</TableHead>
+                  <TableHead>Entity</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-center w-[120px]">Fields</TableHead>
+                  <TableHead>Changed By</TableHead>
+                  <TableHead>Changed At</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right w-[80px]">Options</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {changelogs.map((changelog) => {
+                  const editorVersion = getEditorVersion(changelog)
+                  const fieldsChanged = Array.isArray(changelog.changes) ? changelog.changes.length : 0
+
+                  return (
+                    <TableRow key={changelog.changeLogId} className={cn(!changelog.isActive && "opacity-60")}>
+                      <TableCell>
+                        <Button
+                          variant="link"
+                          className="px-0 font-medium"
+                          onClick={() => setVersionPreview(changelog)}
+                        >
+                          v{editorVersion}
+                        </Button>
+                        <div className="text-xs text-muted-foreground">
+                          {changelog.parentVersion !== null ? `Parent: v${changelog.parentVersion}` : null}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <ChangelogsTableRowActions
-                            changelog={changelog}
-                            onView={() => viewDetails(changelog)}
-                            onRollback={() => onRollback(changelog.entityId, changelog.version)}
-                            onExport={() => onExport(changelog)}
-                          />
-                          <Button size="sm" variant="ghost" onClick={() => toggleExpanded(changelog.changeLogId)}>
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {entityTypeLabels[changelog.entityType as keyof typeof entityTypeLabels] ||
+                              changelog.entityType}
+                          </span>
+                          <span className="text-xs text-muted-foreground break-all">{changelog.entityId}</span>
                         </div>
-                      </div>
-                    </CardHeader>
-                    {isExpanded && (
-                      <CardContent className="pt-0">
-                        <Separator className="mb-4" />
-                        <div className="space-y-4">
-                          {changelog.changeReason && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Reason</Label>
-                              <p className="text-sm mt-1">{changelog.changeReason}</p>
-                            </div>
-                          )}
-
-                          {changelog.changes && changelog.changes.length > 0 && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">
-                                Changes ({changelog.changes.length})
-                              </Label>
-                              <div className="mt-2 space-y-2">
-                                {changelog.changes.map((change: any, idx: number) => (
-                                  <div key={idx} className="p-3 bg-muted/50 rounded-lg text-sm">
-                                    <div className="font-medium mb-1">{change.field || change.fieldPath}</div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                      <div>
-                                        <span className="text-muted-foreground">Previous:</span>
-                                        <pre className="mt-1 p-2 bg-background rounded overflow-auto">
-                                          {JSON.stringify(change.previousValue, null, 2)}
-                                        </pre>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground">New:</span>
-                                        <pre className="mt-1 p-2 bg-background rounded overflow-auto">
-                                          {JSON.stringify(change.newValue, null, 2)}
-                                        </pre>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {changelog.parentVersion !== null && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Parent Version</Label>
-                              <p className="text-sm mt-1">v{changelog.parentVersion}</p>
-                            </div>
-                          )}
-
-                          {changelog.mergedFromVersion !== null && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Merged From Version</Label>
-                              <p className="text-sm mt-1">v{changelog.mergedFromVersion}</p>
-                            </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={actionColors[changelog.action]}>
+                          {changelog.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[260px]">
+                        <div className="text-sm text-muted-foreground line-clamp-3">
+                          {changelog.description || "No description provided"}
+                        </div>
+                        {changelog.changeReason && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">Reason:</span> {changelog.changeReason}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="w-fit">
+                          {fieldsChanged}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{changelog.userName || "Unknown user"}</span>
+                          {changelog.userEmail && (
+                            <span className="text-xs text-muted-foreground">{changelog.userEmail}</span>
                           )}
                         </div>
-                      </CardContent>
-                    )}
-                  </Card>
-                )
-              })}
-            </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(changelog.dateOfChange), "PPp")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "w-fit",
+                            changelog.isActive
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                              : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20"
+                          )}
+                        >
+                          {changelog.isActive ? "Active" : "Superseded"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <ChangelogsTableRowActions
+                          changelog={changelog}
+                          onView={() => viewDetails(changelog)}
+                          onRollback={() => onRollback(changelog.entityId, changelog.version)}
+                          onExport={() => onExport(changelog)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
         </div>
 
@@ -328,6 +342,116 @@ export function ChangelogsTable(props: Props) {
           </div>
         )}
       </div>
+
+      <Dialog open={!!versionPreview} onOpenChange={(open) => !open && setVersionPreview(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>
+              Editor Version v{versionPreview ? getEditorVersion(versionPreview) : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {versionPreview
+                ? `${entityTypeLabels[versionPreview.entityType as keyof typeof entityTypeLabels] || versionPreview.entityType
+                    } • ${versionPreview.action}`
+                : "Field level changes for the selected version"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {versionPreview && (
+            <div className="space-y-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Entity</Label>
+                  <p className="mt-1 break-all">
+                    {entityTypeLabels[versionPreview.entityType as keyof typeof entityTypeLabels] ||
+                      versionPreview.entityType}
+                    {" · "}
+                    {versionPreview.entityId}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Changed By</Label>
+                  <p className="mt-1">
+                    {versionPreview.userName || "Unknown user"}
+                    {versionPreview.userEmail ? ` • ${versionPreview.userEmail}` : ""}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Changed On</Label>
+                  <p className="mt-1">{format(new Date(versionPreview.dateOfChange), "PPpp")}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <p className="mt-1">{versionPreview.isActive ? "Active" : "Superseded"}</p>
+                </div>
+                {versionPreview.parentVersion !== null && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Parent Version</Label>
+                    <p className="mt-1">v{versionPreview.parentVersion}</p>
+                  </div>
+                )}
+                {versionPreview.mergedFromVersion !== null && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Merged From</Label>
+                    <p className="mt-1">v{versionPreview.mergedFromVersion}</p>
+                  </div>
+                )}
+                {versionPreview.changeReason && (
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Reason</Label>
+                    <p className="mt-1">{versionPreview.changeReason}</p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <Label className="text-xs text-muted-foreground">
+                Changed Fields ({Array.isArray(versionPreview.changes) ? versionPreview.changes.length : 0})
+              </Label>
+
+              <ScrollArea className="h-[360px] border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[220px]">Field</TableHead>
+                      <TableHead>Previous Value</TableHead>
+                      <TableHead>New Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.isArray(versionPreview.changes) && versionPreview.changes.length > 0 ? (
+                      versionPreview.changes.map((change: any, index: number) => (
+                        <TableRow key={`${versionPreview.changeLogId}-${index}`}>
+                          <TableCell className="align-top text-sm font-medium">
+                            {change?.field || change?.fieldPath || "Unknown field"}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <pre className="max-h-[200px] whitespace-pre-wrap break-words rounded-md bg-muted/60 p-3 text-xs">
+                              {formatChangeValue(change?.previousValue)}
+                            </pre>
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <pre className="max-h-[200px] whitespace-pre-wrap break-words rounded-md bg-muted/60 p-3 text-xs">
+                              {formatChangeValue(change?.newValue)}
+                            </pre>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                          No field-level changes recorded for this version.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedChangelog} onOpenChange={() => setSelectedChangelog(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
