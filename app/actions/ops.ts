@@ -112,6 +112,7 @@ export async function publishData({ scope }: {
 
         const publisherUserId = session?.user?.userId || null;
 
+        
         let userId = publisherUserId;
 
         if (scope === 1) userId = undefined;
