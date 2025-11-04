@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -9,18 +9,32 @@ import { create } from "zustand";
 import { saveDrugsLibraryItems, getDrugsLibraryItems, deleteDrugsLibraryItems, copyDrugsLibraryItems } from "@/app/actions/drugs-library";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useSocketEventsListener } from "@/hooks/use-socket-events-listener";
+import { 
+    filterDrugsLibrarySearchResults,
+    type DrugsLibrarySearchResultsFilter,
+    type DrugsLibrarySearchResultsItem,
+} from "@/lib/drugs-library-search";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
     draftCreatedByUserId?: string | null;
 };
 
+const defaultSearchState = {
+    value: '',
+    filter: 'all' as DrugsLibrarySearchResultsFilter,
+    searching: false,
+    results: [] as DrugsLibrarySearchResultsItem[],
+    unfilteredResults: [] as DrugsLibrarySearchResultsItem[],
+};
+
+export type DrugsLibrarySearchState = typeof defaultSearchState;
+
 export type DrugsLibraryState = {
     initialised: boolean;
     loading: boolean;
     keys: string[];
     drugs: Drug[];
-    searchQuery: string;
     typeFilter: string;
     statusFilter: string;
     sortBy: string;
@@ -31,7 +45,6 @@ const defaultState: DrugsLibraryState = {
     loading: false,
     keys: [],
     drugs: [],
-    searchQuery: '',
     typeFilter: '',
     statusFilter: '',
     sortBy: 'name-asc',
@@ -47,7 +60,7 @@ export function resetDrugsLibraryState() {
 
 export function useDrugsLibrary() {
     const state = useDrugsLibraryState();
-    const { drugs: allDrugs, searchQuery, typeFilter, statusFilter, sortBy } = state;
+    const { drugs: allDrugs, typeFilter, statusFilter, sortBy } = state;
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -60,8 +73,15 @@ export function useDrugsLibrary() {
 
     const { alert } = useAlertModal();
 
+    const [search, setSearch] = useState(defaultSearchState);
+    const clearSearch = useCallback(() => setSearch(defaultSearchState), []);
+
     const filterDrugs = useCallback(() => {
         const filteredDrugs: typeof allDrugs = [];
+
+        const searchResultIds = !search.value
+            ? undefined
+            : new Set(search.results.map(result => result.itemId));
 
         let tableData = allDrugs.map(item => [
             item.drug || '',
@@ -73,32 +93,23 @@ export function useDrugsLibrary() {
 
         tableData = tableData.filter((row, index) => {
             const item = allDrugs[index];
+            if (!item) return false;
+
             let matchedFilters = true;
 
-            // Search filter
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                const searchableText = [
-                    item.drug,
-                    item.type,
-                    item.key,
-                    item.dosageText,
-                ].join(' ').toLowerCase();
-                
-                matchedFilters = matchedFilters && searchableText.includes(query);
+            if (searchResultIds) {
+                matchedFilters = searchResultIds.has(item.itemId!);
             }
 
-            // Type filter (drug/fluid)
-            if (typeFilter && typeFilter !== 'all') {
-                matchedFilters = matchedFilters && item.type?.toLowerCase() === typeFilter.toLowerCase();
+            if (matchedFilters && typeFilter && typeFilter !== 'all') {
+                matchedFilters = (item.type || '').toLowerCase() === typeFilter.toLowerCase();
             }
 
-            // Status filter (draft/published)
-            if (statusFilter && statusFilter !== 'all') {
+            if (matchedFilters && statusFilter && statusFilter !== 'all') {
                 if (statusFilter === 'draft') {
-                    matchedFilters = matchedFilters && item.isDraft === true;
+                    matchedFilters = item.isDraft === true;
                 } else if (statusFilter === 'published') {
-                    matchedFilters = matchedFilters && !item.isDraft;
+                    matchedFilters = !item.isDraft;
                 }
             }
 
@@ -106,10 +117,8 @@ export function useDrugsLibrary() {
             return matchedFilters;
         });
 
-        // Apply sorting
         const sortedData = [...tableData];
         const sortedDrugs = [...filteredDrugs];
-        
         const sortPairs = sortedData.map((row, idx) => ({ row, drug: sortedDrugs[idx] }));
 
         switch (sortBy) {
@@ -137,7 +146,46 @@ export function useDrugsLibrary() {
             tableData: sortPairs.map(p => p.row),
             filteredDrugs: sortPairs.map(p => p.drug),
         };
-    }, [allDrugs, searchQuery, typeFilter, statusFilter, sortBy]);
+    }, [allDrugs, search, typeFilter, statusFilter, sortBy]);
+
+    const onSearch = useCallback(async (value: string) => {
+        try {
+            clearSearch();
+
+            const trimmedValue = `${value || ''}`.trim();
+            if (!trimmedValue) return;
+
+            setSearch(prev => ({
+                ...prev,
+                value: trimmedValue,
+                searching: true,
+            }));
+
+            const { data: res } = await axios.get<{
+                data: DrugsLibrarySearchResultsItem[];
+                errors?: string[];
+            }>(`/api/drugs-library/search?searchValue=${encodeURIComponent(trimmedValue)}`);
+
+            if (res.errors?.length) throw new Error(res.errors.join(', '));
+
+            setSearch(prev => {
+                const results = res.data || [];
+                return {
+                    value: trimmedValue,
+                    filter: prev.filter,
+                    searching: false,
+                    results: filterDrugsLibrarySearchResults({
+                        searchValue: trimmedValue,
+                        filter: prev.filter,
+                        results,
+                    }),
+                    unfilteredResults: results,
+                };
+            });
+        } catch {
+            clearSearch();
+        }
+    }, [clearSearch]);
 
     const { tableData, filteredDrugs, } = useMemo(() => filterDrugs(), [filterDrugs]);
 
@@ -320,10 +368,6 @@ export function useDrugsLibrary() {
     }, []);
 
     // Filter setters
-    const setSearchQuery = useCallback((query: string) => {
-        useDrugsLibraryState.setState({ searchQuery: query });
-    }, []);
-
     const setTypeFilter = useCallback((type: string) => {
         useDrugsLibraryState.setState({ typeFilter: type });
     }, []);
@@ -338,6 +382,7 @@ export function useDrugsLibrary() {
 
     return {
         ...state,
+        search,
         filteredDrugs,
         tableData,
         selectedItemId: itemId,
@@ -347,7 +392,9 @@ export function useDrugsLibrary() {
         deleteDrugs,
         saveDrugs,
         copyDrugs,
-        setSearchQuery,
+        setSearch,
+        clearSearch,
+        onSearch,
         setTypeFilter,
         setStatusFilter,
         setSortBy,
