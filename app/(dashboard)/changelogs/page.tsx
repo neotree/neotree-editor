@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic"
 
 export default async function ChangelogsPage() {
   const changelogs = await getChangeLogs({
-    limit: 100,
+    limit: 500,
     sortBy: "dateOfChange",
     sortOrder: "desc",
   })

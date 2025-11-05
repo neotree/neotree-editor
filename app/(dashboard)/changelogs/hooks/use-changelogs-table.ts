@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useCallback, useMemo, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import axios from "axios"
 
-import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import type { getChangeLogs } from "@/app/actions/change-logs"
 
@@ -14,6 +12,20 @@ export type UseChangelogsTableParams = {
 
 export type ChangeLogType = Awaited<ReturnType<typeof getChangeLogs>>["data"][0]
 
+export type DataVersionSummary = {
+  dataVersion: number
+  publishedAt: string | null
+  publishedByName: string
+  publishedByEmail?: string
+  totalChanges: number
+  hasActiveChanges: boolean
+  entityCounts: Record<string, number>
+  actionCounts: Record<string, number>
+  descriptions: string[]
+  changeLogIds: string[]
+  changes: ChangeLogType[]
+}
+
 type Pagination = {
   page: number
   limit: number
@@ -22,17 +34,15 @@ type Pagination = {
 }
 
 const sortOptions = [
-  { value: "dateOfChange.desc", label: "Date (Newest)" },
-  { value: "dateOfChange.asc", label: "Date (Oldest)" },
-  { value: "version.desc", label: "Version (High to Low)" },
-  { value: "version.asc", label: "Version (Low to High)" },
+  { value: "publishedAt.desc", label: "Published (Newest)" },
+  { value: "publishedAt.asc", label: "Published (Oldest)" },
+  { value: "dataVersion.desc", label: "Data Version (High to Low)" },
+  { value: "dataVersion.asc", label: "Data Version (Low to High)" },
+  { value: "changeCount.desc", label: "Changes (High to Low)" },
+  { value: "changeCount.asc", label: "Changes (Low to High)" },
 ]
 
-function paginateData<T>(
-  data: T[],
-  page: number,
-  limit: number
-): { data: T[]; pagination: Pagination } {
+function paginateData<T>(data: T[], page: number, limit: number): { data: T[]; pagination: Pagination } {
   const total = data.length
   const totalPages = Math.ceil(total / limit)
   const startIndex = (page - 1) * limit
@@ -49,11 +59,21 @@ function paginateData<T>(
   }
 }
 
+function toNumericVersion(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function getDataVersionFromChangeLog(changelog: ChangeLogType): number | null {
+  const fromRoot = toNumericVersion((changelog as any)?.dataVersion)
+  const fromSnapshot = toNumericVersion((changelog?.fullSnapshot as any)?.dataVersion)
+  return fromRoot ?? fromSnapshot ?? null
+}
+
 export function useChangelogsTable({ initialChangelogs }: UseChangelogsTableParams) {
   const [allChangelogs, setAllChangelogs] = useState<ChangeLogType[]>(initialChangelogs)
   const [loading, setLoading] = useState(false)
-  const [selectedChangelog, setSelectedChangelog] = useState<ChangeLogType | null>(null)
-  const [entityHistory, setEntityHistory] = useState<ChangeLogType[]>([])
 
   const [searchValue, setSearchValue] = useState("")
   const [entityType, setEntityType] = useState("all")
@@ -62,23 +82,20 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
   const [sort, setSort] = useState(sortOptions[0].value)
 
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(50)
+  const [itemsPerPage] = useState(25)
 
-  const router = useRouter()
-  const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
   const loadChangelogs = useCallback(async () => {
     try {
       setLoading(true)
 
-      const params: any = {
-        limit: 1000, // Load all for client-side filtering
+      const res = await axios.post("/api/changelogs/get", {
+        limit: 2000,
         sortBy: "dateOfChange",
         sortOrder: "desc",
-      }
+      })
 
-      const res = await axios.post("/api/changelogs/get", params)
       const { errors, data } = res.data
 
       if (errors?.length) {
@@ -102,161 +119,124 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     }
   }, [alert])
 
-  // Apply filters and search
-  const filteredChangelogs = useMemo(() => {
-    let filtered = [...allChangelogs]
+  const dataVersionSummaries = useMemo((): DataVersionSummary[] => {
+    const grouped = new Map<number, ChangeLogType[]>()
 
-    // Apply search
-    if (searchValue) {
-      const searchLower = searchValue.toLowerCase()
-      filtered = filtered.filter((changelog) => {
-        const searchableFields = [
-          changelog.description || "",
-          changelog.userName || "",
-          changelog.entityId || "",
-          changelog.changeReason || "",
-        ].map((field) => field.toLowerCase())
+    for (const changeLog of allChangelogs) {
+      const dataVersion = getDataVersionFromChangeLog(changeLog)
+      if (dataVersion === null) continue
 
-        return searchableFields.some((field) => field.includes(searchLower))
+      if (!grouped.has(dataVersion)) {
+        grouped.set(dataVersion, [])
+      }
+      grouped.get(dataVersion)!.push(changeLog)
+    }
+
+    const summaries: DataVersionSummary[] = []
+
+    for (const [dataVersion, changeLogs] of Array.from(grouped.entries())) {
+      if (!changeLogs.length) continue
+
+      const sortedByDate = [...changeLogs].sort(
+        (a, b) => new Date(b.dateOfChange).getTime() - new Date(a.dateOfChange).getTime()
+      )
+
+      const latestChange = sortedByDate[0]
+      const publishEntry = changeLogs.find((entry) => entry.action === "publish") ?? latestChange
+
+      const entityCounts = changeLogs.reduce<Record<string, number>>((result, entry) => {
+        result[entry.entityType] = (result[entry.entityType] || 0) + 1
+        return result
+      }, {})
+
+      const actionCounts = changeLogs.reduce<Record<string, number>>((result, entry) => {
+        result[entry.action] = (result[entry.action] || 0) + 1
+        return result
+      }, {})
+
+      const descriptions = Array.from(
+        new Set<string>(
+          changeLogs
+            .map((entry) => entry.description?.trim() || "")
+            .filter((description) => description.length > 0)
+        )
+      ).slice(0, 5)
+
+      summaries.push({
+        dataVersion,
+        publishedAt: latestChange?.dateOfChange ? new Date(latestChange.dateOfChange).toISOString() : null,
+        publishedByName: publishEntry?.userName || latestChange?.userName || "Unknown user",
+        publishedByEmail: publishEntry?.userEmail || latestChange?.userEmail || undefined,
+        totalChanges: changeLogs.length,
+        hasActiveChanges: changeLogs.some((entry) => entry.isActive),
+        entityCounts,
+        actionCounts,
+        descriptions,
+        changeLogIds: changeLogs.map((entry) => entry.changeLogId),
+        changes: changeLogs,
       })
     }
 
-    // Apply entity type filter
+    return summaries.sort((a, b) => b.dataVersion - a.dataVersion)
+  }, [allChangelogs])
+
+  const filteredSummaries = useMemo((): DataVersionSummary[] => {
+    let filtered = [...dataVersionSummaries]
+
+    if (searchValue) {
+      const query = searchValue.toLowerCase()
+      filtered = filtered.filter((summary) => {
+        const versionLabel = `v${summary.dataVersion}`.toLowerCase()
+        if (versionLabel.includes(query)) return true
+        if (summary.publishedByName?.toLowerCase().includes(query)) return true
+        if (summary.publishedByEmail?.toLowerCase().includes(query)) return true
+        if (summary.descriptions.some((desc) => desc.toLowerCase().includes(query))) return true
+
+        return summary.changes.some((change) => {
+          return [
+            change.description || "",
+            change.entityId || "",
+            change.changeReason || "",
+            change.userName || "",
+            change.userEmail || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        })
+      })
+    }
+
     if (entityType !== "all") {
-      filtered = filtered.filter((changelog) => changelog.entityType === entityType)
+      filtered = filtered.filter((summary) => summary.changes.some((change) => change.entityType === entityType))
     }
 
-    // Apply action filter
     if (action !== "all") {
-      filtered = filtered.filter((changelog) => changelog.action === action)
+      filtered = filtered.filter((summary) => summary.changes.some((change) => change.action === action))
     }
 
-    // Apply active only filter
     if (isActiveOnly) {
-      filtered = filtered.filter((changelog) => changelog.isActive)
+      filtered = filtered.filter((summary) => summary.changes.some((change) => change.isActive))
     }
 
-    // Apply sorting
-    const sortedData = sortChangelogs(filtered, sort)
+    return sortDataVersions(filtered, sort)
+  }, [dataVersionSummaries, searchValue, entityType, action, isActiveOnly, sort])
 
-    return sortedData
-  }, [allChangelogs, searchValue, entityType, action, isActiveOnly, sort])
-
-  // Paginate filtered data
-  const { changelogs, pagination } = useMemo(() => {
-    if (!filteredChangelogs.length) {
-      return { changelogs: [], pagination: undefined }
+  const { data: dataVersions, pagination } = useMemo(() => {
+    if (!filteredSummaries.length) {
+      return { data: [] as DataVersionSummary[], pagination: undefined as Pagination | undefined }
     }
 
-    const paginatedResult = paginateData(filteredChangelogs, currentPage, itemsPerPage)
-
+    const paginatedResult = paginateData(filteredSummaries, currentPage, itemsPerPage)
     return {
-      changelogs: paginatedResult.data,
+      data: paginatedResult.data,
       pagination: paginatedResult.pagination,
     }
-  }, [filteredChangelogs, currentPage, itemsPerPage])
+  }, [filteredSummaries, currentPage, itemsPerPage])
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
   }, [searchValue, entityType, action, isActiveOnly, sort])
-
-  const loadEntityHistory = useCallback(
-    async (entityId: string, entityTypeParam: string) => {
-      try {
-        setLoading(true)
-
-        const res = await axios.post("/api/changelogs/entity-history", {
-          entityId,
-          entityType: entityTypeParam,
-          includeInactive: true,
-          limit: 50,
-        })
-
-        const { errors, data } = res.data
-
-        if (errors?.length) throw new Error(errors.join(", "))
-
-        setEntityHistory(data)
-      } catch (e: any) {
-        alert({
-          title: "Error",
-          message: "Failed to load entity history: " + e.message,
-          variant: "error",
-        })
-      } finally {
-        setLoading(false)
-      }
-    },
-    [alert]
-  )
-
-  const onRollback = useCallback(
-    async (entityId: string, version: number, reason?: string) => {
-      confirm(
-        async () => {
-          try {
-            setLoading(true)
-
-            const res = await axios.post("/api/changelogs/rollback", {
-              entityId,
-              toVersion: version,
-              changeReason: reason || `Rolled back to version ${version}`,
-            })
-
-            const { errors, success } = res.data
-
-            if (errors?.length) throw new Error(errors.join(", "))
-
-            if (success) {
-              alert({
-                title: "Success",
-                message: `Successfully rolled back to version ${version}`,
-                variant: "success",
-              })
-
-              router.refresh()
-              await loadChangelogs()
-            }
-          } catch (e: any) {
-            alert({
-              title: "Error",
-              message: "Failed to rollback: " + e.message,
-              variant: "error",
-            })
-          } finally {
-            setLoading(false)
-          }
-        },
-        {
-          danger: true,
-          title: "Rollback to version " + version,
-          message: `Are you sure you want to rollback to version ${version}? This will create a new version with the previous state.`,
-          positiveLabel: "Yes, rollback",
-        }
-      )
-    },
-    [confirm, alert, router, loadChangelogs]
-  )
-
-  const onExport = useCallback((changelog: ChangeLogType) => {
-    const dataStr = JSON.stringify(changelog, null, 2)
-    const dataBlob = new Blob([dataStr], { type: "application/json" })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `changelog-${changelog.changeLogId}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [])
-
-  const viewDetails = useCallback(
-    (changelog: ChangeLogType) => {
-      setSelectedChangelog(changelog)
-      loadEntityHistory(changelog.entityId, changelog.entityType)
-    },
-    [loadEntityHistory]
-  )
 
   const clearFilters = useCallback(() => {
     setSearchValue("")
@@ -268,10 +248,9 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
   }, [])
 
   return {
-    changelogs,
+    dataVersions,
+    totalDataVersions: filteredSummaries.length,
     loading,
-    selectedChangelog,
-    entityHistory,
     searchValue,
     entityType,
     action,
@@ -287,92 +266,40 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     setIsActiveOnly,
     setSort,
     setCurrentPage,
-    setSelectedChangelog,
-    setEntityHistory,
     loadChangelogs,
-    loadEntityHistory,
-    onRollback,
-    onExport,
-    viewDetails,
     clearFilters,
   }
 }
 
-function sortChangelogs(changelogs: ChangeLogType[], sortValue: string) {
-  let sorted = [...changelogs]
+function sortDataVersions(dataVersions: DataVersionSummary[], sortValue: string) {
+  const sorted = [...dataVersions]
 
-  const sortFn = ({
-    key1,
-    key2,
-    sortDirection,
-  }: {
-    sortDirection: "asc" | "desc"
-    key1: string | number
-    key2: string | number
-  }) => {
-    let returnVal = 0
-
-    if (sortDirection === "asc") {
-      if (key1 < key2) returnVal = -1
-      if (key1 > key2) returnVal = 1
-    } else {
-      if (key1 > key2) returnVal = -1
-      if (key1 < key2) returnVal = 1
-    }
-
-    return returnVal
+  const compareDates = (a: string | null, b: string | null) => {
+    const timeA = a ? new Date(a).getTime() : 0
+    const timeB = b ? new Date(b).getTime() : 0
+    return timeA - timeB
   }
 
   switch (sortValue) {
-    case "dateOfChange.asc":
-      sorted = changelogs.sort((c1, c2) =>
-        sortFn({
-          sortDirection: "asc",
-          key1: new Date(c1.dateOfChange).getTime(),
-          key2: new Date(c2.dateOfChange).getTime(),
-        })
-      )
-      break
+    case "publishedAt.asc":
+      return sorted.sort((a, b) => compareDates(a.publishedAt, b.publishedAt))
 
-    case "dateOfChange.desc":
-      sorted = changelogs.sort((c1, c2) =>
-        sortFn({
-          sortDirection: "desc",
-          key1: new Date(c1.dateOfChange).getTime(),
-          key2: new Date(c2.dateOfChange).getTime(),
-        })
-      )
-      break
+    case "publishedAt.desc":
+      return sorted.sort((a, b) => compareDates(b.publishedAt, a.publishedAt))
 
-    case "version.asc":
-      sorted = changelogs.sort((c1, c2) =>
-        sortFn({
-          sortDirection: "asc",
-          key1: c1.version,
-          key2: c2.version,
-        })
-      )
-      break
+    case "dataVersion.asc":
+      return sorted.sort((a, b) => a.dataVersion - b.dataVersion)
 
-    case "version.desc":
-      sorted = changelogs.sort((c1, c2) =>
-        sortFn({
-          sortDirection: "desc",
-          key1: c1.version,
-          key2: c2.version,
-        })
-      )
-      break
+    case "dataVersion.desc":
+      return sorted.sort((a, b) => b.dataVersion - a.dataVersion)
+
+    case "changeCount.asc":
+      return sorted.sort((a, b) => a.totalChanges - b.totalChanges)
+
+    case "changeCount.desc":
+      return sorted.sort((a, b) => b.totalChanges - a.totalChanges)
 
     default:
-      sorted = changelogs.sort((c1, c2) =>
-        sortFn({
-          sortDirection: "desc",
-          key1: new Date(c1.dateOfChange).getTime(),
-          key2: new Date(c2.dateOfChange).getTime(),
-        })
-      )
+      return sorted.sort((a, b) => compareDates(b.publishedAt, a.publishedAt))
   }
-
-  return sorted
 }
