@@ -7,19 +7,18 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Separator } from "@/components/ui/separator"
 
 type Props = {
-  searchValue: string
   entityType: string
   action: string
   isActiveOnly: boolean
   sort: string
   sortOptions: { value: string; label: string }[]
-  setSearchValue: (value: string) => void
   setEntityType: (value: string) => void
   setAction: (value: string) => void
   setIsActiveOnly: (value: boolean) => void
   setSort: (value: string) => void
   clearFilters: () => void
   loading: boolean
+  onRefresh: () => void
 }
 
 const entityTypeLabels = {
@@ -44,14 +43,14 @@ export function ChangelogsTableHeader({
   setSort,
   clearFilters,
   loading,
+  onRefresh,
 }: Props) {
   return (
     <>
       <div className="p-4 flex flex-col gap-y-4">
         <div className="flex flex-wrap items-center">
-          <div className="text-2xl">Changelogs</div>
+          <div className="text-2xl font-semibold">Published Releases</div>
           <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4">
-        
             <div>
               <Select value={sort} onValueChange={setSort}>
                 <SelectTrigger className="w-[180px]">
@@ -120,6 +119,9 @@ export function ChangelogsTableHeader({
             <Button variant="outline" onClick={clearFilters} disabled={loading}>
               <Filter className="h-4 w-4 mr-2" />
               Clear Filters
+            </Button>
+            <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+              Refresh
             </Button>
           </div>
         </div>

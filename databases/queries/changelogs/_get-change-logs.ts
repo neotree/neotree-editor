@@ -13,6 +13,7 @@ export type GetChangeLogsParams = {
     actions?: (typeof changeLogs.$inferSelect)['action'][];
     isActiveOnly?: boolean;
     versions?: number[];
+    dataVersions?: number[];
     scriptIds?: string[];
     screenIds?: string[];
     diagnosisIds?: string[];
@@ -46,6 +47,7 @@ export async function _getChangeLogs(
             actions = [],
             isActiveOnly = false,
             versions = [],
+            dataVersions = [],
             scriptIds = [],
             screenIds = [],
             diagnosisIds = [],
@@ -62,6 +64,8 @@ export async function _getChangeLogs(
         scriptIds = scriptIds.filter(id => uuid.validate(id));
         screenIds = screenIds.filter(id => uuid.validate(id));
         diagnosisIds = diagnosisIds.filter(id => uuid.validate(id));
+
+        dataVersions = dataVersions.filter((value) => Number.isFinite(value)).map((value) => Number(value));
 
         const changeLogsRes = await db
             .select({
@@ -80,6 +84,7 @@ export async function _getChangeLogs(
                 !userIds.length ? undefined : inArray(changeLogs.userId, userIds),
                 !actions.length ? undefined : inArray(changeLogs.action, actions),
                 !versions.length ? undefined : inArray(changeLogs.version, versions),
+                !dataVersions.length ? undefined : inArray(changeLogs.dataVersion, dataVersions),
                 !scriptIds.length ? undefined : inArray(changeLogs.scriptId, scriptIds),
                 !screenIds.length ? undefined : inArray(changeLogs.screenId, screenIds),
                 !diagnosisIds.length ? undefined : inArray(changeLogs.diagnosisId, diagnosisIds),
