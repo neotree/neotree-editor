@@ -56,10 +56,15 @@ function toNumericVersion(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function getEditorVersion(changelog: ChangeLogType): number {
-  const explicitVersion = toNumericVersion((changelog as any)?.editorVersion ?? (changelog as any)?.dataVersion)
-  const snapshotVersion = toNumericVersion(changelog?.fullSnapshot?.editorVersion ?? changelog?.fullSnapshot?.dataVersion)
-  return explicitVersion ?? snapshotVersion ?? changelog.version
+function getVersionInfo(changelog: ChangeLogType): { entityVersion: number; dataVersion: number | null } {
+  const dataVersion = toNumericVersion((changelog as any)?.dataVersion)
+  const snapshotDataVersion = toNumericVersion(changelog?.fullSnapshot?.dataVersion)
+  const entityVersion = changelog.version
+
+  return {
+    entityVersion,
+    dataVersion: dataVersion ?? snapshotDataVersion ?? null,
+  }
 }
 
 function formatChangeValue(value: unknown): string {
@@ -211,7 +216,7 @@ export function ChangelogsTable(props: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[140px]">Editor Version</TableHead>
+                  <TableHead className="w-[160px]">Version</TableHead>
                   <TableHead>Entity</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Description</TableHead>
@@ -224,7 +229,7 @@ export function ChangelogsTable(props: Props) {
               </TableHeader>
               <TableBody>
                 {changelogs.map((changelog) => {
-                  const editorVersion = getEditorVersion(changelog)
+                  const { entityVersion, dataVersion } = getVersionInfo(changelog)
                   const fieldsChanged = Array.isArray(changelog.changes) ? changelog.changes.length : 0
 
                   return (
@@ -235,7 +240,14 @@ export function ChangelogsTable(props: Props) {
                           className="px-0 font-medium"
                           onClick={() => setVersionPreview(changelog)}
                         >
-                          v{editorVersion}
+                          {dataVersion !== null ? (
+                            <div className="flex flex-col items-start">
+                              <span className="text-sm">Data v{dataVersion}</span>
+                              <span className="text-xs text-muted-foreground">Entity v{entityVersion}</span>
+                            </div>
+                          ) : (
+                            <span>Entity v{entityVersion}</span>
+                          )}
                         </Button>
                         <div className="text-xs text-muted-foreground">
                           {changelog.parentVersion !== null ? `Parent: v${changelog.parentVersion}` : null}
@@ -288,7 +300,7 @@ export function ChangelogsTable(props: Props) {
                             "w-fit",
                             changelog.isActive
                               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
-                              : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20"
+                              : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20",
                           )}
                         >
                           {changelog.isActive ? "Active" : "Superseded"}
@@ -328,7 +340,7 @@ export function ChangelogsTable(props: Props) {
                     onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
                     className={cn(
                       "cursor-pointer",
-                      currentPage === pagination.totalPages && "pointer-events-none opacity-50"
+                      currentPage === pagination.totalPages && "pointer-events-none opacity-50",
                     )}
                   />
                 </PaginationItem>
@@ -336,8 +348,8 @@ export function ChangelogsTable(props: Props) {
             </Pagination>
 
             <div className="text-sm text-muted-foreground text-center">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-              {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} entries
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)}{" "}
+              of {pagination.total} entries
             </div>
           </div>
         )}
@@ -347,12 +359,20 @@ export function ChangelogsTable(props: Props) {
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>
-              Editor Version v{versionPreview ? getEditorVersion(versionPreview) : ""}
+              {versionPreview &&
+                (() => {
+                  const { entityVersion, dataVersion } = getVersionInfo(versionPreview)
+                  return dataVersion !== null
+                    ? `Data Version v${dataVersion} (Entity v${entityVersion})`
+                    : `Entity Version v${entityVersion}`
+                })()}
             </DialogTitle>
             <DialogDescription>
               {versionPreview
-                ? `${entityTypeLabels[versionPreview.entityType as keyof typeof entityTypeLabels] || versionPreview.entityType
-                    } • ${versionPreview.action}`
+                ? `${
+                    entityTypeLabels[versionPreview.entityType as keyof typeof entityTypeLabels] ||
+                    versionPreview.entityType
+                  } • ${versionPreview.action}`
                 : "Field level changes for the selected version"}
             </DialogDescription>
           </DialogHeader>
@@ -369,6 +389,26 @@ export function ChangelogsTable(props: Props) {
                     {versionPreview.entityId}
                   </p>
                 </div>
+                {(() => {
+                  const { entityVersion, dataVersion } = getVersionInfo(versionPreview)
+                  return dataVersion !== null ? (
+                    <>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Data Version</Label>
+                        <p className="mt-1 font-medium">v{dataVersion}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Entity Version</Label>
+                        <p className="mt-1">v{entityVersion}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Entity Version</Label>
+                      <p className="mt-1">v{entityVersion}</p>
+                    </div>
+                  )
+                })()}
                 <div>
                   <Label className="text-xs text-muted-foreground">Changed By</Label>
                   <p className="mt-1">
@@ -464,41 +504,53 @@ export function ChangelogsTable(props: Props) {
           </DialogHeader>
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-2">
-              {entityHistory.map((version) => (
-                <Card
-                  key={version.changeLogId}
-                  className={cn(version.changeLogId === selectedChangelog?.changeLogId && "border-primary")}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={actionColors[version.action]}>
-                          {version.action}
-                        </Badge>
-                        <Badge variant="outline">v{version.version}</Badge>
-                        {!version.isActive && (
-                          <Badge variant="outline" className="bg-gray-500/10">
-                            Superseded
+              {entityHistory.map((version) => {
+                const { entityVersion, dataVersion } = getVersionInfo(version)
+                return (
+                  <Card
+                    key={version.changeLogId}
+                    className={cn(version.changeLogId === selectedChangelog?.changeLogId && "border-primary")}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={actionColors[version.action]}>
+                            {version.action}
                           </Badge>
-                        )}
+                          {dataVersion !== null ? (
+                            <>
+                              <Badge variant="outline">Data v{dataVersion}</Badge>
+                              <Badge variant="outline" className="bg-muted">
+                                Entity v{entityVersion}
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge variant="outline">Entity v{entityVersion}</Badge>
+                          )}
+                          {!version.isActive && (
+                            <Badge variant="outline" className="bg-gray-500/10">
+                              Superseded
+                            </Badge>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onRollback(version.entityId, version.version)}
+                          disabled={!version.isActive}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Rollback
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onRollback(version.entityId, version.version)}
-                        disabled={!version.isActive}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Rollback
-                      </Button>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-2">{version.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {version.userName} • {format(new Date(version.dateOfChange), "PPp")}
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
+                      <div className="text-sm text-muted-foreground mt-2">{version.description}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {version.userName} • {format(new Date(version.dateOfChange), "PPp")}
+                      </div>
+                    </CardHeader>
+                  </Card>
+                )
+              })}
             </div>
           </ScrollArea>
         </DialogContent>

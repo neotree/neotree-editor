@@ -10,6 +10,7 @@ export type SaveChangeLogData = {
   entityType: (typeof changeLogs.$inferSelect)["entityType"]
   action: (typeof changeLogs.$inferSelect)["action"]
   version: number
+  dataVersion?: number
   changes?: any
   fullSnapshot?: any
   description?: string
@@ -51,6 +52,7 @@ export async function _saveChangeLog({
       entityType: data.entityType,
       action: data.action,
       version: data.version,
+      dataVersion: data.dataVersion,
       changes: data.changes || [],
       fullSnapshot: data.fullSnapshot || {},
       description: data.description,

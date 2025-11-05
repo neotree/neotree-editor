@@ -65,7 +65,7 @@ export async function _saveConfigKeysHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const { draft, ...rest } = c.data || {}
+        const { ...rest } = c.data || {}
         const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
 
         changeLogsData.push({
@@ -75,7 +75,6 @@ export async function _saveConfigKeysHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
-          description: changeHistoryData.changes?.description,
           userId,
           configKeyId,
         })

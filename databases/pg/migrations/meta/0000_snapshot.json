@@ -1,5 +1,5 @@
 {
-  "id": "fb4214a8-4cdc-48b0-b903-d6a5a17f032f",
+  "id": "c6b8f5e5-26cf-4e1a-a4a0-8c8134c7e621",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -300,6 +300,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "data_version": {
+          "name": "data_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -407,6 +413,21 @@
           "columns": [
             {
               "expression": "date_of_change",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "change_logs_data_version_index": {
+          "name": "change_logs_data_version_index",
+          "columns": [
+            {
+              "expression": "data_version",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

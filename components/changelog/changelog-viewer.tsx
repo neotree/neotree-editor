@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { format } from "date-fns"
-import { ChevronDown, ChevronRight, User, Clock, FileText, GitBranch } from "lucide-react"
+import { ChevronDown, ChevronRight, User, Clock, FileText, GitBranch, Database } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -26,6 +26,19 @@ const actionColors = {
   restore: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
   rollback: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
   merge: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+}
+
+// Helper function to extract dataVersion
+function toNumericVersion(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function getDataVersion(changelog: ChangeLogType): number | null {
+  const dataVersion = toNumericVersion((changelog as any)?.dataVersion)
+  const snapshotDataVersion = toNumericVersion(changelog?.fullSnapshot?.dataVersion)
+  return dataVersion ?? snapshotDataVersion ?? null
 }
 
 export function ChangeLogViewer({ changes, className, showFilters = true, maxHeight = "600px" }: ChangeLogViewerProps) {
@@ -149,6 +162,7 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
             const isExpanded = expandedItems.has(change.changeLogId)
             const actionColor =
               actionColors[change.action as keyof typeof actionColors] || "bg-gray-500/10 text-gray-700"
+            const dataVersion = getDataVersion(change)
 
             return (
               <Collapsible
@@ -168,7 +182,20 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge className={cn("text-xs", actionColor)}>{change.action}</Badge>
-                          <span className="text-sm font-medium">Version {change.version}</span>
+                          {dataVersion !== null ? (
+                            <>
+                              <Badge variant="outline" className="text-xs">
+                                Data v{dataVersion}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs bg-muted">
+                                Entity v{change.version}
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              Entity v{change.version}
+                            </Badge>
+                          )}
                           {change.entityName && (
                             <span className="text-sm text-muted-foreground">• {change.entityName}</span>
                           )}
@@ -185,6 +212,12 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
                             <Clock className="h-3 w-3" />
                             {format(new Date(change.dateOfChange), "MMM d, yyyy h:mm a")}
                           </div>
+                          {dataVersion !== null && (
+                            <div className="flex items-center gap-1">
+                              <Database className="h-3 w-3" />
+                              Data v{dataVersion}
+                            </div>
+                          )}
                           {change.parentVersion && (
                             <div className="flex items-center gap-1">
                               <GitBranch className="h-3 w-3" />
