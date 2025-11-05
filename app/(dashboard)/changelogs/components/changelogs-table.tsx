@@ -45,6 +45,18 @@ const actionLabels: Record<string, string> = {
   merge: "Merged",
 }
 
+const actionBadgeClasses: Record<string, string> = {
+  create: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  update: "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  delete: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
+  publish: "border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-400",
+  restore: "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  rollback: "border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  merge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+}
+
+const defaultActionBadgeClass = "border-muted bg-muted text-muted-foreground"
+
 function formatEntitySummary(entry: DataVersionSummary) {
   const items = Object.entries(entry.entityCounts).sort(([, countA], [, countB]) => countB - countA)
 
@@ -69,7 +81,14 @@ function renderActionBadges(entry: DataVersionSummary) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map(([action, count]) => (
-        <Badge key={action} variant="outline" className="capitalize bg-muted text-muted-foreground">
+        <Badge
+          key={action}
+          variant="outline"
+          className={cn(
+            "capitalize",
+            actionBadgeClasses[action] ?? defaultActionBadgeClass,
+          )}
+        >
           {count} {actionLabels[action] || action}
         </Badge>
       ))}
@@ -243,7 +262,7 @@ export function ChangelogsTable(props: Props) {
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
                           {!entry.hasActiveChanges && (
-                            <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">
+                            <Badge variant="outline" className="w-fit border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
                               Superseded
                             </Badge>
                           )}
