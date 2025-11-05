@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS "nt_change_logs" (
 	"user_id" uuid NOT NULL,
 	"date_of_change" timestamp DEFAULT now() NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
+	"data_version" integer,
 	CONSTRAINT "nt_change_logs_change_log_id_unique" UNIQUE("change_log_id")
 );
 --> statement-breakpoint
@@ -1015,6 +1016,7 @@ CREATE INDEX IF NOT EXISTS "change_logs_entity_index" ON "nt_change_logs" USING 
 CREATE INDEX IF NOT EXISTS "version_chain_index" ON "nt_change_logs" USING btree ("entity_id","parent_version");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "change_logs_user_index" ON "nt_change_logs" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "change_logs_date_index" ON "nt_change_logs" USING btree ("date_of_change");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "change_logs_data_version_index" ON "nt_change_logs" USING btree ("data_version");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "config_keys_search_index" ON "nt_config_keys" USING gin ((
                     to_tsvector('english', "key") ||
                     to_tsvector('english', "label") ||

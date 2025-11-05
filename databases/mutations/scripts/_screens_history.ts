@@ -25,7 +25,7 @@ export async function _saveScreensHistory({
       const changeHistoryData: typeof screensHistory.$inferInsert = {
         version: c?.data?.version || 1,
         screenId,
-        scriptId: c?.data?.scriptId || null,
+        scriptId: c?.data?.scriptId,
         changes: {},
       }
 
@@ -67,7 +67,7 @@ export async function _saveScreensHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const { draft, ...rest } = c.data || {}
+        const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
 
         changeLogsData.push({
@@ -77,7 +77,6 @@ export async function _saveScreensHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
-          description: changeHistoryData.changes?.description,
           userId,
           scriptId: c?.data?.scriptId || null,
           screenId,

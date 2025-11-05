@@ -66,7 +66,7 @@ export async function _saveScriptsHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const { draft, ...rest } = c.data || {}
+        const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
 
         changeLogsData.push({
@@ -76,7 +76,6 @@ export async function _saveScriptsHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
-          description: changeHistoryData.changes?.description,
           userId,
           scriptId,
         })
