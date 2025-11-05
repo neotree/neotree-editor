@@ -253,7 +253,7 @@ export function DataVersionChangesTable({ changes }: Props) {
                       {entityTypeLabels[selectedChange.entityType as keyof typeof entityTypeLabels] ||
                         selectedChange.entityType}
                       {" · "}
-                      {selectedChange.entityId}
+                      {selectedChange.entityName}
                     </p>
                   </div>
 
