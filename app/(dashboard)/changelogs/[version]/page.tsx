@@ -166,7 +166,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
               {Array.from(actionCounts.entries())
                 .sort(([, countA], [, countB]) => countB - countA)
                 .map(([action, count]) => (
-                  <Badge key={action} variant="outline">
+                  <Badge key={action} variant="outline" className="capitalize bg-muted text-muted-foreground">
                     {count} {actionLabels[action] || action}
                   </Badge>
                 ))}

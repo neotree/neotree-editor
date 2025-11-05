@@ -20,16 +20,6 @@ type Props = {
   changes: ChangeLogType[]
 }
 
-const actionColors: Record<string, string> = {
-  create: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
-  update: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-  delete: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
-  publish: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-  restore: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20",
-  rollback: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
-  merge: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
-}
-
 const entityTypeLabels: Record<string, string> = {
   script: "Script",
   screen: "Screen",
@@ -99,19 +89,14 @@ export function DataVersionChangesTable({ changes }: Props) {
             const statusBadge = (
               <Badge
                 variant="outline"
-                className={cn(
-                  "w-fit",
-                  change.isActive
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
-                    : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20"
-                )}
+                className={cn("w-fit bg-muted text-muted-foreground", !change.isActive && "opacity-80")}
               >
                 {change.isActive ? "Active" : "Superseded"}
               </Badge>
             )
 
             return (
-              <TableRow key={change.changeLogId}>
+              <TableRow key={change.changeLogId} className="transition-colors hover:bg-muted/50">
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     <span className="font-medium">{entityLabel}</span>
@@ -120,14 +105,14 @@ export function DataVersionChangesTable({ changes }: Props) {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-2">
-                    <Badge variant="outline" className={actionColors[change.action] || ""}>
+                    <Badge variant="outline" className="w-fit capitalize bg-muted text-muted-foreground">
                       {change.action}
                     </Badge>
                     {statusBadge}
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  <Badge variant="outline" className="w-fit">
+                  <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">
                     {fieldsChanged}
                   </Badge>
                 </TableCell>
@@ -147,9 +132,9 @@ export function DataVersionChangesTable({ changes }: Props) {
                     {change.userEmail && <span className="text-xs text-muted-foreground">{change.userEmail}</span>}
                   </div>
                 </TableCell>
-                <TableCell className="whitespace-nowrap">{publishedAt}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                 <TableCell className="text-right">
-                  <Button size="sm" variant="outline" onClick={() => handleViewChange(change)}>
+                  <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleViewChange(change)}>
                     <Eye className="mr-2 h-4 w-4" />
                     View
                   </Button>
