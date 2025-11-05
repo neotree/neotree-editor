@@ -31,7 +31,7 @@ export function DashboardNavigation(props: Props) {
     // Calculate total pending changes across all entities
     const totalPendingChanges = useMemo(() => {
         if (!allChangesByEntity) return 0;
-        return Object.values(allChangesByEntity).reduce((sum, changes) => sum + changes.length, 0);
+        return Object.values(allChangesByEntity).reduce((sum, group) => sum + group.changes.length, 0);
     }, [allChangesByEntity]);
 
     if (!props.user) return null;

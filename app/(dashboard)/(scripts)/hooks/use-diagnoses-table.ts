@@ -129,6 +129,7 @@ export function useDiagnosesTable({
           await pendingChangesAPI.addChange({
             entityType: "diagnosis",
             entityId: change.diagnosisId,
+            entityTitle: originalDiagnosis.name || originalDiagnosis.key || "Untitled Diagnosis",
             action: "update",
             fieldPath: "position",
             fieldName: "position",

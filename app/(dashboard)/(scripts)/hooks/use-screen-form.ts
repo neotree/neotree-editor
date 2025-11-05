@@ -46,6 +46,8 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
           entityType: "screen",
           userId: authenticatedUser?.userId,
           userName: authenticatedUser?.displayName,
+          entityTitle: formData?.title || formData?.sectionTitle || formData?.label || "Screen",
+          resolveEntityTitle: (data) => data?.title || data?.sectionTitle || data?.label || data?.previewTitle,
         })
       : null,
   )
@@ -185,11 +187,13 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
         await pendingChangesAPI.addChange({
           entityType: "screen",
           entityId: screenId,
+          entityTitle: payloadData.title || payloadData.sectionTitle || payloadData.label || "Untitled Screen",
           action: "create",
           fieldPath: "screen",
           fieldName: "New Screen",
           oldValue: null,
           newValue: payloadData.title || "Untitled Screen",
+          fullSnapshot: payloadData,
         })
       }
 

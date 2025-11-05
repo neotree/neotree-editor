@@ -13,10 +13,15 @@ import { usePendingChanges } from "@/hooks/use-pending-changes"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { PendingChange } from "@/lib/indexed-db"
 
+interface PendingChangesGroup {
+  title: string
+  changes: PendingChange[]
+}
+
 interface GlobalChangeLogPanelProps {
   isOpen: boolean
   onClose: () => void
-  allChangesByEntity?: Record<string, PendingChange[]>
+  allChangesByEntity?: Record<string, PendingChangesGroup>
   className?: string
 }
 
@@ -34,8 +39,7 @@ export function GlobalChangeLogPanel({
   className,
 }: GlobalChangeLogPanelProps) {
   const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set())
-  const { clearAllChanges } = usePendingChanges({ autoTrack: false })
-
+  
   const toggleEntity = (entityId: string) => {
     setExpandedEntities((prev) => {
       const next = new Set(prev)
@@ -48,17 +52,10 @@ export function GlobalChangeLogPanel({
     })
   }
 
-  const handleClearAll = async () => {
-    if (confirm("Are you sure you want to clear all pending changes? This cannot be undone.")) {
-      await clearAllChanges()
-      onClose()
-    }
-  }
-
   if (!isOpen) return null
 
   const entities = Object.entries(allChangesByEntity)
-  const totalChanges = entities.reduce((sum, [, changes]) => sum + changes.length, 0)
+  const totalChanges = entities.reduce((sum, [, group]) => sum + group.changes.length, 0)
 
   return (
     <div
@@ -84,12 +81,6 @@ export function GlobalChangeLogPanel({
             {totalChanges} {totalChanges === 1 ? "change" : "changes"} across {entities.length}{" "}
             {entities.length === 1 ? "entity" : "entities"}
           </div>
-          {totalChanges > 0 && (
-            <Button variant="destructive" size="sm" onClick={handleClearAll}>
-              <Trash2 className="h-3 w-3 mr-2" />
-              Clear All
-            </Button>
-          )}
         </div>
       </div>
 
@@ -103,17 +94,18 @@ export function GlobalChangeLogPanel({
           </div>
         ) : (
           <div className="space-y-4">
-            {entities.map(([entityId, changes]) => {
-              const isExpanded = expandedEntities.has(entityId)
+            {entities.map(([entityKey, group]) => {
+              const { changes, title } = group
+              const isExpanded = expandedEntities.has(entityKey)
               const firstChange = changes[0]
               const entityType = firstChange?.entityType || "Unknown"
-              const entityName = firstChange?.entityType || entityId
+              const entityName = title || firstChange?.entityTitle
 
               return (
                 <Collapsible
-                  key={entityId}
+                  key={entityKey}
                   open={isExpanded}
-                  onOpenChange={() => toggleEntity(entityId)}
+                  onOpenChange={() => toggleEntity(entityKey)}
                 >
                   <div className="border rounded-lg overflow-hidden">
                     {/* Entity Header */}

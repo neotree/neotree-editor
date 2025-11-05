@@ -138,6 +138,8 @@ function Form({
             entityType: "dataKey",
             userId: authenticatedUser?.userId,
             userName: authenticatedUser?.displayName,
+            entityTitle: dataKey?.name || dataKey?.uniqueKey || "Data Key",
+            resolveEntityTitle: (current) => current?.name || current?.uniqueKey,
         });
 
         const snapshot = buildTrackableDataKey(dataKey);
@@ -176,6 +178,8 @@ function Form({
 
         const trackablePayload = buildTrackableDataKey(payload);
 
+        const entityTitle = payload.name || payload.uniqueKey || "Data Key";
+
         if (!dataKey && trackablePayload) {
             const existingChanges = await pendingChangesAPI.getEntityChanges(uuid, "dataKey");
             const existingCreate = existingChanges.find((change) => change.action === "create");
@@ -187,12 +191,14 @@ function Form({
                     timestamp: Date.now(),
                     userId: authenticatedUser?.userId,
                     userName: authenticatedUser?.displayName,
+                    entityTitle,
                     fullSnapshot: trackablePayload,
                 });
             } else {
                 await pendingChangesAPI.addChange({
                     entityType: "dataKey",
                     entityId: uuid,
+                    entityTitle,
                     action: "create",
                     fieldPath: "dataKey",
                     fieldName: payload.name || "New Data Key",

@@ -54,6 +54,79 @@ function formatChangeValue(value: unknown): string {
   }
 }
 
+type NormalizedChange = {
+  field: string
+  previousValue: unknown
+  newValue: unknown
+}
+
+function normalizeChanges(raw: ChangeLogType["changes"]): NormalizedChange[] {
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => {
+      if (item && typeof item === "object") {
+        return {
+          field: item.field || item.fieldPath || "Unknown field",
+          previousValue: item.previousValue ?? item.oldValue,
+          newValue: item.newValue ?? item.value ?? item.updatedValue,
+        }
+      }
+
+      return {
+        field: "Unknown field",
+        previousValue: undefined,
+        newValue: item,
+      }
+    })
+  }
+
+  if (raw && typeof raw === "object" && "oldValues" in raw && "newValues" in raw) {
+    const { oldValues = [], newValues = [] } = raw as { oldValues?: any[]; newValues?: any[] }
+    const max = Math.max(oldValues.length, newValues.length)
+    const normalized: NormalizedChange[] = []
+
+    for (let index = 0; index < max; index++) {
+      const oldEntry = oldValues[index] || {}
+      const newEntry = newValues[index] || {}
+      const field = Object.keys({ ...oldEntry, ...newEntry })[0] || `field_${index + 1}`
+      normalized.push({
+        field,
+        previousValue: oldEntry[field],
+        newValue: newEntry[field],
+      })
+    }
+
+    return normalized
+  }
+
+  return []
+}
+
+function resolveEntityTitle(change: ChangeLogType): string {
+  const fromChange = (change as any)?.entityTitle || (change as any)?.entityName
+  if (typeof fromChange === "string" && fromChange.trim().length) {
+    return fromChange.trim()
+  }
+
+  const snapshot = change.fullSnapshot || {}
+  const candidates = [
+    (snapshot as any)?.title,
+    (snapshot as any)?.name,
+    (snapshot as any)?.label,
+    (snapshot as any)?.printTitle,
+    (snapshot as any)?.sectionTitle,
+    (snapshot as any)?.collectionLabel,
+    (snapshot as any)?.key,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length) {
+      return candidate.trim()
+    }
+  }
+
+  return `${change.entityType} ${change.entityId}`
+}
+
 export function DataVersionChangesTable({ changes }: Props) {
   const [selectedChange, setSelectedChange] = useState<ChangeLogType | null>(null)
 
@@ -83,9 +156,11 @@ export function DataVersionChangesTable({ changes }: Props) {
         </TableHeader>
         <TableBody>
           {sortedChanges.map((change) => {
-            const fieldsChanged = Array.isArray(change.changes) ? change.changes.length : 0
+            const normalizedChanges = normalizeChanges(change.changes)
+            const fieldsChanged = normalizedChanges.length
             const entityLabel = entityTypeLabels[change.entityType as keyof typeof entityTypeLabels] || change.entityType
             const publishedAt = format(new Date(change.dateOfChange), "PPpp")
+            const entityTitle = resolveEntityTitle(change)
             const statusBadge = (
               <Badge
                 variant="outline"
@@ -99,8 +174,10 @@ export function DataVersionChangesTable({ changes }: Props) {
               <TableRow key={change.changeLogId} className="transition-colors hover:bg-muted/50">
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <span className="font-medium">{entityLabel}</span>
-                    <span className="text-xs text-muted-foreground break-all">{change.entityId}</span>
+                    <span className="font-medium">{entityTitle}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {entityLabel} • {change.entityId}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -228,7 +305,7 @@ export function DataVersionChangesTable({ changes }: Props) {
                 <Separator />
 
                 <Label className="text-xs text-muted-foreground">
-                  Changed Fields ({Array.isArray(selectedChange.changes) ? selectedChange.changes.length : 0})
+                  Changed Fields ({normalizeChanges(selectedChange.changes).length})
                 </Label>
 
                 <ScrollArea className="h-[360px] border rounded-md">
@@ -241,31 +318,34 @@ export function DataVersionChangesTable({ changes }: Props) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {Array.isArray(selectedChange.changes) && selectedChange.changes.length > 0 ? (
-                        (selectedChange.changes as any[]).map((change: any, index: number) => (
+                      {(() => {
+                        const normalized = normalizeChanges(selectedChange.changes)
+                        if (!normalized.length) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                                No field-level changes recorded for this change.
+                              </TableCell>
+                            </TableRow>
+                          )
+                        }
+
+                        return normalized.map((change, index) => (
                           <TableRow key={`${selectedChange.changeLogId}-${index}`}>
-                            <TableCell className="align-top text-sm font-medium">
-                              {change?.field || change?.fieldPath || "Unknown field"}
-                            </TableCell>
+                            <TableCell className="align-top text-sm font-medium">{change.field}</TableCell>
                             <TableCell className="align-top">
                               <pre className="max-h-[200px] whitespace-pre-wrap break-words rounded-md bg-muted/60 p-3 text-xs">
-                                {formatChangeValue(change?.previousValue)}
+                                {formatChangeValue(change.previousValue)}
                               </pre>
                             </TableCell>
                             <TableCell className="align-top">
                               <pre className="max-h-[200px] whitespace-pre-wrap break-words rounded-md bg-muted/60 p-3 text-xs">
-                                {formatChangeValue(change?.newValue)}
+                                {formatChangeValue(change.newValue)}
                               </pre>
                             </TableCell>
                           </TableRow>
                         ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
-                            No field-level changes recorded for this change.
-                          </TableCell>
-                        </TableRow>
-                      )}
+                      })()}
                     </TableBody>
                   </Table>
                 </ScrollArea>

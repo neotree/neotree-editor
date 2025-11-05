@@ -53,10 +53,17 @@ export function Item<P = {}>({
     if (selected) {
       const isNew = itemProp?.index === undefined
       const fieldPath = isNew ? `${formKey}[new]` : `${formKey}[${itemProp.index}]`
+      const screenTitle =
+        form.getValues("title") ||
+        form.getValues("sectionTitle") ||
+        form.getValues("label") ||
+        form.getValues("previewTitle") ||
+        "Screen"
 
       await pendingChangesAPI.addChange({
         entityType: "screen",
         entityId: screenId,
+        entityTitle: screenTitle,
         action: isNew ? "create" : "update",
         fieldPath,
         fieldName: `${formKey}: ${selected.key}`,
@@ -82,7 +89,7 @@ export function Item<P = {}>({
       }
     }
     setOpen(false)
-  }, [selected, itemProp, formKey, screenId])
+  }, [selected, itemProp, formKey, screenId, form])
 
   return (
     <>

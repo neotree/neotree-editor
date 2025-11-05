@@ -129,6 +129,7 @@ export function useScreensTable({
           await pendingChangesAPI.addChange({
             entityId: change.screenId,
             entityType: "screen",
+            entityTitle: screen.title || screen.sectionTitle || screen.label || "Untitled Screen",
             action: "update",
             fieldPath: "position",
             fieldName: "position",

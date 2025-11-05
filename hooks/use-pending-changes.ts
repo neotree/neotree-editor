@@ -4,15 +4,18 @@ import { useCallback, useEffect, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { pendingChangesAPI, type PendingChange } from "@/lib/indexed-db"
 
+type PendingChangesByEntity = Record<string, { title: string; changes: PendingChange[] }>
+
 export interface UsePendingChangesOptions {
   entityId?: string
   entityType?: string
+  entityTitle?: string
   userId?: string
   autoTrack?: boolean
 }
 
 export function usePendingChanges(options: UsePendingChangesOptions = {}) {
-  const { entityId, entityType, userId, autoTrack = true } = options
+  const { entityId, entityType, entityTitle, userId, autoTrack = true } = options
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   // Live query for pending changes
@@ -29,14 +32,14 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
   }, [entityId])
 
   // Live query for all changes grouped by entity
-  const allChangesByEntity = useLiveQuery(async () => {
+  const allChangesByEntity = useLiveQuery<PendingChangesByEntity>(async () => {
     return await pendingChangesAPI.getAllChangesByEntity()
   }, [])
 
   // Start tracking session
   useEffect(() => {
     if (autoTrack && entityId && entityType) {
-      pendingChangesAPI.startSession(entityId, entityType, userId).then((id) => {
+      pendingChangesAPI.startSession(entityId, entityType, entityTitle, userId).then((id) => {
         setSessionId(`${entityType}-${entityId}-${Date.now()}`)
       })
 
@@ -46,13 +49,18 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
         }
       }
     }
-  }, [autoTrack, entityId, entityType, userId, sessionId])
+  }, [autoTrack, entityId, entityType, entityTitle, userId, sessionId])
 
   // Track a change
   const trackChange = useCallback(
-    async (change: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType">) => {
+    async (change: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">) => {
       if (!entityId || !entityType) {
         console.warn("Cannot track change: entityId and entityType are required")
+        return
+      }
+
+      if (!entityTitle) {
+        console.warn("Cannot track change: entityTitle is required")
         return
       }
 
@@ -60,6 +68,7 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
         ...change,
         entityId,
         entityType: entityType as any,
+        entityTitle,
         userId,
       })
 
@@ -67,14 +76,19 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
         await pendingChangesAPI.updateSession(sessionId)
       }
     },
-    [entityId, entityType, userId, sessionId],
+    [entityId, entityType, entityTitle, userId, sessionId],
   )
 
   // Track multiple changes at once
   const trackChanges = useCallback(
-    async (changes: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType">[]) => {
+    async (changes: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">[]) => {
       if (!entityId || !entityType) {
         console.warn("Cannot track changes: entityId and entityType are required")
+        return
+      }
+
+      if (!entityTitle) {
+        console.warn("Cannot track changes: entityTitle is required")
         return
       }
 
@@ -83,6 +97,7 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
           ...change,
           entityId,
           entityType: entityType as any,
+          entityTitle,
           userId,
         })
       }
@@ -91,7 +106,7 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
         await pendingChangesAPI.updateSession(sessionId)
       }
     },
-    [entityId, entityType, userId, sessionId],
+    [entityId, entityType, entityTitle, userId, sessionId],
   )
 
   // Clear changes for current entity
@@ -118,6 +133,7 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
       byAction: {} as Record<string, number>,
       byField: {} as Record<string, number>,
       fields: new Set<string>(),
+      entityTitle: pendingChanges[0]?.entityTitle,
     }
 
     pendingChanges.forEach((change) => {
@@ -139,5 +155,6 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
     clearAllChanges,
     getChangesSummary,
     hasChanges: (changeCount || 0) > 0,
+    entityTitle,
   }
 }

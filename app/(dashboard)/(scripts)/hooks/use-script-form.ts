@@ -37,6 +37,7 @@ export function useScriptForm(params: UseScriptFormParams) {
   const { trackChange, clearChanges } = usePendingChanges({
     entityId: formData?.scriptId,
     entityType: "script",
+    entityTitle: formData?.title || formData?.printTitle || "Untitled Script",
     userId: authenticatedUser?.userId,
     autoTrack: false,
   })
@@ -48,6 +49,8 @@ export function useScriptForm(params: UseScriptFormParams) {
           entityType: "script",
           userId: authenticatedUser?.userId,
           userName: authenticatedUser?.displayName,
+          entityTitle: formData?.title || formData?.printTitle || "Untitled Script",
+          resolveEntityTitle: (data) => data?.title || data?.printTitle,
         })
       : null,
   )
@@ -164,11 +167,13 @@ export function useScriptForm(params: UseScriptFormParams) {
         await pendingChangesAPI.addChange({
           entityType: "script",
           entityId: newScriptId,
+          entityTitle: payload.title || "Untitled Script",
           action: "create",
           fieldPath: "script",
           fieldName: "New Script",
           oldValue: null,
           newValue: payload.title || "Untitled Script",
+          fullSnapshot: payload,
         })
       }
 
