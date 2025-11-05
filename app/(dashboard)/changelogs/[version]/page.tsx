@@ -10,6 +10,18 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { getChangeLogs } from "@/app/actions/change-logs"
 import { DataVersionChangesTable } from "../components/data-version-changes-table"
+import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
+
+function normalizeChangeCount(changes: ChangeLogType["changes"]): number {
+  if (Array.isArray(changes)) {
+    return changes.length
+  }
+  if (changes && typeof changes === "object" && "oldValues" in changes && "newValues" in changes) {
+    const legacy = changes as { oldValues?: any[]; newValues?: any[] }
+    return Math.max(legacy.oldValues?.length || 0, legacy.newValues?.length || 0)
+  }
+  return 0
+}
 
 const entityTypeLabels: Record<string, string> = {
   script: "Script",
@@ -110,9 +122,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
     entityCounts.set(change.entityType, (entityCounts.get(change.entityType) || 0) + 1)
     actionCounts.set(change.action, (actionCounts.get(change.action) || 0) + 1)
     uniqueEntities.add(`${change.entityType}:${change.entityId}`)
-    if (Array.isArray(change.changes)) {
-      totalFieldChanges += change.changes.length
-    }
+    totalFieldChanges += normalizeChangeCount(change.changes)
   }
 
   const entitySummary = formatEntitySummary(entityCounts)

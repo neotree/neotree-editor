@@ -46,6 +46,8 @@ export function useDiagnosisForm({
                 entityType: "diagnosis",
                 userId: authenticatedUser?.userId,
                 userName: authenticatedUser?.displayName,
+                entityTitle: formData?.name || formData?.key || "Diagnosis",
+                resolveEntityTitle: (data) => data?.name || data?.key || data?.description,
             })
             : null,
     );
@@ -122,6 +124,7 @@ export function useDiagnosisForm({
                 await pendingChangesAPI.addChange({
                     entityType: "diagnosis",
                     entityId: diagnosisId,
+                    entityTitle: payloadData.name || payloadData.key || "Untitled Diagnosis",
                     action: "create",
                     fieldPath: "diagnosis",
                     fieldName: "New Diagnosis",
@@ -129,6 +132,7 @@ export function useDiagnosisForm({
                     newValue: payloadData.name || "Untitled Diagnosis",
                     userId: authenticatedUser?.userId,
                     userName: authenticatedUser?.displayName,
+                    fullSnapshot: payloadData,
                 });
             } else if (changeTrackerRef.current && originalSnapshotRef.current) {
                 console.log("Tracking diagnosis changes on save draft");

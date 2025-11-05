@@ -30,6 +30,7 @@ export function FieldItems({
   scriptId,
   screenId,
   fieldKey,
+  screenTitle,
 }: {
   disabled: boolean
   items: Item[]
@@ -39,6 +40,7 @@ export function FieldItems({
   scriptId?: string
   screenId?: string
   fieldKey?: string
+  screenTitle?: string
 }) {
   const { confirm } = useConfirmModal()
   const [currentItemIndex, setCurrentItemIndex] = useState<number>(-1)
@@ -77,6 +79,7 @@ export function FieldItems({
           fieldKey={fieldKey}
           itemIndex={currentItemIndex}
           isNew={newItem}
+          screenTitle={screenTitle}
         />
       )}
 
@@ -175,6 +178,7 @@ function Form({
   fieldKey,
   itemIndex,
   isNew,
+  screenTitle,
 }: {
   item: null | Item
   fieldType: string
@@ -186,6 +190,7 @@ function Form({
   fieldKey?: string
   itemIndex?: number
   isNew?: boolean
+  screenTitle?: string
 }) {
   const { dataKeys, extractDataKeys } = useDataKeysCtx()
 
@@ -209,6 +214,7 @@ function Form({
       await pendingChangesAPI.addChange({
         entityType: "screen",
         entityId: screenId,
+        entityTitle: screenTitle || "Screen",
         action: isNew ? "create" : "update",
         fieldPath,
         fieldName: `Field Item: ${data.label}`,

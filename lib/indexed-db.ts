@@ -4,6 +4,7 @@ export interface PendingChange {
   id?: number
   entityId: string
   entityType: "script" | "screen" | "diagnosis" | "configKey" | "drugsLibraryItem" | "dataKey" | "alias"
+  entityTitle: string
   action: "create" | "update" | "delete"
   fieldPath: string
   fieldName: string
@@ -21,6 +22,7 @@ export interface ChangeSession {
   sessionId: string
   entityId: string
   entityType: string
+  entityTitle?: string
   startedAt: number
   lastModifiedAt: number
   changeCount: number
@@ -45,17 +47,30 @@ export const changeLogDB = new ChangeLogDB()
 
 // Helper functions for managing pending changes
 export const pendingChangesAPI = {
-  // Add a new pending change
+  // Add a new pending change (entityTitle is required)
   async addChange(change: Omit<PendingChange, "id" | "timestamp">) {
     const timestamp = Date.now()
+    const entityTitle =
+      typeof change.entityTitle === "string" && change.entityTitle.trim().length
+        ? change.entityTitle.trim()
+        : `${change.entityType} ${change.entityId}`
+
     return await changeLogDB.pendingChanges.add({
       ...change,
+      entityTitle,
       timestamp,
     })
   },
 
   async updateChange(id: number, updates: Partial<Omit<PendingChange, "id">>) {
-    return await changeLogDB.pendingChanges.update(id, updates)
+    const nextUpdates = { ...updates }
+
+    if (updates.entityTitle && typeof updates.entityTitle === "string") {
+      nextUpdates.entityTitle =
+        updates.entityTitle.trim().length > 0 ? updates.entityTitle.trim() : undefined
+    }
+
+    return await changeLogDB.pendingChanges.update(id, nextUpdates)
   },
 
   async deleteChange(id: number) {
@@ -73,17 +88,23 @@ export const pendingChangesAPI = {
     return await query.toArray()
   },
 
-  // Get all pending changes grouped by entity
+  // Get all pending changes grouped by entity (includes title)
   async getAllChangesByEntity() {
     const allChanges = await changeLogDB.pendingChanges.toArray()
-    const grouped: Record<string, PendingChange[]> = {}
+    const grouped: Record<string, { title: string; changes: PendingChange[] }> = {}
 
     allChanges.forEach((change) => {
       const key = `${change.entityType}:${change.entityId}`
       if (!grouped[key]) {
-        grouped[key] = []
+        grouped[key] = {
+          title:
+            (typeof change.entityTitle === "string" && change.entityTitle.trim().length
+              ? change.entityTitle.trim()
+              : `${change.entityType} ${change.entityId}`),
+          changes: [],
+        }
       }
-      grouped[key].push(change)
+      grouped[key].changes.push(change)
     })
 
     return grouped
@@ -125,12 +146,13 @@ export const pendingChangesAPI = {
   },
 
   // Session management
-  async startSession(entityId: string, entityType: string, userId?: string) {
+  async startSession(entityId: string, entityType: string, entityTitle?: string, userId?: string) {
     const sessionId = `${entityType}-${entityId}-${Date.now()}`
     const session: Omit<ChangeSession, "id"> = {
       sessionId,
       entityId,
       entityType,
+      entityTitle,
       startedAt: Date.now(),
       lastModifiedAt: Date.now(),
       changeCount: 0,

@@ -38,6 +38,20 @@ import { pendingChangesAPI } from "@/lib/indexed-db";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
+const resolveItemTitle = (item?: Partial<ItemType> | null) => {
+    if (!item) return undefined;
+    const data = item as any;
+    return (
+        data?.key ||
+        data?.drug ||
+        data?.feed ||
+        data?.fluid ||
+        data?.name ||
+        data?.title ||
+        undefined
+    );
+};
+
 const types: { value: NonNullable<ItemType['type']>, label: string; }[] = [
     { value: 'drug', label: 'Drug', },
     { value: 'fluid', label: 'Fluid', },
@@ -159,6 +173,8 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             entityType: "drugsLibraryItem",
             userId: authenticatedUser?.userId,
             userName: authenticatedUser?.displayName,
+            entityTitle: resolveItemTitle(item) || "Drugs Library Item",
+            resolveEntityTitle: (data) => resolveItemTitle(data) || undefined,
         });
 
         const snapshot = sanitizeDrugsItem(item);
@@ -197,22 +213,27 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     const existingChanges = await pendingChangesAPI.getEntityChanges(entityId, "drugsLibraryItem");
                     const existingCreate = existingChanges.find((change) => change.action === "create");
 
+                    const entityTitle = resolveItemTitle(payload) || "Drugs Library Item"
+                    const fieldName = resolveItemTitle(payload) || "New Library Item"
+
                     if (existingCreate?.id) {
                         await pendingChangesAPI.updateChange(existingCreate.id, {
-                            fieldName: payload.key || payload.drug || "New Library Item",
+                            fieldName,
                             newValue: trackablePayload,
                             timestamp: Date.now(),
                             userId: authenticatedUser?.userId,
                             userName: authenticatedUser?.displayName,
+                            entityTitle,
                             fullSnapshot: trackablePayload,
                         });
                     } else {
                         await pendingChangesAPI.addChange({
                             entityType: "drugsLibraryItem",
                             entityId,
+                            entityTitle,
                             action: "create",
                             fieldPath: "drugsLibraryItem",
-                            fieldName: payload.key || payload.drug || "New Library Item",
+                            fieldName,
                             oldValue: null,
                             newValue: trackablePayload,
                             userId: authenticatedUser?.userId,

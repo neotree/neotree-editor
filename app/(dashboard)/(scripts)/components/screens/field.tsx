@@ -106,6 +106,15 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
 
+  const screenIdValue = form.watch("screenId")
+  const screenTitle =
+    form.watch("title") ||
+    form.watch("sectionTitle") ||
+    form.watch("label") ||
+    form.watch("previewTitle") ||
+    form.watch("collectionLabel") ||
+    "Screen"
+
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
 
   const isDateField = useMemo(() => type === "date" || type === "datetime", [type])
@@ -398,6 +407,10 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           fieldType={type}
                           onChange={onChange}
                           dataKey={dataKey}
+                          scriptId={scriptId}
+                          screenId={screenIdValue}
+                          fieldKey={key}
+                          screenTitle={screenTitle}
                         />
                       )
                     }}

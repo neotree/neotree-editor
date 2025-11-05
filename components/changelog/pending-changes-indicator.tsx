@@ -13,6 +13,7 @@ import { format } from "date-fns"
 interface PendingChangesIndicatorProps {
   entityId?: string
   entityType?: string
+  entityTitle?: string
   className?: string
   showDetails?: boolean
   onClick?: () => void
@@ -21,6 +22,7 @@ interface PendingChangesIndicatorProps {
 export function PendingChangesIndicator({
   entityId,
   entityType,
+  entityTitle,
   className,
   showDetails = true,
   onClick,
@@ -28,6 +30,7 @@ export function PendingChangesIndicator({
   const { pendingChanges, changeCount, hasChanges, getChangesSummary } = usePendingChanges({
     entityId,
     entityType,
+    entityTitle,
     autoTrack: false,
   })
 

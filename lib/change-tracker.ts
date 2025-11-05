@@ -5,6 +5,8 @@ export interface ChangeTrackerOptions {
   entityType: "script" | "screen" | "diagnosis" | "configKey" | "drugsLibraryItem" | "dataKey" | "alias"
   userId?: string
   userName?: string
+  entityTitle?: string
+  resolveEntityTitle?: (currentData: any) => string | undefined
 }
 
 const IGNORED_FIELDS = new Set([
@@ -62,6 +64,7 @@ export class ChangeTracker {
 
     const existingChanges = await pendingChangesAPI.getEntityChanges(this.options.entityId, this.options.entityType)
     const existingChangesByPath = new Map(existingChanges.map((change) => [change.fieldPath, change]))
+    const entityTitle = this.resolveEntityTitle(currentData)
 
     for (const change of changes) {
       const existingChange = existingChangesByPath.get(change.path)
@@ -72,6 +75,7 @@ export class ChangeTracker {
           timestamp: Date.now(),
           description,
           fullSnapshot: currentData,
+          entityTitle,
         })
         console.log("Updated change for field:", change.path)
       } else {
@@ -87,6 +91,7 @@ export class ChangeTracker {
           userName: this.options.userName,
           description,
           fullSnapshot: currentData,
+          entityTitle,
         })
         console.log("Added new change for field:", change.path)
       }
@@ -104,6 +109,51 @@ export class ChangeTracker {
       await pendingChangesAPI.clearEntityChanges(this.options.entityId, this.options.entityType)
       console.log("All changes cleared - form back to original state")
     }
+  }
+
+  private resolveEntityTitle(currentData?: any): string {
+    if (this.options.resolveEntityTitle) {
+      const resolved = this.options.resolveEntityTitle(currentData)
+      if (resolved && resolved.toString().trim().length) {
+        return resolved.toString().trim()
+      }
+    }
+
+    const snapshotTitle = this.extractTitle(currentData)
+    if (snapshotTitle) return snapshotTitle
+
+    if (typeof this.options.entityTitle === "string" && this.options.entityTitle.trim().length) {
+      return this.options.entityTitle.trim()
+    }
+
+    const originalTitle = this.extractTitle(this.originalSnapshot)
+    if (originalTitle) return originalTitle
+
+    return `${this.options.entityType} ${this.options.entityId}`
+  }
+
+  private extractTitle(data: any): string | null {
+    if (!data || typeof data !== "object") return null
+
+    const candidateKeys = [
+      "title",
+      "name",
+      "label",
+      "key",
+      "printTitle",
+      "displayName",
+      "sectionTitle",
+      "collectionLabel",
+    ]
+
+    for (const key of candidateKeys) {
+      const value = data[key]
+      if (typeof value === "string" && value.trim().length) {
+        return value.trim()
+      }
+    }
+
+    return null
   }
 
   private isMeaningfulValue(value: any): boolean {

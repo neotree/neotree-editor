@@ -49,8 +49,8 @@ export function Header({
 
   // Calculate total changes across all entities
   const totalChanges = Object.values(allChangesByEntity || {}).reduce(
-    (sum, changes) => sum + changes.length, 
-    0
+    (sum, entry) => sum + entry.changes.length,
+    0,
   )
 
   return (

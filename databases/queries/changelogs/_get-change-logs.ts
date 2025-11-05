@@ -29,6 +29,32 @@ export type ChangeLogType = typeof changeLogs.$inferSelect & {
     entityName?: string;
 };
 
+function deriveEntityName(change: typeof changeLogs.$inferSelect): string | undefined {
+    const snapshot = (change.fullSnapshot || {}) as Record<string, unknown>;
+    const candidateKeys = [
+        "title",
+        "name",
+        "label",
+        "printTitle",
+        "sectionTitle",
+        "collectionLabel",
+        "key",
+    ];
+
+    for (const key of candidateKeys) {
+        const value = snapshot[key];
+        if (typeof value === "string" && value.trim().length) {
+            return value.trim();
+        }
+    }
+
+    if (typeof change.description === "string" && change.description.trim().length) {
+        return change.description.trim();
+    }
+
+    return undefined;
+}
+
 export type GetChangeLogsResults = {
     data: ChangeLogType[];
     total?: number;
@@ -102,6 +128,7 @@ export async function _getChangeLogs(
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
+            entityName: deriveEntityName(item.changeLog),
         }));
 
         return {

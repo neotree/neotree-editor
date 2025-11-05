@@ -114,6 +114,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
           await pendingChangesAPI.addChange({
             entityId: change.scriptId,
             entityType: "script",
+            entityTitle: script.title || script.printTitle || "Untitled Script",
             action: "update",
             fieldPath: "position",
             fieldName: "position",
