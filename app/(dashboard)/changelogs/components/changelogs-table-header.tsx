@@ -120,7 +120,7 @@ export function ChangelogsTableHeader({
               <Filter className="h-4 w-4 mr-2" />
               Clear Filters
             </Button>
-            <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+            <Button variant="ghost" onClick={onRefresh} disabled={loading}>
               Refresh
             </Button>
           </div>

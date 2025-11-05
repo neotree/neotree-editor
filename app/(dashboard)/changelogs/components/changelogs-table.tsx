@@ -69,7 +69,7 @@ function renderActionBadges(entry: DataVersionSummary) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map(([action, count]) => (
-        <Badge key={action} variant="secondary">
+        <Badge key={action} variant="outline" className="capitalize bg-muted text-muted-foreground">
           {count} {actionLabels[action] || action}
         </Badge>
       ))}
@@ -228,13 +228,13 @@ export function ChangelogsTable(props: Props) {
                   return (
                     <TableRow
                       key={entry.dataVersion}
-                      className="cursor-pointer"
+                      className="cursor-pointer transition-colors hover:bg-muted/60"
                       onClick={() => handleNavigate(entry.dataVersion)}
                     >
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-base">{versionLabel}</span>
-                          <Badge variant="outline" className="w-fit">
+                          <span className="text-base font-semibold">{versionLabel}</span>
+                          <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">
                             {entry.totalChanges} change{entry.totalChanges === 1 ? "" : "s"}
                           </Badge>
                         </div>
@@ -243,7 +243,7 @@ export function ChangelogsTable(props: Props) {
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
                           {!entry.hasActiveChanges && (
-                            <Badge variant="outline" className="w-fit bg-amber-500/10 text-amber-700 border-amber-500/30">
+                            <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">
                               Superseded
                             </Badge>
                           )}
@@ -274,12 +274,17 @@ export function ChangelogsTable(props: Props) {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{publishedAt}</TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={(event) => {
-                          event.stopPropagation()
-                          handleNavigate(entry.dataVersion)
-                        }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-primary"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleNavigate(entry.dataVersion)
+                          }}
+                        >
                           View details
                         </Button>
                       </TableCell>
