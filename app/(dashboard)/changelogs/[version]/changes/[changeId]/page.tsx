@@ -64,7 +64,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const entityTitle = resolveEntityTitle(change)
   const changedOn = format(new Date(change.dateOfChange), "PPpp")
   const dataVersion = getDataVersion(change) ?? numericVersion
-  const normalizedChanges = normalizeChanges(change.changes)
+  const normalizedChanges = normalizeChanges(change)
 
   return (
     <>

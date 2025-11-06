@@ -66,7 +66,7 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
       </TableHeader>
       <TableBody>
         {sortedChanges.map((change) => {
-          const normalizedChanges = normalizeChanges(change.changes)
+          const normalizedChanges = normalizeChanges(change)
           const fieldsChanged = normalizedChanges.length
           const entityLabel = entityTypeLabels[change.entityType as keyof typeof entityTypeLabels] || change.entityType
           const publishedAt = format(new Date(change.dateOfChange), "PPpp")
