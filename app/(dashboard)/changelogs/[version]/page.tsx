@@ -184,7 +184,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
 
             <Separator />
 
-            <DataVersionChangesTable changes={changes} />
+            <DataVersionChangesTable changes={changes} dataVersion={numericVersion} />
           </CardContent>
         </Card>
       </Content>
