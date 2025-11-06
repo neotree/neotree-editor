@@ -115,6 +115,7 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
                     <span className="font-medium text-foreground">Reason:</span> {change.changeReason}
                   </div>
                 )}
+                
               </TableCell>
               <TableCell>
                 <div className="flex flex-col">
