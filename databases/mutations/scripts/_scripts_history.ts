@@ -1,60 +1,93 @@
-import db from "@/databases/pg/drizzle";
-import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema";
-import logger from "@/lib/logger";
-import { removeHexCharacters } from '../../utils'
+import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import db from "@/databases/pg/drizzle"
+import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema"
+import logger from "@/lib/logger"
+import { removeHexCharacters } from "../../utils"
 
-export async function _saveScriptsHistory({ previous, drafts, }: {
-    drafts: typeof scriptsDrafts.$inferSelect[];
-    previous: typeof scripts.$inferSelect[];
-}) {
-    try {
-        const insertData: typeof scriptsHistory.$inferInsert[] = [];
+export async function _saveScriptsHistory({
+  previous,
+  drafts,
+  userId,
+}: {
+  drafts: typeof scriptsDrafts.$inferSelect[]
+  previous: typeof scripts.$inferSelect[]
+  userId?: string | null
+}): Promise<SaveChangeLogData[]> {
+  const changeLogsData: SaveChangeLogData[] = []
 
-        for(const c of drafts) {
-            const changeHistoryData: typeof scriptsHistory.$inferInsert = {
-                version: c?.data?.version || 1,
-                scriptId: c?.data?.scriptId!,
-                changes: {},
-            };
+  try {
+    const insertData: typeof scriptsHistory.$inferInsert[] = []
 
-            if (c?.data?.version === 1) {
-                changeHistoryData.changes = {
-                    action: 'create_script',
-                    description: 'Create script',
-                    oldValues: [],
-                    newValues: [],
-                };
-            } else {
-                const prev = previous.filter(prevC => prevC.scriptId === c?.data?.scriptId)[0];
+    for (const c of drafts) {
+      const scriptId = c?.data?.scriptId
+      if (!scriptId) continue
 
-                const oldValues: any[] = [];
-                const newValues: any[] = [];
+      const changeHistoryData: typeof scriptsHistory.$inferInsert = {
+        version: c?.data?.version || 1,
+        scriptId,
+        changes: {},
+      }
 
-                Object.keys(({ ...c?.data }))
-                    .filter(key => !['version', 'draft'].includes(key))
-                    .forEach(_key => {
-                        const key = _key as unknown as keyof typeof c.data;
-                        const newValue = removeHexCharacters(c.data[key]);
-                        const oldValue = ({ ...prev })[key as keyof typeof prev];
-                        if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-                            oldValues.push({ [key]: oldValue, });
-                            newValues.push({ [key]: newValue, });
-                        }
-                    });
+      const isCreate = (c?.data?.version || 1) === 1
 
-                changeHistoryData.changes = {
-                    action: 'update_script',
-                    description: 'Update script',
-                    oldValues,
-                    newValues,
-                };
-            }
-
-            insertData.push(changeHistoryData);
+      if (isCreate) {
+        changeHistoryData.changes = {
+          action: "create_script",
+          description: "Create script",
+          oldValues: [],
+          newValues: [],
         }
+      } else {
+        const prev = previous.find((prevC) => prevC.scriptId === scriptId)
 
-        await db.insert(scriptsHistory).values(insertData);
-    } catch(e: any) {
-        logger.error(e.message);
+        const oldValues: any[] = []
+        const newValues: any[] = []
+
+        Object.keys({ ...c?.data })
+          .filter((key) => !["version", "draft"].includes(key))
+          .forEach((_key) => {
+            const key = _key as keyof typeof c.data
+            const newValue = removeHexCharacters(c.data[key])
+            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+              oldValues.push({ [key]: oldValue })
+              newValues.push({ [key]: newValue })
+            }
+          })
+
+        changeHistoryData.changes = {
+          action: "update_script",
+          description: "Update script",
+          oldValues,
+          newValues,
+        }
+      }
+
+      insertData.push(changeHistoryData)
+
+      if (userId) {
+        const {  ...rest } = c.data || {}
+        const sanitizedSnapshot = removeHexCharacters(rest)
+
+        changeLogsData.push({
+          entityId: scriptId,
+          entityType: "script",
+          action: isCreate ? "create" : "update",
+          version: changeHistoryData.version || 1,
+          changes: changeHistoryData.changes,
+          fullSnapshot: sanitizedSnapshot,
+          userId,
+          scriptId,
+        })
+      }
     }
+
+    if (insertData.length) {
+      await db.insert(scriptsHistory).values(insertData)
+    }
+  } catch (e: any) {
+    logger.error(e.message)
+  }
+
+  return changeLogsData
 }
