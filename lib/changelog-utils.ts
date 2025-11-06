@@ -31,29 +31,29 @@ export function formatChangeValue(value: unknown): string {
   }
 }
 
-export function normalizeChanges(raw: ChangeLogType["changes"]): NormalizedChange[] {
+export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
+  const normalized: NormalizedChange[] = []
+  const raw = change.changes
+
   if (Array.isArray(raw)) {
-    return raw.map((item: any) => {
+    for (const item of raw) {
       if (item && typeof item === "object") {
-        return {
+        normalized.push({
           field: item.field || item.fieldPath || "Unknown field",
           previousValue: item.previousValue ?? item.oldValue,
           newValue: item.newValue ?? item.value ?? item.updatedValue,
-        }
+        })
+      } else {
+        normalized.push({
+          field: "Unknown field",
+          previousValue: undefined,
+          newValue: item,
+        })
       }
-
-      return {
-        field: "Unknown field",
-        previousValue: undefined,
-        newValue: item,
-      }
-    })
-  }
-
-  if (raw && typeof raw === "object" && "oldValues" in raw && "newValues" in raw) {
+    }
+  } else if (raw && typeof raw === "object" && "oldValues" in raw && "newValues" in raw) {
     const { oldValues = [], newValues = [] } = raw as { oldValues?: any[]; newValues?: any[] }
     const max = Math.max(oldValues.length, newValues.length)
-    const normalized: NormalizedChange[] = []
 
     for (let index = 0; index < max; index++) {
       const oldEntry = oldValues[index] || {}
@@ -65,11 +65,22 @@ export function normalizeChanges(raw: ChangeLogType["changes"]): NormalizedChang
         newValue: newEntry[field],
       })
     }
-
-    return normalized
   }
 
-  return []
+  if (!normalized.length && change.action === "create") {
+    const snapshot = change.fullSnapshot
+    if (snapshot && typeof snapshot === "object") {
+      for (const [field, value] of Object.entries(snapshot as Record<string, unknown>)) {
+        normalized.push({
+          field,
+          previousValue: undefined,
+          newValue: value,
+        })
+      }
+    }
+  }
+
+  return normalized
 }
 
 export function resolveEntityTitle(change: ChangeLogType): string {
