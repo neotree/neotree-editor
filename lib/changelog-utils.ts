@@ -38,10 +38,25 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>
+        const field = (record.field as string) || (record.fieldPath as string) || "Unknown field"
+        const previousValue =
+          "previousValue" in record
+            ? record.previousValue
+            : "oldValue" in record
+              ? (record as any).oldValue
+              : undefined
+        const newValue =
+          "newValue" in record
+            ? record.newValue
+            : "value" in record
+              ? (record as any).value
+              : (record as any).updatedValue
+
         normalized.push({
-          field: item.field || item.fieldPath || "Unknown field",
-          previousValue: item.previousValue ?? item.oldValue,
-          newValue: item.newValue ?? item.value ?? item.updatedValue,
+          field,
+          previousValue,
+          newValue,
         })
       } else {
         normalized.push({

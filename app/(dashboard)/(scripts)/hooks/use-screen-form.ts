@@ -14,6 +14,7 @@ import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
 import { createChangeTracker } from "@/lib/change-tracker"
+import type { ChangeTracker } from "@/lib/change-tracker"
 import { pendingChangesAPI } from "@/lib/indexed-db"
 
 export type UseScreenFormParams = {
@@ -39,7 +40,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     [],
   )
 
-  const changeTrackerRef = useRef(
+  const changeTrackerRef = useRef<ChangeTracker | null>(
     formData?.screenId
       ? createChangeTracker({
           entityId: formData.screenId,
@@ -242,5 +243,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     scriptLockedByUserId,
     save,
     getDefaultValues,
+    changeTracker: changeTrackerRef.current,
   }
 }

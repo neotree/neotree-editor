@@ -21,26 +21,26 @@ export async function _saveDataKeysHistory({
       const dataKeyId = c?.data?.uuid
       if (!dataKeyId) continue
 
-      const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-        version: c?.data?.version || 1,
-        dataKeyId,
-        changes: {},
+      const isCreate = (c?.data?.version || 1) === 1
+      const changeDescription = isCreate ? "Create data key" : "Update data key"
+
+      const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
+        action: isCreate ? "create_data_key" : "update_data_key",
+        description: changeDescription,
+        oldValues: [],
+        newValues: [],
       }
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const versionValue = c?.data?.version || 1
 
-      if (isCreate) {
-        changeHistoryData.changes = {
-          action: "create_data_key",
-          description: "Create data key",
-          oldValues: [],
-          newValues: [],
-        }
-      } else {
+      const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
+        version: versionValue,
+        dataKeyId,
+        changes: changePayload,
+      }
+
+      if (!isCreate) {
         const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
-
-        const oldValues: any[] = []
-        const newValues: any[] = []
 
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
@@ -49,33 +49,25 @@ export async function _saveDataKeysHistory({
             const newValue = c.data[key]
             const oldValue = ({ ...prev })[key as keyof typeof prev]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-              oldValues.push({ [key]: oldValue })
-              newValues.push({ [key]: newValue })
+              changePayload.oldValues.push({ [key]: oldValue })
+              changePayload.newValues.push({ [key]: newValue })
             }
           })
-
-        changeHistoryData.changes = {
-          action: "update_data_key",
-          description: "Update data key",
-          oldValues,
-          newValues,
-        }
       }
 
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const { draft, ...rest } = c.data || {}
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
+        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
 
         changeLogsData.push({
           entityId: dataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
-          changes: changeHistoryData.changes,
+          version: versionValue,
+          changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
-          description: changeHistoryData.changes?.description,
+          description: changeDescription,
           userId,
           dataKeyId,
         })

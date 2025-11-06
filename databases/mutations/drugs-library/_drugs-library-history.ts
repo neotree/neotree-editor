@@ -21,26 +21,26 @@ export async function _saveDrugsLibraryItemsHistory({
       const itemId = c?.data?.itemId
       if (!itemId) continue
 
-      const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
-        version: c?.data?.version || 1,
-        itemId,
-        changes: {},
+      const isCreate = (c?.data?.version || 1) === 1
+      const changeDescription = isCreate ? "Create drugs library item" : "Update drugs library item"
+
+      const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
+        action: isCreate ? "create_drugs_library_item" : "update_drugs_library_item",
+        description: changeDescription,
+        oldValues: [],
+        newValues: [],
       }
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const versionValue = c?.data?.version || 1
 
-      if (isCreate) {
-        changeHistoryData.changes = {
-          action: "create_drugs_library_item",
-          description: "Create drugs library item",
-          oldValues: [],
-          newValues: [],
-        }
-      } else {
+      const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
+        version: versionValue,
+        itemId,
+        changes: changePayload,
+      }
+
+      if (!isCreate) {
         const prev = previous.find((prevC) => prevC.itemId === itemId)
-
-        const oldValues: any[] = []
-        const newValues: any[] = []
 
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
@@ -49,33 +49,25 @@ export async function _saveDrugsLibraryItemsHistory({
             const newValue = c.data[key]
             const oldValue = ({ ...prev })[key as keyof typeof prev]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-              oldValues.push({ [key]: oldValue })
-              newValues.push({ [key]: newValue })
+              changePayload.oldValues.push({ [key]: oldValue })
+              changePayload.newValues.push({ [key]: newValue })
             }
           })
-
-        changeHistoryData.changes = {
-          action: "update_drugs_library_item",
-          description: "Update drugs library item",
-          oldValues,
-          newValues,
-        }
       }
 
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const { draft, ...rest } = c.data || {}
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
+        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
 
         changeLogsData.push({
           entityId: itemId,
           entityType: "drugs_library",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
-          changes: changeHistoryData.changes,
+          version: versionValue,
+          changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
-          description: changeHistoryData.changes?.description,
+          description: changeDescription,
           userId,
           drugsLibraryItemId: itemId,
         })
