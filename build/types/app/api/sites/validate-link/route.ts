@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor-master/app/api/sites/validate-link/route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/sites/validate-link/route.ts
 import * as entry from '../../../../../../app/api/sites/validate-link/route.js'
 import type { NextRequest } from 'next/server.js'
 
