@@ -114,7 +114,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             
             for(const { id, data } of inserts) {
                 const itemId = data.itemId || v4();
-                const payload = { ...data, itemId };
+                const { id: _id, ...payload } = { ...data, itemId };
 
                 inserts = inserts.map(d => {
                     if (d.id === id) d.data.itemId = itemId;
