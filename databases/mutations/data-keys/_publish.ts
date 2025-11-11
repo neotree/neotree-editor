@@ -132,7 +132,7 @@ export async function _publishDataKeys(opts?: {
       }
 
       const updateChangeLogs = await _saveDataKeysHistory({
-         drafts: updates,
+        drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
       })
@@ -141,7 +141,6 @@ export async function _publishDataKeys(opts?: {
         dataVersion: opts?.dataVersion
       })))
     }
-
 
     if (inserts.length) {
       // we'll use data before to compare changes
@@ -168,7 +167,7 @@ export async function _publishDataKeys(opts?: {
       }
 
       const insertChangeLogs = await _saveDataKeysHistory({
-         drafts: updates,
+        drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
       })
@@ -178,11 +177,9 @@ export async function _publishDataKeys(opts?: {
       })))
     }
 
-
     await db.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
 
     const published = [
-      // ...inserts.map(c => c.dataKeyId! || c.dataKeyDraftId),
       ...updates.map((c) => c.dataKeyId!),
       ...deleted.map((c) => c.dataKeyId!),
     ]
