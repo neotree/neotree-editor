@@ -131,6 +131,8 @@ export async function _getChangeLogs(
             entityName: deriveEntityName(item.changeLog),
         }));
 
+        await reconcileActiveFlags(responseData);
+
         return {
             data: responseData,
             total: responseData.length,
@@ -138,6 +140,55 @@ export async function _getChangeLogs(
     } catch (e: any) {
         logger.error('_getChangeLogs ERROR', e.message);
         return { data: [], errors: [e.message] };
+    }
+}
+
+async function reconcileActiveFlags(changes: ChangeLogType[]) {
+    if (!changes.length) return;
+
+    const entityIdsByType = new Map<ChangeLogType["entityType"], Set<string>>();
+
+    for (const change of changes) {
+        if (!change.entityId) continue;
+
+        if (!entityIdsByType.has(change.entityType)) {
+            entityIdsByType.set(change.entityType, new Set());
+        }
+
+        entityIdsByType.get(change.entityType)!.add(change.entityId);
+    }
+
+    if (!entityIdsByType.size) return;
+
+    const latestVersionMap = new Map<string, number>();
+
+    for (const [entityType, idsSet] of entityIdsByType.entries()) {
+        const ids = Array.from(idsSet);
+        if (!ids.length) continue;
+
+        const latestVersions = await db
+            .select({
+                entityId: changeLogs.entityId,
+                latestVersion: sql<number>`max(${changeLogs.version})`,
+            })
+            .from(changeLogs)
+            .where(and(
+                eq(changeLogs.entityType, entityType),
+                inArray(changeLogs.entityId, ids),
+            ))
+            .groupBy(changeLogs.entityId);
+
+        for (const row of latestVersions) {
+            if (row.latestVersion === null || row.latestVersion === undefined) continue;
+            latestVersionMap.set(`${entityType}:${row.entityId}`, Number(row.latestVersion));
+        }
+    }
+
+    for (const change of changes) {
+        const latestVersion = latestVersionMap.get(`${change.entityType}:${change.entityId}`);
+        if (latestVersion === undefined) continue;
+
+        change.isActive = change.isActive && change.version === latestVersion;
     }
 }
 
