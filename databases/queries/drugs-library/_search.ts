@@ -8,6 +8,7 @@ import {
     type DrugsLibrarySearchResultsItem, 
     type DrugsLibrarySearchSourceItem, 
 } from "@/lib/drugs-library-search";
+import { normalizeSearchTerm } from "@/lib/search";
 
 export type SearchDrugsLibraryParams = {
     searchValue: string;
@@ -24,10 +25,11 @@ export async function _searchDrugsLibrary({
     returnDraftsIfExist = true,
 }: SearchDrugsLibraryParams): Promise<SearchDrugsLibraryResponse> {
     try {
-        const search = `${searchValue || ''}`.trim().toLowerCase();
-        if (!search) return { data: [] };
+        const rawSearchValue = `${searchValue || ''}`;
+        const { normalizedValue } = normalizeSearchTerm(rawSearchValue);
+        if (!normalizedValue) return { data: [] };
 
-        const pattern = `%${search}%`;
+        const pattern = `%${normalizedValue}%`;
 
         const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
             where: sql`lower(${schema.drugsLibraryDrafts.data}::text) like ${pattern}`,
@@ -156,7 +158,7 @@ export async function _searchDrugsLibrary({
         ].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
         const data = parseDrugsLibrarySearchResults({
-            searchValue,
+            searchValue: rawSearchValue,
             items,
         });
 

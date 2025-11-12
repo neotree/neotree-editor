@@ -1,5 +1,6 @@
 import * as schema from '@/databases/pg/schema';
 import { ArrayElement, Preferences } from '@/types';
+import { normalizeSearchTerm } from "@/lib/search";
 
 type DrizzleDrugsLibrary = typeof schema.drugsLibrary.$inferSelect;
 
@@ -76,8 +77,13 @@ export function parseDrugsLibrarySearchResults({
     searchValue: string;
     items: DrugsLibrarySearchSourceItem[];
 }): DrugsLibrarySearchResultsItem[] {
-    const search = `${searchValue || ''}`.trim().toLowerCase();
-    if (!search) return [];
+    const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+    if (!normalizedValue) return [];
+
+    const matchesSearch = (value: string) => {
+        const candidate = value.toLowerCase();
+        return isExactMatch ? candidate === normalizedValue : candidate.includes(normalizedValue);
+    };
 
     return items.reduce<DrugsLibrarySearchResultsItem[]>((acc, item) => {
         const matches: DrugsLibrarySearchMatch[] = [];
@@ -91,7 +97,7 @@ export function parseDrugsLibrarySearchResults({
             const stringValue = `${rawValue ?? ''}`.trim();
             if (!stringValue) return;
 
-            if (!stringValue.toLowerCase().includes(search)) return;
+            if (!matchesSearch(stringValue)) return;
 
             const key = `${field}:${stringValue}:${context || ''}`;
             if (seen.has(key)) return;
@@ -223,6 +229,9 @@ export function filterDrugsLibrarySearchResults({
 }) {
     if (filter === 'all') return results;
 
+    const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+    if (!normalizedValue) return results;
+
     const filtered = results.map(result => {
         const matches = result.matches.filter(match => {
             if (!filter) return true;
@@ -230,7 +239,8 @@ export function filterDrugsLibrarySearchResults({
             const matchedFilter = matchedFieldFilterMap[match.field];
             if (matchedFilter !== filter) return false;
 
-            if (!`${match.fieldValue}`.toLowerCase().includes(`${searchValue}`.toLowerCase())) return false;
+            const candidate = `${match.fieldValue}`.toLowerCase();
+            if (isExactMatch ? candidate !== normalizedValue : !candidate.includes(normalizedValue)) return false;
 
             return true;
         });

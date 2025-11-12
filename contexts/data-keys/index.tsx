@@ -20,6 +20,7 @@ import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
+import { normalizeSearchTerm } from "@/lib/search";
 
 
 function paginateData<T>(
@@ -198,15 +199,20 @@ export function DataKeysCtxProvider({
 
         
         if (searchValue) {
-            const searchLower = searchValue.toLowerCase();
-            filtered = filtered.filter(dataKey => {
-                const searchableFields = [
-                    dataKey.name || '',
-                    dataKey.label || '',
-                ].map(field => field.toLowerCase());
-                
-                return searchableFields.some(field => field.includes(searchLower));
-            });
+            const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+
+            if (normalizedValue) {
+                filtered = filtered.filter(dataKey => {
+                    const searchableFields = [
+                        dataKey.name || '',
+                        dataKey.label || '',
+                    ].map(field => field.toLowerCase());
+
+                    return searchableFields.some(field =>
+                        isExactMatch ? field === normalizedValue : field.includes(normalizedValue)
+                    );
+                });
+            }
         }
 
         return filtered;
