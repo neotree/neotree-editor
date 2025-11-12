@@ -9,6 +9,8 @@ export interface ChangeTrackerOptions {
   resolveEntityTitle?: (currentData: any) => string | undefined
 }
 
+export type TrackableEntityType = ChangeTrackerOptions["entityType"]
+
 const IGNORED_FIELDS = new Set([
   "id",
   "createdAt",
@@ -280,4 +282,72 @@ export class ChangeTracker {
 // Helper function to create a change tracker
 export function createChangeTracker(options: ChangeTrackerOptions) {
   return new ChangeTracker(options)
+}
+
+const TITLE_CANDIDATE_KEYS = [
+  "title",
+  "name",
+  "label",
+  "key",
+  "printTitle",
+  "sectionTitle",
+  "collectionLabel",
+  "drug",
+  "fluid",
+  "feed",
+]
+
+function inferEntityTitleFromSnapshot(snapshot?: any): string | null {
+  if (!snapshot || typeof snapshot !== "object") return null
+
+  for (const key of TITLE_CANDIDATE_KEYS) {
+    const value = snapshot[key]
+    if (typeof value === "string" && value.trim().length) {
+      return value.trim()
+    }
+  }
+
+  return null
+}
+
+export async function recordPendingDeletionChange({
+  entityId,
+  entityType,
+  entityTitle,
+  snapshot,
+  userId,
+  userName,
+  description,
+}: {
+  entityId?: string | null
+  entityType: TrackableEntityType
+  entityTitle?: string
+  snapshot?: any
+  userId?: string | null
+  userName?: string | null
+  description?: string
+}) {
+  if (!entityId) return
+
+  const resolvedTitle =
+    entityTitle?.trim() ||
+    inferEntityTitleFromSnapshot(snapshot) ||
+    `${entityType} ${entityId}`
+
+  await pendingChangesAPI.clearEntityChanges(entityId, entityType)
+
+  await pendingChangesAPI.addChange({
+    entityId,
+    entityType,
+    entityTitle: resolvedTitle,
+    action: "delete",
+    fieldPath: "entity",
+    fieldName: resolvedTitle,
+    oldValue: snapshot ?? null,
+    newValue: null,
+    userId: userId || undefined,
+    userName: userName || undefined,
+    description: description || `Marked "${resolvedTitle}" for deletion`,
+    fullSnapshot: snapshot ?? null,
+  })
 }

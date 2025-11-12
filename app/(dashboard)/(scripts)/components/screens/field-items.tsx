@@ -18,6 +18,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
 import { SelectDataKey } from "@/components/select-data-key"
 import { pendingChangesAPI } from "@/lib/indexed-db"
+import { useAppContext } from "@/contexts/app"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -193,6 +194,7 @@ function Form({
   screenTitle?: string
 }) {
   const { dataKeys, extractDataKeys } = useDataKeysCtx()
+  const { authenticatedUser } = useAppContext()
 
   const { control, register, handleSubmit, setValue } = useForm<Item>({
     defaultValues: {
@@ -220,6 +222,8 @@ function Form({
         fieldName: `Field Item: ${data.label}`,
         oldValue: item,
         newValue: data,
+        userId: authenticatedUser?.userId,
+        userName: authenticatedUser?.displayName,
       })
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { MoreVertical, Trash, Edit, Eye, CopyIcon } from "lucide-react";
+import { MoreVertical, Trash, Edit, Eye, CopyIcon, ExternalLink } from "lucide-react";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import {
@@ -84,6 +84,15 @@ export function DrugsLibraryTableActions({
                             </>
                         </DropdownMenuItem>
                     )}
+
+                    <DropdownMenuItem
+                        asChild
+                    >
+                        <Link target="_blank" href={`/drugs-fluids-and-feeds/${item.itemId}/metadata`}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            View metadata
+                        </Link>
+                    </DropdownMenuItem>
 
                     {!disabled && (
                         <DropdownMenuItem
