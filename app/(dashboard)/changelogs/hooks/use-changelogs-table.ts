@@ -19,6 +19,7 @@ export type DataVersionSummary = {
   publishedByEmail?: string
   totalChanges: number
   hasActiveChanges: boolean
+  isLatestVersion: boolean
   entityCounts: Record<string, number>
   actionCounts: Record<string, number>
   descriptions: string[]
@@ -133,6 +134,8 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     }
 
     const summaries: DataVersionSummary[] = []
+    const versionNumbers = Array.from(grouped.keys())
+    const latestVersion = versionNumbers.length ? Math.max(...versionNumbers) : null
 
     for (const [dataVersion, changeLogs] of Array.from(grouped.entries())) {
       if (!changeLogs.length) continue
@@ -169,6 +172,7 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
         publishedByEmail: publishEntry?.userEmail || latestChange?.userEmail || undefined,
         totalChanges: changeLogs.length,
         hasActiveChanges: changeLogs.some((entry) => entry.isActive),
+        isLatestVersion: latestVersion !== null ? dataVersion === latestVersion : false,
         entityCounts,
         actionCounts,
         descriptions,
@@ -216,7 +220,7 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     }
 
     if (isActiveOnly) {
-      filtered = filtered.filter((summary) => summary.changes.some((change) => change.isActive))
+      filtered = filtered.filter((summary) => summary.isLatestVersion)
     }
 
     return sortDataVersions(filtered, sort)

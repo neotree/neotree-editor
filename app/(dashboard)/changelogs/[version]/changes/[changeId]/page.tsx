@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getChangeLog } from "@/app/actions/change-logs"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { formatChangeValue, getDataVersion, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 
 type Params = {
   version: string
@@ -44,6 +45,12 @@ const actionBadgeClasses: Record<string, string> = {
   merge: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
 }
 
+const lifecycleBadgeClasses: Record<ChangeLifecycleState, string> = {
+  active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  inactive: "bg-red-500/10 text-red-700 dark:text-red-400",
+  superseded: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+}
+
 export default async function ChangeDetailsPage({ params }: { params: Params }) {
   const numericVersion = parseDataVersionParam(params.version)
   if (numericVersion === null) {
@@ -65,6 +72,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const changedOn = format(new Date(change.dateOfChange), "PPpp")
   const dataVersion = getDataVersion(change) ?? numericVersion
   const normalizedChanges = normalizeChanges(change)
+  const lifecycle = getChangeLifecycleStatus(change)
 
   return (
     <>
@@ -101,8 +109,8 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
               >
                 {change.action}
               </Badge>
-              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                {change.isActive ? "Active" : "Superseded"}
+              <Badge className={lifecycleBadgeClasses[lifecycle.state]}>
+                {lifecycle.label}
               </Badge>
             </div>
           </CardHeader>

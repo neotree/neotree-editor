@@ -167,12 +167,14 @@ export function useScriptForm(params: UseScriptFormParams) {
         await pendingChangesAPI.addChange({
           entityType: "script",
           entityId: newScriptId,
-          entityTitle: payload.title || "Untitled Script",
+          entityTitle: payload.title || payload.printTitle || "Untitled Script",
           action: "create",
           fieldPath: "script",
           fieldName: "New Script",
           oldValue: null,
-          newValue: payload.title || "Untitled Script",
+          newValue: payload.title || payload.printTitle || "Untitled Script",
+          userId: authenticatedUser?.userId,
+          userName: authenticatedUser?.displayName,
           fullSnapshot: payload,
         })
       }
