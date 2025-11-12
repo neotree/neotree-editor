@@ -8,6 +8,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import * as serverActions from '@/app/actions/config-keys';
 import { useAppContext } from "../app";
+import { recordPendingDeletionChange } from "@/lib/change-tracker";
 
 export interface IConfigKeysContext extends  
 ConfigKeysContextProviderProps,
@@ -47,6 +48,8 @@ export type FormDataType = Parameters<IConfigKeysContext['saveConfigKeys']>[0]['
     draftCreatedByUserId?: string | null;
 };
 
+const getConfigKeyTitle = (item?: FormDataType | null) => item?.label || item?.key || 'Config key';
+
 function useConfigKeysContentHook({
     configKeys: configKeysProp,
     saveConfigKeys,
@@ -54,7 +57,7 @@ function useConfigKeysContentHook({
 }: ConfigKeysContextProviderProps) {
     const router = useRouter();
 
-    const { viewOnly } = useAppContext();
+    const { viewOnly, authenticatedUser } = useAppContext();
     
     const [configKeys, setConfigKeys] = useState(configKeysProp);
     const [activeItemId, setActiveItemId] = useState<string>();
@@ -88,22 +91,26 @@ function useConfigKeysContentHook({
                 message: res.errors.join(', '),
                 variant: 'error',
             });
-        } else {
-            onFormOpenChange(false);
-            router.refresh();
-            alert({
-                title: 'Success',
-                message: 'Config keys saved successfully!',
-                variant: 'success',
-            });
+            setSaving(false);
+            return false;
         }
 
+        onFormOpenChange(false);
+        router.refresh();
+        alert({
+            title: 'Success',
+            message: 'Config keys saved successfully!',
+            variant: 'success',
+        });
+
         setSaving(false);
+        return true;
     }, [saveConfigKeys, alert, onFormOpenChange, router]);
 
     const onDelete = useCallback(async (configKeysIds: string[]) => {
         confirm(async () => {
             const _configKeys = { ...configKeys };
+            const keysToDelete = configKeys.data.filter(s => s.configKeyId && configKeysIds.includes(s.configKeyId));
 
             setConfigKeys(prev => ({ ...prev, data: prev.data.filter(s => !configKeysIds.includes(s.configKeyId)) }));
             setSelected([]);
@@ -120,6 +127,18 @@ function useConfigKeysContentHook({
                     onClose: () => setConfigKeys(_configKeys),
                 });
             } else {
+                await Promise.all(keysToDelete.map(async key => {
+                    if (!key?.configKeyId) return;
+                    await recordPendingDeletionChange({
+                        entityId: key.configKeyId,
+                        entityType: "configKey",
+                        entityTitle: getConfigKeyTitle(key),
+                        snapshot: key,
+                        userId: authenticatedUser?.userId,
+                        userName: authenticatedUser?.displayName,
+                        description: `Marked "${getConfigKeyTitle(key)}" for deletion`,
+                    });
+                }));
                 onFormOpenChange(false);
                 setSelected([]);
                 router.refresh();
@@ -137,7 +156,7 @@ function useConfigKeysContentHook({
             message: 'Are you sure you want to delete config keys?',
             positiveLabel: 'Yes, delete',
         });
-    }, [deleteConfigKeys, confirm, alert, router, configKeys]);
+    }, [deleteConfigKeys, confirm, alert, router, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, onFormOpenChange]);
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number) => {
         const sorted = arrayMoveImmutable([...configKeys.data], oldIndex, newIndex);

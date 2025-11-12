@@ -37,6 +37,16 @@ const actionBadgeClasses: Record<string, string> = {
   merge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
 }
 
+const actionLabels: Record<string, string> = {
+  create: "Created",
+  update: "Updated",
+  delete: "Deleted",
+  publish: "Published",
+  restore: "Restored",
+  rollback: "Rolled back",
+  merge: "Merged",
+}
+
 const defaultActionBadgeClass = "border-muted bg-muted text-muted-foreground"
 
 export function DataVersionChangesTable({ changes, dataVersion }: Props) {
@@ -94,9 +104,9 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
                 <div className="flex flex-col gap-2">
                   <Badge
                     variant="outline"
-                    className={cn("w-fit capitalize", actionBadgeClasses[change.action] ?? defaultActionBadgeClass)}
+                    className={cn("w-fit", actionBadgeClasses[change.action] ?? defaultActionBadgeClass)}
                   >
-                    {change.action}
+                    {actionLabels[change.action] || change.action}
                   </Badge>
                   {statusBadge}
                 </div>

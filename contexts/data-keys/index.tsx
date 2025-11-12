@@ -20,7 +20,7 @@ import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
-import { pendingChangesAPI } from "@/lib/indexed-db";
+import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { normalizeSearchTerm } from "@/lib/search";
 
@@ -344,21 +344,14 @@ export function DataKeysCtxProvider({
 
             const entityTitle = getDataKeyTitle(key);
 
-            await pendingChangesAPI.clearEntityChanges(key.uuid, "dataKey");
-
-            await pendingChangesAPI.addChange({
+            await recordPendingDeletionChange({
                 entityId: key.uuid,
                 entityType: "dataKey",
                 entityTitle,
-                action: "delete",
-                fieldPath: "dataKey",
-                fieldName: entityTitle,
-                oldValue: snapshot,
-                newValue: null,
-                description: `Marked "${entityTitle}" for deletion`,
+                snapshot,
                 userId,
                 userName,
-                fullSnapshot: snapshot,
+                description: `Marked "${entityTitle}" for deletion`,
             });
         }
     }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
