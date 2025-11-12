@@ -13,7 +13,8 @@ import {
     _getDrugsLibraryItem, 
     _getDrugsLibraryItems, 
     _countDrugsLibraryItems, 
-    _defaultDrugsLibraryItemsCount 
+    _defaultDrugsLibraryItemsCount,
+    _getDrugsLibraryMetadata,
 } from "@/databases/queries/drugs-library";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
@@ -93,6 +94,16 @@ export const getDrugsLibraryItems: typeof _getDrugsLibraryItems = async (...args
 export const getDrugsLibraryItem: typeof _getDrugsLibraryItem = async (...args) => {
     await isAllowed();
     return await _getDrugsLibraryItem(...args);
+};
+
+export const getDrugsLibraryMetadata: typeof _getDrugsLibraryMetadata = async (...args) => {
+    try {
+        await isAllowed();
+        return await _getDrugsLibraryMetadata(...args);
+    } catch(e: any) {
+        logger.error('getDrugsLibraryMetadata ERROR', e.message);
+        return { errors: [e.message], data: [], };
+    }
 };
 
 export const saveDrugsLibraryItems: typeof _saveDrugsLibraryItems = async params => {
