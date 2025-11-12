@@ -18,6 +18,7 @@ import { DrugsLibraryTableActions } from "./table-actions";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { DrugsLibrarySearch } from "./search";
+import { ExportMetadataButton } from "./export-metadata-button";
 
 type Props = {};
 
@@ -142,17 +143,19 @@ export function DrugsLibrary({}: Props) {
 
             <Separator />
 
-            <DataTable 
-                onSelect={setSelected}
-                selectable={!disabled}
-                headerActions={(
-                    <>
-                        <Add 
-                            addDrugLink={addLink('drug')}
-                            addFluidLink={addLink('fluid')}
-                        />
-                    </>
-                )}
+                <DataTable 
+                    onSelect={setSelected}
+                    selectable={!disabled}
+                    headerActions={(
+                        <div className="flex flex-wrap items-center gap-2">
+                            <ExportMetadataButton />
+
+                            <Add 
+                                addDrugLink={addLink('drug')}
+                                addFluidLink={addLink('fluid')}
+                            />
+                        </div>
+                    )}
                 rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex }) => {
                     const item = drugs[rowIndex];
                     const result = item ? searchResultsById.get(item.itemId!) : undefined;
