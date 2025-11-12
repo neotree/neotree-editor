@@ -193,7 +193,9 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
           fieldPath: "screen",
           fieldName: "New Screen",
           oldValue: null,
-          newValue: payloadData.title || "Untitled Screen",
+          newValue: payloadData.title || payloadData.sectionTitle || payloadData.label || "Untitled Screen",
+          userId: authenticatedUser?.userId,
+          userName: authenticatedUser?.displayName,
           fullSnapshot: payloadData,
         })
       }

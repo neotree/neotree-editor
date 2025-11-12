@@ -11,6 +11,7 @@ import { useScriptsContext, type IScriptsContext } from "@/contexts/scripts"
 import { useAppContext } from "@/contexts/app"
 import type { ScriptsSearchResultsItem, ScriptsSearchResultsFilter } from "@/lib/scripts-search"
 import { pendingChangesAPI } from "@/lib/indexed-db"
+import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseScriptsTableParams = {
   scripts: Awaited<ReturnType<IScriptsContext["getScripts"]>>
@@ -38,7 +39,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
   }, [scriptsParam])
 
   const router = useRouter()
-  const { viewOnly } = useAppContext()
+  const { viewOnly, authenticatedUser } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -49,6 +50,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
       confirm(
         async () => {
           const _scripts = { ...scripts }
+          const scriptsToDelete = scripts.data.filter((s) => s.scriptId && scriptsIds.includes(s.scriptId))
 
           setScripts((prev) => ({ ...prev, data: prev.data.filter((s) => !scriptsIds.includes(s.scriptId)) }))
           setSelected([])
@@ -71,6 +73,20 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
               onClose: () => setScripts(_scripts),
             })
           } else {
+            await Promise.all(
+              scriptsToDelete.map(async (script) => {
+                if (!script?.scriptId) return
+                await recordPendingDeletionChange({
+                  entityId: script.scriptId,
+                  entityType: "script",
+                  entityTitle: script.title || script.printTitle || "Untitled Script",
+                  snapshot: script,
+                  userId: authenticatedUser?.userId,
+                  userName: authenticatedUser?.displayName,
+                  description: `Marked "${script.title || script.printTitle || "Untitled Script"}" for deletion`,
+                })
+              }),
+            )
             setSelected([])
             router.refresh()
             alert({
@@ -90,7 +106,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
         },
       )
     },
-    [deleteScripts, confirm, alert, router, scripts],
+    [deleteScripts, confirm, alert, router, scripts, authenticatedUser?.userId, authenticatedUser?.displayName],
   )
 
   const onSort = useCallback(
@@ -121,6 +137,8 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
             oldValue: script.position,
             newValue: change.position,
             description: `Position changed from ${script.position} to ${change.position}`,
+            userId: authenticatedUser?.userId,
+            userName: authenticatedUser?.displayName,
           })
         }
       }
@@ -130,7 +148,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
 
       router.refresh()
     },
-    [saveScripts, scripts, router],
+    [saveScripts, scripts, router, authenticatedUser?.userId, authenticatedUser?.displayName],
   )
 
   const onDuplicate = useCallback(

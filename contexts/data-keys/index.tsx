@@ -20,6 +20,8 @@ import * as actions from '@/app/actions/data-keys';
 import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
+import { recordPendingDeletionChange } from "@/lib/change-tracker";
+import { useAppContext } from "@/contexts/app";
 import { normalizeSearchTerm } from "@/lib/search";
 
 
@@ -45,6 +47,28 @@ function paginateData<T>(
 }
 
 export type DataKey = Awaited<ReturnType<typeof _getDataKeys>>['data'][0];
+
+const getDataKeyTitle = (dataKey?: Partial<DataKey>) => {
+    return dataKey?.name || dataKey?.label || dataKey?.uniqueKey || 'Data key';
+};
+
+const buildTrackableSnapshot = (dataKey?: Partial<DataKey>) => {
+    if (!dataKey) return null;
+
+    return {
+        uuid: dataKey.uuid || '',
+        uniqueKey: dataKey.uniqueKey || '',
+        name: dataKey.name || '',
+        refId: dataKey.refId || '',
+        dataType: dataKey.dataType || '',
+        label: dataKey.label || '',
+        options: Array.isArray(dataKey.options) ? dataKey.options : [],
+        metadata: dataKey.metadata || {},
+        version: typeof dataKey.version === 'number'
+            ? dataKey.version
+            : Number(dataKey.version || 0) || 0,
+    };
+};
 
 export type DataKeyFormData = {
     name: DataKey['name'];
@@ -125,6 +149,7 @@ export function DataKeysCtxProvider({
     const mounted = useRef(false);
     const router = useRouter();
     const { alert } = useAlertModal();
+    const { authenticatedUser } = useAppContext();
 
     const [currentDataKeyUuid, setCurrentDataKeyUuid] = useQueryState('uuid', {
         clearOnDefault: true,
@@ -305,7 +330,35 @@ export function DataKeysCtxProvider({
     ******************************************************/
     const [deleting, setDeleting] = useState(false);
 
+    const recordDeletionPendingChanges = useCallback(async (keysToDelete: DataKey[]) => {
+        if (!keysToDelete.length) return;
+
+        const userId = authenticatedUser?.userId;
+        const userName = authenticatedUser?.displayName;
+
+        for (const key of keysToDelete) {
+            if (!key?.uuid) continue;
+
+            const snapshot = buildTrackableSnapshot(key);
+            if (!snapshot) continue;
+
+            const entityTitle = getDataKeyTitle(key);
+
+            await recordPendingDeletionChange({
+                entityId: key.uuid,
+                entityType: "dataKey",
+                entityTitle,
+                snapshot,
+                userId,
+                userName,
+                description: `Marked "${entityTitle}" for deletion`,
+            });
+        }
+    }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
+
     const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data) => {
+        const keysToDelete = allDataKeys.filter(key => key?.uuid && data.includes(key.uuid));
+
         try {
             setDeleting(true);
 
@@ -317,6 +370,8 @@ export function DataKeysCtxProvider({
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
+
+            await recordDeletionPendingChanges(keysToDelete);
 
             setSelected([]);
 
@@ -338,7 +393,7 @@ export function DataKeysCtxProvider({
         } finally {
             setDeleting(false);
         }
-    }, [router.refresh, alert, loadDataKeys]);
+    }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
 
     /*****************************************************
      ************ EXPORT 
