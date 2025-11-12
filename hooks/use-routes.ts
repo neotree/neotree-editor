@@ -54,7 +54,7 @@ export function useRoutes() {
       href: "/changelogs",
       isActive: pathname.substring(0, 11) === "/changelogs",
       id: v4(),
-      hidden: !isSuperUser,
+      hidden: false,
     },
     {
       label: "Settings",
