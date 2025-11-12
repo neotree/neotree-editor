@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { getDataVersion, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import { getChangeLifecycleStatus } from "@/lib/changelog-status"
 
 type Props = {
   changes: ChangeLogType[]
@@ -49,6 +50,12 @@ const actionLabels: Record<string, string> = {
 
 const defaultActionBadgeClass = "border-muted bg-muted text-muted-foreground"
 
+const lifecycleBadgeClasses: Record<string, string> = {
+  active: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  inactive: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400",
+  superseded: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+}
+
 export function DataVersionChangesTable({ changes, dataVersion }: Props) {
   const router = useRouter()
 
@@ -81,12 +88,20 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
           const entityLabel = entityTypeLabels[change.entityType as keyof typeof entityTypeLabels] || change.entityType
           const publishedAt = format(new Date(change.dateOfChange), "PPpp")
           const entityTitle = resolveEntityTitle(change)
+          const lifecycle = getChangeLifecycleStatus(change)
           const statusBadge = (
             <Badge
               variant="outline"
-              className={cn("w-fit bg-muted text-muted-foreground", !change.isActive && "opacity-80")}
+              className={cn("w-fit", lifecycleBadgeClasses[lifecycle.state])}
+              title={
+                lifecycle.state === "inactive"
+                  ? "This entity was deleted in a later version"
+                  : lifecycle.state === "superseded"
+                    ? "This change was replaced by a newer version"
+                    : "This change is currently active"
+              }
             >
-              {change.isActive ? "Active" : "Superseded"}
+              {lifecycle.label}
             </Badge>
           )
 
