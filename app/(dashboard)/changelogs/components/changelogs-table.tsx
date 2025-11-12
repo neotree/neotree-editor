@@ -261,7 +261,7 @@ export function ChangelogsTable(props: Props) {
                       <TableCell>
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
-                          {entry.hasActiveChanges ? (
+                          {entry.isLatestVersion ? (
                             <Badge
                               variant="outline"
                               className="w-fit border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
