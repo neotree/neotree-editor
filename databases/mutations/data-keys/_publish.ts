@@ -156,8 +156,7 @@ export async function _publishDataKeys(opts?: {
 
       for (const { id, data } of inserts) {
         const dataKeyUuid = data.uuid || v4()
-        const payload = { ...data, uuid: dataKeyUuid }
-
+        const { id: _id, ...payload } = { ...data, uuid: dataKeyUuid }
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.uuid = dataKeyUuid
           return d
