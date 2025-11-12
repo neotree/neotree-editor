@@ -46,16 +46,19 @@ export async function _publishDataKeys(opts?: {
           ),
         )
 
-      const historyPayload = deleted.map((c) => ({
-        version: c.dataKey!.version,
-        dataKeyId: c.dataKeyId!,
-        changes: {
-          action: "delete_data_key",
-          description: "Delete data key",
-          oldValues: [{ deletedAt: null }],
-          newValues: [{ deletedAt }],
-        },
-      }))
+      const historyPayload = deleted.map((c) => {
+        const nextVersion = (c.dataKey?.version ?? 0) + 1
+        return {
+          version: nextVersion,
+          dataKeyId: c.dataKeyId!,
+          changes: {
+            action: "delete_data_key",
+            description: "Delete data key",
+            oldValues: [{ deletedAt: null }],
+            newValues: [{ deletedAt }],
+          },
+        }
+      })
 
       await db.insert(dataKeysHistory).values(historyPayload)
 
@@ -70,11 +73,12 @@ export async function _publishDataKeys(opts?: {
             deletedAt,
           }
 
+          const nextVersion = history.version || ((entry.dataKey?.version ?? 0) + 1)
           changeLogs.push({
             entityId: entry.dataKeyId,
             entityType: "data_key",
             action: "delete",
-            version: history.version || 1,
+            version: nextVersion,
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: JSON.parse(JSON.stringify(snapshot)),

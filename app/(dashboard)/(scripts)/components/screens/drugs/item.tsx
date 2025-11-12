@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import type { GetDrugsLibraryItemsResults } from "@/databases/queries/drugs-library"
 import { SelectDrug } from "../../../../components/drugs-library/select"
 import { pendingChangesAPI } from "@/lib/indexed-db"
+import { useAppContext } from "@/contexts/app"
 
 type Props = {
   children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode)
@@ -43,6 +44,7 @@ export function Item<P = {}>({
 }: Props & P) {
   const scriptId = form.getValues("scriptId")
   const screenId = form.getValues("screenId")
+  const { authenticatedUser } = useAppContext()
 
   const [selected, setSelected] = useState<null | DrugField>(null)
   const [open, setOpen] = useState(false)
@@ -69,6 +71,8 @@ export function Item<P = {}>({
         fieldName: `${formKey}: ${selected.key}`,
         oldValue: itemProp?.data || null,
         newValue: selected,
+        userId: authenticatedUser?.userId,
+        userName: authenticatedUser?.displayName,
       })
 
 
