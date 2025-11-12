@@ -203,8 +203,6 @@ export function DataKeysCtxProvider({
                 const searchableFields = [
                     dataKey.name || '',
                     dataKey.label || '',
-                    dataKey.refId || '',
-                    dataKey.dataType || '',
                 ].map(field => field.toLowerCase());
                 
                 return searchableFields.some(field => field.includes(searchLower));
