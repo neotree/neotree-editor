@@ -8,6 +8,7 @@ import {
     type ParseScriptsSearchResultsParams,
     type ScriptsSearchResultsItem,
 } from "@/lib/scripts-search";
+import { normalizeSearchTerm } from "@/lib/search";
 
 export type SearchScriptsParams = {
     searchValue: string;
@@ -24,13 +25,16 @@ export async function _searchScripts({
     returnDraftsIfExist = true,
 }: SearchScriptsParams): Promise<SearchScriptsResponse> {
     try {
-        searchValue = `${searchValue || ''}`.trim().toLowerCase();
+        const rawSearchValue = `${searchValue || ''}`;
+        const { normalizedValue: normalizedSearchValue } = normalizeSearchTerm(rawSearchValue);
 
-        if (!searchValue) return { data: [], };
+        if (!normalizedSearchValue) return { data: [], };
+
+        const searchTerm = normalizedSearchValue;
 
         // SCRIPTS
         const scriptsDrafts = !returnDraftsIfExist ? [] : await db.query.scriptsDrafts.findMany({
-            where: sql`lower(${schema.scriptsDrafts.data}::text) like ${`%${searchValue}%`}`,
+            where: sql`lower(${schema.scriptsDrafts.data}::text) like ${`%${searchTerm}%`}`,
         });
 
         const scripts = await db.select({
@@ -44,14 +48,14 @@ export async function _searchScripts({
             isNull(schema.scripts.deletedAt),
             !scriptsDrafts.length ? undefined : notInArray(schema.scripts.scriptId, scriptsDrafts.map(d => d.scriptDraftId)),
             or(
-                sql`lower(${schema.scripts.title}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.scripts.printTitle}::text) like ${`%${searchValue}%`}`,
+                sql`lower(${schema.scripts.title}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.printTitle}::text) like ${`%${searchTerm}%`}`,
             ),
         ));
 
         // SCREENS
         const screensDrafts = !returnDraftsIfExist ? [] : await db.query.screensDrafts.findMany({
-            where: sql`lower(${schema.screensDrafts.data}::text) like ${`%${searchValue}%`}`,
+            where: sql`lower(${schema.screensDrafts.data}::text) like ${`%${searchTerm}%`}`,
         });
 
         const screens = await db.select({
@@ -65,25 +69,25 @@ export async function _searchScripts({
             isNull(schema.screens.deletedAt),
             !screensDrafts.length ? undefined : notInArray(schema.screens.screenId, screensDrafts.map(d => d.screenDraftId)),
             or(
-                sql`lower(${schema.screens.condition}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.sectionTitle}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.previewTitle}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.previewPrintTitle}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.title}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.key}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.refId}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.label}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.fields}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.items}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.drugs}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.fluids}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.screens.feeds}::text) like ${`%${searchValue}%`}`,
+                sql`lower(${schema.screens.condition}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.sectionTitle}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.previewTitle}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.previewPrintTitle}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.key}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.refId}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.label}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.fields}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.items}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.drugs}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.fluids}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.feeds}::text) like ${`%${searchTerm}%`}`,
             ),
         ));
 
         // DIAGNOSES
         const diagnosesDrafts = !returnDraftsIfExist ? [] : await db.query.diagnosesDrafts.findMany({
-            where: sql`lower(${schema.diagnosesDrafts.data}::text) like ${`%${searchValue}%`}`,
+            where: sql`lower(${schema.diagnosesDrafts.data}::text) like ${`%${searchTerm}%`}`,
         });
 
         const diagnoses = await db.select({
@@ -97,10 +101,10 @@ export async function _searchScripts({
             isNull(schema.diagnoses.deletedAt),
             !diagnosesDrafts.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesDrafts.map(d => d.diagnosisDraftId)),
             or(
-                sql`lower(${schema.diagnoses.name}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.diagnoses.expression}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.diagnoses.symptoms}::text) like ${`%${searchValue}%`}`,
-                sql`lower(${schema.diagnoses.key}::text) like ${`%${searchValue}%`}`,
+                sql`lower(${schema.diagnoses.name}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.expression}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.symptoms}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.key}::text) like ${`%${searchTerm}%`}`,
             ),
         ));
 
@@ -143,7 +147,7 @@ export async function _searchScripts({
         ].sort((a, b) => a.position - b.position);
 
         const data = parseScriptsSearchResults({
-            searchValue,
+            searchValue: rawSearchValue,
             screens: screensArr as ParseScriptsSearchResultsParams['screens'],
             diagnoses: diagnosesArr as ParseScriptsSearchResultsParams['diagnoses'],
             scripts: scriptsArr as ParseScriptsSearchResultsParams['scripts'],
