@@ -161,8 +161,9 @@ async function reconcileActiveFlags(changes: ChangeLogType[]) {
     if (!entityIdsByType.size) return;
 
     const latestVersionMap = new Map<string, number>();
+    const entityEntries = Array.from(entityIdsByType.entries());
 
-    for (const [entityType, idsSet] of entityIdsByType.entries()) {
+    for (const [entityType, idsSet] of entityEntries) {
         const ids = Array.from(idsSet);
         if (!ids.length) continue;
 
