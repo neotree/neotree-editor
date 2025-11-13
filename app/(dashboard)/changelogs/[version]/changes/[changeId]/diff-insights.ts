@@ -41,6 +41,10 @@ export const CHANGE_GROUP_METADATA = {
     label: "Field Changes",
     description: "Fields, inputs, and their options.",
   },
+  drugs: {
+    label: "Drug, Fluids & Feeds",
+    description: "Drug library items, fluid protocols, and feeding options.",
+  },
   screens: {
     label: "Screen Changes",
     description: "Screen level configuration or layout updates.",
@@ -48,6 +52,10 @@ export const CHANGE_GROUP_METADATA = {
   diagnoses: {
     label: "Diagnosis Changes",
     description: "Diagnosis metadata and options.",
+  },
+  dataKeys: {
+    label: "Data Key Changes",
+    description: "Data keys, aliases, and supporting metadata.",
   },
   scripts: {
     label: "Script Changes",
@@ -224,6 +232,17 @@ function buildFieldStatements(insight: FieldChangeInsight): string[] {
 function resolveGroupKey(field: string, entityType?: string): ChangeGroupKey {
   const normalizedField = field.toLowerCase()
   if (normalizedField.startsWith("field") || normalizedField.includes("fields.")) return "fields"
+  if (
+    normalizedField.includes("drug") ||
+    normalizedField.includes("drugs") ||
+    normalizedField.includes("fluid") ||
+    normalizedField.includes("feed")
+  ) {
+    return "drugs"
+  }
+  if (normalizedField.includes("data_key") || normalizedField.includes("datakey") || normalizedField.includes("data key")) {
+    return "dataKeys"
+  }
   if (normalizedField.startsWith("screen") || normalizedField.includes("screens.")) return "screens"
   if (normalizedField.startsWith("diagnosis") || normalizedField.includes("diagnoses.")) return "diagnoses"
   if (normalizedField.startsWith("script") || normalizedField.includes("scripts.")) return "scripts"
@@ -231,6 +250,8 @@ function resolveGroupKey(field: string, entityType?: string): ChangeGroupKey {
 
   if (entityType) {
     const normalizedType = entityType.toLowerCase()
+    if (normalizedType.includes("drug") || normalizedType.includes("drugs")) return "drugs"
+    if (normalizedType.includes("data_key") || normalizedType.includes("datakey")) return "dataKeys"
     if (normalizedType.includes("screen")) return "screens"
     if (normalizedType.includes("diagnosis")) return "diagnoses"
     if (normalizedType.includes("script")) return "scripts"
@@ -278,9 +299,10 @@ function walkDelta(
     const previousArray = Array.isArray(previous) ? previous : []
     const nextArray = Array.isArray(next) ? next : []
 
-    for (const key of Object.keys(arrayDelta)) {
+    const arrayDeltaRecord = arrayDelta as unknown as Record<string, Delta>
+    for (const key of Object.keys(arrayDeltaRecord)) {
       if (key === "_t") continue
-      const childDelta = arrayDelta[key]
+      const childDelta = arrayDeltaRecord[key]
       if (key.startsWith("_")) {
         const index = Number(key.slice(1))
         if (Number.isNaN(index)) continue
