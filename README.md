@@ -33,9 +33,17 @@ App designed for managing neonatal patients in low resource settings, providing 
 ## Deploy
 - Add the `deploy.sh` file into the root folder and run `chmod u+x ./deploy.sh`. 
 - Make sure the ssh commands are pointing to the correct ssh key files.
-- Then, to deploy, run:
+- Then, to deploy:
 
-`./deploy.sh`
+```
+git checkout prod
+git merge master
+yarn build
+git add .
+git commit -m "prod build"
+git push origin prod
+./deploy.sh
+```
 
 ## Disclaimer
 
