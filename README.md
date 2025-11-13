@@ -31,8 +31,9 @@ App designed for managing neonatal patients in low resource settings, providing 
 - `npm run stage-server` - run production (stage) server
 
 ## Deploy
-Add the `deploy.sh` file into the root folder and run `chmod u+x ./deploy.sh`. Then, to deploy:
-`./deploy.sh`
+Add the `deploy.sh` file into the root folder and run `chmod u+x ./deploy.sh`. Then, to deploy, run:
+
+```./deploy.sh```
 
 ## Disclaimer
 
