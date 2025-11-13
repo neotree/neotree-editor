@@ -16,6 +16,7 @@ import {
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
 import { pendingChangesAPI } from "@/lib/indexed-db"
+import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseDiagnosesTableParams = {
   disabled?: boolean
@@ -53,7 +54,7 @@ export function useDiagnosesTable({
   }, [diagnosesParam])
 
   const router = useRouter()
-  const { viewOnly } = useAppContext()
+  const { viewOnly, authenticatedUser } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -64,6 +65,7 @@ export function useDiagnosesTable({
       confirm(
         async () => {
           const _diagnoses = { ...diagnoses }
+          const diagnosesToDelete = diagnoses.data.filter((s) => s.diagnosisId && diagnosesIds.includes(s.diagnosisId))
 
           setDiagnoses((prev) => ({ ...prev, data: prev.data.filter((s) => !diagnosesIds.includes(s.diagnosisId)) }))
           setSelected([])
@@ -86,6 +88,20 @@ export function useDiagnosesTable({
               onClose: () => setDiagnoses(_diagnoses),
             })
           } else {
+            await Promise.all(
+              diagnosesToDelete.map(async (diagnosis) => {
+                if (!diagnosis?.diagnosisId) return
+                await recordPendingDeletionChange({
+                  entityId: diagnosis.diagnosisId,
+                  entityType: "diagnosis",
+                  entityTitle: diagnosis.name || diagnosis.key || "Untitled Diagnosis",
+                  snapshot: diagnosis,
+                  userId: authenticatedUser?.userId,
+                  userName: authenticatedUser?.displayName,
+                  description: `Marked "${diagnosis.name || diagnosis.key || "Untitled Diagnosis"}" for deletion`,
+                })
+              }),
+            )
             setSelected([])
             router.refresh()
             alert({
@@ -105,7 +121,7 @@ export function useDiagnosesTable({
         },
       )
     },
-    [deleteDiagnoses, confirm, alert, router, diagnoses],
+    [deleteDiagnoses, confirm, alert, router, diagnoses, authenticatedUser?.userId, authenticatedUser?.displayName],
   )
 
   const onSort = useCallback(
@@ -135,6 +151,8 @@ export function useDiagnosesTable({
             fieldName: "position",
             oldValue: originalDiagnosis.position,
             newValue: change.position,
+            userId: authenticatedUser?.userId,
+            userName: authenticatedUser?.displayName,
           })
         }
       }
@@ -148,7 +166,7 @@ export function useDiagnosesTable({
 
       router.refresh()
     },
-    [saveDiagnoses, loadDiagnoses, diagnoses, router],
+    [saveDiagnoses, loadDiagnoses, diagnoses, router, authenticatedUser?.userId, authenticatedUser?.displayName],
   )
 
   const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly])

@@ -14,6 +14,8 @@ import {
     type DrugsLibrarySearchResultsFilter,
     type DrugsLibrarySearchResultsItem,
 } from "@/lib/drugs-library-search";
+import { useAppContext } from "@/contexts/app";
+import { recordPendingDeletionChange } from "@/lib/change-tracker";
 
 type Drug = Parameters<typeof saveDrugsLibraryItems>[0]['data'][0] & {
     isDraft?: boolean;
@@ -61,6 +63,7 @@ export function resetDrugsLibraryState() {
 export function useDrugsLibrary() {
     const state = useDrugsLibraryState();
     const { drugs: allDrugs, typeFilter, statusFilter, sortBy } = state;
+    const { authenticatedUser } = useAppContext();
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -223,6 +226,8 @@ export function useDrugsLibrary() {
     });
 
     const deleteDrugs = useCallback(async (ids: string[]) => {
+        const itemsToDelete = allDrugs.filter(item => item.itemId && ids.includes(item.itemId));
+
         try {
             useDrugsLibraryState.setState(prev => ({ 
                 loading: true,
@@ -234,6 +239,22 @@ export function useDrugsLibrary() {
             );
 
             if (res.data.errors?.length) throw new Error(res.data.errors?.join(', '));
+
+            await Promise.all(itemsToDelete.map(async (item) => {
+                if (!item?.itemId) return;
+                const { isDraft, draftCreatedByUserId, ...snapshot } = item;
+                const entityTitle = item.drug || item.key || "Drugs Library Item";
+
+                await recordPendingDeletionChange({
+                    entityId: item.itemId,
+                    entityType: "drugsLibraryItem",
+                    entityTitle,
+                    snapshot,
+                    userId: authenticatedUser?.userId,
+                    userName: authenticatedUser?.displayName,
+                    description: `Marked "${entityTitle}" for deletion`,
+                });
+            }));
 
             router.refresh();
 
@@ -251,7 +272,7 @@ export function useDrugsLibrary() {
         } finally {
             useDrugsLibraryState.setState({ loading: false, });
         }
-    }, [alert, router.refresh]);
+    }, [alert, router.refresh, allDrugs, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const saveDrugs = useCallback(async (item?: Drug) => {
         try {

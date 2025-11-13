@@ -261,8 +261,20 @@ export function ChangelogsTable(props: Props) {
                       <TableCell>
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
-                          {!entry.hasActiveChanges && (
-                            <Badge variant="outline" className="w-fit border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          {entry.isLatestVersion ? (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              title="This release is the latest published version."
+                            >
+                              Active version
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                              title="A newer release has replaced this version."
+                            >
                               Superseded
                             </Badge>
                           )}

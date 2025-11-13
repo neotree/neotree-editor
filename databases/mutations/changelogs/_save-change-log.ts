@@ -1,3 +1,4 @@
+import { and, eq, lt } from "drizzle-orm"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
@@ -72,6 +73,24 @@ export async function _saveChangeLog({
     }
 
     const [inserted] = await db.insert(changeLogs).values(changeLogData).returning()
+
+    if (inserted && inserted.entityId && Number.isFinite(inserted.version)) {
+      await db
+        .update(changeLogs)
+        .set({
+          isActive: false,
+          supersededBy: inserted.version,
+          supersededAt: inserted.dateOfChange ?? new Date(),
+        })
+        .where(
+          and(
+            eq(changeLogs.entityId, inserted.entityId),
+            eq(changeLogs.entityType, inserted.entityType),
+            lt(changeLogs.version, inserted.version),
+            eq(changeLogs.isActive, true),
+          ),
+        )
+    }
 
     response.success = true
     response.data = inserted
