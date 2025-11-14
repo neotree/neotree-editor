@@ -124,7 +124,7 @@ export async function scrapDataKeys({
                                 return {
                                     label: s.label as string,
                                     name,
-                                    dataType: `${dataType}_option`,
+                                    dataType: 'option',
                                 };
                             }),
                         };
@@ -133,7 +133,7 @@ export async function scrapDataKeys({
                     ...(s.items || []).map(f => {
                         const name = f.key || f.id;
 
-                        let _dataType = `${dataType}_option`;
+                        let _dataType = 'option';
 
                         if (s.type === 'diagnosis') _dataType = 'diagnosis';
 
@@ -347,7 +347,7 @@ export async function parseImportedDataKeys({
                             const k = {
                                 label: item.label as string,
                                 name: item.value as string,
-                                dataType: `${dataType}_option`,
+                                dataType: 'option',
                             };
                             const keyId = pickDataKey(parsed, k)?.uniqueKey;
                             return {
@@ -359,7 +359,7 @@ export async function parseImportedDataKeys({
                 }),
                 items: (s.items || []).map(f => {
                     const name = f.key || f.id;
-                    let dataType = `${s.type}_option`;
+                    let dataType = 'option';
                     if (s.type === 'diagnosis') dataType = 'diagnosis';
                     const k = {
                         label: f.label,
