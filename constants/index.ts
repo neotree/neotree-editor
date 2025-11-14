@@ -100,29 +100,14 @@ export const dataKeyTypes: {
         hasChildren: true,
     },
     {
-        value: 'checklist_option',
-        label: 'checklist_option',
-        hasChildren: false,
-    },
-    {
         value: 'multi_select',
         label: 'multi_select',
         hasChildren: true,
     },
     {
-        value: 'multi_select_option',
-        label: 'multi_select_option',
-        hasChildren: false,
-    },
-    {
         value: 'single_select',
         label: 'single_select',
         hasChildren: true,
-    },
-    {
-        value: 'single_select_option',
-        label: 'single_select_option',
-        hasChildren: false,
     },
     {
         value: 'yesno',
@@ -150,19 +135,9 @@ export const dataKeyTypes: {
         hasChildren: true,
     },
     {
-        value: 'zw_edliz_summary_table_option',
-        label: 'zw_edliz_summary_table_option',
-        hasChildren: false,
-    },
-    {
         value: 'mwi_edliz_summary_table',
         label: 'mwi_edliz_summary_table',
         hasChildren: true,
-    },
-    {
-        value: 'mwi_edliz_summary_table_option',
-        label: 'mwi_edliz_summary_table_option',
-        hasChildren: false,
     },
     {
         value: 'diagnosis',
@@ -195,11 +170,6 @@ export const dataKeyTypes: {
         hasChildren: true,
     },
     {
-        value: 'dropdown_option',
-        label: 'dropdown_option',
-        hasChildren: false,
-    },
-    {
         value: 'number',
         label: 'number',
         hasChildren: false,
@@ -217,6 +187,11 @@ export const dataKeyTypes: {
     {
         value: 'period',
         label: 'period',
+        hasChildren: false,
+    },
+    {
+        value: 'option',
+        label: 'option',
         hasChildren: false,
     },
 ]
