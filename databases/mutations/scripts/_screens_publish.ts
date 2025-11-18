@@ -8,6 +8,8 @@ import { _saveScreensHistory } from "./_screens_history"
 import { v4 } from "uuid"
 import { _generateScreenAliases } from "../aliases/_aliases_save"
 import { removeHexCharacters } from "@/databases/utils"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishScreens(opts?: {
   scriptsIds?: string[]
@@ -154,13 +156,14 @@ export async function _publishScreens(opts?: {
           ),
         )
 
+      const screenDeletionMeta = CHANGELOG_DELETE_ACTIONS.screen
       const historyPayload = deleted.map((c) => ({
         version: c.screen!.version,
         screenId: c.screenId!,
         scriptId: c.screen!.scriptId,
         changes: {
-          action: "delete_screen",
-          description: "Delete screen",
+          action: screenDeletionMeta.historyAction,
+          description: screenDeletionMeta.description,
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -192,6 +195,7 @@ export async function _publishScreens(opts?: {
             scriptId: entry.screen?.scriptId || null,
             screenId: entry.screenId,
             isActive: false,
+            parentVersion: inferParentVersion(history.version),
           })
         }
       }

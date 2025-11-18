@@ -6,6 +6,8 @@ import db from "@/databases/pg/drizzle"
 import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveConfigKeysHistory } from "./_config-keys-history"
 import { v4 } from "uuid"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishConfigKeys(opts?: {
   broadcastAction?: boolean
@@ -129,12 +131,13 @@ export async function _publishConfigKeys(opts?: {
           ),
         )
 
+      const configKeyDeletionMeta = CHANGELOG_DELETE_ACTIONS.config_key
       const historyPayload = deleted.map((c) => ({
         version: c.configKey!.version,
         configKeyId: c.configKeyId!,
         changes: {
-          action: "delete_config_key",
-          description: "Delete config key",
+          action: configKeyDeletionMeta.historyAction,
+          description: configKeyDeletionMeta.description,
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -165,6 +168,7 @@ export async function _publishConfigKeys(opts?: {
             userId: opts.publisherUserId,
             configKeyId: entry.configKeyId,
             isActive: false,
+            parentVersion: inferParentVersion(history.version),
           })
         }
       }

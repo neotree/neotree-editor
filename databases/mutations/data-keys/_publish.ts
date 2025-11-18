@@ -6,6 +6,8 @@ import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, dataKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveDataKeysHistory } from "./_history"
 import { v4 } from "uuid"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishDataKeys(opts?: {
   broadcastAction?: boolean
@@ -46,14 +48,15 @@ export async function _publishDataKeys(opts?: {
           ),
         )
 
+      const dataKeyDeletionMeta = CHANGELOG_DELETE_ACTIONS.data_key
       const historyPayload = deleted.map((c) => {
         const nextVersion = (c.dataKey?.version ?? 0) + 1
         return {
           version: nextVersion,
           dataKeyId: c.dataKeyId!,
           changes: {
-            action: "delete_data_key",
-            description: "Delete data key",
+            action: dataKeyDeletionMeta.historyAction,
+            description: dataKeyDeletionMeta.description,
             oldValues: [{ deletedAt: null }],
             newValues: [{ deletedAt }],
           },
@@ -86,6 +89,7 @@ export async function _publishDataKeys(opts?: {
             userId: opts.publisherUserId,
             dataKeyId: entry.dataKeyId,
             isActive: false,
+            parentVersion: inferParentVersion(nextVersion),
           })
         }
       }

@@ -7,6 +7,8 @@ import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion 
 import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history"
 import { v4 } from "uuid"
 import { removeHexCharacters } from "@/databases/utils"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishDrugsLibraryItems(opts?: {
   broadcastAction?: boolean
@@ -48,12 +50,13 @@ export async function _publishDrugsLibraryItems(opts?: {
           ),
         )
 
+      const drugsDeletionMeta = CHANGELOG_DELETE_ACTIONS.drugs_library
       const historyPayload = deleted.map((c) => ({
         version: c.drugsLibraryItem!.version,
         itemId: c.drugsLibraryItemId!,
         changes: {
-          action: "delete_drugs_library_item",
-          description: "Delete drugs library item",
+          action: drugsDeletionMeta.historyAction,
+          description: drugsDeletionMeta.description,
           oldValues: [{ deletedAt: null, key: c.drugsLibraryItem!.key }],
           newValues: [{ deletedAt, key: `${c.drugsLibraryItem!.key}_${c.drugsLibraryItemId}` }],
         },
@@ -85,6 +88,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             userId: opts.publisherUserId,
             drugsLibraryItemId: entry.drugsLibraryItemId,
             isActive: false,
+            parentVersion: inferParentVersion(history.version),
           })
         }
       }

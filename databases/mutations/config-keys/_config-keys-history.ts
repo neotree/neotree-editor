@@ -2,6 +2,7 @@ import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-c
 import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _saveConfigKeysHistory({
   previous,
@@ -29,6 +30,8 @@ export async function _saveConfigKeysHistory({
 
       const isCreate = (c?.data?.version || 1) === 1
 
+      const previousEntry = previous.find((prevC) => prevC.configKeyId === configKeyId)
+
       if (isCreate) {
         changeHistoryData.changes = {
           action: "create_config_key",
@@ -37,8 +40,6 @@ export async function _saveConfigKeysHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -47,7 +48,7 @@ export async function _saveConfigKeysHistory({
           .forEach((_key) => {
             const key = _key as keyof typeof c.data
             const newValue = c.data[key]
-            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            const oldValue = ({ ...previousEntry })[key as keyof typeof previousEntry]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
               oldValues.push({ [key]: oldValue })
               newValues.push({ [key]: newValue })
@@ -77,6 +78,7 @@ export async function _saveConfigKeysHistory({
           fullSnapshot: sanitizedSnapshot,
           userId,
           configKeyId,
+          parentVersion: inferParentVersion(changeHistoryData.version, previousEntry?.version),
         })
       }
     }

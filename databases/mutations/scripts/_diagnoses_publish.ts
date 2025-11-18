@@ -7,6 +7,8 @@ import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@
 import { _saveDiagnosesHistory } from "./_diagnoses_history"
 import { v4 } from "uuid"
 import { removeHexCharacters } from "@/databases/utils"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishDiagnoses(opts?: {
   scriptsIds?: string[]
@@ -152,13 +154,14 @@ export async function _publishDiagnoses(opts?: {
           ),
         )
 
+      const diagnosisDeletionMeta = CHANGELOG_DELETE_ACTIONS.diagnosis
       const historyPayload = deleted.map((c) => ({
         version: c.diagnosis!.version,
         diagnosisId: c.diagnosisId!,
         scriptId: c.diagnosis!.scriptId,
         changes: {
-          action: "delete_diagnosis",
-          description: "Delete diagnosis",
+          action: diagnosisDeletionMeta.historyAction,
+          description: diagnosisDeletionMeta.description,
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -190,6 +193,7 @@ export async function _publishDiagnoses(opts?: {
             scriptId: entry.diagnosis?.scriptId || null,
             diagnosisId: entry.diagnosisId,
             isActive: false,
+            parentVersion: inferParentVersion(history.version),
           })
         }
       }

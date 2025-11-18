@@ -3,6 +3,7 @@ import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _saveDiagnosesHistory({
   previous,
@@ -41,15 +42,16 @@ export async function _saveDiagnosesHistory({
         changes: changePayload,
       }
 
+      const previousEntry = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
+
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
 
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
             const key = _key as keyof typeof c.data
             const newValue = removeHexCharacters(c.data[key])
-            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            const oldValue = ({ ...previousEntry })[key as keyof typeof previousEntry]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
               changePayload.oldValues.push({ [key]: oldValue })
               changePayload.newValues.push({ [key]: newValue })
@@ -73,6 +75,7 @@ export async function _saveDiagnosesHistory({
           userId,
           scriptId: c?.data?.scriptId || null,
           diagnosisId,
+          parentVersion: inferParentVersion(versionValue, previousEntry?.version),
         })
       }
     }

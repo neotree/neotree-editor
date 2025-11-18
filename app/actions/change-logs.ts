@@ -4,6 +4,7 @@ import * as mutations from "@/databases/mutations/changelogs"
 import * as queries from "@/databases/queries/changelogs"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
+import { _getEditorInfo } from "@/databases/queries/editor-info"
 
 // QUERIES
 export const getChangeLogs: typeof queries._getChangeLogs = async (...args) => {
@@ -178,10 +179,12 @@ export const findRelatedChanges: typeof queries.SearchChangeLogs._findRelatedCha
 export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => {
   try {
     const session = await isAllowed()
+    const resolvedDataVersion = await resolveDataVersionIfNeeded(params.data?.dataVersion)
     return await mutations._saveChangeLog({
       ...params,
       data: {
         ...params.data,
+        dataVersion: resolvedDataVersion,
         userId: session.user?.userId!,
       },
     })
@@ -194,10 +197,15 @@ export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => 
 export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) => {
   try {
     const session = await isAllowed()
+    const needsFallbackDataVersion = params.data.some(
+      (entry) => entry.dataVersion === undefined || entry.dataVersion === null,
+    )
+    const fallbackDataVersion = needsFallbackDataVersion ? await resolveDataVersionIfNeeded() : undefined
     return await mutations._saveChangeLogs({
       ...params,
       data: params.data.map((d) => ({
         ...d,
+        dataVersion: d.dataVersion ?? fallbackDataVersion,
         userId: session.user?.userId!,
       })),
     })
@@ -238,4 +246,21 @@ export const rollbackChangeLog: typeof mutations._rollbackChangeLog = async (par
     logger.error("rollbackChangeLog ERROR", e.message)
     return { errors: [e.message], success: false }
   }
+}
+
+async function resolveDataVersionIfNeeded(current?: number | null): Promise<number | undefined> {
+  if (current !== undefined && current !== null) {
+    return current
+  }
+
+  try {
+    const editorInfo = await _getEditorInfo()
+    if (typeof editorInfo.data?.dataVersion === "number") {
+      return editorInfo.data.dataVersion
+    }
+  } catch (error: any) {
+    logger.error("resolveDataVersionIfNeeded ERROR", error?.message)
+  }
+
+  return undefined
 }

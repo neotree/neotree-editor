@@ -3,6 +3,7 @@ import db from "@/databases/pg/drizzle"
 import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
 import { removeHexCharacters } from "../../utils"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _saveScriptsHistory({
   previous,
@@ -30,6 +31,8 @@ export async function _saveScriptsHistory({
 
       const isCreate = (c?.data?.version || 1) === 1
 
+      const previousEntry = previous.find((prevC) => prevC.scriptId === scriptId)
+
       if (isCreate) {
         changeHistoryData.changes = {
           action: "create_script",
@@ -38,8 +41,6 @@ export async function _saveScriptsHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.scriptId === scriptId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -48,7 +49,7 @@ export async function _saveScriptsHistory({
           .forEach((_key) => {
             const key = _key as keyof typeof c.data
             const newValue = removeHexCharacters(c.data[key])
-            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            const oldValue = ({ ...previousEntry })[key as keyof typeof previousEntry]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
               oldValues.push({ [key]: oldValue })
               newValues.push({ [key]: newValue })
@@ -78,6 +79,7 @@ export async function _saveScriptsHistory({
           fullSnapshot: sanitizedSnapshot,
           userId,
           scriptId,
+          parentVersion: inferParentVersion(changeHistoryData.version, previousEntry?.version),
         })
       }
     }

@@ -3,6 +3,7 @@ import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _saveScreensHistory({
   previous,
@@ -31,6 +32,8 @@ export async function _saveScreensHistory({
 
       const isCreate = (c?.data?.version || 1) === 1
 
+      const previousEntry = previous.find((prevC) => prevC.screenId === screenId)
+
       if (isCreate) {
         changeHistoryData.changes = {
           action: "create_screen",
@@ -39,8 +42,6 @@ export async function _saveScreensHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.screenId === screenId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -49,7 +50,7 @@ export async function _saveScreensHistory({
           .forEach((_key) => {
             const key = _key as keyof typeof c.data
             const newValue = removeHexCharacters(c.data[key])
-            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            const oldValue = ({ ...previousEntry })[key as keyof typeof previousEntry]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
               oldValues.push({ [key]: oldValue })
               newValues.push({ [key]: newValue })
@@ -80,6 +81,7 @@ export async function _saveScreensHistory({
           userId,
           scriptId: c?.data?.scriptId || null,
           screenId,
+          parentVersion: inferParentVersion(changeHistoryData.version, previousEntry?.version),
         })
       }
     }

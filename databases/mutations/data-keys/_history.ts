@@ -2,6 +2,7 @@ import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-c
 import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _saveDataKeysHistory({
   previous,
@@ -39,15 +40,16 @@ export async function _saveDataKeysHistory({
         changes: changePayload,
       }
 
+      const previousEntry = previous.find((prevC) => prevC.uuid === dataKeyId)
+
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
 
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
             const key = _key as keyof typeof c.data
             const newValue = c.data[key]
-            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            const oldValue = ({ ...previousEntry })[key as keyof typeof previousEntry]
             if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
               changePayload.oldValues.push({ [key]: oldValue })
               changePayload.newValues.push({ [key]: newValue })
@@ -70,6 +72,7 @@ export async function _saveDataKeysHistory({
           description: changeDescription,
           userId,
           dataKeyId,
+          parentVersion: inferParentVersion(versionValue, previousEntry?.version),
         })
       }
     }

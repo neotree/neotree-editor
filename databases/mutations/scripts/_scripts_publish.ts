@@ -16,6 +16,8 @@ import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
 import { _publishScreens } from "./_screens_publish"
 import { _publishDiagnoses } from "./_diagnoses_publish"
+import { CHANGELOG_DELETE_ACTIONS } from "@/lib/changelog-action-labels"
+import { inferParentVersion } from "@/lib/changelog-parent"
 
 export async function _publishScripts({
   userId,
@@ -172,12 +174,13 @@ export async function _publishScripts({
           ),
         )
 
+      const scriptDeletionMeta = CHANGELOG_DELETE_ACTIONS.script
       const historyPayload = deleted.map((c) => ({
         version: c.script!.version,
         scriptId: c.scriptId!,
         changes: {
-          action: "delete_config_key",
-          description: "Delete config key",
+          action: scriptDeletionMeta.historyAction,
+          description: scriptDeletionMeta.description,
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -208,6 +211,7 @@ export async function _publishScripts({
             userId: publisherUserId,
             scriptId: entry.scriptId,
             isActive: false,
+            parentVersion: inferParentVersion(history.version),
           })
         }
       }
