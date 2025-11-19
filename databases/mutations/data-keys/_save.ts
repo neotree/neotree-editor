@@ -73,7 +73,10 @@ export async function _saveDataKeys({
                     });
 
                     const published = (draft || isNewUuid) ? null : await db.query.dataKeys.findFirst({
-                        where: eq(dataKeys.uuid, dataKeyUuid),
+                        where: or(
+                            eq(dataKeys.uuid, dataKeyUuid),
+                            !item.uniqueKey ? undefined : eq(dataKeys.uniqueKey, item.uniqueKey)
+                        ),
                     });
 
                     if (draft) {
