@@ -127,12 +127,19 @@ function Modal({
                 const v2 = b.isSelected ? 1 : 0;
                 return v2 - v1;
             })
-            .filter(o => JSON.stringify([
-                o.value || '', 
-                o.label || '', 
-                // o.caption || '', 
-                o.description || '',
-            ]).toLowerCase().match(searchValueDebounced.toLowerCase()));
+            .filter(o => {
+                const search = searchValueDebounced.toLowerCase();
+                if (!search) return true;
+
+                const haystack = JSON.stringify([
+                    o.value || '', 
+                    o.label || '', 
+                    // o.caption || '', 
+                    o.description || '',
+                ]).toLowerCase();
+
+                return haystack.includes(search);
+            });
 
         return filtered;
     }, [optionsProp, searchValueDebounced, selected, selectedPending]);
