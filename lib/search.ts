@@ -1,6 +1,11 @@
 const START_QUOTE_CHARS = ['"', '\u201C']
 const END_QUOTE_CHARS = ['"', '\u201D']
 
+/** Escape user input for safe literal use in RegExp constructors. */
+export function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export function normalizeSearchTerm(rawValue: string) {
   const trimmedValue = `${rawValue ?? ""}`.trim()
 
