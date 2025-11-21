@@ -217,9 +217,9 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
         if (value) {
           setSearch((prev) => ({ ...prev, searching: true }))
 
-          const { data: res } = await axios.get<{ data: ScriptsSearchResultsItem[] }>(
-            `/api/scripts/search?searchValue=${value}`,
-          )
+          const { data: res } = await axios.get<{ data: ScriptsSearchResultsItem[] }>("/api/scripts/search", {
+            params: { searchValue: value },
+          })
 
           setSearch((prev) => ({
             value,
