@@ -2,15 +2,14 @@ import { Title } from "@/components/title"
 import { Content } from "@/components/content"
 import { Card, CardContent } from "@/components/ui/card"
 import { ChangelogManagement } from "./components"
-import { getChangeLogs } from "@/app/actions/change-logs"
+import { getChangeLogSummaries } from "@/app/actions/change-logs"
 
 export const dynamic = "force-dynamic"
 
 export default async function ChangelogsPage() {
-  const changelogs = await getChangeLogs({
-    limit: 500,
-    sortBy: "dateOfChange",
-    sortOrder: "desc",
+  const summaries = await getChangeLogSummaries({
+    limit: 25,
+    sort: "publishedAt.desc",
   })
 
   return (
@@ -20,7 +19,11 @@ export default async function ChangelogsPage() {
       <Content>
         <Card className="mb-20">
           <CardContent className="p-0">
-            <ChangelogManagement initialChangelogs={changelogs.data} />
+            <ChangelogManagement
+              initialSummaries={summaries.data}
+              initialPagination={summaries.pagination}
+              activeDataVersion={summaries.activeDataVersion ?? null}
+            />
           </CardContent>
         </Card>
       </Content>

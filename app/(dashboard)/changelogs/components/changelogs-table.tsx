@@ -29,8 +29,11 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
-import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import { type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
 import { useAppContext } from "@/contexts/app"
+import { DataVersionSummary } from "@/app/actions/change-logs"
+import { useConfirmModal } from "@/hooks/use-confirm-modal"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Props = UseChangelogsTableParams
 
@@ -135,10 +138,13 @@ export function ChangelogsTable(props: Props) {
 
   const router = useRouter()
   const { isSuperUser } = useAppContext()
+  const { confirm } = useConfirmModal()
+  const { alert } = useAlertModal()
   const [actionLoading, setActionLoading] = useState(false)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+    loadChangelogs(page)
   }
 
   const renderPageNumbers = () => {
@@ -190,52 +196,99 @@ export function ChangelogsTable(props: Props) {
     })
   }
 
-  const warnLatest = (version: number) =>
-    `Rollback active release v${version} to the state that was live before it was published. This undoes everything introduced in v${version}, is destructive, and cannot be undone—do this only if you really know what you're doing.`
-
-  const warnRestore = (version: number) =>
-    `Restore the system to the snapshots from data version v${version}. This replaces current active data with what existed in v${version}, is destructive, and cannot be undone—do this only if you really know what you're doing.`
-
   const handleNavigate = (version: number) => {
     router.push(buildDetailsHref(version))
   }
 
-  const handleRevertLatest = async (version: number) => {
-    if (!isSuperUser) return
-    if (!window.confirm(warnLatest(version))) return
+  const buildConfirmation = (
+    mode: "rollback" | "restore",
+    version: number,
+    summary?: {
+      entitiesPlanned?: number
+      totalChanges?: number
+      missingPrerequisites?: string[]
+      alreadyAligned?: string[]
+      plan?: { entityId: string; entityType: string; targetVersion: number }[]
+    },
+  ) => {
+    const planned = summary?.entitiesPlanned ?? "?"
+    const total = summary?.totalChanges ?? "?"
+    const missingCount = summary?.missingPrerequisites?.length ?? 0
+    const alreadyCount = summary?.alreadyAligned?.length ?? 0
+    const scopeLine =
+      mode === "rollback"
+        ? `Rollback active v${version} to the state before it was published. Will touch ${planned} entities (release has ${total} recorded changes).`
+        : `Restore system to snapshots from v${version}. Will touch ${planned} entities (release has ${total} recorded changes).`
+    const missingLine =
+      missingCount > 0
+        ? `Blocked entities (${missingCount}) without required versions: ${summary?.missingPrerequisites?.slice(0, 5).join(", ")}${missingCount > 5 ? "..." : ""}.`
+        : "All required versions are present."
+    const alreadyLine = alreadyCount > 0 ? `${alreadyCount} entities are already at the target version.` : ""
+    const samplePlan = summary?.plan?.slice(0, 5) || []
+    const planLines = samplePlan.length
+      ? ["Sample plan actions:", ...samplePlan.map((p) => `• ${p.entityType}:${p.entityId} -> v${p.targetVersion}`)]
+      : []
+    const caution =
+      "This is destructive and cannot be undone. Do this only if you really know what you're doing. Proceed?"
 
-    setActionLoading(true)
-    try {
-      const res = await axios.post("/api/changelogs/rollback-data-version", {
-        dataVersion: version,
-        changeReason: `Reverted active release v${version} to previous state`,
-      })
-
-      if (!res.data?.success) throw new Error(res.data?.errors?.join(", ") || "Failed to revert release")
-      await loadChangelogs()
-    } catch (e: any) {
-      window.alert(e?.message || "Failed to revert release")
-    } finally {
-      setActionLoading(false)
-    }
+    return [scopeLine, alreadyLine, missingLine, ...planLines, caution].filter(Boolean).join("\n\n")
   }
 
-  const handleRestoreToVersion = async (version: number) => {
-    if (!isSuperUser) return
-    if (!window.confirm(warnRestore(version))) return
+  const runVersionAction = async (mode: "rollback" | "restore", version: number) => {
+    if (!isSuperUser || actionLoading) return
+
+    const isRollback = mode === "rollback"
+    const path = isRollback ? "/api/changelogs/rollback-data-version" : "/api/changelogs/restore-data-version"
+    const payload = isRollback
+      ? { dataVersion: version, changeReason: `Reverted active release v${version} to previous state` }
+      : { targetDataVersion: version, changeReason: `Reverted to data version v${version}` }
+    const confirmationKeyword = `${isRollback ? "ROLLBACK" : "RESTORE"} v${version}`
 
     setActionLoading(true)
     try {
-      const res = await axios.post("/api/changelogs/restore-data-version", {
-        targetDataVersion: version,
-        changeReason: `Reverted to data version v${version}`,
-      })
+      const preflight = await axios.post(path, { ...payload, dryRun: true })
+      if (!preflight.data?.success) throw new Error(preflight.data?.errors?.join(", ") || "Preflight failed")
 
-      if (!res.data?.success) throw new Error(res.data?.errors?.join(", ") || "Failed to revert to this version")
-      await loadChangelogs()
+      const confirmMessage = buildConfirmation(mode, version, {
+        ...preflight.data?.summary,
+        plan: preflight.data?.plan,
+      })
+      const messageWithHtml = confirmMessage.replace(/\n/g, "<br />")
+
+      setActionLoading(false)
+      confirm(
+        async () => {
+          setActionLoading(true)
+          try {
+            const res = await axios.post(path, { ...payload, auditNote: confirmationKeyword })
+            if (!res.data?.success) throw new Error(res.data?.errors?.join(", ") || "Failed to apply action")
+            await loadChangelogs()
+          } catch (e: any) {
+            const message = e?.response?.data?.errors?.join(", ") || e?.message || "Failed to apply action"
+            alert({
+              title: "Error",
+              message,
+              variant: "error",
+            })
+          } finally {
+            setActionLoading(false)
+          }
+        },
+        {
+          title: `${isRollback ? "Rollback" : "Restore"} v${version}`,
+          message: `${messageWithHtml}<br /><br />This action is irreversible. Continue?`,
+          positiveLabel: isRollback ? "Confirm rollback" : "Confirm restore",
+          negativeLabel: "Cancel",
+          danger: true,
+        }
+      )
     } catch (e: any) {
-      window.alert(e?.message || "Failed to revert to this version")
-    } finally {
+      const message = e?.response?.data?.errors?.join(", ") || e?.message || "Failed to apply action"
+      alert({
+        title: "Error",
+        message,
+        variant: "error",
+      })
       setActionLoading(false)
     }
   }
@@ -391,7 +444,7 @@ export function ChangelogsTable(props: Props) {
                                 className="text-destructive focus:text-destructive"
                                 onClick={(event) => {
                                     event.stopPropagation()
-                                    handleRevertLatest(entry.dataVersion)
+                                    runVersionAction("rollback", entry.dataVersion)
                                   }}
                                 >
                                 <RotateCcw className="mr-2 h-4 w-4" />
@@ -404,7 +457,7 @@ export function ChangelogsTable(props: Props) {
                                 className="text-destructive focus:text-destructive"
                                 onClick={(event) => {
                                   event.stopPropagation()
-                                  handleRestoreToVersion(entry.dataVersion)
+                                  runVersionAction("restore", entry.dataVersion)
                                 }}
                               >
                                 <RotateCcw className="mr-2 h-4 w-4" />

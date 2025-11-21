@@ -8,11 +8,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const dataVersion = Number(body?.dataVersion)
     const changeReason = body?.changeReason ? String(body.changeReason) : undefined
+    const dryRun = Boolean(body?.dryRun)
+    const auditNote = body?.auditNote ? String(body.auditNote) : undefined
 
     const res = await rollbackDataVersion({
       dataVersion,
       changeReason,
       broadcastAction: true,
+      dryRun,
+      auditNote,
     })
 
     return NextResponse.json(res, { status: res.success ? 200 : 400 })
