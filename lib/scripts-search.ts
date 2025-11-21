@@ -1,6 +1,6 @@
 import * as schema from '@/databases/pg/schema';
 import { ScriptField, ArrayElement } from '@/types';
-import { normalizeSearchTerm } from "@/lib/search";
+import { escapeRegex, normalizeSearchTerm } from "@/lib/search";
 
 type Script = typeof schema.scripts.$inferSelect & {
     isDraft: boolean;
@@ -58,7 +58,8 @@ export function parseScriptsSearchResults({
         return [];
     }
 
-    const pattern = isExactMatch ? `^${normalizedValue}$` : normalizedValue;
+    const escapedSearchValue = escapeRegex(normalizedValue);
+    const pattern = isExactMatch ? `^${escapedSearchValue}$` : escapedSearchValue;
     const searchRegex = new RegExp(pattern);
 
     const resultsMap: Record<string, ScriptsSearchResultsItem> = {};
