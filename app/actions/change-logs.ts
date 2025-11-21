@@ -2,6 +2,9 @@
 
 import * as mutations from "@/databases/mutations/changelogs"
 import * as queries from "@/databases/queries/changelogs"
+import db from "@/databases/pg/drizzle"
+import { changeLogs } from "@/databases/pg/schema"
+import { and, eq, lt, desc } from "drizzle-orm"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
 import { _getEditorInfo } from "@/databases/queries/editor-info"
@@ -245,6 +248,166 @@ export const rollbackChangeLog: typeof mutations._rollbackChangeLog = async (par
   } catch (e: any) {
     logger.error("rollbackChangeLog ERROR", e.message)
     return { errors: [e.message], success: false }
+  }
+}
+
+export type RollbackDataVersionParams = {
+  dataVersion: number
+  changeReason?: string
+  broadcastAction?: boolean
+}
+
+export const rollbackDataVersion = async ({
+  dataVersion,
+  changeReason,
+  broadcastAction,
+}: RollbackDataVersionParams) => {
+  try {
+    const session = await isAllowed()
+    const userRole = session.user?.role
+    if (userRole !== "super_user") throw new Error("Only super users can revert data versions")
+
+    if (!Number.isFinite(dataVersion) || dataVersion <= 0) {
+      throw new Error("Invalid data version")
+    }
+
+    const { data: changes } = await queries._getChangeLogs({
+      dataVersions: [dataVersion],
+      isActiveOnly: true,
+      sortBy: "version",
+      sortOrder: "desc",
+      limit: 5000,
+    })
+
+    if (!changes?.length) {
+      return { success: false, rolledBack: 0, errors: ["No changes found for this data version"] }
+    }
+
+    const errors: string[] = []
+    let rolledBack = 0
+
+    for (const change of changes) {
+      if (!change.entityId || change.version === undefined || change.version === null) continue
+
+      const previousVersion = await db.query.changeLogs.findFirst({
+        where: and(
+          eq(changeLogs.entityId, change.entityId),
+          eq(changeLogs.entityType, change.entityType),
+          lt(changeLogs.version, change.version),
+        ),
+        orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+      })
+
+      if (!previousVersion) {
+        errors.push(`No prior version found for entity ${change.entityId}`)
+        continue
+      }
+
+      const res = await mutations._rollbackChangeLog({
+        entityId: change.entityId,
+        toVersion: previousVersion.version,
+        dataVersion: previousVersion.dataVersion ?? dataVersion,
+        userId: session.user?.userId!,
+        changeReason,
+        broadcastAction,
+      })
+
+      if (!res.success) {
+        errors.push(...(res.errors || [`Failed to rollback entity ${change.entityId}`]))
+      } else {
+        rolledBack++
+      }
+    }
+
+    return {
+      success: !errors.length,
+      rolledBack,
+      errors: errors.length ? errors : undefined,
+    }
+  } catch (e: any) {
+    logger.error("rollbackDataVersion ERROR", e.message)
+    return { success: false, rolledBack: 0, errors: [e.message] }
+  }
+}
+
+export type RestoreDataVersionParams = {
+  targetDataVersion: number
+  changeReason?: string
+  broadcastAction?: boolean
+}
+
+// Revert the current active entities back to the state they had in a specific data version.
+export const restoreDataVersion = async ({
+  targetDataVersion,
+  changeReason,
+  broadcastAction,
+}: RestoreDataVersionParams) => {
+  try {
+    const session = await isAllowed()
+    const userRole = session.user?.role
+    if (userRole !== "super_user") throw new Error("Only super users can revert data versions")
+
+    if (!Number.isFinite(targetDataVersion) || targetDataVersion <= 0) {
+      throw new Error("Invalid data version")
+    }
+
+    const { data: targetChanges } = await queries._getChangeLogs({
+      dataVersions: [targetDataVersion],
+      sortBy: "version",
+      sortOrder: "desc",
+      limit: 5000,
+    })
+
+    if (!targetChanges?.length) {
+      return { success: false, rolledBack: 0, errors: ["No changes found for this data version"] }
+    }
+
+    const errors: string[] = []
+    let rolledBack = 0
+
+    for (const change of targetChanges) {
+      if (!change.entityId || change.version === undefined || change.version === null) continue
+
+      // Find the current active version for this entity
+      const currentActive = await db.query.changeLogs.findFirst({
+        where: and(eq(changeLogs.entityId, change.entityId), eq(changeLogs.entityType, change.entityType), eq(changeLogs.isActive, true)),
+        orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+      })
+
+      if (!currentActive) {
+        errors.push(`No active version found for entity ${change.entityId}`)
+        continue
+      }
+
+      if (currentActive.version === change.version) {
+        // Already at the desired version
+        continue
+      }
+
+      const res = await mutations._rollbackChangeLog({
+        entityId: change.entityId,
+        toVersion: change.version,
+        dataVersion: targetDataVersion,
+        userId: session.user?.userId!,
+        changeReason,
+        broadcastAction,
+      })
+
+      if (!res.success) {
+        errors.push(...(res.errors || [`Failed to revert entity ${change.entityId} to data version v${targetDataVersion}`]))
+      } else {
+        rolledBack++
+      }
+    }
+
+    return {
+      success: !errors.length,
+      rolledBack,
+      errors: errors.length ? errors : undefined,
+    }
+  } catch (e: any) {
+    logger.error("restoreDataVersion ERROR", e.message)
+    return { success: false, rolledBack: 0, errors: [e.message] }
   }
 }
 

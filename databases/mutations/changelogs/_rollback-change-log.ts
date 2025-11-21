@@ -12,6 +12,7 @@ export type RollbackChangeLogParams = {
   toVersion: number
   userId: string
   changeReason?: string
+  dataVersion?: number
   broadcastAction?: boolean
 }
 
@@ -27,6 +28,7 @@ export async function _rollbackChangeLog({
   toVersion,
   userId,
   changeReason,
+  dataVersion,
   broadcastAction,
 }: RollbackChangeLogParams): Promise<RollbackChangeLogResponse> {
   const response: RollbackChangeLogResponse = { success: false }
@@ -74,6 +76,7 @@ export async function _rollbackChangeLog({
       entityType: targetVersion.entityType,
       action: "rollback",
       version: newVersion,
+      dataVersion: dataVersion ?? (targetVersion.dataVersion ?? undefined),
       changes: [
         {
           action: "rollback",

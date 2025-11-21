@@ -2,13 +2,21 @@
 
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
-import { Search } from "lucide-react"
+import axios from "axios"
+import { Eye, MoreVertical, RotateCcw, Search } from "lucide-react"
+import { useState } from "react"
 
 import { Loader } from "@/components/loader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Pagination,
   PaginationContent,
@@ -22,6 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
 import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import { useAppContext } from "@/contexts/app"
 
 type Props = UseChangelogsTableParams
 
@@ -125,6 +134,8 @@ export function ChangelogsTable(props: Props) {
   } = useChangelogsTable(props)
 
   const router = useRouter()
+  const { isSuperUser } = useAppContext()
+  const [actionLoading, setActionLoading] = useState(false)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -179,13 +190,59 @@ export function ChangelogsTable(props: Props) {
     })
   }
 
+  const warnLatest = (version: number) =>
+    `Rollback active release v${version} to the state that was live before it was published. This undoes everything introduced in v${version}, is destructive, and cannot be undone—do this only if you really know what you're doing.`
+
+  const warnRestore = (version: number) =>
+    `Restore the system to the snapshots from data version v${version}. This replaces current active data with what existed in v${version}, is destructive, and cannot be undone—do this only if you really know what you're doing.`
+
   const handleNavigate = (version: number) => {
     router.push(buildDetailsHref(version))
   }
 
+  const handleRevertLatest = async (version: number) => {
+    if (!isSuperUser) return
+    if (!window.confirm(warnLatest(version))) return
+
+    setActionLoading(true)
+    try {
+      const res = await axios.post("/api/changelogs/rollback-data-version", {
+        dataVersion: version,
+        changeReason: `Reverted active release v${version} to previous state`,
+      })
+
+      if (!res.data?.success) throw new Error(res.data?.errors?.join(", ") || "Failed to revert release")
+      await loadChangelogs()
+    } catch (e: any) {
+      window.alert(e?.message || "Failed to revert release")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleRestoreToVersion = async (version: number) => {
+    if (!isSuperUser) return
+    if (!window.confirm(warnRestore(version))) return
+
+    setActionLoading(true)
+    try {
+      const res = await axios.post("/api/changelogs/restore-data-version", {
+        targetDataVersion: version,
+        changeReason: `Reverted to data version v${version}`,
+      })
+
+      if (!res.data?.success) throw new Error(res.data?.errors?.join(", ") || "Failed to revert to this version")
+      await loadChangelogs()
+    } catch (e: any) {
+      window.alert(e?.message || "Failed to revert to this version")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   return (
     <>
-      {loading && <Loader overlay />}
+      {(loading || actionLoading) && <Loader overlay />}
 
       <div className="flex flex-col gap-y-4">
         <ChangelogsTableHeader
@@ -234,7 +291,7 @@ export function ChangelogsTable(props: Props) {
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[200px]">Published By</TableHead>
                   <TableHead className="w-[170px]">Published At</TableHead>
-                  <TableHead className="text-right w-[120px]">Details</TableHead>
+                  <TableHead className="text-right w-[140px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -307,17 +364,55 @@ export function ChangelogsTable(props: Props) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-primary"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleNavigate(entry.dataVersion)
-                          }}
-                        >
-                          View details
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-8 w-8"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleNavigate(entry.dataVersion)
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View details
+                            </DropdownMenuItem>
+                            {entry.isLatestVersion && (
+                              <DropdownMenuItem
+                                disabled={!isSuperUser || actionLoading}
+                                className="text-destructive focus:text-destructive"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    handleRevertLatest(entry.dataVersion)
+                                  }}
+                                >
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                {`Rollback active v${entry.dataVersion}`}
+                              </DropdownMenuItem>
+                            )}
+                            {!entry.isLatestVersion && (
+                              <DropdownMenuItem
+                                disabled={!isSuperUser || actionLoading}
+                                className="text-destructive focus:text-destructive"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  handleRestoreToVersion(entry.dataVersion)
+                                }}
+                              >
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                {`Restore to v${entry.dataVersion} snapshot`}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   )

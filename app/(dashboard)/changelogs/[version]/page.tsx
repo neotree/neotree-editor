@@ -93,6 +93,12 @@ export default async function DataVersionPage({ params }: { params: Params }) {
             Back to releases
           </Link>
 
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
+              Data version v{numericVersion}
+            </Badge>
+          </div>
+
           <Card className="mt-6">
             <CardContent className="p-8 text-center text-muted-foreground">
               No changelog entries were found for data version v{numericVersion}.
