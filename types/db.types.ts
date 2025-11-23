@@ -186,6 +186,9 @@ export type SiteSelect = {
     apiKey: string;
     type: "nodeapi" | "webeditor";
     env: "production" | "stage" | "development" | "demo";
+    displayName: string | null;
+    countryISO: string | null;
+    countryName: string | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
@@ -199,6 +202,9 @@ export type SiteInsert = {
     apiKey: string;
     type: "nodeapi" | "webeditor";
     env?: ("production" | "stage" | "development" | "demo") | undefined;
+    displayName?: (string | null) | undefined;
+    countryISO?: (string | null) | undefined;
+    countryName?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
@@ -230,12 +236,14 @@ export type EditorInfoSelect = {
     id: number;
     dataVersion: number;
     lastPublishDate: Date | null;
+    lastDataKeysSyncDate: Date | null;
 };
 
 export type EditorInfoInsert = {
     id?: number | undefined;
     dataVersion?: number | undefined;
     lastPublishDate?: (Date | null) | undefined;
+    lastDataKeysSyncDate?: (Date | null) | undefined;
 };
 
 export type DeviceSelect = {
@@ -340,6 +348,7 @@ export type ConfigKeyDraftSelect = {
     configKeyId: string | null;
     position: number;
     data: ConfigKeyDraftSelect;
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -350,6 +359,7 @@ export type ConfigKeyDraftInsert = {
     configKeyId?: (string | null) | undefined;
     position: number;
     data: ConfigKeyDraftInsert;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
 };
@@ -376,6 +386,8 @@ export type DrugsLibraryItemSelect = {
     id: number;
     itemId: string;
     key: string;
+    keyId: string;
+    type: "drug" | "fluid" | "feed";
     drug: string;
     minGestation: number | null;
     maxGestation: number | null;
@@ -383,6 +395,8 @@ export type DrugsLibraryItemSelect = {
     maxWeight: number | null;
     minAge: number | null;
     maxAge: number | null;
+    hourlyFeed: number | null;
+    hourlyFeedDivider: number | null;
     dosage: number | null;
     dosageMultiplier: number | null;
     dayOfLife: string;
@@ -392,11 +406,17 @@ export type DrugsLibraryItemSelect = {
     weightKey: string;
     diagnosisKey: string;
     ageKey: string;
+    ageKeyId: string;
+    gestationKeyId: string;
+    weightKeyId: string;
+    diagnosisKeyId: string;
     administrationFrequency: string;
     drugUnit: string;
     routeOfAdministration: string;
     position: number;
     condition: string;
+    calculator_condition: string;
+    validationType: ("default" | "condition") | null;
     version: number;
     publishDate: Date;
     createdAt: Date;
@@ -408,6 +428,8 @@ export type DrugsLibraryItemInsert = {
     id?: number | undefined;
     itemId?: string | undefined;
     key: string;
+    keyId?: string | undefined;
+    type?: ("drug" | "fluid" | "feed") | undefined;
     drug?: string | undefined;
     minGestation?: (number | null) | undefined;
     maxGestation?: (number | null) | undefined;
@@ -415,6 +437,8 @@ export type DrugsLibraryItemInsert = {
     maxWeight?: (number | null) | undefined;
     minAge?: (number | null) | undefined;
     maxAge?: (number | null) | undefined;
+    hourlyFeed?: (number | null) | undefined;
+    hourlyFeedDivider?: (number | null) | undefined;
     dosage?: (number | null) | undefined;
     dosageMultiplier?: (number | null) | undefined;
     dayOfLife?: string | undefined;
@@ -424,11 +448,17 @@ export type DrugsLibraryItemInsert = {
     weightKey?: string | undefined;
     diagnosisKey?: string | undefined;
     ageKey?: string | undefined;
+    ageKeyId?: string | undefined;
+    gestationKeyId?: string | undefined;
+    weightKeyId?: string | undefined;
+    diagnosisKeyId?: string | undefined;
     administrationFrequency?: string | undefined;
     drugUnit?: string | undefined;
     routeOfAdministration?: string | undefined;
     position: number;
     condition?: string | undefined;
+    calculator_condition?: string | undefined;
+    validationType?: (("default" | "condition") | null) | undefined;
     version: number;
     publishDate?: Date | undefined;
     createdAt?: Date | undefined;
@@ -441,8 +471,10 @@ export type DrugsLibraryItemDraftSelect = {
     itemDraftId: string;
     itemId: string | null;
     key: string;
+    type: "drug" | "fluid" | "feed";
     position: number;
     data: DrugsLibraryItemDraftSelect;
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -452,8 +484,10 @@ export type DrugsLibraryItemDraftInsert = {
     itemDraftId?: string | undefined;
     itemId?: (string | null) | undefined;
     key: string;
+    type?: ("drug" | "fluid" | "feed") | undefined;
     position: number;
     data: DrugsLibraryItemDraftInsert;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
 };
@@ -481,7 +515,7 @@ export type ScriptSelect = {
     scriptId: string;
     oldScriptId: string | null;
     version: number;
-    type: "admission" | "discharge" | "neolab"|"drecord";
+    type: "admission" | "discharge" | "neolab" | "drecord" | "dff_calculator";
     position: number;
     source: string | null;
     title: string;
@@ -491,17 +525,15 @@ export type ScriptSelect = {
     exportable: boolean;
     nuidSearchEnabled: boolean;
     nuidSearchFields: ScriptSelect;
-    reviewConfigurations:ScriptSelect|undefined;
-    reviewable: boolean | undefined;
+    reviewable: boolean;
+    reviewConfigurations: ScriptSelect;
     preferences: ScriptSelect;
+    printConfig: ScriptSelect;
     printSections: ScriptSelect;
     publishDate: Date;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
-    aliases: ScriptSelect
-    lastAlias: string;
-
 };
 
 export type ScriptInsert = {
@@ -509,7 +541,7 @@ export type ScriptInsert = {
     scriptId?: string | undefined;
     oldScriptId?: (string | null) | undefined;
     version: number;
-    type?: ("admission" | "discharge" | "neolab"|"drecord") | undefined;
+    type?: ("admission" | "discharge" | "neolab" | "drecord" | "dff_calculator") | undefined;
     position: number;
     source?: (string | null) | undefined;
     title: string;
@@ -519,18 +551,16 @@ export type ScriptInsert = {
     exportable?: boolean | undefined;
     nuidSearchEnabled?: boolean | undefined;
     nuidSearchFields?: ScriptInsert | undefined;
-    reviewConfigurations?:ScriptInsert|undefined;
     reviewable?: boolean | undefined;
+    reviewConfigurations?: ScriptInsert | undefined;
     preferences?: ScriptInsert | undefined;
+    printConfig?: ScriptInsert | undefined;
     printSections?: ScriptInsert | undefined;
     publishDate?: Date | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
-    aliases?:ScriptSelect|undefined;
-    lastAlias?:boolean | undefined;
 };
-
 
 export type ScriptDraftSelect = {
     id: number;
@@ -539,6 +569,7 @@ export type ScriptDraftSelect = {
     position: number;
     hospitalId: string | null;
     data: ScriptDraftSelect;
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -550,6 +581,7 @@ export type ScriptDraftInsert = {
     position: number;
     hospitalId?: (string | null) | undefined;
     data: ScriptDraftInsert;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
 };
@@ -579,7 +611,7 @@ export type ScreenSelect = {
     oldScriptId: string | null;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "fluids" | "feeds" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     source: string | null;
     sectionTitle: string;
@@ -591,10 +623,13 @@ export type ScreenSelect = {
     epicId: string;
     storyId: string;
     refId: string;
+    refIdDataKey: string;
     refKey: string;
+    refKeyDataKey: string;
     step: string;
     actionText: string;
     contentText: string;
+    contentTextImage: ScreenSelect | null;
     infoText: string;
     title: string;
     title1: string;
@@ -616,6 +651,7 @@ export type ScreenSelect = {
     notes: string;
     dataType: string;
     key: string;
+    keyId: string;
     label: string;
     negativeLabel: string;
     positiveLabel: string;
@@ -632,10 +668,17 @@ export type ScreenSelect = {
     items: ScreenSelect;
     preferences: ScreenSelect;
     drugs: ScreenSelect;
+    fluids: ScreenSelect;
+    feeds: ScreenSelect;
+    reasons: ScreenSelect;
+    listStyle: "none" | "number" | "bullet";
     publishDate: Date;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
+    collectionName: string;
+    collectionLabel: string;
+    repeatable: boolean | null;
 };
 
 export type ScreenInsert = {
@@ -645,7 +688,7 @@ export type ScreenInsert = {
     oldScriptId?: (string | null) | undefined;
     version: number;
     scriptId: string;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table"
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "fluids" | "feeds" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     source?: (string | null) | undefined;
     sectionTitle: string;
@@ -657,10 +700,13 @@ export type ScreenInsert = {
     epicId?: string | undefined;
     storyId?: string | undefined;
     refId?: string | undefined;
+    refIdDataKey?: string | undefined;
     refKey?: string | undefined;
+    refKeyDataKey?: string | undefined;
     step?: string | undefined;
     actionText?: string | undefined;
     contentText?: string | undefined;
+    contentTextImage?: (ScreenInsert | null) | undefined;
     infoText?: string | undefined;
     title: string;
     title1?: string | undefined;
@@ -682,6 +728,7 @@ export type ScreenInsert = {
     notes?: string | undefined;
     dataType?: string | undefined;
     key?: string | undefined;
+    keyId?: string | undefined;
     label?: string | undefined;
     negativeLabel?: string | undefined;
     positiveLabel?: string | undefined;
@@ -698,10 +745,17 @@ export type ScreenInsert = {
     items?: ScreenInsert | undefined;
     preferences?: ScreenInsert | undefined;
     drugs?: ScreenInsert | undefined;
+    fluids?: ScreenInsert | undefined;
+    feeds?: ScreenInsert | undefined;
+    reasons?: ScreenInsert | undefined;
+    listStyle?: ("none" | "number" | "bullet") | undefined;
     publishDate?: Date | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
+    collectionName?: string | undefined;
+    collectionLabel?: string | undefined;
+    repeatable?: (boolean | null) | undefined;
 };
 
 export type ScreenDraftSelect = {
@@ -710,9 +764,10 @@ export type ScreenDraftSelect = {
     screenId: string | null;
     scriptId: string | null;
     scriptDraftId: string | null;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "fluids" | "feeds" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     data: ScreenDraftSelect;
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -723,9 +778,10 @@ export type ScreenDraftInsert = {
     screenId?: (string | null) | undefined;
     scriptId?: (string | null) | undefined;
     scriptDraftId?: (string | null) | undefined;
-    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table";
+    type: "diagnosis" | "checklist" | "form" | "management" | "multi_select" | "single_select" | "progress" | "timer" | "yesno" | "drugs" | "fluids" | "feeds" | "zw_edliz_summary_table" | "mwi_edliz_summary_table" | "edliz_summary_table" | "dynamic_form";
     position: number;
     data: ScreenDraftInsert;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
 };
@@ -763,6 +819,7 @@ export type DiagnosisSelect = {
     name: string;
     description: string;
     key: string | null;
+    keyId: string;
     severityOrder: number | null;
     expressionMeaning: string;
     symptoms: DiagnosisSelect;
@@ -792,6 +849,7 @@ export type DiagnosisInsert = {
     name?: string | undefined;
     description?: string | undefined;
     key?: (string | null) | undefined;
+    keyId?: string | undefined;
     severityOrder?: (number | null) | undefined;
     expressionMeaning?: string | undefined;
     symptoms?: DiagnosisInsert | undefined;
@@ -816,6 +874,7 @@ export type DiagnosisDraftSelect = {
     scriptDraftId: string | null;
     position: number;
     data: DiagnosisDraftSelect;
+    createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -828,6 +887,7 @@ export type DiagnosisDraftInsert = {
     scriptDraftId?: (string | null) | undefined;
     position: number;
     data: DiagnosisDraftInsert;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
 };
@@ -866,6 +926,10 @@ export type PendingDeletionItemSelect = {
     diagnosisDraftId: string | null;
     configKeyDraftId: string | null;
     drugsLibraryItemDraftId: string | null;
+    dataKeyId: string | null;
+    dataKeyDraftId: string | null;
+    aliasId: string | null;
+    createdByUserId: string | null;
     createdAt: Date;
 };
 
@@ -883,5 +947,9 @@ export type PendingDeletionItemInsert = {
     diagnosisDraftId?: (string | null) | undefined;
     configKeyDraftId?: (string | null) | undefined;
     drugsLibraryItemDraftId?: (string | null) | undefined;
+    dataKeyId?: (string | null) | undefined;
+    dataKeyDraftId?: (string | null) | undefined;
+    aliasId?: (string | null) | undefined;
+    createdByUserId?: (string | null) | undefined;
     createdAt?: Date | undefined;
 };
