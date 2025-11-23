@@ -122,6 +122,7 @@ export async function _searchDrugsLibrary({
                 routeOfAdministration: data.routeOfAdministration ?? '',
                 position: data.position ?? draft.position,
                 condition: data.condition ?? '',
+                calculator_condition: data.calculator_condition ?? '',
                 validationType: data.validationType ?? 'default',
                 version: data.version ?? 0,
                 publishDate: coerceDate(data.publishDate, new Date()),

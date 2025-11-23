@@ -1,4 +1,4 @@
-import { and, eq, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import * as schema from '@/databases/pg/schema';
@@ -146,10 +146,53 @@ export async function _searchScripts({
             })),
         ].sort((a, b) => a.position - b.position);
 
+        let scriptsIdsFromItems = [
+            ...diagnosesArr.map(d => d.scriptId),
+            ...screensArr.map(s => s.scriptId),
+        ];
+
+        scriptsIdsFromItems = scriptsIdsFromItems
+            .filter((id, i) => scriptsIdsFromItems.indexOf(id) === i)
+            .filter(id => scriptsArr.map(s => s.scriptId).indexOf(id) === -1);
+
+        const scriptsDraftsFromItems = !scriptsIdsFromItems.length ? [] : await db.query.scriptsDrafts.findMany({
+            where: or(
+                inArray(schema.scriptsDrafts.scriptId, scriptsIdsFromItems),
+                inArray(schema.scriptsDrafts.scriptDraftId, scriptsIdsFromItems),
+            ),
+        });
+
+        const scriptsFromItems = !scriptsIdsFromItems.length ? [] : await db.select({
+            script: schema.scripts,
+        })
+        .from(schema.scripts)
+        .where(and(
+            inArray(schema.scripts.scriptId, scriptsIdsFromItems),
+            !scriptsDraftsFromItems.length ? undefined : notInArray(schema.scripts.scriptId, scriptsDraftsFromItems.map(d => d.scriptDraftId)),
+        ));
+
+        const scriptsFromItemsArr = [
+            ...scriptsDraftsFromItems.map(d => ({
+                ...d.data,
+                scriptId: d.scriptId || d.scriptDraftId,
+                isDraft: true,
+            })),
+            ...scriptsFromItems.map(s => ({
+                ...s.script,
+                isDraft: false,
+            })),
+        ].sort((a, b) => a.position - b.position);
+
         const data = parseScriptsSearchResults({
             searchValue: rawSearchValue,
-            screens: screensArr as ParseScriptsSearchResultsParams['screens'],
-            diagnoses: diagnosesArr as ParseScriptsSearchResultsParams['diagnoses'],
+            screens: screensArr.map(s => ({
+                ...s,
+                scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === s.scriptId)?.title || '',
+            })) as ParseScriptsSearchResultsParams['screens'],
+            diagnoses: diagnosesArr.map(d => ({
+                ...d,
+                scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.title || '',
+            })) as ParseScriptsSearchResultsParams['diagnoses'],
             scripts: scriptsArr as ParseScriptsSearchResultsParams['scripts'],
         });
 

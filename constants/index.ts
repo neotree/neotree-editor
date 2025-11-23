@@ -31,7 +31,8 @@ export const scriptTypes = [
     { label: 'Admission', value: 'admission', },
     { label: 'Discharge', value: 'discharge', },
     { label: 'Neolab', value: 'neolab', },
-    {label: 'Daily Record',value:'drecord'}
+    { label: 'Daily Record',value:'drecord' },
+    { label: 'DFF Calculator',value:'dff_calculator', }
 ] as { label: string; value: ScriptType['type'] }[];
 
 export const screenTypes: { label: string; value: ScreenType['type'] }[] = [
