@@ -103,8 +103,12 @@ function sanitizeSearchValue(searchValue = '') {
 
 const filterOptions = [
     {
-        label: 'All',
+        label: 'All matches',
         value: 'all',
+    },
+    {
+        label: 'Scripts only',
+        value: 'scripts',
     },
     {
         label: 'Screens only',
@@ -157,6 +161,22 @@ export function SearchAndReplaceModal(props: Props) {
 
     const disabled = !replaceItems.length || !replaceWith;
 
+    const onFilterChange = useCallback((val: string) => {
+        setFilter(val);
+        setReplaceItems(getReplaceItems(props).filter(item => {
+            switch(val) {
+                case 'scripts':
+                    return item.type === 'script';
+                case 'screens':
+                    return item.type === 'screen';
+                case 'diagnoses':
+                    return item.type === 'diagnosis';
+                default:
+                    return true;
+            }
+        }));
+    }, [filter, props]);
+
     return (
         <>
             <Modal
@@ -193,20 +213,32 @@ export function SearchAndReplaceModal(props: Props) {
                         >
                             <div>
                                 <Label className="mb-2 block text-left" htmlFor="filter">Filter</Label>
-                                <Input 
-                                    name="replaceWith"
-                                    value={replaceWith}
-                                    onChange={e => setReplaceWith(e.target.value)}
-                                />
+                                <div className="w-[120px]">
+                                    <Select
+                                        value={filter}
+                                        onValueChange={onFilterChange}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All matches" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {filterOptions.map(f => {
+                                                return (
+                                                    <SelectItem key={f.value} value={f.value}>
+                                                        {f.label}
+                                                    </SelectItem>
+                                                );
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
                 trigger={(
                     <DialogTrigger asChild>
-                        <Button
-                            variant="outline"
-                        >
+                        <Button>
                             Replace
                         </Button>
                     </DialogTrigger>
@@ -235,7 +267,7 @@ export function SearchAndReplaceModal(props: Props) {
                 <div className="flex flex-col gap-y-6">
                     {!replaceItems.length && (
                         <div className="text-sm opacity-60 text-center">
-                            Nothing to replace
+                            No matches
                         </div>
                     )}
 

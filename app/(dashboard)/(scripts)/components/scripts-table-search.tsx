@@ -36,15 +36,6 @@ export function ScriptsTableSearch({
                     />
                 </div>
 
-                {!!search.results?.length && (
-                    <>
-                        <SearchAndReplaceModal 
-                            searchValue={search.value}
-                            scriptsSearchResults={search.results}
-                        />
-                    </>
-                )}
-
                 {!!search.value && (
                     <div className="w-[120px]">
                         <Select
@@ -76,6 +67,15 @@ export function ScriptsTableSearch({
                             </SelectContent>
                         </Select>
                     </div>
+                )}
+
+                {!!search.results?.length && (
+                    <>
+                        <SearchAndReplaceModal 
+                            searchValue={search.value}
+                            scriptsSearchResults={search.results}
+                        />
+                    </>
                 )}
             </div>
         </>
