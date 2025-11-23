@@ -42,8 +42,12 @@ export type ScriptsSearchResultsItem = {
 export type ParseScriptsSearchResultsParams = {
     searchValue: string;
     scripts: Script[];
-    screens: Screen[];
-    diagnoses: Diagnosis[];
+    screens: (Screen & {
+        scriptTitle: string;
+    })[];
+    diagnoses: (Diagnosis & {
+        scriptTitle: string;
+    })[];
 };
 
 export function parseScriptsSearchResults({
@@ -262,6 +266,8 @@ export function parseScriptsSearchResults({
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
 
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
+
             resultsMap[s.scriptId].screens.push({
                 title: s.title,
                 matches,
@@ -339,6 +345,8 @@ export function parseScriptsSearchResults({
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
+
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
 
             resultsMap[s.scriptId].diagnoses.push({
                 title: s.name || '',
