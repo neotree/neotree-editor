@@ -1,14 +1,13 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { XIcon } from 'lucide-react';
+import axios from 'axios';
 
-import { DialogClose, DialogTrigger, } from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
@@ -22,6 +21,10 @@ import { Modal } from '@/components/modal';
 import type { ScriptsSearchResultsItem, } from "@/lib/scripts-search"
 import ucFirst from '@/lib/ucFirst';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, } from '@/components/ui/tooltip';
+import { DialogClose, DialogTrigger, } from '@/components/ui/dialog';
+import { useAlertModal } from '@/hooks/use-alert-modal';
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { Loader } from '@/components/loader';
 
 type Props = {
     searchValue: string;
@@ -45,7 +48,6 @@ type ReplaceItem = {
 function getReplaceItems({
     scriptsSearchResults = [],
 }: Props) {
-    console.log(scriptsSearchResults)
     const items: ReplaceItem[] = [];
 
     scriptsSearchResults.forEach(script => {
@@ -126,6 +128,7 @@ export function SearchAndReplaceModal(props: Props) {
         scriptsSearchResults = [],
     } = props;
 
+    const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState(filterOptions[0].value);
     const [searchValue, setSearchValue] = useState(sanitizeSearchValue(searchValueProp));
     const [replaceItems, setReplaceItems] = useState<ReplaceItem[]>([]);
@@ -133,6 +136,9 @@ export function SearchAndReplaceModal(props: Props) {
     const [replaceWith, setReplaceWith] = useState('');
     const replaceWithDebounced = useDebounce(replaceWith);
     const replaceWithRef = useRef(replaceWithDebounced);
+
+    const { confirm } = useConfirmModal();
+    const { alert } = useAlertModal();
 
     useEffect(() => {
         if (replaceWithRef.current !== replaceWithDebounced) {
@@ -162,6 +168,7 @@ export function SearchAndReplaceModal(props: Props) {
     const disabled = !replaceItems.length || !replaceWith;
 
     const onFilterChange = useCallback((val: string) => {
+        replaceWithRef.current = '';
         setFilter(val);
         setReplaceItems(getReplaceItems(props).filter(item => {
             switch(val) {
@@ -176,6 +183,127 @@ export function SearchAndReplaceModal(props: Props) {
             }
         }));
     }, [filter, props]);
+
+    const onSave = useCallback(async () => {
+        try {
+            setLoading(true);
+
+            const response = await axios.post("/api/save", { 
+                broadcastAction: true,
+
+                scripts: replaceItems
+                    .filter(s => s.type === 'script')
+                    .map(s => ({
+                        scriptId: s.id,
+                        data: s.matches.reduce((acc, m) => ({
+                            ...acc,
+                            [m.field]: m.newValue,
+                        }), {} as Record<string, any>)
+                    })),
+
+                screens: replaceItems
+                    .filter(s => s.type === 'screen')
+                    .map(s => ({
+                        screenId: s.id,
+                        data: {
+                            ...s.matches
+                            .reduce((acc, m) => {
+                                const _fields: Record<string, any>[] = acc['_fields'] || [];
+                                const _items: Record<string, any>[] = acc['_items'] || [];
+
+                                if (m.fieldIndex === undefined) {
+                                    acc[m.field] = m.newValue;
+                                } else {
+                                    if (m.field.includes('field_item_')) {
+                                        let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
+                                        if (index === -1) index = _fields.length;
+                                        _fields[index] = {
+                                            index: m.fieldIndex,
+                                            data: {
+                                                ..._fields[index],
+                                                [m.field.substring(11)]: m.newValue,
+                                            },
+                                        };
+                                    } else {
+                                        let index = _items.map(f => f.index).indexOf(m.fieldIndex);
+                                        if (index === -1) index = _items.length;
+                                        _items[index] = {
+                                            index: m.fieldIndex,
+                                            data: {
+                                                ..._items[index],
+                                                [m.field.substring(5)]: m.newValue,
+                                            },
+                                        };
+                                    }
+                                }
+
+                                return {
+                                    ...acc,
+                                    _fields,
+                                    _items,
+                                };
+                            }, {} as Record<string, any>),
+                        }
+                    })),
+
+                diagnoses: replaceItems
+                    .filter(s => s.type === 'diagnosis')
+                    .map(s => ({
+                        diagnosisId: s.id,
+                        data: {
+                            ...s.matches
+                            .reduce((acc, m) => {
+                                const _fields: Record<string, any>[] = acc['_fields'] || [];
+
+                                if (m.fieldIndex === undefined) {
+                                    acc[m.field] = m.newValue;
+                                } else {
+                                    let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
+                                    if (index === -1) index = _fields.length;
+                                    _fields[index] = {
+                                        index: m.fieldIndex,
+                                        data: {
+                                            ..._fields[index],
+                                            [m.field]: m.newValue,
+                                        },
+                                    };
+                                }
+
+                                return {
+                                    ...acc,
+                                    _fields,
+                                };
+                            }, {} as Record<string, any>),
+                        }
+                    })),
+            });
+
+            const res = response.data as { success: boolean; errors?: string[]; };
+
+            if (res.errors) {
+                alert({
+                    title: "Error",
+                    message: res.errors.join(", "),
+                    variant: "error",
+                })
+            } else {
+                alert({
+                    title: "Success",
+                    message: "Changes saved successfully!",
+                    variant: "success",
+                    onClose: () => window.location.reload(),
+                });
+            }
+        } catch(e: any) {
+            alert({
+                title: "Error",
+                message: e.message,
+                variant: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [replaceItems]);
 
     return (
         <>
@@ -255,8 +383,12 @@ export function SearchAndReplaceModal(props: Props) {
 
                         <Button
                             disabled={disabled}
+                            onClick={() => confirm(onSave, {
+                                title: 'Save changes',
+                                danger: true,
+                            })}
                         >
-                            Replace
+                            Save
                         </Button>
                     </div>
                 )}
@@ -277,10 +409,13 @@ export function SearchAndReplaceModal(props: Props) {
                                 className="flex flex-col gap-y-2"
                                 key={item.id}
                             >
+                                {loading && <Loader overlay transparent />}
+
                                 <div className="text-sm">
                                     {!item.parent ? null : <div><b>{ucFirst(item.parent.type)}:&nbsp;</b>{item.parent.title}</div>}
                                     <div><b>{ucFirst(item.type)}:&nbsp;</b>{item.title}</div>
                                 </div>
+
                                 {item.matches.map((match, i) => {
                                     const key = item.id + `_match${i}`;
 
