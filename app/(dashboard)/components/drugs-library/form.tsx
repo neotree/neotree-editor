@@ -35,6 +35,7 @@ import { useIsLocked } from "@/hooks/use-is-locked";
 import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import { ErrorCard } from "@/components/error-card";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -84,6 +85,7 @@ const getDefaultForm = (item?: ItemType, type = 'drug') => ({
     weightKeyId: `${item?.weightKeyId || ''}`,
     diagnosisKeyId: `${item?.diagnosisKeyId || ''}`,
     condition: `${item?.condition || ''}`,
+    calculator_condition: `${item?.calculator_condition || ''}`,
     administrationFrequency: `${item?.administrationFrequency || ''}`,
     drugUnit: `${item?.drugUnit || ''}`,
     routeOfAdministration: `${item?.routeOfAdministration || ''}`,
@@ -420,7 +422,30 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div>
-                <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''}</Label>
+                <Label secondary htmlFor="calculator_condition">Calculator condition</Label>
+                <div className="text-xs mb-2">
+                    <ErrorCard color="warning">
+                        <p>Will be used in DFF Calculator scripts only</p>
+                    </ErrorCard>
+                </div>
+                <Textarea
+                    rows={3}
+                    name="calculator_condition"
+                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
+                    value={form.calculator_condition}
+                    disabled={disabled}
+                    onChange={e => setForm(prev => ({ ...prev, calculator_condition: e.target.value, }))}
+                />
+                <span className="font-bold opacity-50 text-xs">e.g {CONDITIONAL_EXP_EXAMPLE}</span>
+            </div>
+
+            <div>
+                <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''} (Admission)</Label>
+                <div className="text-xs mb-2">
+                    <ErrorCard color="warning">
+                        <p>Will <b>NOT</b> be used in DFF Calculator scripts</p>
+                    </ErrorCard>
+                </div>
                 <Textarea
                     rows={3}
                     name="condition"
@@ -449,6 +474,11 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             {isDrug && (
                 <div>
                     <Label secondary htmlFor="diagnosisKey">Diagnosis Key {validateWithCondition ? '' : '*'}</Label>
+                    <div className="text-xs mb-2">
+                        <ErrorCard color="warning">
+                            <p>Will <b>NOT</b> be used in DFF Calculator scripts</p>
+                        </ErrorCard>
+                    </div>
                     <Textarea
                         rows={3}
                         name="gestationKey"
