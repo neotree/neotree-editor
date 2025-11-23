@@ -89,6 +89,7 @@ export async function _getDrugsLibraryMetadata(
             administrationFrequency: item.administrationFrequency || '',
             routeOfAdministration: item.routeOfAdministration || '',
             condition: item.condition || '',
+            calculator_condition: item.calculator_condition || '',
             preferences: item.preferences ?? null,
             validationType: item.validationType || null,
             minGestation: item.minGestation ?? null,

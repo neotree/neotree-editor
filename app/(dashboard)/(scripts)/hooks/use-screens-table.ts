@@ -183,7 +183,10 @@ export function useScreensTable({
             searchValue: value,
             diagnoses: [],
             scripts: [],
-            screens: screens.data,
+            screens: screens.data.map(s => ({
+              ...s,
+              scriptTitle: '',
+            })),
           })
 
           setSearch((prev) => ({

@@ -1,6 +1,6 @@
 import * as schema from '@/databases/pg/schema';
 import { ScriptField, ArrayElement } from '@/types';
-import { normalizeSearchTerm } from "@/lib/search";
+import { escapeRegex, normalizeSearchTerm } from "@/lib/search";
 
 type Script = typeof schema.scripts.$inferSelect & {
     isDraft: boolean;
@@ -42,8 +42,12 @@ export type ScriptsSearchResultsItem = {
 export type ParseScriptsSearchResultsParams = {
     searchValue: string;
     scripts: Script[];
-    screens: Screen[];
-    diagnoses: Diagnosis[];
+    screens: (Screen & {
+        scriptTitle: string;
+    })[];
+    diagnoses: (Diagnosis & {
+        scriptTitle: string;
+    })[];
 };
 
 export function parseScriptsSearchResults({
@@ -58,7 +62,8 @@ export function parseScriptsSearchResults({
         return [];
     }
 
-    const pattern = isExactMatch ? `^${normalizedValue}$` : normalizedValue;
+    const escapedSearchValue = escapeRegex(normalizedValue);
+    const pattern = isExactMatch ? `^${escapedSearchValue}$` : escapedSearchValue;
     const searchRegex = new RegExp(pattern);
 
     const resultsMap: Record<string, ScriptsSearchResultsItem> = {};
@@ -261,6 +266,8 @@ export function parseScriptsSearchResults({
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
 
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
+
             resultsMap[s.scriptId].screens.push({
                 title: s.title,
                 matches,
@@ -338,6 +345,8 @@ export function parseScriptsSearchResults({
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
+
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
 
             resultsMap[s.scriptId].diagnoses.push({
                 title: s.name || '',
