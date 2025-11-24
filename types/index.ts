@@ -139,7 +139,7 @@ export type ImageTextField = {
     };
 };
 
-export type ScriptType = 'admission' | 'discharge' | 'neolab'|'drecord';
+export type ScriptType = 'admission' | 'discharge' | 'neolab'| 'drecord' | 'dff_calculator';
 
 export type Script = {
     id: number;

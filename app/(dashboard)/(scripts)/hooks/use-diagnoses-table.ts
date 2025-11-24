@@ -182,7 +182,10 @@ export function useDiagnosesTable({
             searchValue: value,
             screens: [],
             scripts: [],
-            diagnoses: diagnoses.data,
+            diagnoses: diagnoses.data.map(d => ({
+              ...d,
+              scriptTitle: '',
+            })),
           })
 
           setSearch((prev) => ({

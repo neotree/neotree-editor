@@ -59,7 +59,7 @@ export const siteTypeEnum = pgEnum("site_type", ["nodeapi", "webeditor"])
 export const siteEnvEnum = pgEnum("site_env", ["production", "stage", "development", "demo"])
 
 // SCRIPT TYPES ENUM
-export const scriptTypeEnum = pgEnum("script_type", ["admission", "discharge", "neolab", "drecord"])
+export const scriptTypeEnum = pgEnum("script_type", ["admission", "discharge", "neolab", "drecord", 'dff_calculator'])
 
 // SCREEN TYPES ENUM
 export const screenTypeEnum = pgEnum("screen_type", [
@@ -920,6 +920,7 @@ export const drugsLibrary = pgTable("nt_drugs_library", {
   routeOfAdministration: text("route_of_administration").notNull().default(""),
   position: integer("position").notNull(),
   condition: text("condition").notNull().default(""),
+  calculator_condition: text("calculator_condition").notNull().default(""),
   validationType: drugsLibraryItemValidationType("validation_type").default("default"),
   version: integer("version").notNull(),
 
