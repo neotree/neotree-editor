@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { filterScriptsSearchResults, scriptsSearchResultsFilters, } from "@/lib/scripts-search";
+import { SearchAndReplaceModal } from "@/components/search-and-replace-modal";
 
 type Props = {
     search: ReturnType<typeof useScriptsTable>['search'];
@@ -66,6 +67,15 @@ export function ScriptsTableSearch({
                             </SelectContent>
                         </Select>
                     </div>
+                )}
+
+                {!!search.results?.length && (
+                    <>
+                        <SearchAndReplaceModal 
+                            searchValue={search.value}
+                            scriptsSearchResults={search.results}
+                        />
+                    </>
                 )}
             </div>
         </>
