@@ -253,6 +253,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'form':
                             const formFields = screenFields.map(f => {
                                 let dataType = f.dataType;
+                                const dropdownItems = f.items || [];
 
                                 switch (f.type) {
                                     case 'datetime':
@@ -288,13 +289,21 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     let dataType = 'dropdown';
                                     if (f.type === 'multi_select') dataType = 'multi_select';
 
-                                    const opts = (f.values || '').split('\n')
+                                    let opts = (f.values || '').split('\n')
                                         .map((v = '') => v.trim())
                                         .filter((v: any) => v)
                                         .map((v: any) => {
                                             v = v.split(',');
                                             return { value: v[0] as string, label: v[1] as string, };
                                         });
+                                    
+                                    if (dropdownItems.length) {
+                                        opts = dropdownItems.map(o => ({
+                                            value: `${o.value || ''}`,
+                                            label: `${o.label || ''}`,
+                                        }));
+                                    }
+
                                     return opts.map(o => {
                                         return {
                                             label: f.label,
