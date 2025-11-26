@@ -38,18 +38,28 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
 
   // Start tracking session
   useEffect(() => {
+    let activeSessionId: string | null = null
+    let cancelled = false
+
     if (autoTrack && entityId && entityType) {
       pendingChangesAPI.startSession(entityId, entityType, entityTitle, userId).then((id) => {
-        setSessionId(`${entityType}-${entityId}-${Date.now()}`)
+        if (cancelled) return
+        activeSessionId = id || null
+        setSessionId(id || null)
       })
 
       return () => {
-        if (sessionId) {
-          pendingChangesAPI.endSession(sessionId)
+        cancelled = true
+        if (activeSessionId) {
+          pendingChangesAPI.endSession(activeSessionId)
         }
       }
     }
-  }, [autoTrack, entityId, entityType, entityTitle, userId, sessionId])
+
+    return () => {
+      cancelled = true
+    }
+  }, [autoTrack, entityId, entityType, entityTitle, userId])
 
   // Track a change
   const trackChange = useCallback(
