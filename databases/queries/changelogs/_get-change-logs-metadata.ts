@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { changeLogs, users } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { sanitizeChangeLogForResponse } from "./_get-change-logs";
 
 export type SearchChangeLogsParams = {
     searchTerm?: string;
@@ -78,7 +79,7 @@ export async function _searchChangeLogs(
             .limit(limit)
             .offset(offset);
 
-        const data = result.map(item => ({
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -251,7 +252,7 @@ export async function _searchChangeLogsByUser(
             .limit(limit)
             .offset(offset);
 
-        const data = result.map(item => ({
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -315,7 +316,7 @@ export async function _searchChangeLogsByDateRange(
             .orderBy(desc(changeLogs.dateOfChange))
             .limit(limit);
 
-        const data = result.map(item => ({
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
         }));
@@ -418,11 +419,11 @@ export async function _findRelatedChanges(
 
         return {
             data: {
-                current,
-                parent,
-                children,
-                mergedVersions,
-                supersededVersions,
+                current: current ? sanitizeChangeLogForResponse(current) : current,
+                parent: parent ? sanitizeChangeLogForResponse(parent) : parent,
+                children: children.map(sanitizeChangeLogForResponse),
+                mergedVersions: mergedVersions.map(sanitizeChangeLogForResponse),
+                supersededVersions: supersededVersions.map(sanitizeChangeLogForResponse),
             },
         };
     } catch (e: any) {

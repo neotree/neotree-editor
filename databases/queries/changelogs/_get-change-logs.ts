@@ -29,6 +29,33 @@ export type ChangeLogType = typeof changeLogs.$inferSelect & {
     entityName?: string;
 };
 
+const SENSITIVE_KEYS = ["password", "secret", "token", "credential", "auth", "privatekey", "apikey", "salt"];
+
+function sanitizeValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(sanitizeValue);
+    }
+
+    if (value && typeof value === "object") {
+        return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, val]) => {
+            const normalizedKey = key.toLowerCase();
+            const isSensitive = SENSITIVE_KEYS.some((needle) => normalizedKey.includes(needle));
+            if (isSensitive) return acc;
+            acc[key] = sanitizeValue(val);
+            return acc;
+        }, {});
+    }
+
+    return value;
+}
+
+export function sanitizeChangeLogForResponse(change: ChangeLogType): ChangeLogType {
+    return {
+        ...change,
+        fullSnapshot: sanitizeValue(change.fullSnapshot),
+    };
+}
+
 function deriveEntityName(change: typeof changeLogs.$inferSelect): string | undefined {
     const snapshot = (change.fullSnapshot || {}) as Record<string, unknown>;
     const candidateKeys = [
@@ -124,7 +151,7 @@ export async function _getChangeLogs(
             .limit(limit || 1000)
             .offset(offset || 0);
 
-        const responseData = changeLogsRes.map(item => ({
+        const responseData = changeLogsRes.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -238,11 +265,11 @@ export async function _getChangeLog(
 
         if (!changeLogRes[0]) return { data: null };
 
-        const responseData = {
+        const responseData = sanitizeChangeLogForResponse({
             ...changeLogRes[0].changeLog,
             userName: changeLogRes[0].user?.name || '',
             userEmail: changeLogRes[0].user?.email || '',
-        };
+        });
 
         return { data: responseData };
     } catch (e: any) {
@@ -292,7 +319,7 @@ export async function _getEntityHistory(
             .orderBy(desc(changeLogs.version))
             .limit(limit || 100);
 
-        const responseData = historyRes.map(item => ({
+        const responseData = historyRes.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -352,11 +379,11 @@ export async function _getActiveVersion(
 
         if (!activeVersionRes[0]) return { data: null };
 
-        const responseData = {
+        const responseData = sanitizeChangeLogForResponse({
             ...activeVersionRes[0].changeLog,
             userName: activeVersionRes[0].user?.name || '',
             userEmail: activeVersionRes[0].user?.email || '',
-        };
+        });
 
         return { data: responseData };
     } catch (e: any) {
@@ -425,11 +452,11 @@ export async function _getVersionChain(
 
             if (!versionRes[0]) break;
 
-            chain.push({
+            chain.push(sanitizeChangeLogForResponse({
                 ...versionRes[0].changeLog,
                 userName: versionRes[0].user?.name || '',
                 userEmail: versionRes[0].user?.email || '',
-            });
+            }));
 
             nextVersion = versionRes[0].changeLog.parentVersion;
         }
