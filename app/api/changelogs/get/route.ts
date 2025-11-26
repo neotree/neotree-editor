@@ -10,7 +10,14 @@ export async function POST(req: NextRequest) {
     if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
 
     const body = await req.json()
-    const data = await getChangeLogs(body)
+    const limit = Math.max(1, Math.min(Number(body?.limit) || 500, 2000))
+    const offset = Math.max(0, Number(body?.offset) || 0)
+
+    const data = await getChangeLogs({
+      ...body,
+      limit,
+      offset,
+    })
     return NextResponse.json(data)
   } catch (e: any) {
     logger.log("/api/changelogs/get", e)

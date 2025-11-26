@@ -104,11 +104,15 @@ export async function _getChangeLogs(
             scriptIds = [],
             screenIds = [],
             diagnosisIds = [],
-            limit,
-            offset,
+            limit = 1000,
+            offset = 0,
             sortBy = 'dateOfChange',
             sortOrder = 'desc',
         } = { ...params };
+
+        // clamp pagination to avoid runaway responses
+        const safeLimit = Math.max(1, Math.min(limit, 2000));
+        const safeOffset = Math.max(0, offset || 0);
 
         // Filter valid UUIDs
         changeLogIds = changeLogIds.filter(id => uuid.validate(id));
@@ -148,8 +152,8 @@ export async function _getChangeLogs(
                     ? desc(changeLogs[sortBy])
                     : asc(changeLogs[sortBy])
             )
-            .limit(limit || 1000)
-            .offset(offset || 0);
+            .limit(safeLimit)
+            .offset(safeOffset);
 
         const responseData = changeLogsRes.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
