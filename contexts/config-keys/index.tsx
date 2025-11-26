@@ -160,63 +160,80 @@ function useConfigKeysContentHook({
     }, [deleteConfigKeys, confirm, alert, router, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, onFormOpenChange]);
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number) => {
-        const sorted = arrayMoveImmutable([...configKeys.data], oldIndex, newIndex);
+        const previousPositions = new Map(configKeys.data.map(item => [item.configKeyId!, item.position]));
 
-        const payload: { configKeyId: string; position: number; oldPosition: number; snapshot: typeof configKeys.data[number]; }[] = [];
+        const sorted = arrayMoveImmutable([...configKeys.data], oldIndex, newIndex).map((item, index) => ({
+            ...item,
+            position: index + 1,
+        }));
 
-        sorted.forEach((s, i) => {
-            const old = configKeys.data[i];
-            if (old.position !== s.position) {
-                const position = i + 1;
-                payload.push({ 
-                    configKeyId: s.configKeyId!, 
-                    position, 
-                    oldPosition: s.position, 
-                    snapshot: s,
+        const payload: { configKeyId: string; position: number; previousPosition?: number; snapshot: typeof configKeys.data[number]; }[] = [];
+
+        sorted.forEach((item) => {
+            if (!item.configKeyId) return;
+            const previousPosition = previousPositions.get(item.configKeyId);
+            if (previousPosition !== undefined && previousPosition !== item.position) {
+                payload.push({
+                    configKeyId: item.configKeyId,
+                    position: item.position,
+                    previousPosition,
+                    snapshot: item,
                 });
-                sorted[i].position = position;
             }
         });
 
-        if (!payload.length) return;
-
         setConfigKeys(prev => ({ ...prev, data: sorted, }));
 
-        await Promise.all(payload.map(async ({ configKeyId, position, oldPosition, snapshot }) => {
-            if (!configKeyId) return;
+        await Promise.all(sorted.map(async (item) => {
+            if (!item?.configKeyId) return;
 
-            const existingChanges = await pendingChangesAPI.getEntityChanges(configKeyId, "configKey");
+            const existingChanges = await pendingChangesAPI.getEntityChanges(item.configKeyId, "configKey");
             const existingPositionChange = existingChanges.find(change => change.fieldPath === "position");
-            const entityTitle = getConfigKeyTitle(snapshot);
+            const previousPosition = existingPositionChange?.oldValue ?? previousPositions.get(item.configKeyId);
+
+            if (previousPosition === undefined) return;
+
+            if (item.position === previousPosition) {
+                if (existingPositionChange?.id) {
+                    await pendingChangesAPI.deleteChange(existingPositionChange.id);
+                }
+                return;
+            }
+
+            const entityTitle = getConfigKeyTitle(item);
+            const description = `Position changed from ${previousPosition} to ${item.position}`;
+            const fullSnapshot = { ...item, position: item.position };
 
             if (existingPositionChange?.id) {
                 await pendingChangesAPI.updateChange(existingPositionChange.id, {
-                    newValue: position,
-                    description: `Position changed from ${existingPositionChange.oldValue ?? oldPosition} to ${position}`,
-                    fullSnapshot: { ...snapshot, position },
+                    newValue: item.position,
+                    description,
+                    fullSnapshot,
                 });
             } else {
                 await pendingChangesAPI.addChange({
-                    entityId: configKeyId,
+                    entityId: item.configKeyId,
                     entityType: "configKey",
                     entityTitle,
                     action: "update",
                     fieldPath: "position",
                     fieldName: "Position",
-                    oldValue: oldPosition,
-                    newValue: position,
+                    oldValue: previousPosition,
+                    newValue: item.position,
                     userId: authenticatedUser?.userId,
                     userName: authenticatedUser?.displayName,
-                    description: `Position changed from ${oldPosition} to ${position}`,
-                    fullSnapshot: { ...snapshot, position },
+                    description,
+                    fullSnapshot,
                 });
             }
         }));
 
-        await saveConfigKeys({ 
-            data: payload.map(({ configKeyId, position }) => ({ configKeyId, position, })), 
-            broadcastAction: true, 
-        });
+        if (payload.length) {
+            await saveConfigKeys({ 
+                data: payload.map(({ configKeyId, position }) => ({ configKeyId, position, })), 
+                broadcastAction: true, 
+            });
+        }
     }, [saveConfigKeys, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const activeItem = useMemo(() => !activeItemId ? null : configKeys.data.filter(t => t.configKeyId === activeItemId)[0], [activeItemId, configKeys]);
