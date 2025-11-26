@@ -1104,13 +1104,14 @@ export const changeLogs = pgTable(
     mergedFromVersion: integer("merged_from_version"),
 
     // Script/Screen specific tracking
-    scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
-    screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "cascade" }),
-    diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "cascade" }),
-    configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "cascade" }),
-    drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "cascade" }),
-    dataKeyId: uuid("data_key_id").references(() => dataKeys.uuid, { onDelete: "cascade" }),
-    aliasId: uuid("alias_id").references(() => aliases.uuid, { onDelete: "cascade" }),
+    // Keep changelog rows even if the referenced entity is deleted to preserve audit history
+    scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "set null" }),
+    screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "set null" }),
+    diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "set null" }),
+    configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "set null" }),
+    drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "set null" }),
+    dataKeyId: uuid("data_key_id").references(() => dataKeys.uuid, { onDelete: "set null" }),
+    aliasId: uuid("alias_id").references(() => aliases.uuid, { onDelete: "set null" }),
 
     // Action tracking
     action: changeLogActionEnum("action").notNull(),
