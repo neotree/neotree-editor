@@ -9,6 +9,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import * as serverActions from '@/app/actions/config-keys';
 import { useAppContext } from "../app";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
+import { pendingChangesAPI } from "@/lib/indexed-db";
 
 export interface IConfigKeysContext extends  
 ConfigKeysContextProviderProps,
@@ -161,42 +162,62 @@ function useConfigKeysContentHook({
     const onSort = useCallback(async (oldIndex: number, newIndex: number) => {
         const sorted = arrayMoveImmutable([...configKeys.data], oldIndex, newIndex);
 
-        const payload: { configKeyId: string; position: number; }[] = [];
+        const payload: { configKeyId: string; position: number; oldPosition: number; snapshot: typeof configKeys.data[number]; }[] = [];
 
         sorted.forEach((s, i) => {
             const old = configKeys.data[i];
             if (old.position !== s.position) {
                 const position = i + 1;
-                payload.push({ configKeyId: s.configKeyId!, position, });
+                payload.push({ 
+                    configKeyId: s.configKeyId!, 
+                    position, 
+                    oldPosition: s.position, 
+                    snapshot: s,
+                });
                 sorted[i].position = position;
             }
         });
 
+        if (!payload.length) return;
+
         setConfigKeys(prev => ({ ...prev, data: sorted, }));
 
-        const res = await saveConfigKeys({ data: payload, broadcastAction: true, });
+        await Promise.all(payload.map(async ({ configKeyId, position, oldPosition, snapshot }) => {
+            if (!configKeyId) return;
 
-        // setLoading(true);
+            const existingChanges = await pendingChangesAPI.getEntityChanges(configKeyId, "configKey");
+            const existingPositionChange = existingChanges.find(change => change.fieldPath === "position");
+            const entityTitle = getConfigKeyTitle(snapshot);
 
-        // const res = await saveConfigKeys(payload);
+            if (existingPositionChange?.id) {
+                await pendingChangesAPI.updateChange(existingPositionChange.id, {
+                    newValue: position,
+                    description: `Position changed from ${existingPositionChange.oldValue ?? oldPosition} to ${position}`,
+                    fullSnapshot: { ...snapshot, position },
+                });
+            } else {
+                await pendingChangesAPI.addChange({
+                    entityId: configKeyId,
+                    entityType: "configKey",
+                    entityTitle,
+                    action: "update",
+                    fieldPath: "position",
+                    fieldName: "Position",
+                    oldValue: oldPosition,
+                    newValue: position,
+                    userId: authenticatedUser?.userId,
+                    userName: authenticatedUser?.displayName,
+                    description: `Position changed from ${oldPosition} to ${position}`,
+                    fullSnapshot: { ...snapshot, position },
+                });
+            }
+        }));
 
-        // if (res.errors?.length) {
-        //     alert({
-        //         title: 'Error',
-        //         message: res.errors.join(', '),
-        //         variant: 'error',
-        //     });
-        // } else {
-        //     setSelected([]);
-        //     alert({
-        //         title: 'Success',
-        //         message: 'Config keys deleted successfully!',
-        //         variant: 'success',
-        //     });
-        // }
-
-        // setLoading(false);
-    }, [saveConfigKeys, alert]);
+        await saveConfigKeys({ 
+            data: payload.map(({ configKeyId, position }) => ({ configKeyId, position, })), 
+            broadcastAction: true, 
+        });
+    }, [saveConfigKeys, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const activeItem = useMemo(() => !activeItemId ? null : configKeys.data.filter(t => t.configKeyId === activeItemId)[0], [activeItemId, configKeys]);
     const disabled = useMemo(() => viewOnly, [viewOnly]);
