@@ -75,6 +75,13 @@ function validateEntityAlignment(data: SaveChangeLogData) {
   if (hasUnexpectedFk) {
     throw new Error(`Only the ${expectedFkKey} FK should be provided for entityType ${data.entityType}`)
   }
+
+  if (data.action === "publish") {
+    const numericDataVersion = Number(data.dataVersion)
+    if (!Number.isFinite(numericDataVersion) || numericDataVersion <= 0) {
+      throw new Error("dataVersion is required and must be a positive number for publish actions")
+    }
+  }
 }
 
 async function getNextVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
