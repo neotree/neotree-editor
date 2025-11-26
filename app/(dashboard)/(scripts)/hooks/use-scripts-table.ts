@@ -112,6 +112,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
   const onSort = useCallback(
     async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number; newIndex: number }[]) => {
       const previousPositions = new Map(scripts.data.map((item) => [item.scriptId, item.position]))
+      const previousState = scripts
 
       const sorted = arrayMoveImmutable([...scripts.data], oldIndex, newIndex).map((item, index) => ({
         ...item,
@@ -129,57 +130,81 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
 
       setScripts((prev) => ({ ...prev, data: sorted }))
 
-      await Promise.all(
-        sorted.map(async (item) => {
-          const previousPosition = previousPositions.get(item.scriptId)
-          if (previousPosition === undefined) return
+      try {
+        await Promise.all(
+          sorted.map(async (item) => {
+            const previousPosition = previousPositions.get(item.scriptId)
+            if (previousPosition === undefined) return
 
-          const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
-          const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
-          const baseline = existingPositionChange?.oldValue ?? previousPosition
+            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
+            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
+            const baseline = existingPositionChange?.oldValue ?? previousPosition
 
-          if (baseline === undefined) return
+            if (baseline === undefined) return
 
-          if (item.position === baseline) {
-            if (existingPositionChange?.id) {
-              await pendingChangesAPI.deleteChange(existingPositionChange.id)
+            if (item.position === baseline) {
+              if (existingPositionChange?.id) {
+                await pendingChangesAPI.deleteChange(existingPositionChange.id)
+              }
+              return
             }
-            return
-          }
 
-          const description = `Position changed from ${baseline} to ${item.position}`
+            const description = `Position changed from ${baseline} to ${item.position}`
 
-          if (existingPositionChange?.id) {
-            await pendingChangesAPI.updateChange(existingPositionChange.id, {
-              newValue: item.position,
-              description,
-              fullSnapshot: { ...item },
-            })
-          } else {
-            await pendingChangesAPI.addChange({
-              entityId: item.scriptId,
-              entityType: "script",
-              entityTitle: item.title || item.printTitle || "Untitled Script",
-              action: "update",
-              fieldPath: "position",
-              fieldName: "position",
-              oldValue: baseline,
-              newValue: item.position,
-              description,
-              userId: authenticatedUser?.userId,
-              userName: authenticatedUser?.displayName,
-              fullSnapshot: { ...item },
-            })
-          }
-        }),
-      )
+            if (existingPositionChange?.id) {
+              await pendingChangesAPI.updateChange(existingPositionChange.id, {
+                newValue: item.position,
+                description,
+                fullSnapshot: { ...item },
+              })
+            } else {
+              await pendingChangesAPI.addChange({
+                entityId: item.scriptId,
+                entityType: "script",
+                entityTitle: item.title || item.printTitle || "Untitled Script",
+                action: "update",
+                fieldPath: "position",
+                fieldName: "position",
+                oldValue: baseline,
+                newValue: item.position,
+                description,
+                userId: authenticatedUser?.userId,
+                userName: authenticatedUser?.displayName,
+                fullSnapshot: { ...item },
+              })
+            }
+          }),
+        )
 
-      if (payload.length) {
-        // TODO: Replace this with server action
-        await axios.post("/api/scripts/save", { data: payload, broadcastAction: true })
+        if (payload.length) {
+          // TODO: Replace this with server action
+          await axios.post("/api/scripts/save", { data: payload, broadcastAction: true })
+        }
+
+        router.refresh()
+      } catch (e) {
+        // Roll back UI and pending changes on failure
+        setScripts(previousState)
+
+        await Promise.all(
+          sorted.map(async (item) => {
+            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
+            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
+            const baseline = existingPositionChange?.oldValue ?? previousPositions.get(item.scriptId)
+
+            if (existingPositionChange?.id) {
+              if (baseline === undefined || baseline === item.position) {
+                await pendingChangesAPI.deleteChange(existingPositionChange.id)
+              } else {
+                await pendingChangesAPI.updateChange(existingPositionChange.id, {
+                  newValue: baseline,
+                  description: `Position rolled back to ${baseline}`,
+                })
+              }
+            }
+          }),
+        )
       }
-
-      router.refresh()
     },
     [saveScripts, scripts, router, authenticatedUser?.userId, authenticatedUser?.displayName],
   )

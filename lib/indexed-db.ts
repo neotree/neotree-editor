@@ -178,6 +178,10 @@ export const pendingChangesAPI = {
     return await changeLogDB.changeSessions.where("sessionId").equals(sessionId).delete()
   },
 
+  async clearAllSessions() {
+    return await changeLogDB.changeSessions.clear()
+  },
+
   async getActiveSession(entityId: string) {
     return await changeLogDB.changeSessions.where("entityId").equals(entityId).first()
   },

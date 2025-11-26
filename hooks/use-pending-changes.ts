@@ -42,6 +42,9 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
     let cancelled = false
 
     if (autoTrack && entityId && entityType) {
+      // Clear any lingering legacy sessions to keep Dexie tidy
+      pendingChangesAPI.clearAllSessions().catch(() => {})
+
       pendingChangesAPI.startSession(entityId, entityType, entityTitle, userId).then((id) => {
         if (cancelled) return
         activeSessionId = id || null
