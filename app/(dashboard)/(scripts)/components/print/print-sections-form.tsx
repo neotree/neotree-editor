@@ -34,18 +34,18 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
     onClose: () => void;
     onChange: (section: PrintSection) => void;
 }) {
+    const { screens: { data: screens, } } = useScriptsContext();
+    
     const [containerDivRef, containerDiv] = useMeasure<HTMLDivElement>();
     const [contentDivRef, contentDiv] = useMeasure<HTMLDivElement>();
 
     const [loading, setLoading] = useState(false);
     const [title, setTitle] = useState(section?.title || '');
-    const [selected, setSelected] = useState(section?.screensIds || []);
-
-    const { screens: { data: screens, } } = useScriptsContext();
+    const [selected, setSelected] = useState((section?.screensIds || []).filter(id => screens.find(s => s.screenId === id)));
 
     useEffect(() => {
         setTitle(section?.title || '');
-        setSelected(section?.screensIds || []);
+        setSelected((section?.screensIds || []).filter(id => screens.find(s => s.screenId === id)));
     }, [section]);
 
     const onSave = useCallback(() => {
