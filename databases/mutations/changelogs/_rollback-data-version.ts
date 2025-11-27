@@ -212,7 +212,7 @@ export async function _rollbackDataVersion({
         throw new Error(`No active changes found for data version v${currentDataVersion}`)
       }
 
-      // Preflight: ensure each entity has a valid snapshot from the previous published data version
+      // Preflight: ensure each entity has a valid snapshot from the previous published data version (or current if new)
       for (const current of currentChanges) {
         const target = await tx.query.changeLogs.findFirst({
           where: and(
@@ -223,17 +223,18 @@ export async function _rollbackDataVersion({
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
 
-        if (!target) throw new Error(`Previous data version not found for ${current.entityId}`)
-        if (!target.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
-        if (target.entityType !== current.entityType) {
+        const effectiveTarget = target ?? current
+
+        if (!effectiveTarget.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
+        if (effectiveTarget.entityType !== current.entityType) {
           throw new Error(`Entity type mismatch for ${current.entityId}`)
         }
 
         // Snapshot integrity (best-effort): if hashes exist, verify; otherwise compute and trust
-        const computedTargetHash = hashSnapshot(target.fullSnapshot)
-        const storedTargetHash = await ensureSnapshotHash(tx, target)
+        const computedTargetHash = hashSnapshot(effectiveTarget.fullSnapshot)
+        const storedTargetHash = await ensureSnapshotHash(tx, effectiveTarget)
         if (storedTargetHash !== computedTargetHash) {
-          throw new Error(`Snapshot hash mismatch for ${current.entityId} v${target.version}`)
+          throw new Error(`Snapshot hash mismatch for ${current.entityId} v${effectiveTarget.version}`)
         }
         const storedCurrentHash = await ensureSnapshotHash(tx, current)
         const computedCurrentHash = hashSnapshot(current.fullSnapshot)
@@ -258,10 +259,11 @@ export async function _rollbackDataVersion({
           ),
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
-        if (!scriptTarget || !scriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
+        const effectiveScriptTarget = scriptTarget ?? scriptChange
+        if (!effectiveScriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
 
         const plan: { current: typeof changeLogs.$inferSelect; target: typeof changeLogs.$inferSelect; binding: VersionedEntityBinding }[] = []
-        plan.push({ current: scriptChange, target: scriptTarget, binding })
+        plan.push({ current: scriptChange, target: effectiveScriptTarget, binding })
 
         const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis"]
         for (const childType of childTypes) {
@@ -279,10 +281,11 @@ export async function _rollbackDataVersion({
               ),
               orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
             })
-            if (!targetChild || !targetChild.fullSnapshot) {
+            const effectiveChildTarget = targetChild ?? child
+            if (!effectiveChildTarget || !effectiveChildTarget.fullSnapshot) {
               throw new Error(`Missing previous snapshot for child entity ${child.entityId}`)
             }
-            plan.push({ current: child, target: targetChild, binding: childBinding })
+            plan.push({ current: child, target: effectiveChildTarget, binding: childBinding })
           }
         }
 
@@ -350,7 +353,8 @@ export async function _rollbackDataVersion({
           ),
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
-        if (!target || !target.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
+        const effectiveTarget = target ?? current
+        if (!effectiveTarget || !effectiveTarget.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
 
         const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
         const rollbackChangeLog: SaveChangeLogData = {
