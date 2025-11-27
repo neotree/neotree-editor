@@ -80,6 +80,18 @@ function hashSnapshot(snapshot: any) {
   return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
 }
 
+async function ensureSnapshotHash(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  change: typeof changeLogs.$inferSelect,
+) {
+  if (change.snapshotHash) return change.snapshotHash
+  const computed = hashSnapshot(change.fullSnapshot)
+  if ((change as any).id) {
+    await tx.update(changeLogs).set({ snapshotHash: computed }).where(eq(changeLogs.id, (change as any).id))
+  }
+  return computed
+}
+
 async function lockEntityRow({
   tx,
   binding,
@@ -108,6 +120,19 @@ function pickColumns(snapshot: any, table: any) {
   }, {})
 }
 
+function coerceTemporalValues(payload: Record<string, any>) {
+  const dateLikeKeys = Object.keys(payload).filter((key) => /date|at|time/i.test(key))
+  for (const key of dateLikeKeys) {
+    const value = payload[key]
+    if (value && (typeof value === "string" || typeof value === "number")) {
+      const coerced = new Date(value)
+      if (!isNaN(coerced.valueOf())) {
+        payload[key] = coerced
+      }
+    }
+  }
+}
+
 async function applySnapshot({
   tx,
   binding,
@@ -123,6 +148,7 @@ async function applySnapshot({
 }) {
   const now = new Date()
   const basePayload = pickColumns(snapshot ?? {}, binding.table)
+  coerceTemporalValues(basePayload)
 
   basePayload[binding.pkKey] = entityId
   if (binding.versionKey) basePayload[binding.versionKey] = newVersion
@@ -205,17 +231,11 @@ export async function _rollbackDataVersion({
 
         // Snapshot integrity (best-effort): if hashes exist, verify; otherwise compute and trust
         const computedTargetHash = hashSnapshot(target.fullSnapshot)
-        const storedTargetHash = (target as any).snapshotHash || (target.fullSnapshot as any)?.snapshotHash
-        if (!storedTargetHash) {
-          throw new Error(`Snapshot hash missing for ${current.entityId} v${target.version}`)
-        }
+        const storedTargetHash = await ensureSnapshotHash(tx, target)
         if (storedTargetHash !== computedTargetHash) {
           throw new Error(`Snapshot hash mismatch for ${current.entityId} v${target.version}`)
         }
-        const storedCurrentHash = (current as any).snapshotHash || (current.fullSnapshot as any)?.snapshotHash
-        if (!storedCurrentHash) {
-          throw new Error(`Snapshot hash missing for current ${current.entityId} v${current.version}`)
-        }
+        const storedCurrentHash = await ensureSnapshotHash(tx, current)
         const computedCurrentHash = hashSnapshot(current.fullSnapshot)
         if (storedCurrentHash !== computedCurrentHash) {
           throw new Error(`Snapshot hash mismatch for current ${current.entityId} v${current.version}`)

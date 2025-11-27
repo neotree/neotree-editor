@@ -3,13 +3,19 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
-import { Search } from "lucide-react"
+import { MoreVertical, Search } from "lucide-react"
 
 import { Loader } from "@/components/loader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Pagination,
   PaginationContent,
@@ -26,7 +32,7 @@ import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTa
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 
-type Props = UseChangelogsTableParams
+type Props = UseChangelogsTableParams & { isSuperUser: boolean }
 
 const entityTypeLabels: Record<string, string> = {
   script: "Script",
@@ -126,6 +132,8 @@ export function ChangelogsTable(props: Props) {
     loadChangelogs,
     clearFilters,
   } = useChangelogsTable(props)
+
+  const { isSuperUser } = props
 
   const router = useRouter()
   const { alert } = useAlertModal()
@@ -356,32 +364,33 @@ export function ChangelogsTable(props: Props) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-primary"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleNavigate(entry.dataVersion)
-                            }}
-                          >
-                            View details
-                          </Button>
-                          {entry.isLatestVersion && entry.dataVersion > 1 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                handleRollbackDataVersion(entry.dataVersion)
-                              }}
-                              disabled={rollbacking === entry.dataVersion}
-                            >
-                              {rollbacking === entry.dataVersion ? "Rolling back..." : `Rollback to v${entry.dataVersion - 1}`}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open actions</span>
                             </Button>
-                          )}
-                        </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                            <DropdownMenuItem
+                              onClick={() => handleNavigate(entry.dataVersion)}
+                              className="cursor-pointer"
+                            >
+                              View details
+                            </DropdownMenuItem>
+                            {isSuperUser && entry.isLatestVersion && entry.dataVersion > 1 && (
+                              <DropdownMenuItem
+                                disabled={rollbacking === entry.dataVersion}
+                                onClick={() => handleRollbackDataVersion(entry.dataVersion)}
+                                className="cursor-pointer text-orange-600 focus:text-orange-700"
+                              >
+                                {rollbacking === entry.dataVersion
+                                  ? "Rolling back..."
+                                  : `Rollback to v${entry.dataVersion - 1}`}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   )
