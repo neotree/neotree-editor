@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const isAuthorised = await isAuthenticated()
 
-    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] })
+    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
 
     const params = JSON.parse(req.nextUrl.searchParams.get("data") || "{}") as Parameters<typeof searchChangeLogs>[0]
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   try {
     const isAuthorised = await isAuthenticated()
 
-    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] })
+    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
 
     const body = await req.json()
     const data = await searchChangeLogs(body)

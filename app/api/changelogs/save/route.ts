@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const isAuthorised = await isAuthenticated()
 
-    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 200 })
+    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
 
     const body = await req.json()
 

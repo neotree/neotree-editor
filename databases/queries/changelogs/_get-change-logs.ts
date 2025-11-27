@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc, asc, sql } from "drizzle-orm";
+import { and, eq, inArray, desc, asc, sql, count } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -162,11 +162,28 @@ export async function _getChangeLogs(
             entityName: deriveEntityName(item.changeLog),
         }));
 
+        const totalRes = await db
+            .select({ total: count() })
+            .from(changeLogs)
+            .where(and(
+                !changeLogIds.length ? undefined : inArray(changeLogs.changeLogId, changeLogIds),
+                !entityIds.length ? undefined : inArray(changeLogs.entityId, entityIds),
+                !entityTypes.length ? undefined : inArray(changeLogs.entityType, entityTypes),
+                !userIds.length ? undefined : inArray(changeLogs.userId, userIds),
+                !actions.length ? undefined : inArray(changeLogs.action, actions),
+                !versions.length ? undefined : inArray(changeLogs.version, versions),
+                !dataVersions.length ? undefined : inArray(changeLogs.dataVersion, dataVersions),
+                !scriptIds.length ? undefined : inArray(changeLogs.scriptId, scriptIds),
+                !screenIds.length ? undefined : inArray(changeLogs.screenId, screenIds),
+                !diagnosisIds.length ? undefined : inArray(changeLogs.diagnosisId, diagnosisIds),
+                isActiveOnly ? eq(changeLogs.isActive, true) : undefined,
+            ));
+
         await reconcileActiveFlags(responseData);
 
         return {
             data: responseData,
-            total: responseData.length,
+            total: totalRes?.[0]?.total ?? responseData.length,
         };
     } catch (e: any) {
         logger.error('_getChangeLogs ERROR', e.message);

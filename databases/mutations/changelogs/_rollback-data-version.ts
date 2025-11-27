@@ -1,0 +1,398 @@
+import { and, desc, eq, lt, sql } from "drizzle-orm"
+import { createHash } from "crypto"
+import * as uuid from "uuid"
+
+import logger from "@/lib/logger"
+import db from "@/databases/pg/drizzle"
+import {
+  aliases,
+  changeLogs,
+  configKeys,
+  dataKeys,
+  diagnoses,
+  drugsLibrary,
+  editorInfo,
+  screens,
+  scripts,
+} from "@/databases/pg/schema"
+import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
+
+export type RollbackDataVersionParams = {
+  dataVersion?: number
+  userId: string
+  changeReason?: string
+}
+
+export type RollbackDataVersionResponse = {
+  success: boolean
+  errors?: string[]
+  restoredVersion?: number
+}
+
+type VersionedEntityBinding = {
+  table: any
+  pk: any
+  pkKey: string
+  versionKey?: string
+  publishDateKey?: string
+}
+
+const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding> = {
+  script: { table: scripts, pk: scripts.scriptId, pkKey: "scriptId", versionKey: "version", publishDateKey: "publishDate" },
+  screen: { table: screens, pk: screens.screenId, pkKey: "screenId", versionKey: "version", publishDateKey: "publishDate" },
+  diagnosis: {
+    table: diagnoses,
+    pk: diagnoses.diagnosisId,
+    pkKey: "diagnosisId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+  },
+  config_key: {
+    table: configKeys,
+    pk: configKeys.configKeyId,
+    pkKey: "configKeyId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+  },
+  drugs_library: {
+    table: drugsLibrary,
+    pk: drugsLibrary.itemId,
+    pkKey: "itemId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+  },
+  data_key: {
+    table: dataKeys,
+    pk: dataKeys.uuid,
+    pkKey: "uuid",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+  },
+  alias: {
+    table: aliases,
+    pk: aliases.uuid,
+    pkKey: "uuid",
+    publishDateKey: "publishDate",
+  },
+}
+
+function hashSnapshot(snapshot: any) {
+  return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
+}
+
+async function lockEntityRow({
+  tx,
+  binding,
+  entityId,
+}: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  binding: VersionedEntityBinding
+  entityId: string
+}) {
+  await tx
+    .select({ lock: sql<number>`1` })
+    .from(binding.table)
+    .where(eq(binding.pk, entityId))
+    .for("update")
+}
+
+function pickColumns(snapshot: any, table: any) {
+  const allowed = Object.keys(table).filter((key) => {
+    const col = (table as any)[key]
+    return col && typeof col === "object" && "name" in col
+  })
+
+  return allowed.reduce<Record<string, any>>((acc, key) => {
+    if (snapshot[key] !== undefined) acc[key] = snapshot[key]
+    return acc
+  }, {})
+}
+
+async function applySnapshot({
+  tx,
+  binding,
+  entityId,
+  snapshot,
+  newVersion,
+}: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  binding: VersionedEntityBinding
+  entityId: string
+  snapshot: any
+  newVersion: number
+}) {
+  const now = new Date()
+  const basePayload = pickColumns(snapshot ?? {}, binding.table)
+
+  basePayload[binding.pkKey] = entityId
+  if (binding.versionKey) basePayload[binding.versionKey] = newVersion
+  if (binding.publishDateKey) basePayload[binding.publishDateKey] = now
+  if ("updatedAt" in binding.table) basePayload.updatedAt = now
+
+  const [updated] = await tx.update(binding.table).set(basePayload).where(eq(binding.pk, entityId)).returning()
+  if (updated) return updated
+
+  const insertPayload = { ...basePayload }
+  delete insertPayload.id
+
+  const [inserted] = await tx.insert(binding.table).values(insertPayload).returning()
+  return inserted
+}
+
+export async function _rollbackDataVersion({
+  dataVersion: requestedDataVersion,
+  userId,
+  changeReason,
+}: RollbackDataVersionParams): Promise<RollbackDataVersionResponse> {
+  const response: RollbackDataVersionResponse = { success: false }
+  let restoredVersion: number | undefined
+
+  try {
+    if (!uuid.validate(userId)) throw new Error("Invalid userId")
+
+    await db.transaction(async (tx) => {
+      const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(
+        sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
+      )
+      const editor = lockedEditorInfo?.[0]
+
+      const currentDataVersion = requestedDataVersion ?? editor?.dataVersion
+      if (!currentDataVersion || currentDataVersion < 2) {
+        throw new Error("No data version to rollback or already at initial version")
+      }
+
+      if (!editor || editor.dataVersion !== currentDataVersion) {
+        throw new Error("Data version drift detected; reload and try again")
+      }
+
+      const previousDataVersion = currentDataVersion - 1
+      if (previousDataVersion < 1) {
+        throw new Error("No previous data version available to restore")
+      }
+
+      const targetDataVersion = currentDataVersion + 1
+      restoredVersion = targetDataVersion
+
+      await tx.execute(
+        sql`select id from nt_change_logs where data_version = ${currentDataVersion} and is_active = true for update`,
+      )
+
+      const currentChanges = await tx.query.changeLogs.findMany({
+        where: and(eq(changeLogs.dataVersion, currentDataVersion), eq(changeLogs.isActive, true)),
+        orderBy: (changeLogs, { asc }) => [asc(changeLogs.entityType), asc(changeLogs.entityId)],
+      })
+
+      if (!currentChanges.length) {
+        throw new Error(`No active changes found for data version v${currentDataVersion}`)
+      }
+
+      // Preflight: ensure each entity has a valid snapshot from the previous published data version
+      for (const current of currentChanges) {
+        const target = await tx.query.changeLogs.findFirst({
+          where: and(
+            eq(changeLogs.entityId, current.entityId),
+            eq(changeLogs.entityType, current.entityType),
+            lt(changeLogs.dataVersion, currentDataVersion),
+          ),
+          orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+        })
+
+        if (!target) throw new Error(`Previous data version not found for ${current.entityId}`)
+        if (!target.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
+        if (target.entityType !== current.entityType) {
+          throw new Error(`Entity type mismatch for ${current.entityId}`)
+        }
+
+        // Snapshot integrity (best-effort): if hashes exist, verify; otherwise compute and trust
+        const computedTargetHash = hashSnapshot(target.fullSnapshot)
+        const storedTargetHash = (target as any).snapshotHash || (target.fullSnapshot as any)?.snapshotHash
+        if (!storedTargetHash) {
+          throw new Error(`Snapshot hash missing for ${current.entityId} v${target.version}`)
+        }
+        if (storedTargetHash !== computedTargetHash) {
+          throw new Error(`Snapshot hash mismatch for ${current.entityId} v${target.version}`)
+        }
+        const storedCurrentHash = (current as any).snapshotHash || (current.fullSnapshot as any)?.snapshotHash
+        if (!storedCurrentHash) {
+          throw new Error(`Snapshot hash missing for current ${current.entityId} v${current.version}`)
+        }
+        const computedCurrentHash = hashSnapshot(current.fullSnapshot)
+        if (storedCurrentHash !== computedCurrentHash) {
+          throw new Error(`Snapshot hash mismatch for current ${current.entityId} v${current.version}`)
+        }
+      }
+
+      // Build grouped restore plan per script (parent + children)
+      const scriptChanges = currentChanges.filter((c) => c.entityType === "script")
+      const nonScriptChanges = currentChanges.filter((c) => c.entityType !== "script")
+
+      for (const scriptChange of scriptChanges) {
+        const binding = ENTITY_BINDINGS[scriptChange.entityType]
+        await lockEntityRow({ tx, binding, entityId: scriptChange.entityId })
+
+        const scriptTarget = await tx.query.changeLogs.findFirst({
+          where: and(
+            eq(changeLogs.entityId, scriptChange.entityId),
+            eq(changeLogs.entityType, scriptChange.entityType),
+            lt(changeLogs.dataVersion, currentDataVersion),
+          ),
+          orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+        })
+        if (!scriptTarget || !scriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
+
+        const plan: { current: typeof changeLogs.$inferSelect; target: typeof changeLogs.$inferSelect; binding: VersionedEntityBinding }[] = []
+        plan.push({ current: scriptChange, target: scriptTarget, binding })
+
+        const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis"]
+        for (const childType of childTypes) {
+          const children = currentChanges.filter(
+            (c) => c.entityType === childType && c.scriptId === scriptChange.scriptId,
+          )
+          for (const child of children) {
+            const childBinding = ENTITY_BINDINGS[childType]
+            await lockEntityRow({ tx, binding: childBinding, entityId: child.entityId })
+            const targetChild = await tx.query.changeLogs.findFirst({
+              where: and(
+                eq(changeLogs.entityId, child.entityId),
+                eq(changeLogs.entityType, child.entityType),
+                lt(changeLogs.dataVersion, currentDataVersion),
+              ),
+              orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+            })
+            if (!targetChild || !targetChild.fullSnapshot) {
+              throw new Error(`Missing previous snapshot for child entity ${child.entityId}`)
+            }
+            plan.push({ current: child, target: targetChild, binding: childBinding })
+          }
+        }
+
+        // Apply plan atomically
+        for (const { current, target, binding } of plan) {
+          const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
+          const rollbackChangeLog: SaveChangeLogData = {
+            entityId: current.entityId,
+            entityType: current.entityType,
+            action: "rollback",
+            changes: [
+              {
+                action: "rollback",
+                description,
+                fromVersion: current.version,
+                toVersion: target.version,
+                fromDataVersion: currentDataVersion,
+                toDataVersion: previousDataVersion,
+              },
+            ],
+            fullSnapshot: target.fullSnapshot,
+            description,
+            changeReason: changeReason || description,
+            parentVersion: current.version,
+            dataVersion: targetDataVersion,
+            isActive: true,
+            userId,
+            scriptId: current.scriptId,
+            screenId: current.screenId,
+            diagnosisId: current.diagnosisId,
+            configKeyId: current.configKeyId,
+            drugsLibraryItemId: current.drugsLibraryItemId,
+            dataKeyId: current.dataKeyId,
+            aliasId: current.aliasId,
+          }
+
+          const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
+          if (!saved.success || !saved.data) {
+            throw new Error(saved.errors?.join(", ") || `Failed to rollback ${current.entityId}`)
+          }
+
+          const applied = await applySnapshot({
+            tx,
+            binding,
+            entityId: current.entityId,
+            snapshot: target.fullSnapshot,
+            newVersion: saved.data.version,
+          })
+
+          if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)
+        }
+      }
+
+      // Non-script entities (singletons)
+      for (const current of nonScriptChanges) {
+        const binding = ENTITY_BINDINGS[current.entityType]
+        if (!binding) throw new Error(`Unsupported entity type ${current.entityType}`)
+        await lockEntityRow({ tx, binding, entityId: current.entityId })
+
+        const target = await tx.query.changeLogs.findFirst({
+          where: and(
+            eq(changeLogs.entityId, current.entityId),
+            eq(changeLogs.entityType, current.entityType),
+            lt(changeLogs.dataVersion, currentDataVersion),
+          ),
+          orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+        })
+        if (!target || !target.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
+
+        const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
+        const rollbackChangeLog: SaveChangeLogData = {
+          entityId: current.entityId,
+          entityType: current.entityType,
+          action: "rollback",
+          changes: [
+            {
+              action: "rollback",
+              description,
+              fromVersion: current.version,
+              toVersion: target.version,
+              fromDataVersion: currentDataVersion,
+              toDataVersion: previousDataVersion,
+            },
+          ],
+          fullSnapshot: target.fullSnapshot,
+          description,
+          changeReason: changeReason || description,
+          parentVersion: current.version,
+          dataVersion: targetDataVersion,
+          isActive: true,
+          userId,
+          scriptId: current.scriptId,
+          screenId: current.screenId,
+          diagnosisId: current.diagnosisId,
+          configKeyId: current.configKeyId,
+          drugsLibraryItemId: current.drugsLibraryItemId,
+          dataKeyId: current.dataKeyId,
+          aliasId: current.aliasId,
+        }
+
+        const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
+        if (!saved.success || !saved.data) {
+          throw new Error(saved.errors?.join(", ") || `Failed to rollback ${current.entityId}`)
+        }
+
+        const applied = await applySnapshot({
+          tx,
+          binding,
+          entityId: current.entityId,
+          snapshot: target.fullSnapshot,
+          newVersion: saved.data.version,
+        })
+
+        if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)
+      }
+
+      if (editor) {
+        await tx
+          .update(editorInfo)
+          .set({ dataVersion: targetDataVersion, lastPublishDate: new Date() })
+          .where(eq(editorInfo.id, editor.id))
+      }
+    })
+
+    response.success = true
+    response.restoredVersion = restoredVersion
+    return response
+  } catch (e: any) {
+    logger.error("_rollbackDataVersion ERROR", e.message)
+    response.errors = [e.message]
+    return response
+  }
+}

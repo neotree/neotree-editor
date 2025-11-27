@@ -4,6 +4,15 @@ import * as mutations from "@/databases/mutations/changelogs"
 import * as queries from "@/databases/queries/changelogs"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
+import { isAuthenticated } from "./is-authenticated"
+
+async function ensureSuperUser() {
+  const session = await isAuthenticated()
+  if (!session.yes || session.user?.role !== "super_user") {
+    throw new Error("Forbidden: superuser required")
+  }
+  return session
+}
 
 // QUERIES
 export const getChangeLogs: typeof queries._getChangeLogs = async (...args) => {
@@ -229,13 +238,26 @@ export const markVersionAsSuperseded: typeof mutations._markVersionAsSuperseded 
 
 export const rollbackChangeLog: typeof mutations._rollbackChangeLog = async (params) => {
   try {
-    const session = await isAllowed()
+    const session = await ensureSuperUser()
     return await mutations._rollbackChangeLog({
       ...params,
       userId: session.user?.userId!,
     })
   } catch (e: any) {
     logger.error("rollbackChangeLog ERROR", e.message)
+    return { errors: [e.message], success: false }
+  }
+}
+
+export const rollbackDataVersion: typeof mutations._rollbackDataVersion = async (params) => {
+  try {
+    const session = await ensureSuperUser()
+    return await mutations._rollbackDataVersion({
+      ...params,
+      userId: session.user?.userId!,
+    })
+  } catch (e: any) {
+    logger.error("rollbackDataVersion ERROR", e.message)
     return { errors: [e.message], success: false }
   }
 }
