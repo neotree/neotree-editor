@@ -91,13 +91,12 @@ function validateEntityAlignment(data: SaveChangeLogData) {
 }
 
 async function getNextVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
-  const [row] = await (client as any).execute<{
-    maxVersion: number
-  }>(
-    sql`select coalesce(max(version), 0) as "maxVersion" from nt_change_logs where entity_id = ${entityId} and entity_type = ${entityType} for update`,
+  const rows = await client.execute(
+    sql`select version from nt_change_logs where entity_id = ${entityId} and entity_type = ${entityType} order by version desc limit 1 for update`,
   )
 
-  return (row?.maxVersion ?? 0) + 1
+  const row = rows[0] as any
+  return (row?.version ?? 0) + 1
 }
 
 export async function _saveChangeLog({

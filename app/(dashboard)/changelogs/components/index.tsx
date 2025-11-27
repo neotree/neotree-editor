@@ -3,7 +3,7 @@
 import { ChangelogsTable } from "./changelogs-table"
 import type { UseChangelogsTableParams } from "../hooks/use-changelogs-table"
 
-type Props = UseChangelogsTableParams
+type Props = UseChangelogsTableParams & { isSuperUser: boolean }
 
 export function ChangelogManagement(props: Props) {
   return (
