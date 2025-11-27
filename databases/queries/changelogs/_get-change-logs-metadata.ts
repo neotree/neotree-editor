@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc, sql, or, ilike } from "drizzle-orm";
+import { and, eq, inArray, desc, sql, or, ilike, count } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -79,6 +79,19 @@ export async function _searchChangeLogs(
             .limit(limit)
             .offset(offset);
 
+        const totalRes = await db
+            .select({ total: count() })
+            .from(changeLogs)
+            .where(and(
+                searchConditions,
+                !entityTypes.length ? undefined : inArray(changeLogs.entityType, entityTypes),
+                !actions.length ? undefined : inArray(changeLogs.action, actions),
+                !userIds.length ? undefined : inArray(changeLogs.userId, userIds),
+                isActiveOnly ? eq(changeLogs.isActive, true) : undefined,
+                startDate ? sql`${changeLogs.dateOfChange} >= ${startDate}` : undefined,
+                endDate ? sql`${changeLogs.dateOfChange} <= ${endDate}` : undefined,
+            ));
+
         const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
@@ -87,7 +100,7 @@ export async function _searchChangeLogs(
 
         return {
             data,
-            total: data.length,
+            total: totalRes?.[0]?.total ?? data.length,
         };
     } catch (e: any) {
         logger.error('_searchChangeLogs ERROR', e.message);

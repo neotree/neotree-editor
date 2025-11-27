@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
@@ -22,6 +23,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
 import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import axios from "axios"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Props = UseChangelogsTableParams
 
@@ -125,6 +128,8 @@ export function ChangelogsTable(props: Props) {
   } = useChangelogsTable(props)
 
   const router = useRouter()
+  const { alert } = useAlertModal()
+  const [rollbacking, setRollbacking] = useState<number | null>(null)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -183,6 +188,42 @@ export function ChangelogsTable(props: Props) {
     router.push(buildDetailsHref(version))
   }
 
+  const handleRollbackDataVersion = async (dataVersion: number) => {
+    if (dataVersion < 2) return
+
+    const confirmed = window.confirm(
+      `Publish a rollback for release v${dataVersion} (restoring the state of v${dataVersion - 1}). This will create a new release v${dataVersion + 1}.`,
+    )
+    if (!confirmed) return
+
+    try {
+      setRollbacking(dataVersion)
+      const res = await axios.post("/api/changelogs/rollback-data-version", {
+        dataVersion,
+        changeReason: `Rollback release v${dataVersion} to v${dataVersion - 1}`,
+      })
+
+      if (res.data?.errors?.length) {
+        throw new Error(res.data.errors.join(", "))
+      }
+
+      alert({
+        title: "Rollback queued",
+        message: `Release v${dataVersion} will be rolled back to the state of v${dataVersion - 1}. New release v${dataVersion + 1} will be created. Refreshing...`,
+        variant: "success",
+        onClose: () => window.location.reload(),
+      })
+    } catch (e: any) {
+      alert({
+        title: "Rollback failed",
+        message: e.message || "An unexpected error occurred.",
+        variant: "error",
+      })
+    } finally {
+      setRollbacking(null)
+    }
+  }
+
   return (
     <>
       {loading && <Loader overlay />}
@@ -234,7 +275,7 @@ export function ChangelogsTable(props: Props) {
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[200px]">Published By</TableHead>
                   <TableHead className="w-[170px]">Published At</TableHead>
-                  <TableHead className="text-right w-[120px]">Details</TableHead>
+                  <TableHead className="text-right w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -261,7 +302,15 @@ export function ChangelogsTable(props: Props) {
                       <TableCell>
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
-                          {entry.isLatestVersion ? (
+                          {entry.rollbackSourceVersion ? (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                              title={`This release restores the state from data version v${entry.rollbackSourceVersion}.`}
+                            >
+                              State of v{entry.rollbackSourceVersion}
+                            </Badge>
+                          ) : entry.isLatestVersion ? (
                             <Badge
                               variant="outline"
                               className="w-fit border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
@@ -307,17 +356,32 @@ export function ChangelogsTable(props: Props) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-primary"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleNavigate(entry.dataVersion)
-                          }}
-                        >
-                          View details
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-primary"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleNavigate(entry.dataVersion)
+                            }}
+                          >
+                            View details
+                          </Button>
+                          {entry.isLatestVersion && entry.dataVersion > 1 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleRollbackDataVersion(entry.dataVersion)
+                              }}
+                              disabled={rollbacking === entry.dataVersion}
+                            >
+                              {rollbacking === entry.dataVersion ? "Rolling back..." : `Rollback to v${entry.dataVersion - 1}`}
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

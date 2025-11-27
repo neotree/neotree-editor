@@ -1,4 +1,5 @@
 import { and, eq, lt, sql } from "drizzle-orm"
+import { createHash } from "crypto"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
@@ -14,6 +15,7 @@ export type SaveChangeLogData = {
   dataVersion?: number | null
   changes?: any
   fullSnapshot?: any
+  snapshotHash?: string | null
   description?: string
   changeReason?: string
   parentVersion?: number | null
@@ -48,6 +50,10 @@ const ENTITY_TYPE_TO_FK: Record<SaveChangeLogData["entityType"], keyof SaveChang
 type DbClient = typeof db
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbOrTransaction = DbClient | TransactionClient
+
+function computeSnapshotHash(snapshot: any) {
+  return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
+}
 
 function validateEntityAlignment(data: SaveChangeLogData) {
   if (!uuid.validate(data.entityId)) throw new Error("Invalid entityId")
@@ -85,12 +91,13 @@ function validateEntityAlignment(data: SaveChangeLogData) {
 }
 
 async function getNextVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
-  const result = await client
-    .select({ maxVersion: sql<number>`coalesce(max(${changeLogs.version}), 0)` })
-    .from(changeLogs)
-    .where(and(eq(changeLogs.entityId, entityId), eq(changeLogs.entityType, entityType)))
+  const [row] = await (client as any).execute<{
+    maxVersion: number
+  }>(
+    sql`select coalesce(max(version), 0) as "maxVersion" from nt_change_logs where entity_id = ${entityId} and entity_type = ${entityType} for update`,
+  )
 
-  return (result[0]?.maxVersion ?? 0) + 1
+  return (row?.maxVersion ?? 0) + 1
 }
 
 export async function _saveChangeLog({
@@ -111,6 +118,8 @@ export async function _saveChangeLog({
       const changeLogId = uuid.v4()
       const computedVersion = await getNextVersion(tx, data.entityId, data.entityType)
       const dataVersion = Number.isFinite(data.dataVersion) ? Number(data.dataVersion) : null
+      const snapshotHash = data.snapshotHash || computeSnapshotHash(data.fullSnapshot)
+      if (!snapshotHash) throw new Error("snapshotHash is required")
 
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
@@ -121,6 +130,7 @@ export async function _saveChangeLog({
         dataVersion,
         changes: data.changes || [],
         fullSnapshot: data.fullSnapshot || {},
+        snapshotHash,
         description: data.description,
         changeReason: data.changeReason,
         parentVersion: data.parentVersion,
@@ -189,15 +199,18 @@ export async function _saveChangeLogs({
   const errors: string[] = []
 
   try {
-    for (const changeLogData of data) {
-      const res = await _saveChangeLog({ data: changeLogData })
+    await db.transaction(async (tx) => {
+      for (const changeLogData of data) {
+        const res = await _saveChangeLog({ data: changeLogData, client: tx })
 
-      if (res.errors?.length) {
-        errors.push(...res.errors)
-      } else {
+        if (res.errors?.length) {
+          errors.push(...res.errors)
+          throw new Error(errors.join(", "))
+        }
+
         saved++
       }
-    }
+    })
 
     if (broadcastAction && !errors.length) {
       socket.emit("data_changed", "save_change_logs")
@@ -210,6 +223,7 @@ export async function _saveChangeLogs({
     }
   } catch (e: any) {
     logger.error("_saveChangeLogs ERROR", e.message)
+    saved = 0
     return { success: false, errors: [e.message], saved }
   }
 }

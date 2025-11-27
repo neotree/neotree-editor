@@ -1133,6 +1133,7 @@ export const changeLogs = pgTable(
 
     // Complete snapshot of the entity after change
     fullSnapshot: jsonb("full_snapshot").$type<any>().notNull(),
+    snapshotHash: text("snapshot_hash"),
 
     // Context and metadata
     description: text("description").notNull().default(""),
@@ -1155,7 +1156,7 @@ export const changeLogs = pgTable(
     dataVersion: integer("data_version"),
   },
   (table) => ({
-    uniqueVersionPerEntity: uniqueIndex("unique_version_per_entity").on(table.entityId, table.version),
+    uniqueVersionPerEntity: uniqueIndex("unique_version_per_entity").on(table.entityType, table.entityId, table.version),
     activeVersionIndex: index("active_version_index").on(table.entityId, table.isActive),
     entityIndex: index("change_logs_entity_index").on(table.entityType, table.entityId),
     versionChainIndex: index("version_chain_index").on(table.entityId, table.parentVersion),
