@@ -159,8 +159,6 @@ function pickColumns(snapshot: any, table: any) {
 }
 
 function coerceTemporalValues(payload: Record<string, any>) {
-  // Tight pattern: only coerce keys explicitly ending with _at/_on/_date/_time or camelCase Date/Time.
-  // Avoid generic "At/On" suffixes which can hit fields like "position".
   const temporalPattern = /(_at|_on|_date|_time|Date$|Time$)/i
   const dateLikeKeys = Object.keys(payload).filter((key) => temporalPattern.test(key))
   for (const key of dateLikeKeys) {
@@ -173,7 +171,7 @@ function coerceTemporalValues(payload: Record<string, any>) {
         continue
       }
     }
-    // Set uncoercible temporal-like values to null to avoid toISOString errors downstream
+    
     payload[key] = null
   }
 }
