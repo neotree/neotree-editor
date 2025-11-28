@@ -67,6 +67,7 @@ export async function _saveConfigKeysHistory({
       if (userId) {
         const { ...rest } = c.data || {}
         const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
+        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.configKeyId === configKeyId) || {}))
 
         changeLogsData.push({
           entityId: configKeyId,
@@ -75,6 +76,8 @@ export async function _saveConfigKeysHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
+          previousSnapshot,
+          baselineSnapshot: previousSnapshot,
           userId,
           configKeyId,
         })

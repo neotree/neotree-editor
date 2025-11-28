@@ -24,11 +24,13 @@ export type SaveChangeLogData = {
   dataVersion?: number | null
   changes?: any
   fullSnapshot?: any
+  previousSnapshot?: any
   snapshotHash?: string | null
   description?: string
   changeReason?: string
   parentVersion?: number | null
   mergedFromVersion?: number | null
+  baselineSnapshot?: any
   isActive?: boolean
   userId: string
   scriptId?: string | null
@@ -69,6 +71,12 @@ type EntityVersionConfig = {
   entityLabel: string
 }
 
+type EntityFetchConfig = {
+  table: any
+  idColumn: any
+  entityLabel: string
+}
+
 type EntityType = SaveChangeLogData["entityType"]
 const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias"]
 const VERSIONED_ENTITY_TYPES = ["script", "screen", "diagnosis", "config_key", "drugs_library", "data_key"] as const
@@ -96,6 +104,16 @@ const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = 
     entityLabel: "drugs library item",
   },
   data_key: { table: dataKeys, idColumn: dataKeys.uuid, versionColumn: dataKeys.version, entityLabel: "data key" },
+}
+
+const ENTITY_FETCH_CONFIG: Record<EntityType, EntityFetchConfig> = {
+  script: { table: scripts, idColumn: scripts.scriptId, entityLabel: "script" },
+  screen: { table: screens, idColumn: screens.screenId, entityLabel: "screen" },
+  diagnosis: { table: diagnoses, idColumn: diagnoses.diagnosisId, entityLabel: "diagnosis" },
+  config_key: { table: configKeys, idColumn: configKeys.configKeyId, entityLabel: "config key" },
+  drugs_library: { table: drugsLibrary, idColumn: drugsLibrary.itemId, entityLabel: "drugs library item" },
+  data_key: { table: dataKeys, idColumn: dataKeys.uuid, entityLabel: "data key" },
+  alias: { table: aliases, idColumn: aliases.uuid, entityLabel: "alias" },
 }
 
 
@@ -188,6 +206,88 @@ async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: stri
   return rows?.[0]?.version as number | undefined
 }
 
+async function getEntitySnapshot(client: DbOrTransaction, data: SaveChangeLogData) {
+  const config = ENTITY_FETCH_CONFIG[data.entityType]
+  if (!config) throw new Error(`Unknown entityType ${data.entityType}`)
+
+  const rows = await client
+    .select()
+    .from(config.table)
+    .where(eq(config.idColumn, data.entityId))
+    .limit(1)
+
+  if (!rows?.[0]) throw new Error(`Entity not found for snapshot (${config.entityLabel} ${data.entityId})`)
+  return rows[0]
+}
+
+async function ensureBaselineChangeLog({
+  client,
+  data,
+  computedVersion,
+  dataVersion,
+  baselineSnapshot,
+}: {
+  client: DbOrTransaction
+  data: SaveChangeLogData
+  computedVersion: number
+  dataVersion: number | null
+  baselineSnapshot?: any
+}): Promise<number | undefined> {
+  // Only create baseline when no prior changelog exists for this entity
+  const latestVersion = await getLatestChangeLogVersion(client, data.entityId, data.entityType)
+  if (Number.isFinite(latestVersion)) return
+
+  let snapshotForBaseline = baselineSnapshot ?? data.previousSnapshot
+
+  if (snapshotForBaseline === undefined) {
+    try {
+      snapshotForBaseline = await getEntitySnapshot(client, data)
+      logger.error("saveChangeLog baselineSnapshot missing; captured current entity state as baseline", {
+        entityId: data.entityId,
+        entityType: data.entityType,
+      })
+    } catch (e: any) {
+      throw new Error(
+        "baselineSnapshot is required for the first changelog of an entity to capture the pre-change state",
+      )
+    }
+  }
+
+  const baselineVersion = Math.max(0, computedVersion - 1)
+  const snapshotHash = computeSnapshotHash(snapshotForBaseline)
+
+  const baseline: typeof changeLogs.$inferInsert = {
+    changeLogId: uuid.v4(),
+    entityId: data.entityId,
+    entityType: data.entityType,
+    action: "create",
+    version: baselineVersion,
+    dataVersion,
+    changes: [],
+    fullSnapshot: snapshotForBaseline,
+    previousSnapshot: snapshotForBaseline,
+    snapshotHash,
+    description: "Baseline snapshot",
+    changeReason: "Baseline snapshot",
+    parentVersion: null,
+    mergedFromVersion: null,
+    isActive: false,
+    userId: data.userId,
+    scriptId: data.scriptId,
+    screenId: data.screenId,
+    diagnosisId: data.diagnosisId,
+    configKeyId: data.configKeyId,
+    drugsLibraryItemId: data.drugsLibraryItemId,
+    dataKeyId: data.dataKeyId,
+    aliasId: data.aliasId,
+    dateOfChange: new Date(),
+  }
+
+  await client.insert(changeLogs).values(baseline)
+
+  return baselineVersion
+}
+
 export async function _saveChangeLog({
   data,
   broadcastAction,
@@ -207,10 +307,21 @@ export async function _saveChangeLog({
       const isVersionless = isVersionlessEntityType(data.entityType)
       let computedVersion: number
       const providedVersion = Number.isFinite(data.version) ? Number(data.version) : null
-
+      const dataVersion = Number.isFinite(data.dataVersion) ? Number(data.dataVersion) : null
+      let latestChangeLogVersion: number | undefined
+      let baselineVersionCreated: number | undefined
       if (isVersionless) {
         const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+        latestChangeLogVersion = latestVersion
         computedVersion = (latestVersion ?? 0) + 1
+
+        baselineVersionCreated = await ensureBaselineChangeLog({
+          client: tx,
+          data,
+          computedVersion,
+          dataVersion,
+          baselineSnapshot: data.baselineSnapshot,
+        })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
           if (providedVersion < computedVersion) {
@@ -239,6 +350,7 @@ export async function _saveChangeLog({
         const entityVersion = await getEntityVersion(tx, { ...data, entityType })
         const config = ENTITY_VERSION_CONFIG[entityType]
         const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+        latestChangeLogVersion = latestVersion
 
         // Prefer the entity's version, but if legacy data has higher changelog versions already,
         // continue the changelog sequence to avoid blocking writes.
@@ -248,6 +360,14 @@ export async function _saveChangeLog({
         } else {
           computedVersion = entityVersion
         }
+
+        baselineVersionCreated = await ensureBaselineChangeLog({
+          client: tx,
+          data,
+          computedVersion,
+          dataVersion,
+          baselineSnapshot: data.baselineSnapshot,
+        })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
           if (providedVersion < computedVersion) {
@@ -275,9 +395,10 @@ export async function _saveChangeLog({
         }
       }
 
-      const dataVersion = Number.isFinite(data.dataVersion) ? Number(data.dataVersion) : null
       const snapshotHash = data.snapshotHash || computeSnapshotHash(data.fullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
+
+      const previousSnapshot = data.previousSnapshot ?? data.baselineSnapshot ?? {}
 
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
@@ -288,10 +409,13 @@ export async function _saveChangeLog({
         dataVersion,
         changes: data.changes || [],
         fullSnapshot: data.fullSnapshot || {},
+        previousSnapshot,
         snapshotHash,
         description: data.description,
         changeReason: data.changeReason,
-        parentVersion: data.parentVersion,
+        parentVersion:
+          data.parentVersion ??
+          (latestChangeLogVersion === undefined ? baselineVersionCreated : latestChangeLogVersion),
         mergedFromVersion: data.mergedFromVersion,
         isActive: data.isActive !== false,
         userId: data.userId,
