@@ -61,6 +61,9 @@ export async function _saveDiagnosesHistory({
 
       if (userId) {
         const sanitizedSnapshot = removeHexCharacters(c.data || {})
+        const previousSnapshot = isCreate
+          ? {}
+          : removeHexCharacters(previous.find((prevC) => prevC.diagnosisId === diagnosisId) || {})
 
         changeLogsData.push({
           entityId: diagnosisId,
@@ -69,6 +72,8 @@ export async function _saveDiagnosesHistory({
           version: versionValue,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
+          previousSnapshot,
+          baselineSnapshot: previousSnapshot,
           description: changeDescription,
           userId,
           scriptId: c?.data?.scriptId || null,

@@ -29,6 +29,13 @@
       "when": 1764237836294,
       "tag": "0003_fair_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1764334833794,
+      "tag": "0004_chief_molecule_man",
+      "breakpoints": true
     }
   ]
 }

@@ -53,6 +53,7 @@ export function sanitizeChangeLogForResponse(change: ChangeLogType): ChangeLogTy
     return {
         ...change,
         fullSnapshot: sanitizeValue(change.fullSnapshot),
+        previousSnapshot: sanitizeValue((change as any).previousSnapshot),
     };
 }
 

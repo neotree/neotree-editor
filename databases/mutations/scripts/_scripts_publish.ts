@@ -204,6 +204,8 @@ export async function _publishScripts({
             dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
+            previousSnapshot: snapshot,
+            baselineSnapshot: snapshot,
             description: history.changes.description,
             userId: publisherUserId,
             scriptId: entry.scriptId,

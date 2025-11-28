@@ -1133,6 +1133,8 @@ export const changeLogs = pgTable(
 
     // Complete snapshot of the entity after change
     fullSnapshot: jsonb("full_snapshot").$type<any>().notNull(),
+    // Snapshot immediately before the change (pre-change state)
+    previousSnapshot: jsonb("previous_snapshot").$type<any>().default({}).notNull(),
     snapshotHash: text("snapshot_hash"),
 
     // Context and metadata

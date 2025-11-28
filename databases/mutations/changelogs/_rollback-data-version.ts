@@ -130,6 +130,17 @@ async function ensureSnapshotHash(
   return computed
 }
 
+function normalizeSnapshot(snapshot: any) {
+  if (snapshot && typeof snapshot === "string") {
+    try {
+      return JSON.parse(snapshot)
+    } catch {
+      return {}
+    }
+  }
+  return snapshot ?? {}
+}
+
 async function lockEntityRow({
   tx,
   binding,
@@ -248,6 +259,34 @@ async function applySnapshot({
   return inserted
 }
 
+async function findPreviousChangeLog(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  current: typeof changeLogs.$inferSelect,
+  currentDataVersion: number,
+) {
+  // Try previous dataVersion first
+  const target = await tx.query.changeLogs.findFirst({
+    where: and(
+      eq(changeLogs.entityId, current.entityId),
+      eq(changeLogs.entityType, current.entityType),
+      lt(changeLogs.dataVersion, currentDataVersion),
+    ),
+    orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+  })
+  if (target) return target
+
+  // Fallback: any older version regardless of dataVersion
+  const versionTarget = await tx.query.changeLogs.findFirst({
+    where: and(
+      eq(changeLogs.entityId, current.entityId),
+      eq(changeLogs.entityType, current.entityType),
+      lt(changeLogs.version, current.version),
+    ),
+    orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+  })
+  return versionTarget ?? current
+}
+
 export async function _rollbackDataVersion({
   dataVersion: requestedDataVersion,
   userId,
@@ -334,16 +373,8 @@ export async function _rollbackDataVersion({
         const binding = ENTITY_BINDINGS[scriptChange.entityType]
         await lockEntityRow({ tx, binding, entityId: scriptChange.entityId })
 
-        const scriptTarget = await tx.query.changeLogs.findFirst({
-          where: and(
-            eq(changeLogs.entityId, scriptChange.entityId),
-            eq(changeLogs.entityType, scriptChange.entityType),
-            lt(changeLogs.dataVersion, currentDataVersion),
-          ),
-          orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
-        })
-        const effectiveScriptTarget = scriptTarget ?? scriptChange
-        if (!effectiveScriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
+        const effectiveScriptTarget = await findPreviousChangeLog(tx, scriptChange, currentDataVersion)
+    if (!effectiveScriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
 
         const plan: { current: typeof changeLogs.$inferSelect; target: typeof changeLogs.$inferSelect; binding: VersionedEntityBinding }[] = []
         plan.push({ current: scriptChange, target: effectiveScriptTarget, binding })
@@ -364,7 +395,8 @@ export async function _rollbackDataVersion({
               ),
               orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
             })
-            const effectiveChildTarget = targetChild ?? child
+            const fallbackChildTarget = await findPreviousChangeLog(tx, child, currentDataVersion)
+            const effectiveChildTarget = targetChild ?? fallbackChildTarget
             if (!effectiveChildTarget || !effectiveChildTarget.fullSnapshot) {
               throw new Error(`Missing previous snapshot for child entity ${child.entityId}`)
             }
@@ -376,6 +408,8 @@ export async function _rollbackDataVersion({
         for (const { current, target, binding } of plan) {
           const effectiveTarget = target ?? current
           const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
+          const targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
+          const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
           const rollbackChangeLog: SaveChangeLogData = {
             entityId: current.entityId,
             entityType: current.entityType,
@@ -390,7 +424,8 @@ export async function _rollbackDataVersion({
                 toDataVersion: previousDataVersion,
               },
             ],
-            fullSnapshot: effectiveTarget.fullSnapshot,
+            fullSnapshot: targetSnapshot,
+            previousSnapshot: currentSnapshot,
             description,
             changeReason: changeReason || description,
             parentVersion: current.version,
@@ -415,8 +450,9 @@ export async function _rollbackDataVersion({
             tx,
             binding,
             entityId: current.entityId,
-            snapshot: effectiveTarget.fullSnapshot,
-            newVersion: saved.data.version,
+            snapshot: targetSnapshot,
+            // Restore entity version to the target snapshot's version if available; otherwise use the rollback changelog version
+            newVersion: effectiveTarget.version ?? saved.data.version,
           })
 
           if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)
@@ -437,10 +473,13 @@ export async function _rollbackDataVersion({
           ),
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
-        const effectiveTarget = target ?? current
+        const fallbackTarget = await findPreviousChangeLog(tx, current, currentDataVersion)
+        const effectiveTarget = target ?? fallbackTarget
         if (!effectiveTarget || !effectiveTarget.fullSnapshot) throw new Error(`Previous snapshot missing for ${current.entityId}`)
 
         const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
+        const targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
+        const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
         const rollbackChangeLog: SaveChangeLogData = {
           entityId: current.entityId,
           entityType: current.entityType,
@@ -454,13 +493,14 @@ export async function _rollbackDataVersion({
               fromDataVersion: currentDataVersion,
               toDataVersion: previousDataVersion,
             },
-          ],
-          fullSnapshot: effectiveTarget.fullSnapshot,
-          description,
-          changeReason: changeReason || description,
-          parentVersion: current.version,
-          dataVersion: targetDataVersion,
-          isActive: true,
+            ],
+            fullSnapshot: targetSnapshot,
+          previousSnapshot: currentSnapshot,
+            description,
+            changeReason: changeReason || description,
+            parentVersion: current.version,
+            dataVersion: targetDataVersion,
+            isActive: true,
           userId,
           scriptId: current.scriptId,
           screenId: current.screenId,
@@ -480,8 +520,8 @@ export async function _rollbackDataVersion({
           tx,
           binding,
           entityId: current.entityId,
-          snapshot: effectiveTarget.fullSnapshot,
-          newVersion: saved.data.version,
+          snapshot: targetSnapshot,
+          newVersion: effectiveTarget.version ?? saved.data.version,
         })
 
         if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)

@@ -68,6 +68,9 @@ export async function _saveScriptsHistory({
       if (userId) {
         const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
+        const previousSnapshot = isCreate
+          ? {}
+          : removeHexCharacters(previous.find((prevC) => prevC.scriptId === scriptId) || {})
 
         changeLogsData.push({
           entityId: scriptId,
@@ -76,6 +79,8 @@ export async function _saveScriptsHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
+          previousSnapshot,
+          baselineSnapshot: previousSnapshot,
           userId,
           scriptId,
         })

@@ -59,6 +59,9 @@ export async function _saveDrugsLibraryItemsHistory({
 
       if (userId) {
         const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
+        const previousSnapshot = isCreate
+          ? {}
+          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.itemId === itemId) || {}))
 
         changeLogsData.push({
           entityId: itemId,
@@ -67,6 +70,8 @@ export async function _saveDrugsLibraryItemsHistory({
           version: versionValue,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
+          previousSnapshot,
+          baselineSnapshot: previousSnapshot,
           description: changeDescription,
           userId,
           drugsLibraryItemId: itemId,

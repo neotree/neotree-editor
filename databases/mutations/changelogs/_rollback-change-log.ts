@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, lt } from "drizzle-orm"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
@@ -91,6 +91,17 @@ function pickColumns(snapshot: any, table: any) {
   }, {})
 }
 
+function normalizeSnapshot(snapshot: any) {
+  if (snapshot && typeof snapshot === "string") {
+    try {
+      return JSON.parse(snapshot)
+    } catch {
+      return {}
+    }
+  }
+  return snapshot ?? {}
+}
+
 async function applySnapshot({
   tx,
   binding,
@@ -146,18 +157,30 @@ export async function _rollbackChangeLog({
 
       if (!current) throw new Error("No active version found for entity")
 
-      const expectedPreviousVersion = current.parentVersion ?? current.version - 1
-      if (!expectedPreviousVersion || expectedPreviousVersion < 1) {
+      const explicitPreviousVersion = Number.isFinite(current.parentVersion) ? current.parentVersion! : undefined
+
+      const target =
+        (explicitPreviousVersion !== undefined
+          ? await tx.query.changeLogs.findFirst({
+              where: and(eq(changeLogs.entityId, entityId), eq(changeLogs.version, explicitPreviousVersion)),
+            })
+          : await tx.query.changeLogs.findFirst({
+              where: and(
+                eq(changeLogs.entityId, entityId),
+                lt(changeLogs.version, current.version),
+              ),
+              orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+            })) ?? null
+
+      if (!target) {
         throw new Error("No previous version available to restore")
       }
+
+      const expectedPreviousVersion = target.version
 
       if (toVersion !== undefined && toVersion !== expectedPreviousVersion) {
         throw new Error(`Can only restore to immediate previous version (${expectedPreviousVersion})`)
       }
-
-      const target = await tx.query.changeLogs.findFirst({
-        where: and(eq(changeLogs.entityId, entityId), eq(changeLogs.version, expectedPreviousVersion)),
-      })
 
       if (!target) {
         throw new Error(`Previous version ${expectedPreviousVersion} not found for entity`)
@@ -175,6 +198,8 @@ export async function _rollbackChangeLog({
       const editor = await tx.query.editorInfo.findFirst()
       const nextDataVersion = (editor?.dataVersion ?? current.dataVersion ?? 0) + 1
       const description = `Rollback to version ${target.version}`
+      const targetSnapshot = normalizeSnapshot(target.fullSnapshot)
+      const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
 
       const newChangeLogData: SaveChangeLogData = {
         entityId,
@@ -188,7 +213,8 @@ export async function _rollbackChangeLog({
             toVersion: target.version,
           },
         ],
-        fullSnapshot: target.fullSnapshot,
+      fullSnapshot: targetSnapshot,
+        previousSnapshot: currentSnapshot,
         description,
         changeReason: changeReason || description,
         parentVersion: current.version,
@@ -218,7 +244,7 @@ export async function _rollbackChangeLog({
         tx,
         binding,
         entityId,
-        snapshot: target.fullSnapshot,
+        snapshot: targetSnapshot,
         newVersion: saveResult.data.version,
       })
 
