@@ -35,17 +35,38 @@ type VersionedEntityBinding = {
   pkKey: string
   versionKey?: string
   publishDateKey?: string
+  numericKeys?: string[]
+  timestampKeys?: string[]
+  forceNullKeys?: string[]
 }
 
 const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding> = {
-  script: { table: scripts, pk: scripts.scriptId, pkKey: "scriptId", versionKey: "version", publishDateKey: "publishDate" },
-  screen: { table: screens, pk: screens.screenId, pkKey: "screenId", versionKey: "version", publishDateKey: "publishDate" },
+  script: {
+    table: scripts,
+    pk: scripts.scriptId,
+    pkKey: "scriptId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+    numericKeys: ["position"],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
+  },
+  screen: {
+    table: screens,
+    pk: screens.screenId,
+    pkKey: "screenId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+    numericKeys: ["position", "timerValue", "multiplier", "minValue", "maxValue"],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
+  },
   diagnosis: {
     table: diagnoses,
     pk: diagnoses.diagnosisId,
     pkKey: "diagnosisId",
     versionKey: "version",
     publishDateKey: "publishDate",
+    numericKeys: ["position", "severityOrder"],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
   config_key: {
     table: configKeys,
@@ -53,6 +74,8 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     pkKey: "configKeyId",
     versionKey: "version",
     publishDateKey: "publishDate",
+    numericKeys: ["position"],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
   drugs_library: {
     table: drugsLibrary,
@@ -60,6 +83,19 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     pkKey: "itemId",
     versionKey: "version",
     publishDateKey: "publishDate",
+    numericKeys: [
+      "minGestation",
+      "maxGestation",
+      "minWeight",
+      "maxWeight",
+      "minAge",
+      "maxAge",
+      "hourlyFeed",
+      "hourlyFeedDivider",
+      "dosage",
+      "dosageMultiplier",
+    ],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
   data_key: {
     table: dataKeys,
@@ -67,12 +103,14 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     pkKey: "uuid",
     versionKey: "version",
     publishDateKey: "publishDate",
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
   alias: {
     table: aliases,
     pk: aliases.uuid,
     pkKey: "uuid",
     publishDateKey: "publishDate",
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
 }
 
@@ -121,15 +159,53 @@ function pickColumns(snapshot: any, table: any) {
 }
 
 function coerceTemporalValues(payload: Record<string, any>) {
-  const dateLikeKeys = Object.keys(payload).filter((key) => /date|at|time/i.test(key))
+  // Tight pattern: only coerce keys explicitly ending with _at/_on/_date/_time or camelCase Date/Time.
+  // Avoid generic "At/On" suffixes which can hit fields like "position".
+  const temporalPattern = /(_at|_on|_date|_time|Date$|Time$)/i
+  const dateLikeKeys = Object.keys(payload).filter((key) => temporalPattern.test(key))
   for (const key of dateLikeKeys) {
     const value = payload[key]
+    if (value instanceof Date) continue
     if (value && (typeof value === "string" || typeof value === "number")) {
       const coerced = new Date(value)
       if (!isNaN(coerced.valueOf())) {
         payload[key] = coerced
+        continue
       }
     }
+    // Set uncoercible temporal-like values to null to avoid toISOString errors downstream
+    payload[key] = null
+  }
+}
+
+function coerceNumericValues(payload: Record<string, any>, numericKeys: string[]) {
+  for (const key of numericKeys) {
+    if (!(key in payload)) continue
+    const value = payload[key]
+    const num = typeof value === "number" ? value : Number(value)
+    payload[key] = Number.isFinite(num) ? num : null
+  }
+}
+
+function coerceTimestampKeys(payload: Record<string, any>, timestampKeys: string[]) {
+  for (const key of timestampKeys) {
+    if (!(key in payload)) continue
+    const value = payload[key]
+    if (value instanceof Date) continue
+    if (value && (typeof value === "string" || typeof value === "number")) {
+      const coerced = new Date(value)
+      if (!isNaN(coerced.valueOf())) {
+        payload[key] = coerced
+        continue
+      }
+    }
+    payload[key] = null
+  }
+}
+
+function setForceNullKeys(payload: Record<string, any>, forceNullKeys: string[]) {
+  for (const key of forceNullKeys) {
+    if (key in payload) payload[key] = null
   }
 }
 
@@ -149,6 +225,15 @@ async function applySnapshot({
   const now = new Date()
   const basePayload = pickColumns(snapshot ?? {}, binding.table)
   coerceTemporalValues(basePayload)
+  if (binding.numericKeys?.length) {
+    coerceNumericValues(basePayload, binding.numericKeys)
+  }
+  if (binding.timestampKeys?.length) {
+    coerceTimestampKeys(basePayload, binding.timestampKeys)
+  }
+  if (binding.forceNullKeys?.length) {
+    setForceNullKeys(basePayload, binding.forceNullKeys)
+  }
 
   basePayload[binding.pkKey] = entityId
   if (binding.versionKey) basePayload[binding.versionKey] = newVersion
@@ -291,6 +376,7 @@ export async function _rollbackDataVersion({
 
         // Apply plan atomically
         for (const { current, target, binding } of plan) {
+          const effectiveTarget = target ?? current
           const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
           const rollbackChangeLog: SaveChangeLogData = {
             entityId: current.entityId,
@@ -301,12 +387,12 @@ export async function _rollbackDataVersion({
                 action: "rollback",
                 description,
                 fromVersion: current.version,
-                toVersion: target.version,
+                toVersion: effectiveTarget.version ?? current.version,
                 fromDataVersion: currentDataVersion,
                 toDataVersion: previousDataVersion,
               },
             ],
-            fullSnapshot: target.fullSnapshot,
+            fullSnapshot: effectiveTarget.fullSnapshot,
             description,
             changeReason: changeReason || description,
             parentVersion: current.version,
@@ -331,7 +417,7 @@ export async function _rollbackDataVersion({
             tx,
             binding,
             entityId: current.entityId,
-            snapshot: target.fullSnapshot,
+            snapshot: effectiveTarget.fullSnapshot,
             newVersion: saved.data.version,
           })
 
@@ -366,12 +452,12 @@ export async function _rollbackDataVersion({
               action: "rollback",
               description,
               fromVersion: current.version,
-              toVersion: target.version,
+              toVersion: effectiveTarget.version ?? current.version,
               fromDataVersion: currentDataVersion,
               toDataVersion: previousDataVersion,
             },
           ],
-          fullSnapshot: target.fullSnapshot,
+          fullSnapshot: effectiveTarget.fullSnapshot,
           description,
           changeReason: changeReason || description,
           parentVersion: current.version,
@@ -396,7 +482,7 @@ export async function _rollbackDataVersion({
           tx,
           binding,
           entityId: current.entityId,
-          snapshot: target.fullSnapshot,
+          snapshot: effectiveTarget.fullSnapshot,
           newVersion: saved.data.version,
         })
 
