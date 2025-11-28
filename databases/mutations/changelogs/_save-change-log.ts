@@ -1,10 +1,19 @@
-import { and, eq, lt, sql } from "drizzle-orm"
+import { and, desc, eq, lt } from "drizzle-orm"
 import { createHash } from "crypto"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
-import { changeLogs } from "@/databases/pg/schema"
+import {
+  aliases,
+  changeLogs,
+  configKeys,
+  dataKeys,
+  diagnoses,
+  drugsLibrary,
+  screens,
+  scripts,
+} from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 
 export type SaveChangeLogData = {
@@ -47,6 +56,49 @@ const ENTITY_TYPE_TO_FK: Record<SaveChangeLogData["entityType"], keyof SaveChang
   alias: "aliasId",
 }
 
+// Allow certain contextual foreign keys alongside the primary FK (e.g., a screen changelog can also include its scriptId)
+const ENTITY_TYPE_ALLOWED_CONTEXT_FKS: Partial<Record<SaveChangeLogData["entityType"], (keyof SaveChangeLogData)[]>> = {
+  screen: ["scriptId"],
+  diagnosis: ["scriptId"],
+}
+
+type EntityVersionConfig = {
+  table: any
+  idColumn: any
+  versionColumn: any
+  entityLabel: string
+}
+
+type EntityType = SaveChangeLogData["entityType"]
+const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias"]
+const VERSIONED_ENTITY_TYPES = ["script", "screen", "diagnosis", "config_key", "drugs_library", "data_key"] as const
+type VersionedEntityType = (typeof VERSIONED_ENTITY_TYPES)[number]
+
+const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = {
+  script: { table: scripts, idColumn: scripts.scriptId, versionColumn: scripts.version, entityLabel: "script" },
+  screen: { table: screens, idColumn: screens.screenId, versionColumn: screens.version, entityLabel: "screen" },
+  diagnosis: {
+    table: diagnoses,
+    idColumn: diagnoses.diagnosisId,
+    versionColumn: diagnoses.version,
+    entityLabel: "diagnosis",
+  },
+  config_key: {
+    table: configKeys,
+    idColumn: configKeys.configKeyId,
+    versionColumn: configKeys.version,
+    entityLabel: "config key",
+  },
+  drugs_library: {
+    table: drugsLibrary,
+    idColumn: drugsLibrary.itemId,
+    versionColumn: drugsLibrary.version,
+    entityLabel: "drugs library item",
+  },
+  data_key: { table: dataKeys, idColumn: dataKeys.uuid, versionColumn: dataKeys.version, entityLabel: "data key" },
+}
+
+
 type DbClient = typeof db
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbOrTransaction = DbClient | TransactionClient
@@ -71,13 +123,26 @@ function validateEntityAlignment(data: SaveChangeLogData) {
     throw new Error(`entityId must match ${expectedFkKey} for entityType ${data.entityType}`)
   }
 
+  // Validate allowed contextual FKs if provided
+  const allowedContextFks = ENTITY_TYPE_ALLOWED_CONTEXT_FKS[data.entityType] || []
+  for (const key of allowedContextFks) {
+    const value = (data as any)[key]
+    if (value !== undefined && value !== null) {
+      if (typeof value !== "string" || !uuid.validate(value)) {
+        throw new Error(`Invalid ${String(key)} for entityType ${data.entityType}`)
+      }
+    }
+  }
+
   // Prevent multiple entity foreign keys being set at once
   const populatedFks = Object.entries(ENTITY_TYPE_TO_FK)
     .map(([type, key]) => ({ type, key, value: (data as any)[key] }))
     .filter((entry) => entry.value !== undefined && entry.value !== null)
 
   const nonEmptyFks = populatedFks.filter((entry) => entry.value)
-  const hasUnexpectedFk = nonEmptyFks.some((entry) => entry.type !== data.entityType)
+  const hasUnexpectedFk = nonEmptyFks.some(
+    (entry) => entry.type !== data.entityType && !allowedContextFks.includes(entry.key as keyof SaveChangeLogData),
+  )
   if (hasUnexpectedFk) {
     throw new Error(`Only the ${expectedFkKey} FK should be provided for entityType ${data.entityType}`)
   }
@@ -90,13 +155,37 @@ function validateEntityAlignment(data: SaveChangeLogData) {
   }
 }
 
-async function getNextVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
-  const rows = await client.execute(
-    sql`select version from nt_change_logs where entity_id = ${entityId} and entity_type = ${entityType} order by version desc limit 1 for update`,
-  )
+function isVersionlessEntityType(entityType: EntityType): entityType is typeof VERSIONLESS_ENTITY_TYPES[number] {
+  return VERSIONLESS_ENTITY_TYPES.includes(entityType)
+}
 
-  const row = rows[0] as any
-  return (row?.version ?? 0) + 1
+async function getEntityVersion(client: DbOrTransaction, data: SaveChangeLogData & { entityType: VersionedEntityType }) {
+  const config = ENTITY_VERSION_CONFIG[data.entityType]
+  if (!config) throw new Error(`Unknown entityType ${data.entityType}`)
+
+  const rows = await client
+    .select({ version: config.versionColumn })
+    .from(config.table)
+    .where(eq(config.idColumn, data.entityId))
+    .limit(1)
+
+  const version = rows?.[0]?.version
+  if (!Number.isFinite(version)) {
+    throw new Error(`Missing ${config.entityLabel} or version for entityId ${data.entityId}`)
+  }
+
+  return Number(version)
+}
+
+async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
+  const rows = await client
+    .select({ version: changeLogs.version })
+    .from(changeLogs)
+    .where(and(eq(changeLogs.entityId, entityId), eq(changeLogs.entityType, entityType)))
+    .orderBy(desc(changeLogs.version))
+    .limit(1)
+
+  return rows?.[0]?.version as number | undefined
 }
 
 export async function _saveChangeLog({
@@ -115,7 +204,77 @@ export async function _saveChangeLog({
 
     const executor = async (tx: DbOrTransaction) => {
       const changeLogId = uuid.v4()
-      const computedVersion = await getNextVersion(tx, data.entityId, data.entityType)
+      const isVersionless = isVersionlessEntityType(data.entityType)
+      let computedVersion: number
+      const providedVersion = Number.isFinite(data.version) ? Number(data.version) : null
+
+      if (isVersionless) {
+        const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+        computedVersion = (latestVersion ?? 0) + 1
+
+        if (providedVersion !== null && providedVersion !== computedVersion) {
+          if (providedVersion < computedVersion) {
+            // logger.error("saveChangeLog versionless stale providedVersion, auto-upgrading", {
+            //   entityType: data.entityType,
+            //   entityId: data.entityId,
+            //   providedVersion,
+            //   latestChangeLogVersion: latestVersion,
+            //   computedVersion,
+            // })
+          } else {
+            logger.error("saveChangeLog versionless mismatch", {
+              entityType: data.entityType,
+              entityId: data.entityId,
+              providedVersion,
+              latestChangeLogVersion: latestVersion,
+              computedVersion,
+            })
+            throw new Error(
+              `Provided version (${data.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${data.entityType}`,
+            )
+          }
+        }
+      } else {
+        const entityType = data.entityType as VersionedEntityType
+        const entityVersion = await getEntityVersion(tx, { ...data, entityType })
+        const config = ENTITY_VERSION_CONFIG[entityType]
+        const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+
+        // Prefer the entity's version, but if legacy data has higher changelog versions already,
+        // continue the changelog sequence to avoid blocking writes.
+        if (Number.isFinite(latestVersion)) {
+          const nextSequential = Number(latestVersion) + 1
+          computedVersion = entityVersion <= Number(latestVersion) ? nextSequential : entityVersion
+        } else {
+          computedVersion = entityVersion
+        }
+
+        if (providedVersion !== null && providedVersion !== computedVersion) {
+          if (providedVersion < computedVersion) {
+            // logger.error("saveChangeLog stale providedVersion, auto-upgrading", {
+            //   entityType: data.entityType,
+            //   entityId: data.entityId,
+            //   providedVersion,
+            //   entityVersion,
+            //   latestChangeLogVersion: latestVersion,
+            //   computedVersion,
+            // })
+          } else {
+            logger.error("saveChangeLog version mismatch", {
+              entityType: data.entityType,
+              entityId: data.entityId,
+              providedVersion,
+              entityVersion,
+              latestChangeLogVersion: latestVersion,
+              computedVersion,
+            })
+            throw new Error(
+              `Provided version (${data.version}) does not match ${config.entityLabel} version (${computedVersion})`,
+            )
+          }
+        }
+      }
+
       const dataVersion = Number.isFinite(data.dataVersion) ? Number(data.dataVersion) : null
       const snapshotHash = data.snapshotHash || computeSnapshotHash(data.fullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
