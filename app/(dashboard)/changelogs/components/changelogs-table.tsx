@@ -1,14 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
-import { Search } from "lucide-react"
+import { MoreVertical, Search } from "lucide-react"
 
 import { Loader } from "@/components/loader"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Pagination,
   PaginationContent,
@@ -22,8 +39,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
 import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import { resolveEntityTitle } from "@/lib/changelog-utils"
+import axios from "axios"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
-type Props = UseChangelogsTableParams
+type Props = UseChangelogsTableParams & { isSuperUser: boolean }
 
 const entityTypeLabels: Record<string, string> = {
   script: "Script",
@@ -124,7 +144,13 @@ export function ChangelogsTable(props: Props) {
     clearFilters,
   } = useChangelogsTable(props)
 
+  const { isSuperUser } = props
+
   const router = useRouter()
+  const { alert } = useAlertModal()
+  const [rollbacking, setRollbacking] = useState<number | null>(null)
+  const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
+  const [showEntityDetails, setShowEntityDetails] = useState(false)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -183,6 +209,85 @@ export function ChangelogsTable(props: Props) {
     router.push(buildDetailsHref(version))
   }
 
+  const handleRollbackDataVersion = async (dataVersion: number) => {
+    if (dataVersion < 2) return
+
+    try {
+      setRollbacking(dataVersion)
+      const res = await axios.post("/api/changelogs/rollback-data-version", {
+        dataVersion,
+        changeReason: `Rollback release v${dataVersion} to v${dataVersion - 1}`,
+      })
+
+      if (res.data?.errors?.length) {
+        throw new Error(res.data.errors.join(", "))
+      }
+
+      alert({
+        title: "Rollback queued",
+        message: `Release v${dataVersion} will be rolled back to the state of v${dataVersion - 1}. New release v${dataVersion + 1} will be created. Refreshing...`,
+        variant: "success",
+        onClose: () => window.location.reload(),
+      })
+    } catch (e: any) {
+      alert({
+        title: "Rollback failed",
+        message: e.message || "An unexpected error occurred.",
+        variant: "error",
+      })
+    } finally {
+      setRollbacking(null)
+      setPendingRollbackEntry(null)
+    }
+  }
+
+  const renderEntityImpactList = (entry: DataVersionSummary) => {
+    const items = Object.entries(entry.entityCounts)
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a)
+
+    if (!items.length) return <p className="text-sm text-muted-foreground">No entities recorded.</p>
+
+    return (
+      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+        {items.map(([entityType, count]) => (
+          <li key={entityType}>
+            {count} {entityTypeLabels[entityType] || entityType}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  const renderEntityDetails = (entry: DataVersionSummary) => {
+    const groups = entry.changes.reduce<Record<string, { label: string; items: string[] }>>((acc, change) => {
+      const key = change.entityType
+      const label = entityTypeLabels[key] || key
+      const title = resolveEntityTitle(change) || change.entityId
+      if (!acc[key]) acc[key] = { label, items: [] }
+      acc[key].items.push(`${title} (${change.entityId})`)
+      return acc
+    }, {})
+
+    const groupEntries = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]))
+    if (!groupEntries.length) return null
+
+    return (
+      <div className="space-y-3">
+        {groupEntries.map(([key, group]) => (
+          <div key={key}>
+            <p className="text-sm font-semibold text-foreground">{group.label}</p>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+              {group.items.map((item, idx) => (
+                <li key={`${key}-${idx}`}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <>
       {loading && <Loader overlay />}
@@ -234,7 +339,7 @@ export function ChangelogsTable(props: Props) {
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[200px]">Published By</TableHead>
                   <TableHead className="w-[170px]">Published At</TableHead>
-                  <TableHead className="text-right w-[120px]">Details</TableHead>
+                  <TableHead className="text-right w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -261,7 +366,15 @@ export function ChangelogsTable(props: Props) {
                       <TableCell>
                         <div className="flex flex-col gap-2">
                           {renderActionBadges(entry)}
-                          {entry.isLatestVersion ? (
+                          {entry.rollbackSourceVersion ? (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                              title={`This release restores the state from data version v${entry.rollbackSourceVersion}.`}
+                            >
+                              State of v{entry.rollbackSourceVersion}
+                            </Badge>
+                          ) : entry.isLatestVersion ? (
                             <Badge
                               variant="outline"
                               className="w-fit border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
@@ -307,17 +420,33 @@ export function ChangelogsTable(props: Props) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-primary"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleNavigate(entry.dataVersion)
-                          }}
-                        >
-                          View details
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                            <DropdownMenuItem
+                              onClick={() => handleNavigate(entry.dataVersion)}
+                              className="cursor-pointer"
+                            >
+                              View details
+                            </DropdownMenuItem>
+                            {isSuperUser && entry.isLatestVersion && entry.dataVersion > 1 && (
+                              <DropdownMenuItem
+                                disabled={rollbacking === entry.dataVersion}
+                                onClick={() => setPendingRollbackEntry(entry)}
+                                className="cursor-pointer text-orange-600 focus:text-orange-700"
+                              >
+                                {rollbacking === entry.dataVersion
+                                  ? "Rolling back..."
+                                  : `Rollback to v${entry.dataVersion - 1}`}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   )
@@ -359,6 +488,70 @@ export function ChangelogsTable(props: Props) {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingRollbackEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRollbackEntry(null)
+            setShowEntityDetails(false)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Danger: rollback release</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                {pendingRollbackEntry && (
+                  <>
+                    <p>
+                      You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state
+                      of the previous release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
+                    </p>
+                    <div>
+                      <p className="font-medium text-foreground mb-1">Entities affected:</p>
+                      {renderEntityImpactList(pendingRollbackEntry)}
+                      <div className="mt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="px-0 text-primary"
+                          onClick={() => setShowEntityDetails((prev) => !prev)}
+                        >
+                          {showEntityDetails ? "Hide entity list" : "View entity list"}
+                        </Button>
+                      </div>
+                      {showEntityDetails && (
+                        <div className="mt-2 max-h-56 overflow-y-auto pr-2">
+                          {renderEntityDetails(pendingRollbackEntry)}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                <p className="font-semibold text-foreground">
+                  Do not proceed unless you are absolutely sure what you are doing.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingRollbackEntry(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              disabled={rollbacking !== null}
+              onClick={() => {
+                if (pendingRollbackEntry !== null) {
+                  handleRollbackDataVersion(pendingRollbackEntry.dataVersion)
+                }
+              }}
+            >
+              Proceed with rollback
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

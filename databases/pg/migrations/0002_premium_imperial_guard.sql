@@ -1,0 +1,1 @@
+ALTER TABLE "nt_change_logs" ADD COLUMN "snapshot_hash" text;
