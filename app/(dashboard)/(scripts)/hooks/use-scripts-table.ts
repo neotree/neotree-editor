@@ -111,42 +111,100 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
 
   const onSort = useCallback(
     async (oldIndex: number, newIndex: number, sortedIndexes: { oldIndex: number; newIndex: number }[]) => {
+      const previousPositions = new Map(scripts.data.map((item) => [item.scriptId, item.position]))
+      const previousState = scripts
+
+      const sorted = arrayMoveImmutable([...scripts.data], oldIndex, newIndex).map((item, index) => ({
+        ...item,
+        position: index + 1,
+      }))
+
       const payload: { scriptId: string; position: number }[] = []
 
-      const sorted = arrayMoveImmutable([...scripts.data], oldIndex, newIndex).map((s, i) => {
-        const newPosition = scripts.data[i].position
-        if (newPosition !== s.position) payload.push({ scriptId: s.scriptId, position: newPosition })
-        return {
-          ...s,
-          position: newPosition,
+      sorted.forEach((item) => {
+        const previousPosition = previousPositions.get(item.scriptId)
+        if (previousPosition !== undefined && previousPosition !== item.position) {
+          payload.push({ scriptId: item.scriptId, position: item.position })
         }
       })
 
       setScripts((prev) => ({ ...prev, data: sorted }))
 
-      for (const change of payload) {
-        const script = scripts.data.find((s) => s.scriptId === change.scriptId)
-        if (script) {
-          await pendingChangesAPI.addChange({
-            entityId: change.scriptId,
-            entityType: "script",
-            entityTitle: script.title || script.printTitle || "Untitled Script",
-            action: "update",
-            fieldPath: "position",
-            fieldName: "position",
-            oldValue: script.position,
-            newValue: change.position,
-            description: `Position changed from ${script.position} to ${change.position}`,
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-          })
+      try {
+        await Promise.all(
+          sorted.map(async (item) => {
+            const previousPosition = previousPositions.get(item.scriptId)
+            if (previousPosition === undefined) return
+
+            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
+            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
+            const baseline = existingPositionChange?.oldValue ?? previousPosition
+
+            if (baseline === undefined) return
+
+            if (item.position === baseline) {
+              if (existingPositionChange?.id) {
+                await pendingChangesAPI.deleteChange(existingPositionChange.id)
+              }
+              return
+            }
+
+            const description = `Position changed from ${baseline} to ${item.position}`
+
+            if (existingPositionChange?.id) {
+              await pendingChangesAPI.updateChange(existingPositionChange.id, {
+                newValue: item.position,
+                description,
+                fullSnapshot: { ...item },
+              })
+            } else {
+              await pendingChangesAPI.addChange({
+                entityId: item.scriptId,
+                entityType: "script",
+                entityTitle: item.title || item.printTitle || "Untitled Script",
+                action: "update",
+                fieldPath: "position",
+                fieldName: "position",
+                oldValue: baseline,
+                newValue: item.position,
+                description,
+                userId: authenticatedUser?.userId,
+                userName: authenticatedUser?.displayName,
+                fullSnapshot: { ...item },
+              })
+            }
+          }),
+        )
+
+        if (payload.length) {
+          // TODO: Replace this with server action
+          await axios.post("/api/scripts/save", { data: payload, broadcastAction: true })
         }
+
+        router.refresh()
+      } catch (e) {
+        // Roll back UI and pending changes on failure
+        setScripts(previousState)
+
+        await Promise.all(
+          sorted.map(async (item) => {
+            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
+            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
+            const baseline = existingPositionChange?.oldValue ?? previousPositions.get(item.scriptId)
+
+            if (existingPositionChange?.id) {
+              if (baseline === undefined || baseline === item.position) {
+                await pendingChangesAPI.deleteChange(existingPositionChange.id)
+              } else {
+                await pendingChangesAPI.updateChange(existingPositionChange.id, {
+                  newValue: baseline,
+                  description: `Position rolled back to ${baseline}`,
+                })
+              }
+            }
+          }),
+        )
       }
-
-      // TODO: Replace this with server action
-      await axios.post("/api/scripts/save", { data: payload, broadcastAction: true })
-
-      router.refresh()
     },
     [saveScripts, scripts, router, authenticatedUser?.userId, authenticatedUser?.displayName],
   )

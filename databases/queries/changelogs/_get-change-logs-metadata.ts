@@ -1,9 +1,10 @@
-import { and, eq, inArray, desc, sql, or, ilike } from "drizzle-orm";
+import { and, eq, inArray, desc, sql, or, ilike, count } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
 import { changeLogs, users } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { sanitizeChangeLogForResponse } from "./_get-change-logs";
 
 export type SearchChangeLogsParams = {
     searchTerm?: string;
@@ -78,7 +79,20 @@ export async function _searchChangeLogs(
             .limit(limit)
             .offset(offset);
 
-        const data = result.map(item => ({
+        const totalRes = await db
+            .select({ total: count() })
+            .from(changeLogs)
+            .where(and(
+                searchConditions,
+                !entityTypes.length ? undefined : inArray(changeLogs.entityType, entityTypes),
+                !actions.length ? undefined : inArray(changeLogs.action, actions),
+                !userIds.length ? undefined : inArray(changeLogs.userId, userIds),
+                isActiveOnly ? eq(changeLogs.isActive, true) : undefined,
+                startDate ? sql`${changeLogs.dateOfChange} >= ${startDate}` : undefined,
+                endDate ? sql`${changeLogs.dateOfChange} <= ${endDate}` : undefined,
+            ));
+
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -86,7 +100,7 @@ export async function _searchChangeLogs(
 
         return {
             data,
-            total: data.length,
+            total: totalRes?.[0]?.total ?? data.length,
         };
     } catch (e: any) {
         logger.error('_searchChangeLogs ERROR', e.message);
@@ -251,7 +265,7 @@ export async function _searchChangeLogsByUser(
             .limit(limit)
             .offset(offset);
 
-        const data = result.map(item => ({
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -315,7 +329,7 @@ export async function _searchChangeLogsByDateRange(
             .orderBy(desc(changeLogs.dateOfChange))
             .limit(limit);
 
-        const data = result.map(item => ({
+        const data = result.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
         }));
@@ -418,11 +432,11 @@ export async function _findRelatedChanges(
 
         return {
             data: {
-                current,
-                parent,
-                children,
-                mergedVersions,
-                supersededVersions,
+                current: current ? sanitizeChangeLogForResponse(current) : current,
+                parent: parent ? sanitizeChangeLogForResponse(parent) : parent,
+                children: children.map(sanitizeChangeLogForResponse),
+                mergedVersions: mergedVersions.map(sanitizeChangeLogForResponse),
+                supersededVersions: supersededVersions.map(sanitizeChangeLogForResponse),
             },
         };
     } catch (e: any) {

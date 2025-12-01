@@ -25,6 +25,7 @@ export type DataVersionSummary = {
   descriptions: string[]
   changeLogIds: string[]
   changes: ChangeLogType[]
+  rollbackSourceVersion?: number | null
 }
 
 type Pagination = {
@@ -146,6 +147,19 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
 
       const latestChange = sortedByDate[0]
       const publishEntry = changeLogs.find((entry) => entry.action === "publish") ?? latestChange
+      const rollbackEntry = changeLogs.find((entry) => entry.action === "rollback")
+      const rollbackSourceVersion = rollbackEntry?.changes && Array.isArray(rollbackEntry.changes)
+        ? (() => {
+            const match = (rollbackEntry.changes as any[]).find(
+              (c) => Number.isFinite((c as any)?.toDataVersion) || Number.isFinite((c as any)?.toVersion),
+            ) as any
+            return Number.isFinite(match?.toDataVersion)
+              ? match.toDataVersion
+              : Number.isFinite(match?.toVersion)
+                ? match.toVersion
+                : null
+          })()
+        : null
 
       const entityCounts = changeLogs.reduce<Record<string, number>>((result, entry) => {
         result[entry.entityType] = (result[entry.entityType] || 0) + 1
@@ -178,6 +192,7 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
         descriptions,
         changeLogIds: changeLogs.map((entry) => entry.changeLogId),
         changes: changeLogs,
+        rollbackSourceVersion,
       })
     }
 
