@@ -38,6 +38,10 @@ export type GetScriptsMetadataResponse = {
             diagnosisId: string;
             name: string;
             key: string;
+            severityOrder?: string | number | null;
+            expression?: string | number | null;
+            expressionMeaning?: string | null;
+            description?: string | null;
             fields: {
                 label: string;
                 key: string;
@@ -167,6 +171,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         diagnosisId: d.diagnosisId,
                         name: d.name,
                         key: d.key || d.name,
+                        severityOrder: d.severityOrder || '',
+                        expression: d.expression || '',
+                        expressionMeaning: d.expressionMeaning || '',
+                        description: d.description || '',
                         fields: [],
                     };
                 }),
