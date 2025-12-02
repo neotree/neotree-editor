@@ -56,6 +56,9 @@ export function ScriptMetaActions({ data }: {
                 'Diagnosis Name': string;
                 Key: string;
                 Label: string;
+                'Severity Order': string;
+                Expression: string;
+                'Expression Meaning': string;
                 'Data Type': string;
                 'Value': string;
                 'Value Label': string;
@@ -68,6 +71,9 @@ export function ScriptMetaActions({ data }: {
                     'Diagnosis Name': d.name,
                     Key: d.key,
                     Label: d.name,
+                    'Severity Order': `${d.severityOrder || ''}`,
+                    Expression: `${d.expression || ''}`,
+                    'Expression Meaning': `${d.expressionMeaning || ''}`,
                     'Data Type': 'diagnosis',
                     Value: d.key,
                     'Value Label': d.name,
