@@ -138,7 +138,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
   useEffect(() => {
     if (mounted.current) {
-      form.reset(getDefaultValues())
+      // form.reset(getDefaultValues())
     } else {
       mounted.current = true
     }
