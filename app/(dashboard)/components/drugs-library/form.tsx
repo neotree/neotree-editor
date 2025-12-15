@@ -425,7 +425,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 <Label secondary htmlFor="calculator_condition">Calculator condition</Label>
                 <div className="text-xs mb-2">
                     <ErrorCard color="warning">
-                        <p>Will be used in DFF Calculator scripts only</p>
+                        <p>Will be used in the Standalone DFF Calculator only</p>
                     </ErrorCard>
                 </div>
                 <Textarea
@@ -443,7 +443,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''} (Admission)</Label>
                 <div className="text-xs mb-2">
                     <ErrorCard color="warning">
-                        <p>Will <b>NOT</b> be used in DFF Calculator scripts</p>
+                        <p>Will be used in the Admission DFF Calculator only</p>
                     </ErrorCard>
                 </div>
                 <Textarea
@@ -476,7 +476,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     <Label secondary htmlFor="diagnosisKey">Diagnosis Key {validateWithCondition ? '' : '*'}</Label>
                     <div className="text-xs mb-2">
                         <ErrorCard color="warning">
-                            <p>Will <b>NOT</b> be used in DFF Calculator scripts</p>
+                            <p>Will be used in the Admission DFF Calculator only</p>
                         </ErrorCard>
                     </div>
                     <Textarea
