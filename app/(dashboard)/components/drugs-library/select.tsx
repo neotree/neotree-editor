@@ -97,7 +97,7 @@ export function SelectDrug({
                     </Select>
                 </div>
 
-                <div className="flex justify-end gap-x-4 text-xs">
+                <div className="hidden flex justify-end gap-x-4 text-xs">
                     {!!selected[0] && (
                         <Link 
                             href={editLink(selected[0])}
