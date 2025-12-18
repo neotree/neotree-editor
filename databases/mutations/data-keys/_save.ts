@@ -73,7 +73,10 @@ export async function _saveDataKeys({
                     });
 
                     const published = (draft || isNewUuid) ? null : await db.query.dataKeys.findFirst({
-                        where: eq(dataKeys.uuid, dataKeyUuid),
+                        where: or(
+                            eq(dataKeys.uuid, dataKeyUuid),
+                            !item.uniqueKey ? undefined : eq(dataKeys.uniqueKey, item.uniqueKey)
+                        ),
                     });
 
                     if (draft) {
@@ -124,7 +127,7 @@ export async function _saveDataKeys({
         } else {
             if (updateRefs && uniqueKeys.length) {
                 const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
-                await _updateDataKeysRefs({ dataKeys, broadcastAction, });
+                await _updateDataKeysRefs({ dataKeys, broadcastAction, userId, });
             }
 
             socket.emit('data_changed', 'save_data_keys');

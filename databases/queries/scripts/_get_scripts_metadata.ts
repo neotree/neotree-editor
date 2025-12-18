@@ -34,6 +34,27 @@ export type GetScriptsMetadataResponse = {
                 maxValue?: string | number | null;
             }[];
         }[];
+        diagnoses: {
+            diagnosisId: string;
+            name: string;
+            key: string;
+            severityOrder?: string | number | null;
+            expression?: string | number | null;
+            expressionMeaning?: string | null;
+            description?: string | null;
+            fields: {
+                label: string;
+                key: string;
+                type: string;
+                dataType: string | null;
+                value: any;
+                valueLabel: null | string;
+                optional?: boolean;
+                confidential: boolean;
+                minValue?: string | number | null;
+                maxValue?: string | number | null;
+            }[];
+        }[];
     }[],
     errors?: string[];
 };
@@ -80,6 +101,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             ),
             with: {
                 screensDrafts: true,
+                diagnosesDrafts: true,
             }
         });
 
@@ -91,6 +113,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             with: {
                 draft: !returnDraftsIfExist ? undefined : true,
                 screens: {
+                    where: isNull(screens.deletedAt),
+                    with: {
+                        draft: !returnDraftsIfExist ? undefined : true,
+                    },
+                },
+                diagnoses: {
+                    where: isNull(screens.deletedAt),
                     with: {
                         draft: !returnDraftsIfExist ? undefined : true,
                     },
@@ -103,6 +132,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             ...(returnDraftsIfExist && s.draft ? s.draft.data : null),
             screens: s.screens
                 .sort((a, b) => a.position - b.position),
+            diagnoses: s.diagnoses
+                .sort((a, b) => a.position - b.position),
         }));
 
         const unpublisedScripts = unpublisedScriptsRes.map(s => {
@@ -112,6 +143,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 screens: s.screensDrafts.map(screenDraft => ({
                     ...screenDraft.data,
                     screenId: screenDraft.screenDraftId,
+                })),
+                diagnoses: s.diagnosesDrafts.map(diagnosisDraft => ({
+                    ...diagnosisDraft.data,
+                    diagnosisId: diagnosisDraft.diagnosisDraftId,
                 }))
             }
         }) as typeof publishedScripts;
@@ -131,6 +166,18 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 scriptId: script.scriptId,
                 title: script.title,
                 hospitalName: hospital?.name || '',
+                diagnoses: script.diagnoses.map(d => {
+                    return {
+                        diagnosisId: d.diagnosisId,
+                        name: d.name,
+                        key: d.key || d.name,
+                        severityOrder: d.severityOrder || '',
+                        expression: d.expression || '',
+                        expressionMeaning: d.expressionMeaning || '',
+                        description: d.description || '',
+                        fields: [],
+                    };
+                }),
                 screens: script.screens.map(screen => {
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];
@@ -214,6 +261,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'form':
                             const formFields = screenFields.map(f => {
                                 let dataType = f.dataType;
+                                const dropdownItems = f.items || [];
 
                                 switch (f.type) {
                                     case 'datetime':
@@ -249,13 +297,21 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     let dataType = 'dropdown';
                                     if (f.type === 'multi_select') dataType = 'multi_select';
 
-                                    const opts = (f.values || '').split('\n')
+                                    let opts = (f.values || '').split('\n')
                                         .map((v = '') => v.trim())
                                         .filter((v: any) => v)
                                         .map((v: any) => {
                                             v = v.split(',');
                                             return { value: v[0] as string, label: v[1] as string, };
                                         });
+                                    
+                                    if (dropdownItems.length) {
+                                        opts = dropdownItems.map(o => ({
+                                            value: `${o.value || ''}`,
+                                            label: `${o.label || ''}`,
+                                        }));
+                                    }
+
                                     return opts.map(o => {
                                         return {
                                             label: f.label,

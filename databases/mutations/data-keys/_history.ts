@@ -1,59 +1,85 @@
-import db from "@/databases/pg/drizzle";
-import logger from "@/lib/logger";
-import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema";
+import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
+import db from "@/databases/pg/drizzle"
+import logger from "@/lib/logger"
+import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
 
-export async function _saveDataKeysHistory({ previous, drafts, }: {
-    drafts: typeof dataKeysDrafts.$inferSelect[];
-    previous: typeof dataKeys.$inferSelect[];
-}) {
-    try {
-        const insertData: typeof dataKeysHistory.$inferInsert[] = [];
+export async function _saveDataKeysHistory({
+  previous,
+  drafts,
+  userId,
+}: {
+  drafts: typeof dataKeysDrafts.$inferSelect[]
+  previous: typeof dataKeys.$inferSelect[]
+  userId?: string | null
+}): Promise<SaveChangeLogData[]> {
+  const changeLogsData: SaveChangeLogData[] = []
 
-        for(const c of drafts) {
-            const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-                version: c?.data?.version || 1,
-                dataKeyId: c?.data?.uuid!,
-                changes: {},
-            };
+  try {
+    const insertData: typeof dataKeysHistory.$inferInsert[] = []
 
-            if (c?.data?.version === 1) {
-                changeHistoryData.changes = {
-                    action: 'create_data_key',
-                    description: 'Create data key',
-                    oldValues: [],
-                    newValues: [],
-                };
-            } else {
-                const prev = previous.filter(prevC => prevC.uuid === c?.data?.uuid)[0];
+    for (const c of drafts) {
+      const dataKeyId = c?.data?.uuid
+      if (!dataKeyId) continue
 
-                const oldValues: any[] = [];
-                const newValues: any[] = [];
+      const isCreate = (c?.data?.version || 1) === 1
+      const changeDescription = isCreate ? "Create data key" : "Update data key"
 
-                Object.keys(({ ...c?.data }))
-                    .filter(key => !['version', 'draft'].includes(key))
-                    .forEach(_key => {
-                        const key = _key as unknown as keyof typeof c.data;
-                        const newValue = c.data[key];
-                        const oldValue = ({ ...prev })[key as keyof typeof prev];
-                        if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-                            oldValues.push({ [key]: oldValue, });
-                            newValues.push({ [key]: newValue, });
-                        }
-                    });
+      const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
+        action: isCreate ? "create_data_key" : "update_data_key",
+        description: changeDescription,
+        oldValues: [],
+        newValues: [],
+      }
 
-                changeHistoryData.changes = {
-                    action: 'update_data_key',
-                    description: 'Update data key',
-                    oldValues,
-                    newValues,
-                };
+      const versionValue = c?.data?.version || 1
+
+      const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
+        version: versionValue,
+        dataKeyId,
+        changes: changePayload,
+      }
+
+      if (!isCreate) {
+        const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
+
+        Object.keys({ ...c?.data })
+          .filter((key) => !["version", "draft"].includes(key))
+          .forEach((_key) => {
+            const key = _key as keyof typeof c.data
+            const newValue = c.data[key]
+            const oldValue = ({ ...prev })[key as keyof typeof prev]
+            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+              changePayload.oldValues.push({ [key]: oldValue })
+              changePayload.newValues.push({ [key]: newValue })
             }
+          })
+      }
 
-            insertData.push(changeHistoryData);
-        }
+      insertData.push(changeHistoryData)
 
-        await db.insert(dataKeysHistory).values(insertData);
-    } catch(e: any) {
-        logger.error(e.message);
+      if (userId) {
+        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
+
+        changeLogsData.push({
+          entityId: dataKeyId,
+          entityType: "data_key",
+          action: isCreate ? "create" : "update",
+          version: versionValue,
+          changes: changePayload,
+          fullSnapshot: sanitizedSnapshot,
+          description: changeDescription,
+          userId,
+          dataKeyId,
+        })
+      }
     }
+
+    if (insertData.length) {
+      await db.insert(dataKeysHistory).values(insertData)
+    }
+  } catch (e: any) {
+    logger.error(e.message)
+  }
+
+  return changeLogsData
 }
