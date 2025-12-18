@@ -19,6 +19,7 @@ import * as dataKeysActions from '@/app/actions/data-keys';
 
 import "@/app/globals.css";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import { ChangeLogProvider } from "@/components/providers/changelog-context-provider";
 
 const roboto = Roboto({
     subsets: ['latin'],
@@ -77,25 +78,27 @@ export default async function RootLayout({
                                 sys={sys}
                                 getSites={getSitesWithoutConfidentialData}
                             >
-                                {children}
+                                <ChangeLogProvider>
+                                    {children}
 
-                                <SocketEventsListener 
-                                    events={[
-                                        {
-                                            name: 'mode_changed',
-                                            onEvent: { refreshRouter: true, },
-                                        },
-                                        {
-                                            name: 'update_system',
-                                            onEvent: { refreshRouter: true, },
-                                        },
-                                        {
-                                            name: 'data_changed',
-                                            onEvent: { refreshRouter: true, },
-                                        },
+                                    <SocketEventsListener 
+                                        events={[
+                                            {
+                                                name: 'mode_changed',
+                                                onEvent: { refreshRouter: true, },
+                                            },
+                                            {
+                                                name: 'update_system',
+                                                onEvent: { refreshRouter: true, },
+                                            },
+                                            {
+                                                name: 'data_changed',
+                                                onEvent: { refreshRouter: true, },
+                                            },
 
-                                    ]}
-                                />
+                                        ]}
+                                    />
+                                </ChangeLogProvider>
                             </AppContextProvider>
                             <Toaster />
                             <ConfirmModal />

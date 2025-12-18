@@ -1,5 +1,6 @@
 import * as schema from '@/databases/pg/schema';
 import { ScriptField, ArrayElement } from '@/types';
+import { escapeRegex, normalizeSearchTerm } from "@/lib/search";
 
 type Script = typeof schema.scripts.$inferSelect & {
     isDraft: boolean;
@@ -41,8 +42,12 @@ export type ScriptsSearchResultsItem = {
 export type ParseScriptsSearchResultsParams = {
     searchValue: string;
     scripts: Script[];
-    screens: Screen[];
-    diagnoses: Diagnosis[];
+    screens: (Screen & {
+        scriptTitle: string;
+    })[];
+    diagnoses: (Diagnosis & {
+        scriptTitle: string;
+    })[];
 };
 
 export function parseScriptsSearchResults({
@@ -51,21 +56,29 @@ export function parseScriptsSearchResults({
     screens,
     diagnoses,
 }: ParseScriptsSearchResultsParams): ScriptsSearchResultsItem[] {
-    searchValue = `${searchValue || ''}`.trim().toLowerCase();
+    const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+
+    if (!normalizedValue) {
+        return [];
+    }
+
+    const escapedSearchValue = escapeRegex(normalizedValue);
+    const pattern = isExactMatch ? `^${escapedSearchValue}$` : escapedSearchValue;
+    const searchRegex = new RegExp(pattern);
 
     const resultsMap: Record<string, ScriptsSearchResultsItem> = {};
 
     scripts.forEach(s => {
         const matches: ScriptsSearchResultsItem['matches'] = [];
 
-        if (`${s.title || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.title || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'title',
                 fieldValue: s.title,
             });
         }
 
-        if (`${s.printTitle || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.printTitle || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'printTitle',
                 fieldValue: s.printTitle,
@@ -86,56 +99,56 @@ export function parseScriptsSearchResults({
     screens.forEach(s => {
         const matches: ScriptsSearchResultsItem['matches'] = [];
 
-        if (`${s.title || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.title || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'title',
                 fieldValue: s.title,
             });
         }
 
-        if (`${s.key || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.key || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'key',
                 fieldValue: s.key!,
             });
         }
 
-        if (`${s.refId || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.refId || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'refId',
                 fieldValue: `${s.refId || ''}`,
             });
         }
 
-        if (`${s.label || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.label || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'label',
                 fieldValue: s.label!,
             });
         }
 
-        if (`${s.sectionTitle || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.sectionTitle || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'sectionTitle',
                 fieldValue: s.sectionTitle!,
             });
         }
 
-        if (`${s.previewTitle || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.previewTitle || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'previewTitle',
                 fieldValue: s.previewTitle!,
             });
         }
 
-        if (`${s.previewPrintTitle || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.previewPrintTitle || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'previewPrintTitle',
                 fieldValue: s.previewPrintTitle!,
             });
         }
 
-        if (`${s.condition || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.condition || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'condition',
                 fieldValue: s.condition!,
@@ -143,7 +156,7 @@ export function parseScriptsSearchResults({
         }
 
         (s.fields || []).map((f: ScriptField, i) => {
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'field_key',
                     fieldIndex: i,
@@ -151,7 +164,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.label || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.label || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'field_label',
                     fieldIndex: i,
@@ -159,7 +172,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.condition || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.condition || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'field_condition',
                     fieldIndex: i,
@@ -168,7 +181,7 @@ export function parseScriptsSearchResults({
             }
 
             (f.items || []).map((f, j) => {
-                if (`${f.value || ''}`.toLowerCase().match(searchValue)) {
+                if (`${f.value || ''}`.toLowerCase().match(searchRegex)) {
                     matches.push({
                         field: 'field_item_key',
                         fieldIndex: i,
@@ -177,7 +190,7 @@ export function parseScriptsSearchResults({
                     });
                 }
 
-                if (`${f.label || ''}`.toLowerCase().match(searchValue)) {
+                if (`${f.label || ''}`.toLowerCase().match(searchRegex)) {
                     matches.push({
                         field: 'field_item_label',
                         fieldIndex: i,
@@ -189,7 +202,7 @@ export function parseScriptsSearchResults({
         });
 
         (s.items || []).map((f, i) => {
-            if (`${f.id || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.id || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'item_id',
                     fieldIndex: i,
@@ -197,7 +210,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'item_key',
                     fieldIndex: i,
@@ -205,7 +218,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.label || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.label || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'item_label',
                     fieldIndex: i,
@@ -215,7 +228,7 @@ export function parseScriptsSearchResults({
         });
 
         (s.drugs || []).map((f, i) => {
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'drug',
                     fieldIndex: i,
@@ -225,7 +238,7 @@ export function parseScriptsSearchResults({
         });
 
         (s.fluids || []).map((f, i) => {
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'fluid',
                     fieldIndex: i,
@@ -235,7 +248,7 @@ export function parseScriptsSearchResults({
         });
 
         (s.feeds || []).map((f, i) => {
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'feed',
                     fieldIndex: i,
@@ -252,6 +265,8 @@ export function parseScriptsSearchResults({
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
+
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
 
             resultsMap[s.scriptId].screens.push({
                 title: s.title,
@@ -275,21 +290,21 @@ export function parseScriptsSearchResults({
     diagnoses.forEach(s => {
         const matches: ScriptsSearchResultsItem['matches'] = [];
 
-        if (`${s.name || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.name || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'name',
                 fieldValue: s.name!,
             });
         }
 
-        if (`${s.key || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.key || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'key',
                 fieldValue: s.key!,
             });
         }
 
-        if (`${s.expression || ''}`.toLowerCase().match(searchValue)) {
+        if (`${s.expression || ''}`.toLowerCase().match(searchRegex)) {
             matches.push({
                 field: 'expression',
                 fieldValue: s.expression!,
@@ -297,7 +312,7 @@ export function parseScriptsSearchResults({
         }
 
         (s.symptoms || []).map((f, i) => {
-            if (`${f.key || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.key || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'diagnosis_symptom_key',
                     fieldIndex: i,
@@ -305,7 +320,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.name || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.name || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'diagnosis_symptom_name',
                     fieldIndex: i,
@@ -313,7 +328,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (`${f.expression || ''}`.toLowerCase().match(searchValue)) {
+            if (`${f.expression || ''}`.toLowerCase().match(searchRegex)) {
                 matches.push({
                     field: 'diagnosis_symptom_expression',
                     fieldIndex: i,
@@ -330,6 +345,8 @@ export function parseScriptsSearchResults({
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
+
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
 
             resultsMap[s.scriptId].diagnoses.push({
                 title: s.name || '',

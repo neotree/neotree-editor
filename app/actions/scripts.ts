@@ -5,8 +5,8 @@ import queryString from "query-string";
 
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
-import * as drugsLibraryMutations from "@/databases/mutations/drugs-library";
-import { _saveDataKeys, _saveDataKeysIfNotExist } from "@/databases/mutations/data-keys";
+import { _saveDrugsLibraryItemsUpdateIfExists, _saveDrugsLibraryItemsIfKeysNotExist } from "@/databases/mutations/drugs-library";
+import { _saveDataKeys } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
@@ -592,6 +592,8 @@ export async function copyScripts(params?: {
     } = { ...params };
 
     try {
+        const session = await isAllowed();
+
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
 
@@ -709,14 +711,14 @@ export async function copyScripts(params?: {
         if (dffItemsToSave.length) {
             const { data: dffItems, } = await _getDrugsLibraryItems();
             const res = overwriteDrugsLibraryItems ? 
-                await drugsLibraryMutations._saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, })
+                await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
-                await drugsLibraryMutations._saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, });
+                await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
         }
 
         if (dataKeysToSave.length) {
-            const res = await _saveDataKeys({ data: dataKeysToSave, });
+            const res = await _saveDataKeys({ data: dataKeysToSave, userId: session.user?.userId, });
             if (res.success) response.info.dataKeys = dataKeysToSave.length;
         }
 
