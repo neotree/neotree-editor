@@ -11,6 +11,8 @@ import * as scriptsQueries from "@/databases/queries/scripts"
 import * as scriptsMutations from "@/databases/mutations/scripts"
 import * as configKeysMutations from "@/databases/mutations/config-keys"
 import * as configKeysQueries from "@/databases/queries/config-keys"
+import * as hospitalsMutations from "@/databases/mutations/hospitals"
+import * as hospitalsQueries from "@/databases/queries/hospitals"
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library"
 import * as drugsLibraryQueries from "@/databases/queries/drugs-library"
 import * as dataKeysMutations from "@/databases/mutations/data-keys"
@@ -68,6 +70,7 @@ export const revalidatePath = async (
 export const countAllDrafts = async () => {
   try {
     const configKeys = await configKeysQueries._countConfigKeys()
+    const hospitals = await hospitalsQueries._countHospitals()
     const drugsLibraryItems = await drugsLibraryQueries._countDrugsLibraryItems()
     const dataKeys = await dataKeysQueries._countDataKeys()
     const screens = await scriptsQueries._countScreens()
@@ -76,6 +79,7 @@ export const countAllDrafts = async () => {
 
     return {
       configKeys: configKeys.data.allDrafts,
+      hospitals: hospitals.data.allDrafts,
       drugsLibrary: drugsLibraryItems.data.allDrafts,
       screens: screens.data.allDrafts,
       scripts: scripts.data.allDrafts,
@@ -88,6 +92,7 @@ export const countAllDrafts = async () => {
       screens: 0,
       scripts: 0,
       configKeys: 0,
+      hospitals: 0,
       diagnoses: 0,
     }
   }
@@ -128,6 +133,13 @@ export async function publishData({
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+
+    const publishHospitals = await hospitalsMutations._publishHospitals({
+      userId,
+      publisherUserId,
+      dataVersion: nextDataVersion,
+    })
+
     const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
       userId,
       publisherUserId,
@@ -166,6 +178,11 @@ export async function publishData({
     if (publishConfigKeys.errors) {
       results.success = false
       results.errors = [...(results.errors || []), ...publishConfigKeys.errors]
+    }
+
+    if (publishHospitals.errors) {
+      results.success = false
+      results.errors = [...(results.errors || []), ...publishHospitals.errors]
     }
 
     if (publishDrugsLibraryItems.errors) {
@@ -223,6 +240,7 @@ export async function discardDrafts({
     if (scope === 1) userId = undefined
 
     await configKeysMutations._deleteAllConfigKeysDrafts({ userId })
+    await hospitalsMutations._deleteAllHospitalsDrafts({ userId })
     await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts({ userId })
     await dataKeysMutations._deleteAllDataKeysDrafts({ userId })
     await scriptsMutations._deleteAllScriptsDrafts({ userId })

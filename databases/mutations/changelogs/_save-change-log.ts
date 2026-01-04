@@ -27,6 +27,7 @@ export type SaveChangeLogData = {
   drugsLibraryItemId?: string | null
   dataKeyId?: string | null
   aliasId?: string | null
+  hospitalId?: string | null
 }
 
 export type SaveChangeLogResponse = {
