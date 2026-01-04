@@ -16,6 +16,7 @@ export type GetHospitalsResults = {
     data: (typeof hospitals.$inferSelect & {
         isDraft: boolean;
         isDeleted: boolean;
+        isUnpublishedDraft: boolean;
         preferences: Preferences;
         draftCreatedByUserId?: string | null;
     })[];
@@ -81,15 +82,18 @@ export async function _getHospitals(
                 ...s,
                 isDraft: false,
                 isDeleted: false,
+                isUnpublishedDraft: false,
             } as GetHospitalsResults['data'][0])),
 
             ...drafts.map((s => ({
                 ...s.data,
                 isDraft: true,
                 isDeleted: false,
+                isUnpublishedDraft: !s.hospitalId,
                 draftCreatedByUserId: s.createdByUserId,
             } as GetHospitalsResults['data'][0])))
         ]
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
             .filter(s => !inPendingDeletion.map(s => s.hospitalId).includes(s.hospitalId));
 
         return  { 
@@ -106,6 +110,7 @@ export type GetHospitalResults = {
         isDraft: boolean;
         isDeleted: boolean;
         draftCreatedByUserId?: string | null;
+        isUnpublishedDraft: boolean;
     };
     errors?: string[];
 };
@@ -134,6 +139,7 @@ export async function _getHospital(
             draftCreatedByUserId: draft.createdByUserId,
             isDraft: true,
             isDeleted: false,
+            isUnpublishedDraft: !draft.hospitalId,
         } as GetHospitalResults['data'];
 
         if (responseData) return { data: responseData, };
@@ -157,6 +163,7 @@ export async function _getHospital(
             draftCreatedByUserId: draft?.createdByUserId,
             isDraft: !!draft?.data,
             isDeleted: false,
+            isUnpublishedDraft: false,
         };
 
         if (!responseData) return { data: null, };
