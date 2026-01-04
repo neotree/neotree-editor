@@ -842,7 +842,7 @@ export function ScreenForm(props: Props) {
 
                 {isDiagnosisScreen && (
                     <>
-                        <div>
+                        {/* <div>
                             <Label secondary htmlFor="instructions2">Instructions 2</Label>
                             <Textarea
                                 {...register('instructions2', { disabled, })}
@@ -874,7 +874,7 @@ export function ScreenForm(props: Props) {
                                 data={preferences}
                                 onSave={data => setValue('preferences', data, { shouldDirty: true, })}
                             />
-                        </div>
+                        </div> */}
 
                         <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                             <div>
