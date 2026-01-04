@@ -11,6 +11,8 @@ import {
     getHospital, 
     saveHospitals
 } from "@/app/actions/hospitals";
+import { cn } from "@/lib/utils";
+import { useAppContext } from "@/contexts/app";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -43,6 +45,8 @@ export function HospitalsTable({
     const [showHospitalForm, setShowHospitalForm] = useState(false);
 
     const { confirm } = useConfirmModal();
+
+    const { viewOnly } = useAppContext();
 
     const getHospitals = useCallback(async (
         opts?: {
@@ -152,6 +156,12 @@ export function HospitalsTable({
                 )}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
+                getRowOptions={({ rowIndex }) => {
+                    const s = hospitals.data[rowIndex];
+                    return !s ? {} : {
+                        className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                    };
+                }}
                 columns={[
                     {
                         name: 'Name',
@@ -161,12 +171,11 @@ export function HospitalsTable({
                         align: 'right',
                         // thClassName: 'opacity-0',
                         cellRenderer(cell) {
-                            const u = hospitals.data[cell.rowIndex];
+                            const h = hospitals.data[cell.rowIndex];
                             return (
                                 <HospitalAction 
-                                    hospitalId={u.hospitalId}
-                                    hospitalName={u.name}
-                                    onDelete={() => onDelete([u.hospitalId])}
+                                    hospital={h}
+                                    onDelete={() => onDelete([h.hospitalId])}
                                 />
                             );
                         },
