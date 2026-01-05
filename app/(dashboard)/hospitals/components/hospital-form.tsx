@@ -25,6 +25,8 @@ import { Loader } from "@/components/loader";
 import { useEffectOnce } from '@/hooks/use-effect-once';
 import { useEffectIfMounted } from "@/hooks/use-effect-if-mounted";
 import { useMount } from "react-use";
+import { LockStatus } from '@/components/lock-status';
+import { useIsLocked } from "@/hooks/use-is-locked"
 
 type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
@@ -54,7 +56,12 @@ export function HospitalForm({
 
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [, setHospital] = useState<Awaited<ReturnType<typeof getHospital>>['data']>();
+    const [hospital, setHospital] = useState<Awaited<ReturnType<typeof getHospital>>['data']>();
+    
+    const isLocked = useIsLocked({
+        isDraft: !!hospital?.isDraft,
+        userId: hospital?.draftCreatedByUserId,
+    })
 
     const {
         setValue,
@@ -113,10 +120,12 @@ export function HospitalForm({
             try {
                 setSubmitting(true);
 
-                const payload: Parameters<typeof saveHospitals>[0] = [{
-                    ...data,
-                    id: data.id || undefined,
-                }];
+                const payload: Parameters<typeof saveHospitals>[0] = {
+                    data: [{
+                        ...data,
+                        id: data.id || undefined,
+                    }],
+                };
 
                 // TODO: Replace with server actions
                 const res = await axios.post<Awaited<ReturnType<typeof saveHospitals>>>('/api/hospitals/save', { data: payload, });
@@ -177,10 +186,21 @@ export function HospitalForm({
                     </SheetHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-4 gap-y-4 overflow-y-auto">
+                        {isLocked && (
+                            <div>
+                                <LockStatus 
+                                    card
+                                    isDraft={!!hospital?.isDraft}
+                                    userId={hospital?.draftCreatedByUserId}
+                                    dataType="hospital"
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <Label htmlFor="name">Hospital Name</Label>
                             <Input 
-                                {...register('name', { required: true, disabled: submitting, })}
+                                {...register('name', { required: true, disabled: submitting || isLocked, })}
                                 placeholder="Hospital Name"
                                 className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                             />
@@ -198,6 +218,7 @@ export function HospitalForm({
 
                         <Button
                             onClick={onSave}
+                            disabled={isLocked}
                         >
                             Save
                         </Button>
