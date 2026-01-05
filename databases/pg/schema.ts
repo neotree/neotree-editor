@@ -107,6 +107,7 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "drugs_library",
   "data_key",
   "alias",
+  "hospital",
 ])
 
 // MAILER SETTINGS
@@ -294,6 +295,7 @@ export const hospitals = pgTable(
     oldHospitalId: text("old_hospital_id").unique(),
     name: text("name").notNull().unique(),
     country: text("country").default(""),
+    version: integer("version").default(1).notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -311,6 +313,60 @@ export const hospitals = pgTable(
     ),
   }),
 )
+
+export const hospitalsRelations = relations(hospitals, ({ many, one }) => ({
+  history: many(hospitalsHistory),
+  draft: one(hospitalsDrafts, {
+    fields: [hospitals.hospitalId],
+    references: [hospitalsDrafts.hospitalId],
+  }),
+}))
+
+// HOSPITALS DRAFTS
+export const hospitalsDrafts = pgTable("nt_hospitals_drafts", {
+  id: serial("id").primaryKey(),
+  hospitalDraftId: uuid("hospital_draft_id").notNull().unique().defaultRandom(),
+  hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "cascade" }),
+  data: jsonb("data").$type<typeof hospitals.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})
+
+export const hospitalsDraftsRelations = relations(hospitalsDrafts, ({ one }) => ({
+  hospital: one(hospitals, {
+    fields: [hospitalsDrafts.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
+  createdBy: one(users, {
+    fields: [hospitalsDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// HOSPITALS HISTORY
+export const hospitalsHistory = pgTable("nt_hospitals_history", {
+  id: serial("id").primaryKey(),
+  version: integer("version").notNull(),
+  hospitalId: uuid("hospital_id")
+    .references(() => hospitals.hospitalId, { onDelete: "cascade" })
+    .notNull(),
+  restoreKey: uuid("restore_key"),
+  changes: jsonb("data").default([]),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export const hospitalsHistoryRelations = relations(hospitalsHistory, ({ one }) => ({
+  hospital: one(hospitals, {
+    fields: [hospitalsHistory.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
+}))
 
 // DEVICES
 export const editorInfo = pgTable("nt_editor_info", {
@@ -999,6 +1055,7 @@ export const pendingDeletion = pgTable("nt_pending_deletion", {
   diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "cascade" }),
   diagnosisScriptId: uuid("diagnosis_script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "cascade" }),
+  hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "cascade" }),
   drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "cascade" }),
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   screenDraftId: uuid("screen_draft_id").references(() => screensDrafts.screenDraftId, { onDelete: "cascade" }),
@@ -1006,6 +1063,9 @@ export const pendingDeletion = pgTable("nt_pending_deletion", {
     onDelete: "cascade",
   }),
   configKeyDraftId: uuid("config_key_draft_id").references(() => configKeysDrafts.configKeyDraftId, {
+    onDelete: "cascade",
+  }),
+  hospitalDraftId: uuid("hospital_draft_id").references(() => hospitalsDrafts.hospitalDraftId, {
     onDelete: "cascade",
   }),
   drugsLibraryItemDraftId: uuid("drugs_library_item_draft_id").references(() => drugsLibraryDrafts.itemDraftId, {
@@ -1043,6 +1103,10 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     fields: [pendingDeletion.configKeyId],
     references: [configKeys.configKeyId],
   }),
+  hospital: one(hospitals, {
+    fields: [pendingDeletion.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
   drugsLibraryItem: one(drugsLibrary, {
     fields: [pendingDeletion.drugsLibraryItemId],
     references: [drugsLibrary.itemId],
@@ -1062,6 +1126,10 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
   configKeyDraft: one(configKeysDrafts, {
     fields: [pendingDeletion.configKeyId],
     references: [configKeysDrafts.configKeyDraftId],
+  }),
+  hospitalDraft: one(hospitalsDrafts, {
+    fields: [pendingDeletion.hospitalId],
+    references: [hospitalsDrafts.hospitalDraftId],
   }),
   drugsLibraryItemDraft: one(drugsLibraryDrafts, {
     fields: [pendingDeletion.drugsLibraryItemDraftId],
@@ -1108,6 +1176,7 @@ export const changeLogs = pgTable(
     screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "cascade" }),
     diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "cascade" }),
     configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "cascade" }),
+    hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "cascade" }),
     drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "cascade" }),
     dataKeyId: uuid("data_key_id").references(() => dataKeys.uuid, { onDelete: "cascade" }),
     aliasId: uuid("alias_id").references(() => aliases.uuid, { onDelete: "cascade" }),
@@ -1185,6 +1254,10 @@ export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
   configKey: one(configKeys, {
     fields: [changeLogs.configKeyId],
     references: [configKeys.configKeyId],
+  }),
+  hospital: one(hospitals, {
+    fields: [changeLogs.hospitalId],
+    references: [hospitals.hospitalId],
   }),
   drugsLibraryItem: one(drugsLibrary, {
     fields: [changeLogs.drugsLibraryItemId],
