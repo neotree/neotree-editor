@@ -1,2 +1,2 @@
-export * from './_get-hospitals';
-export * from './_count-hospitals';
+export * from './_get';
+export * from './_count';
