@@ -12,6 +12,7 @@ import {
   diagnoses,
   drugsLibrary,
   editorInfo,
+  hospitals,
   screens,
   scripts,
 } from "@/databases/pg/schema"
@@ -109,6 +110,14 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     table: aliases,
     pk: aliases.uuid,
     pkKey: "uuid",
+    publishDateKey: "publishDate",
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
+  },
+  hospital: {
+    table: hospitals,
+    pk: hospitals.hospitalId,
+    pkKey: "hospitalId",
+    versionKey: "version",
     publishDateKey: "publishDate",
     timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },

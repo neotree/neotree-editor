@@ -11,6 +11,7 @@ import {
   diagnoses,
   drugsLibrary,
   editorInfo,
+  hospitals,
   screens,
   scripts,
 } from "@/databases/pg/schema"
@@ -75,6 +76,13 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     table: aliases,
     pk: aliases.uuid,
     pkKey: "uuid",
+    publishDateKey: "publishDate",
+  },
+  hospital: {
+    table: hospitals,
+    pk: hospitals.hospitalId,
+    pkKey: "hospitalId",
+    versionKey: "version",
     publishDateKey: "publishDate",
   },
 }
@@ -225,6 +233,7 @@ export async function _rollbackChangeLog({
         screenId: target.screenId,
         diagnosisId: target.diagnosisId,
         configKeyId: target.configKeyId,
+        hospitalId: target.hospitalId,
         drugsLibraryItemId: target.drugsLibraryItemId,
         dataKeyId: target.dataKeyId,
         aliasId: target.aliasId,
