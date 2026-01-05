@@ -3,6 +3,7 @@ import { Content } from "@/components/content"
 import { Card, CardContent } from "@/components/ui/card"
 import { ChangelogManagement } from "./components"
 import { getChangeLogs } from "@/app/actions/change-logs"
+import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 
 export const dynamic = "force-dynamic"
 
@@ -12,6 +13,8 @@ export default async function ChangelogsPage() {
     sortBy: "dateOfChange",
     sortOrder: "desc",
   })
+  const currentUser = await getAuthenticatedUser()
+  const isSuperUser = currentUser?.role === "super_user"
 
   return (
     <>
@@ -20,7 +23,7 @@ export default async function ChangelogsPage() {
       <Content>
         <Card className="mb-20">
           <CardContent className="p-0">
-            <ChangelogManagement initialChangelogs={changelogs.data} />
+            <ChangelogManagement initialChangelogs={changelogs.data} isSuperUser={isSuperUser} />
           </CardContent>
         </Card>
       </Content>

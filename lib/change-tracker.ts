@@ -42,27 +42,22 @@ export class ChangeTracker {
 
   setSnapshot(data: any) {
     if (this.isInitialized) {
-      console.warn("Snapshot already initialized, ignoring subsequent calls")
       return
     }
 
     this.originalSnapshot = JSON.parse(JSON.stringify(data))
     this.isInitialized = true
-    console.log("Initial snapshot set for entity:", this.options.entityId)
   }
 
   async trackChanges(currentData: any, description?: string) {
     if (!this.isInitialized || !this.originalSnapshot) {
-      console.warn("Snapshot not initialized, initializing now")
       this.setSnapshot(currentData)
       return
     }
 
-    console.log("Tracking changes for entity:", this.options.entityId)
 
     const changes = this.detectChanges(this.originalSnapshot, currentData)
 
-    console.log("Detected changes:", changes.length)
 
     const existingChanges = await pendingChangesAPI.getEntityChanges(this.options.entityId, this.options.entityType)
     const existingChangesByPath = new Map(existingChanges.map((change) => [change.fieldPath, change]))
@@ -79,7 +74,6 @@ export class ChangeTracker {
           fullSnapshot: currentData,
           entityTitle,
         })
-        console.log("Updated change for field:", change.path)
       } else {
         await pendingChangesAPI.addChange({
           entityId: this.options.entityId,
@@ -95,7 +89,6 @@ export class ChangeTracker {
           fullSnapshot: currentData,
           entityTitle,
         })
-        console.log("Added new change for field:", change.path)
       }
     }
 
@@ -103,13 +96,11 @@ export class ChangeTracker {
       const stillChanged = changes.some((c) => c.path === path)
       if (!stillChanged) {
         await pendingChangesAPI.deleteChange(existingChange.id!)
-        console.log("Removed reverted change for field:", path)
       }
     }
 
     if (changes.length === 0) {
       await pendingChangesAPI.clearEntityChanges(this.options.entityId, this.options.entityType)
-      console.log("All changes cleared - form back to original state")
     }
   }
 
@@ -270,7 +261,6 @@ export class ChangeTracker {
     await pendingChangesAPI.clearEntityChanges(this.options.entityId, this.options.entityType)
     this.originalSnapshot = null
     this.isInitialized = false
-    console.log("Change tracker reset for entity:", this.options.entityId)
   }
 
   // Get all pending changes for this entity

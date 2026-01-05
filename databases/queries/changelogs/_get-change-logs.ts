@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc, asc, sql } from "drizzle-orm";
+import { and, eq, inArray, desc, asc, sql, count } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -28,6 +28,34 @@ export type ChangeLogType = typeof changeLogs.$inferSelect & {
     userEmail?: string;
     entityName?: string;
 };
+
+const SENSITIVE_KEYS = ["password", "secret", "token", "credential", "auth", "privatekey", "apikey", "salt"];
+
+function sanitizeValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(sanitizeValue);
+    }
+
+    if (value && typeof value === "object") {
+        return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, val]) => {
+            const normalizedKey = key.toLowerCase();
+            const isSensitive = SENSITIVE_KEYS.some((needle) => normalizedKey.includes(needle));
+            if (isSensitive) return acc;
+            acc[key] = sanitizeValue(val);
+            return acc;
+        }, {});
+    }
+
+    return value;
+}
+
+export function sanitizeChangeLogForResponse(change: ChangeLogType): ChangeLogType {
+    return {
+        ...change,
+        fullSnapshot: sanitizeValue(change.fullSnapshot),
+        previousSnapshot: sanitizeValue((change as any).previousSnapshot),
+    };
+}
 
 function deriveEntityName(change: typeof changeLogs.$inferSelect): string | undefined {
     const snapshot = (change.fullSnapshot || {}) as Record<string, unknown>;
@@ -77,11 +105,15 @@ export async function _getChangeLogs(
             scriptIds = [],
             screenIds = [],
             diagnosisIds = [],
-            limit,
-            offset,
+            limit = 1000,
+            offset = 0,
             sortBy = 'dateOfChange',
             sortOrder = 'desc',
         } = { ...params };
+
+        // clamp pagination to avoid runaway responses
+        const safeLimit = Math.max(1, Math.min(limit, 2000));
+        const safeOffset = Math.max(0, offset || 0);
 
         // Filter valid UUIDs
         changeLogIds = changeLogIds.filter(id => uuid.validate(id));
@@ -121,21 +153,38 @@ export async function _getChangeLogs(
                     ? desc(changeLogs[sortBy])
                     : asc(changeLogs[sortBy])
             )
-            .limit(limit || 1000)
-            .offset(offset || 0);
+            .limit(safeLimit)
+            .offset(safeOffset);
 
-        const responseData = changeLogsRes.map(item => ({
+        const responseData = changeLogsRes.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
             entityName: deriveEntityName(item.changeLog),
         }));
 
+        const totalRes = await db
+            .select({ total: count() })
+            .from(changeLogs)
+            .where(and(
+                !changeLogIds.length ? undefined : inArray(changeLogs.changeLogId, changeLogIds),
+                !entityIds.length ? undefined : inArray(changeLogs.entityId, entityIds),
+                !entityTypes.length ? undefined : inArray(changeLogs.entityType, entityTypes),
+                !userIds.length ? undefined : inArray(changeLogs.userId, userIds),
+                !actions.length ? undefined : inArray(changeLogs.action, actions),
+                !versions.length ? undefined : inArray(changeLogs.version, versions),
+                !dataVersions.length ? undefined : inArray(changeLogs.dataVersion, dataVersions),
+                !scriptIds.length ? undefined : inArray(changeLogs.scriptId, scriptIds),
+                !screenIds.length ? undefined : inArray(changeLogs.screenId, screenIds),
+                !diagnosisIds.length ? undefined : inArray(changeLogs.diagnosisId, diagnosisIds),
+                isActiveOnly ? eq(changeLogs.isActive, true) : undefined,
+            ));
+
         await reconcileActiveFlags(responseData);
 
         return {
             data: responseData,
-            total: responseData.length,
+            total: totalRes?.[0]?.total ?? responseData.length,
         };
     } catch (e: any) {
         logger.error('_getChangeLogs ERROR', e.message);
@@ -238,11 +287,11 @@ export async function _getChangeLog(
 
         if (!changeLogRes[0]) return { data: null };
 
-        const responseData = {
+        const responseData = sanitizeChangeLogForResponse({
             ...changeLogRes[0].changeLog,
             userName: changeLogRes[0].user?.name || '',
             userEmail: changeLogRes[0].user?.email || '',
-        };
+        });
 
         return { data: responseData };
     } catch (e: any) {
@@ -292,7 +341,7 @@ export async function _getEntityHistory(
             .orderBy(desc(changeLogs.version))
             .limit(limit || 100);
 
-        const responseData = historyRes.map(item => ({
+        const responseData = historyRes.map(item => sanitizeChangeLogForResponse({
             ...item.changeLog,
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
@@ -352,11 +401,11 @@ export async function _getActiveVersion(
 
         if (!activeVersionRes[0]) return { data: null };
 
-        const responseData = {
+        const responseData = sanitizeChangeLogForResponse({
             ...activeVersionRes[0].changeLog,
             userName: activeVersionRes[0].user?.name || '',
             userEmail: activeVersionRes[0].user?.email || '',
-        };
+        });
 
         return { data: responseData };
     } catch (e: any) {
@@ -425,11 +474,11 @@ export async function _getVersionChain(
 
             if (!versionRes[0]) break;
 
-            chain.push({
+            chain.push(sanitizeChangeLogForResponse({
                 ...versionRes[0].changeLog,
                 userName: versionRes[0].user?.name || '',
                 userEmail: versionRes[0].user?.email || '',
-            });
+            }));
 
             nextVersion = versionRes[0].changeLog.parentVersion;
         }
