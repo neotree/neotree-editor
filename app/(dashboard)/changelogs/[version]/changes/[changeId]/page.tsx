@@ -22,6 +22,7 @@ import {
   type FieldChangeInsight,
   type HighlightEntry,
 } from "./diff-insights"
+import { RollbackButton } from "../../../components/rollback-button"
 
 type Params = {
   version: string
@@ -86,6 +87,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const highlightEntries = buildHighlightEntries(fieldInsights)
   const groupedSummaries = groupFieldChangeInsights(fieldInsights)
   const hasAnyDiffs = fieldInsights.some((entry) => entry.stats.total > 0)
+  const canRollback = change.isActive && (change.parentVersion ?? null) !== null
 
   return (
     <>
@@ -128,6 +130,17 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {canRollback && (
+              <div className="flex justify-end">
+                <RollbackButton
+                  entityId={change.entityId}
+                  targetVersion={change.parentVersion}
+                  currentVersion={change.version}
+                  dataVersion={dataVersion ?? null}
+                  disabled={!change.isActive}
+                />
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed By</div>

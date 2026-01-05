@@ -159,7 +159,8 @@ export const pendingChangesAPI = {
       userId,
     }
 
-    return await changeLogDB.changeSessions.add(session)
+    await changeLogDB.changeSessions.add(session)
+    return sessionId
   },
 
   async updateSession(sessionId: string) {
@@ -175,6 +176,10 @@ export const pendingChangesAPI = {
 
   async endSession(sessionId: string) {
     return await changeLogDB.changeSessions.where("sessionId").equals(sessionId).delete()
+  },
+
+  async clearAllSessions() {
+    return await changeLogDB.changeSessions.clear()
   },
 
   async getActiveSession(entityId: string) {

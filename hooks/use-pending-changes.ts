@@ -38,29 +38,40 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
 
   // Start tracking session
   useEffect(() => {
+    let activeSessionId: string | null = null
+    let cancelled = false
+
     if (autoTrack && entityId && entityType) {
+      // Clear any lingering legacy sessions to keep Dexie tidy
+      pendingChangesAPI.clearAllSessions().catch(() => {})
+
       pendingChangesAPI.startSession(entityId, entityType, entityTitle, userId).then((id) => {
-        setSessionId(`${entityType}-${entityId}-${Date.now()}`)
+        if (cancelled) return
+        activeSessionId = id || null
+        setSessionId(id || null)
       })
 
       return () => {
-        if (sessionId) {
-          pendingChangesAPI.endSession(sessionId)
+        cancelled = true
+        if (activeSessionId) {
+          pendingChangesAPI.endSession(activeSessionId)
         }
       }
     }
-  }, [autoTrack, entityId, entityType, entityTitle, userId, sessionId])
+
+    return () => {
+      cancelled = true
+    }
+  }, [autoTrack, entityId, entityType, entityTitle, userId])
 
   // Track a change
   const trackChange = useCallback(
     async (change: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">) => {
       if (!entityId || !entityType) {
-        console.warn("Cannot track change: entityId and entityType are required")
         return
       }
 
       if (!entityTitle) {
-        console.warn("Cannot track change: entityTitle is required")
         return
       }
 
@@ -83,12 +94,10 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
   const trackChanges = useCallback(
     async (changes: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">[]) => {
       if (!entityId || !entityType) {
-        console.warn("Cannot track changes: entityId and entityType are required")
         return
       }
 
       if (!entityTitle) {
-        console.warn("Cannot track changes: entityTitle is required")
         return
       }
 

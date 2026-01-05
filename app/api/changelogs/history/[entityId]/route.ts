@@ -8,7 +8,7 @@ export async function GET(req: NextRequest, { params }: { params: { entityId: st
   try {
     const isAuthorised = await isAuthenticated()
 
-    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] })
+    if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
 
     const queryParams = JSON.parse(req.nextUrl.searchParams.get("data") || "{}")
 

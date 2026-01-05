@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
+import { formatChangeValue, normalizeChanges } from "@/lib/changelog-utils"
 
 interface ChangeLogViewerProps {
   changes: ChangeLogType[]
@@ -75,42 +76,33 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
   }
 
   const renderChangeDetails = (change: ChangeLogType) => {
-    const changes = (change.changes as any) || {}
-    const oldValues = changes.oldValues || []
-    const newValues = changes.newValues || []
+    const normalized = normalizeChanges(change)
 
-    if (!oldValues.length && !newValues.length) {
-      return <div className="text-sm text-muted-foreground italic">No detailed changes recorded</div>
+    if (!normalized.length) {
+      return <div className="text-sm text-muted-foreground italic">No field-level changes recorded</div>
     }
 
     return (
       <div className="space-y-2">
-        {oldValues.map((oldVal: any, index: number) => {
-          const newVal = newValues[index]
-          const fieldName = Object.keys(oldVal)[0]
-          const oldValue = oldVal[fieldName]
-          const newValue = newVal?.[fieldName]
-
-          return (
-            <div key={index} className="p-3 rounded-md bg-muted/30 space-y-2">
-              <div className="font-medium text-sm">{fieldName}</div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <div className="text-muted-foreground mb-1">Previous</div>
-                  <div className="p-2 rounded bg-red-500/10 font-mono break-all">
-                    {JSON.stringify(oldValue, null, 2)}
-                  </div>
+        {normalized.map((item, index) => (
+          <div key={`${change.changeLogId}-${item.field}-${index}`} className="p-3 rounded-md bg-muted/30 space-y-2">
+            <div className="font-medium text-sm">{item.field}</div>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <div className="text-muted-foreground mb-1">Previous</div>
+                <div className="p-2 rounded bg-red-500/10 font-mono break-all">
+                  {formatChangeValue(item.previousValue)}
                 </div>
-                <div>
-                  <div className="text-muted-foreground mb-1">New</div>
-                  <div className="p-2 rounded bg-green-500/10 font-mono break-all">
-                    {JSON.stringify(newValue, null, 2)}
-                  </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground mb-1">New</div>
+                <div className="p-2 rounded bg-green-500/10 font-mono break-all">
+                  {formatChangeValue(item.newValue)}
                 </div>
               </div>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     )
   }
