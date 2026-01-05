@@ -137,11 +137,22 @@ export function ScriptForm(props: Props) {
                                 <SelectGroup>
                                     {/* <SelectLabel>Hospitals</SelectLabel> */}
                                     <SelectItem value="none">No hospital</SelectItem>
-                                    {hospitals.map(h => (
-                                        <SelectItem key={h.hospitalId} value={h.hospitalId}>
-                                            {h.name}
-                                        </SelectItem>
-                                    ))}
+                                    {hospitals.map(h => {
+                                        return (
+                                            <SelectItem 
+                                                key={h.hospitalId} 
+                                                value={h.hospitalId}
+                                                disabled={h.isUnpublishedDraft}
+                                            >
+                                                {!h.isUnpublishedDraft ? h.name : (
+                                                    <div className='flex items-center w-full'>
+                                                        <div>{h.name}&nbsp;-&nbsp;</div>
+                                                        <div className="text-destructive ml-auto">unpublished draft</div>
+                                                    </div>
+                                                )}
+                                            </SelectItem>
+                                        );
+                                    })}
                                 </SelectGroup>
                             </SelectContent>
                         </Select>

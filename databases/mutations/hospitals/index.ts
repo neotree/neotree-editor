@@ -1,2 +1,4 @@
-export * from './_save-hospitals';
-export * from './_delete-hospitals';
+export * from './_save';
+export * from './_delete';
+export * from './_history';
+export * from './_publish';

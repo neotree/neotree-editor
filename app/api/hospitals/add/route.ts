@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
             
         const body = await req.json();
         
-        const data = await saveHospitals(body.data);
+        const data = await saveHospitals({
+            broadcastAction: true,
+            ...body.data,
+        });
 
         return NextResponse.json(data);
     } catch(e: any) {

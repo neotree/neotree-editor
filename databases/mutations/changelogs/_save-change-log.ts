@@ -11,6 +11,7 @@ import {
   dataKeys,
   diagnoses,
   drugsLibrary,
+  hospitals,
   screens,
   scripts,
 } from "@/databases/pg/schema"
@@ -40,6 +41,7 @@ export type SaveChangeLogData = {
   drugsLibraryItemId?: string | null
   dataKeyId?: string | null
   aliasId?: string | null
+  hospitalId?: string | null
 }
 
 export type SaveChangeLogResponse = {
@@ -56,6 +58,7 @@ const ENTITY_TYPE_TO_FK: Record<SaveChangeLogData["entityType"], keyof SaveChang
   drugs_library: "drugsLibraryItemId",
   data_key: "dataKeyId",
   alias: "aliasId",
+  hospital: "hospitalId",
 }
 
 // Allow certain contextual foreign keys alongside the primary FK (e.g., a screen changelog can also include its scriptId)
@@ -79,7 +82,15 @@ type EntityFetchConfig = {
 
 type EntityType = SaveChangeLogData["entityType"]
 const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias"]
-const VERSIONED_ENTITY_TYPES = ["script", "screen", "diagnosis", "config_key", "drugs_library", "data_key"] as const
+const VERSIONED_ENTITY_TYPES = [
+  "script",
+  "screen",
+  "diagnosis",
+  "config_key",
+  "drugs_library",
+  "data_key",
+  "hospital",
+] as const
 type VersionedEntityType = (typeof VERSIONED_ENTITY_TYPES)[number]
 
 const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = {
@@ -104,6 +115,12 @@ const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = 
     entityLabel: "drugs library item",
   },
   data_key: { table: dataKeys, idColumn: dataKeys.uuid, versionColumn: dataKeys.version, entityLabel: "data key" },
+  hospital: {
+    table: hospitals,
+    idColumn: hospitals.hospitalId,
+    versionColumn: hospitals.version,
+    entityLabel: "hospital",
+  },
 }
 
 const ENTITY_FETCH_CONFIG: Record<EntityType, EntityFetchConfig> = {
@@ -114,6 +131,7 @@ const ENTITY_FETCH_CONFIG: Record<EntityType, EntityFetchConfig> = {
   drugs_library: { table: drugsLibrary, idColumn: drugsLibrary.itemId, entityLabel: "drugs library item" },
   data_key: { table: dataKeys, idColumn: dataKeys.uuid, entityLabel: "data key" },
   alias: { table: aliases, idColumn: aliases.uuid, entityLabel: "alias" },
+  hospital: { table: hospitals, idColumn: hospitals.hospitalId, entityLabel: "hospital" },
 }
 
 
@@ -277,6 +295,7 @@ async function ensureBaselineChangeLog({
     screenId: data.screenId,
     diagnosisId: data.diagnosisId,
     configKeyId: data.configKeyId,
+    hospitalId: data.hospitalId,
     drugsLibraryItemId: data.drugsLibraryItemId,
     dataKeyId: data.dataKeyId,
     aliasId: data.aliasId,
@@ -423,6 +442,7 @@ export async function _saveChangeLog({
         screenId: data.screenId,
         diagnosisId: data.diagnosisId,
         configKeyId: data.configKeyId,
+        hospitalId: data.hospitalId,
         drugsLibraryItemId: data.drugsLibraryItemId,
         dataKeyId: data.dataKeyId,
         aliasId: data.aliasId,

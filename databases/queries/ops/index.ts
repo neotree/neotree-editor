@@ -3,6 +3,7 @@ import { count } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { 
     configKeysDrafts,
+    hospitalsDrafts,
     diagnosesDrafts,
     screensDrafts,
     scriptsDrafts ,
@@ -29,6 +30,7 @@ export const defaultCountDraftsData = {
     screens: 0,
     diagnoses: 0,
     configKeys: 0,
+    hospitals: 0,
     drugsLibraryItems: 0,
     total: 0,
     dataKeys: 0,
@@ -51,6 +53,9 @@ export async function _countDrafts(): Promise<typeof defaultCountDraftsData & {
 
         const configKeys = await db.select({ count: count(), }).from(configKeysDrafts);
         data.configKeys = configKeys[0]?.count || 0;
+
+        const hospitals = await db.select({ count: count(), }).from(hospitalsDrafts);
+        data.hospitals = hospitals[0]?.count || 0;
 
         const drugsLibraryItems = await db.select({ count: count(), }).from(drugsLibraryDrafts);
         data.drugsLibraryItems = drugsLibraryItems[0]?.count || 0;
