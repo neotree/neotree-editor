@@ -620,7 +620,6 @@ export async function copyScripts(params?: {
 
             scripts = resData;
 
-            console.log('axiosClient', res.config.baseURL)
 
             scripts.data.forEach(({ screens, diagnoses, dataKeys, drugsLibrary }, i) => {
                 const getImageUrl = (suffix: string) => {
