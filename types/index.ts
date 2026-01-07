@@ -47,6 +47,8 @@ export type ScriptItem = {
     subType: string;
     type: string;
     exclusive: boolean;
+    exclusiveGroup?: string;
+    forbidWith?: string[];
     confidential: boolean;
     checked: boolean;
     enterValueManually?: boolean;
@@ -102,6 +104,8 @@ export type ScriptField = {
         label: string | number;
         label2?: string;
         exclusive?: boolean;
+        exclusiveGroup?: string;
+        forbidWith?: string[];
         enterValueManually?: boolean;
         keyId?: string;
     }[];

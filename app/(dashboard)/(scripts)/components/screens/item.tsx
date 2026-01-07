@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SelectModal } from "@/components/select-modal"
 import { SelectDataKey } from "@/components/select-data-key"
 import { useDataKeysCtx } from "@/contexts/data-keys"
 
@@ -87,6 +88,8 @@ export function Item<P = {}>({
       subType: item?.subType || "",
       type: item?.type || itemType || "",
       exclusive: item?.exclusive || false,
+      exclusiveGroup: item?.exclusiveGroup || "",
+      forbidWith: item?.forbidWith || [],
       confidential: item?.confidential || false,
       checked: item?.checked || false,
       enterValueManually: item?.enterValueManually || false,
@@ -136,29 +139,19 @@ export function Item<P = {}>({
   const keyHasError = false // key && /[a-zA-Z0-9]+/.test(key) ? false : true;
 
   const disabled = useMemo(() => !!disabledProp, [disabledProp])
+  const items = form.watch("items")
+
+  const forbidOptions = useMemo(() => {
+    const currentItemId = item?.itemId
+    return (items || [])
+      .filter((option) => option?.itemId && option.itemId !== currentItemId)
+      .map((option) => ({
+        value: option.itemId,
+        label: option.label || option.id || option.itemId,
+      }))
+  }, [items, item?.itemId])
 
   const onSave = handleSubmit(async (data) => {
-    if (form.changeTracker) {
-      const currentItems = form.getValues("items")
-      const updatedItems =
-        !isEmpty(itemIndex) && item
-          ? currentItems.map((f, i) => ({
-              ...f,
-              ...(i !== itemIndex
-                ? null
-                : {
-                    ...data,
-                    score: data.score ? Number(data.score) : null,
-                  }),
-            }))
-          : [...currentItems, data]
-
-      await form.changeTracker.trackChanges(
-        { ...form.getValues(), items: updatedItems },
-        `Item "${data.label}" ${item ? "updated" : "added"}`,
-      )
-    }
-
     if (!isEmpty(itemIndex) && item) {
       form.setValue(
         "items",
@@ -306,6 +299,40 @@ export function Item<P = {}>({
                         Disable other items if selected
                       </Label>
                     </div>
+
+                    <div>
+                      <Label htmlFor="exclusiveGroup">Exclusive group</Label>
+                      <Input {...register("exclusiveGroup", { disabled })} name="exclusiveGroup" />
+                      <span className="text-xs text-muted-foreground">
+                        Items in the same group cannot be selected together.
+                      </span>
+                    </div>
+
+                    <Controller
+                      control={control}
+                      name="forbidWith"
+                      render={({ field: { value, onChange } }) => {
+                        const selected = Array.isArray(value) ? value : []
+                        return (
+                          <div>
+                            <Label htmlFor="forbidWith">Forbid with</Label>
+                            <SelectModal
+                              multiple
+                              search={{ placeholder: "Search items" }}
+                              placeholder="Select items"
+                              selected={selected}
+                              options={forbidOptions}
+                              onSelect={(selectedOptions) => {
+                                onChange(selectedOptions.map((option) => `${option.value}`))
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              These items cannot be selected together with this option.
+                            </span>
+                          </div>
+                        )
+                      }}
+                    />
                   </>
                 )
               } else if (isProgressScreen) {
@@ -391,6 +418,40 @@ export function Item<P = {}>({
                             Disable other items if selected
                           </Label>
                         </div>
+
+                        <div>
+                          <Label htmlFor="exclusiveGroup">Exclusive group</Label>
+                          <Input {...register("exclusiveGroup", { disabled })} name="exclusiveGroup" />
+                          <span className="text-xs text-muted-foreground">
+                            Items in the same group cannot be selected together.
+                          </span>
+                        </div>
+
+                        <Controller
+                          control={control}
+                          name="forbidWith"
+                          render={({ field: { value, onChange } }) => {
+                            const selected = Array.isArray(value) ? value : []
+                            return (
+                              <div>
+                                <Label htmlFor="forbidWith">Forbid with</Label>
+                                <SelectModal
+                                  multiple
+                                  search={{ placeholder: "Search items" }}
+                                  placeholder="Select items"
+                                  selected={selected}
+                                  options={forbidOptions}
+                                  onSelect={(selectedOptions) => {
+                                    onChange(selectedOptions.map((option) => `${option.value}`))
+                                  }}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  These items cannot be selected together with this option.
+                                </span>
+                              </div>
+                            )
+                          }}
+                        />
 
                         <div className="flex items-center space-x-2">
                           <Switch

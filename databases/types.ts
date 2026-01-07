@@ -37,6 +37,8 @@ export type ScriptItem = {
     subType: string;
     type: string;
     exclusive: boolean;
+    exclusiveGroup?: string;
+    forbidWith?: string[];
     confidential: boolean;
     checked: boolean;
     enterValueManually?: boolean;
@@ -73,6 +75,17 @@ export type ScriptField = {
     optional: boolean;
     printable: boolean;
     prePopulate: string[];
+    items?: {
+        itemId: string;
+        value: string | number;
+        label: string | number;
+        label2?: string;
+        exclusive?: boolean;
+        exclusiveGroup?: string;
+        forbidWith?: string[];
+        enterValueManually?: boolean;
+        keyId?: string;
+    }[];
 };
 
 export type DiagnosisSymptom = {
