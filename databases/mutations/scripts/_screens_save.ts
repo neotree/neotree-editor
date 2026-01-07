@@ -7,6 +7,7 @@ import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
+import { validateSelectionRules } from '@/lib/selection-rules';
 
 
 export type SaveScreensData = Partial<ScreenType>;
@@ -34,6 +35,21 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                 index++;
 
                 const screenId = itemScreenId || uuid.v4();
+
+                const screenLabel = item.title || item.label || itemScreenId || `screen ${index}`;
+                const validationErrors = [
+                    ...validateSelectionRules(item.items || [], `Screen "${screenLabel}" items`),
+                    ...(item.fields || []).flatMap((field, fieldIndex) =>
+                        validateSelectionRules(
+                            field.items || [],
+                            `Screen "${screenLabel}" field "${field.label || field.key || fieldIndex}" items`
+                        )
+                    ),
+                ];
+
+                if (validationErrors.length) {
+                    errors.push(...validationErrors);
+                }
 
                 if (!errors.length) {
                     const draft = !itemScreenId ? null : await db.query.screensDrafts.findFirst({

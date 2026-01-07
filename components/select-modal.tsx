@@ -109,8 +109,9 @@ function Modal({
     const options = useMemo(() => {
         const filtered = optionsProp
             .map(o => {
-                let isSelected = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s).includes(`${o?.value}`);
-                isSelected = isSelected || selectedPending.includes(o.value);
+                const selectedValues = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s);
+                let isSelected = selectedValues.includes(`${o?.value}`);
+                if (multiple) isSelected = selectedPending.includes(o.value);
 
                 return {
                     ...o,
@@ -146,13 +147,30 @@ function Modal({
 
     useEffect(() => () => setSearchValue(''), []);
 
+    useEffect(() => {
+        if (!multiple) return;
+        setSelectedPending(selected.map(o => o.value));
+    }, [multiple, selected]);
+
+    const hasPendingChanges = useMemo(() => {
+        if (!multiple) return false;
+        const selectedValues = selected.map(o => `${o.value}`).sort();
+        const pendingValues = selectedPending.map(o => `${o}`).sort();
+        if (selectedValues.length !== pendingValues.length) return true;
+        return selectedValues.some((value, index) => value !== pendingValues[index]);
+    }, [multiple, selected, selectedPending]);
+
     return (
         <>
             <Dialog
                 modal={modal}
                 onOpenChange={() => {
                     setSearchValue('');
-                    setSelectedPending([]);
+                    if (multiple) {
+                        setSelectedPending(selected.map(o => o.value));
+                    } else {
+                        setSelectedPending([]);
+                    }
                 }}
             >
                 <DialogTrigger asChild>
@@ -250,7 +268,7 @@ function Modal({
                             </Button>
                         </DialogClose>
 
-                        {!!selectedPending.length && (
+                        {hasPendingChanges && (
                             <DialogClose asChild>
                                 <Button
                                     onClick={() => {
