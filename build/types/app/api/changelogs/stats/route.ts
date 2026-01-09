@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/changelogs/stats/route.ts
+// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\api\changelogs\stats\route.ts
 import * as entry from '../../../../../../app/api/changelogs/stats/route.js'
 import type { NextRequest } from 'next/server.js'
 
