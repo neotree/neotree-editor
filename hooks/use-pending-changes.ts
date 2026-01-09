@@ -68,12 +68,10 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
   const trackChange = useCallback(
     async (change: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">) => {
       if (!entityId || !entityType) {
-        console.warn("Cannot track change: entityId and entityType are required")
         return
       }
 
       if (!entityTitle) {
-        console.warn("Cannot track change: entityTitle is required")
         return
       }
 
@@ -96,12 +94,10 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
   const trackChanges = useCallback(
     async (changes: Omit<PendingChange, "id" | "timestamp" | "entityId" | "entityType" | "entityTitle">[]) => {
       if (!entityId || !entityType) {
-        console.warn("Cannot track changes: entityId and entityType are required")
         return
       }
 
       if (!entityTitle) {
-        console.warn("Cannot track changes: entityTitle is required")
         return
       }
 
