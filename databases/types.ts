@@ -71,6 +71,7 @@ export type ScriptField = {
     minTimeKey: string;
     maxTimeKey: string;
     values: string;
+    unit?: string;
     confidential: boolean;
     optional: boolean;
     printable: boolean;
