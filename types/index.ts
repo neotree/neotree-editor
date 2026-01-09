@@ -88,6 +88,7 @@ export type ScriptField = {
     minTimeKeyId?: string;
     maxTimeKeyId?: string;
     values: string;
+    unit?: string;
     valuesOptions: {
         key: string;
         optionKey: string;
