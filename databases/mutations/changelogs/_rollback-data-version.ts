@@ -12,6 +12,7 @@ import {
   diagnoses,
   drugsLibrary,
   editorInfo,
+  hospitals,
   screens,
   scripts,
 } from "@/databases/pg/schema"
@@ -109,6 +110,14 @@ const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], Ve
     table: aliases,
     pk: aliases.uuid,
     pkKey: "uuid",
+    publishDateKey: "publishDate",
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
+  },
+  hospital: {
+    table: hospitals,
+    pk: hospitals.hospitalId,
+    pkKey: "hospitalId",
+    versionKey: "version",
     publishDateKey: "publishDate",
     timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
   },
@@ -248,6 +257,9 @@ async function applySnapshot({
   if (binding.versionKey) basePayload[binding.versionKey] = newVersion
   if (binding.publishDateKey) basePayload[binding.publishDateKey] = now
   if ("updatedAt" in binding.table) basePayload.updatedAt = now
+  if ("createdAt" in binding.table && (basePayload.createdAt === null || basePayload.createdAt === undefined)) {
+    basePayload.createdAt = now
+  }
 
   const [updated] = await tx.update(binding.table).set(basePayload).where(eq(binding.pk, entityId)).returning()
   if (updated) return updated

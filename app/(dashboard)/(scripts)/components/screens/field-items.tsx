@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { v4 as uuidV4 } from "uuid"
@@ -17,8 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
 import { SelectDataKey } from "@/components/select-data-key"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { useAppContext } from "@/contexts/app"
+import { SelectModal } from "@/components/select-modal"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -28,20 +27,12 @@ export function FieldItems({
   fieldType,
   dataKey,
   onChange,
-  scriptId,
-  screenId,
-  fieldKey,
-  screenTitle,
 }: {
   disabled: boolean
   items: Item[]
   fieldType: string
   dataKey?: DataKey | null
   onChange: (items: Item[]) => void
-  scriptId?: string
-  screenId?: string
-  fieldKey?: string
-  screenTitle?: string
 }) {
   const { confirm } = useConfirmModal()
   const [currentItemIndex, setCurrentItemIndex] = useState<number>(-1)
@@ -56,6 +47,7 @@ export function FieldItems({
           fieldDataKey={dataKey}
           fieldType={fieldType}
           item={items[currentItemIndex] || null}
+          allItems={items}
           onClose={() => {
             setCurrentItemIndex(-1)
             setNewItem(false)
@@ -75,12 +67,6 @@ export function FieldItems({
               )
             }
           }}
-          scriptId={scriptId}
-          screenId={screenId}
-          fieldKey={fieldKey}
-          itemIndex={currentItemIndex}
-          isNew={newItem}
-          screenTitle={screenTitle}
         />
       )}
 
@@ -93,6 +79,8 @@ export function FieldItems({
             item.label,
             item.exclusive ? "✓" : "✕",
             item.enterValueManually ? "✓" : "✕",
+            item.exclusiveGroup || "",
+            item.forbidWith?.length ? `${item.forbidWith.length}` : "",
             "",
           ])}
           onSort={(oldIndex: number, newIndex: number) => {
@@ -121,6 +109,15 @@ export function FieldItems({
             {
               name: "Enter Value Manually",
               align: "center",
+            },
+            {
+              name: "Exclusive Group",
+              cellClassName: fieldType !== "multi_select" ? "hidden" : "",
+            },
+            {
+              name: "Forbid With",
+              align: "center",
+              cellClassName: fieldType !== "multi_select" ? "hidden" : "",
             },
             {
               name: "",
@@ -170,37 +167,28 @@ export function FieldItems({
 
 function Form({
   item,
+  allItems,
   fieldType,
   fieldDataKey,
   onClose,
   onChange,
-  scriptId,
-  screenId,
-  fieldKey,
-  itemIndex,
-  isNew,
-  screenTitle,
 }: {
   item: null | Item
+  allItems: Item[]
   fieldType: string
   fieldDataKey?: DataKey | null
   onClose: () => void
   onChange: (item: Item) => void
-  scriptId?: string
-  screenId?: string
-  fieldKey?: string
-  itemIndex?: number
-  isNew?: boolean
-  screenTitle?: string
 }) {
-  const { dataKeys, extractDataKeys } = useDataKeysCtx()
-  const { authenticatedUser } = useAppContext()
+  const { extractDataKeys } = useDataKeysCtx()
 
   const { control, register, handleSubmit, setValue } = useForm<Item>({
     defaultValues: {
       ...item,
       enterValueManually: item?.enterValueManually || false,
       exclusive: item?.exclusive || false,
+      exclusiveGroup: item?.exclusiveGroup || "",
+      forbidWith: item?.forbidWith || [],
       itemId: item?.itemId || uuidV4(),
       label: item?.label || "",
       label2: item?.label2 || "",
@@ -209,24 +197,17 @@ function Form({
     },
   })
 
+  const forbidOptions = useMemo(() => {
+    const currentItemId = item?.itemId
+    return (allItems || [])
+      .filter((option) => option?.itemId && option.itemId !== currentItemId)
+      .map((option) => ({
+        value: option.itemId,
+        label: option.label || option.value || option.itemId,
+      }))
+  }, [allItems, item?.itemId])
+
   const onSave = handleSubmit(async (data) => {
-    if (scriptId && screenId && fieldKey) {
-      const fieldPath = isNew ? `fields.${fieldKey}.items[new]` : `fields.${fieldKey}.items[${itemIndex}]`
-
-      await pendingChangesAPI.addChange({
-        entityType: "screen",
-        entityId: screenId,
-        entityTitle: screenTitle || "Screen",
-        action: isNew ? "create" : "update",
-        fieldPath,
-        fieldName: `Field Item: ${data.label}`,
-        oldValue: item,
-        newValue: data,
-        userId: authenticatedUser?.userId,
-        userName: authenticatedUser?.displayName,
-      })
-    }
-
     onChange(data)
   })
 
@@ -278,20 +259,56 @@ function Form({
             </div>
 
             {fieldType === "multi_select" && (
-              <Controller
-                control={control}
-                name="exclusive"
-                render={({ field: { value, onChange } }) => {
-                  return (
-                    <div className="px-4 flex items-center space-x-2">
-                      <Switch id="exclusive" checked={value} onCheckedChange={() => onChange(!value)} />
-                      <Label secondary htmlFor="exclusive">
-                        Disable other items if selected
-                      </Label>
-                    </div>
-                  )
-                }}
-              />
+              <>
+                <Controller
+                  control={control}
+                  name="exclusive"
+                  render={({ field: { value, onChange } }) => {
+                    return (
+                      <div className="px-4 flex items-center space-x-2">
+                        <Switch id="exclusive" checked={value} onCheckedChange={() => onChange(!value)} />
+                        <Label secondary htmlFor="exclusive">
+                          Disable other items if selected
+                        </Label>
+                      </div>
+                    )
+                  }}
+                />
+
+                <div className="px-4">
+                  <Label htmlFor="exclusiveGroup">Exclusive group</Label>
+                  <Input disabled={false} {...register("exclusiveGroup", { disabled: false })} />
+                  <span className="text-xs text-muted-foreground">
+                    Items in the same group cannot be selected together.
+                  </span>
+                </div>
+
+                <Controller
+                  control={control}
+                  name="forbidWith"
+                  render={({ field: { value, onChange } }) => {
+                    const selected = Array.isArray(value) ? value : []
+                    return (
+                      <div className="px-4">
+                        <Label htmlFor="forbidWith">Forbid with</Label>
+                        <SelectModal
+                          multiple
+                          search={{ placeholder: "Search items" }}
+                          placeholder="Select items"
+                          selected={selected}
+                          options={forbidOptions}
+                          onSelect={(selectedOptions) => {
+                            onChange(selectedOptions.map((option) => `${option.value}`))
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          These items cannot be selected together with this option.
+                        </span>
+                      </div>
+                    )
+                  }}
+                />
+              </>
             )}
 
             <Controller

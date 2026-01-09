@@ -65,7 +65,6 @@ export function useScriptForm(params: UseScriptFormParams) {
 
   useEffect(() => {
     if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
-      console.log("Initializing original snapshot for script:", formData.scriptId)
       originalSnapshotRef.current = formData
       changeTrackerRef.current.setSnapshot(formData)
     }
@@ -140,9 +139,8 @@ export function useScriptForm(params: UseScriptFormParams) {
 
     if (isNewScript) {
       // For new scripts, we'll track the creation after we get the scriptId from the server
-      console.log("New script will be tracked after creation")
     } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-      console.log("Tracking changes on save draft")
+     
       await changeTrackerRef.current.trackChanges(data, "Draft saved")
     }
 
@@ -161,7 +159,6 @@ export function useScriptForm(params: UseScriptFormParams) {
     } else {
       if (isNewScript && scriptId) {
         const newScriptId = scriptId
-        console.log("Tracking new script creation:", newScriptId)
 
         // Track the creation of the new script
         await pendingChangesAPI.addChange({

@@ -36,6 +36,13 @@
       "when": 1764334833794,
       "tag": "0004_chief_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1767597638944,
+      "tag": "0005_solid_silver_sable",
+      "breakpoints": true
     }
   ]
 }

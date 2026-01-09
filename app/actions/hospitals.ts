@@ -1,14 +1,17 @@
 'use server';
 
 import { _saveHospitals, _deleteHospitals } from "@/databases/mutations/hospitals";
-import { _getHospital, _getHospitals, _countHospitals } from "@/databases/queries/hospitals";
+import { _getHospital, _getHospitals, _countHospitals, _defaultHospitalsCount } from "@/databases/queries/hospitals";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 
-export const deleteHospitals: typeof _deleteHospitals = async (...args) => {
+export const deleteHospitals: typeof _deleteHospitals = async params => {
     try {
-        await isAllowed();
-        return await _deleteHospitals(...args);
+        const session = await isAllowed();
+        return await _deleteHospitals({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('deleteHospitals ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -21,7 +24,7 @@ export const countHospitals: typeof _countHospitals = async (...args) => {
         return await _countHospitals(...args);
     } catch(e: any) {
         logger.error('countHospitals ERROR', e.message);
-        return { errors: [e.message], data: 0, };
+        return { errors: [e.message], data: _defaultHospitalsCount, };
     }
 };
 
@@ -40,10 +43,13 @@ export const getHospital: typeof _getHospital = async (...args) => {
     return await _getHospital(...args);
 };
 
-export const saveHospitals: typeof _saveHospitals = async (...args) => {
+export const saveHospitals: typeof _saveHospitals = async (params) => {
     try {
-        await isAllowed();
-        return await _saveHospitals(...args);
+        const session = await isAllowed();
+        return await _saveHospitals({
+            ...params,
+            userId: session.user?.userId,
+        });
     } catch(e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
