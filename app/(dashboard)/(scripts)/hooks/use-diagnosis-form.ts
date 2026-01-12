@@ -119,7 +119,6 @@ export function useDiagnosisForm({
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
             if (isNewDiagnosis) {
-                console.log("[v0] Tracking new diagnosis creation:", diagnosisId);
 
                 await pendingChangesAPI.addChange({
                     entityType: "diagnosis",
@@ -135,7 +134,7 @@ export function useDiagnosisForm({
                     fullSnapshot: payloadData,
                 });
             } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-                console.log("Tracking diagnosis changes on save draft");
+           
                 await changeTrackerRef.current.trackChanges(payloadData, "Diagnosis draft saved");
             }
 

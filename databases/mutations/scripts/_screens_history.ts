@@ -69,6 +69,9 @@ export async function _saveScreensHistory({
       if (userId) {
         const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
+        const previousSnapshot = isCreate
+          ? {}
+          : removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {})
 
         changeLogsData.push({
           entityId: screenId,
@@ -77,6 +80,8 @@ export async function _saveScreensHistory({
           version: changeHistoryData.version || 1,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
+          previousSnapshot,
+          baselineSnapshot: previousSnapshot,
           userId,
           scriptId: c?.data?.scriptId || null,
           screenId,

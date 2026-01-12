@@ -161,6 +161,8 @@ export async function _publishConfigKeys(opts?: {
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
+            previousSnapshot: JSON.parse(JSON.stringify(snapshot)),
+            baselineSnapshot: JSON.parse(JSON.stringify(snapshot)),
             description: history.changes.description,
             userId: opts.publisherUserId,
             configKeyId: entry.configKeyId,

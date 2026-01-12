@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "unique_version_per_entity";--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "unique_version_per_entity" ON "nt_change_logs" USING btree ("entity_type","entity_id","version");
