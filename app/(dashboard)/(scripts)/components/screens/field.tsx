@@ -103,6 +103,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const defaultValue = watch("defaultValue")
   const values = watch("values")
   const items = watch("items")
+  const unit = watch("unit")
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
 
@@ -313,6 +314,16 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <Input {...register("label", { disabled })} name="label" error={!disabled && !label} />
                 </div>
               </div>
+
+              {(isTextField || isNumberField) && (
+                <div>
+                  <Label htmlFor="unit">Unit (optional)</Label>
+                  <Input {...register("unit", { disabled })} name="unit" noRing={false} />
+                  <span className="text-xs text-muted-foreground">
+                    Displayed next to the value on summaries and printouts.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="refKey">Reference Key</Label>
