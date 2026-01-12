@@ -26,6 +26,8 @@ export function ScriptMetaActions({ data }: {
                 'Data Type': string;
                 'Value': string;
                 'Value Label': string;
+                Confidential: string;
+                Optional: string;
             }[];
 
             script.screens.forEach(screen => {
@@ -41,6 +43,8 @@ export function ScriptMetaActions({ data }: {
                         'Data Type': f.dataType || '',
                         'Value': `${f.value || ''}`,
                         'Value Label': `${f.valueLabel || ''}`,
+                        Confidential: f.confidential ? 'Yes' : 'No',
+                        Optional: f.optional ? 'Yes' : 'No',
                     });
                 });
             });

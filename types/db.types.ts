@@ -216,6 +216,7 @@ export type HospitalSelect = {
     oldHospitalId: string | null;
     name: string;
     country: string | null;
+    version: number;
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;
@@ -227,6 +228,7 @@ export type HospitalInsert = {
     oldHospitalId?: (string | null) | undefined;
     name: string;
     country?: (string | null) | undefined;
+    version?: number | undefined;
     createdAt?: Date | undefined;
     updatedAt?: Date | undefined;
     deletedAt?: (Date | null) | undefined;
@@ -920,11 +922,13 @@ export type PendingDeletionItemSelect = {
     diagnosisId: string | null;
     diagnosisScriptId: string | null;
     configKeyId: string | null;
+    hospitalId: string | null;
     drugsLibraryItemId: string | null;
     scriptDraftId: string | null;
     screenDraftId: string | null;
     diagnosisDraftId: string | null;
     configKeyDraftId: string | null;
+    hospitalDraftId: string | null;
     drugsLibraryItemDraftId: string | null;
     dataKeyId: string | null;
     dataKeyDraftId: string | null;
@@ -941,11 +945,13 @@ export type PendingDeletionItemInsert = {
     diagnosisId?: (string | null) | undefined;
     diagnosisScriptId?: (string | null) | undefined;
     configKeyId?: (string | null) | undefined;
+    hospitalId?: (string | null) | undefined;
     drugsLibraryItemId?: (string | null) | undefined;
     scriptDraftId?: (string | null) | undefined;
     screenDraftId?: (string | null) | undefined;
     diagnosisDraftId?: (string | null) | undefined;
     configKeyDraftId?: (string | null) | undefined;
+    hospitalDraftId?: (string | null) | undefined;
     drugsLibraryItemDraftId?: (string | null) | undefined;
     dataKeyId?: (string | null) | undefined;
     dataKeyDraftId?: (string | null) | undefined;
