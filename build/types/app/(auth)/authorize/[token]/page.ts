@@ -1,4 +1,4 @@
-// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\(auth)\authorize\[token]\page.tsx
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/(auth)/authorize/[token]/page.tsx
 import * as entry from '../../../../../../app/(auth)/authorize/[token]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

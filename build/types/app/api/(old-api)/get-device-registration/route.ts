@@ -1,4 +1,4 @@
-// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\api\(old-api)\get-device-registration\route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/(old-api)/get-device-registration/route.ts
 import * as entry from '../../../../../../app/api/(old-api)/get-device-registration/route.js'
 import type { NextRequest } from 'next/server.js'
 
