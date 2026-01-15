@@ -41,6 +41,7 @@ export function useField(field?: ScriptField) {
             confidential: field?.confidential || false,
             optional: field?.optional || false,
             printable: field?.printable || false,
+            ips: field?.ips || false,
             prePopulate: field?.prePopulate || [],
             editable: field?.editable || false,
             items: field?.items || [],
