@@ -1,4 +1,4 @@
-// File: /home/watkay/ReactProjects/neotree-editor/app/api/app/errors/route.ts
+// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\api\app\errors\route.ts
 import * as entry from '../../../../../../app/api/app/errors/route.js'
 import type { NextRequest } from 'next/server.js'
 

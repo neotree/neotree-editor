@@ -1,4 +1,4 @@
-// File: /home/watkay/ReactProjects/neotree-editor/app/api/(old-api)/check-email-registration/route.ts
+// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\api\(old-api)\check-email-registration\route.ts
 import * as entry from '../../../../../../app/api/(old-api)/check-email-registration/route.js'
 import type { NextRequest } from 'next/server.js'
 
