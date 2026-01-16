@@ -94,6 +94,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const label = watch("label")
   const optional = watch("optional")
   const printable = watch("printable")
+  const ips = watch("ips")
   const confidential = watch("confidential")
   const maxDate = watch("maxDate")
   const minDate = watch("minDate")
@@ -757,6 +758,23 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
 
                 <span className="text-muted-foreground text-xs">
                   If not checked, data will not be display on the session summary and the printout.
+                </span>
+              </div>
+            </>
+            <>
+              <Title>Patient summary</Title>
+              <div>
+                <div className="flex-1 flex items-center space-x-2">
+                  <Checkbox
+                    id="ips"
+                    disabled={disabled}
+                    checked={ips}
+                    onCheckedChange={() => setValue("ips", !ips, { shouldDirty: true })}
+                  />
+                  <Label htmlFor="ips">Show on patient summary (IPS)</Label>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  If not checked, this field will be excluded from the patient summary dataset.
                 </span>
               </div>
             </>
