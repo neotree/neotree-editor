@@ -97,6 +97,7 @@ export type ScriptField = {
     confidential: boolean;
     optional: boolean;
     printable: boolean;
+    ips?: boolean;
     prePopulate: string[];
     editable: boolean;
     items?: {
