@@ -155,15 +155,24 @@ export class ChangeTracker {
     return true
   }
 
-  private normalizeComparableValue(value: any): any {
+  private isEmptyEquivalentField(fieldPath?: string): boolean {
+    if (!fieldPath) return false
+    const key = fieldPath.split(".").pop() || ""
+    return ["timerValue", "multiplier", "minValue", "maxValue"].includes(key)
+  }
+
+  private normalizeComparableValue(value: any, fieldPath?: string): any {
     if (value === undefined || value === null) return null
     if (typeof value === "string" && value.trim() === "") return null
+    if (this.isEmptyEquivalentField(fieldPath) && typeof value === "number" && value === 0) {
+      return null
+    }
     return value
   }
 
-  private areEquivalentValues(a: any, b: any): boolean {
-    const normalizedA = this.normalizeComparableValue(a)
-    const normalizedB = this.normalizeComparableValue(b)
+  private areEquivalentValues(a: any, b: any, fieldPath?: string): boolean {
+    const normalizedA = this.normalizeComparableValue(a, fieldPath)
+    const normalizedB = this.normalizeComparableValue(b, fieldPath)
 
     if (normalizedA === null && normalizedB === null) return true
     if (typeof normalizedA !== "object" || typeof normalizedB !== "object") {
@@ -222,7 +231,7 @@ export class ChangeTracker {
 
     // Handle primitive types
     if (typeof oldObj !== "object" || typeof newObj !== "object") {
-      if (!this.areEquivalentValues(oldObj, newObj) && this.isMeaningfulValue(newObj)) {
+      if (!this.areEquivalentValues(oldObj, newObj, path) && this.isMeaningfulValue(newObj)) {
         changes.push({
           path: path || "root",
           name: path.split(".").pop() || "root",
@@ -238,7 +247,7 @@ export class ChangeTracker {
       if (this.shouldDiffScreenFields(path)) {
         return this.diffScreenFields(oldObj, newObj, path)
       }
-      if (!this.areEquivalentValues(oldObj, newObj)) {
+      if (!this.areEquivalentValues(oldObj, newObj, path)) {
         changes.push({
           path: path || "root",
           name: path.split(".").pop() || "root",
@@ -273,7 +282,7 @@ export class ChangeTracker {
         !Array.isArray(newValue)
       ) {
         changes.push(...this.detectChanges(oldValue, newValue, newPath))
-      } else if (!this.areEquivalentValues(oldValue, newValue)) {
+      } else if (!this.areEquivalentValues(oldValue, newValue, newPath)) {
         if (this.isMeaningfulValue(newValue)) {
           changes.push({
             path: newPath,
