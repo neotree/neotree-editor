@@ -1,0 +1,1 @@
+ALTER TYPE "change_log_entity" ADD VALUE 'release';

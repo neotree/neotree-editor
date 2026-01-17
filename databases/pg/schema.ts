@@ -108,6 +108,7 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "data_key",
   "alias",
   "hospital",
+  "release",
 ])
 
 // MAILER SETTINGS

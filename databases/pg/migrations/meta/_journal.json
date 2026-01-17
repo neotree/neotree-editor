@@ -43,6 +43,13 @@
       "when": 1767597638944,
       "tag": "0005_solid_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1768655509983,
+      "tag": "0006_familiar_karma",
+      "breakpoints": true
     }
   ]
 }
