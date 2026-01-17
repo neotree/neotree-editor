@@ -30,15 +30,21 @@ export function formatChangeValue(value: unknown): string {
   }
 }
 
-function normalizeComparableValue(value: unknown): unknown {
+function isEmptyEquivalentField(field: string): boolean {
+  const key = field.split(".").pop() || field
+  return ["timerValue", "multiplier", "minValue", "maxValue"].includes(key)
+}
+
+function normalizeComparableValue(value: unknown, field: string): unknown {
   if (value === null || value === undefined) return null
   if (typeof value === "string" && value.trim() === "") return null
+  if (isEmptyEquivalentField(field) && typeof value === "number" && value === 0) return null
   return value
 }
 
-function areEquivalentValues(a: unknown, b: unknown): boolean {
-  const normalizedA = normalizeComparableValue(a)
-  const normalizedB = normalizeComparableValue(b)
+function areEquivalentValues(a: unknown, b: unknown, field: string): boolean {
+  const normalizedA = normalizeComparableValue(a, field)
+  const normalizedB = normalizeComparableValue(b, field)
   if (normalizedA === null && normalizedB === null) return true
   if (typeof normalizedA !== "object" || typeof normalizedB !== "object") return normalizedA === normalizedB
   try {
@@ -70,7 +76,7 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
               ? (record as any).value
               : (record as any).updatedValue
 
-        if (!areEquivalentValues(previousValue, newValue)) {
+        if (!areEquivalentValues(previousValue, newValue, field)) {
           normalized.push({
             field,
             previousValue,
@@ -78,7 +84,7 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
           })
         }
       } else {
-        if (!areEquivalentValues(undefined, item)) {
+        if (!areEquivalentValues(undefined, item, "Unknown field")) {
           normalized.push({
             field: "Unknown field",
             previousValue: undefined,
@@ -97,7 +103,7 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
       const field = Object.keys({ ...oldEntry, ...newEntry })[0] || `field_${index + 1}`
       const previousValue = oldEntry[field]
       const newValue = newEntry[field]
-      if (!areEquivalentValues(previousValue, newValue)) {
+      if (!areEquivalentValues(previousValue, newValue, field)) {
         normalized.push({
           field,
           previousValue,
@@ -111,7 +117,7 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
     const snapshot = change.fullSnapshot
     if (snapshot && typeof snapshot === "object") {
       for (const [field, value] of Object.entries(snapshot as Record<string, unknown>)) {
-        if (!areEquivalentValues(undefined, value)) {
+        if (!areEquivalentValues(undefined, value, field)) {
           normalized.push({
             field,
             previousValue: undefined,
