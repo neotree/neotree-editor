@@ -82,6 +82,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
   }
 
   const changes = data ?? []
+  const visibleChanges = changes.filter((change) => change.entityType !== "release")
 
   if (!changes.length) {
     return (
@@ -108,8 +109,12 @@ export default async function DataVersionPage({ params }: { params: Params }) {
     return new Date(change.dateOfChange).getTime() > new Date(latest.dateOfChange).getTime() ? change : latest
   }, changes[0])
 
-  const publishEntry = changes.find((change) => change.action === "publish") ?? latestChange
-  const publishedAt = format(new Date(latestChange.dateOfChange), "PPpp")
+  const releasePublishEntry = changes.find(
+    (change) => change.action === "publish" && change.entityType === "release",
+  )
+  const publishEntry =
+    releasePublishEntry ?? changes.find((change) => change.action === "publish") ?? latestChange
+  const publishedAt = format(new Date(publishEntry.dateOfChange), "PPpp")
   const publishedBy = publishEntry.userName || latestChange.userName || "Unknown user"
   const publishedEmail = publishEntry.userEmail || latestChange.userEmail || ""
 
@@ -118,7 +123,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
   let totalFieldChanges = 0
   const uniqueEntities = new Set<string>()
 
-  for (const change of changes) {
+  for (const change of visibleChanges) {
     entityCounts.set(change.entityType, (entityCounts.get(change.entityType) || 0) + 1)
     actionCounts.set(change.action, (actionCounts.get(change.action) || 0) + 1)
     uniqueEntities.add(`${change.entityType}:${change.entityId}`)
@@ -158,7 +163,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg border p-4">
                 <div className="text-sm text-muted-foreground">Total Changes</div>
-                <div className="text-2xl font-semibold mt-1">{changes.length}</div>
+                <div className="text-2xl font-semibold mt-1">{visibleChanges.length}</div>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="text-sm text-muted-foreground">Entities Affected</div>
@@ -184,7 +189,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
 
             <Separator />
 
-            <DataVersionChangesTable changes={changes} dataVersion={numericVersion} />
+            <DataVersionChangesTable changes={visibleChanges} dataVersion={numericVersion} />
           </CardContent>
         </Card>
       </Content>
