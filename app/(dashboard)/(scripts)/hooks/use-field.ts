@@ -45,6 +45,7 @@ export function useField(field?: ScriptField) {
             prePopulate: field?.prePopulate || [],
             editable: field?.editable || false,
             items: field?.items || [],
+            printDisplayColumns: field?.printDisplayColumns || 2,
         } satisfies ScriptField;
     }, [field]);
 

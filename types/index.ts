@@ -58,6 +58,7 @@ export type ScriptItem = {
     keyId?: string;
     dataType: null | string;
     score: null | number;
+    printDisplayColumns?: 1 | 2;
 };
 
 export type ScriptField = {
@@ -97,6 +98,7 @@ export type ScriptField = {
     confidential: boolean;
     optional: boolean;
     printable: boolean;
+    printDisplayColumns?: 1 | 2;
     ips?: boolean;
     prePopulate: string[];
     editable: boolean;
