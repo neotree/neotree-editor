@@ -185,6 +185,7 @@ export function useDiagnosesTable({
             diagnoses: diagnoses.data.map(d => ({
               ...d,
               scriptTitle: '',
+              scriptPosition: 0,
             })),
           })
 
