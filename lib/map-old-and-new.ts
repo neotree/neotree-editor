@@ -126,6 +126,7 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             previewTitle: s.previewTitle,
             previewPrintTitle: s.previewPrintTitle,
             listStyle: s.listStyle,
+            printDisplayColumns: s.printDisplayColumns,
             // printCategory: s.printCategory,
             // order: s.order,
             metadata: {
