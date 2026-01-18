@@ -51,51 +51,53 @@ function getReplaceItems({
 }: Props) {
     const items: ReplaceItem[] = [];
 
-    scriptsSearchResults.forEach(script => {
-        items.push({
-            type: 'script',
-            title: script.title,
-            id: script.scriptId,
-            matches: script.matches.map(m => ({
-                ...m,
-                newValue: '',
-            })),
-        });
-
-        script.diagnoses.forEach(diagnosis => {
+    scriptsSearchResults
+        .sort((a, b) => a.position - b.position)
+        .forEach(script => {
             items.push({
-                type: 'diagnosis',
-                title: diagnosis.title,
-                parent: {
-                    id: script.scriptId,
-                    title: script.title,
-                    type: 'script',
-                },
-                id: diagnosis.diagnosisId,
-                matches: diagnosis.matches.map(m => ({
+                type: 'script',
+                title: script.title,
+                id: script.scriptId,
+                matches: script.matches.map(m => ({
                     ...m,
                     newValue: '',
                 })),
             });
-        });
 
-        script.screens.forEach(screen => {
-            items.push({
-                type: 'screen',
-                title: screen.title,
-                parent: {
-                    id: script.scriptId,
-                    title: script.title,
-                    type: 'script',
-                },
-                id: screen.screenId,
-                matches: screen.matches.map(m => ({
-                    ...m,
-                    newValue: '',
-                })),
+            script.diagnoses.forEach(diagnosis => {
+                items.push({
+                    type: 'diagnosis',
+                    title: diagnosis.title,
+                    parent: {
+                        id: script.scriptId,
+                        title: script.title,
+                        type: 'script',
+                    },
+                    id: diagnosis.diagnosisId,
+                    matches: diagnosis.matches.map(m => ({
+                        ...m,
+                        newValue: '',
+                    })),
+                });
+            });
+
+            script.screens.forEach(screen => {
+                items.push({
+                    type: 'screen',
+                    title: screen.title,
+                    parent: {
+                        id: script.scriptId,
+                        title: script.title,
+                        type: 'script',
+                    },
+                    id: screen.screenId,
+                    matches: screen.matches.map(m => ({
+                        ...m,
+                        newValue: '',
+                    })),
+                });
             });
         });
-    });
 
     return items.filter(item => !!item.matches.length);
 }
@@ -224,6 +226,16 @@ export function SearchAndReplaceModal(props: Props) {
                                             data: {
                                                 ..._fields[index],
                                                 [m.field.substring(11)]: m.newValue,
+                                            },
+                                        };
+                                    } else if (m.field.includes('field_')) {
+                                        let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
+                                        if (index === -1) index = _fields.length;
+                                        _fields[index] = {
+                                            index: m.fieldIndex,
+                                            data: {
+                                                ..._fields[index],
+                                                [m.field.substring(6)]: m.newValue,
                                             },
                                         };
                                     } else {
