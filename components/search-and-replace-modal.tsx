@@ -25,6 +25,7 @@ import { DialogClose, DialogTrigger, } from '@/components/ui/dialog';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
+import { useAppContext } from '@/contexts/app';
 
 type Props = {
     searchValue: string;
@@ -139,6 +140,7 @@ export function SearchAndReplaceModal(props: Props) {
 
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
+    const { isAdmin, isSuperUser, viewOnly, } = useAppContext();
 
     useEffect(() => {
         if (replaceWithRef.current !== replaceWithDebounced) {
@@ -305,6 +307,8 @@ export function SearchAndReplaceModal(props: Props) {
         }
     }, [replaceItems]);
 
+    if (viewOnly || !(isSuperUser || isAdmin)) return null;
+
     return (
         <>
             <Modal
@@ -403,21 +407,23 @@ export function SearchAndReplaceModal(props: Props) {
                         </div>
                     )}
 
-                    {replaceItems.map(item => {
+                    {replaceItems.map((replaceItem, replaceItemIndex) => {
                         return (
                             <div
                                 className="flex flex-col gap-y-2"
-                                key={item.id}
+                                key={replaceItem.id}
                             >
                                 {loading && <Loader overlay transparent />}
 
                                 <div className="text-sm">
-                                    {!item.parent ? null : <div><b>{ucFirst(item.parent.type)}:&nbsp;</b>{item.parent.title}</div>}
-                                    <div><b>{ucFirst(item.type)}:&nbsp;</b>{item.title}</div>
+                                    {!replaceItem.parent ? null : <div><b>{ucFirst(replaceItem.parent.type)}:&nbsp;</b>{replaceItem.parent.title}</div>}
+                                    <div><b>{ucFirst(replaceItem.type)}:&nbsp;</b>{replaceItem.title}</div>
                                 </div>
 
-                                {item.matches.map((match, i) => {
-                                    const key = item.id + `_match${i}`;
+                                {replaceItem.matches.map((match, matchIndex) => {
+                                    const key = replaceItem.id + `_match${matchIndex}`;
+
+                                    if (match.field === 'key') return null;
 
                                     return (
                                         <Card
@@ -460,7 +466,15 @@ export function SearchAndReplaceModal(props: Props) {
                                                             <TooltipTrigger>
                                                                 <Button
                                                                     variant="ghost"
-                                                                    onClick={() => setReplaceItems(prev => prev.filter((_, j) => j !== i))}
+                                                                    onClick={() => setReplaceItems(prev => {
+                                                                        return prev.map((replaceItem, i) => {
+                                                                            if (i !== replaceItemIndex) return replaceItem;
+                                                                            return {
+                                                                                ...replaceItem,
+                                                                                matches: replaceItem.matches.filter((_, j) => matchIndex !== j),
+                                                                            };
+                                                                        }).filter(item => item.matches.length);
+                                                                    })}
                                                                 >
                                                                     <XIcon className="size-4" />
                                                                 </Button>
