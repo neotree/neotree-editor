@@ -716,6 +716,7 @@ export const screens = pgTable(
     feeds: jsonb("feeds").default("[]").$type<FeedField[]>().notNull(),
     reasons: jsonb("reasons").default("[]").notNull().$type<{ key: string; value: string }[]>(),
     listStyle: listStyleEnum("list_style").default("none").notNull(),
+    printDisplayColumns: integer('print_display_columns').default(2).notNull(),
 
     publishDate: timestamp("publish_date").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
