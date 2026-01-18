@@ -94,6 +94,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const label = watch("label")
   const optional = watch("optional")
   const printable = watch("printable")
+  const ips = watch("ips")
   const confidential = watch("confidential")
   const maxDate = watch("maxDate")
   const minDate = watch("minDate")
@@ -103,8 +104,10 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const defaultValue = watch("defaultValue")
   const values = watch("values")
   const items = watch("items")
+  const unit = watch("unit")
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
+  const printDisplayColumns = watch('printDisplayColumns');
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
 
@@ -313,6 +316,16 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <Input {...register("label", { disabled })} name="label" error={!disabled && !label} />
                 </div>
               </div>
+
+              {(isTextField || isNumberField) && (
+                <div>
+                  <Label htmlFor="unit">Unit (optional)</Label>
+                  <Input {...register("unit", { disabled })} name="unit" noRing={false} />
+                  <span className="text-xs text-muted-foreground">
+                    Displayed next to the value on summaries and printouts.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="refKey">Reference Key</Label>
@@ -733,6 +746,20 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
 
             <>
               <Title>Print</Title>
+              {isMultiSelectField && (
+                <div>
+                  <div className="flex-1 flex items-center space-x-2">
+                    <Checkbox
+                      id="printDisplayColumns"
+                      disabled={disabled}
+                      checked={printDisplayColumns === 1}
+                      onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
+                    />
+                    <Label htmlFor="printDisplayColumns">Single print display column</Label>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="flex-1 flex items-center space-x-2">
                   <Checkbox
@@ -746,6 +773,23 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
 
                 <span className="text-muted-foreground text-xs">
                   If not checked, data will not be display on the session summary and the printout.
+                </span>
+              </div>
+            </>
+            <>
+              <Title>Patient summary</Title>
+              <div>
+                <div className="flex-1 flex items-center space-x-2">
+                  <Checkbox
+                    id="ips"
+                    disabled={disabled}
+                    checked={ips}
+                    onCheckedChange={() => setValue("ips", !ips, { shouldDirty: true })}
+                  />
+                  <Label htmlFor="ips">Show on patient summary (IPS)</Label>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  If not checked, this field will be excluded from the patient summary dataset.
                 </span>
               </div>
             </>

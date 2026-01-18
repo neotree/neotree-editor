@@ -58,6 +58,7 @@ export type ScriptItem = {
     keyId?: string;
     dataType: null | string;
     score: null | number;
+    printDisplayColumns?: 1 | 2;
 };
 
 export type ScriptField = {
@@ -88,6 +89,7 @@ export type ScriptField = {
     minTimeKeyId?: string;
     maxTimeKeyId?: string;
     values: string;
+    unit?: string;
     valuesOptions: {
         key: string;
         optionKey: string;
@@ -96,6 +98,8 @@ export type ScriptField = {
     confidential: boolean;
     optional: boolean;
     printable: boolean;
+    printDisplayColumns?: 1 | 2;
+    ips?: boolean;
     prePopulate: string[];
     editable: boolean;
     items?: {

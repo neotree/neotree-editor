@@ -46,3 +46,7 @@ next-env.d.ts
 # DEPLOY
 deploy.sh
 deploy.command
+
+#zencoder
+.zencoder
+.zenflow

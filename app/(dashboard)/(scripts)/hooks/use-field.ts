@@ -36,13 +36,16 @@ export function useField(field?: ScriptField) {
             minTimeKeyId: field?.minTimeKeyId || '',
             maxTimeKeyId: field?.maxTimeKeyId || '',
             values: field?.values || '',
+            unit: field?.unit || '',
             valuesOptions: field?.valuesOptions || [],
             confidential: field?.confidential || false,
             optional: field?.optional || false,
             printable: field?.printable || false,
+            ips: field?.ips || false,
             prePopulate: field?.prePopulate || [],
             editable: field?.editable || false,
             items: field?.items || [],
+            printDisplayColumns: field?.printDisplayColumns || 2,
         } satisfies ScriptField;
     }, [field]);
 
