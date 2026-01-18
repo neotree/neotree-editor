@@ -188,10 +188,12 @@ export async function _searchScripts({
             screens: screensArr.map(s => ({
                 ...s,
                 scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === s.scriptId)?.title || '',
+                scriptPosition: scriptsFromItemsArr.find(script => script.scriptId === s.scriptId)?.position || 0,
             })) as ParseScriptsSearchResultsParams['screens'],
             diagnoses: diagnosesArr.map(d => ({
                 ...d,
                 scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.title || '',
+                scriptPosition: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.position || 0,
             })) as ParseScriptsSearchResultsParams['diagnoses'],
             scripts: scriptsArr as ParseScriptsSearchResultsParams['scripts'],
         });

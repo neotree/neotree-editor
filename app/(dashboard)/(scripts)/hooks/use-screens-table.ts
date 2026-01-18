@@ -186,6 +186,7 @@ export function useScreensTable({
             screens: screens.data.map(s => ({
               ...s,
               scriptTitle: '',
+              scriptPosition: 0,
             })),
           })
 

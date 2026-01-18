@@ -17,6 +17,7 @@ type Diagnosis = typeof schema.diagnoses.$inferSelect & {
 export type ScriptsSearchResultsItem = {
     scriptId: string;
     title: string;
+    position: number;
     matches: {
         field: string;
         fieldIndex?: number;
@@ -29,6 +30,7 @@ export type ScriptsSearchResultsItem = {
         screenId: string;
         fields: { label: string; type: string, }[];
         matches: ScriptsSearchResultsItem['matches'];
+        position: number;
     }[];
     diagnoses: {
         title: string;
@@ -36,6 +38,7 @@ export type ScriptsSearchResultsItem = {
         diagnosisId: string;
         fields: { label: string; type: string, }[];
         matches: ScriptsSearchResultsItem['matches'];
+        position: number;
     }[];
 };
 
@@ -44,9 +47,11 @@ export type ParseScriptsSearchResultsParams = {
     scripts: Script[];
     screens: (Screen & {
         scriptTitle: string;
+        scriptPosition: number;
     })[];
     diagnoses: (Diagnosis & {
         scriptTitle: string;
+        scriptPosition: number;
     })[];
 };
 
@@ -89,6 +94,7 @@ export function parseScriptsSearchResults({
             resultsMap[s.scriptId] = {
                 title: s.title,
                 scriptId: s.scriptId,
+                position: s.position,
                 diagnoses: [],
                 screens: [],
                 matches,
@@ -261,6 +267,7 @@ export function parseScriptsSearchResults({
             resultsMap[s.scriptId] = resultsMap[s.scriptId] || {
                 title: '',
                 scriptId: s.scriptId,
+                position: s.scriptPosition,
                 diagnoses: [],
                 screens: [],
                 matches: [],
@@ -273,6 +280,7 @@ export function parseScriptsSearchResults({
                 matches,
                 screenId: s.screenId,
                 isDraft: s.isDraft,
+                position: s.position,
                 fields: [
                     ...s.items.map(f => ({
                         label: f.label,
@@ -341,6 +349,7 @@ export function parseScriptsSearchResults({
             resultsMap[s.scriptId] = resultsMap[s.scriptId] || {
                 title: '',
                 scriptId: s.scriptId,
+                position: s.scriptPosition,
                 diagnoses: [],
                 screens: [],
                 matches: [],
@@ -350,6 +359,7 @@ export function parseScriptsSearchResults({
 
             resultsMap[s.scriptId].diagnoses.push({
                 title: s.name || '',
+                position: s.position,
                 matches,
                 diagnosisId: s.diagnosisId,
                 isDraft: s.isDraft,

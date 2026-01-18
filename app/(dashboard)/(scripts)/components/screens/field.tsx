@@ -107,6 +107,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const unit = watch("unit")
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
+  const printDisplayColumns = watch('printDisplayColumns');
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
 
@@ -745,6 +746,20 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
 
             <>
               <Title>Print</Title>
+              {isMultiSelectField && (
+                <div>
+                  <div className="flex-1 flex items-center space-x-2">
+                    <Checkbox
+                      id="printDisplayColumns"
+                      disabled={disabled}
+                      checked={printDisplayColumns === 1}
+                      onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
+                    />
+                    <Label htmlFor="printDisplayColumns">Single print display column</Label>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="flex-1 flex items-center space-x-2">
                   <Checkbox
