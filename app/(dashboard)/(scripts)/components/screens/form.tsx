@@ -239,7 +239,7 @@ export function ScreenForm(props: Props) {
     const hasItems = isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen;
     const hasFields = isFormScreen;
 
-    const hasSinglePrintColumnField = !(isManagementScreen || isDrugsScreen);
+    const hasSinglePrintColumnField = isMultiSelectScreen;
 
     const renderKeyInput = ({ 
         value: key, 
@@ -1007,6 +1007,20 @@ export function ScreenForm(props: Props) {
                     <>
                         <Title>Print</Title>
 
+                        {hasSinglePrintColumnField && (
+                            <div>
+                                <div className="flex-1 flex items-center space-x-2">
+                                <Checkbox
+                                    id="printDisplayColumns"
+                                    disabled={disabled}
+                                    checked={printDisplayColumns === 1}
+                                    onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
+                                />
+                                <Label htmlFor="printDisplayColumns">Single print display column</Label>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex flex-col gap-y-5 items-end sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                             {isManagementScreen && (
                                 <div className="max-w-64">
@@ -1035,20 +1049,6 @@ export function ScreenForm(props: Props) {
                                             );
                                         }}
                                     />
-                                </div>
-                            )}
-
-                            {hasSinglePrintColumnField && (
-                                <div>
-                                    <div className="flex-1 flex items-center space-x-2">
-                                    <Checkbox
-                                        id="printDisplayColumns"
-                                        disabled={disabled}
-                                        checked={printDisplayColumns === 1}
-                                        onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
-                                    />
-                                    <Label htmlFor="printDisplayColumns">Single print display column</Label>
-                                    </div>
                                 </div>
                             )}
 
