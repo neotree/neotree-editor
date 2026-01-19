@@ -19,15 +19,38 @@ export function getDataVersion(change: ChangeLogType): number | null {
 }
 
 export function formatChangeValue(value: unknown): string {
-  if (value === null) return "null"
-  if (value === undefined) return "—"
-  if (typeof value === "string") return value.length ? value : '""'
+  if (value === null || value === undefined) return "Not set"
+  if (typeof value === "string") return value.trim().length ? value : "Not set"
   if (typeof value === "number" || typeof value === "boolean") return String(value)
 
   try {
     return JSON.stringify(value, null, 2)
   } catch (error) {
     return String(value)
+  }
+}
+
+function isEmptyEquivalentField(field: string): boolean {
+  const key = field.split(".").pop() || field
+  return ["timerValue", "multiplier", "minValue", "maxValue"].includes(key)
+}
+
+function normalizeComparableValue(value: unknown, field: string): unknown {
+  if (value === null || value === undefined) return null
+  if (typeof value === "string" && value.trim() === "") return null
+  if (isEmptyEquivalentField(field) && typeof value === "number" && value === 0) return null
+  return value
+}
+
+function areEquivalentValues(a: unknown, b: unknown, field: string): boolean {
+  const normalizedA = normalizeComparableValue(a, field)
+  const normalizedB = normalizeComparableValue(b, field)
+  if (normalizedA === null && normalizedB === null) return true
+  if (typeof normalizedA !== "object" || typeof normalizedB !== "object") return normalizedA === normalizedB
+  try {
+    return JSON.stringify(normalizedA) === JSON.stringify(normalizedB)
+  } catch {
+    return false
   }
 }
 
@@ -53,17 +76,21 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
               ? (record as any).value
               : (record as any).updatedValue
 
-        normalized.push({
-          field,
-          previousValue,
-          newValue,
-        })
+        if (!areEquivalentValues(previousValue, newValue, field)) {
+          normalized.push({
+            field,
+            previousValue,
+            newValue,
+          })
+        }
       } else {
-        normalized.push({
-          field: "Unknown field",
-          previousValue: undefined,
-          newValue: item,
-        })
+        if (!areEquivalentValues(undefined, item, "Unknown field")) {
+          normalized.push({
+            field: "Unknown field",
+            previousValue: undefined,
+            newValue: item,
+          })
+        }
       }
     }
   } else if (raw && typeof raw === "object" && "oldValues" in raw && "newValues" in raw) {
@@ -74,11 +101,15 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
       const oldEntry = oldValues[index] || {}
       const newEntry = newValues[index] || {}
       const field = Object.keys({ ...oldEntry, ...newEntry })[0] || `field_${index + 1}`
-      normalized.push({
-        field,
-        previousValue: oldEntry[field],
-        newValue: newEntry[field],
-      })
+      const previousValue = oldEntry[field]
+      const newValue = newEntry[field]
+      if (!areEquivalentValues(previousValue, newValue, field)) {
+        normalized.push({
+          field,
+          previousValue,
+          newValue,
+        })
+      }
     }
   }
 
@@ -86,11 +117,13 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
     const snapshot = change.fullSnapshot
     if (snapshot && typeof snapshot === "object") {
       for (const [field, value] of Object.entries(snapshot as Record<string, unknown>)) {
-        normalized.push({
-          field,
-          previousValue: undefined,
-          newValue: value,
-        })
+        if (!areEquivalentValues(undefined, value, field)) {
+          normalized.push({
+            field,
+            previousValue: undefined,
+            newValue: value,
+          })
+        }
       }
     }
   }

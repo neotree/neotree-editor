@@ -41,7 +41,7 @@ type VersionedEntityBinding = {
   publishDateKey?: string
 }
 
-const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding> = {
+const ENTITY_BINDINGS: Partial<Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding>> = {
   script: { table: scripts, pk: scripts.scriptId, pkKey: "scriptId", versionKey: "version", publishDateKey: "publishDate" },
   screen: { table: screens, pk: screens.screenId, pkKey: "screenId", versionKey: "version", publishDateKey: "publishDate" },
   diagnosis: {

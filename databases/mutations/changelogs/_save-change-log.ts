@@ -16,6 +16,7 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
+import { sql } from "drizzle-orm"
 
 export type SaveChangeLogData = {
   entityId: string
@@ -50,7 +51,7 @@ export type SaveChangeLogResponse = {
   data?: typeof changeLogs.$inferSelect
 }
 
-const ENTITY_TYPE_TO_FK: Record<SaveChangeLogData["entityType"], keyof SaveChangeLogData> = {
+const ENTITY_TYPE_TO_FK: Partial<Record<SaveChangeLogData["entityType"], keyof SaveChangeLogData>> = {
   script: "scriptId",
   screen: "screenId",
   diagnosis: "diagnosisId",
@@ -81,7 +82,8 @@ type EntityFetchConfig = {
 }
 
 type EntityType = SaveChangeLogData["entityType"]
-const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias"]
+const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias", "release"]
+const NO_FK_ENTITY_TYPES: EntityType[] = ["release"]
 const VERSIONED_ENTITY_TYPES = [
   "script",
   "screen",
@@ -123,7 +125,7 @@ const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = 
   },
 }
 
-const ENTITY_FETCH_CONFIG: Record<EntityType, EntityFetchConfig> = {
+const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   script: { table: scripts, idColumn: scripts.scriptId, entityLabel: "script" },
   screen: { table: screens, idColumn: screens.screenId, entityLabel: "screen" },
   diagnosis: { table: diagnoses, idColumn: diagnoses.diagnosisId, entityLabel: "diagnosis" },
@@ -139,6 +141,20 @@ type DbClient = typeof db
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbOrTransaction = DbClient | TransactionClient
 
+function hashToInt32(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0
+  }
+  return hash
+}
+
+async function lockChangeLogChain(client: DbOrTransaction, entityType: string, entityId: string) {
+  const key1 = hashToInt32(entityType)
+  const key2 = hashToInt32(entityId)
+  await client.execute(sql`select pg_advisory_xact_lock(${key1}, ${key2})`)
+}
+
 function computeSnapshotHash(snapshot: any) {
   return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
 }
@@ -147,7 +163,20 @@ function validateEntityAlignment(data: SaveChangeLogData) {
   if (!uuid.validate(data.entityId)) throw new Error("Invalid entityId")
   if (!uuid.validate(data.userId)) throw new Error("Invalid userId")
 
+  if (NO_FK_ENTITY_TYPES.includes(data.entityType)) {
+    const populatedFks = Object.values(ENTITY_TYPE_TO_FK)
+      .map((key) => (data as any)[key])
+      .filter((value) => value !== undefined && value !== null)
+    if (populatedFks.length) {
+      throw new Error(`No foreign keys should be provided for entityType ${data.entityType}`)
+    }
+    return
+  }
+
   const expectedFkKey = ENTITY_TYPE_TO_FK[data.entityType]
+  if (!expectedFkKey) {
+    throw new Error(`Unknown entityType ${data.entityType}`)
+  }
   const expectedFkValue = data[expectedFkKey]
 
   if (!expectedFkValue || typeof expectedFkValue !== "string" || !uuid.validate(expectedFkValue)) {
@@ -322,6 +351,8 @@ export async function _saveChangeLog({
     validateEntityAlignment(data)
 
     const executor = async (tx: DbOrTransaction) => {
+      await lockChangeLogChain(tx, data.entityType, data.entityId)
+
       const changeLogId = uuid.v4()
       const isVersionless = isVersionlessEntityType(data.entityType)
       let computedVersion: number
@@ -493,26 +524,43 @@ export async function _saveChangeLog({
 export async function _saveChangeLogs({
   data,
   broadcastAction,
+  allowPartial,
 }: {
   data: SaveChangeLogData[]
   broadcastAction?: boolean
+  allowPartial?: boolean
 }): Promise<{ success: boolean; errors?: string[]; saved: number }> {
   let saved = 0
   const errors: string[] = []
 
   try {
-    await db.transaction(async (tx) => {
-      for (const changeLogData of data) {
-        const res = await _saveChangeLog({ data: changeLogData, client: tx })
+    if (allowPartial && data.some((entry) => entry.action === "rollback")) {
+      throw new Error("allowPartial is not permitted for rollback changelog writes")
+    }
 
+    if (allowPartial) {
+      for (const changeLogData of data) {
+        const res = await _saveChangeLog({ data: changeLogData })
         if (res.errors?.length) {
           errors.push(...res.errors)
-          throw new Error(errors.join(", "))
+          continue
         }
-
         saved++
       }
-    })
+    } else {
+      await db.transaction(async (tx) => {
+        for (const changeLogData of data) {
+          const res = await _saveChangeLog({ data: changeLogData, client: tx })
+
+          if (res.errors?.length) {
+            errors.push(...res.errors)
+            throw new Error(errors.join(", "))
+          }
+
+          saved++
+        }
+      })
+    }
 
     if (broadcastAction && !errors.length) {
       socket.emit("data_changed", "save_change_logs")
