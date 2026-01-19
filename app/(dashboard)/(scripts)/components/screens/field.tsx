@@ -750,12 +750,12 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                 <div>
                   <div className="flex-1 flex items-center space-x-2">
                     <Checkbox
-                      id="printDisplayColumns"
+                      id="field_printDisplayColumns"
                       disabled={disabled}
                       checked={printDisplayColumns === 1}
                       onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
                     />
-                    <Label htmlFor="printDisplayColumns">Single print display column</Label>
+                    <Label htmlFor="field_printDisplayColumns">Single print display column</Label>
                   </div>
                 </div>
               )}
