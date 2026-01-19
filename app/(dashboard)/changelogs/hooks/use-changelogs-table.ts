@@ -92,24 +92,40 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     try {
       setLoading(true)
 
-      const res = await axios.post("/api/changelogs/get", {
-        limit: 2000,
-        sortBy: "dateOfChange",
-        sortOrder: "desc",
-      })
+      const pageSize = 2000
+      let offset = 0
+      let total = 0
+      const aggregated: ChangeLogType[] = []
 
-      const { errors, data } = res.data
-
-      if (errors?.length) {
-        alert({
-          title: "Error",
-          message: "Failed to load changelogs: " + errors.join(", "),
-          variant: "error",
+      do {
+        const res = await axios.post("/api/changelogs/get", {
+          limit: pageSize,
+          offset,
+          sortBy: "dateOfChange",
+          sortOrder: "desc",
         })
-        return
-      }
 
-      setAllChangelogs(data)
+        const { errors, data, total: responseTotal } = res.data
+
+        if (errors?.length) {
+          alert({
+            title: "Error",
+            message: "Failed to load changelogs: " + errors.join(", "),
+            variant: "error",
+          })
+          return
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+          break
+        }
+
+        aggregated.push(...data)
+        total = Number.isFinite(responseTotal) ? Number(responseTotal) : aggregated.length
+        offset = aggregated.length
+      } while (offset < total)
+
+      setAllChangelogs(aggregated)
     } catch (e: any) {
       alert({
         title: "Error",
@@ -146,8 +162,12 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
       )
 
       const latestChange = sortedByDate[0]
-      const publishEntry = changeLogs.find((entry) => entry.action === "publish") ?? latestChange
+      const publishEntry =
+        changeLogs.find((entry) => entry.action === "publish" && entry.entityType === "release") ??
+        changeLogs.find((entry) => entry.action === "publish" && entry.entityType !== "release") ??
+        latestChange
       const rollbackEntry = changeLogs.find((entry) => entry.action === "rollback")
+      const summaryChanges = changeLogs.filter((entry) => entry.entityType !== "release")
       const rollbackSourceVersion = rollbackEntry?.changes && Array.isArray(rollbackEntry.changes)
         ? (() => {
             const match = (rollbackEntry.changes as any[]).find(
@@ -161,19 +181,19 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
           })()
         : null
 
-      const entityCounts = changeLogs.reduce<Record<string, number>>((result, entry) => {
+      const entityCounts = summaryChanges.reduce<Record<string, number>>((result, entry) => {
         result[entry.entityType] = (result[entry.entityType] || 0) + 1
         return result
       }, {})
 
-      const actionCounts = changeLogs.reduce<Record<string, number>>((result, entry) => {
+      const actionCounts = summaryChanges.reduce<Record<string, number>>((result, entry) => {
         result[entry.action] = (result[entry.action] || 0) + 1
         return result
       }, {})
 
       const descriptions = Array.from(
         new Set<string>(
-          changeLogs
+          summaryChanges
             .map((entry) => entry.description?.trim() || "")
             .filter((description) => description.length > 0)
         )
@@ -184,14 +204,14 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
         publishedAt: latestChange?.dateOfChange ? new Date(latestChange.dateOfChange).toISOString() : null,
         publishedByName: publishEntry?.userName || latestChange?.userName || "Unknown user",
         publishedByEmail: publishEntry?.userEmail || latestChange?.userEmail || undefined,
-        totalChanges: changeLogs.length,
-        hasActiveChanges: changeLogs.some((entry) => entry.isActive),
+        totalChanges: summaryChanges.length,
+        hasActiveChanges: summaryChanges.some((entry) => entry.isActive),
         isLatestVersion: latestVersion !== null ? dataVersion === latestVersion : false,
         entityCounts,
         actionCounts,
         descriptions,
-        changeLogIds: changeLogs.map((entry) => entry.changeLogId),
-        changes: changeLogs,
+        changeLogIds: summaryChanges.map((entry) => entry.changeLogId),
+        changes: summaryChanges,
         rollbackSourceVersion,
       })
     }
@@ -256,6 +276,10 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
   useEffect(() => {
     setCurrentPage(1)
   }, [searchValue, entityType, action, isActiveOnly, sort])
+
+  useEffect(() => {
+    loadChangelogs()
+  }, [loadChangelogs])
 
   const clearFilters = useCallback(() => {
     setSearchValue("")

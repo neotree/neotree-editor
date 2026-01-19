@@ -92,7 +92,7 @@ export class ChangeTracker {
       }
     }
 
-    for (const [path, existingChange] of Array.from(existingChangesByPath)) {
+    for (const [path, existingChange] of Array.from(existingChangesByPath.entries())) {
       const stillChanged = changes.some((c) => c.path === path)
       if (!stillChanged) {
         await pendingChangesAPI.deleteChange(existingChange.id!)
@@ -155,6 +155,37 @@ export class ChangeTracker {
     return true
   }
 
+  private isEmptyEquivalentField(fieldPath?: string): boolean {
+    if (!fieldPath) return false
+    const key = fieldPath.split(".").pop() || ""
+    return ["timerValue", "multiplier", "minValue", "maxValue"].includes(key)
+  }
+
+  private normalizeComparableValue(value: any, fieldPath?: string): any {
+    if (value === undefined || value === null) return null
+    if (typeof value === "string" && value.trim() === "") return null
+    if (this.isEmptyEquivalentField(fieldPath) && typeof value === "number" && value === 0) {
+      return null
+    }
+    return value
+  }
+
+  private areEquivalentValues(a: any, b: any, fieldPath?: string): boolean {
+    const normalizedA = this.normalizeComparableValue(a, fieldPath)
+    const normalizedB = this.normalizeComparableValue(b, fieldPath)
+
+    if (normalizedA === null && normalizedB === null) return true
+    if (typeof normalizedA !== "object" || typeof normalizedB !== "object") {
+      return normalizedA === normalizedB
+    }
+
+    try {
+      return JSON.stringify(normalizedA) === JSON.stringify(normalizedB)
+    } catch {
+      return false
+    }
+  }
+
   private detectChanges(
     oldObj: any,
     newObj: any,
@@ -166,6 +197,12 @@ export class ChangeTracker {
     newValue: any
   }> {
     const changes: Array<{ path: string; name: string; oldValue: any; newValue: any }> = []
+
+    if (this.shouldDiffScreenFields(path) && (Array.isArray(oldObj) || Array.isArray(newObj))) {
+      const previous = Array.isArray(oldObj) ? oldObj : []
+      const next = Array.isArray(newObj) ? newObj : []
+      return this.diffScreenFields(previous, next, path)
+    }
 
     // Handle null/undefined cases
     if (oldObj === null || oldObj === undefined) {
@@ -194,7 +231,7 @@ export class ChangeTracker {
 
     // Handle primitive types
     if (typeof oldObj !== "object" || typeof newObj !== "object") {
-      if (oldObj !== newObj && this.isMeaningfulValue(newObj)) {
+      if (!this.areEquivalentValues(oldObj, newObj, path) && this.isMeaningfulValue(newObj)) {
         changes.push({
           path: path || "root",
           name: path.split(".").pop() || "root",
@@ -207,7 +244,10 @@ export class ChangeTracker {
 
     // Handle arrays
     if (Array.isArray(oldObj) && Array.isArray(newObj)) {
-      if (JSON.stringify(oldObj) !== JSON.stringify(newObj)) {
+      if (this.shouldDiffScreenFields(path)) {
+        return this.diffScreenFields(oldObj, newObj, path)
+      }
+      if (!this.areEquivalentValues(oldObj, newObj, path)) {
         changes.push({
           path: path || "root",
           name: path.split(".").pop() || "root",
@@ -242,7 +282,7 @@ export class ChangeTracker {
         !Array.isArray(newValue)
       ) {
         changes.push(...this.detectChanges(oldValue, newValue, newPath))
-      } else if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      } else if (!this.areEquivalentValues(oldValue, newValue, newPath)) {
         if (this.isMeaningfulValue(newValue)) {
           changes.push({
             path: newPath,
@@ -255,6 +295,92 @@ export class ChangeTracker {
     })
 
     return changes
+  }
+
+  private shouldDiffScreenFields(path: string): boolean {
+    if (this.options.entityType !== "screen") return false
+    return path === "fields" || path.endsWith(".fields")
+  }
+
+  private diffScreenFields(
+    oldFields: any[],
+    newFields: any[],
+    path: string,
+  ): Array<{ path: string; name: string; oldValue: any; newValue: any }> {
+    const changes: Array<{ path: string; name: string; oldValue: any; newValue: any }> = []
+    const oldMap = this.indexFieldsByKey(oldFields)
+    const newMap = this.indexFieldsByKey(newFields)
+    const allKeys = new Set<string>()
+    oldMap.forEach((_value, key) => allKeys.add(key))
+    newMap.forEach((_value, key) => allKeys.add(key))
+
+    for (const key of Array.from(allKeys)) {
+      const oldField = oldMap.get(key) || null
+      const newField = newMap.get(key) || null
+      const label = this.resolveFieldLabel(newField || oldField, key)
+      const fieldPath = `${path}.${key}`
+
+      if (!oldField && newField) {
+        changes.push({
+          path: fieldPath,
+          name: `${label} (added)`,
+          oldValue: null,
+          newValue: newField,
+        })
+        continue
+      }
+
+      if (oldField && !newField) {
+        changes.push({
+          path: fieldPath,
+          name: `${label} (removed)`,
+          oldValue: oldField,
+          newValue: null,
+        })
+        continue
+      }
+
+      if (oldField && newField) {
+        const fieldChanges = this.detectChanges(oldField, newField, fieldPath)
+        for (const change of fieldChanges) {
+          changes.push({
+            ...change,
+            name: change.name ? `${label} • ${change.name}` : label,
+          })
+        }
+      }
+    }
+
+    return changes
+  }
+
+  private indexFieldsByKey(fields: any[]): Map<string, any> {
+    const map = new Map<string, any>()
+    fields.forEach((field, index) => {
+      if (!field || typeof field !== "object") return
+      const rawKey = field.fieldId || field.id || field.key || field.name
+      const fallbackKey = `index_${index}`
+      const safeKey = String(rawKey || fallbackKey).replace(/\./g, "_")
+      map.set(safeKey, field)
+    })
+    return map
+  }
+
+  private resolveFieldLabel(field: any, fallbackKey: string): string {
+    if (!field || typeof field !== "object") return fallbackKey
+    const candidates = [
+      field.label,
+      field.title,
+      field.name,
+      field.key,
+      field.fieldId,
+      field.id,
+    ]
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim().length) return candidate.trim()
+      if (typeof candidate === "number" && Number.isFinite(candidate)) return String(candidate)
+    }
+    return fallbackKey
   }
 
   async clearChanges() {

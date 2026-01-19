@@ -41,7 +41,7 @@ type VersionedEntityBinding = {
   forceNullKeys?: string[]
 }
 
-const ENTITY_BINDINGS: Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding> = {
+const ENTITY_BINDINGS: Partial<Record<(typeof changeLogs.$inferSelect)["entityType"], VersionedEntityBinding>> = {
   script: {
     table: scripts,
     pk: scripts.scriptId,
@@ -383,6 +383,7 @@ export async function _rollbackDataVersion({
 
       for (const scriptChange of scriptChanges) {
         const binding = ENTITY_BINDINGS[scriptChange.entityType]
+        if (!binding) throw new Error(`Unsupported entity type ${scriptChange.entityType}`)
         await lockEntityRow({ tx, binding, entityId: scriptChange.entityId })
 
         const effectiveScriptTarget = await findPreviousChangeLog(tx, scriptChange, currentDataVersion)
@@ -398,6 +399,7 @@ export async function _rollbackDataVersion({
           )
           for (const child of children) {
             const childBinding = ENTITY_BINDINGS[childType]
+            if (!childBinding) throw new Error(`Unsupported entity type ${childType}`)
             await lockEntityRow({ tx, binding: childBinding, entityId: child.entityId })
             const targetChild = await tx.query.changeLogs.findFirst({
               where: and(

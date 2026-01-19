@@ -59,9 +59,13 @@ const lifecycleBadgeClasses: Record<string, string> = {
 export function DataVersionChangesTable({ changes, dataVersion }: Props) {
   const router = useRouter()
 
-  const sortedChanges = useMemo(() => {
-    return [...changes].sort((a, b) => new Date(b.dateOfChange).getTime() - new Date(a.dateOfChange).getTime())
+  const filteredChanges = useMemo(() => {
+    return changes.filter((change) => change.entityType !== "release")
   }, [changes])
+
+  const sortedChanges = useMemo(() => {
+    return [...filteredChanges].sort((a, b) => new Date(b.dateOfChange).getTime() - new Date(a.dateOfChange).getTime())
+  }, [filteredChanges])
 
   const handleViewChange = (change: ChangeLogType) => {
     const targetVersion = getDataVersion(change) ?? dataVersion

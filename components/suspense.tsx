@@ -37,9 +37,10 @@ export function Suspense({
 	return (
 		<ReactSuspense fallback={loader}>
 			<ErrorBoundary
-				fallbackRender={({ error, resetErrorBoundary }) => (
-					<ErrorCard errors={[error?.message || JSON.stringify(error)]} />
-				)}
+				fallbackRender={({ error }) => {
+					const message = error instanceof Error ? error.message : String(error);
+					return <ErrorCard errors={[message]} />;
+				}}
 			>
 				{children}
 			</ErrorBoundary>
