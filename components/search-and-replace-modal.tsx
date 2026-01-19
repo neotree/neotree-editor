@@ -25,6 +25,7 @@ import { DialogClose, DialogTrigger, } from '@/components/ui/dialog';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
+import { useAppContext } from '@/contexts/app';
 
 type Props = {
     searchValue: string;
@@ -50,51 +51,53 @@ function getReplaceItems({
 }: Props) {
     const items: ReplaceItem[] = [];
 
-    scriptsSearchResults.forEach(script => {
-        items.push({
-            type: 'script',
-            title: script.title,
-            id: script.scriptId,
-            matches: script.matches.map(m => ({
-                ...m,
-                newValue: '',
-            })),
-        });
-
-        script.diagnoses.forEach(diagnosis => {
+    scriptsSearchResults
+        .sort((a, b) => a.position - b.position)
+        .forEach(script => {
             items.push({
-                type: 'diagnosis',
-                title: diagnosis.title,
-                parent: {
-                    id: script.scriptId,
-                    title: script.title,
-                    type: 'script',
-                },
-                id: diagnosis.diagnosisId,
-                matches: diagnosis.matches.map(m => ({
+                type: 'script',
+                title: script.title,
+                id: script.scriptId,
+                matches: script.matches.map(m => ({
                     ...m,
                     newValue: '',
                 })),
             });
-        });
 
-        script.screens.forEach(screen => {
-            items.push({
-                type: 'screen',
-                title: screen.title,
-                parent: {
-                    id: script.scriptId,
-                    title: script.title,
-                    type: 'script',
-                },
-                id: screen.screenId,
-                matches: screen.matches.map(m => ({
-                    ...m,
-                    newValue: '',
-                })),
+            script.diagnoses.forEach(diagnosis => {
+                items.push({
+                    type: 'diagnosis',
+                    title: diagnosis.title,
+                    parent: {
+                        id: script.scriptId,
+                        title: script.title,
+                        type: 'script',
+                    },
+                    id: diagnosis.diagnosisId,
+                    matches: diagnosis.matches.map(m => ({
+                        ...m,
+                        newValue: '',
+                    })),
+                });
+            });
+
+            script.screens.forEach(screen => {
+                items.push({
+                    type: 'screen',
+                    title: screen.title,
+                    parent: {
+                        id: script.scriptId,
+                        title: script.title,
+                        type: 'script',
+                    },
+                    id: screen.screenId,
+                    matches: screen.matches.map(m => ({
+                        ...m,
+                        newValue: '',
+                    })),
+                });
             });
         });
-    });
 
     return items.filter(item => !!item.matches.length);
 }
@@ -139,6 +142,7 @@ export function SearchAndReplaceModal(props: Props) {
 
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
+    const { isAdmin, isSuperUser, viewOnly, } = useAppContext();
 
     useEffect(() => {
         if (replaceWithRef.current !== replaceWithDebounced) {
@@ -224,6 +228,16 @@ export function SearchAndReplaceModal(props: Props) {
                                                 [m.field.substring(11)]: m.newValue,
                                             },
                                         };
+                                    } else if (m.field.includes('field_')) {
+                                        let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
+                                        if (index === -1) index = _fields.length;
+                                        _fields[index] = {
+                                            index: m.fieldIndex,
+                                            data: {
+                                                ..._fields[index],
+                                                [m.field.substring(6)]: m.newValue,
+                                            },
+                                        };
                                     } else {
                                         let index = _items.map(f => f.index).indexOf(m.fieldIndex);
                                         if (index === -1) index = _items.length;
@@ -304,6 +318,8 @@ export function SearchAndReplaceModal(props: Props) {
             setLoading(false);
         }
     }, [replaceItems]);
+
+    if (viewOnly || !(isSuperUser || isAdmin)) return null;
 
     return (
         <>
@@ -403,21 +419,23 @@ export function SearchAndReplaceModal(props: Props) {
                         </div>
                     )}
 
-                    {replaceItems.map(item => {
+                    {replaceItems.map((replaceItem, replaceItemIndex) => {
                         return (
                             <div
                                 className="flex flex-col gap-y-2"
-                                key={item.id}
+                                key={replaceItem.id}
                             >
                                 {loading && <Loader overlay transparent />}
 
                                 <div className="text-sm">
-                                    {!item.parent ? null : <div><b>{ucFirst(item.parent.type)}:&nbsp;</b>{item.parent.title}</div>}
-                                    <div><b>{ucFirst(item.type)}:&nbsp;</b>{item.title}</div>
+                                    {!replaceItem.parent ? null : <div><b>{ucFirst(replaceItem.parent.type)}:&nbsp;</b>{replaceItem.parent.title}</div>}
+                                    <div><b>{ucFirst(replaceItem.type)}:&nbsp;</b>{replaceItem.title}</div>
                                 </div>
 
-                                {item.matches.map((match, i) => {
-                                    const key = item.id + `_match${i}`;
+                                {replaceItem.matches.map((match, matchIndex) => {
+                                    const key = replaceItem.id + `_match${matchIndex}`;
+
+                                    if (match.field === 'key') return null;
 
                                     return (
                                         <Card
@@ -460,7 +478,15 @@ export function SearchAndReplaceModal(props: Props) {
                                                             <TooltipTrigger>
                                                                 <Button
                                                                     variant="ghost"
-                                                                    onClick={() => setReplaceItems(prev => prev.filter((_, j) => j !== i))}
+                                                                    onClick={() => setReplaceItems(prev => {
+                                                                        return prev.map((replaceItem, i) => {
+                                                                            if (i !== replaceItemIndex) return replaceItem;
+                                                                            return {
+                                                                                ...replaceItem,
+                                                                                matches: replaceItem.matches.filter((_, j) => matchIndex !== j),
+                                                                            };
+                                                                        }).filter(item => item.matches.length);
+                                                                    })}
                                                                 >
                                                                     <XIcon className="size-4" />
                                                                 </Button>
