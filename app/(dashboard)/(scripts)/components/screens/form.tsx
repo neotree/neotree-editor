@@ -105,6 +105,7 @@ export function ScreenForm(props: Props) {
     const collectionLabel = watch('collectionLabel');
     const key = watch('key');
     const listStyle = form.watch('listStyle');
+    const printDisplayColumns = form.watch('printDisplayColumns');
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -234,9 +235,11 @@ export function ScreenForm(props: Props) {
     const isDrugsScreen = type === 'drugs';
     const isFluidsScreen = type === 'fluids';
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
-    const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen;
+    const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen || isFormScreen;
     const hasItems = isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen;
     const hasFields = isFormScreen;
+
+    const hasSinglePrintColumnField = isMultiSelectScreen;
 
     const renderKeyInput = ({ 
         value: key, 
@@ -1004,6 +1007,20 @@ export function ScreenForm(props: Props) {
                     <>
                         <Title>Print</Title>
 
+                        {hasSinglePrintColumnField && (
+                            <div>
+                                <div className="flex-1 flex items-center space-x-2">
+                                <Checkbox
+                                    id="printDisplayColumns"
+                                    disabled={disabled}
+                                    checked={printDisplayColumns === 1}
+                                    onCheckedChange={() => setValue("printDisplayColumns", printDisplayColumns !== 1 ? 1 : 2, { shouldDirty: true })}
+                                />
+                                <Label htmlFor="printDisplayColumns">Single print display column</Label>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex flex-col gap-y-5 items-end sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                             {isManagementScreen && (
                                 <div className="max-w-64">
@@ -1035,19 +1052,21 @@ export function ScreenForm(props: Props) {
                                 </div>
                             )}
 
-                            <div>
-                                <div className="flex-1 flex items-center space-x-2">
-                                    <Checkbox
-                                        id="printable"
-                                        checked={printable}
-                                        disabled={disabled}
-                                        onCheckedChange={() => setValue('printable', !printable, { shouldDirty: true, })}
-                                    />
-                                    <Label htmlFor="printable">Print</Label>
-                                </div>
+                            {!isFormScreen && (
+                                <div>
+                                    <div className="flex-1 flex items-center space-x-2">
+                                        <Checkbox
+                                            id="printable"
+                                            checked={printable}
+                                            disabled={disabled}
+                                            onCheckedChange={() => setValue('printable', !printable, { shouldDirty: true, })}
+                                        />
+                                        <Label htmlFor="printable">Print</Label>
+                                    </div>
 
-                                <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
-                            </div>
+                                    <span className="text-muted-foreground text-xs">If not checked, data will not be display on the session summary and the printout.</span>
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
