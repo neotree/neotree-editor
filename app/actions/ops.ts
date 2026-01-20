@@ -19,6 +19,9 @@ import * as dataKeysMutations from "@/databases/mutations/data-keys"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
+import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
+
+const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
 export async function getEditorDetails(): Promise<{
   errors?: string[]
@@ -210,11 +213,51 @@ export async function publishData({
       results.errors = [...(results.errors || []), ...processPendingDeletion.errors]
     }
 
-    await _saveEditorInfo({
+    const editorInfoSave = await _saveEditorInfo({
       increaseVersion: results.success,
       broadcastAction: true,
       data: { lastPublishDate: new Date() },
     })
+
+    if (results.success && editorInfoSave.success && editorInfoSave.data?.dataVersion && publisherUserId) {
+      const releaseDataVersion = editorInfoSave.data.dataVersion
+      const now = new Date()
+      const releaseLog = await _saveChangeLog({
+        data: {
+          entityId: RELEASE_CHANGELOG_ENTITY_ID,
+          entityType: "release",
+          action: "publish",
+          dataVersion: releaseDataVersion,
+          changes: [
+            {
+              action: "publish",
+              description: `Release v${releaseDataVersion} published`,
+              fromDataVersion: releaseDataVersion - 1,
+              toDataVersion: releaseDataVersion,
+            },
+          ],
+          fullSnapshot: {
+            dataVersion: releaseDataVersion,
+            publishedAt: now.toISOString(),
+            publishedBy: publisherUserId,
+          },
+          previousSnapshot: {},
+          baselineSnapshot: {
+            dataVersion: releaseDataVersion,
+            publishedAt: now.toISOString(),
+            publishedBy: publisherUserId,
+          },
+          description: `Release v${releaseDataVersion} published`,
+          changeReason: `Release v${releaseDataVersion} published`,
+          isActive: false,
+          userId: publisherUserId,
+        },
+      })
+
+      if (!releaseLog.success) {
+        logger.error("publishData release changelog warning", releaseLog.errors?.join(", ") || "Unknown error")
+      }
+    }
 
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {
