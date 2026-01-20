@@ -238,7 +238,10 @@ export async function _publishScripts({
     }
 
     if (changeLogs.length) {
-      await _saveChangeLogs({ data: changeLogs })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
+      if (saveResult.errors?.length) {
+        logger.error("_publishScripts changelog warnings", saveResult.errors.join(", "))
+      }
     }
 
     results.success = true

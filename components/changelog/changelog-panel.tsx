@@ -32,6 +32,79 @@ const actionColors = {
   modify: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
 }
 
+const MAX_LIST_ITEMS = 3
+const MAX_OBJECT_FIELDS = 4
+
+function formatPrimitive(value: unknown): string {
+  if (value === null || value === undefined) return "—"
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "—"
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed
+  }
+  return String(value)
+}
+
+function extractLabel(value: Record<string, unknown>): string | null {
+  const labelKeys = ["title", "name", "label", "key", "id", "type"]
+  for (const key of labelKeys) {
+    const entry = value[key]
+    if (typeof entry === "string" && entry.trim().length) return entry.trim()
+    if (typeof entry === "number" && Number.isFinite(entry)) return String(entry)
+  }
+  return null
+}
+
+function summarizeArray(values: unknown[]): string {
+  if (!values.length) return "Empty list"
+  const primitiveValues = values.filter((val) => val === null || ["string", "number", "boolean"].includes(typeof val))
+  if (primitiveValues.length === values.length) {
+    const preview = primitiveValues.slice(0, MAX_LIST_ITEMS).map(formatPrimitive)
+    const remainder = values.length - preview.length
+    return remainder > 0 ? `${preview.join(", ")} + ${remainder} more` : preview.join(", ")
+  }
+
+  const labeled = values
+    .filter((val): val is Record<string, unknown> => !!val && typeof val === "object")
+    .map((val) => extractLabel(val))
+    .filter((val): val is string => !!val)
+
+  if (labeled.length) {
+    const preview = labeled.slice(0, MAX_LIST_ITEMS)
+    const remainder = labeled.length - preview.length
+    return remainder > 0 ? `${preview.join(", ")} + ${remainder} more` : preview.join(", ")
+  }
+
+  return `${values.length} items`
+}
+
+function summarizeObject(value: Record<string, unknown>): string {
+  const preferredKeys = ["title", "name", "label", "key", "id", "type", "value", "summary", "position"]
+  const entries = preferredKeys
+    .filter((key) => key in value)
+    .map((key) => `${key}: ${formatPrimitive(value[key])}`)
+    .filter((entry) => !entry.endsWith(": —"))
+
+  if (entries.length) {
+    const preview = entries.slice(0, MAX_OBJECT_FIELDS)
+    const remainder = entries.length - preview.length
+    return remainder > 0 ? `${preview.join("; ")} + ${remainder} more` : preview.join("; ")
+  }
+
+  const keys = Object.keys(value)
+  if (!keys.length) return "No details"
+  const preview = keys.slice(0, MAX_OBJECT_FIELDS)
+  const remainder = keys.length - preview.length
+  return remainder > 0 ? `${preview.join(", ")} + ${remainder} more fields` : `${preview.join(", ")} fields`
+}
+
+function renderReadableValue(value: unknown) {
+  if (Array.isArray(value)) return summarizeArray(value)
+  if (value && typeof value === "object") return summarizeObject(value as Record<string, unknown>)
+  return formatPrimitive(value)
+}
+
 export function GlobalChangeLogPanel({
   isOpen,
   onClose,
@@ -184,26 +257,22 @@ export function GlobalChangeLogPanel({
                               </div>
 
                               {/* Show old/new values if available */}
-                              {(change.oldValue !== undefined || change.newValue !== undefined) && (
+                                  {(change.oldValue !== undefined || change.newValue !== undefined) && (
                                 <div className="pt-2 space-y-2 border-t">
                                   <div className="grid grid-cols-2 gap-2 text-xs">
                                     {change.oldValue !== undefined && (
                                       <div>
                                         <div className="text-muted-foreground mb-1">Previous</div>
-                                        <div className="p-2 rounded bg-red-500/10 font-mono break-all">
-                                          {typeof change.oldValue === "object"
-                                            ? JSON.stringify(change.oldValue, null, 2)
-                                            : String(change.oldValue)}
+                                        <div className="p-2 rounded bg-red-500/10 text-foreground break-words">
+                                          {renderReadableValue(change.oldValue)}
                                         </div>
                                       </div>
                                     )}
                                     {change.newValue !== undefined && (
                                       <div>
                                         <div className="text-muted-foreground mb-1">New</div>
-                                        <div className="p-2 rounded bg-green-500/10 font-mono break-all">
-                                          {typeof change.newValue === "object"
-                                            ? JSON.stringify(change.newValue, null, 2)
-                                            : String(change.newValue)}
+                                        <div className="p-2 rounded bg-green-500/10 text-foreground break-words">
+                                          {renderReadableValue(change.newValue)}
                                         </div>
                                       </div>
                                     )}
