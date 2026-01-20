@@ -103,7 +103,7 @@ function getReplaceItems({
         .filter(item => !!item.matches.length)
         .map(item => ({
             ...item,
-            matches: item.matches.filter(match => ['key', 'field_key', 'field_id'].includes(match.field)),
+            matches: item.matches.filter(match => !['key', 'field_key', 'field_id', 'field_item_key', 'field_item_id'].includes(match.field)),
         }));
 }
 
