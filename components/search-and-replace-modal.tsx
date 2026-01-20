@@ -435,7 +435,7 @@ export function SearchAndReplaceModal(props: Props) {
                                 {replaceItem.matches.map((match, matchIndex) => {
                                     const key = replaceItem.id + `_match${matchIndex}`;
 
-                                    if (match.field === 'key') return null;
+                                    if (['key', 'field_key', 'field_id'].includes(match.field)) return null;
 
                                     return (
                                         <Card
