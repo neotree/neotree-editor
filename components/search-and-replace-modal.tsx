@@ -99,7 +99,12 @@ function getReplaceItems({
             });
         });
 
-    return items.filter(item => !!item.matches.length);
+    return items
+        .filter(item => !!item.matches.length)
+        .map(item => ({
+            ...item,
+            matches: item.matches.filter(match => ['key', 'field_key', 'field_id'].includes(match.field)),
+        }));
 }
 
 function sanitizeSearchValue(searchValue = '') {
@@ -434,8 +439,6 @@ export function SearchAndReplaceModal(props: Props) {
 
                                 {replaceItem.matches.map((match, matchIndex) => {
                                     const key = replaceItem.id + `_match${matchIndex}`;
-
-                                    if (['key', 'field_key', 'field_id'].includes(match.field)) return null;
 
                                     return (
                                         <Card
