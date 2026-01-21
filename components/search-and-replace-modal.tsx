@@ -26,6 +26,7 @@ import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { useAppContext } from '@/contexts/app';
+import { ErrorCard } from './error-card';
 
 type Props = {
     searchValue: string;
@@ -100,11 +101,11 @@ function getReplaceItems({
         });
 
     return items
-        .filter(item => !!item.matches.length)
         .map(item => ({
             ...item,
             matches: item.matches.filter(match => !['key', 'field_key', 'field_id', 'field_item_key', 'field_item_id'].includes(match.field)),
-        }));
+        }))
+        .filter(item => !!item.matches.length);
 }
 
 function sanitizeSearchValue(searchValue = '') {
@@ -418,6 +419,10 @@ export function SearchAndReplaceModal(props: Props) {
                 }}
             >
                 <div className="flex flex-col gap-y-6">
+                    <ErrorCard color="warning">
+                        NB: Data key matches are not replaceable and will not be displayed
+                    </ErrorCard>
+
                     {!replaceItems.length && (
                         <div className="text-sm opacity-60 text-center">
                             No matches
