@@ -161,6 +161,7 @@ export function ChangelogsTable(props: Props) {
   const [rollbacking, setRollbacking] = useState<number | null>(null)
   const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
   const [showEntityDetails, setShowEntityDetails] = useState(false)
+  const [softDeleteCreated, setSoftDeleteCreated] = useState(false)
 
   useEffect(() => {
     if (pendingRollbackEntry) {
@@ -233,6 +234,7 @@ export function ChangelogsTable(props: Props) {
       const res = await axios.post("/api/changelogs/rollback-data-version", {
         dataVersion,
         changeReason: `Rollback release v${dataVersion} to v${dataVersion - 1}`,
+        createdEntityPolicy: softDeleteCreated ? "soft_delete" : "keep",
       })
 
       if (res.data?.errors?.length) {
@@ -254,6 +256,7 @@ export function ChangelogsTable(props: Props) {
     } finally {
       setRollbacking(null)
       setPendingRollbackEntry(null)
+      setSoftDeleteCreated(false)
     }
   }
 
@@ -517,6 +520,7 @@ export function ChangelogsTable(props: Props) {
           if (!open) {
             setPendingRollbackEntry(null)
             setShowEntityDetails(false)
+            setSoftDeleteCreated(false)
           }
         }}
       >
@@ -559,6 +563,21 @@ export function ChangelogsTable(props: Props) {
                           )}
                         </div>
                       )}
+                    </div>
+                    <div className="pt-1">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={softDeleteCreated}
+                          onChange={(event) => setSoftDeleteCreated(event.target.checked)}
+                          className="rounded"
+                          disabled={rollbacking !== null}
+                        />
+                        <span>Soft delete items created in this release</span>
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Newly created entities with no prior snapshot will be marked deleted instead of kept.
+                      </p>
                     </div>
                   </>
                 )}
