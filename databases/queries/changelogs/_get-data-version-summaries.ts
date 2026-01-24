@@ -1,4 +1,5 @@
 import { and, desc, eq, sql, inArray, or, ilike, asc } from "drizzle-orm"
+import * as uuid from "uuid"
 import db from "@/databases/pg/drizzle"
 import { changeLogs, users } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
@@ -76,13 +77,37 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
           : []
 
     // First, let's find the data versions that match our filters
-    const searchConditions = searchTerm
+    const normalizedSearch = typeof searchTerm === "string" ? searchTerm.trim() : ""
+    const normalizedSearchLower = normalizedSearch.toLowerCase()
+    const isUuidSearch = normalizedSearch ? uuid.validate(normalizedSearch) : false
+
+    const entityTypeAliases: Record<string, string[]> = {
+      script: ["script", "scripts"],
+      screen: ["screen", "screens"],
+      diagnosis: ["diagnosis", "diagnoses"],
+      config_key: ["config key", "config keys", "config-key", "configkey", "configkeys"],
+      drugs_library: ["drugs library", "drug library", "drugs-library", "drug-library", "drugs library item"],
+      data_key: ["data key", "data keys", "data-key", "datakey", "datakeys"],
+      alias: ["alias", "aliases"],
+      hospital: ["hospital", "hospitals"],
+      release: ["release", "releases"],
+    }
+
+    const matchedEntityTypes = Object.entries(entityTypeAliases)
+      .filter(([, aliases]) => aliases.some((alias) => alias === normalizedSearchLower))
+      .map(([key]) => key) as (typeof changeLogs.$inferSelect)["entityType"][]
+
+    const searchConditions = normalizedSearch
       ? or(
-          ilike(changeLogs.description, `%${searchTerm}%`),
-          ilike(changeLogs.changeReason, `%${searchTerm}%`),
-          sql`${changeLogs.changes}::text ILIKE ${"%" + searchTerm + "%"}`,
-          ilike(users.displayName, `%${searchTerm}%`),
-          ilike(users.email, `%${searchTerm}%`),
+          ilike(changeLogs.description, `%${normalizedSearch}%`),
+          ilike(changeLogs.changeReason, `%${normalizedSearch}%`),
+          sql`${changeLogs.changes}::text ILIKE ${"%" + normalizedSearch + "%"}`,
+          ilike(changeLogs.entityId, `%${normalizedSearch}%`),
+          isUuidSearch ? eq(changeLogs.entityId, normalizedSearch) : undefined,
+          ilike(changeLogs.entityType, `%${normalizedSearch}%`),
+          matchedEntityTypes.length ? inArray(changeLogs.entityType, matchedEntityTypes) : undefined,
+          ilike(users.displayName, `%${normalizedSearch}%`),
+          ilike(users.email, `%${normalizedSearch}%`),
         )
       : undefined
 

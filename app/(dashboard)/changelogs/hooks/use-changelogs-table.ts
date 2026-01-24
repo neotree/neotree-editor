@@ -206,10 +206,8 @@ export function useChangelogsTable({
 
   return {
     dataVersions,
-    totalDataVersions: filteredSummaries.length,
-    loading,
-    dataVersions,
     totalDataVersions,
+    loading,
     searchValue,
     entityType,
     action,
