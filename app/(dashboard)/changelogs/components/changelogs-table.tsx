@@ -310,7 +310,7 @@ export function ChangelogsTable(props: Props) {
 
   return (
     <>
-      {loading && <Loader overlay />}
+      {(loading || rollbacking !== null) && <Loader overlay />}
 
       <div className="flex flex-col gap-y-4">
         <ChangelogsTableHeader
@@ -531,6 +531,9 @@ export function ChangelogsTable(props: Props) {
                       You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state
                       of the previous release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
                     </p>
+                    {rollbacking !== null && (
+                      <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>
+                    )}
                     <div>
                       <p className="font-medium text-foreground mb-1">Entities affected:</p>
                       {renderEntityImpactList(pendingRollbackEntry)}
