@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { MoreVertical, Search } from "lucide-react"
@@ -38,7 +38,12 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
-import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import {
+  type ChangeLogType,
+  type DataVersionSummary,
+  type UseChangelogsTableParams,
+  useChangelogsTable,
+} from "../hooks/use-changelogs-table"
 import { resolveEntityTitle } from "@/lib/changelog-utils"
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
@@ -129,6 +134,7 @@ export function ChangelogsTable(props: Props) {
     entityType,
     action,
     isActiveOnly,
+    applyFiltersToCounts,
     sort,
     pagination,
     currentPage,
@@ -138,10 +144,14 @@ export function ChangelogsTable(props: Props) {
     setEntityType,
     setAction,
     setIsActiveOnly,
+    setApplyFiltersToCounts,
     setSort,
     setCurrentPage,
     loadChangelogs,
     clearFilters,
+    detailsByVersion,
+    detailsLoadingByVersion,
+    loadVersionDetails,
   } = useChangelogsTable(props)
 
   const { isSuperUser } = props
@@ -151,6 +161,12 @@ export function ChangelogsTable(props: Props) {
   const [rollbacking, setRollbacking] = useState<number | null>(null)
   const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
   const [showEntityDetails, setShowEntityDetails] = useState(false)
+
+  useEffect(() => {
+    if (pendingRollbackEntry) {
+      loadVersionDetails(pendingRollbackEntry.dataVersion)
+    }
+  }, [loadVersionDetails, pendingRollbackEntry])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -259,8 +275,12 @@ export function ChangelogsTable(props: Props) {
     )
   }
 
-  const renderEntityDetails = (entry: DataVersionSummary) => {
-    const groups = entry.changes.reduce<Record<string, { label: string; items: string[] }>>((acc, change) => {
+  const renderEntityDetails = (entry: DataVersionSummary, details?: ChangeLogType[]) => {
+    if (!details || details.length === 0) {
+      return <p className="text-sm text-muted-foreground">No entity details available.</p>
+    }
+
+    const groups = details.reduce<Record<string, { label: string; items: string[] }>>((acc, change) => {
       const key = change.entityType
       const label = entityTypeLabels[key] || key
       const title = resolveEntityTitle(change) || change.entityId
@@ -297,11 +317,13 @@ export function ChangelogsTable(props: Props) {
           entityType={entityType}
           action={action}
           isActiveOnly={isActiveOnly}
+          applyFiltersToCounts={applyFiltersToCounts}
           sort={sort}
           sortOptions={sortOptions}
           setEntityType={setEntityType}
           setAction={setAction}
           setIsActiveOnly={setIsActiveOnly}
+          setApplyFiltersToCounts={setApplyFiltersToCounts}
           setSort={setSort}
           clearFilters={clearFilters}
           loading={loading}
@@ -524,7 +546,14 @@ export function ChangelogsTable(props: Props) {
                       </div>
                       {showEntityDetails && (
                         <div className="mt-2 max-h-56 overflow-y-auto pr-2">
-                          {renderEntityDetails(pendingRollbackEntry)}
+                          {detailsLoadingByVersion[pendingRollbackEntry.dataVersion] ? (
+                            <p className="text-sm text-muted-foreground">Loading entity details...</p>
+                          ) : (
+                            renderEntityDetails(
+                              pendingRollbackEntry,
+                              detailsByVersion[pendingRollbackEntry.dataVersion],
+                            )
+                          )}
                         </div>
                       )}
                     </div>
