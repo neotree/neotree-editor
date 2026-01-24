@@ -4,29 +4,17 @@ import { useState, useCallback, useMemo, useEffect } from "react"
 import axios from "axios"
 
 import { useAlertModal } from "@/hooks/use-alert-modal"
-import type { getChangeLogs } from "@/app/actions/change-logs"
+import type { getChangeLogs, getDataVersionSummaries } from "@/app/actions/change-logs"
 
 export type UseChangelogsTableParams = {
-  initialChangelogs: Awaited<ReturnType<typeof getChangeLogs>>["data"]
+  initialSummaries?: Awaited<ReturnType<typeof getDataVersionSummaries>>["data"]
+  initialTotal?: number
+  initialLatestDataVersion?: number | null
 }
 
 export type ChangeLogType = Awaited<ReturnType<typeof getChangeLogs>>["data"][0]
 
-export type DataVersionSummary = {
-  dataVersion: number
-  publishedAt: string | null
-  publishedByName: string
-  publishedByEmail?: string
-  totalChanges: number
-  hasActiveChanges: boolean
-  isLatestVersion: boolean
-  entityCounts: Record<string, number>
-  actionCounts: Record<string, number>
-  descriptions: string[]
-  changeLogIds: string[]
-  changes: ChangeLogType[]
-  rollbackSourceVersion?: number | null
-}
+export type DataVersionSummary = Awaited<ReturnType<typeof getDataVersionSummaries>>["data"][0]
 
 type Pagination = {
   page: number
@@ -44,43 +32,32 @@ const sortOptions = [
   { value: "changeCount.asc", label: "Changes (Low to High)" },
 ]
 
-function paginateData<T>(data: T[], page: number, limit: number): { data: T[]; pagination: Pagination } {
-  const total = data.length
-  const totalPages = Math.ceil(total / limit)
-  const startIndex = (page - 1) * limit
-  const endIndex = startIndex + limit
-
-  return {
-    data: data.slice(startIndex, endIndex),
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  }
-}
-
-function toNumericVersion(value: unknown): number | null {
-  if (value === null || value === undefined) return null
-  const parsed = typeof value === "number" ? value : Number(value)
+function parseVersionSearch(value: string): number | null {
+  const trimmed = value.trim().toLowerCase()
+  if (!trimmed) return null
+  const match = /^v?\d+$/.exec(trimmed)
+  if (!match) return null
+  const parsed = Number(trimmed.replace(/^v/, ""))
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function getDataVersionFromChangeLog(changelog: ChangeLogType): number | null {
-  const fromRoot = toNumericVersion((changelog as any)?.dataVersion)
-  const fromSnapshot = toNumericVersion((changelog?.fullSnapshot as any)?.dataVersion)
-  return fromRoot ?? fromSnapshot ?? null
-}
-
-export function useChangelogsTable({ initialChangelogs }: UseChangelogsTableParams) {
-  const [allChangelogs, setAllChangelogs] = useState<ChangeLogType[]>(initialChangelogs)
+export function useChangelogsTable({
+  initialSummaries = [],
+  initialTotal = 0,
+  initialLatestDataVersion = null,
+}: UseChangelogsTableParams) {
+  const [dataVersions, setDataVersions] = useState<DataVersionSummary[]>(initialSummaries)
+  const [totalDataVersions, setTotalDataVersions] = useState<number>(initialTotal)
+  const [latestDataVersion, setLatestDataVersion] = useState<number | null>(initialLatestDataVersion)
+  const [detailsByVersion, setDetailsByVersion] = useState<Record<number, ChangeLogType[]>>({})
+  const [detailsLoadingByVersion, setDetailsLoadingByVersion] = useState<Record<number, boolean>>({})
   const [loading, setLoading] = useState(false)
 
   const [searchValue, setSearchValue] = useState("")
   const [entityType, setEntityType] = useState("all")
   const [action, setAction] = useState("all")
   const [isActiveOnly, setIsActiveOnly] = useState(false)
+  const [applyFiltersToCounts, setApplyFiltersToCounts] = useState(false)
   const [sort, setSort] = useState(sortOptions[0].value)
 
   const [currentPage, setCurrentPage] = useState(1)
@@ -88,204 +65,141 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
 
   const { alert } = useAlertModal()
 
-  const loadChangelogs = useCallback(async () => {
+  const loadSummaries = useCallback(async () => {
     try {
       setLoading(true)
 
-      const pageSize = 2000
-      let offset = 0
-      let total = 0
-      const aggregated: ChangeLogType[] = []
+      const parsedVersion = parseVersionSearch(searchValue)
+      const [sortKey, sortDir] = sort.split(".")
 
-      do {
-        const res = await axios.post("/api/changelogs/get", {
-          limit: pageSize,
-          offset,
-          sortBy: "dateOfChange",
-          sortOrder: "desc",
+      const limit = isActiveOnly ? 1 : itemsPerPage
+      const offset = isActiveOnly ? 0 : (currentPage - 1) * itemsPerPage
+
+      const res = await axios.post("/api/changelogs/summaries", {
+        limit,
+        offset,
+        searchTerm: parsedVersion ? undefined : searchValue || undefined,
+        dataVersions: parsedVersion ? [parsedVersion] : undefined,
+        entityTypes: entityType !== "all" ? [entityType] : undefined,
+        actions: action !== "all" ? [action] : undefined,
+        applyFiltersToCounts,
+        sortBy: sortKey || "publishedAt",
+        sortOrder: sortDir || "desc",
+        latestOnly: isActiveOnly,
+      })
+
+      const { errors, data, total, latestDataVersion: latest } = res.data
+
+      if (errors?.length) {
+        alert({
+          title: "Error",
+          message: "Failed to load changelog summaries: " + errors.join(", "),
+          variant: "error",
         })
+        return
+      }
 
-        const { errors, data, total: responseTotal } = res.data
-
-        if (errors?.length) {
-          alert({
-            title: "Error",
-            message: "Failed to load changelogs: " + errors.join(", "),
-            variant: "error",
-          })
-          return
-        }
-
-        if (!Array.isArray(data) || data.length === 0) {
-          break
-        }
-
-        aggregated.push(...data)
-        total = Number.isFinite(responseTotal) ? Number(responseTotal) : aggregated.length
-        offset = aggregated.length
-      } while (offset < total)
-
-      setAllChangelogs(aggregated)
+      setDataVersions(Array.isArray(data) ? data : [])
+      setTotalDataVersions(Number.isFinite(total) ? Number(total) : 0)
+      setLatestDataVersion(Number.isFinite(latest) ? Number(latest) : null)
     } catch (e: any) {
       alert({
         title: "Error",
-        message: "Failed to load changelogs: " + e.message,
+        message: "Failed to load changelog summaries: " + e.message,
         variant: "error",
       })
     } finally {
       setLoading(false)
     }
-  }, [alert])
+  }, [alert, action, applyFiltersToCounts, currentPage, entityType, isActiveOnly, itemsPerPage, searchValue, sort])
 
-  const dataVersionSummaries = useMemo((): DataVersionSummary[] => {
-    const grouped = new Map<number, ChangeLogType[]>()
-
-    for (const changeLog of allChangelogs) {
-      const dataVersion = getDataVersionFromChangeLog(changeLog)
-      if (dataVersion === null) continue
-
-      if (!grouped.has(dataVersion)) {
-        grouped.set(dataVersion, [])
-      }
-      grouped.get(dataVersion)!.push(changeLog)
-    }
-
-    const summaries: DataVersionSummary[] = []
-    const versionNumbers = Array.from(grouped.keys())
-    const latestVersion = versionNumbers.length ? Math.max(...versionNumbers) : null
-
-    for (const [dataVersion, changeLogs] of Array.from(grouped.entries())) {
-      if (!changeLogs.length) continue
-
-      const sortedByDate = [...changeLogs].sort(
-        (a, b) => new Date(b.dateOfChange).getTime() - new Date(a.dateOfChange).getTime()
-      )
-
-      const latestChange = sortedByDate[0]
-      const publishEntry =
-        changeLogs.find((entry) => entry.action === "publish" && entry.entityType === "release") ??
-        changeLogs.find((entry) => entry.action === "publish" && entry.entityType !== "release") ??
-        latestChange
-      const rollbackEntry = changeLogs.find((entry) => entry.action === "rollback")
-      const summaryChanges = changeLogs.filter((entry) => entry.entityType !== "release")
-      const rollbackSourceVersion = rollbackEntry?.changes && Array.isArray(rollbackEntry.changes)
-        ? (() => {
-            const match = (rollbackEntry.changes as any[]).find(
-              (c) => Number.isFinite((c as any)?.toDataVersion) || Number.isFinite((c as any)?.toVersion),
-            ) as any
-            return Number.isFinite(match?.toDataVersion)
-              ? match.toDataVersion
-              : Number.isFinite(match?.toVersion)
-                ? match.toVersion
-                : null
-          })()
-        : null
-
-      const entityCounts = summaryChanges.reduce<Record<string, number>>((result, entry) => {
-        result[entry.entityType] = (result[entry.entityType] || 0) + 1
-        return result
-      }, {})
-
-      const actionCounts = summaryChanges.reduce<Record<string, number>>((result, entry) => {
-        result[entry.action] = (result[entry.action] || 0) + 1
-        return result
-      }, {})
-
-      const descriptions = Array.from(
-        new Set<string>(
-          summaryChanges
-            .map((entry) => entry.description?.trim() || "")
-            .filter((description) => description.length > 0)
-        )
-      ).slice(0, 5)
-
-      summaries.push({
-        dataVersion,
-        publishedAt: latestChange?.dateOfChange ? new Date(latestChange.dateOfChange).toISOString() : null,
-        publishedByName: publishEntry?.userName || latestChange?.userName || "Unknown user",
-        publishedByEmail: publishEntry?.userEmail || latestChange?.userEmail || undefined,
-        totalChanges: summaryChanges.length,
-        hasActiveChanges: summaryChanges.some((entry) => entry.isActive),
-        isLatestVersion: latestVersion !== null ? dataVersion === latestVersion : false,
-        entityCounts,
-        actionCounts,
-        descriptions,
-        changeLogIds: summaryChanges.map((entry) => entry.changeLogId),
-        changes: summaryChanges,
-        rollbackSourceVersion,
-      })
-    }
-
-    return summaries.sort((a, b) => b.dataVersion - a.dataVersion)
-  }, [allChangelogs])
-
-  const filteredSummaries = useMemo((): DataVersionSummary[] => {
-    let filtered = [...dataVersionSummaries]
-
-    if (searchValue) {
-      const query = searchValue.toLowerCase()
-      filtered = filtered.filter((summary) => {
-        const versionLabel = `v${summary.dataVersion}`.toLowerCase()
-        if (versionLabel.includes(query)) return true
-        if (summary.publishedByName?.toLowerCase().includes(query)) return true
-        if (summary.publishedByEmail?.toLowerCase().includes(query)) return true
-        if (summary.descriptions.some((desc) => desc.toLowerCase().includes(query))) return true
-
-        return summary.changes.some((change) => {
-          return [
-            change.description || "",
-            change.entityId || "",
-            change.changeReason || "",
-            change.userName || "",
-            change.userEmail || "",
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query)
-        })
-      })
-    }
-
-    if (entityType !== "all") {
-      filtered = filtered.filter((summary) => summary.changes.some((change) => change.entityType === entityType))
-    }
-
-    if (action !== "all") {
-      filtered = filtered.filter((summary) => summary.changes.some((change) => change.action === action))
-    }
-
-    if (isActiveOnly) {
-      filtered = filtered.filter((summary) => summary.isLatestVersion)
-    }
-
-    return sortDataVersions(filtered, sort)
-  }, [dataVersionSummaries, searchValue, entityType, action, isActiveOnly, sort])
-
-  const { data: dataVersions, pagination } = useMemo(() => {
-    if (!filteredSummaries.length) {
-      return { data: [] as DataVersionSummary[], pagination: undefined as Pagination | undefined }
-    }
-
-    const paginatedResult = paginateData(filteredSummaries, currentPage, itemsPerPage)
+  const pagination = useMemo(() => {
+    if (!totalDataVersions) return undefined
+    const totalPages = Math.max(1, Math.ceil(totalDataVersions / itemsPerPage))
     return {
-      data: paginatedResult.data,
-      pagination: paginatedResult.pagination,
+      page: currentPage,
+      limit: itemsPerPage,
+      total: totalDataVersions,
+      totalPages,
     }
-  }, [filteredSummaries, currentPage, itemsPerPage])
+  }, [currentPage, itemsPerPage, totalDataVersions])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchValue, entityType, action, isActiveOnly, sort])
+  }, [searchValue, entityType, action, isActiveOnly, sort, applyFiltersToCounts])
 
   useEffect(() => {
-    loadChangelogs()
-  }, [loadChangelogs])
+    loadSummaries()
+  }, [loadSummaries])
+
+  useEffect(() => {
+    if (!pagination) return
+    if (currentPage > pagination.totalPages) {
+      setCurrentPage(1)
+    }
+  }, [currentPage, pagination])
+
+  const loadVersionDetails = useCallback(
+    async (dataVersion: number) => {
+      if (detailsByVersion[dataVersion] || detailsLoadingByVersion[dataVersion]) return
+
+      try {
+        setDetailsLoadingByVersion((prev) => ({ ...prev, [dataVersion]: true }))
+
+        const pageSize = 2000
+        let offset = 0
+        let total = 0
+        const aggregated: ChangeLogType[] = []
+
+        do {
+          const res = await axios.post("/api/changelogs/get", {
+            limit: pageSize,
+            offset,
+            dataVersions: [dataVersion],
+            sortBy: "dateOfChange",
+            sortOrder: "desc",
+          })
+
+          const { errors, data, total: responseTotal } = res.data
+
+          if (errors?.length) {
+            alert({
+              title: "Error",
+              message: "Failed to load changelog details: " + errors.join(", "),
+              variant: "error",
+            })
+            return
+          }
+
+          if (!Array.isArray(data) || data.length === 0) {
+            break
+          }
+
+          aggregated.push(...data.filter((entry: ChangeLogType) => entry.entityType !== "release"))
+          total = Number.isFinite(responseTotal) ? Number(responseTotal) : aggregated.length
+          offset = aggregated.length
+        } while (offset < total)
+
+        setDetailsByVersion((prev) => ({ ...prev, [dataVersion]: aggregated }))
+      } catch (e: any) {
+        alert({
+          title: "Error",
+          message: "Failed to load changelog details: " + e.message,
+          variant: "error",
+        })
+      } finally {
+        setDetailsLoadingByVersion((prev) => ({ ...prev, [dataVersion]: false }))
+      }
+    },
+    [alert, detailsByVersion, detailsLoadingByVersion],
+  )
 
   const clearFilters = useCallback(() => {
     setSearchValue("")
     setEntityType("all")
     setAction("all")
     setIsActiveOnly(false)
+    setApplyFiltersToCounts(false)
     setSort(sortOptions[0].value)
     setCurrentPage(1)
   }, [])
@@ -294,10 +208,13 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     dataVersions,
     totalDataVersions: filteredSummaries.length,
     loading,
+    dataVersions,
+    totalDataVersions,
     searchValue,
     entityType,
     action,
     isActiveOnly,
+    applyFiltersToCounts,
     sort,
     pagination,
     currentPage,
@@ -307,42 +224,14 @@ export function useChangelogsTable({ initialChangelogs }: UseChangelogsTablePara
     setEntityType,
     setAction,
     setIsActiveOnly,
+    setApplyFiltersToCounts,
     setSort,
     setCurrentPage,
-    loadChangelogs,
+    loadChangelogs: loadSummaries,
     clearFilters,
-  }
-}
-
-function sortDataVersions(dataVersions: DataVersionSummary[], sortValue: string) {
-  const sorted = [...dataVersions]
-
-  const compareDates = (a: string | null, b: string | null) => {
-    const timeA = a ? new Date(a).getTime() : 0
-    const timeB = b ? new Date(b).getTime() : 0
-    return timeA - timeB
-  }
-
-  switch (sortValue) {
-    case "publishedAt.asc":
-      return sorted.sort((a, b) => compareDates(a.publishedAt, b.publishedAt))
-
-    case "publishedAt.desc":
-      return sorted.sort((a, b) => compareDates(b.publishedAt, a.publishedAt))
-
-    case "dataVersion.asc":
-      return sorted.sort((a, b) => a.dataVersion - b.dataVersion)
-
-    case "dataVersion.desc":
-      return sorted.sort((a, b) => b.dataVersion - a.dataVersion)
-
-    case "changeCount.asc":
-      return sorted.sort((a, b) => a.totalChanges - b.totalChanges)
-
-    case "changeCount.desc":
-      return sorted.sort((a, b) => b.totalChanges - a.totalChanges)
-
-    default:
-      return sorted.sort((a, b) => compareDates(b.publishedAt, a.publishedAt))
+    latestDataVersion,
+    detailsByVersion,
+    detailsLoadingByVersion,
+    loadVersionDetails,
   }
 }
