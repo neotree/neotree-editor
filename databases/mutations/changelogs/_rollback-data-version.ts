@@ -453,6 +453,7 @@ export async function _rollbackDataVersion({
             drugsLibraryItemId: current.drugsLibraryItemId,
             dataKeyId: current.dataKeyId,
             aliasId: current.aliasId,
+            hospitalId: current.entityType === "hospital" ? current.entityId : undefined,
           }
 
           const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
@@ -523,6 +524,7 @@ export async function _rollbackDataVersion({
           drugsLibraryItemId: current.drugsLibraryItemId,
           dataKeyId: current.dataKeyId,
           aliasId: current.aliasId,
+          hospitalId: current.entityType === "hospital" ? current.entityId : undefined,
         }
 
         const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
