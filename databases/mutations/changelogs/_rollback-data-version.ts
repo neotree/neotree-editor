@@ -22,6 +22,7 @@ export type RollbackDataVersionParams = {
   dataVersion?: number
   userId: string
   changeReason?: string
+  createdEntityPolicy?: "keep" | "soft_delete"
 }
 
 export type RollbackDataVersionResponse = {
@@ -303,6 +304,7 @@ export async function _rollbackDataVersion({
   dataVersion: requestedDataVersion,
   userId,
   changeReason,
+  createdEntityPolicy = "keep",
 }: RollbackDataVersionParams): Promise<RollbackDataVersionResponse> {
   const response: RollbackDataVersionResponse = { success: false }
   let restoredVersion: number | undefined
@@ -381,6 +383,8 @@ export async function _rollbackDataVersion({
       const scriptChanges = currentChanges.filter((c) => c.entityType === "script")
       const nonScriptChanges = currentChanges.filter((c) => c.entityType !== "script")
 
+      const shouldSoftDeleteCreated = createdEntityPolicy === "soft_delete"
+
       for (const scriptChange of scriptChanges) {
         const binding = ENTITY_BINDINGS[scriptChange.entityType]
         if (!binding) throw new Error(`Unsupported entity type ${scriptChange.entityType}`)
@@ -389,8 +393,18 @@ export async function _rollbackDataVersion({
         const effectiveScriptTarget = await findPreviousChangeLog(tx, scriptChange, currentDataVersion)
     if (!effectiveScriptTarget.fullSnapshot) throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
 
-        const plan: { current: typeof changeLogs.$inferSelect; target: typeof changeLogs.$inferSelect; binding: VersionedEntityBinding }[] = []
-        plan.push({ current: scriptChange, target: effectiveScriptTarget, binding })
+        const plan: {
+          current: typeof changeLogs.$inferSelect
+          target: typeof changeLogs.$inferSelect
+          binding: VersionedEntityBinding
+          createdInCurrentVersion: boolean
+        }[] = []
+        plan.push({
+          current: scriptChange,
+          target: effectiveScriptTarget,
+          binding,
+          createdInCurrentVersion: effectiveScriptTarget.dataVersion === currentDataVersion,
+        })
 
         const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis"]
         for (const childType of childTypes) {
@@ -414,16 +428,25 @@ export async function _rollbackDataVersion({
             if (!effectiveChildTarget || !effectiveChildTarget.fullSnapshot) {
               throw new Error(`Missing previous snapshot for child entity ${child.entityId}`)
             }
-            plan.push({ current: child, target: effectiveChildTarget, binding: childBinding })
+            plan.push({
+              current: child,
+              target: effectiveChildTarget,
+              binding: childBinding,
+              createdInCurrentVersion: !targetChild || targetChild.dataVersion === currentDataVersion,
+            })
           }
         }
 
         // Apply plan atomically
-        for (const { current, target, binding } of plan) {
+        for (const { current, target, binding, createdInCurrentVersion } of plan) {
           const effectiveTarget = target ?? current
           const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
           const targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
           const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
+          const shouldSoftDelete = shouldSoftDeleteCreated && createdInCurrentVersion
+          if (shouldSoftDelete) {
+            targetSnapshot.deletedAt = new Date().toISOString()
+          }
           const rollbackChangeLog: SaveChangeLogData = {
             entityId: current.entityId,
             entityType: current.entityType,
@@ -453,6 +476,7 @@ export async function _rollbackDataVersion({
             drugsLibraryItemId: current.drugsLibraryItemId,
             dataKeyId: current.dataKeyId,
             aliasId: current.aliasId,
+            hospitalId: current.entityType === "hospital" ? current.entityId : undefined,
           }
 
           const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
@@ -494,6 +518,11 @@ export async function _rollbackDataVersion({
         const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${previousDataVersion})`
         const targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
         const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
+        const createdInCurrentVersion = !target || target.dataVersion === currentDataVersion
+        const shouldSoftDelete = shouldSoftDeleteCreated && createdInCurrentVersion
+        if (shouldSoftDelete) {
+          targetSnapshot.deletedAt = new Date().toISOString()
+        }
         const rollbackChangeLog: SaveChangeLogData = {
           entityId: current.entityId,
           entityType: current.entityType,
@@ -523,6 +552,7 @@ export async function _rollbackDataVersion({
           drugsLibraryItemId: current.drugsLibraryItemId,
           dataKeyId: current.dataKeyId,
           aliasId: current.aliasId,
+          hospitalId: current.entityType === "hospital" ? current.entityId : undefined,
         }
 
         const saved = await _saveChangeLog({ data: rollbackChangeLog, client: tx })
