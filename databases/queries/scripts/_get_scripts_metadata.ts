@@ -21,6 +21,7 @@ export type GetScriptsMetadataResponse = {
             type: typeof screens.$inferSelect['type'];
             title: string;
             ref: string;
+            condition?: typeof screens.$inferSelect['condition'];
             fields: {
                 label: string;
                 key: string;
@@ -32,6 +33,7 @@ export type GetScriptsMetadataResponse = {
                 confidential: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
+                condition?: string | null;
             }[];
         }[];
         diagnoses: {
@@ -337,6 +339,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     confidential: f.confidential,
                                     minValue: f.minValue ?? f.minDate ?? f.minTime,
                                     maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
+                                    condition: f.condition || '',
                                 }];
                             });
                             fields = formFields.reduce((acc, f) => {
@@ -378,6 +381,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         type: screen.type,
                         title: screen.title,
                         ref: screen.refId,
+                        condition: screen.condition,
                         fields,
                     };
                 }),
