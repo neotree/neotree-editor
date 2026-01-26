@@ -10,11 +10,13 @@ type Props = {
   entityType: string
   action: string
   isActiveOnly: boolean
+  applyFiltersToCounts: boolean
   sort: string
   sortOptions: { value: string; label: string }[]
   setEntityType: (value: string) => void
   setAction: (value: string) => void
   setIsActiveOnly: (value: boolean) => void
+  setApplyFiltersToCounts: (value: boolean) => void
   setSort: (value: string) => void
   clearFilters: () => void
   loading: boolean
@@ -35,11 +37,13 @@ export function ChangelogsTableHeader({
   entityType,
   action,
   isActiveOnly,
+  applyFiltersToCounts,
   sort,
   sortOptions,
   setEntityType,
   setAction,
   setIsActiveOnly,
+  setApplyFiltersToCounts,
   setSort,
   clearFilters,
   loading,
@@ -113,6 +117,18 @@ export function ChangelogsTableHeader({
                   className="rounded"
                 />
                 <span className="text-sm whitespace-nowrap">Active only</span>
+              </label>
+            </div>
+
+            <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyFiltersToCounts}
+                  onChange={(e) => setApplyFiltersToCounts(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm whitespace-nowrap">Filter counts</span>
               </label>
             </div>
 

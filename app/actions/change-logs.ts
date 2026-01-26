@@ -128,6 +128,16 @@ export const countEntityVersions: typeof queries._countEntityVersions = async (.
   }
 }
 
+export const getDataVersionSummaries: typeof queries._getDataVersionSummaries = async (...args) => {
+  try {
+    await isAllowed()
+    return await queries._getDataVersionSummaries(...args)
+  } catch (e: any) {
+    logger.error("getDataVersionSummaries ERROR", e.message)
+    return { errors: [e.message], data: [], total: 0 }
+  }
+}
+
 export const searchChangeLogs: typeof queries.SearchChangeLogs._searchChangeLogs = async (...args) => {
   try {
     await isAllowed()
