@@ -28,6 +28,8 @@ export function ScriptMetaActions({ data }: {
                 'Value Label': string;
                 Confidential: string;
                 Optional: string;
+                'Field Condition': string;
+                'Screen Condition': string;
             }[];
 
             script.screens.forEach(screen => {
@@ -45,6 +47,8 @@ export function ScriptMetaActions({ data }: {
                         'Value Label': `${f.valueLabel || ''}`,
                         Confidential: f.confidential ? 'Yes' : 'No',
                         Optional: f.optional ? 'Yes' : 'No',
+                        'Field Condition': f.condition || '',
+                        'Screen Condition': screen.condition || '',
                     });
                 });
             });
@@ -66,6 +70,7 @@ export function ScriptMetaActions({ data }: {
                 'Data Type': string;
                 'Value': string;
                 'Value Label': string;
+                Condition: string;
             }[];
 
             script.diagnoses.forEach(d => {
@@ -81,6 +86,7 @@ export function ScriptMetaActions({ data }: {
                     'Data Type': 'diagnosis',
                     Value: d.key,
                     'Value Label': d.name,
+                    Condition: `${d.expression || ''}`,
                 });
             });
 
