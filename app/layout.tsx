@@ -12,7 +12,7 @@ import { FilesModal } from "@/components/modals/files";
 import { AppContextProvider } from "@/contexts/app";
 import { getSys } from "@/app/actions/sys";
 import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
-import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
+import { getAuthenticatedUserWithRoles, getSession } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
 import * as dataKeysActions from '@/app/actions/data-keys';
@@ -52,17 +52,19 @@ export default async function RootLayout({
         editorDetails,
         authenticatedUser,
         sys,
+        session,
     ] = await Promise.all([
         opsActions.getEditorDetails(),
         getAuthenticatedUserWithRoles(),
         getSys(),
+        getSession(),
     ]);
 
     return (
         <html lang="en">
             <body className={roboto.className} suppressHydrationWarning>
                 <NuqsAdapter>
-                    <AuthContextProvider>
+                    <AuthContextProvider session={session}>
                         <ThemeProvider
                             attribute="class"
                             defaultTheme="light"

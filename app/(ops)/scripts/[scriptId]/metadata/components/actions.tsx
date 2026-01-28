@@ -129,6 +129,7 @@ export function ScriptMetaActions({ data }: {
                 <Button onClick={downloadExcel}>
                     Download excel
                 </Button>
+
             </div>
         </>
     );
