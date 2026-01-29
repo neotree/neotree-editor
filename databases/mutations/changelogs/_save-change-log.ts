@@ -4,6 +4,7 @@ import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
   aliases,
   changeLogs,
@@ -157,6 +158,36 @@ async function lockChangeLogChain(client: DbOrTransaction, entityType: string, e
 
 function computeSnapshotHash(snapshot: any) {
   return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
+}
+
+async function resolveUserId(data: SaveChangeLogData) {
+  const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""
+
+  if (!rawUserId) {
+    try {
+      const authUser = await getAuthenticatedUser()
+      const authUserId = authUser?.userId
+      if (authUserId && uuid.validate(authUserId)) {
+        logger.error("saveChangeLog warning: missing userId; using authenticated userId", {
+          providedUserId: data.userId,
+          authenticatedUserId: authUserId,
+        })
+        return { ...data, userId: authUserId }
+      }
+    } catch (e: any) {
+      logger.error("saveChangeLog warning: failed to resolve authenticated userId", e?.message || e)
+    }
+  }
+
+  if (!uuid.validate(rawUserId)) {
+    logger.error("saveChangeLog warning: invalid userId", {
+      providedUserId: data.userId,
+      entityType: data.entityType,
+      entityId: data.entityId,
+    })
+  }
+
+  return { ...data, userId: rawUserId || data.userId }
 }
 
 function validateEntityAlignment(data: SaveChangeLogData) {
@@ -348,29 +379,30 @@ export async function _saveChangeLog({
   const response: SaveChangeLogResponse = { success: false }
 
   try {
-    validateEntityAlignment(data)
+    const resolvedData = await resolveUserId(data)
+    validateEntityAlignment(resolvedData)
 
     const executor = async (tx: DbOrTransaction) => {
-      await lockChangeLogChain(tx, data.entityType, data.entityId)
+      await lockChangeLogChain(tx, resolvedData.entityType, resolvedData.entityId)
 
       const changeLogId = uuid.v4()
-      const isVersionless = isVersionlessEntityType(data.entityType)
+      const isVersionless = isVersionlessEntityType(resolvedData.entityType)
       let computedVersion: number
-      const providedVersion = Number.isFinite(data.version) ? Number(data.version) : null
-      const dataVersion = Number.isFinite(data.dataVersion) ? Number(data.dataVersion) : null
+      const providedVersion = Number.isFinite(resolvedData.version) ? Number(resolvedData.version) : null
+      const dataVersion = Number.isFinite(resolvedData.dataVersion) ? Number(resolvedData.dataVersion) : null
       let latestChangeLogVersion: number | undefined
       let baselineVersionCreated: number | undefined
       if (isVersionless) {
-        const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+        const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
         latestChangeLogVersion = latestVersion
         computedVersion = (latestVersion ?? 0) + 1
 
         baselineVersionCreated = await ensureBaselineChangeLog({
           client: tx,
-          data,
+          data: resolvedData,
           computedVersion,
           dataVersion,
-          baselineSnapshot: data.baselineSnapshot,
+          baselineSnapshot: resolvedData.baselineSnapshot,
         })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
@@ -384,22 +416,22 @@ export async function _saveChangeLog({
             // })
           } else {
             logger.error("saveChangeLog versionless mismatch", {
-              entityType: data.entityType,
-              entityId: data.entityId,
+              entityType: resolvedData.entityType,
+              entityId: resolvedData.entityId,
               providedVersion,
               latestChangeLogVersion: latestVersion,
               computedVersion,
             })
             throw new Error(
-              `Provided version (${data.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${data.entityType}`,
+              `Provided version (${resolvedData.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${resolvedData.entityType}`,
             )
           }
         }
       } else {
-        const entityType = data.entityType as VersionedEntityType
-        const entityVersion = await getEntityVersion(tx, { ...data, entityType })
+        const entityType = resolvedData.entityType as VersionedEntityType
+        const entityVersion = await getEntityVersion(tx, { ...resolvedData, entityType })
         const config = ENTITY_VERSION_CONFIG[entityType]
-        const latestVersion = await getLatestChangeLogVersion(tx, data.entityId, data.entityType)
+        const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
         latestChangeLogVersion = latestVersion
 
         // Prefer the entity's version, but if legacy data has higher changelog versions already,
@@ -413,10 +445,10 @@ export async function _saveChangeLog({
 
         baselineVersionCreated = await ensureBaselineChangeLog({
           client: tx,
-          data,
+          data: resolvedData,
           computedVersion,
           dataVersion,
-          baselineSnapshot: data.baselineSnapshot,
+          baselineSnapshot: resolvedData.baselineSnapshot,
         })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
@@ -431,52 +463,52 @@ export async function _saveChangeLog({
             // })
           } else {
             logger.error("saveChangeLog version mismatch", {
-              entityType: data.entityType,
-              entityId: data.entityId,
+              entityType: resolvedData.entityType,
+              entityId: resolvedData.entityId,
               providedVersion,
               entityVersion,
               latestChangeLogVersion: latestVersion,
               computedVersion,
             })
             throw new Error(
-              `Provided version (${data.version}) does not match ${config.entityLabel} version (${computedVersion})`,
+              `Provided version (${resolvedData.version}) does not match ${config.entityLabel} version (${computedVersion})`,
             )
           }
         }
       }
 
-      const snapshotHash = data.snapshotHash || computeSnapshotHash(data.fullSnapshot)
+      const snapshotHash = resolvedData.snapshotHash || computeSnapshotHash(resolvedData.fullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
 
-      const previousSnapshot = data.previousSnapshot ?? data.baselineSnapshot ?? {}
+      const previousSnapshot = resolvedData.previousSnapshot ?? resolvedData.baselineSnapshot ?? {}
 
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
-        entityId: data.entityId,
-        entityType: data.entityType,
-        action: data.action,
+        entityId: resolvedData.entityId,
+        entityType: resolvedData.entityType,
+        action: resolvedData.action,
         version: computedVersion,
         dataVersion,
-        changes: data.changes || [],
-        fullSnapshot: data.fullSnapshot || {},
+        changes: resolvedData.changes || [],
+        fullSnapshot: resolvedData.fullSnapshot || {},
         previousSnapshot,
         snapshotHash,
-        description: data.description,
-        changeReason: data.changeReason,
+        description: resolvedData.description,
+        changeReason: resolvedData.changeReason,
         parentVersion:
-          data.parentVersion ??
+          resolvedData.parentVersion ??
           (latestChangeLogVersion === undefined ? baselineVersionCreated : latestChangeLogVersion),
-        mergedFromVersion: data.mergedFromVersion,
-        isActive: data.isActive !== false,
-        userId: data.userId,
-        scriptId: data.scriptId,
-        screenId: data.screenId,
-        diagnosisId: data.diagnosisId,
-        configKeyId: data.configKeyId,
-        hospitalId: data.hospitalId,
-        drugsLibraryItemId: data.drugsLibraryItemId,
-        dataKeyId: data.dataKeyId,
-        aliasId: data.aliasId,
+        mergedFromVersion: resolvedData.mergedFromVersion,
+        isActive: resolvedData.isActive !== false,
+        userId: resolvedData.userId,
+        scriptId: resolvedData.scriptId,
+        screenId: resolvedData.screenId,
+        diagnosisId: resolvedData.diagnosisId,
+        configKeyId: resolvedData.configKeyId,
+        hospitalId: resolvedData.hospitalId,
+        drugsLibraryItemId: resolvedData.drugsLibraryItemId,
+        dataKeyId: resolvedData.dataKeyId,
+        aliasId: resolvedData.aliasId,
         dateOfChange: new Date(),
       }
 
