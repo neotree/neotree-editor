@@ -389,7 +389,7 @@ function parseConditionClauses(condition?: string) {
 
     let mode: "any" | "all" = hasOr ? "any" : "all";
     let op = hasOr ? "or" : hasAnd ? "and" : null;
-    let parts = op ? splitCondition(normalized, op) : [normalized];
+    let parts = op ? splitCondition(normalized, op as "and" | "or") : [normalized];
     let approximate = false;
 
     if (hasOr && hasAnd) {
