@@ -162,13 +162,14 @@ function computeSnapshotHash(snapshot: any) {
 
 async function resolveUserId(data: SaveChangeLogData) {
   const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""
+  const hasValidUserId = rawUserId && uuid.validate(rawUserId)
 
-  if (!rawUserId) {
+  if (!rawUserId || !hasValidUserId) {
     try {
       const authUser = await getAuthenticatedUser()
       const authUserId = authUser?.userId
       if (authUserId && uuid.validate(authUserId)) {
-        logger.error("saveChangeLog warning: missing userId; using authenticated userId", {
+        logger.error("saveChangeLog warning: invalid or missing userId; using authenticated userId", {
           providedUserId: data.userId,
           authenticatedUserId: authUserId,
         })
@@ -179,7 +180,7 @@ async function resolveUserId(data: SaveChangeLogData) {
     }
   }
 
-  if (!uuid.validate(rawUserId)) {
+  if (!hasValidUserId) {
     logger.error("saveChangeLog warning: invalid userId", {
       providedUserId: data.userId,
       entityType: data.entityType,
