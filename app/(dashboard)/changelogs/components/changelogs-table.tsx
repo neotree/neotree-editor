@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { MoreVertical, Search } from "lucide-react"
@@ -38,7 +38,12 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { ChangelogsTableHeader } from "./changelogs-table-header"
-import { type DataVersionSummary, type UseChangelogsTableParams, useChangelogsTable } from "../hooks/use-changelogs-table"
+import {
+  type ChangeLogType,
+  type DataVersionSummary,
+  type UseChangelogsTableParams,
+  useChangelogsTable,
+} from "../hooks/use-changelogs-table"
 import { resolveEntityTitle } from "@/lib/changelog-utils"
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
@@ -129,6 +134,7 @@ export function ChangelogsTable(props: Props) {
     entityType,
     action,
     isActiveOnly,
+    applyFiltersToCounts,
     sort,
     pagination,
     currentPage,
@@ -138,10 +144,14 @@ export function ChangelogsTable(props: Props) {
     setEntityType,
     setAction,
     setIsActiveOnly,
+    setApplyFiltersToCounts,
     setSort,
     setCurrentPage,
     loadChangelogs,
     clearFilters,
+    detailsByVersion,
+    detailsLoadingByVersion,
+    loadVersionDetails,
   } = useChangelogsTable(props)
 
   const { isSuperUser } = props
@@ -151,6 +161,13 @@ export function ChangelogsTable(props: Props) {
   const [rollbacking, setRollbacking] = useState<number | null>(null)
   const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
   const [showEntityDetails, setShowEntityDetails] = useState(false)
+  const [softDeleteCreated, setSoftDeleteCreated] = useState(false)
+
+  useEffect(() => {
+    if (pendingRollbackEntry) {
+      loadVersionDetails(pendingRollbackEntry.dataVersion)
+    }
+  }, [loadVersionDetails, pendingRollbackEntry])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -217,6 +234,7 @@ export function ChangelogsTable(props: Props) {
       const res = await axios.post("/api/changelogs/rollback-data-version", {
         dataVersion,
         changeReason: `Rollback release v${dataVersion} to v${dataVersion - 1}`,
+        createdEntityPolicy: softDeleteCreated ? "soft_delete" : "keep",
       })
 
       if (res.data?.errors?.length) {
@@ -238,6 +256,7 @@ export function ChangelogsTable(props: Props) {
     } finally {
       setRollbacking(null)
       setPendingRollbackEntry(null)
+      setSoftDeleteCreated(false)
     }
   }
 
@@ -259,8 +278,12 @@ export function ChangelogsTable(props: Props) {
     )
   }
 
-  const renderEntityDetails = (entry: DataVersionSummary) => {
-    const groups = entry.changes.reduce<Record<string, { label: string; items: string[] }>>((acc, change) => {
+  const renderEntityDetails = (entry: DataVersionSummary, details?: ChangeLogType[]) => {
+    if (!details || details.length === 0) {
+      return <p className="text-sm text-muted-foreground">No entity details available.</p>
+    }
+
+    const groups = details.reduce<Record<string, { label: string; items: string[] }>>((acc, change) => {
       const key = change.entityType
       const label = entityTypeLabels[key] || key
       const title = resolveEntityTitle(change) || change.entityId
@@ -290,18 +313,20 @@ export function ChangelogsTable(props: Props) {
 
   return (
     <>
-      {loading && <Loader overlay />}
+      {(loading || rollbacking !== null) && <Loader overlay />}
 
       <div className="flex flex-col gap-y-4">
         <ChangelogsTableHeader
           entityType={entityType}
           action={action}
           isActiveOnly={isActiveOnly}
+          applyFiltersToCounts={applyFiltersToCounts}
           sort={sort}
           sortOptions={sortOptions}
           setEntityType={setEntityType}
           setAction={setAction}
           setIsActiveOnly={setIsActiveOnly}
+          setApplyFiltersToCounts={setApplyFiltersToCounts}
           setSort={setSort}
           clearFilters={clearFilters}
           loading={loading}
@@ -495,6 +520,7 @@ export function ChangelogsTable(props: Props) {
           if (!open) {
             setPendingRollbackEntry(null)
             setShowEntityDetails(false)
+            setSoftDeleteCreated(false)
           }
         }}
       >
@@ -509,6 +535,9 @@ export function ChangelogsTable(props: Props) {
                       You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state
                       of the previous release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
                     </p>
+                    {rollbacking !== null && (
+                      <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>
+                    )}
                     <div>
                       <p className="font-medium text-foreground mb-1">Entities affected:</p>
                       {renderEntityImpactList(pendingRollbackEntry)}
@@ -524,9 +553,31 @@ export function ChangelogsTable(props: Props) {
                       </div>
                       {showEntityDetails && (
                         <div className="mt-2 max-h-56 overflow-y-auto pr-2">
-                          {renderEntityDetails(pendingRollbackEntry)}
+                          {detailsLoadingByVersion[pendingRollbackEntry.dataVersion] ? (
+                            <p className="text-sm text-muted-foreground">Loading entity details...</p>
+                          ) : (
+                            renderEntityDetails(
+                              pendingRollbackEntry,
+                              detailsByVersion[pendingRollbackEntry.dataVersion],
+                            )
+                          )}
                         </div>
                       )}
+                    </div>
+                    <div className="pt-1">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={softDeleteCreated}
+                          onChange={(event) => setSoftDeleteCreated(event.target.checked)}
+                          className="rounded"
+                          disabled={rollbacking !== null}
+                        />
+                        <span>Soft delete items created in this release</span>
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Newly created entities with no prior snapshot will be marked deleted instead of kept.
+                      </p>
                     </div>
                   </>
                 )}
