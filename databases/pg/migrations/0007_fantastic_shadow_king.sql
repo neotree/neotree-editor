@@ -1,0 +1,1 @@
+ALTER TABLE "nt_screens" ADD COLUMN "print_display_columns" integer DEFAULT 2 NOT NULL;
