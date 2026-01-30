@@ -158,7 +158,7 @@ export function useScreensTable({
         }
       }
 
-      await saveScreens({ data: payload, broadcastAction: true })
+      // await saveScreens({ data: payload, broadcastAction: true })
 
       // TODO: Replace this with server action
       await axios.post("/api/screens/save", { data: payload, broadcastAction: true })
