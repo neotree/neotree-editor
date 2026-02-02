@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/modal';
 import type { ScriptsSearchResultsItem, } from "@/lib/scripts-search"
 import ucFirst from '@/lib/ucFirst';
@@ -44,6 +45,7 @@ type ReplaceItem = {
     };
     matches: (ScriptsSearchResultsItem['matches'][0] & {
         newValue: string;
+        exclude: boolean;
     })[];
 };
 
@@ -62,6 +64,7 @@ function getReplaceItems({
                 matches: script.matches.map(m => ({
                     ...m,
                     newValue: '',
+                    exclude: false,
                 })),
             });
 
@@ -78,6 +81,7 @@ function getReplaceItems({
                     matches: diagnosis.matches.map(m => ({
                         ...m,
                         newValue: '',
+                        exclude: false,
                     })),
                 });
             });
@@ -95,6 +99,7 @@ function getReplaceItems({
                     matches: screen.matches.map(m => ({
                         ...m,
                         newValue: '',
+                        exclude: false,
                     })),
                 });
             });
@@ -141,31 +146,38 @@ export function SearchAndReplaceModal(props: Props) {
     const [filter, setFilter] = useState(filterOptions[0].value);
     const [searchValue, setSearchValue] = useState(sanitizeSearchValue(searchValueProp));
     const [replaceItems, setReplaceItems] = useState<ReplaceItem[]>([]);
+    const [caseSensitive, setCaseSensitive] = useState(false);
 
     const [replaceWith, setReplaceWith] = useState('');
     const replaceWithDebounced = useDebounce(replaceWith);
     const replaceWithRef = useRef(replaceWithDebounced);
+    const caseSensitiveRef = useRef(caseSensitive);
 
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
     const { isAdmin, isSuperUser, viewOnly, } = useAppContext();
 
     useEffect(() => {
-        if (replaceWithRef.current !== replaceWithDebounced) {
+        if (
+            (replaceWithRef.current !== replaceWithDebounced) ||
+            (caseSensitiveRef.current !== caseSensitive)
+        ) {
             replaceWithRef.current = replaceWithDebounced;
+            caseSensitiveRef.current = caseSensitive;
             setReplaceItems(prev => prev.map(item => {
                 return {
                     ...item,
                     matches: item.matches.map(match => {
                         return {
                             ...match,
-                            newValue: !replaceWithDebounced ? '' : match.fieldValue.replaceAll(searchValue, replaceWithDebounced),
+                            newValue: !replaceWithDebounced ? '' : match.fieldValue.replace(new RegExp(searchValue, caseSensitive ? 'g' : 'gi'), replaceWithDebounced),
+                            exclude: !`${match.fieldValue}`.match(new RegExp(searchValue, caseSensitive ? 'g' : 'gi'))
                         };
                     }),
                 }
             }));
         }
-    }, [searchValue, replaceWithDebounced, replaceItems]);
+    }, [searchValue, replaceWithDebounced, replaceItems, caseSensitive]);
 
     const onModalOpenChange = useCallback(() => {
         setFilter(filterOptions[0].value);
@@ -173,6 +185,7 @@ export function SearchAndReplaceModal(props: Props) {
         setReplaceItems(getReplaceItems(props));
         setReplaceWith('');
         replaceWithRef.current = '';
+        setCaseSensitive(false);
     }, [props]);
 
     const disabled = !replaceItems.length || !replaceWith;
@@ -192,16 +205,22 @@ export function SearchAndReplaceModal(props: Props) {
                     return true;
             }
         }));
-    }, [filter, props]);
+    }, [filter, props, caseSensitive]);
 
     const onSave = useCallback(async () => {
         try {
             setLoading(true);
 
+            const items = replaceItems.map(item => ({
+                ...item,
+                matches: item.matches.filter(m => !m.exclude),
+            }))
+            .filter(item => item.matches.length);
+
             const response = await axios.post("/api/save", { 
                 broadcastAction: true,
 
-                scripts: replaceItems
+                scripts: items
                     .filter(s => s.type === 'script')
                     .map(s => ({
                         scriptId: s.id,
@@ -211,7 +230,7 @@ export function SearchAndReplaceModal(props: Props) {
                         }), {} as Record<string, any>)
                     })),
 
-                screens: replaceItems
+                screens: items
                     .filter(s => s.type === 'screen')
                     .map(s => ({
                         screenId: s.id,
@@ -266,7 +285,7 @@ export function SearchAndReplaceModal(props: Props) {
                         }
                     })),
 
-                diagnoses: replaceItems
+                diagnoses: items
                     .filter(s => s.type === 'diagnosis')
                     .map(s => ({
                         diagnosisId: s.id,
@@ -383,6 +402,21 @@ export function SearchAndReplaceModal(props: Props) {
                                     </Select>
                                 </div>
                             </div>
+
+                            <div className="flex gap-x-2 items-center">
+                                <Checkbox 
+                                    id="caseSensitive"
+                                    name="caseSensitive"
+                                    checked={caseSensitive}
+                                    onCheckedChange={() => {
+                                        const value = !caseSensitive;
+                                        setCaseSensitive(value);
+                                    }}
+                                />
+                                <Label htmlFor="caseSensitive">
+                                    Case sensitive
+                                </Label>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -430,6 +464,10 @@ export function SearchAndReplaceModal(props: Props) {
                     )}
 
                     {replaceItems.map((replaceItem, replaceItemIndex) => {
+                        const matchesLength = replaceItem.matches.filter(m => !m.exclude).length;
+
+                        if (!matchesLength) return null;
+
                         return (
                             <div
                                 className="flex flex-col gap-y-2"
@@ -444,6 +482,8 @@ export function SearchAndReplaceModal(props: Props) {
 
                                 {replaceItem.matches.map((match, matchIndex) => {
                                     const key = replaceItem.id + `_match${matchIndex}`;
+
+                                    if (match.exclude) return null;
 
                                     return (
                                         <Card
@@ -464,7 +504,7 @@ export function SearchAndReplaceModal(props: Props) {
                                                             match.newValue && 'bg-red-400/20 p-1 rounded-sm',
                                                         )}
                                                         dangerouslySetInnerHTML={{
-                                                            __html: match.fieldValue.replaceAll(searchValue, `<mark>${searchValue}</mark>`),
+                                                            __html: match.fieldValue.replace(new RegExp(`(${searchValue})`, caseSensitive ? 'g' : 'gi'), `<mark>$1</mark>`),
                                                         }}
                                                     />
 
