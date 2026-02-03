@@ -109,7 +109,12 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "alias",
   "hospital",
   "release",
+  "app_update_policy",
+  "apk_release",
 ])
+
+// APP UPDATE ENUMS
+export const apkReleaseStatusEnum = pgEnum("apk_release_status", ["uploaded", "validated", "approved", "available", "deprecated", "revoked", "rolled_back"])
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable("nt_mailer_settings", {
@@ -392,6 +397,56 @@ export const devices = pgTable("nt_devices", {
   deletedAt: timestamp("deleted_at"),
 })
 
+// DEVICE UPDATE EVENTS
+export const deviceUpdateEvents = pgTable("nt_device_update_events", {
+  id: serial("id").primaryKey(),
+  eventId: uuid("event_id").notNull().unique().defaultRandom(),
+
+  deviceId: text("device_id").notNull(),
+
+  eventType: text("event_type").notNull(),
+  appVersion: text("app_version"),
+  runtimeVersion: text("runtime_version"),
+  otaUpdateId: text("ota_update_id"),
+  otaChannel: text("ota_channel"),
+  payload: jsonb("payload").default("{}").notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  deviceIndex: index("device_update_events_device_idx").on(table.deviceId),
+  typeIndex: index("device_update_events_type_idx").on(table.eventType),
+}))
+
+// DEVICE APP STATES
+export const deviceAppStates = pgTable("nt_device_app_states", {
+  id: serial("id").primaryKey(),
+
+  deviceId: text("device_id").notNull(),
+
+  appVersion: text("app_version").notNull(),
+  runtimeVersion: text("runtime_version").notNull(),
+
+  otaUpdateId: text("ota_update_id"),
+  otaChannel: text("ota_channel"),
+
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  reportedAt: timestamp("reported_at").defaultNow().notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  deviceUnique: uniqueIndex("device_app_state_unique").on(table.deviceId),
+}))
+
+export const deviceAppStatesRelations = relations(deviceAppStates, ({ one }) => ({
+  apkRelease: one(apkReleases, {
+    fields: [deviceAppStates.apkReleaseId],
+    references: [apkReleases.apkReleaseId],
+  }),
+}))
+
 // FILES
 export const files = pgTable("nt_files", {
   id: serial("id").primaryKey(),
@@ -426,6 +481,139 @@ export const filesChunks = pgTable("nt_files_chunks", {
     .notNull(),
   data: bytea("data").notNull(),
 })
+
+// APK RELEASES
+export const apkReleases = pgTable("nt_apk_releases", {
+  id: serial("id").primaryKey(),
+  apkReleaseId: uuid("apk_release_id").notNull().unique().defaultRandom(),
+  runtimeVersion: text("runtime_version").notNull(),
+  versionName: text("version_name").notNull(),
+  versionCode: integer("version_code").notNull(),
+  status: apkReleaseStatusEnum("status").notNull().default("uploaded"),
+  isAvailable: boolean("is_available").default(false).notNull(),
+
+  fileId: uuid("file_id").references(() => files.fileId, { onDelete: "set null" }),
+  fileSize: integer("file_size"),
+  checksumSha256: text("checksum_sha256"),
+  signatureSha256: text("signature_sha256"),
+
+  validatedAt: timestamp("validated_at"),
+  approvedAt: timestamp("approved_at"),
+
+  releaseNotes: text("release_notes").default(""),
+  releasedAt: timestamp("released_at"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  uniqueVersionPerRuntime: uniqueIndex("apk_release_unique_version").on(table.runtimeVersion, table.versionCode),
+  statusIndex: index("apk_release_status_index").on(table.status),
+}))
+
+export const apkReleasesRelations = relations(apkReleases, ({ one }) => ({
+  file: one(files, {
+    fields: [apkReleases.fileId],
+    references: [files.fileId],
+  }),
+  createdBy: one(users, {
+    fields: [apkReleases.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// APP UPDATE POLICIES
+export const appUpdatePolicies = pgTable("nt_app_update_policies", {
+  id: serial("id").primaryKey(),
+  policyId: uuid("policy_id").notNull().unique().defaultRandom(),
+  runtimeVersion: text("runtime_version").notNull(),
+  policyVersion: integer("policy_version").default(1).notNull(),
+
+  otaEnabled: boolean("ota_enabled").default(true).notNull(),
+  otaChannel: text("ota_channel").default("production").notNull(),
+
+  apkAutoDownload: boolean("apk_auto_download").default(true).notNull(),
+  apkForceInstall: boolean("apk_force_install").default(false).notNull(),
+  apkGracePeriodHours: integer("apk_grace_period_hours"),
+  apkForceAfter: timestamp("apk_force_after"),
+  apkInstallWindow: text("apk_install_window").default("on_restart"),
+
+  apkMessageTitle: text("apk_message_title").default(""),
+  apkMessageBody: text("apk_message_body").default(""),
+
+  currentApkReleaseId: uuid("current_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  rollbackApkReleaseId: uuid("rollback_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+}))
+
+export const appUpdatePoliciesRelations = relations(appUpdatePolicies, ({ one }) => ({
+  currentApkRelease: one(apkReleases, {
+    fields: [appUpdatePolicies.currentApkReleaseId],
+    references: [apkReleases.apkReleaseId],
+    relationName: "currentApkRelease",
+  }),
+  rollbackApkRelease: one(apkReleases, {
+    fields: [appUpdatePolicies.rollbackApkReleaseId],
+    references: [apkReleases.apkReleaseId],
+    relationName: "rollbackApkRelease",
+  }),
+  createdBy: one(users, {
+    fields: [appUpdatePolicies.createdByUserId],
+    references: [users.userId],
+  }),
+}))// APK RELEASES DRAFTS
+export const apkReleasesDrafts = pgTable("nt_apk_releases_drafts", {
+  id: serial("id").primaryKey(),
+  apkReleaseDraftId: uuid("apk_release_draft_id").notNull().unique().defaultRandom(),
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "cascade" }),
+  data: jsonb("data").$type<typeof apkReleases.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+})
+
+export const apkReleasesDraftsRelations = relations(apkReleasesDrafts, ({ one }) => ({
+  apkRelease: one(apkReleases, {
+    fields: [apkReleasesDrafts.apkReleaseId],
+    references: [apkReleases.apkReleaseId],
+  }),
+  createdBy: one(users, {
+    fields: [apkReleasesDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// APP UPDATE POLICIES DRAFTS
+export const appUpdatePoliciesDrafts = pgTable("nt_app_update_policies_drafts", {
+  id: serial("id").primaryKey(),
+  policyDraftId: uuid("policy_draft_id").notNull().unique().defaultRandom(),
+  policyId: uuid("policy_id").references(() => appUpdatePolicies.policyId, { onDelete: "cascade" }),
+  data: jsonb("data").$type<typeof appUpdatePolicies.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+})
+
+export const appUpdatePoliciesDraftsRelations = relations(appUpdatePoliciesDrafts, ({ one }) => ({
+  policy: one(appUpdatePolicies, {
+    fields: [appUpdatePoliciesDrafts.policyId],
+    references: [appUpdatePolicies.policyId],
+  }),
+  createdBy: one(users, {
+    fields: [appUpdatePoliciesDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+
 
 // CONFIG KEYS
 export const configKeys = pgTable(

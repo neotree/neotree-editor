@@ -83,8 +83,8 @@ type EntityFetchConfig = {
 }
 
 type EntityType = SaveChangeLogData["entityType"]
-const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias", "release"]
-const NO_FK_ENTITY_TYPES: EntityType[] = ["release"]
+const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias", "release", "app_update_policy", "apk_release"]
+const NO_FK_ENTITY_TYPES: EntityType[] = ["release", "app_update_policy", "apk_release"]
 const VERSIONED_ENTITY_TYPES = [
   "script",
   "screen",
