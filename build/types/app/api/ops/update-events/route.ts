@@ -1,4 +1,4 @@
-// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\api\ops\update-events\route.ts
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/ops/update-events/route.ts
 import * as entry from '../../../../../../app/api/ops/update-events/route.js'
 import type { NextRequest } from 'next/server.js'
 

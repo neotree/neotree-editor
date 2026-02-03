@@ -1,4 +1,4 @@
-// File: C:\Users\HomePC\Neotree Projects\neotree-editor\app\(dashboard)\data-keys\layout.tsx
+// File: /home/farai/Workbench/Neotree/neotree-editor/app/(dashboard)/data-keys/layout.tsx
 import * as entry from '../../../../../app/(dashboard)/data-keys/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
