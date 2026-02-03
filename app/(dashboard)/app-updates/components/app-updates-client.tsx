@@ -102,7 +102,7 @@ export function AppUpdatesClient({
             <div>
               <div className="text-sm text-muted-foreground">Recommended release flow</div>
               <div className="text-sm">
-                1) Upload APK and save a draft -> 2) Mark it available -> 3) Update policy to point to the release
+                1) Upload APK and save a draft {"->"} 2) Mark it available {"->"} 3) Update policy to point to the release
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
                 {latestPolicyDraft
