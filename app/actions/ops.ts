@@ -16,7 +16,9 @@ import * as hospitalsQueries from "@/databases/queries/hospitals"
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library"
 import * as drugsLibraryQueries from "@/databases/queries/drugs-library"
 import * as dataKeysMutations from "@/databases/mutations/data-keys"
+import * as appUpdatesMutations from "@/databases/mutations/app-updates"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
+import * as appUpdatesQueries from "@/databases/queries/app-updates"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
@@ -79,6 +81,8 @@ export const countAllDrafts = async () => {
     const screens = await scriptsQueries._countScreens()
     const scripts = await scriptsQueries._countScripts()
     const diagnoses = await scriptsQueries._countDiagnoses()
+    const appUpdatePolicies = await appUpdatesQueries._countAppUpdatePolicies()
+    const apkReleases = await appUpdatesQueries._countApkReleases()
 
     return {
       configKeys: configKeys.data.allDrafts,
@@ -88,6 +92,8 @@ export const countAllDrafts = async () => {
       scripts: scripts.data.allDrafts,
       diagnoses: diagnoses.data.allDrafts,
       dataKeys: dataKeys.data.allDrafts,
+      appUpdatePolicies: appUpdatePolicies.data.allDrafts,
+      apkReleases: apkReleases.data.allDrafts,
     }
   } catch (e: any) {
     logger.error("countAllDrafts ERROR", e.message)
@@ -168,6 +174,12 @@ export async function publishData({
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    const publishAppUpdatePolicies = await appUpdatesMutations._publishAppUpdatePolicies({
+      userId,
+    })
+    const publishApkReleases = await appUpdatesMutations._publishApkReleases({
+      userId,
+    })
     const processPendingDeletion = await _processPendingDeletion({
       userId,
       publisherUserId: publisherUserId || undefined,
@@ -206,6 +218,16 @@ export async function publishData({
     if (publishDiagnoses.errors) {
       results.success = false
       results.errors = [...(results.errors || []), ...publishDiagnoses.errors]
+    }
+
+    if (publishAppUpdatePolicies.errors) {
+      results.success = false
+      results.errors = [...(results.errors || []), ...publishAppUpdatePolicies.errors]
+    }
+
+    if (publishApkReleases.errors) {
+      results.success = false
+      results.errors = [...(results.errors || []), ...publishApkReleases.errors]
     }
 
     if (processPendingDeletion.errors) {
