@@ -55,6 +55,7 @@ export function Item<P = {}>({
 
   const screenType = form.getValues("type")
   const screenKeyId = form.getValues("keyId")
+  const rankItems = form.watch('rankItems');
   const screenRefIdDataKey = form.getValues("refIdDataKey")
   const isDiagnosisScreen = screenType === "diagnosis"
   const isProgressScreen = screenType === "progress"
@@ -394,6 +395,19 @@ export function Item<P = {}>({
                         />
                       </div>
                     </div>
+
+                    {isMultiSelectScreen && rankItems && (
+                      <>
+                        <div>
+                          <Label htmlFor="score">Score</Label>
+                          <Input 
+                            {...register("score", { disabled, required: false })} 
+                            name="score" 
+                            type="number"
+                          />
+                        </div>
+                      </>
+                    )}
 
                     {(isMultiSelectScreen || isDiagnosisScreen) && (
                       <>
