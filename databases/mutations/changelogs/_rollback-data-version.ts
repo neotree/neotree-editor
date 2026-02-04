@@ -18,6 +18,12 @@ import {
 } from "@/databases/pg/schema"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
 
+const UUID_LOOSE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuidLike(value: unknown): value is string {
+  return typeof value === "string" && UUID_LOOSE_REGEX.test(value)
+}
+
 export type RollbackDataVersionParams = {
   dataVersion?: number
   userId: string
@@ -310,7 +316,7 @@ export async function _rollbackDataVersion({
   let restoredVersion: number | undefined
 
   try {
-    if (!uuid.validate(userId)) throw new Error("Invalid userId")
+    if (!isUuidLike(userId)) throw new Error("Invalid userId")
 
     await db.transaction(async (tx) => {
       const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(
