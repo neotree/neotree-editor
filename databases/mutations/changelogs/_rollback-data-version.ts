@@ -1,8 +1,8 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm"
 import { createHash } from "crypto"
-import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
+import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
 import {
   aliases,
@@ -17,12 +17,6 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
-
-const UUID_LOOSE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function isUuidLike(value: unknown): value is string {
-  return typeof value === "string" && UUID_LOOSE_REGEX.test(value)
-}
 
 export type RollbackDataVersionParams = {
   dataVersion?: number
