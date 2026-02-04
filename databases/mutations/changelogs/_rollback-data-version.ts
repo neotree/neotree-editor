@@ -1,8 +1,8 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm"
 import { createHash } from "crypto"
-import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
+import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
 import {
   aliases,
@@ -310,7 +310,7 @@ export async function _rollbackDataVersion({
   let restoredVersion: number | undefined
 
   try {
-    if (!uuid.validate(userId)) throw new Error("Invalid userId")
+    if (!isUuidLike(userId)) throw new Error("Invalid userId")
 
     await db.transaction(async (tx) => {
       const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(

@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { changeLogs, users, scripts, screens, diagnoses, configKeys, drugsLibrary, dataKeys, aliases } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { isUuidLike } from "@/lib/uuid";
 
 export type GetChangeLogsParams = {
     changeLogIds?: string[];
@@ -118,7 +119,7 @@ export async function _getChangeLogs(
         // Filter valid UUIDs
         changeLogIds = changeLogIds.filter(id => uuid.validate(id));
         entityIds = entityIds.filter(id => uuid.validate(id));
-        userIds = userIds.filter(id => uuid.validate(id));
+        userIds = userIds.filter(id => isUuidLike(id));
         scriptIds = scriptIds.filter(id => uuid.validate(id));
         screenIds = screenIds.filter(id => uuid.validate(id));
         diagnosisIds = diagnosisIds.filter(id => uuid.validate(id));
