@@ -142,6 +142,12 @@ type DbClient = typeof db
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbOrTransaction = DbClient | TransactionClient
 
+const UUID_LOOSE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuidLike(value: unknown): value is string {
+  return typeof value === "string" && UUID_LOOSE_REGEX.test(value)
+}
+
 function hashToInt32(value: string): number {
   let hash = 0
   for (let i = 0; i < value.length; i++) {
@@ -162,13 +168,13 @@ function computeSnapshotHash(snapshot: any) {
 
 async function resolveUserId(data: SaveChangeLogData) {
   const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""
-  const hasValidUserId = rawUserId && uuid.validate(rawUserId)
+  const hasValidUserId = rawUserId && isUuidLike(rawUserId)
 
   if (!rawUserId || !hasValidUserId) {
     try {
       const authUser = await getAuthenticatedUser()
       const authUserId = authUser?.userId
-      if (authUserId && uuid.validate(authUserId)) {
+      if (authUserId && isUuidLike(authUserId)) {
         logger.error("saveChangeLog warning: invalid or missing userId; using authenticated userId", {
           providedUserId: data.userId,
           authenticatedUserId: authUserId,
@@ -193,7 +199,7 @@ async function resolveUserId(data: SaveChangeLogData) {
 
 function validateEntityAlignment(data: SaveChangeLogData) {
   if (!uuid.validate(data.entityId)) throw new Error("Invalid entityId")
-  if (!uuid.validate(data.userId)) throw new Error("Invalid userId")
+  if (!isUuidLike(data.userId)) throw new Error("Invalid userId")
 
   if (NO_FK_ENTITY_TYPES.includes(data.entityType)) {
     const populatedFks = Object.values(ENTITY_TYPE_TO_FK)
