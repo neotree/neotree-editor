@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { changeLogs } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { isUuidLike } from "@/lib/uuid";
 
 export type CountChangeLogsParams = {
     entityIds?: string[];
@@ -42,7 +43,7 @@ export async function _countChangeLogs(
 
         // Filter valid UUIDs
         entityIds = entityIds.filter(id => uuid.validate(id));
-        userIds = userIds.filter(id => uuid.validate(id));
+        userIds = userIds.filter(id => isUuidLike(id));
         scriptIds = scriptIds.filter(id => uuid.validate(id));
         screenIds = screenIds.filter(id => uuid.validate(id));
         diagnosisIds = diagnosisIds.filter(id => uuid.validate(id));
@@ -153,7 +154,7 @@ export async function _countChangeLogsByAction(
             .where(and(
                 entityId && uuid.validate(entityId) ? eq(changeLogs.entityId, entityId) : undefined,
                 entityType ? eq(changeLogs.entityType, entityType) : undefined,
-                userId && uuid.validate(userId) ? eq(changeLogs.userId, userId) : undefined,
+                userId && isUuidLike(userId) ? eq(changeLogs.userId, userId) : undefined,
                 startDate ? sql`${changeLogs.dateOfChange} >= ${startDate}` : undefined,
                 endDate ? sql`${changeLogs.dateOfChange} <= ${endDate}` : undefined,
             ))

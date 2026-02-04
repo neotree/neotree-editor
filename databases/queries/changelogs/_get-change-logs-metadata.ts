@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { changeLogs, users } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { isUuidLike } from "@/lib/uuid";
 import { sanitizeChangeLogForResponse } from "./_get-change-logs";
 
 export type SearchChangeLogsParams = {
@@ -45,7 +46,7 @@ export async function _searchChangeLogs(
         } = { ...params };
 
         // Filter valid UUIDs
-        userIds = userIds.filter(id => uuid.validate(id));
+        userIds = userIds.filter(id => isUuidLike(id));
 
         const searchConditions = searchTerm
             ? or(
@@ -240,7 +241,7 @@ export async function _searchChangeLogsByUser(
 
         const userCondition = userName
             ? ilike(users.displayName, `%${userName}%`)
-            : userId && uuid.validate(userId)
+            : userId && isUuidLike(userId)
                 ? eq(changeLogs.userId, userId)
                 : undefined;
 

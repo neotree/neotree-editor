@@ -3,6 +3,7 @@ import { createHash } from "crypto"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
+import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
@@ -141,12 +142,6 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
 type DbClient = typeof db
 type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbOrTransaction = DbClient | TransactionClient
-
-const UUID_LOOSE_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function isUuidLike(value: unknown): value is string {
-  return typeof value === "string" && UUID_LOOSE_REGEX.test(value)
-}
 
 function hashToInt32(value: string): number {
   let hash = 0
