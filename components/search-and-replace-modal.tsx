@@ -49,6 +49,11 @@ type ReplaceItem = {
     })[];
 };
 
+function regExpEsc(s: string) {
+    // @ts-ignore
+    return RegExp.escape(s);
+}
+
 function getReplaceItems({
     scriptsSearchResults = [],
 }: Props) {
@@ -170,8 +175,8 @@ export function SearchAndReplaceModal(props: Props) {
                     matches: item.matches.map(match => {
                         return {
                             ...match,
-                            newValue: !replaceWithDebounced ? '' : match.fieldValue.replace(new RegExp(searchValue, caseSensitive ? 'g' : 'gi'), replaceWithDebounced),
-                            exclude: !`${match.fieldValue}`.match(new RegExp(searchValue, caseSensitive ? 'g' : 'gi'))
+                            newValue: !replaceWithDebounced ? '' : match.fieldValue.replace(new RegExp(regExpEsc(searchValue), caseSensitive ? 'g' : 'gi'), replaceWithDebounced),
+                            exclude: !`${match.fieldValue}`.match(new RegExp(regExpEsc(searchValue), caseSensitive ? 'g' : 'gi'))
                         };
                     }),
                 }
@@ -504,7 +509,7 @@ export function SearchAndReplaceModal(props: Props) {
                                                             match.newValue && 'bg-red-400/20 p-1 rounded-sm',
                                                         )}
                                                         dangerouslySetInnerHTML={{
-                                                            __html: match.fieldValue.replace(new RegExp(`(${searchValue})`, caseSensitive ? 'g' : 'gi'), `<mark>$1</mark>`),
+                                                            __html: match.fieldValue.replace(new RegExp(`(${regExpEsc(searchValue)})`, caseSensitive ? 'g' : 'gi'), `<mark>$1</mark>`),
                                                         }}
                                                     />
 
