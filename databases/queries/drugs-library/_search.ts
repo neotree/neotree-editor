@@ -29,7 +29,7 @@ export async function _searchDrugsLibrary({
         const { normalizedValue } = normalizeSearchTerm(rawSearchValue);
         if (!normalizedValue) return { data: [] };
 
-        const pattern = `%${normalizedValue}%`;
+        const pattern = `%${normalizedValue.toLowerCase()}%`;
 
         const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
             where: sql`lower(${schema.drugsLibraryDrafts.data}::text) like ${pattern}`,
