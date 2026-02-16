@@ -1,6 +1,6 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useMemo, useState, useRef } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit, CircleCheck, AlertCircle, X } from "lucide-react";
 import { useQueryState } from 'nuqs';
 
 import { DataTable } from "@/components/data-table";
@@ -30,9 +30,42 @@ export function Fields({
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
+    const [manualOnly, setManualOnly] = useState(false);
+    const [missingManualLabelOnly, setMissingManualLabelOnly] = useState(false);
     const { confirm } = useConfirmModal();
 
     const fields = form.watch('fields');
+    const fieldMeta = useMemo(() => {
+        return fields.map((field) => {
+            const items = field.items || [];
+            const manualItems = items.filter(item => !!item?.enterValueManually);
+            const manualCount = manualItems.length;
+            const hasManual = manualCount > 0;
+            const missingManualLabelCount = manualItems.filter(item => !`${item?.enterValueManuallyLabel || ''}`.trim()).length;
+
+            const searchableParts = [
+                field.type,
+                field.key,
+                field.label,
+                ...manualItems.map(item => `${item.label || ''}`),
+                ...manualItems.map(item => `${item.value || ''}`),
+                ...manualItems.map(item => `${item.enterValueManuallyLabel || ''}`),
+            ];
+
+            return {
+                hasManual,
+                manualCount,
+                missingManualLabelCount,
+                searchableText: searchableParts.join(' ').trim(),
+            };
+        });
+    }, [fields]);
+
+    const manualFieldsCount = useMemo(() => fieldMeta.filter(meta => meta.hasManual).length, [fieldMeta]);
+    const missingLabelFieldsCount = useMemo(
+        () => fieldMeta.filter(meta => meta.missingManualLabelCount > 0).length,
+        [fieldMeta],
+    );
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...fields], oldIndex, newIndex);
@@ -124,10 +157,47 @@ export function Fields({
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
                 search={{
-                    inputPlaceholder: 'Search fields',
+                    inputPlaceholder: 'Search fields, manual labels, or option keys',
+                }}
+                filter={(rowIndex) => {
+                    const meta = fieldMeta[rowIndex];
+                    if (!meta) return true;
+                    if (manualOnly && !meta.hasManual) return false;
+                    if (missingManualLabelOnly && meta.missingManualLabelCount < 1) return false;
+                    return true;
                 }}
                 headerActions={disabled ? undefined : (
                     <>
+                        <Button
+                            variant={manualOnly ? "default" : "outline"}
+                            onClick={() => setManualOnly(prev => !prev)}
+                        >
+                            <CircleCheck className="h-4 w-4 mr-2" />
+                            Manual entry ({manualFieldsCount})
+                        </Button>
+
+                        <Button
+                            variant={missingManualLabelOnly ? "default" : "outline"}
+                            onClick={() => setMissingManualLabelOnly(prev => !prev)}
+                        >
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            Missing label ({missingLabelFieldsCount})
+                        </Button>
+
+                        {(manualOnly || missingManualLabelOnly) && (
+                            <Button
+                                variant="ghost"
+                                className="text-muted-foreground"
+                                onClick={() => {
+                                    setManualOnly(false);
+                                    setMissingManualLabelOnly(false);
+                                }}
+                            >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear filters
+                            </Button>
+                        )}
+
                         <Button 
                             className="text-primary border-primary" 
                             variant="outline"
@@ -147,6 +217,13 @@ export function Fields({
                     },
                     {
                         name: 'Label',
+                    },
+                    {
+                        name: 'Manual Entry',
+                    },
+                    {
+                        name: 'Manual Search',
+                        cellClassName: 'hidden',
                     },
                     {
                         name: 'Action',
@@ -203,10 +280,12 @@ export function Fields({
                         }
                     },
                 ]}
-                data={fields.map(f => [
+                data={fields.map((f, i) => [
                     f.type,
                     f.key,
                     f.label,
+                    fieldMeta[i]?.manualCount ? `${fieldMeta[i].manualCount} option${fieldMeta[i].manualCount > 1 ? 's' : ''}` : 'No',
+                    fieldMeta[i]?.searchableText || '',
                     '',
                 ])}
             />
