@@ -186,7 +186,14 @@ function Form({
 }) {
   const { extractDataKeys } = useDataKeysCtx()
 
-  const { control, register, handleSubmit, setValue, watch } = useForm<Item>({
+  const {
+    control,
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<Item>({
     defaultValues: {
       ...item,
       enterValueManually: item?.enterValueManually || false,
@@ -214,7 +221,13 @@ function Form({
   }, [allItems, item?.itemId])
 
   const onSave = handleSubmit(async (data) => {
-    onChange(data)
+    const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
+    const payload = {
+      ...data,
+      enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
+    }
+    onChange(payload)
+    onClose()
   })
 
   return (
@@ -334,17 +347,24 @@ function Form({
 
             {enterValueManually && (
               <div className="px-4">
-                <Label htmlFor="enterValueManuallyLabel">Manual value label</Label>
+                <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
                 <Input
                   disabled={false}
                   {...register("enterValueManuallyLabel", {
-                    required: true,
+                    validate: (value) => {
+                      if (!enterValueManually) return true
+                      return !!`${value || ""}`.trim() || "Manual value label is required."
+                    },
                     disabled: false,
                   })}
+                  error={!!errors.enterValueManuallyLabel}
                 />
                 <span className="text-xs text-muted-foreground">
                   Shown to users when they need to enter a custom value.
                 </span>
+                {!!errors.enterValueManuallyLabel && (
+                  <span className="text-xs text-destructive">{`${errors.enterValueManuallyLabel.message || ""}`}</span>
+                )}
               </div>
             )}
           </div>
@@ -360,9 +380,7 @@ function Form({
               </Button>
             </SheetClose>
 
-            <SheetClose asChild>
-              <Button onClick={() => onSave()}>Save</Button>
-            </SheetClose>
+            <Button onClick={() => onSave()}>Save</Button>
           </div>
         </SheetContent>
       </Sheet>

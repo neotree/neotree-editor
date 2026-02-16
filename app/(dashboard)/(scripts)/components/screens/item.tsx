@@ -123,6 +123,7 @@ export function Item<P = {}>({
     register,
     handleSubmit,
     setValue,
+    formState: { errors },
   } = useForm({
     defaultValues: getDefaultValues(),
   })
@@ -153,6 +154,12 @@ export function Item<P = {}>({
   }, [items, item?.itemId])
 
   const onSave = handleSubmit(async (data) => {
+    const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
+    data = {
+      ...data,
+      enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
+    }
+
     if (!isEmpty(itemIndex) && item) {
       form.setValue(
         "items",
@@ -470,14 +477,26 @@ export function Item<P = {}>({
 
                         {enterValueManually && (
                           <div>
-                            <Label htmlFor="enterValueManuallyLabel">Manual value label</Label>
+                            <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
                             <Input
-                              {...register("enterValueManuallyLabel", { disabled, required: enterValueManually })}
+                              {...register("enterValueManuallyLabel", {
+                                disabled,
+                                validate: (value) => {
+                                  if (!enterValueManually) return true
+                                  return !!`${value || ""}`.trim() || "Manual value label is required."
+                                },
+                              })}
                               name="enterValueManuallyLabel"
+                              error={!disabled && !!errors.enterValueManuallyLabel}
                             />
                             <span className="text-xs text-muted-foreground">
                               Shown to users when they enter a custom value for this option.
                             </span>
+                            {!!errors.enterValueManuallyLabel && (
+                              <span className="text-xs text-destructive">
+                                {`${errors.enterValueManuallyLabel.message || ""}`}
+                              </span>
+                            )}
                           </div>
                         )}
                       </>
