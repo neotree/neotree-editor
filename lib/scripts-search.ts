@@ -70,7 +70,13 @@ export function parseScriptsSearchResults({
     const escapedSearchValue = escapeRegex(normalizedValue);
     const pattern = isExactMatch ? `^${escapedSearchValue}$` : escapedSearchValue;
     const searchRegex = new RegExp(pattern, isExactMatch ? "" : "i");
-    const manualEntrySearchText = 'manual entry enter value manually custom value other specify';
+    const manualEntrySearchTerms = [
+        'manual entry',
+        'enter value manually',
+        'custom value',
+        'other',
+        'specify',
+    ];
 
     const resultsMap: Record<string, ScriptsSearchResultsItem> = {};
 
@@ -206,7 +212,7 @@ export function parseScriptsSearchResults({
                     });
                 }
 
-                if (f.enterValueManually && manualEntrySearchText.match(searchRegex)) {
+                if (f.enterValueManually && manualEntrySearchTerms.some(term => term.match(searchRegex))) {
                     matches.push({
                         field: 'field_item_manual_entry',
                         fieldIndex: i,
@@ -251,7 +257,7 @@ export function parseScriptsSearchResults({
                 });
             }
 
-            if (f.enterValueManually && manualEntrySearchText.match(searchRegex)) {
+            if (f.enterValueManually && manualEntrySearchTerms.some(term => term.match(searchRegex))) {
                 matches.push({
                     field: 'item_manual_entry',
                     fieldIndex: i,
