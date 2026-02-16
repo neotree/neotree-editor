@@ -1,5 +1,9 @@
-const START_QUOTE_CHARS = ['"', "'", '\u201C', '\u2018']
-const END_QUOTE_CHARS = ['"', "'", '\u201D', '\u2019']
+const QUOTE_PAIRS: Record<string, string> = {
+  '"': '"',
+  "'": "'",
+  "\u201C": "\u201D",
+  "\u2018": "\u2019",
+}
 
 /** Escape user input for safe literal use in RegExp constructors. */
 export function escapeRegex(value: string) {
@@ -16,9 +20,10 @@ export function normalizeSearchTerm(rawValue: string) {
     }
   }
 
-  const startsWithQuote = START_QUOTE_CHARS.includes(trimmedValue[0])
-  const endsWithQuote = END_QUOTE_CHARS.includes(trimmedValue[trimmedValue.length - 1])
-  const wrappedInQuotes = trimmedValue.length > 1 && startsWithQuote && endsWithQuote
+  const startQuote = trimmedValue[0]
+  const endQuote = trimmedValue[trimmedValue.length - 1]
+  const expectedEndQuote = QUOTE_PAIRS[startQuote]
+  const wrappedInQuotes = trimmedValue.length > 1 && !!expectedEndQuote && expectedEndQuote === endQuote
 
   const unquotedValue = wrappedInQuotes ? trimmedValue.slice(1, -1) : trimmedValue
 
