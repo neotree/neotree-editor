@@ -93,6 +93,7 @@ export function Item<P = {}>({
       confidential: item?.confidential || false,
       checked: item?.checked || false,
       enterValueManually: item?.enterValueManually || false,
+      enterValueManuallyLabel: item?.enterValueManuallyLabel || "",
       severity_order: item?.severity_order || "",
       summary: item?.summary || "",
       key: item?.key || "",
@@ -466,6 +467,19 @@ export function Item<P = {}>({
                             Enter value manually if selected
                           </Label>
                         </div>
+
+                        {enterValueManually && (
+                          <div>
+                            <Label htmlFor="enterValueManuallyLabel">Manual value label</Label>
+                            <Input
+                              {...register("enterValueManuallyLabel", { disabled, required: enterValueManually })}
+                              name="enterValueManuallyLabel"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              Shown to users when they enter a custom value for this option.
+                            </span>
+                          </div>
+                        )}
                       </>
                     )}
 
