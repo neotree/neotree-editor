@@ -1,5 +1,5 @@
-const START_QUOTE_CHARS = ['"', '\u201C']
-const END_QUOTE_CHARS = ['"', '\u201D']
+const START_QUOTE_CHARS = ['"', "'", '\u201C', '\u2018']
+const END_QUOTE_CHARS = ['"', "'", '\u201D', '\u2019']
 
 /** Escape user input for safe literal use in RegExp constructors. */
 export function escapeRegex(value: string) {
@@ -23,7 +23,7 @@ export function normalizeSearchTerm(rawValue: string) {
   const unquotedValue = wrappedInQuotes ? trimmedValue.slice(1, -1) : trimmedValue
 
   return {
-    normalizedValue: unquotedValue.trim().toLowerCase(),
+    normalizedValue: wrappedInQuotes ? unquotedValue.trim() : unquotedValue.trim().toLowerCase(),
     isExactMatch: wrappedInQuotes,
   }
 }

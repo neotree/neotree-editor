@@ -79,6 +79,7 @@ export function FieldItems({
             item.label,
             item.exclusive ? "✓" : "✕",
             item.enterValueManually ? "✓" : "✕",
+            item.enterValueManuallyLabel || "",
             item.exclusiveGroup || "",
             item.forbidWith?.length ? `${item.forbidWith.length}` : "",
             "",
@@ -109,6 +110,9 @@ export function FieldItems({
             {
               name: "Enter Value Manually",
               align: "center",
+            },
+            {
+              name: "Manual Value Label",
             },
             {
               name: "Exclusive Group",
@@ -182,10 +186,11 @@ function Form({
 }) {
   const { extractDataKeys } = useDataKeysCtx()
 
-  const { control, register, handleSubmit, setValue } = useForm<Item>({
+  const { control, register, handleSubmit, setValue, watch } = useForm<Item>({
     defaultValues: {
       ...item,
       enterValueManually: item?.enterValueManually || false,
+      enterValueManuallyLabel: item?.enterValueManuallyLabel || "",
       exclusive: item?.exclusive || false,
       exclusiveGroup: item?.exclusiveGroup || "",
       forbidWith: item?.forbidWith || [],
@@ -196,6 +201,7 @@ function Form({
       keyId: item?.keyId,
     },
   })
+  const enterValueManually = watch("enterValueManually")
 
   const forbidOptions = useMemo(() => {
     const currentItemId = item?.itemId
@@ -325,6 +331,22 @@ function Form({
                 )
               }}
             />
+
+            {enterValueManually && (
+              <div className="px-4">
+                <Label htmlFor="enterValueManuallyLabel">Manual value label</Label>
+                <Input
+                  disabled={false}
+                  {...register("enterValueManuallyLabel", {
+                    required: true,
+                    disabled: false,
+                  })}
+                />
+                <span className="text-xs text-muted-foreground">
+                  Shown to users when they need to enter a custom value.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-t-border px-4 py-2 flex gap-x-2 items-center">
