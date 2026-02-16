@@ -151,7 +151,7 @@ export function Fields({
 
             <DataTable 
                 title="Fields"
-                sortable={!disabled}
+                sortable={!disabled && !manualOnly && !missingManualLabelOnly}
                 selectable={!disabled}
                 onSort={onSort}
                 selectedIndexes={selectedIndexes}
