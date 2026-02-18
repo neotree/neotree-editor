@@ -84,7 +84,7 @@ function Form({
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
-    const { authenticatedUser } = useAppContext();
+    const { authenticatedUser, viewOnly } = useAppContext();
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -96,7 +96,7 @@ function Form({
         userId: dataKey?.draftCreatedByUserId,
     });
 
-    disabled = disabled || isLocked;
+    const isReadOnly = !!disabled || isLocked || viewOnly;
 
     const {
         control,
@@ -159,6 +159,8 @@ function Form({
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
     const onSave = handleSubmit(async (data) => {
+        if (isReadOnly) return;
+
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
         const payload = {
@@ -218,7 +220,7 @@ function Form({
         });
     });
 
-    const isFormDisabled = disabled || saving;
+    const isFormDisabled = isReadOnly || saving;
 
     const children = useMemo(() => {
         return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
@@ -326,14 +328,15 @@ function Form({
                                 return (
                                     <div className="mt-4 pt-4 border-t border-t-border">
                                         <DataTable 
-                                            sortable={!disabled}
+                                            sortable={!isReadOnly}
                                             onSort={(oldIndex: number, newIndex: number) => {
+                                                if (isReadOnly) return;
                                                 const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
                                                 onChange(sorted);
                                             }}
                                             search={{}}
                                             title="Options"
-                                            headerActions={(
+                                            headerActions={isReadOnly ? null : (
                                                 <>
                                                     <SelectModal 
                                                         multiple
@@ -384,7 +387,7 @@ function Form({
                                                     cellRenderer({ rowIndex }) {
                                                         const child = value[rowIndex];
 
-                                                        if (!child || disabled) return null;
+                                                        if (!child || isReadOnly) return null;
 
                                                         return (
                                                             <>
@@ -442,7 +445,7 @@ function Form({
                             <Link href="/data-keys">Cancel</Link>
                         </Button>
 
-                        {!disabled && (
+                        {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
                                 disabled={isFormDisabled}
