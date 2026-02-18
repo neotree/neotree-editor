@@ -1,13 +1,11 @@
-import { desc, eq, or } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getDataKeys, DataKey } from '@/databases/queries/data-keys';
-import { _saveScreens } from '@/databases/mutations/scripts';
-import { _getScreens } from '@/databases/queries/scripts';
+import { _getDataKeys } from '@/databases/queries/data-keys';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
@@ -21,7 +19,10 @@ export type SaveDataKeysParams = {
 
 export type SaveDataKeysResponse = { 
     success: boolean; 
-    errors?: string[]; 
+    errors?: string[];
+    info?: {
+        refs?: Awaited<ReturnType<typeof _updateDataKeysRefs>>['info'];
+    };
 };
 
 export async function _saveDataKeys({ 
@@ -57,6 +58,7 @@ export async function _saveDataKeys({
         // }
 
         let index = 0;
+        const previousDataKeys: Array<{ uniqueKey: string; name?: string; label?: string; dataType?: string; }> = [];
         for (const { uuid: dataKeyUuid, isNewUuid, createdAt, publishDate, deletedAt, updatedAt, ...item } of data) {
             try {
                 item.name = `${item.name || ''}`.trim();
@@ -84,6 +86,15 @@ export async function _saveDataKeys({
                             ...draft.data,
                             ...item,
                         };
+
+                        if (data.uniqueKey) {
+                            previousDataKeys.push({
+                                uniqueKey: data.uniqueKey,
+                                name: draft.data?.name,
+                                label: draft.data?.label,
+                                dataType: draft.data?.dataType || undefined,
+                            });
+                        }
                         
                         await db
                             .update(dataKeysDrafts)
@@ -104,6 +115,13 @@ export async function _saveDataKeys({
                             uuid: dataKeyUuid,
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
+
+                        previousDataKeys.push({
+                            uniqueKey: data.uniqueKey,
+                            name: published?.name,
+                            label: published?.label,
+                            dataType: published?.dataType || undefined,
+                        });
 
                         await db.insert(dataKeysDrafts).values({
                             data,
@@ -127,7 +145,16 @@ export async function _saveDataKeys({
         } else {
             if (updateRefs && uniqueKeys.length) {
                 const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
-                await _updateDataKeysRefs({ dataKeys, broadcastAction, userId, });
+                const updateRefsRes = await _updateDataKeysRefs({ dataKeys, previousDataKeys, broadcastAction, userId, });
+                if (updateRefsRes.errors?.length || !updateRefsRes.success) {
+                    response.success = false;
+                    response.errors = updateRefsRes.errors?.length ? updateRefsRes.errors : ['Failed to update related scripts references'];
+                    return response;
+                }
+                response.info = {
+                    ...response.info,
+                    refs: updateRefsRes.info,
+                };
             }
 
             socket.emit('data_changed', 'save_data_keys');
