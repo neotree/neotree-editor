@@ -71,6 +71,9 @@ function useConfigKeysContentHook({
     const { confirm } = useConfirmModal();
 
     useEffect(() => { setConfigKeys(configKeysProp); }, [configKeysProp]);
+    useEffect(() => {
+        if (viewOnly) setSelected([]);
+    }, [viewOnly]);
 
     const onFormOpenChange = useCallback((open: boolean) => {
         if (open && activeItemId) {
@@ -82,6 +85,8 @@ function useConfigKeysContentHook({
     }, [activeItemId]);
 
     const onSave = useCallback(async (data: FormDataType[]) => {
+        if (viewOnly) return false;
+
         setSaving(true);
 
         const res = await saveConfigKeys({ data, broadcastAction: true, });
@@ -106,9 +111,11 @@ function useConfigKeysContentHook({
 
         setSaving(false);
         return true;
-    }, [saveConfigKeys, alert, onFormOpenChange, router]);
+    }, [saveConfigKeys, alert, onFormOpenChange, router, viewOnly]);
 
     const onDelete = useCallback(async (configKeysIds: string[]) => {
+        if (viewOnly) return;
+
         confirm(async () => {
             const _configKeys = { ...configKeys };
             const keysToDelete = configKeys.data.filter(s => s.configKeyId && configKeysIds.includes(s.configKeyId));
@@ -157,9 +164,11 @@ function useConfigKeysContentHook({
             message: 'Are you sure you want to delete config keys?',
             positiveLabel: 'Yes, delete',
         });
-    }, [deleteConfigKeys, confirm, alert, router, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, onFormOpenChange]);
+    }, [deleteConfigKeys, confirm, alert, router, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, onFormOpenChange, viewOnly]);
 
     const onSort = useCallback(async (oldIndex: number, newIndex: number) => {
+        if (viewOnly) return;
+
         const previousPositions = new Map(configKeys.data.map(item => [item.configKeyId!, item.position]));
         const previousState = configKeys;
 
@@ -258,7 +267,7 @@ function useConfigKeysContentHook({
                 }
             }));
         }
-    }, [saveConfigKeys, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName]);
+    }, [saveConfigKeys, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, viewOnly]);
 
     const activeItem = useMemo(() => !activeItemId ? null : configKeys.data.filter(t => t.configKeyId === activeItemId)[0], [activeItemId, configKeys]);
     const disabled = useMemo(() => viewOnly, [viewOnly]);

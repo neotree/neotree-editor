@@ -47,6 +47,7 @@ export function HospitalsTable({
     const { confirm } = useConfirmModal();
 
     const { viewOnly } = useAppContext();
+    const disabled = viewOnly;
 
     const getHospitals = useCallback(async (
         opts?: {
@@ -87,6 +88,8 @@ export function HospitalsTable({
     }, [_getHospitals, searchParams, initialData]);
 
     const onDelete = useCallback((hospitalIds: string[], cb?: () => void) => {
+        if (disabled) return;
+
         const names = hospitals.data.filter(u => hospitalIds.includes(u.hospitalId)).map(u => u.name);
         confirm(() => {
             (async () => {
@@ -117,7 +120,7 @@ export function HospitalsTable({
             positiveLabel: 'Delete',
             danger: true,
         });
-    }, [confirm, deleteHospitals, getHospitals, hospitals]);
+    }, [confirm, deleteHospitals, getHospitals, hospitals, disabled]);
 
     const hospitalForm = (searchParams.parsed.hospitalId || showHospitalForm) ? (
         <HospitalForm 
@@ -132,7 +135,7 @@ export function HospitalsTable({
     return (
         <div className="flex flex-col">
             <DataTable
-                selectable
+                selectable={!disabled}
                 // sortable
                 // onSort={sorted => setHospitals(prev => {
                 //     return {
@@ -144,7 +147,7 @@ export function HospitalsTable({
                 search={{
                     inputPlaceholder: 'Search hospitals',
                 }}
-                headerActions={(
+                headerActions={disabled ? null : (
                     <Button
                         variant="outline"
                         className="w-auto h-auto border-primary text-primary"
