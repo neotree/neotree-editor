@@ -7,6 +7,7 @@ import { RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/loader"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { useAppContext } from "@/contexts/app"
 
 type Props = {
   entityId: string
@@ -18,9 +19,12 @@ type Props = {
 
 export function RollbackButton({ entityId, targetVersion, currentVersion, dataVersion, disabled }: Props) {
   const { alert } = useAlertModal()
+  const { viewOnly } = useAppContext()
   const [loading, setLoading] = useState(false)
 
   const handleRollback = useCallback(async () => {
+    if (viewOnly) return
+
     if (!targetVersion || targetVersion < 1) {
       alert({
         title: "No previous version",
@@ -68,7 +72,7 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
     } finally {
       setLoading(false)
     }
-  }, [alert, currentVersion, dataVersion, entityId, targetVersion])
+  }, [alert, currentVersion, dataVersion, entityId, targetVersion, viewOnly])
 
   return (
     <div className="relative">
@@ -77,7 +81,7 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
         size="sm"
         variant="outline"
         onClick={handleRollback}
-        disabled={disabled || loading}
+        disabled={viewOnly || disabled || loading}
         className="inline-flex items-center gap-2"
       >
         <RotateCcw className="h-4 w-4" />

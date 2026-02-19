@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { CheckCircle } from "lucide-react";
 import moment from "moment";
@@ -67,6 +67,7 @@ export function UsersTable({
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
 
     const { confirm } = useConfirmModal();
+    const disabled = useMemo(() => (mode === 'view'), [mode]);
 
     const getUsers = useCallback(async (
         opts?: {
@@ -110,6 +111,8 @@ export function UsersTable({
     }, [_getUsers, searchParams, initialData]);
 
     const onDelete = useCallback((userIds: string[], cb?: () => void) => {
+        if (disabled) return;
+
         const names = users.data.filter(u => userIds.includes(u.userId)).map(u => u.displayName);
         confirm(() => {
             (async () => {
@@ -137,9 +140,11 @@ export function UsersTable({
             positiveLabel: 'Delete',
             danger: true,
         });
-    }, [confirm, deleteUsers, getUsers, users]);
+    }, [confirm, deleteUsers, getUsers, users, disabled]);
 
     const onResetPasswords = useCallback((usersIds: string[], cb?: () => void) => {
+        if (disabled) return;
+
         const names = users.data.filter(u => usersIds.includes(u.userId)).map(u => u.displayName);
         confirm(() => {
             (async () => {
@@ -169,14 +174,17 @@ export function UsersTable({
             positiveLabel: 'Reset',
             danger: true,
         });
-    }, [confirm, resetUsersPasswords, users]);
+    }, [confirm, resetUsersPasswords, users, disabled]);
 
-    const disabled = useMemo(() => (mode === 'view'), [mode]);
+    useEffect(() => {
+        if (disabled) setSelectedIndexes([]);
+    }, [disabled]);
 
     const bulkEditForm = (
         <BulkEdit 
             roles={roles}
-            open={!!selectedIndexes.length}
+            open={!disabled && !!selectedIndexes.length}
+            disabled={disabled}
             userIds={selectedIndexes.map(i => users.data[i].userId)}
             updateUsers={updateUsers}
             onSaveSuccess={() => getUsers({ page: users.page, })}
@@ -203,6 +211,7 @@ export function UsersTable({
                         <Header 
                             users={users}
                             roles={roles}
+                            disabled={disabled}
                             selected={selectedIndexes.map(i => users.data[i].userId)}
                             onDelete={onDelete}
                             getUsers={getUsers}
@@ -255,6 +264,7 @@ export function UsersTable({
                                         userId={u.userId}
                                         userName={u.displayName}
                                         isActivated={!!u.activationDate}
+                                        disabled={disabled}
                                         onDelete={() => onDelete([u.userId])}
                                         onResetPasswords={() => onResetPasswords([u.userId])}
                                     />
