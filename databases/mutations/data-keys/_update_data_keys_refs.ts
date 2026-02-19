@@ -11,6 +11,7 @@ import { DataKey } from "@/databases/queries/data-keys";
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
     dataKeys: DataKey[];
+    dryRun?: boolean;
     previousDataKeys?: Array<{
         uniqueKey: string;
         name?: string | null;
@@ -37,11 +38,27 @@ type UpdateStats = {
     ambiguousLegacySkips: number;
 };
 
+type AffectedEntity = {
+    id: string;
+    scriptId: string;
+    scriptTitle?: string;
+    title: string;
+    type: 'screen' | 'diagnosis';
+};
+
 export type UpdateDataKeysRefsResponse = {
     errors?: string[];
     success: boolean;
     info?: UpdateStats;
+    affected?: {
+        scripts: { scriptId: string; scriptTitle?: string; }[];
+        screens: AffectedEntity[];
+        diagnoses: AffectedEntity[];
+    };
 };
+
+const SAVE_CHUNK_SIZE = 50;
+const SAVE_RETRY_CONCURRENCY = 5;
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
     if (size <= 0) return [arr];
@@ -67,8 +84,28 @@ function escapeLikePattern(value: string) {
     return value.replace(/[\\%_]/g, '\\$&');
 }
 
+async function mapWithConcurrency<T>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<void>,
+) {
+    const workers = Math.max(1, Math.min(concurrency, items.length || 1));
+    let index = 0;
+
+    async function runWorker() {
+        while (index < items.length) {
+            const current = items[index];
+            index++;
+            await fn(current);
+        }
+    }
+
+    await Promise.all(Array.from({ length: workers }).map(() => runWorker()));
+}
+
 export async function _updateDataKeysRefs({
     dataKeys,
+    dryRun = false,
     previousDataKeys = [],
     broadcastAction,
     userId,
@@ -181,24 +218,63 @@ export async function _updateDataKeysRefs({
             if (source === 'legacyLabel') stats.matchedByLegacyLabel++;
         };
 
-        const searchTokens = Array.from(new Set([
-            ...changedUniqueKeys,
-            ...Array.from(oldNames),
-            ...Array.from(oldLabels),
-            ...dataKeys.map(k => `${k.name || ''}`.trim()).filter(Boolean),
-            ...dataKeys.map(k => `${k.label || ''}`.trim()).filter(Boolean),
-        ]));
-        const likePatterns = searchTokens
+        const oldNamesArr = Array.from(oldNames);
+        const oldLabelsArr = Array.from(oldLabels);
+
+        const keyIdPatterns = changedUniqueKeys
             .filter(Boolean)
-            .slice(0, 100)
-            .map(v => `%${escapeLikePattern(v)}%`);
+            .slice(0, 120)
+            .flatMap(keyId => {
+                const id = escapeLikePattern(keyId);
+                return [
+                    `%\"keyId\":\"${id}\"%`,
+                    `%\"keyId\": \"${id}\"%`,
+                    `%\"keyId\"%\"${id}\"%`,
+                ];
+            });
+        const oldNamePatterns = oldNamesArr
+            .filter(Boolean)
+            .slice(0, 80)
+            .flatMap(name => {
+                const n = escapeLikePattern(name);
+                return [
+                    `%\"key\":\"${n}\"%`,
+                    `%\"key\": \"${n}\"%`,
+                    `%\"key\"%\"${n}\"%`,
+                    `%\"id\":\"${n}\"%`,
+                    `%\"id\": \"${n}\"%`,
+                    `%\"id\"%\"${n}\"%`,
+                    `%\"value\":\"${n}\"%`,
+                    `%\"value\": \"${n}\"%`,
+                    `%\"value\"%\"${n}\"%`,
+                    `%\"refKey\":\"${n}\"%`,
+                    `%\"refKey\": \"${n}\"%`,
+                    `%\"refKey\"%\"${n}\"%`,
+                ];
+            });
+        const oldLabelPatterns = oldLabelsArr
+            .filter(Boolean)
+            .slice(0, 80)
+            .flatMap(label => {
+                const l = escapeLikePattern(label);
+                return [
+                    `%\"label\":\"${l}\"%`,
+                    `%\"label\": \"${l}\"%`,
+                    `%\"label\"%\"${l}\"%`,
+                    `%\"name\":\"${l}\"%`,
+                    `%\"name\": \"${l}\"%`,
+                    `%\"name\"%\"${l}\"%`,
+                ];
+            });
+        const likePatterns = Array.from(new Set([
+            ...keyIdPatterns,
+            ...oldNamePatterns,
+            ...oldLabelPatterns,
+        ])).slice(0, 240);
 
         const candidateScripts = new Set<string>();
 
         if (changedUniqueKeys.length || oldNames.size || oldLabels.size || likePatterns.length) {
-            const oldNamesArr = Array.from(oldNames);
-            const oldLabelsArr = Array.from(oldLabels);
-
             const screensPublishedCandidates = await db
                 .select({ scriptId: screens.scriptId })
                 .from(screens)
@@ -267,13 +343,33 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        if (!candidateScripts.size) {
-            return { success: true, info: stats };
+        const shouldFallbackToFullScan = !candidateScripts.size && (
+            changedUniqueKeys.length > 0 ||
+            oldNamesArr.length > 0 ||
+            oldLabelsArr.length > 0
+        );
+
+        const useFullScan = dryRun || shouldFallbackToFullScan;
+
+        if (!candidateScripts.size && !useFullScan) {
+            return {
+                success: true,
+                info: stats,
+                affected: {
+                    scripts: [],
+                    screens: [],
+                    diagnoses: [],
+                },
+            };
         }
 
-        const scriptsIds = Array.from(candidateScripts);
-        const { data: screensArr, errors: screensGetErrors } = await _getScreens({ scriptsIds });
-        const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses({ scriptsIds });
+        const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
+        const { data: screensArr, errors: screensGetErrors } = await _getScreens(
+            scriptsIds?.length ? { scriptsIds } : undefined
+        );
+        const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses(
+            scriptsIds?.length ? { scriptsIds } : undefined
+        );
 
         const prefetchErrors = [
             ...(screensGetErrors || []),
@@ -481,55 +577,99 @@ export async function _updateDataKeysRefs({
         stats.updatedScreens = screensUpdatedData.length;
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
 
+        const affectedScreens: AffectedEntity[] = screensUpdatedData.map(s => ({
+            id: s.screenId,
+            scriptId: s.scriptId,
+            scriptTitle: s.scriptTitle || undefined,
+            title: s.title || s.label || s.refId || s.screenId,
+            type: 'screen',
+        }));
+        const affectedDiagnoses: AffectedEntity[] = diagnosesUpdatedData.map(d => ({
+            id: d.diagnosisId,
+            scriptId: d.scriptId,
+            scriptTitle: d.scriptTitle || undefined,
+            title: d.name || d.key || d.diagnosisId,
+            type: 'diagnosis',
+        }));
+        const affectedScriptsMap: { [key: string]: { scriptId: string; scriptTitle?: string; }; } = {};
+        [...affectedScreens, ...affectedDiagnoses].forEach(entity => {
+            if (!entity.scriptId) return;
+            if (!affectedScriptsMap[entity.scriptId]) {
+                affectedScriptsMap[entity.scriptId] = {
+                    scriptId: entity.scriptId,
+                    scriptTitle: entity.scriptTitle,
+                };
+            }
+        });
+        const affected = {
+            scripts: Object.values(affectedScriptsMap),
+            screens: affectedScreens,
+            diagnoses: affectedDiagnoses,
+        };
+
+        if (dryRun) {
+            return {
+                success: true,
+                info: stats,
+                affected,
+            };
+        }
+
         const saveErrors: string[] = [];
-        const CHUNK_SIZE = 50;
 
-        for (const chunk of chunkArray(diagnosesUpdatedData, CHUNK_SIZE)) {
-            const res = await _saveDiagnoses({ data: chunk, userId, });
-            if (res.errors?.length) {
-                stats.chunkRetries++;
-                for (const diagnosis of chunk) {
-                    const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, });
-                    if (singleRes.errors?.length) {
-                        saveErrors.push(...singleRes.errors.map(e => `[diagnosis:${diagnosis.diagnosisId}] ${e}`));
-                    } else {
-                        stats.savedDiagnoses++;
-                    }
+        const saveDiagnosesTask = async () => {
+            for (const chunk of chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE)) {
+                const res = await _saveDiagnoses({ data: chunk, userId, });
+                if (res.errors?.length) {
+                    stats.chunkRetries++;
+                    await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (diagnosis) => {
+                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, });
+                        if (singleRes.errors?.length) {
+                            saveErrors.push(...singleRes.errors.map(e => `[diagnosis:${diagnosis.diagnosisId}] ${e}`));
+                        } else {
+                            stats.savedDiagnoses++;
+                        }
+                    });
+                } else {
+                    stats.savedDiagnoses += chunk.length;
                 }
-            } else {
-                stats.savedDiagnoses += chunk.length;
             }
-        }
+        };
 
-        for (const chunk of chunkArray(screensUpdatedData, CHUNK_SIZE)) {
-            const res = await _saveScreens({ data: chunk, userId, });
-            if (res.errors?.length) {
-                stats.chunkRetries++;
-                for (const screen of chunk) {
-                    const singleRes = await _saveScreens({ data: [screen], userId, });
-                    if (singleRes.errors?.length) {
-                        saveErrors.push(...singleRes.errors.map(e => `[screen:${screen.screenId}] ${e}`));
-                    } else {
-                        stats.savedScreens++;
-                    }
+        const saveScreensTask = async () => {
+            for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
+                const res = await _saveScreens({ data: chunk, userId, });
+                if (res.errors?.length) {
+                    stats.chunkRetries++;
+                    await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (screen) => {
+                        const singleRes = await _saveScreens({ data: [screen], userId, });
+                        if (singleRes.errors?.length) {
+                            saveErrors.push(...singleRes.errors.map(e => `[screen:${screen.screenId}] ${e}`));
+                        } else {
+                            stats.savedScreens++;
+                        }
+                    });
+                } else {
+                    stats.savedScreens += chunk.length;
                 }
-            } else {
-                stats.savedScreens += chunk.length;
             }
-        }
+        };
+
+        await Promise.all([saveDiagnosesTask(), saveScreensTask()]);
 
         if (saveErrors.length) {
             return {
                 success: false,
                 errors: saveErrors,
                 info: stats,
+                affected,
             };
         }
 
         const saved = stats.savedDiagnoses + stats.savedScreens;
         if (broadcastAction && saved) socket.emit('data_changed', 'save_scripts');
 
-        return { success: true, info: stats };
+        return { success: true, info: stats, affected };
     } catch(e: any) {
         logger.error('_updateDataKeysRefs ERROR', e.message);
         return {

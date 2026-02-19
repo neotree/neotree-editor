@@ -21,7 +21,7 @@ export type SaveDataKeysResponse = {
     success: boolean; 
     errors?: string[];
     info?: {
-        refs?: Awaited<ReturnType<typeof _updateDataKeysRefs>>['info'];
+        refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
     };
 };
 
@@ -153,7 +153,10 @@ export async function _saveDataKeys({
                 }
                 response.info = {
                     ...response.info,
-                    refs: updateRefsRes.info,
+                    refs: {
+                        info: updateRefsRes.info,
+                        affected: updateRefsRes.affected,
+                    },
                 };
             }
 
