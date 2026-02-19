@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
 import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -37,6 +38,10 @@ import { useIsLocked } from '@/hooks/use-is-locked';
 import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
+import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
+
+type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
 const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
     uuid?: string;
@@ -104,6 +109,7 @@ function Form({
         handleSubmit,
         watch,
         setValue,
+        getValues,
     } = useForm({
         defaultValues: {
             ...dataKey,
@@ -155,8 +161,77 @@ function Form({
 
     const dataType = watch('dataType');
     const options = watch('options');
+    const nameValue = watch('name');
+    const labelValue = watch('label');
+
+    const [previewingImpact, setPreviewingImpact] = useState(false);
+    const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
+    const [impactPreviewStats, setImpactPreviewStats] = useState<UpdateDataKeysRefsResponse['info']>();
+    const [saveImpact, setSaveImpact] = useState<SaveRefsImpact>();
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
+
+    const buildPreviewPayload = useCallback(() => {
+        const values = getValues();
+        return [{
+            uuid: (values as any)?.uuid || dataKey?.uuid || '',
+            uniqueKey: (values as any)?.uniqueKey || dataKey?.uniqueKey || '',
+            name: values.name || '',
+            label: values.label || '',
+            dataType: values.dataType || '',
+            refId: values.refId || '',
+            options: values.options || [],
+            version: typeof values.version === 'string' ? Number(values.version) : values.version,
+        }];
+    }, [getValues, dataKey?.uuid, dataKey?.uniqueKey]);
+
+    const loadImpactPreview = useCallback(async () => {
+        if (!dataKey?.uuid && !dataKey?.uniqueKey) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+            return;
+        }
+
+        try {
+            setPreviewingImpact(true);
+            const response = await axios.post<UpdateDataKeysRefsResponse>('/api/data-keys/refs-preview', {
+                data: buildPreviewPayload(),
+            });
+            setImpactPreview(response.data.affected);
+            setImpactPreviewStats(response.data.info);
+        } catch (e: any) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+        } finally {
+            setPreviewingImpact(false);
+        }
+    }, [dataKey?.uuid, dataKey?.uniqueKey, buildPreviewPayload]);
+
+    useEffect(() => {
+        if (!dataKey) return;
+        const changed = (
+            `${nameValue || ''}` !== `${dataKey.name || ''}` ||
+            `${labelValue || ''}` !== `${dataKey.label || ''}` ||
+            `${dataType || ''}` !== `${dataKey.dataType || ''}`
+        );
+        if (!changed) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            loadImpactPreview();
+        }, 350);
+
+        return () => clearTimeout(timeout);
+    }, [
+        dataKey,
+        nameValue,
+        labelValue,
+        dataType,
+        loadImpactPreview,
+    ]);
 
     const onSave = handleSubmit(async (data) => {
         if (isReadOnly) return;
@@ -215,9 +290,10 @@ function Form({
             await changeTrackerRef.current.trackChanges(trackablePayload, "Data key saved");
         }
 
-        await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }], (err) => {
-            if (!err) window.location.href = "/data-keys";
-        });
+        const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+        if (res && 'info' in res) {
+            setSaveImpact(res.info?.refs);
+        }
     });
 
     const isFormDisabled = isReadOnly || saving;
@@ -227,6 +303,54 @@ function Form({
     }, [dataKeys, options]);
 
     const displayLoader = loadingDataKeys || saving;
+
+    const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
+        if (!affected) return null;
+
+        return (
+            <div className="space-y-3">
+                <DataTable
+                    title={`Scripts (${affected.scripts.length})`}
+                    columns={[
+                        { name: 'Script title' },
+                        { name: 'Script ID' },
+                    ]}
+                    data={affected.scripts.map(s => [
+                        s.scriptTitle || '',
+                        s.scriptId || '',
+                    ])}
+                />
+
+                <DataTable
+                    title={`Screens (${affected.screens.length})`}
+                    columns={[
+                        { name: 'Screen title' },
+                        { name: 'Script title' },
+                        { name: 'Screen ID' },
+                    ]}
+                    data={affected.screens.map(s => [
+                        s.title || '',
+                        s.scriptTitle || '',
+                        s.id || '',
+                    ])}
+                />
+
+                <DataTable
+                    title={`Diagnoses (${affected.diagnoses.length})`}
+                    columns={[
+                        { name: 'Diagnosis name' },
+                        { name: 'Script title' },
+                        { name: 'Diagnosis ID' },
+                    ]}
+                    data={affected.diagnoses.map(d => [
+                        d.title || '',
+                        d.scriptTitle || '',
+                        d.id || '',
+                    ])}
+                />
+            </div>
+        );
+    }, []);
 
 
     return (
@@ -434,6 +558,61 @@ function Form({
                     </div>
 
                     <br />
+
+                    <div className="px-4 space-y-4">
+                        {(!!dataKey || !!saveImpact?.affected) && (
+                            <div className="rounded-md border border-border p-3 space-y-3">
+                                <div className="flex items-center justify-between gap-x-2">
+                                    <div className="font-medium">Affected entities</div>
+                                    {!!dataKey && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={previewingImpact || isFormDisabled}
+                                            onClick={() => loadImpactPreview()}
+                                        >
+                                            {previewingImpact ? 'Refreshing...' : 'Refresh Preview'}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {!!impactPreview && (
+                                    <>
+                                        <div className="text-sm">
+                                            Before update: {(impactPreview.scripts?.length || 0)} scripts, {(impactPreview.screens?.length || 0)} screens, {(impactPreview.diagnoses?.length || 0)} diagnoses
+                                        </div>
+                                        {renderAffectedTables(impactPreview)}
+                                    </>
+                                )}
+                                {!impactPreview && !!dataKey && !previewingImpact && (
+                                    <div className="text-sm text-muted-foreground">
+                                        No pending impact preview yet. Change key, label, or type to load preview.
+                                    </div>
+                                )}
+
+                                {!!saveImpact?.affected && (
+                                    <>
+                                        <div className="text-sm">
+                                            After update: {(saveImpact.affected.scripts?.length || 0)} scripts, {(saveImpact.affected.screens?.length || 0)} screens, {(saveImpact.affected.diagnoses?.length || 0)} diagnoses
+                                        </div>
+                                        {renderAffectedTables(saveImpact.affected)}
+                                    </>
+                                )}
+
+                                {!!impactPreviewStats && (
+                                    <div className="text-xs text-muted-foreground">
+                                        Preview matching: {impactPreviewStats.matchedByUniqueKey} key-id, {impactPreviewStats.matchedByLegacyName} legacy-name, {impactPreviewStats.matchedByLegacyLabel} legacy-label, {impactPreviewStats.ambiguousLegacySkips} ambiguous skipped
+                                    </div>
+                                )}
+
+                                {!!saveImpact?.info && (
+                                    <div className="text-xs text-muted-foreground">
+                                        Save matching: {saveImpact.info.matchedByUniqueKey} key-id, {saveImpact.info.matchedByLegacyName} legacy-name, {saveImpact.info.matchedByLegacyLabel} legacy-label, {saveImpact.info.ambiguousLegacySkips} ambiguous skipped
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     <CardFooter className="gap-x-2">
                         <div className="ml-auto" />
