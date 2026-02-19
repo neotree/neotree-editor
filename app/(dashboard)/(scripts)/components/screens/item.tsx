@@ -132,6 +132,7 @@ export function Item<P = {}>({
   const type = watch("type")
   const label = watch("label")
   const key = watch("key")
+  const enterValueManually = watch("enterValueManually")
   const confidential = watch("confidential")
   const exclusive = watch("exclusive")
   const checked = watch("checked")
