@@ -117,7 +117,10 @@ export type tDataKeysCtx = {
     itemsPerPage: number;
     setCurrentPage: (page: number) => void;
     setSearchValue: (value: string) => void;
-    saveDataKeys: (data: DataKeyFormData[], cb?: ((error?: string) => void)) => Promise<void>;
+    saveDataKeys: (
+        data: DataKeyFormData[],
+        cb?: ((error?: string) => void)
+    ) => Promise<Awaited<ReturnType<typeof actions.saveDataKeys>>>;
     deleteDataKeys: (data: string[]) => Promise<void>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
@@ -305,6 +308,7 @@ export function DataKeysCtxProvider({
                     message: res.errors.join(', '),
                     variant: 'error',
                 });
+                return res;
             } else {
                 await loadDataKeys();
                 router.refresh();
@@ -313,6 +317,7 @@ export function DataKeysCtxProvider({
                     variant: 'success',
                     onClose: () => cb?.(),
                 });
+                return res;
             }
         } catch(e: any) {
             alert({
@@ -320,6 +325,7 @@ export function DataKeysCtxProvider({
                 message: 'Failed to save data key: ' + e.message,
                 onClose: () => cb?.(e.message),
             });
+            return { success: false, errors: [e.message], };
         } finally {
             setSaving(false);
         }
