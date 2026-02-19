@@ -26,6 +26,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { validEmailRegex } from "@/constants/email";
+import { useAppContext } from "@/contexts/app";
 
 type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
@@ -40,6 +41,7 @@ export function UserForm({
 }: Props) {
     const { alert } = useAlertModal();
     const router = useRouter();
+    const { viewOnly } = useAppContext();
 
     const [loading, setLoading] = useState(false);
     const [showEmailInput, setShowEmailInput] = useState(!user);
@@ -65,6 +67,8 @@ export function UserForm({
     });
 
     const onSave = handleSubmit(data => {
+        if (viewOnly) return;
+
         (async () => {
             try {
                 setLoading(true);
@@ -116,7 +120,7 @@ export function UserForm({
                         value={role}
                         required
                         name="role"
-                        disabled={loading}
+                        disabled={loading || viewOnly}
                         onValueChange={value => {
                             setValue('role', value as typeof role);
                         }}
@@ -148,7 +152,7 @@ export function UserForm({
                                     className={cn(errors.email ? 'border-danger ring-danger focus-visible:ring-danger' : '')}
                                     {...register('email', { 
                                         required: true, 
-                                        disabled: loading, 
+                                        disabled: loading || viewOnly, 
                                         pattern: {
                                             value: validEmailRegex,
                                             message: "Incorrect email format",
@@ -171,7 +175,7 @@ export function UserForm({
                 <div>
                     <Label htmlFor="displayName">Display name</Label>
                     <Input 
-                        {...register('displayName', { required: true, disabled: loading, })}
+                        {...register('displayName', { required: true, disabled: loading || viewOnly, })}
                         placeholder="Display name"
                     />
                 </div>
@@ -179,7 +183,7 @@ export function UserForm({
                 <div>
                     <Label htmlFor="firstName">First name</Label>
                     <Input 
-                        {...register('firstName', { required: false, disabled: loading, })}
+                        {...register('firstName', { required: false, disabled: loading || viewOnly, })}
                         placeholder="First name"
                     />
                 </div>
@@ -187,7 +191,7 @@ export function UserForm({
                 <div>
                     <Label htmlFor="lastName">Last name</Label>
                     <Input 
-                        {...register('lastName', { required: false, disabled: loading, })}
+                        {...register('lastName', { required: false, disabled: loading || viewOnly, })}
                         placeholder="Last name"
                     />
                 </div>
@@ -203,11 +207,14 @@ export function UserForm({
                     </Link>
                 </Button>
 
-                <Button
-                    onClick={onSave}
-                >
-                    Save
-                </Button>
+                {!viewOnly && (
+                    <Button
+                        onClick={onSave}
+                        disabled={loading || viewOnly}
+                    >
+                        Save
+                    </Button>
+                )}
             </div>
         </>
     )
