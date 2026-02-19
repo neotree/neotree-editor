@@ -102,6 +102,8 @@ function FormComponent({ formData }: Props) {
     }, [formData, reset, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const onSubmit = handleSubmit(async data => {
+        if (disabled) return;
+
         const payload: FormDataType = {
             ...data,
             configKeyId: data.configKeyId || formData?.configKeyId || v4(),
@@ -177,11 +179,14 @@ function FormComponent({ formData }: Props) {
                         </Button>
                     </SheetClose>
 
-                    <Button
-                        onClick={() => onSubmit()}
-                    >
-                        Save
-                    </Button>
+                    {!disabled && (
+                        <Button
+                            onClick={() => onSubmit()}
+                            disabled={disabled}
+                        >
+                            Save
+                        </Button>
+                    )}
                 </SheetFooter>
             </SheetContent>
         </>

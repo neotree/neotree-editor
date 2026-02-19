@@ -47,6 +47,7 @@ import {
 import { resolveEntityTitle } from "@/lib/changelog-utils"
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { useAppContext } from "@/contexts/app"
 
 type Props = UseChangelogsTableParams & { isSuperUser: boolean }
 
@@ -155,6 +156,7 @@ export function ChangelogsTable(props: Props) {
   } = useChangelogsTable(props)
 
   const { isSuperUser } = props
+  const { viewOnly } = useAppContext()
 
   const router = useRouter()
   const { alert } = useAlertModal()
@@ -168,6 +170,13 @@ export function ChangelogsTable(props: Props) {
       loadVersionDetails(pendingRollbackEntry.dataVersion)
     }
   }, [loadVersionDetails, pendingRollbackEntry])
+
+  useEffect(() => {
+    if (!viewOnly) return
+    setPendingRollbackEntry(null)
+    setShowEntityDetails(false)
+    setSoftDeleteCreated(false)
+  }, [viewOnly])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -227,6 +236,7 @@ export function ChangelogsTable(props: Props) {
   }
 
   const handleRollbackDataVersion = async (dataVersion: number) => {
+    if (viewOnly) return
     if (dataVersion < 2) return
 
     try {
@@ -459,7 +469,7 @@ export function ChangelogsTable(props: Props) {
                             >
                               View details
                             </DropdownMenuItem>
-                            {isSuperUser && entry.isLatestVersion && entry.dataVersion > 1 && (
+                            {isSuperUser && !viewOnly && entry.isLatestVersion && entry.dataVersion > 1 && (
                               <DropdownMenuItem
                                 disabled={rollbacking === entry.dataVersion}
                                 onClick={() => setPendingRollbackEntry(entry)}
@@ -515,7 +525,7 @@ export function ChangelogsTable(props: Props) {
       </div>
 
       <AlertDialog
-        open={pendingRollbackEntry !== null}
+        open={!viewOnly && pendingRollbackEntry !== null}
         onOpenChange={(open) => {
           if (!open) {
             setPendingRollbackEntry(null)
@@ -571,7 +581,7 @@ export function ChangelogsTable(props: Props) {
                           checked={softDeleteCreated}
                           onChange={(event) => setSoftDeleteCreated(event.target.checked)}
                           className="rounded"
-                          disabled={rollbacking !== null}
+                          disabled={viewOnly || rollbacking !== null}
                         />
                         <span>Soft delete items created in this release</span>
                       </label>
@@ -591,7 +601,7 @@ export function ChangelogsTable(props: Props) {
             <AlertDialogCancel onClick={() => setPendingRollbackEntry(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-orange-600 hover:bg-orange-700 text-white"
-              disabled={rollbacking !== null}
+              disabled={viewOnly || rollbacking !== null}
               onClick={() => {
                 if (pendingRollbackEntry !== null) {
                   handleRollbackDataVersion(pendingRollbackEntry.dataVersion)

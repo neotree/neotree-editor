@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function Content({ _updateSys }: Props) {
-    const { sys, updateSys } = useAppContext();
+    const { sys, updateSys, viewOnly } = useAppContext();
 
     const [form, setForm] = useState(sys.data);
     const [loading, setLoading] = useState(false);
@@ -28,6 +28,8 @@ export function Content({ _updateSys }: Props) {
     const { confirm } = useConfirmModal();
     
     const onSave = useCallback(async () => {
+        if (viewOnly) return;
+
         try {
             setLoading(true);
 
@@ -50,7 +52,7 @@ export function Content({ _updateSys }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [updateSys, alert, router, form]);
+    }, [updateSys, alert, router, form, viewOnly]);
 
     const isDirty = useMemo(() => JSON.stringify(sys) !== JSON.stringify(form), [sys, form]);
 
@@ -72,6 +74,7 @@ export function Content({ _updateSys }: Props) {
                             <Switch
                                 id={key}
                                 checked={checked}
+                                disabled={viewOnly || loading}
                                 onCheckedChange={checked => setForm(prev => ({
                                     ...prev,
                                     [key]: checked ? 'yes' : 'no',
@@ -86,17 +89,19 @@ export function Content({ _updateSys }: Props) {
                 <div className="flex gap-x-4">
                     <div className="flex-1" />
 
-                    <Button
-                        disabled={!isDirty}
-                        onClick={() => confirm(onSave, {
-                            title: 'Update system',
-                            message: 'Are you sure? These changes will affect everyone!',
-                            danger: true,
-                            positiveLabel: 'Save',
-                        })}
-                    >
-                        Save
-                    </Button>
+                    {!viewOnly && (
+                        <Button
+                            disabled={!isDirty || loading || viewOnly}
+                            onClick={() => confirm(onSave, {
+                                title: 'Update system',
+                                message: 'Are you sure? These changes will affect everyone!',
+                                danger: true,
+                                positiveLabel: 'Save',
+                            })}
+                        >
+                            Save
+                        </Button>
+                    )}
                 </div>
             </div>
         </>

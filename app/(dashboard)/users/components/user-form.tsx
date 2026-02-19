@@ -34,6 +34,7 @@ import { Loader } from "@/components/loader";
 import { useEffectOnce } from '@/hooks/use-effect-once';
 import { cn } from "@/lib/utils";
 import { validEmailRegex } from "@/constants/email";
+import { useAppContext } from "@/contexts/app";
 
 type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
@@ -61,6 +62,7 @@ export function UserForm({
 }: Props) {
     const { alert } = useAlertModal();
     const { parsed, replace: searchParamsReplace } = useSearchParams();
+    const { viewOnly } = useAppContext();
 
     const updateUserId = userId || parsed.userId;
 
@@ -120,6 +122,8 @@ export function UserForm({
     useEffectOnce(load);
 
     const onSave = handleSubmit(data => {
+        if (viewOnly) return;
+
         (async () => {
             try {
                 setSubmitting(true);
@@ -200,7 +204,7 @@ export function UserForm({
                                 value={role}
                                 required
                                 name="role"
-                                disabled={submitting}
+                                disabled={submitting || viewOnly}
                                 onValueChange={value => {
                                     setValue('role', value as typeof role);
                                 }}
@@ -232,7 +236,7 @@ export function UserForm({
                                             className={cn(errors.email ? 'border-danger ring-danger focus-visible:ring-danger' : '')}
                                             {...register('email', { 
                                                 required: true, 
-                                                disabled: submitting, 
+                                                disabled: submitting || viewOnly, 
                                                 pattern: {
                                                     value: validEmailRegex,
                                                     message: "Incorrect email format",
@@ -255,7 +259,7 @@ export function UserForm({
                         <div>
                             <Label htmlFor="displayName">Display name</Label>
                             <Input 
-                                {...register('displayName', { required: true, disabled: submitting, })}
+                                {...register('displayName', { required: true, disabled: submitting || viewOnly, })}
                                 placeholder="Display name"
                             />
                         </div>
@@ -263,7 +267,7 @@ export function UserForm({
                         <div>
                             <Label htmlFor="firstName">First name</Label>
                             <Input 
-                                {...register('firstName', { required: false, disabled: submitting, })}
+                                {...register('firstName', { required: false, disabled: submitting || viewOnly, })}
                                 placeholder="First name"
                             />
                         </div>
@@ -271,7 +275,7 @@ export function UserForm({
                         <div>
                             <Label htmlFor="lastName">Last name</Label>
                             <Input 
-                                {...register('lastName', { required: false, disabled: submitting, })}
+                                {...register('lastName', { required: false, disabled: submitting || viewOnly, })}
                                 placeholder="Last name"
                             />
                         </div>
@@ -286,11 +290,14 @@ export function UserForm({
                             </Button>
                         </SheetClose>
 
-                        <Button
-                            onClick={onSave}
-                        >
-                            Save
-                        </Button>
+                        {!viewOnly && (
+                            <Button
+                                onClick={onSave}
+                                disabled={submitting || viewOnly}
+                            >
+                                Save
+                            </Button>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>
