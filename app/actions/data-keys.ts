@@ -1,7 +1,7 @@
 'use server';
 
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
-import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, } from '@/databases/mutations/data-keys';
+import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
@@ -22,6 +22,16 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
 export const saveDataKeysIfNotExist = _saveDataKeysIfNotExist;
 
 export const saveDataKeysUpdateIfExist = _saveDataKeysUpdateIfExist;
+
+export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = async params => {
+    try {
+        await isAllowed();
+        return await _previewDataKeysRefsImpact(params);
+    } catch (e: any) {
+        logger.error('previewDataKeysRefsImpact ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+}
 
 export const getDataKeys = async (params?: GetDataKeysParams) => {
     const res = await _getDataKeys(params);

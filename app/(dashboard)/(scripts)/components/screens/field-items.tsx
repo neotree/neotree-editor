@@ -191,8 +191,6 @@ function Form({
     register,
     handleSubmit,
     setValue,
-    watch,
-    formState: { errors },
   } = useForm<Item>({
     defaultValues: {
       ...item,
@@ -208,7 +206,6 @@ function Form({
       keyId: item?.keyId,
     },
   })
-  const enterValueManually = watch("enterValueManually")
 
   const forbidOptions = useMemo(() => {
     const currentItemId = item?.itemId
@@ -345,28 +342,6 @@ function Form({
               }}
             />
 
-            {enterValueManually && (
-              <div className="px-4">
-                <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
-                <Input
-                  disabled={false}
-                  {...register("enterValueManuallyLabel", {
-                    validate: (value) => {
-                      if (!enterValueManually) return true
-                      return !!`${value || ""}`.trim() || "Manual value label is required."
-                    },
-                    disabled: false,
-                  })}
-                  error={!!errors.enterValueManuallyLabel}
-                />
-                <span className="text-xs text-muted-foreground">
-                  Shown to users when they need to enter a custom value.
-                </span>
-                {!!errors.enterValueManuallyLabel && (
-                  <span className="text-xs text-destructive">{`${errors.enterValueManuallyLabel.message || ""}`}</span>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="border-t border-t-border px-4 py-2 flex gap-x-2 items-center">

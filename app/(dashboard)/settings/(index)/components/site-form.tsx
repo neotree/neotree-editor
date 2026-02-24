@@ -21,11 +21,11 @@ import { getSites } from "@/app/actions/sites";
 import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
-import { Separator } from "@/components/ui/separator";
 import { Modal } from "@/components/modal";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Input, } from "@/components/ui/input";
 import { Label, } from "@/components/ui/label";
+import { useAppContext } from "@/contexts/app";
 
 type Props = typeof sitesActions & {
     sites: Awaited<ReturnType<typeof getSites>>['data'];
@@ -39,6 +39,7 @@ export function SiteForm({ sites, saveSites }: Props) {
     const site = useMemo(() => sites.filter(s => s.siteId === searchParamsObj.editSiteId)[0], [sites, searchParamsObj.editSiteId]);
 
     const [saving, setSaving] = useState(false);
+    const { viewOnly } = useAppContext();
 
     const {
         watch,
@@ -68,6 +69,8 @@ export function SiteForm({ sites, saveSites }: Props) {
     }, [searchParamsObj, router.push]);
 
     const onSave = handleSubmit(async (data) => {
+        if (viewOnly) return;
+
         try {
             setSaving(true);
 
@@ -134,21 +137,23 @@ export function SiteForm({ sites, saveSites }: Props) {
                         <div className="flex-1" />
 
                         <DialogClose asChild>
-                            <Button
-                                variant="ghost"
-                                disabled={saving}
+                        <Button
+                            variant="ghost"
+                            disabled={saving}
                                 onClick={() => onCloseEditModal()}
                             >
                                 Cancel
                             </Button>
                         </DialogClose>
 
-                        <Button
-                            onClick={() => onSave()}
-                            disabled={saving}
-                        >
-                            Save
-                        </Button>
+                        {!viewOnly && (
+                            <Button
+                                onClick={() => onSave()}
+                                disabled={saving || viewOnly}
+                            >
+                                Save
+                            </Button>
+                        )}
                     </>
                 )}
             >
@@ -158,7 +163,7 @@ export function SiteForm({ sites, saveSites }: Props) {
                             <Label htmlFor="type">Type *</Label>
                             <Select
                                 value={type || ''}
-                                disabled={saving}
+                                disabled={saving || viewOnly}
                                 name="type"
                                 onValueChange={(v: typeof type) => {
                                     setValue('type', v);
@@ -180,7 +185,7 @@ export function SiteForm({ sites, saveSites }: Props) {
                             <Label htmlFor="env">Environment *</Label>
                             <Select
                                 value={env || ''}
-                                disabled={saving}
+                                disabled={saving || viewOnly}
                                 name="env"
                                 onValueChange={(v: typeof env) => {
                                     setValue('env', v);
@@ -204,7 +209,7 @@ export function SiteForm({ sites, saveSites }: Props) {
                     <div>
                         <Label htmlFor="name">Name *</Label>
                         <Input 
-                            {...register('name', { disabled: saving, required: true, })}
+                            {...register('name', { disabled: saving || viewOnly, required: true, })}
                             placeholder="Site name"
                         />
                     </div>
@@ -212,7 +217,7 @@ export function SiteForm({ sites, saveSites }: Props) {
                     <div>
                         <Label htmlFor="link">Link *</Label>
                         <Input 
-                            {...register('link', { disabled: saving, required: true, })}
+                            {...register('link', { disabled: saving || viewOnly, required: true, })}
                             placeholder="Site link"
                         />
                     </div>

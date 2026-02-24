@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Separator } from "@/components/ui/separator";
 import { SiteForm } from "./site-form";
+import { useAppContext } from "@/contexts/app";
 
 type Props = typeof sitesActions & {
     sites: Awaited<ReturnType<typeof sitesActions.getSites>>;
@@ -23,6 +24,7 @@ type Props = typeof sitesActions & {
 
 export function Sites(props: Props) {
     const { sites } = props;
+    const { viewOnly } = useAppContext();
 
     const searchParams = useSearchParams();
     const editSiteId = searchParams.get('editSiteId');
@@ -30,6 +32,8 @@ export function Sites(props: Props) {
     const { confirm } = useConfirmModal();
 
     const onDelete = (ids: string[]) => {
+        if (viewOnly) return;
+
         const data = sites.data.filter(s => ids.includes(s.siteId));
         confirm(() => {}, {
             danger: true,
@@ -85,11 +89,12 @@ export function Sites(props: Props) {
                                             >
                                                 <Link href={`/settings?editSiteId=${site.siteId}`}>
                                                     <Edit className="mr-2 h-4 w-4" />
-                                                    Edit
+                                                    {viewOnly ? "View" : "Edit"}
                                                 </Link>
                                             </DropdownMenuItem>
 
                                             <DropdownMenuItem
+                                                disabled={viewOnly}
                                                 onClick={() => onDelete([site.siteId])}
                                                 className="text-danger focus:bg-danger focus:text-danger-foreground"
                                             >

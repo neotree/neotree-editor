@@ -32,6 +32,7 @@ type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
 export function BulkEdit({ 
     open, 
+    disabled,
     userIds, 
     roles, 
     onOpenChange, 
@@ -39,6 +40,7 @@ export function BulkEdit({
     onSaveSuccess,
 }: {
     open?: boolean;
+    disabled?: boolean;
     userIds: string[];
     roles: Awaited<ReturnType<typeof getRoles>>;
     updateUsers: typeof updateUsersAction;
@@ -46,7 +48,7 @@ export function BulkEdit({
     onSaveSuccess?: () => Promise<any>;
 }) {
     const { alert } = useAlertModal();
-    const { parsed, replace: searchParamsReplace } = useSearchParams();
+    const { replace: searchParamsReplace } = useSearchParams();
 
     const [submitting, setSubmitting] = useState(false);
 
@@ -66,6 +68,8 @@ export function BulkEdit({
     }, [onOpenChange, searchParamsReplace, setValue]);
 
     const onSave = handleSubmit(data => {
+        if (disabled) return;
+
         (async () => {
             try {
                 setSubmitting(true);
@@ -126,7 +130,7 @@ export function BulkEdit({
                                 value={role}
                                 required
                                 name="role"
-                                disabled={submitting}
+                                disabled={submitting || !!disabled}
                                 onValueChange={value => {
                                     setValue('role', value as typeof role);
                                 }}
@@ -159,7 +163,7 @@ export function BulkEdit({
 
                         <Button
                             onClick={onSave}
-                            disabled={!role}
+                            disabled={!!disabled || !role}
                         >
                             Save
                         </Button>

@@ -21,6 +21,7 @@ import {
 type Props = {
     users: Awaited<ReturnType<typeof getUsers>>;
     roles: Awaited<ReturnType<typeof getRoles>>;
+    disabled?: boolean;
     selected: string[];
     onDelete: (ids: string[], cb?: () => void) => void;
     searchUsers: typeof searchUsers;
@@ -38,6 +39,7 @@ const statuses = [
 export function Header({ 
     selected, 
     roles, 
+    disabled,
     getUsers, 
     onDelete, 
     searchUsers, 
@@ -107,18 +109,20 @@ export function Header({
                 </Select>
             </div>
 
-            <div>
-                <Button
-                    variant="outline"
-                    className="w-auto h-auto border-primary text-primary"
-                    asChild
-                >
-                    <Link href="/users/add">
-                        <Plus className="w-4 h-4 mr-1" />
-                        New User
-                    </Link>
-                </Button>
-            </div>
+            {!disabled && (
+                <div>
+                    <Button
+                        variant="outline"
+                        className="w-auto h-auto border-primary text-primary"
+                        asChild
+                    >
+                        <Link href="/users/add">
+                            <Plus className="w-4 h-4 mr-1" />
+                            New User
+                        </Link>
+                    </Button>
+                </div>
+            )}
         </>
     );
 }
