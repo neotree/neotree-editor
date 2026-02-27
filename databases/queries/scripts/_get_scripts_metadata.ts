@@ -2,7 +2,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
-import { ScriptField, ScriptItem } from "@/types";
+import { ScriptField, ScriptImage, ScriptItem } from "@/types";
 import * as uuid from "uuid";
 
 export type GetScriptsMetadataParams = {
@@ -22,6 +22,36 @@ export type GetScriptsMetadataResponse = {
             title: string;
             ref: string;
             condition?: typeof screens.$inferSelect['condition'];
+            skipToCondition?: typeof screens.$inferSelect['skipToCondition'];
+            skipToScreen?: {
+                screenId: string;
+                position: number | null;
+            } | null;
+            managementMetadata?: {
+                actionText: string;
+                contentText: string;
+                infoText: string;
+                title: string;
+                title1: string;
+                title2: string;
+                title3: string;
+                title4: string;
+                text1: string;
+                text2: string;
+                text3: string;
+                instructions: string;
+                instructions2: string;
+                instructions3: string;
+                instructions4: string;
+                notes: string;
+                refKey: string;
+                images: {
+                    contentTextImage: null | ScriptImage;
+                    image1: null | ScriptImage;
+                    image2: null | ScriptImage;
+                    image3: null | ScriptImage;
+                };
+            } | null;
             fields: {
                 label: string;
                 key: string;
@@ -34,6 +64,8 @@ export type GetScriptsMetadataResponse = {
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
+                disableOtherOptionsIfSelected?: boolean;
+                forbidWith?: string[];
             }[];
         }[];
         diagnoses: {
@@ -63,6 +95,18 @@ export type GetScriptsMetadataResponse = {
 
 export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Promise<GetScriptsMetadataResponse> {
     try {
+        const sanitizeImage = (image: unknown): null | ScriptImage => {
+            if (!image || typeof image !== "object") return null;
+            const img = image as ScriptImage;
+            return {
+                data: `${img.data || ""}`,
+                fileId: img.fileId,
+                filename: img.filename,
+                size: img.size,
+                contentType: img.contentType,
+            };
+        };
+
         const {
             scriptsIds = [],
             hospitalsIds = [],
@@ -183,6 +227,47 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 screens: script.screens.map(screen => {
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];
+                    const skipToScreen = !screen.skipToScreenId
+                        ? null
+                        : (() => {
+                            const targetScreen = script.screens.find(s => s.screenId === screen.skipToScreenId);
+                            const targetScreenIndex = script.screens.findIndex(s => s.screenId === screen.skipToScreenId);
+                            if (!targetScreen) {
+                                return {
+                                    screenId: screen.skipToScreenId,
+                                    position: null,
+                                };
+                            }
+                            return {
+                                screenId: targetScreen.screenId,
+                                position: targetScreenIndex >= 0 ? targetScreenIndex + 1 : null,
+                            };
+                        })();
+                    const managementMetadata = screen.type !== 'management' ? null : {
+                        actionText: `${screen.actionText || ''}`,
+                        contentText: `${screen.contentText || ''}`,
+                        infoText: `${screen.infoText || ''}`,
+                        title: `${screen.title || ''}`,
+                        title1: `${screen.title1 || ''}`,
+                        title2: `${screen.title2 || ''}`,
+                        title3: `${screen.title3 || ''}`,
+                        title4: `${screen.title4 || ''}`,
+                        text1: `${screen.text1 || ''}`,
+                        text2: `${screen.text2 || ''}`,
+                        text3: `${screen.text3 || ''}`,
+                        instructions: `${screen.instructions || ''}`,
+                        instructions2: `${screen.instructions2 || ''}`,
+                        instructions3: `${screen.instructions3 || ''}`,
+                        instructions4: `${screen.instructions4 || ''}`,
+                        notes: `${screen.notes || ''}`,
+                        refKey: `${screen.refKey || ''}`,
+                        images: {
+                            contentTextImage: sanitizeImage(screen.contentTextImage),
+                            image1: sanitizeImage(screen.image1),
+                            image2: sanitizeImage(screen.image2),
+                            image3: sanitizeImage(screen.image3),
+                        },
+                    };
 
                     let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0])[] = [{
                         label: screen.label,
@@ -299,7 +384,12 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     let dataType = 'dropdown';
                                     if (f.type === 'multi_select') dataType = 'multi_select';
 
-                                    let opts = (f.values || '').split('\n')
+                                    let opts: {
+                                        value: string;
+                                        label: string;
+                                        disableOtherOptionsIfSelected?: boolean;
+                                        forbidWith?: string[];
+                                    }[] = (f.values || '').split('\n')
                                         .map((v = '') => v.trim())
                                         .filter((v: any) => v)
                                         .map((v: any) => {
@@ -311,6 +401,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         opts = dropdownItems.map(o => ({
                                             value: `${o.value || ''}`,
                                             label: `${o.label || ''}`,
+                                            disableOtherOptionsIfSelected: !!o.exclusive,
+                                            forbidWith: (o.forbidWith || [])
+                                                .map(forbidWithItemId =>
+                                                    dropdownItems.find(item => item.itemId === forbidWithItemId)?.value
+                                                )
+                                                .filter((v): v is string | number => !!v)
+                                                .map(v => `${v}`),
                                         }));
                                     }
 
@@ -324,6 +421,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                             valueLabel: o.label,
                                             optional: f.optional,
                                             confidential: f.confidential,
+                                            disableOtherOptionsIfSelected: dataType === 'multi_select' ? !!o.disableOtherOptionsIfSelected : undefined,
+                                            forbidWith: dataType === 'multi_select' ? (o.forbidWith || []) : undefined,
                                         };
                                     });
                                 }
@@ -370,6 +469,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 valueLabel: item.label,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                disableOtherOptionsIfSelected: !!item.exclusive,
+                                forbidWith: (item.forbidWith || [])
+                                    .map(forbidWithItemId => items.find(option => option.itemId === forbidWithItemId)?.id)
+                                    .filter((v): v is string => !!v),
                             }));
                             break;
                         default:
@@ -382,6 +485,9 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         title: screen.title,
                         ref: screen.refId,
                         condition: screen.condition,
+                        skipToCondition: screen.skipToCondition,
+                        skipToScreen,
+                        managementMetadata,
                         fields,
                     };
                 }),

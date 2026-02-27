@@ -30,9 +30,38 @@ export function ScriptMetaActions({ data }: {
                 Optional: string;
                 'Field Condition': string;
                 'Screen Condition': string;
+                'Skip To Screen Conditional Expression': string;
+                'Skip To Screen': string;
+                'Disable other options if selected': string;
+                'Forbid With': string;
+                'Management Metadata': string;
             }[];
 
             script.screens.forEach(screen => {
+                if ((screen.type === 'management') && !screen.fields.length) {
+                    worksheetData.push({
+                        Script: script.title,
+                        Hospital: script.hospitalName || '',
+                        Screen: screen.title,
+                        'Screen Ref': screen.ref || '',
+                        'Screen Type': screen.type || '',
+                        Key: '',
+                        Label: '',
+                        'Data Type': '',
+                        'Value': '',
+                        'Value Label': '',
+                        Confidential: '',
+                        Optional: '',
+                        'Field Condition': '',
+                        'Screen Condition': screen.condition || '',
+                        'Skip To Screen Conditional Expression': screen.skipToCondition || '',
+                        'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
+                        'Disable other options if selected': '',
+                        'Forbid With': '',
+                        'Management Metadata': screen.managementMetadata ? JSON.stringify(screen.managementMetadata) : '',
+                    });
+                }
+
                 screen.fields.forEach(f => {
                     worksheetData.push({
                         Script: script.title,
@@ -49,6 +78,15 @@ export function ScriptMetaActions({ data }: {
                         Optional: f.optional ? 'Yes' : 'No',
                         'Field Condition': f.condition || '',
                         'Screen Condition': screen.condition || '',
+                        'Skip To Screen Conditional Expression': screen.skipToCondition || '',
+                        'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
+                        'Disable other options if selected': typeof f.disableOtherOptionsIfSelected === 'boolean'
+                            ? (f.disableOtherOptionsIfSelected ? 'Yes' : 'No')
+                            : '',
+                        'Forbid With': f.forbidWith?.join(', ') || '',
+                        'Management Metadata': screen.type === 'management' && screen.managementMetadata
+                            ? JSON.stringify(screen.managementMetadata)
+                            : '',
                     });
                 });
             });
@@ -71,6 +109,8 @@ export function ScriptMetaActions({ data }: {
                 'Value': string;
                 'Value Label': string;
                 Condition: string;
+                'Disable other options if selected': string;
+                'Forbid With': string;
             }[];
 
             script.diagnoses.forEach(d => {
@@ -87,6 +127,8 @@ export function ScriptMetaActions({ data }: {
                     Value: d.key,
                     'Value Label': d.name,
                     Condition: `${d.expression || ''}`,
+                    'Disable other options if selected': '',
+                    'Forbid With': '',
                 });
             });
 
