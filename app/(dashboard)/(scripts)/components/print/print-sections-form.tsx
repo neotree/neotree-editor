@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/loader";
 import { ReactSelect } from "@/components/react-select";
 import { useScriptsContext } from "@/contexts/scripts";
+import { screenTypes } from "@/constants";
 
 export function PrintForm({ open, disabled, section, onClose, onChange }: {
     open: boolean;
@@ -69,8 +70,13 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
         return [
             screen.position,
             screen.title,
+            screenTypes.find(t => t.value === screen.type)?.label || screen.type,
             screen.refId || '',
         ].join(' - ');
+    }, []);
+
+    const getScreenTypeLabel = useCallback((screen: typeof screens[0]) => {
+        return screenTypes.find(t => t.value === screen.type)?.label || screen.type;
     }, []);
 
     const selectOpts = screens.map(s => ({
@@ -141,6 +147,9 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
                                             name: 'Screen title'
                                         },
                                         {
+                                            name: 'Screen type'
+                                        },
+                                        {
                                             name: 'Ref'
                                         },
                                         {
@@ -181,6 +190,7 @@ export function PrintForm({ open, disabled, section, onClose, onChange }: {
                                         .filter(s => s)
                                         .map(s => [
                                             s.title,
+                                            getScreenTypeLabel(s),
                                             s.refId,
                                             s.screenId
                                         ])}
