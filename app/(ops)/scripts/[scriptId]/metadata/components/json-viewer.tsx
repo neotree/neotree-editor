@@ -47,6 +47,37 @@ function JsonLine({
 
     if (!entries.length) return <div>{indent}{keyPrefix}{openToken}{closeToken}{comma}</div>;
 
+    return (
+        <CompositeJsonLine
+            depth={depth}
+            keyPrefix={keyPrefix}
+            comma={comma}
+            isArray={isArray}
+            openToken={openToken}
+            closeToken={closeToken}
+            entries={entries}
+        />
+    );
+}
+
+function CompositeJsonLine({
+    depth,
+    keyPrefix,
+    comma,
+    isArray,
+    openToken,
+    closeToken,
+    entries,
+}: {
+    depth: number;
+    keyPrefix: string;
+    comma: string;
+    isArray: boolean;
+    openToken: string;
+    closeToken: string;
+    entries: ReadonlyArray<readonly [string, JsonValue]>;
+}) {
+    const indent = '  '.repeat(depth);
     const [open, setOpen] = useState(true);
 
     return (
