@@ -15,6 +15,7 @@ export type SaveDataKeysParams = {
     broadcastAction?: boolean,
     userId?: string;
     updateRefs?: boolean;
+    allowConfidentialDowngrade?: boolean;
 };
 
 export type SaveDataKeysResponse = { 
@@ -29,12 +30,45 @@ export async function _saveDataKeys({
     data: dataParam, 
     broadcastAction, 
     updateRefs = true,
+    allowConfidentialDowngrade = false,
     userId,
 }: SaveDataKeysParams) {
     const response: SaveDataKeysResponse = { success: false, };
 
     try {
         const errors = [];
+
+        const resolveConfidential = ({
+            incoming,
+            existing,
+            fallback,
+        }: {
+            incoming: SaveDataKeysData;
+            existing?: Partial<typeof dataKeys.$inferSelect> | null;
+            fallback?: boolean | null;
+        }) => {
+            if (typeof incoming.confidential === 'boolean') return incoming.confidential;
+            if (typeof existing?.confidential === 'boolean') return existing.confidential;
+            if (typeof fallback === 'boolean') return fallback;
+            return true;
+        };
+
+        const assertNoConfidentialDowngrade = ({
+            requested,
+            current,
+            keyName,
+        }: {
+            requested: boolean;
+            current?: boolean | null;
+            keyName?: string | null;
+        }) => {
+            if (!allowConfidentialDowngrade && current === true && requested === false) {
+                throw new Error(
+                    `Cannot downgrade confidential data key "${keyName || 'unknown'}". ` +
+                    `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
+                );
+            }
+        };
 
         const data = dataParam.map(item => {
             return {
@@ -82,10 +116,31 @@ export async function _saveDataKeys({
                     });
 
                     if (draft) {
+                        const publishedForDraft = !draft.dataKeyId ? null : await db.query.dataKeys.findFirst({
+                            where: eq(dataKeys.uuid, draft.dataKeyId),
+                            columns: {
+                                confidential: true,
+                                name: true,
+                            },
+                        });
+
                         const data = {
                             ...draft.data,
                             ...item,
                         };
+                        const resolvedConfidential = resolveConfidential({
+                            incoming: item,
+                            existing: draft.data,
+                            fallback: publishedForDraft?.confidential,
+                        });
+                        assertNoConfidentialDowngrade({
+                            requested: resolvedConfidential,
+                            current: (typeof draft.data?.confidential === 'boolean')
+                                ? draft.data.confidential
+                                : publishedForDraft?.confidential,
+                            keyName: data.name || draft.data?.name || publishedForDraft?.name,
+                        });
+                        data.confidential = resolvedConfidential;
 
                         if (data.uniqueKey) {
                             previousDataKeys.push({
@@ -115,6 +170,13 @@ export async function _saveDataKeys({
                             uuid: dataKeyUuid,
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
+                        const resolvedConfidential = resolveConfidential({ incoming: item, existing: published });
+                        assertNoConfidentialDowngrade({
+                            requested: resolvedConfidential,
+                            current: published?.confidential,
+                            keyName: data.name || published?.name,
+                        });
+                        data.confidential = resolvedConfidential;
 
                         previousDataKeys.push({
                             uniqueKey: data.uniqueKey,

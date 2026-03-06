@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch"
 import { DateTimePicker } from "@/components/datetime-picker"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { validateDropdownValues } from "@/lib/validate-dropdown-values"
 import { cn } from "@/lib/utils"
 import { isEmpty } from "@/lib/isEmpty"
@@ -36,6 +37,7 @@ import { Title } from "../title"
 import type { useScreenForm } from "../../hooks/use-screen-form"
 import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Props = {
   open: boolean
@@ -51,6 +53,7 @@ type Props = {
 
 export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled: disabledProp, onClose }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
+  const { alert } = useAlertModal()
 
   const { data: field, index: fieldIndex } = { ...fieldProp }
 
@@ -184,6 +187,16 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     return key
   }, [keyId, extractDataKeys])
 
+  const inheritedConfidential = useMemo(() => {
+    return !!(confidential || dataKey?.confidential)
+  }, [confidential, dataKey?.confidential])
+
+  useEffect(() => {
+    if (confidential !== inheritedConfidential) {
+      setValue("confidential", inheritedConfidential, { shouldDirty: true })
+    }
+  }, [confidential, inheritedConfidential, setValue])
+
   return (
     <>
       <Modal
@@ -305,6 +318,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       setValue("key", item?.name, { shouldDirty: true })
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
                       setValue("label", item?.label, { shouldDirty: true })
+                      if (item?.confidential) {
+                        setValue("confidential", true, { shouldDirty: true })
+                      }
                     }}
                   />
                 </div>
@@ -351,15 +367,29 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
               </div>
 
               <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
-                <div className="flex-1 flex items-center space-x-2">
-                  <Switch
-                    id="confidential"
-                    disabled={disabled}
-                    checked={confidential}
-                    onCheckedChange={(checked) => setValue("confidential", checked, { shouldDirty: true })}
-                  />
-                  <Label htmlFor="confidential">Confidential</Label>
-                </div>
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                        onClick={() =>
+                          alert({
+                            title: "Confidentiality is managed in Data Keys",
+                            message: "Change this in the Data Key. Fields inherit confidential status automatically.",
+                            variant: "info",
+                          })
+                        }
+                      >
+                        <Switch id="confidential" disabled checked={inheritedConfidential} />
+                        <Label htmlFor="confidential">Confidential</Label>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Change confidentiality in the Data Key library.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
                 <div className="flex-1 flex items-center space-x-2">
                   <Switch
