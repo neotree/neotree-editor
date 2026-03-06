@@ -6,9 +6,16 @@ import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
 
+function assertCanManageDataKeys(user?: { role?: string | null } | null) {
+    const role = user?.role;
+    const allowed = role === 'admin' || role === 'super_user';
+    if (!allowed) throw new Error('Forbidden: only admin or super_user can manage data keys');
+}
+
 export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
         return await _saveDataKeys({
             ...params,
             userId: session.user?.userId,
@@ -19,9 +26,33 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     }
 }
 
-export const saveDataKeysIfNotExist = _saveDataKeysIfNotExist;
+export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async params => {
+    try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+        return await _saveDataKeysIfNotExist({
+            ...params,
+            userId: session.user?.userId,
+        });
+    } catch (e: any) {
+        logger.error('saveDataKeysIfNotExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+};
 
-export const saveDataKeysUpdateIfExist = _saveDataKeysUpdateIfExist;
+export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = async params => {
+    try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+        return await _saveDataKeysUpdateIfExist({
+            ...params,
+            userId: session.user?.userId,
+        });
+    } catch (e: any) {
+        logger.error('saveDataKeysUpdateIfExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+};
 
 export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = async params => {
     try {
@@ -51,6 +82,9 @@ export const exportDataKeys = async ({
     errors?: string[];
 }> => {
     try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+
         const axiosClient = await getSiteAxiosClient(siteId);
         
         const dataKeys = await _getDataKeys({

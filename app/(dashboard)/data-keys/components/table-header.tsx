@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useDataKeysCtx } from '@/contexts/data-keys';
+import { useAppContext } from '@/contexts/app';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
 import { 
     Select, 
@@ -19,12 +20,14 @@ import {
 } from '@/components/ui/select';
 
 export function DataKeysTableHeader() {
+    const { isAdmin, isSuperUser, viewOnly } = useAppContext();
     const { 
         sort,
         filter,
         onSort,
         setFilter,
     } = useDataKeysCtx();
+    const canManageDataKeys = (isAdmin || isSuperUser) && !viewOnly;
 
     return (
         <>
@@ -110,16 +113,18 @@ export function DataKeysTableHeader() {
                             </Select>
                         </div>
 
-                        <Button
-                            asChild
-                            variant="ghost"
-                            className="w-auto h-auto"
-                        >
-                            <Link href="/data-keys/new">
-                                <PlusIcon className="size-4 mr-2" />
-                                Add
-                            </Link>
-                        </Button>
+                        {canManageDataKeys && (
+                            <Button
+                                asChild
+                                variant="ghost"
+                                className="w-auto h-auto"
+                            >
+                                <Link href="/data-keys/new">
+                                    <PlusIcon className="size-4 mr-2" />
+                                    Add
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
