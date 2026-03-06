@@ -29,6 +29,9 @@ export async function DELETE(req: NextRequest) {
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
+        if (!['admin', 'super_user'].includes(isAuthorised.user?.role || '')) {
+            return NextResponse.json({ errors: ['Forbidden'] }, { status: 403 });
+        }
 
         const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
 
