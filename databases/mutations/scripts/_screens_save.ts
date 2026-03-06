@@ -18,6 +18,62 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
+function getConfidentialDataKeyIds(screen: SaveScreensData) {
+    const ids = new Set<string>();
+
+    if (screen.confidential && screen.keyId) {
+        ids.add(screen.keyId);
+    }
+
+    for (const field of screen.fields || []) {
+        if (field?.confidential && field?.keyId) {
+            ids.add(field.keyId);
+        }
+    }
+
+    for (const item of screen.items || []) {
+        if (item?.confidential && item?.keyId) {
+            ids.add(item.keyId);
+        }
+    }
+
+    return Array.from(ids).filter(Boolean);
+}
+
+async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string) {
+    const ids = Array.from(new Set(uniqueKeys.filter(Boolean)));
+    if (!ids.length) return;
+
+    const { _getDataKeys } = await import('@/databases/queries/data-keys');
+    const { _saveDataKeys } = await import('@/databases/mutations/data-keys');
+
+    const dataKeysRes = await _getDataKeys({ uniqueKeys: ids, returnDraftsIfExist: true });
+    if (dataKeysRes.errors?.length) {
+        throw new Error(dataKeysRes.errors.join(', '));
+    }
+
+    const updates = dataKeysRes.data
+        .filter((key) => !key?.confidential)
+        .map((key) => ({
+            uuid: key.uuid,
+            uniqueKey: key.uniqueKey,
+            confidential: true,
+        }));
+
+    if (!updates.length) return;
+
+    const saveRes = await _saveDataKeys({
+        data: updates,
+        userId,
+        updateRefs: false,
+        broadcastAction: false,
+    });
+
+    if (saveRes.errors?.length || !saveRes.success) {
+        throw new Error(saveRes.errors?.join(', ') || 'Failed to promote confidential data keys');
+    }
+}
+
 export async function _saveScreens({ data, broadcastAction, userId, }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
@@ -27,6 +83,7 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
     data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
+    const confidentialDataKeyIds = new Set<string>();
     
     try {
         let index = 0;
@@ -50,6 +107,8 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                 if (validationErrors.length) {
                     errors.push(...validationErrors);
                 }
+
+                getConfidentialDataKeyIds(item).forEach((id) => confidentialDataKeyIds.add(id));
 
                 if (!errors.length) {
                     const draft = !itemScreenId ? null : await db.query.screensDrafts.findFirst({
@@ -143,6 +202,9 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
             response.errors = errors;
             response.info = info;
         } else {
+            if (confidentialDataKeyIds.size) {
+                await promoteDataKeysAsConfidential(Array.from(confidentialDataKeyIds), userId);
+            }
             response.success = true;
         }
     } catch(e: any) {

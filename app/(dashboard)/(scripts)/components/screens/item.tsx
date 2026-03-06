@@ -26,6 +26,8 @@ import {
 import { SelectModal } from "@/components/select-modal"
 import { SelectDataKey } from "@/components/select-data-key"
 import { useDataKeysCtx } from "@/contexts/data-keys"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Props = {
   open: boolean
@@ -52,6 +54,7 @@ export function Item<P = {}>({
   onClose,
 }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
+  const { alert } = useAlertModal()
 
   const screenType = form.getValues("type")
   const screenKeyId = form.getValues("keyId")
@@ -132,6 +135,7 @@ export function Item<P = {}>({
   const type = watch("type")
   const label = watch("label")
   const key = watch("key")
+  const keyId = watch("keyId")
   const enterValueManually = watch("enterValueManually")
   const confidential = watch("confidential")
   const exclusive = watch("exclusive")
@@ -180,6 +184,21 @@ export function Item<P = {}>({
 
   const isKeyDisabled = false // isChecklistScreen ? disabled : true;
 
+  const dataKey = useMemo(() => {
+    const [keyData] = !keyId ? [null] : extractDataKeys([keyId])
+    return keyData
+  }, [keyId, extractDataKeys])
+
+  const inheritedConfidential = useMemo(() => {
+    return !!(confidential || dataKey?.confidential)
+  }, [confidential, dataKey?.confidential])
+
+  useEffect(() => {
+    if (confidential !== inheritedConfidential) {
+      setValue("confidential", inheritedConfidential, { shouldDirty: true })
+    }
+  }, [confidential, inheritedConfidential, setValue])
+
   const renderKeyComponent = ({
     value: key,
     label = "Select key",
@@ -214,6 +233,9 @@ export function Item<P = {}>({
           setValue(variant, key, { shouldDirty: true })
           setValue("keyId", dataKey?.uniqueKey, { shouldDirty: true })
           setValue("label", label, { shouldDirty: true })
+          if (dataKey?.confidential) {
+            setValue("confidential", true, { shouldDirty: true })
+          }
         }}
       />
     )
@@ -283,17 +305,31 @@ export function Item<P = {}>({
                       <Input {...register("summary", { disabled, required: false })} name="summary" />
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="confidential"
-                        checked={confidential}
-                        disabled={disabled}
-                        onCheckedChange={(checked) => setValue("confidential", checked, { shouldDirty: true })}
-                      />
-                      <Label secondary htmlFor="confidential">
-                        Confidential
-                      </Label>
-                    </div>
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onClick={() =>
+                              alert({
+                                title: "Confidentiality is managed in Data Keys",
+                                message: "Change this in the Data Key. Items inherit confidential status automatically.",
+                                variant: "info",
+                              })
+                            }
+                          >
+                            <Switch id="confidential" checked={inheritedConfidential} disabled />
+                            <Label secondary htmlFor="confidential">
+                              Confidential
+                            </Label>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Change confidentiality in the Data Key library.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
                     <div className="flex items-center space-x-2">
                       <Switch

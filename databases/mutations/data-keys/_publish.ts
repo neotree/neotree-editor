@@ -12,6 +12,7 @@ export async function _publishDataKeys(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  allowConfidentialDowngrade?: boolean
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const errors: string[] = []
@@ -124,8 +125,17 @@ export async function _publishDataKeys(opts?: {
 
       for (const { dataKeyId: _dataKeyId, data: c } of updates) {
         const dataKeyId = _dataKeyId!
+        const current = dataBefore.find((d) => d.uuid === dataKeyId)
 
         const { uuid: __uuid, id, createdAt, updatedAt, deletedAt, ...payload } = c
+
+        if (!opts?.allowConfidentialDowngrade && current?.confidential === true && payload.confidential === false) {
+          errors.push(
+            `Cannot downgrade confidential data key "${current.name || dataKeyId}" during publish. ` +
+              `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
+          )
+          continue
+        }
 
         const updates = {
           ...payload,
@@ -144,6 +154,12 @@ export async function _publishDataKeys(opts?: {
         ...log,
         dataVersion: opts?.dataVersion
       })))
+
+      if (errors.length) {
+        results.success = false
+        results.errors = errors
+        return results
+      }
     }
 
     if (inserts.length) {
@@ -178,6 +194,12 @@ export async function _publishDataKeys(opts?: {
         ...log,
         dataVersion: opts?.dataVersion
       })))
+
+      if (errors.length) {
+        results.success = false
+        results.errors = errors
+        return results
+      }
     }
 
     await db.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
@@ -201,7 +223,12 @@ export async function _publishDataKeys(opts?: {
       }
     }
 
-    results.success = true
+    if (errors.length) {
+      results.success = false
+      results.errors = errors
+    } else {
+      results.success = true
+    }
   } catch (e: any) {
     results.success = false
     results.errors = [e.message]

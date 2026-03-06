@@ -28,7 +28,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { DataTable } from '@/components/data-table';
 import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
@@ -63,6 +65,7 @@ const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
         name: source.name ?? "",
         refId: source.refId ?? "",
         dataType: source.dataType ?? "",
+        confidential: !!source.confidential,
         label: source.label ?? "",
         options: Array.isArray(source.options) ? source.options : [],
         metadata: source.metadata ?? {},
@@ -89,6 +92,7 @@ function Form({
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
+    const { alert } = useAlertModal();
     const { authenticatedUser, viewOnly } = useAppContext();
 
     const dataKey = useMemo(() => dataKeys.find(k => (
@@ -116,6 +120,7 @@ function Form({
             name: dataKey?.name || '',
             refId: dataKey?.refId || '',
             dataType: dataKey?.dataType || '',
+            confidential: dataKey ? !!dataKey.confidential : true,
             label: dataKey?.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
@@ -163,6 +168,7 @@ function Form({
     const options = watch('options');
     const nameValue = watch('name');
     const labelValue = watch('label');
+    const confidential = !!watch('confidential');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -179,6 +185,7 @@ function Form({
             name: values.name || '',
             label: values.label || '',
             dataType: values.dataType || '',
+            confidential: !!values.confidential,
             refId: values.refId || '',
             options: values.options || [],
             version: typeof values.version === 'string' ? Number(values.version) : values.version,
@@ -440,6 +447,32 @@ function Form({
                                     required: false,
                                 })}
                             />
+                        </div>
+
+                        <div className="px-4">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="dataKeyConfidential"
+                                    checked={confidential}
+                                    disabled={isFormDisabled}
+                                    onCheckedChange={checked => {
+                                        if (!checked && dataKey?.confidential) {
+                                            alert({
+                                                title: "Cannot unset confidential",
+                                                message: "This Data Key is already confidential. Downgrading is blocked by policy.",
+                                                variant: "info",
+                                            });
+                                            setValue('confidential', true, { shouldDirty: false });
+                                            return;
+                                        }
+                                        setValue('confidential', checked, { shouldDirty: true });
+                                    }}
+                                />
+                                <Label htmlFor="dataKeyConfidential">Confidential</Label>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Fields and items that reference this Data Key inherit this setting.
+                            </span>
                         </div>
 
                         <Controller
