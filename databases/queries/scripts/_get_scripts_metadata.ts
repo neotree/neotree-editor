@@ -2,7 +2,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
-import { ScriptField, ScriptImage, ScriptItem } from "@/types";
+import { DiagnosisSymptom, ScriptField, ScriptImage, ScriptItem } from "@/types";
 import * as uuid from "uuid";
 
 export type GetScriptsMetadataParams = {
@@ -72,10 +72,20 @@ export type GetScriptsMetadataResponse = {
             diagnosisId: string;
             name: string;
             key: string;
+            keyId: string;
+            position: number | null;
+            source: string | null;
             severityOrder?: string | number | null;
             expression?: string | number | null;
             expressionMeaning?: string | null;
             description?: string | null;
+            text1: string | null;
+            text2: string | null;
+            text3: string | null;
+            image1: null | ScriptImage;
+            image2: null | ScriptImage;
+            image3: null | ScriptImage;
+            symptoms: DiagnosisSymptom[];
             fields: {
                 label: string;
                 key: string;
@@ -213,14 +223,26 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 title: script.title,
                 hospitalName: hospital?.name || '',
                 diagnoses: script.diagnoses.map(d => {
+                    const symptoms = Array.isArray(d.symptoms) ? d.symptoms : [];
+
                     return {
                         diagnosisId: d.diagnosisId,
                         name: d.name,
                         key: d.key || d.name,
+                        keyId: d.keyId || '',
+                        position: d.position ?? null,
+                        source: d.source || '',
                         severityOrder: d.severityOrder || '',
                         expression: d.expression || '',
                         expressionMeaning: d.expressionMeaning || '',
                         description: d.description || '',
+                        text1: d.text1 || '',
+                        text2: d.text2 || '',
+                        text3: d.text3 || '',
+                        image1: sanitizeImage(d.image1),
+                        image2: sanitizeImage(d.image2),
+                        image3: sanitizeImage(d.image3),
+                        symptoms,
                         fields: [],
                     };
                 }),
