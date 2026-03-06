@@ -100,11 +100,22 @@ export function ScriptMetaActions({ data }: {
                 Script: string;
                 Hospital: string;
                 'Diagnosis Name': string;
+                'Diagnosis Description': string;
                 Key: string;
+                'Key ID': string;
                 Label: string;
+                Position: string;
+                Source: string;
                 'Severity Order': string;
                 Expression: string;
                 'Expression Meaning': string;
+                Symptoms: string;
+                'Text 1': string;
+                'Text 2': string;
+                'Text 3': string;
+                'Image 1': string;
+                'Image 2': string;
+                'Image 3': string;
                 'Data Type': string;
                 'Value': string;
                 'Value Label': string;
@@ -118,11 +129,22 @@ export function ScriptMetaActions({ data }: {
                     Script: script.title,
                     Hospital: script.hospitalName || '',
                     'Diagnosis Name': d.name,
+                    'Diagnosis Description': `${d.description || ''}`,
                     Key: d.key,
+                    'Key ID': `${d.keyId || ''}`,
                     Label: d.name,
+                    Position: `${d.position || ''}`,
+                    Source: `${d.source || ''}`,
                     'Severity Order': `${d.severityOrder || ''}`,
                     Expression: `${d.expression || ''}`,
                     'Expression Meaning': `${d.expressionMeaning || ''}`,
+                    Symptoms: JSON.stringify(d.symptoms || []),
+                    'Text 1': `${d.text1 || ''}`,
+                    'Text 2': `${d.text2 || ''}`,
+                    'Text 3': `${d.text3 || ''}`,
+                    'Image 1': d.image1 ? JSON.stringify(d.image1) : '',
+                    'Image 2': d.image2 ? JSON.stringify(d.image2) : '',
+                    'Image 3': d.image3 ? JSON.stringify(d.image3) : '',
                     'Data Type': 'diagnosis',
                     Value: d.key,
                     'Value Label': d.name,
