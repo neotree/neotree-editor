@@ -2,9 +2,14 @@
 
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
+import { _getScreens } from '@/databases/queries/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
+import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
+import db from '@/databases/pg/drizzle';
+import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
+import { count, isNull, max } from 'drizzle-orm';
 
 export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
@@ -37,6 +42,220 @@ export const getDataKeys = async (params?: GetDataKeysParams) => {
     const res = await _getDataKeys(params);
     return res;
 }
+
+type UsageExportCache = {
+    fingerprint: string;
+    generatedAt: number;
+    data: DataKeysUsageExportRow[];
+};
+
+const USAGE_EXPORT_CACHE_KEY = '__data_keys_usage_export_cache__';
+
+function getUsageExportCacheStore(): { current?: UsageExportCache } {
+    const globalWithCache = globalThis as typeof globalThis & {
+        [USAGE_EXPORT_CACHE_KEY]?: { current?: UsageExportCache };
+    };
+    if (!globalWithCache[USAGE_EXPORT_CACHE_KEY]) {
+        globalWithCache[USAGE_EXPORT_CACHE_KEY] = {};
+    }
+    return globalWithCache[USAGE_EXPORT_CACHE_KEY]!;
+}
+
+async function getUsageExportFingerprint() {
+    const [
+        [publishedKeysMeta],
+        [draftKeysMeta],
+        [publishedScreensMeta],
+        [draftScreensMeta],
+    ] = await Promise.all([
+        db.select({
+            updatedAt: max(dataKeys.updatedAt),
+            count: count(),
+        }).from(dataKeys).where(isNull(dataKeys.deletedAt)),
+        db.select({
+            updatedAt: max(dataKeysDrafts.updatedAt),
+            count: count(),
+        }).from(dataKeysDrafts),
+        db.select({
+            updatedAt: max(screens.updatedAt),
+            count: count(),
+        }).from(screens).where(isNull(screens.deletedAt)),
+        db.select({
+            updatedAt: max(screensDrafts.updatedAt),
+            count: count(),
+        }).from(screensDrafts),
+    ]);
+
+    return [
+        publishedKeysMeta?.updatedAt ? new Date(publishedKeysMeta.updatedAt).toISOString() : '',
+        `${publishedKeysMeta?.count || 0}`,
+        draftKeysMeta?.updatedAt ? new Date(draftKeysMeta.updatedAt).toISOString() : '',
+        `${draftKeysMeta?.count || 0}`,
+        publishedScreensMeta?.updatedAt ? new Date(publishedScreensMeta.updatedAt).toISOString() : '',
+        `${publishedScreensMeta?.count || 0}`,
+        draftScreensMeta?.updatedAt ? new Date(draftScreensMeta.updatedAt).toISOString() : '',
+        `${draftScreensMeta?.count || 0}`,
+    ].join('|');
+}
+
+export const getDataKeysUsageExportRows = async (params?: {
+    dataKeys?: string[];
+}): Promise<{
+    success: boolean;
+    data: DataKeysUsageExportRow[];
+    errors?: string[];
+}> => {
+    try {
+        await isAllowed();
+
+        const [dataKeysRes, screensRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ returnDraftsIfExist: true }),
+        ]);
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+        ];
+
+        if (errors.length) return { success: false, data: [], errors };
+
+        const [fingerprint] = await Promise.all([
+            getUsageExportFingerprint(),
+        ]);
+
+        const cache = getUsageExportCacheStore();
+        const filterDataKeys = new Set((params?.dataKeys || []).filter(Boolean));
+        const applyFilter = (rows: DataKeysUsageExportRow[]) => (
+            !filterDataKeys.size
+                ? rows
+                : rows.filter(row => filterDataKeys.has(row.DataKey))
+        );
+
+        if (cache.current && cache.current.fingerprint === fingerprint) {
+            return {
+                success: true,
+                data: applyFilter(cache.current.data),
+            };
+        }
+
+        const byUniqueKey = new Map<string, string>();
+        const namesMap = new Map<string, Set<string>>();
+        const allowLegacyNameMatch = process.env.DATA_KEYS_USAGE_ALLOW_LEGACY_NAME_MATCH === 'true';
+
+        dataKeysRes.data.forEach(dataKey => {
+            if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey.name);
+            if (dataKey.name) {
+                if (!namesMap.has(dataKey.name)) namesMap.set(dataKey.name, new Set());
+                namesMap.get(dataKey.name)!.add(dataKey.uniqueKey);
+            }
+        });
+
+        const rowsMap = new Map<string, DataKeysUsageExportRow>();
+
+        const resolveDataKeyName = (keyId?: string | null, keyName?: string | null) => {
+            const byKeyId = keyId ? byUniqueKey.get(keyId) : undefined;
+            if (byKeyId) return byKeyId;
+
+            if (!allowLegacyNameMatch) return null;
+
+            const name = `${keyName || ''}`.trim();
+            if (!name) return null;
+
+            const matched = namesMap.get(name);
+            if (!matched || matched.size !== 1) return null;
+
+            return name;
+        };
+
+        const addRow = ({
+            keyId,
+            keyName,
+            scriptTitle,
+            confidential,
+        }: {
+            keyId?: string | null;
+            keyName?: string | null;
+            scriptTitle: string;
+            confidential: boolean;
+        }) => {
+            const dataKeyName = resolveDataKeyName(keyId, keyName);
+            if (!dataKeyName) return;
+
+            const row: DataKeysUsageExportRow = {
+                DataKey: dataKeyName,
+                ScriptTitle: scriptTitle || '',
+                Confidential: confidential ? 'true' : 'false',
+            };
+
+            const mapKey = `${row.DataKey}|||${row.ScriptTitle}|||${row.Confidential}`;
+            rowsMap.set(mapKey, row);
+        };
+
+        screensRes.data.forEach(screen => {
+            const scriptTitle = screen.scriptTitle || '';
+
+            addRow({
+                keyId: screen.keyId,
+                keyName: screen.key,
+                scriptTitle,
+                confidential: !!screen.confidential,
+            });
+
+            (screen.fields || []).forEach(field => {
+                addRow({
+                    keyId: field.keyId,
+                    keyName: field.key,
+                    scriptTitle,
+                    confidential: !!field.confidential,
+                });
+
+                (field.items || []).forEach(item => {
+                    addRow({
+                        keyId: item.keyId,
+                        keyName: `${item.value || ''}` || `${item.label || ''}`,
+                        scriptTitle,
+                        confidential: !!field.confidential,
+                    });
+                });
+            });
+
+            (screen.items || []).forEach(item => {
+                addRow({
+                    keyId: item.keyId,
+                    keyName: item.key || item.id,
+                    scriptTitle,
+                    confidential: !!item.confidential,
+                });
+            });
+        });
+
+        const data = Array.from(rowsMap.values())
+            .sort((a, b) => {
+                if (a.DataKey !== b.DataKey) return a.DataKey.localeCompare(b.DataKey);
+                if (a.ScriptTitle !== b.ScriptTitle) return a.ScriptTitle.localeCompare(b.ScriptTitle);
+                return a.Confidential.localeCompare(b.Confidential);
+            });
+
+        cache.current = {
+            fingerprint,
+            generatedAt: Date.now(),
+            data,
+        };
+
+        return {
+            success: true,
+            data: applyFilter(data),
+        };
+    } catch (e: any) {
+        logger.error('getDataKeysUsageExportRows ERROR', e.message);
+        return {
+            success: false,
+            data: [],
+            errors: [e.message],
+        };
+    }
+};
 
 export const exportDataKeys = async ({
     uuids,

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
+import { ExportMetadataButton } from './export-metadata-button';
 import { 
     Select, 
     SelectGroup,
@@ -120,6 +121,8 @@ export function DataKeysTableHeader() {
                                 Add
                             </Link>
                         </Button>
+
+                        <ExportMetadataButton />
                     </div>
                 </div>
             </div>
