@@ -11,7 +11,7 @@ import {
 } from "react";
 import axios from 'axios';
 import { useQueryState } from "nuqs";
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Alert } from "@/components/alert";
@@ -151,6 +151,7 @@ export function DataKeysCtxProvider({
 }) {
     const mounted = useRef(false);
     const router = useRouter();
+    const pathname = usePathname();
     const { alert } = useAlertModal();
     const { authenticatedUser } = useAppContext();
 
@@ -174,6 +175,12 @@ export function DataKeysCtxProvider({
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
     const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
     const [errors, setErrors] = useState<string[] | undefined>();
+    const isDataKeyEditorPage = useMemo(() => (
+        !!pathname && (
+            pathname.startsWith('/data-keys/edit/') ||
+            pathname.startsWith('/data-keys/new')
+        )
+    ), [pathname]);
 
     // Fetch ALL data once without pagination
     const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
@@ -194,6 +201,10 @@ export function DataKeysCtxProvider({
                 queryParams.set('dataKeysIds', JSON.stringify(params.dataKeysIds));
             }
 
+            if (!isDataKeyEditorPage) {
+                queryParams.set('lean', 'true');
+            }
+
             const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys?${queryParams.toString()}`);
 
             // Apply sorting on client side using current sort value
@@ -208,7 +219,7 @@ export function DataKeysCtxProvider({
         } finally {
             setLoadingDataKeys(false);
         }
-    }, [sort]); // Include sort in dependencies
+    }, [sort, isDataKeyEditorPage]); // Include sort in dependencies
 
     // Apply filters and search to get filtered data
     const filteredDataKeys = useMemo(() => {
