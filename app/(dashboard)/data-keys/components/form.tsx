@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from '@/components/data-table';
 import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
@@ -181,6 +182,7 @@ function Form({
             dataType: values.dataType || '',
             refId: values.refId || '',
             options: values.options || [],
+            metadata: values.metadata || {},
             version: typeof values.version === 'string' ? Number(values.version) : values.version,
         }];
     }, [getValues, dataKey?.uuid, dataKey?.uniqueKey]);
@@ -441,6 +443,46 @@ function Form({
                                 })}
                             />
                         </div>
+
+                        <Controller
+                            control={control}
+                            name="metadata"
+                            render={({ field: { value, onChange, }, }) => {
+                                return (
+                                    <>
+                                        <div className="px-4 flex items-center space-x-2">
+                                            <Checkbox
+                                                id="confidential"
+                                                checked={!!value.confidential}
+                                                disabled={disabled}
+                                                onCheckedChange={checked => {
+                                                    onChange({
+                                                        ...value,
+                                                        confidential: checked,
+                                                    })
+                                                }}
+                                            />
+                                            <Label htmlFor="confidential">Confidential</Label>
+                                        </div>
+
+                                        <div className="px-4 flex items-center space-x-2">
+                                            <Checkbox
+                                                id="optional"
+                                                checked={!!value.optional}
+                                                disabled={disabled}
+                                                onCheckedChange={checked => {
+                                                    onChange({
+                                                        ...value,
+                                                        optional: checked,
+                                                    })
+                                                }}
+                                            />
+                                            <Label htmlFor="optional">Optional</Label>
+                                        </div>
+                                    </>
+                                )
+                            }}
+                        />
 
                         <Controller
                             control={control}
