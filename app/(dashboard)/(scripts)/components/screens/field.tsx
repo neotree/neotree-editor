@@ -321,6 +321,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       if (item?.confidential) {
                         setValue("confidential", true, { shouldDirty: true })
                       }
+                      setValue("optional", !!item?.metadata?.optional, { shouldDirty: true })
                     }}
                   />
                 </div>

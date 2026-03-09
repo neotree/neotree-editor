@@ -16,6 +16,13 @@ export async function GET(req: NextRequest) {
         const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
 
         res = await _getDataKeys(params);
+        res = {
+            ...res,
+            data: res.data.map(item => ({
+                ...item,
+                metadata: item.metadata ?? {},
+            })),
+        };
 
 		return NextResponse.json(res);
 	} catch(e: any) {

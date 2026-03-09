@@ -57,8 +57,16 @@ export type UpdateDataKeysRefsResponse = {
     };
 };
 
-const SAVE_CHUNK_SIZE = 50;
-const SAVE_RETRY_CONCURRENCY = 5;
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    const normalized = Math.floor(parsed);
+    return normalized > 0 ? normalized : fallback;
+};
+
+const SAVE_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_SIZE, 50);
+const SAVE_RETRY_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_RETRY_CONCURRENCY, 5);
+const ALLOW_LEGACY_DATA_KEY_MATCH = process.env.DATA_KEYS_REFS_ALLOW_LEGACY_MATCH !== 'false';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
     if (size <= 0) return [arr];
@@ -178,6 +186,10 @@ export async function _updateDataKeysRefs({
             if (uniqueKey) {
                 const keyById = byUniqueKey.get(uniqueKey);
                 if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+            }
+
+            if (!ALLOW_LEGACY_DATA_KEY_MATCH) {
+                return {};
             }
 
             const trimmedKey = `${key || ''}`.trim();

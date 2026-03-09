@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { useAppContext } from '@/contexts/app';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
+import { ExportMetadataButton } from './export-metadata-button';
 import { 
     Select, 
     SelectGroup,
@@ -114,16 +115,20 @@ export function DataKeysTableHeader() {
                         </div>
 
                         {canManageDataKeys && (
-                            <Button
-                                asChild
-                                variant="ghost"
-                                className="w-auto h-auto"
-                            >
-                                <Link href="/data-keys/new">
-                                    <PlusIcon className="size-4 mr-2" />
-                                    Add
-                                </Link>
-                            </Button>
+                            <>
+                                <Button
+                                    asChild
+                                    variant="ghost"
+                                    className="w-auto h-auto"
+                                >
+                                    <Link href="/data-keys/new">
+                                        <PlusIcon className="size-4 mr-2" />
+                                        Add
+                                    </Link>
+                                </Button>
+
+                                <ExportMetadataButton />
+                            </>
                         )}
                     </div>
                 </div>
