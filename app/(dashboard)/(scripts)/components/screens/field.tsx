@@ -304,7 +304,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                     onChange={([item]) => {
                       setValue("key", item?.name, { shouldDirty: true })
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
-                      setValue("label", item?.label, { shouldDirty: true })
+                      setValue("label", item?.label, { shouldDirty: true });
+                      setValue('confidential', !!item?.metadata?.confidential, { shouldDirty: true, });
+                      setValue('optional', !!item?.metadata?.optional, { shouldDirty: true, });
                     }}
                   />
                 </div>
