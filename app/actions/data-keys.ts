@@ -139,12 +139,18 @@ export const getDataKeysUsageExportRows = async (params?: {
             };
         }
 
-        const byUniqueKey = new Map<string, string>();
+        const byUniqueKey = new Map<string, {
+            name: string;
+            metadata: Record<string, any>;
+        }>();
         const namesMap = new Map<string, Set<string>>();
         const allowLegacyNameMatch = process.env.DATA_KEYS_USAGE_ALLOW_LEGACY_NAME_MATCH === 'true';
 
         dataKeysRes.data.forEach(dataKey => {
-            if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey.name);
+            if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, {
+                name: dataKey.name,
+                metadata: dataKey.metadata || {},
+            });
             if (dataKey.name) {
                 if (!namesMap.has(dataKey.name)) namesMap.set(dataKey.name, new Set());
                 namesMap.get(dataKey.name)!.add(dataKey.uniqueKey);
@@ -153,7 +159,7 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         const rowsMap = new Map<string, DataKeysUsageExportRow>();
 
-        const resolveDataKeyName = (keyId?: string | null, keyName?: string | null) => {
+        const resolveDataKey = (keyId?: string | null, keyName?: string | null) => {
             const byKeyId = keyId ? byUniqueKey.get(keyId) : undefined;
             if (byKeyId) return byKeyId;
 
@@ -165,7 +171,9 @@ export const getDataKeysUsageExportRows = async (params?: {
             const matched = namesMap.get(name);
             if (!matched || matched.size !== 1) return null;
 
-            return name;
+            const [matchedUniqueKey] = Array.from(matched);
+            if (!matchedUniqueKey) return null;
+            return byUniqueKey.get(matchedUniqueKey) || null;
         };
 
         const addRow = ({
@@ -177,15 +185,19 @@ export const getDataKeysUsageExportRows = async (params?: {
             keyId?: string | null;
             keyName?: string | null;
             scriptTitle: string;
-            confidential: boolean;
+            confidential?: boolean;
         }) => {
-            const dataKeyName = resolveDataKeyName(keyId, keyName);
-            if (!dataKeyName) return;
+            const dataKey = resolveDataKey(keyId, keyName);
+            if (!dataKey) return;
+            const defaultConfidential = !!dataKey.metadata?.confidential;
+            const confidentialValue = typeof confidential === 'boolean'
+                ? confidential
+                : defaultConfidential;
 
             const row: DataKeysUsageExportRow = {
-                DataKey: dataKeyName,
+                DataKey: dataKey.name,
                 ScriptTitle: scriptTitle || '',
-                Confidential: confidential ? 'true' : 'false',
+                Confidential: confidentialValue ? 'true' : 'false',
             };
 
             const mapKey = `${row.DataKey}|||${row.ScriptTitle}|||${row.Confidential}`;
