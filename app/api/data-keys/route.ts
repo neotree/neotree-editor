@@ -13,25 +13,9 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const parsedParams = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams & {
-            lean?: string;
-        };
-        const {
-            lean,
-            ...params
-        } = parsedParams;
+        const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
 
         res = await _getDataKeys(params);
-
-        if (lean === 'true') {
-            res = {
-                ...res,
-                data: res.data.map(item => ({
-                    ...item,
-                    metadata: {},
-                })),
-            };
-        }
 
 		return NextResponse.json(res);
 	} catch(e: any) {
