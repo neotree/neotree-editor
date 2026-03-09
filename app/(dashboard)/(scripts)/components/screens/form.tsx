@@ -258,6 +258,7 @@ export function ScreenForm(props: Props) {
                     setValue('key', key, { shouldDirty: true, });
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
+                    setValue('confidential', !!dataKey?.metadata?.confidential, { shouldDirty: true, });
                     if (hasItems) setValue('items', [], { shouldDirty: true, });
                     if (hasFields) setValue('fields', [], { shouldDirty: true, });
 

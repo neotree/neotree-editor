@@ -236,6 +236,7 @@ export function Item<P = {}>({
           if (dataKey?.confidential) {
             setValue("confidential", true, { shouldDirty: true })
           }
+          setValue("label", label, { shouldDirty: true })
         }}
       />
     )
