@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/ping/route.ts
+// File: /home/watkay/ReactProjects/neotree-editor/app/api/ping/route.ts
 import * as entry from '../../../../../app/api/ping/route.js'
 import type { NextRequest } from 'next/server.js'
 
