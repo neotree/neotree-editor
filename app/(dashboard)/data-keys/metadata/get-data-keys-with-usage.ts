@@ -21,6 +21,16 @@ type DataKeyUsage = {
         scripts: { scriptId: string; scriptTitle?: string }[];
         screens: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
         diagnoses: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
+        usages: {
+            id: string;
+            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom';
+            title: string;
+            location: string;
+            scriptId: string;
+            scriptTitle?: string;
+            screenId?: string;
+            diagnosisId?: string;
+        }[];
     };
     rows: DataKeysUsageExportRow[];
     summary: {

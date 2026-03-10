@@ -46,6 +46,17 @@ type AffectedEntity = {
     type: 'screen' | 'diagnosis';
 };
 
+type AffectedUsage = {
+    id: string;
+    kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom';
+    title: string;
+    location: string;
+    scriptId: string;
+    scriptTitle?: string;
+    screenId?: string;
+    diagnosisId?: string;
+};
+
 export type UpdateDataKeysRefsResponse = {
     errors?: string[];
     success: boolean;
@@ -54,6 +65,7 @@ export type UpdateDataKeysRefsResponse = {
         scripts: { scriptId: string; scriptTitle?: string; }[];
         screens: AffectedEntity[];
         diagnoses: AffectedEntity[];
+        usages: AffectedUsage[];
     };
 };
 
@@ -230,6 +242,19 @@ export async function _updateDataKeysRefs({
             if (source === 'legacyLabel') stats.matchedByLegacyLabel++;
         };
 
+        const usagesMap = new Map<string, AffectedUsage>();
+        const addUsage = (usage: AffectedUsage) => {
+            const dedupeKey = [
+                usage.kind,
+                usage.scriptId,
+                usage.screenId || '',
+                usage.diagnosisId || '',
+                usage.id,
+                usage.title,
+            ].join('|');
+            usagesMap.set(dedupeKey, usage);
+        };
+
         const oldNamesArr = Array.from(oldNames);
         const oldLabelsArr = Array.from(oldLabels);
 
@@ -371,6 +396,7 @@ export async function _updateDataKeysRefs({
                     scripts: [],
                     screens: [],
                     diagnoses: [],
+                    usages: [],
                 },
             };
         }
@@ -409,9 +435,21 @@ export async function _updateDataKeysRefs({
             });
             trackMatchSource(screenMatchSource);
 
+            if (screenDataKey) {
+                addUsage({
+                    id: s.screenId,
+                    kind: 'screen',
+                    title: s.title || s.label || s.refId || s.screenId,
+                    location: 'Screen',
+                    scriptId: s.scriptId,
+                    scriptTitle: s.scriptTitle || undefined,
+                    screenId: s.screenId,
+                });
+            }
+
             let updated = !!screenDataKey || !!refIdDataKey;
 
-            const items = (s.items || []).map(item => {
+            const items = (s.items || []).map((item, itemIndex) => {
                 const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
                     key: item.key || item.id,
@@ -420,7 +458,18 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(itemMatchSource);
 
-                if (itemDataKey) updated = true;
+                if (itemDataKey) {
+                    updated = true;
+                    addUsage({
+                        id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                        kind: 'screen_item',
+                        title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                        location: s.title || s.label || s.refId || s.screenId,
+                        scriptId: s.scriptId,
+                        scriptTitle: s.scriptTitle || undefined,
+                        screenId: s.screenId,
+                    });
+                }
                 return {
                     ...item,
                     ...(!itemDataKey ? {} : {
@@ -433,7 +482,7 @@ export async function _updateDataKeysRefs({
                 };
             });
 
-            const fields = (s.fields || []).map(field => {
+            const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
                     key: field.key,
@@ -476,6 +525,18 @@ export async function _updateDataKeysRefs({
                     updated = true;
                 }
 
+                if (fieldDataKey) {
+                    addUsage({
+                        id: field.fieldId || `${s.screenId}:field:${fieldIndex}`,
+                        kind: 'screen_field',
+                        title: field.label || field.key || `${fieldIndex + 1}`,
+                        location: s.title || s.label || s.refId || s.screenId,
+                        scriptId: s.scriptId,
+                        scriptTitle: s.scriptTitle || undefined,
+                        screenId: s.screenId,
+                    });
+                }
+
                 return {
                     ...field,
                     ...(!fieldDataKey ? {} : {
@@ -504,7 +565,7 @@ export async function _updateDataKeysRefs({
                         maxTimeKeyId: maxTimeKeyDataKey.uniqueKey,
                         maxTimeKey: maxTimeKeyDataKey.name,
                     }),
-                    items: (field.items || []).map(item => {
+                    items: (field.items || []).map((item, fieldItemIndex) => {
                         const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                             uniqueKey: item.keyId,
                             key: `${item.value || ''}`,
@@ -513,7 +574,18 @@ export async function _updateDataKeysRefs({
                         });
                         trackMatchSource(fieldItemMatchSource);
 
-                        if (fieldItemDataKey) updated = true;
+                        if (fieldItemDataKey) {
+                            updated = true;
+                            addUsage({
+                                id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
+                                kind: 'screen_field_item',
+                                title: `${item.label || item.value || (fieldItemIndex + 1)}`,
+                                location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
+                                scriptId: s.scriptId,
+                                scriptTitle: s.scriptTitle || undefined,
+                                screenId: s.screenId,
+                            });
+                        }
                         return {
                             ...item,
                             ...(!fieldItemDataKey ? {} : {
@@ -554,9 +626,21 @@ export async function _updateDataKeysRefs({
             });
             trackMatchSource(diagnosisMatchSource);
 
+            if (diagnosisDataKey) {
+                addUsage({
+                    id: d.diagnosisId,
+                    kind: 'diagnosis',
+                    title: d.name || d.key || d.diagnosisId,
+                    location: 'Diagnosis',
+                    scriptId: d.scriptId,
+                    scriptTitle: d.scriptTitle || undefined,
+                    diagnosisId: d.diagnosisId,
+                });
+            }
+
             let updated = !!diagnosisDataKey;
 
-            const symptoms = (d.symptoms || []).map(item => {
+            const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
                     key: item.key,
@@ -565,7 +649,18 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(symptomMatchSource);
 
-                if (symptomDataKey) updated = true;
+                if (symptomDataKey) {
+                    updated = true;
+                    addUsage({
+                        id: item?.symptomId || `${d.diagnosisId}:symptom:${symptomIndex}`,
+                        kind: 'diagnosis_symptom',
+                        title: item.name || item.key || `${symptomIndex + 1}`,
+                        location: d.name || d.key || d.diagnosisId,
+                        scriptId: d.scriptId,
+                        scriptTitle: d.scriptTitle || undefined,
+                        diagnosisId: d.diagnosisId,
+                    });
+                }
                 return {
                     ...item,
                     ...(!symptomDataKey ? {} : {
@@ -620,6 +715,7 @@ export async function _updateDataKeysRefs({
             scripts: Object.values(affectedScriptsMap),
             screens: affectedScreens,
             diagnoses: affectedDiagnoses,
+            usages: Array.from(usagesMap.values()),
         };
 
         if (dryRun) {
