@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useEffect } from "react"
 import { Controller, useForm } from "react-hook-form"
 import axios from "axios"
+import Link from "next/link"
 
 import {
   Select,
@@ -188,8 +189,8 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   }, [keyId, extractDataKeys])
 
   const inheritedConfidential = useMemo(() => {
-    return !!(confidential || dataKey?.confidential)
-  }, [confidential, dataKey?.confidential])
+    return !!dataKey?.confidential
+  }, [dataKey?.confidential])
 
   useEffect(() => {
     if (confidential !== inheritedConfidential) {
@@ -318,9 +319,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       setValue("key", item?.name, { shouldDirty: true })
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
                       setValue("label", item?.label, { shouldDirty: true })
-                      if (item?.confidential) {
-                        setValue("confidential", true, { shouldDirty: true })
-                      }
+                      setValue("confidential", !!item?.confidential, { shouldDirty: true })
                       setValue("optional", !!item?.metadata?.optional, { shouldDirty: true })
                     }}
                   />
@@ -387,7 +386,19 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       </button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      Change confidentiality in the Data Key library.
+                      <div className="flex flex-col gap-y-1">
+                        <span>Change confidentiality in the Data Key library.</span>
+                        {!!keyId && (
+                          <Link
+                            href={`/data-keys/edit/${keyId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            Open Data Key
+                          </Link>
+                        )}
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

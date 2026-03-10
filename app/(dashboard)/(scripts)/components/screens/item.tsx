@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { v4 } from "uuid"
 import { Controller, useForm } from "react-hook-form"
+import Link from "next/link"
 
 import type { useScreenForm } from "../../hooks/use-screen-form"
 import type { ScriptItem as ItemType } from "@/types"
@@ -190,8 +191,8 @@ export function Item<P = {}>({
   }, [keyId, extractDataKeys])
 
   const inheritedConfidential = useMemo(() => {
-    return !!(confidential || dataKey?.confidential)
-  }, [confidential, dataKey?.confidential])
+    return !!dataKey?.confidential
+  }, [dataKey?.confidential])
 
   useEffect(() => {
     if (confidential !== inheritedConfidential) {
@@ -233,9 +234,7 @@ export function Item<P = {}>({
           setValue(variant, key, { shouldDirty: true })
           setValue("keyId", dataKey?.uniqueKey, { shouldDirty: true })
           setValue("label", label, { shouldDirty: true })
-          if (dataKey?.confidential) {
-            setValue("confidential", true, { shouldDirty: true })
-          }
+          setValue("confidential", !!dataKey?.confidential, { shouldDirty: true })
           setValue("label", label, { shouldDirty: true })
         }}
       />
@@ -327,7 +326,19 @@ export function Item<P = {}>({
                           </button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          Change confidentiality in the Data Key library.
+                          <div className="flex flex-col gap-y-1">
+                            <span>Change confidentiality in the Data Key library.</span>
+                            {!!keyId && (
+                              <Link
+                                href={`/data-keys/edit/${keyId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                Open Data Key
+                              </Link>
+                            )}
+                          </div>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
