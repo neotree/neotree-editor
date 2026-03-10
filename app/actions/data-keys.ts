@@ -61,8 +61,7 @@ export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = asyn
 
 export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = async params => {
     try {
-        const session = await isAllowed();
-        assertCanManageDataKeys(session.user);
+        await isAllowed();
         return await _previewDataKeysRefsImpact(params);
     } catch (e: any) {
         logger.error('previewDataKeysRefsImpact ERROR', e.message);

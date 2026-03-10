@@ -115,21 +115,19 @@ export function DataKeysTableHeader() {
                         </div>
 
                         {canManageDataKeys && (
-                            <>
-                                <Button
-                                    asChild
-                                    variant="ghost"
-                                    className="w-auto h-auto"
-                                >
-                                    <Link href="/data-keys/new">
-                                        <PlusIcon className="size-4 mr-2" />
-                                        Add
-                                    </Link>
-                                </Button>
-
-                                <ExportMetadataButton />
-                            </>
+                            <Button
+                                asChild
+                                variant="ghost"
+                                className="w-auto h-auto"
+                            >
+                                <Link href="/data-keys/new">
+                                    <PlusIcon className="size-4 mr-2" />
+                                    Add
+                                </Link>
+                            </Button>
                         )}
+
+                        <ExportMetadataButton />
                     </div>
                 </div>
             </div>
