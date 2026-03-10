@@ -308,10 +308,10 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
             .sort((a, b) => {
-                if (a.DataKeyUniqueKey !== b.DataKeyUniqueKey) return a.DataKeyUniqueKey.localeCompare(b.DataKeyUniqueKey);
                 if (a.DataKeyKey !== b.DataKeyKey) return a.DataKeyKey.localeCompare(b.DataKeyKey);
                 if (a.DataKeyLabel !== b.DataKeyLabel) return a.DataKeyLabel.localeCompare(b.DataKeyLabel);
                 if (a.ScriptTitle !== b.ScriptTitle) return a.ScriptTitle.localeCompare(b.ScriptTitle);
+                if (a.DataKeyUniqueKey !== b.DataKeyUniqueKey) return a.DataKeyUniqueKey.localeCompare(b.DataKeyUniqueKey);
                 return a.Confidential.localeCompare(b.Confidential);
             });
 
