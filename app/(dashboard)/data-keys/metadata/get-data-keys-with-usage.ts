@@ -21,6 +21,20 @@ type DataKeyUsage = {
         scripts: { scriptId: string; scriptTitle?: string }[];
         screens: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
         diagnoses: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
+        usages: {
+            id: string;
+            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom';
+            title: string;
+            location: string;
+            scriptId: string;
+            scriptTitle?: string;
+            screenId?: string;
+            diagnosisId?: string;
+            screenItemIndex?: number;
+            fieldIndex?: number;
+            fieldItemIndex?: number;
+            diagnosisSymptomIndex?: number;
+        }[];
     };
     rows: DataKeysUsageExportRow[];
     summary: {
@@ -38,12 +52,12 @@ export type DataKeyWithUsage = DataKey & {
 
 export async function getDataKeysWithUsage(dataKeys: DataKey[]): Promise<DataKeyWithUsage[]> {
     const usageRowsRes = await getDataKeysUsageExportRows({
-        dataKeys: Array.from(new Set(dataKeys.map(k => k.name).filter(Boolean))),
+        uniqueKeys: Array.from(new Set(dataKeys.map(k => k.uniqueKey).filter(Boolean))),
     });
     const rowsByDataKey = new Map<string, DataKeysUsageExportRow[]>();
     (usageRowsRes.data || []).forEach(row => {
-        if (!rowsByDataKey.has(row.DataKey)) rowsByDataKey.set(row.DataKey, []);
-        rowsByDataKey.get(row.DataKey)!.push(row);
+        if (!rowsByDataKey.has(row.DataKeyUniqueKey)) rowsByDataKey.set(row.DataKeyUniqueKey, []);
+        rowsByDataKey.get(row.DataKeyUniqueKey)!.push(row);
     });
 
     const usageEntries = await Promise.all(
@@ -61,7 +75,7 @@ export async function getDataKeysWithUsage(dataKeys: DataKey[]): Promise<DataKey
                 }],
             });
 
-            const rows = rowsByDataKey.get(dataKey.name || '') || [];
+            const rows = rowsByDataKey.get(dataKey.uniqueKey || '') || [];
             const scripts = new Set(rows.map(r => r.ScriptTitle).filter(Boolean));
             const confidentialTrue = rows.filter(r => r.Confidential === 'true').length;
             const confidentialFalse = rows.filter(r => r.Confidential === 'false').length;

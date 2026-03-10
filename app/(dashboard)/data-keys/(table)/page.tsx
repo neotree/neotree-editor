@@ -8,9 +8,10 @@ import { DataKeysTable } from '../components/table';
 export const dynamic = 'force-dynamic';
 
 export default async function DataKeysPage() { 
-    const [{ isSuperUser }] = await Promise.all([
+    const [{ isSuperUser, isAdmin }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
+    const canManageDataKeys = isSuperUser || isAdmin;
 
     return (
         <>
@@ -21,7 +22,7 @@ export default async function DataKeysPage() {
                     <CardContent className="p-0">
                         <DataKeysTable 
                             {...actions}
-                            disabled={!isSuperUser}
+                            disabled={!canManageDataKeys}
                         />
                     </CardContent>
                 </Card>
