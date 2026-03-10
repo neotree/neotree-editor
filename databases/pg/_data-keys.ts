@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import { 
+    boolean,
     index,
     integer,
     jsonb,
@@ -21,6 +22,7 @@ export const dataKeys = pgTable(
         label: text('label').default('').notNull(),
         refId: text('ref_id'),
         dataType: text('data_type').notNull(),
+        confidential: boolean('confidential').notNull().default(true),
         options: jsonb('options').default([]).$type<string[]>().notNull(),
         metadata: jsonb('metadata').default({}).$type<Record<string, any>>().notNull(),
         version: integer('version').notNull(),

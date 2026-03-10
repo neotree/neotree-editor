@@ -11,9 +11,16 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, isNull, max } from 'drizzle-orm';
 
+function assertCanManageDataKeys(user?: { role?: string | null } | null) {
+    const role = user?.role;
+    const allowed = role === 'admin' || role === 'super_user';
+    if (!allowed) throw new Error('Forbidden: only admin or super_user can manage data keys');
+}
+
 export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
         return await _saveDataKeys({
             ...params,
             userId: session.user?.userId,
@@ -24,9 +31,33 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     }
 }
 
-export const saveDataKeysIfNotExist = _saveDataKeysIfNotExist;
+export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async params => {
+    try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+        return await _saveDataKeysIfNotExist({
+            ...params,
+            userId: session.user?.userId,
+        });
+    } catch (e: any) {
+        logger.error('saveDataKeysIfNotExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+};
 
-export const saveDataKeysUpdateIfExist = _saveDataKeysUpdateIfExist;
+export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = async params => {
+    try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+        return await _saveDataKeysUpdateIfExist({
+            ...params,
+            userId: session.user?.userId,
+        });
+    } catch (e: any) {
+        logger.error('saveDataKeysUpdateIfExist ERROR', e.message);
+        return { errors: [e.message], success: false, };
+    }
+};
 
 export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = async params => {
     try {
@@ -59,6 +90,33 @@ function getUsageExportCacheStore(): { current?: UsageExportCache } {
         globalWithCache[USAGE_EXPORT_CACHE_KEY] = {};
     }
     return globalWithCache[USAGE_EXPORT_CACHE_KEY]!;
+}
+
+function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
+    return rows.map((row) => {
+        const r = (row || {}) as {
+            DataKeyUniqueKey?: unknown;
+            DataKeyKey?: unknown;
+            DataKeyLabel?: unknown;
+            DataKey?: unknown;
+            ScriptTitle?: unknown;
+            Confidential?: unknown;
+        };
+
+        const dataKeyUniqueKey = `${r.DataKeyUniqueKey ?? ''}`.trim();
+        const dataKeyKey = `${r.DataKeyKey ?? r.DataKey ?? ''}`.trim();
+        const dataKeyLabel = `${r.DataKeyLabel ?? ''}`.trim();
+        const scriptTitle = `${r.ScriptTitle ?? ''}`.trim();
+        const confidential = `${r.Confidential ?? 'false'}`.toLowerCase() === 'true' ? 'true' : 'false';
+
+        return {
+            DataKeyUniqueKey: dataKeyUniqueKey,
+            DataKeyKey: dataKeyKey,
+            DataKeyLabel: dataKeyLabel,
+            ScriptTitle: scriptTitle,
+            Confidential: confidential,
+        };
+    });
 }
 
 async function getUsageExportFingerprint() {
@@ -100,6 +158,7 @@ async function getUsageExportFingerprint() {
 
 export const getDataKeysUsageExportRows = async (params?: {
     dataKeys?: string[];
+    uniqueKeys?: string[];
 }): Promise<{
     success: boolean;
     data: DataKeysUsageExportRow[];
@@ -125,22 +184,30 @@ export const getDataKeysUsageExportRows = async (params?: {
         ]);
 
         const cache = getUsageExportCacheStore();
-        const filterDataKeys = new Set((params?.dataKeys || []).filter(Boolean));
+        const filterDataKeys = new Set([
+            ...(params?.dataKeys || []),
+            ...(params?.uniqueKeys || []),
+        ].filter(Boolean));
         const applyFilter = (rows: DataKeysUsageExportRow[]) => (
             !filterDataKeys.size
                 ? rows
-                : rows.filter(row => filterDataKeys.has(row.DataKey))
+                : rows.filter(row => filterDataKeys.has(row.DataKeyUniqueKey || row.DataKeyKey))
         );
 
         if (cache.current && cache.current.fingerprint === fingerprint) {
+            const normalizedCachedRows = normalizeUsageExportRows(cache.current.data as unknown[]);
+            cache.current.data = normalizedCachedRows;
             return {
                 success: true,
-                data: applyFilter(cache.current.data),
+                data: applyFilter(normalizedCachedRows),
             };
         }
 
         const byUniqueKey = new Map<string, {
+            uniqueKey: string;
             name: string;
+            label: string;
+            confidential: boolean;
             metadata: Record<string, any>;
         }>();
         const namesMap = new Map<string, Set<string>>();
@@ -148,7 +215,10 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         dataKeysRes.data.forEach(dataKey => {
             if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, {
+                uniqueKey: dataKey.uniqueKey,
                 name: dataKey.name,
+                label: dataKey.label || '',
+                confidential: !!dataKey.confidential,
                 metadata: dataKey.metadata || {},
             });
             if (dataKey.name) {
@@ -180,27 +250,24 @@ export const getDataKeysUsageExportRows = async (params?: {
             keyId,
             keyName,
             scriptTitle,
-            confidential,
         }: {
             keyId?: string | null;
             keyName?: string | null;
             scriptTitle: string;
-            confidential?: boolean;
         }) => {
             const dataKey = resolveDataKey(keyId, keyName);
             if (!dataKey) return;
-            const defaultConfidential = !!dataKey.metadata?.confidential;
-            const confidentialValue = typeof confidential === 'boolean'
-                ? confidential
-                : defaultConfidential;
+            const confidentialValue = !!dataKey.confidential;
 
             const row: DataKeysUsageExportRow = {
-                DataKey: dataKey.name,
+                DataKeyUniqueKey: dataKey.uniqueKey || keyId || '',
+                DataKeyKey: dataKey.name,
+                DataKeyLabel: dataKey.label || '',
                 ScriptTitle: scriptTitle || '',
                 Confidential: confidentialValue ? 'true' : 'false',
             };
 
-            const mapKey = `${row.DataKey}|||${row.ScriptTitle}|||${row.Confidential}`;
+            const mapKey = `${row.DataKeyUniqueKey}|||${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}`;
             rowsMap.set(mapKey, row);
         };
 
@@ -211,7 +278,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                 keyId: screen.keyId,
                 keyName: screen.key,
                 scriptTitle,
-                confidential: !!screen.confidential,
             });
 
             (screen.fields || []).forEach(field => {
@@ -219,7 +285,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                     keyId: field.keyId,
                     keyName: field.key,
                     scriptTitle,
-                    confidential: !!field.confidential,
                 });
 
                 (field.items || []).forEach(item => {
@@ -227,7 +292,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                         keyId: item.keyId,
                         keyName: `${item.value || ''}` || `${item.label || ''}`,
                         scriptTitle,
-                        confidential: !!field.confidential,
                     });
                 });
             });
@@ -237,15 +301,16 @@ export const getDataKeysUsageExportRows = async (params?: {
                     keyId: item.keyId,
                     keyName: item.key || item.id,
                     scriptTitle,
-                    confidential: !!item.confidential,
                 });
             });
         });
 
-        const data = Array.from(rowsMap.values())
+        const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
             .sort((a, b) => {
-                if (a.DataKey !== b.DataKey) return a.DataKey.localeCompare(b.DataKey);
+                if (a.DataKeyKey !== b.DataKeyKey) return a.DataKeyKey.localeCompare(b.DataKeyKey);
+                if (a.DataKeyLabel !== b.DataKeyLabel) return a.DataKeyLabel.localeCompare(b.DataKeyLabel);
                 if (a.ScriptTitle !== b.ScriptTitle) return a.ScriptTitle.localeCompare(b.ScriptTitle);
+                if (a.DataKeyUniqueKey !== b.DataKeyUniqueKey) return a.DataKeyUniqueKey.localeCompare(b.DataKeyUniqueKey);
                 return a.Confidential.localeCompare(b.Confidential);
             });
 
@@ -282,6 +347,9 @@ export const exportDataKeys = async ({
     errors?: string[];
 }> => {
     try {
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
+
         const axiosClient = await getSiteAxiosClient(siteId);
         
         const dataKeys = await _getDataKeys({

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
-import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -28,17 +28,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from '@/components/data-table';
 import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
 import { SelectModal } from "@/components/select-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
 
@@ -64,6 +69,7 @@ const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
         name: source.name ?? "",
         refId: source.refId ?? "",
         dataType: source.dataType ?? "",
+        confidential: !!source.confidential,
         label: source.label ?? "",
         options: Array.isArray(source.options) ? source.options : [],
         metadata: source.metadata ?? {},
@@ -90,6 +96,7 @@ function Form({
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
+    const { alert } = useAlertModal();
     const { authenticatedUser, viewOnly } = useAppContext();
 
     const dataKey = useMemo(() => dataKeys.find(k => (
@@ -117,6 +124,7 @@ function Form({
             name: dataKey?.name || '',
             refId: dataKey?.refId || '',
             dataType: dataKey?.dataType || '',
+            confidential: dataKey ? !!dataKey.confidential : true,
             label: dataKey?.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
@@ -164,6 +172,7 @@ function Form({
     const options = watch('options');
     const nameValue = watch('name');
     const labelValue = watch('label');
+    const confidential = !!watch('confidential');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -180,6 +189,7 @@ function Form({
             name: values.name || '',
             label: values.label || '',
             dataType: values.dataType || '',
+            confidential: !!values.confidential,
             refId: values.refId || '',
             options: values.options || [],
             metadata: values.metadata || {},
@@ -214,7 +224,8 @@ function Form({
         const changed = (
             `${nameValue || ''}` !== `${dataKey.name || ''}` ||
             `${labelValue || ''}` !== `${dataKey.label || ''}` ||
-            `${dataType || ''}` !== `${dataKey.dataType || ''}`
+            `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
+            !!confidential !== !!dataKey.confidential
         );
         if (!changed) {
             setImpactPreview(undefined);
@@ -232,6 +243,7 @@ function Form({
         nameValue,
         labelValue,
         dataType,
+        confidential,
         loadImpactPreview,
     ]);
 
@@ -309,45 +321,122 @@ function Form({
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
 
+        const usageByScript = new Map<string, NonNullable<UpdateDataKeysRefsResponse['affected']>['usages']>();
+        (affected.usages || []).forEach((usage) => {
+            const current = usageByScript.get(usage.scriptId) || [];
+            current.push(usage);
+            usageByScript.set(usage.scriptId, current);
+        });
+
+        const scriptRows = (affected.scripts || []).map((script) => ({
+            ...script,
+            usages: usageByScript.get(script.scriptId) || [],
+        }));
+
         return (
             <div className="space-y-3">
                 <DataTable
-                    title={`Scripts (${affected.scripts.length})`}
+                    title={`Affected scripts (${scriptRows.length})`}
+                    rowRenderer={({ props, cells, rowIndex }) => {
+                        const row = scriptRows[rowIndex];
+                        if (!row) return null;
+
+                        return (
+                            <>
+                                <TableRow {...props}>
+                                    {cells}
+                                </TableRow>
+
+                                {!!row.usages.length && (
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                        <TableCell colSpan={cells.length} className="p-0">
+                                            <div className="flex flex-col gap-y-2">
+                                                {row.usages.map((usage, index) => {
+                                                    const linkLabel = (() => {
+                                                        if (usage.kind === 'screen') return 'screen';
+                                                        if (usage.kind === 'screen_field') return 'field';
+                                                        if (usage.kind === 'screen_item') return 'item';
+                                                        if (usage.kind === 'screen_field_item') return 'field item';
+                                                        if (usage.kind === 'diagnosis') return 'diagnosis';
+                                                        if (usage.kind === 'diagnosis_symptom') return 'symptom';
+                                                        return 'open';
+                                                    })();
+                                                    const href = (() => {
+                                                        if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
+                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        }
+                                                        if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
+                                                        if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        return `/script/${usage.scriptId}`;
+                                                    })();
+
+                                                    return (
+                                                        <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
+                                                            <div className="flex items-center gap-x-2 p-2 px-4">
+                                                                <div className="font-medium">{usage.title}</div>
+                                                                <div className="text-muted-foreground">{usage.location}</div>
+                                                                <div className="ml-auto flex gap-x-2">
+                                                                    <Link
+                                                                        href={href}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-x-1"
+                                                                    >
+                                                                        {linkLabel}
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                </div>
+                                                            </div>
+                                                            {(index < row.usages.length - 1) && <Separator />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        );
+                    }}
                     columns={[
                         { name: 'Script title' },
                         { name: 'Script ID' },
+                        { name: 'Matches', align: 'right' },
+                        {
+                            name: '',
+                            align: 'right',
+                            cellClassName: 'w-12',
+                            cellRenderer({ rowIndex }) {
+                                const script = scriptRows[rowIndex];
+                                if (!script?.scriptId) return null;
+
+                                return (
+                                    <Link
+                                        href={`/script/${script.scriptId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Open script"
+                                    >
+                                        <ExternalLinkIcon className="h-4 w-4 text-primary" />
+                                    </Link>
+                                );
+                            },
+                        },
                     ]}
-                    data={affected.scripts.map(s => [
+                    data={scriptRows.map(s => [
                         s.scriptTitle || '',
                         s.scriptId || '',
-                    ])}
-                />
-
-                <DataTable
-                    title={`Screens (${affected.screens.length})`}
-                    columns={[
-                        { name: 'Screen title' },
-                        { name: 'Script title' },
-                        { name: 'Screen ID' },
-                    ]}
-                    data={affected.screens.map(s => [
-                        s.title || '',
-                        s.scriptTitle || '',
-                        s.id || '',
-                    ])}
-                />
-
-                <DataTable
-                    title={`Diagnoses (${affected.diagnoses.length})`}
-                    columns={[
-                        { name: 'Diagnosis name' },
-                        { name: 'Script title' },
-                        { name: 'Diagnosis ID' },
-                    ]}
-                    data={affected.diagnoses.map(d => [
-                        d.title || '',
-                        d.scriptTitle || '',
-                        d.id || '',
+                        `${s.usages.length}`,
+                        '',
                     ])}
                 />
             </div>
@@ -444,6 +533,35 @@ function Form({
                             />
                         </div>
 
+                        <div className="px-4">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="dataKeyConfidential"
+                                    checked={confidential}
+                                    disabled={isFormDisabled}
+                                    onCheckedChange={checked => {
+                                        if (!checked && confidential) {
+                                            confirm(
+                                                () => setValue('confidential', false, { shouldDirty: true }),
+                                                {
+                                                    title: 'Disable confidentiality?',
+                                                    message: 'You are about to mark this Data Key as non-confidential. This can expose sensitive data in linked scripts. Only continue if you fully understand the impact.',
+                                                    danger: true,
+                                                },
+                                            );
+                                            return;
+                                        }
+
+                                        setValue('confidential', checked, { shouldDirty: true });
+                                    }}
+                                />
+                                <Label htmlFor="dataKeyConfidential">Confidential</Label>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Fields and items that reference this Data Key inherit this setting.
+                            </span>
+                        </div>
+
                         <Controller
                             control={control}
                             name="metadata"
@@ -452,24 +570,9 @@ function Form({
                                     <>
                                         <div className="px-4 flex items-center space-x-2">
                                             <Checkbox
-                                                id="confidential"
-                                                checked={!!value.confidential}
-                                                disabled={disabled}
-                                                onCheckedChange={checked => {
-                                                    onChange({
-                                                        ...value,
-                                                        confidential: checked,
-                                                    })
-                                                }}
-                                            />
-                                            <Label htmlFor="confidential">Confidential</Label>
-                                        </div>
-
-                                        <div className="px-4 flex items-center space-x-2">
-                                            <Checkbox
                                                 id="optional"
                                                 checked={!!value.optional}
-                                                disabled={disabled}
+                                                disabled={isFormDisabled}
                                                 onCheckedChange={checked => {
                                                     onChange({
                                                         ...value,
@@ -628,7 +731,7 @@ function Form({
                                 )}
                                 {!impactPreview && !!dataKey && !previewingImpact && (
                                     <div className="text-sm text-muted-foreground">
-                                        No pending impact preview yet. Change key, label, or type to load preview.
+                                        No pending impact preview yet. Change key, label, type, or confidentiality to load preview.
                                     </div>
                                 )}
 
@@ -669,7 +772,7 @@ function Form({
                         {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
-                                disabled={isFormDisabled}
+                                disabled={isFormDisabled || previewingImpact}
                             >
                                 Save
                             </Button>

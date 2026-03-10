@@ -15,6 +15,7 @@ export type SaveDataKeysParams = {
     broadcastAction?: boolean,
     userId?: string;
     updateRefs?: boolean;
+    allowConfidentialDowngrade?: boolean;
 };
 
 export type SaveDataKeysResponse = { 
@@ -35,6 +36,21 @@ export async function _saveDataKeys({
 
     try {
         const errors = [];
+
+        const resolveConfidential = ({
+            incoming,
+            existing,
+            fallback,
+        }: {
+            incoming: SaveDataKeysData;
+            existing?: Partial<typeof dataKeys.$inferSelect> | null;
+            fallback?: boolean | null;
+        }) => {
+            if (typeof incoming.confidential === 'boolean') return incoming.confidential;
+            if (typeof existing?.confidential === 'boolean') return existing.confidential;
+            if (typeof fallback === 'boolean') return fallback;
+            return true;
+        };
 
         const data = dataParam.map(item => {
             return {
@@ -82,10 +98,24 @@ export async function _saveDataKeys({
                     });
 
                     if (draft) {
+                        const publishedForDraft = !draft.dataKeyId ? null : await db.query.dataKeys.findFirst({
+                            where: eq(dataKeys.uuid, draft.dataKeyId),
+                            columns: {
+                                confidential: true,
+                                name: true,
+                            },
+                        });
+
                         const data = {
                             ...draft.data,
                             ...item,
                         };
+                        const resolvedConfidential = resolveConfidential({
+                            incoming: item,
+                            existing: draft.data,
+                            fallback: publishedForDraft?.confidential,
+                        });
+                        data.confidential = resolvedConfidential;
 
                         if (data.uniqueKey) {
                             previousDataKeys.push({
@@ -115,6 +145,8 @@ export async function _saveDataKeys({
                             uuid: dataKeyUuid,
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
+                        const resolvedConfidential = resolveConfidential({ incoming: item, existing: published });
+                        data.confidential = resolvedConfidential;
 
                         previousDataKeys.push({
                             uniqueKey: data.uniqueKey,
