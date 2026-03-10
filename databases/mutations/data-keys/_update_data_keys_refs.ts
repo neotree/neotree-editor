@@ -426,6 +426,7 @@ export async function _updateDataKeysRefs({
                     ...(!itemDataKey ? {} : {
                         keyId: itemDataKey.uniqueKey,
                         label: itemDataKey.label,
+                        confidential: !!itemDataKey.confidential,
                         ...(!(`${item.key || ''}`.length) ? {} : { key: itemDataKey.name, }),
                         ...(!(`${item.id || ''}`.length) ? {} : { id: itemDataKey.name, }),
                     }),
@@ -481,6 +482,7 @@ export async function _updateDataKeysRefs({
                         keyId: fieldDataKey.uniqueKey,
                         key: fieldDataKey.name,
                         label: fieldDataKey.label,
+                        confidential: !!fieldDataKey.confidential,
                     }),
                     ...(!refKeyDataKey ? {} : {
                         refKeyId: refKeyDataKey.uniqueKey,
@@ -533,6 +535,7 @@ export async function _updateDataKeysRefs({
                     keyId: screenDataKey.uniqueKey,
                     key: screenDataKey.name,
                     label: screenDataKey.label,
+                    confidential: !!screenDataKey.confidential,
                 }),
                 ...(!refIdDataKey ? {} : {
                     refId: refIdDataKey.name,

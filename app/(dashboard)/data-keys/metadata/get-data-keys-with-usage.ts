@@ -42,8 +42,8 @@ export async function getDataKeysWithUsage(dataKeys: DataKey[]): Promise<DataKey
     });
     const rowsByDataKey = new Map<string, DataKeysUsageExportRow[]>();
     (usageRowsRes.data || []).forEach(row => {
-        if (!rowsByDataKey.has(row.DataKey)) rowsByDataKey.set(row.DataKey, []);
-        rowsByDataKey.get(row.DataKey)!.push(row);
+        if (!rowsByDataKey.has(row.DataKeyKey)) rowsByDataKey.set(row.DataKeyKey, []);
+        rowsByDataKey.get(row.DataKeyKey)!.push(row);
     });
 
     const usageEntries = await Promise.all(

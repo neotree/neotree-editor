@@ -1,5 +1,6 @@
 export type DataKeysUsageExportRow = {
-    DataKey: string;
+    DataKeyKey: string;
+    DataKeyLabel: string;
     ScriptTitle: string;
     Confidential: 'true' | 'false';
 };
