@@ -485,24 +485,9 @@ function Form({
                                     <>
                                         <div className="px-4 flex items-center space-x-2">
                                             <Checkbox
-                                                id="confidential"
-                                                checked={!!value.confidential}
-                                                disabled={disabled}
-                                                onCheckedChange={checked => {
-                                                    onChange({
-                                                        ...value,
-                                                        confidential: checked,
-                                                    })
-                                                }}
-                                            />
-                                            <Label htmlFor="confidential">Confidential</Label>
-                                        </div>
-
-                                        <div className="px-4 flex items-center space-x-2">
-                                            <Checkbox
                                                 id="optional"
                                                 checked={!!value.optional}
-                                                disabled={disabled}
+                                                disabled={isFormDisabled}
                                                 onCheckedChange={checked => {
                                                     onChange({
                                                         ...value,
