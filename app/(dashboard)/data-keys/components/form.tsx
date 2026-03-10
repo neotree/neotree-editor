@@ -352,6 +352,15 @@ function Form({
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {row.usages.map((usage, index) => {
+                                                    const linkLabel = (() => {
+                                                        if (usage.kind === 'screen') return 'screen';
+                                                        if (usage.kind === 'screen_field') return 'field';
+                                                        if (usage.kind === 'screen_item') return 'item';
+                                                        if (usage.kind === 'screen_field_item') return 'field item';
+                                                        if (usage.kind === 'diagnosis') return 'diagnosis';
+                                                        if (usage.kind === 'diagnosis_symptom') return 'symptom';
+                                                        return 'open';
+                                                    })();
                                                     const href = (() => {
                                                         if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
                                                             return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
@@ -382,7 +391,7 @@ function Form({
                                                                         rel="noopener noreferrer"
                                                                         className="flex items-center gap-x-1"
                                                                     >
-                                                                        open
+                                                                        {linkLabel}
                                                                         <ExternalLinkIcon className="h-3 w-3" />
                                                                     </Link>
                                                                 </div>
