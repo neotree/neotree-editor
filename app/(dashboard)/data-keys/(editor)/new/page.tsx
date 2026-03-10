@@ -8,9 +8,10 @@ import { DataKeyForm } from '../../components/form';
 export const dynamic = 'force-dynamic';
 
 export default async function NewDataKeyPage() { 
-    const [{ isSuperUser }] = await Promise.all([
+    const [{ isSuperUser, isAdmin }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
+    const canManageDataKeys = isSuperUser || isAdmin;
 
     return (
         <>
@@ -21,7 +22,7 @@ export default async function NewDataKeyPage() {
                     <CardContent className="p-0">
                         <DataKeyForm 
                             {...actions}
-                            disabled={!isSuperUser}
+                            disabled={!canManageDataKeys}
                         />
                     </CardContent>
                 </Card>
