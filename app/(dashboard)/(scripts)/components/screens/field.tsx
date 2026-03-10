@@ -320,7 +320,6 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
                       setValue("label", item?.label, { shouldDirty: true })
                       setValue("confidential", !!item?.confidential, { shouldDirty: true })
-                      setValue("optional", !!item?.metadata?.optional, { shouldDirty: true })
                     }}
                   />
                 </div>
