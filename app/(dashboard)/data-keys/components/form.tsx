@@ -352,12 +352,23 @@ function Form({
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {row.usages.map((usage, index) => {
-                                                    const href =
-                                                        usage.screenId
-                                                            ? `/script/${usage.scriptId}/screen/${usage.screenId}`
-                                                            : usage.diagnosisId
-                                                                ? `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`
-                                                                : `/script/${usage.scriptId}`;
+                                                    const href = (() => {
+                                                        if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
+                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        }
+                                                        if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
+                                                        if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        return `/script/${usage.scriptId}`;
+                                                    })();
 
                                                     return (
                                                         <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
@@ -371,7 +382,7 @@ function Form({
                                                                         rel="noopener noreferrer"
                                                                         className="flex items-center gap-x-1"
                                                                     >
-                                                                        {usage.kind.replace(/_/g, ' ')}
+                                                                        open
                                                                         <ExternalLinkIcon className="h-3 w-3" />
                                                                     </Link>
                                                                 </div>

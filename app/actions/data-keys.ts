@@ -61,7 +61,8 @@ export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = asyn
 
 export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = async params => {
     try {
-        await isAllowed();
+        const session = await isAllowed();
+        assertCanManageDataKeys(session.user);
         return await _previewDataKeysRefsImpact(params);
     } catch (e: any) {
         logger.error('previewDataKeysRefsImpact ERROR', e.message);
@@ -95,6 +96,7 @@ function getUsageExportCacheStore(): { current?: UsageExportCache } {
 function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
     return rows.map((row) => {
         const r = (row || {}) as {
+            DataKeyUniqueKey?: unknown;
             DataKeyKey?: unknown;
             DataKeyLabel?: unknown;
             DataKey?: unknown;
@@ -102,12 +104,14 @@ function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
             Confidential?: unknown;
         };
 
+        const dataKeyUniqueKey = `${r.DataKeyUniqueKey ?? ''}`.trim();
         const dataKeyKey = `${r.DataKeyKey ?? r.DataKey ?? ''}`.trim();
         const dataKeyLabel = `${r.DataKeyLabel ?? ''}`.trim();
         const scriptTitle = `${r.ScriptTitle ?? ''}`.trim();
         const confidential = `${r.Confidential ?? 'false'}`.toLowerCase() === 'true' ? 'true' : 'false';
 
         return {
+            DataKeyUniqueKey: dataKeyUniqueKey,
             DataKeyKey: dataKeyKey,
             DataKeyLabel: dataKeyLabel,
             ScriptTitle: scriptTitle,
@@ -155,6 +159,7 @@ async function getUsageExportFingerprint() {
 
 export const getDataKeysUsageExportRows = async (params?: {
     dataKeys?: string[];
+    uniqueKeys?: string[];
 }): Promise<{
     success: boolean;
     data: DataKeysUsageExportRow[];
@@ -180,11 +185,14 @@ export const getDataKeysUsageExportRows = async (params?: {
         ]);
 
         const cache = getUsageExportCacheStore();
-        const filterDataKeys = new Set((params?.dataKeys || []).filter(Boolean));
+        const filterDataKeys = new Set([
+            ...(params?.dataKeys || []),
+            ...(params?.uniqueKeys || []),
+        ].filter(Boolean));
         const applyFilter = (rows: DataKeysUsageExportRow[]) => (
             !filterDataKeys.size
                 ? rows
-                : rows.filter(row => filterDataKeys.has(row.DataKeyKey))
+                : rows.filter(row => filterDataKeys.has(row.DataKeyUniqueKey || row.DataKeyKey))
         );
 
         if (cache.current && cache.current.fingerprint === fingerprint) {
@@ -197,6 +205,7 @@ export const getDataKeysUsageExportRows = async (params?: {
         }
 
         const byUniqueKey = new Map<string, {
+            uniqueKey: string;
             name: string;
             label: string;
             confidential: boolean;
@@ -207,6 +216,7 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         dataKeysRes.data.forEach(dataKey => {
             if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, {
+                uniqueKey: dataKey.uniqueKey,
                 name: dataKey.name,
                 label: dataKey.label || '',
                 confidential: !!dataKey.confidential,
@@ -251,13 +261,14 @@ export const getDataKeysUsageExportRows = async (params?: {
             const confidentialValue = !!dataKey.confidential;
 
             const row: DataKeysUsageExportRow = {
+                DataKeyUniqueKey: dataKey.uniqueKey || keyId || '',
                 DataKeyKey: dataKey.name,
                 DataKeyLabel: dataKey.label || '',
                 ScriptTitle: scriptTitle || '',
                 Confidential: confidentialValue ? 'true' : 'false',
             };
 
-            const mapKey = `${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}`;
+            const mapKey = `${row.DataKeyUniqueKey}|||${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}`;
             rowsMap.set(mapKey, row);
         };
 
@@ -297,6 +308,7 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
             .sort((a, b) => {
+                if (a.DataKeyUniqueKey !== b.DataKeyUniqueKey) return a.DataKeyUniqueKey.localeCompare(b.DataKeyUniqueKey);
                 if (a.DataKeyKey !== b.DataKeyKey) return a.DataKeyKey.localeCompare(b.DataKeyKey);
                 if (a.DataKeyLabel !== b.DataKeyLabel) return a.DataKeyLabel.localeCompare(b.DataKeyLabel);
                 if (a.ScriptTitle !== b.ScriptTitle) return a.ScriptTitle.localeCompare(b.ScriptTitle);
