@@ -30,7 +30,6 @@ export async function _saveDataKeys({
     data: dataParam, 
     broadcastAction, 
     updateRefs = true,
-    allowConfidentialDowngrade = false,
     userId,
 }: SaveDataKeysParams) {
     const response: SaveDataKeysResponse = { success: false, };
@@ -51,23 +50,6 @@ export async function _saveDataKeys({
             if (typeof existing?.confidential === 'boolean') return existing.confidential;
             if (typeof fallback === 'boolean') return fallback;
             return true;
-        };
-
-        const assertNoConfidentialDowngrade = ({
-            requested,
-            current,
-            keyName,
-        }: {
-            requested: boolean;
-            current?: boolean | null;
-            keyName?: string | null;
-        }) => {
-            if (!allowConfidentialDowngrade && current === true && requested === false) {
-                throw new Error(
-                    `Cannot downgrade confidential data key "${keyName || 'unknown'}". ` +
-                    `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
-                );
-            }
         };
 
         const data = dataParam.map(item => {
@@ -133,13 +115,6 @@ export async function _saveDataKeys({
                             existing: draft.data,
                             fallback: publishedForDraft?.confidential,
                         });
-                        assertNoConfidentialDowngrade({
-                            requested: resolvedConfidential,
-                            current: (typeof draft.data?.confidential === 'boolean')
-                                ? draft.data.confidential
-                                : publishedForDraft?.confidential,
-                            keyName: data.name || draft.data?.name || publishedForDraft?.name,
-                        });
                         data.confidential = resolvedConfidential;
 
                         if (data.uniqueKey) {
@@ -171,11 +146,6 @@ export async function _saveDataKeys({
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
                         const resolvedConfidential = resolveConfidential({ incoming: item, existing: published });
-                        assertNoConfidentialDowngrade({
-                            requested: resolvedConfidential,
-                            current: published?.confidential,
-                            keyName: data.name || published?.name,
-                        });
                         data.confidential = resolvedConfidential;
 
                         previousDataKeys.push({

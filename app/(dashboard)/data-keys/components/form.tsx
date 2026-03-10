@@ -221,7 +221,8 @@ function Form({
         const changed = (
             `${nameValue || ''}` !== `${dataKey.name || ''}` ||
             `${labelValue || ''}` !== `${dataKey.label || ''}` ||
-            `${dataType || ''}` !== `${dataKey.dataType || ''}`
+            `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
+            !!confidential !== !!dataKey.confidential
         );
         if (!changed) {
             setImpactPreview(undefined);
@@ -239,6 +240,7 @@ function Form({
         nameValue,
         labelValue,
         dataType,
+        confidential,
         loadImpactPreview,
     ]);
 
@@ -458,15 +460,18 @@ function Form({
                                     checked={confidential}
                                     disabled={isFormDisabled}
                                     onCheckedChange={checked => {
-                                        if (!checked && dataKey?.confidential) {
-                                            alert({
-                                                title: "Cannot unset confidential",
-                                                message: "This Data Key is already confidential. Downgrading is blocked by policy.",
-                                                variant: "info",
-                                            });
-                                            setValue('confidential', true, { shouldDirty: false });
+                                        if (!checked && confidential) {
+                                            confirm(
+                                                () => setValue('confidential', false, { shouldDirty: true }),
+                                                {
+                                                    title: 'Disable confidentiality?',
+                                                    message: 'You are about to mark this Data Key as non-confidential. This can expose sensitive data in linked scripts. Only continue if you fully understand the impact.',
+                                                    danger: true,
+                                                },
+                                            );
                                             return;
                                         }
+
                                         setValue('confidential', checked, { shouldDirty: true });
                                     }}
                                 />
@@ -646,7 +651,7 @@ function Form({
                                 )}
                                 {!impactPreview && !!dataKey && !previewingImpact && (
                                     <div className="text-sm text-muted-foreground">
-                                        No pending impact preview yet. Change key, label, or type to load preview.
+                                        No pending impact preview yet. Change key, label, type, or confidentiality to load preview.
                                     </div>
                                 )}
 
@@ -687,7 +692,7 @@ function Form({
                         {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
-                                disabled={isFormDisabled}
+                                disabled={isFormDisabled || previewingImpact}
                             >
                                 Save
                             </Button>

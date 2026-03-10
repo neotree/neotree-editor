@@ -92,6 +92,30 @@ function getUsageExportCacheStore(): { current?: UsageExportCache } {
     return globalWithCache[USAGE_EXPORT_CACHE_KEY]!;
 }
 
+function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
+    return rows.map((row) => {
+        const r = (row || {}) as {
+            DataKeyKey?: unknown;
+            DataKeyLabel?: unknown;
+            DataKey?: unknown;
+            ScriptTitle?: unknown;
+            Confidential?: unknown;
+        };
+
+        const dataKeyKey = `${r.DataKeyKey ?? r.DataKey ?? ''}`.trim();
+        const dataKeyLabel = `${r.DataKeyLabel ?? ''}`.trim();
+        const scriptTitle = `${r.ScriptTitle ?? ''}`.trim();
+        const confidential = `${r.Confidential ?? 'false'}`.toLowerCase() === 'true' ? 'true' : 'false';
+
+        return {
+            DataKeyKey: dataKeyKey,
+            DataKeyLabel: dataKeyLabel,
+            ScriptTitle: scriptTitle,
+            Confidential: confidential,
+        };
+    });
+}
+
 async function getUsageExportFingerprint() {
     const [
         [publishedKeysMeta],
@@ -160,18 +184,22 @@ export const getDataKeysUsageExportRows = async (params?: {
         const applyFilter = (rows: DataKeysUsageExportRow[]) => (
             !filterDataKeys.size
                 ? rows
-                : rows.filter(row => filterDataKeys.has(row.DataKey))
+                : rows.filter(row => filterDataKeys.has(row.DataKeyKey))
         );
 
         if (cache.current && cache.current.fingerprint === fingerprint) {
+            const normalizedCachedRows = normalizeUsageExportRows(cache.current.data as unknown[]);
+            cache.current.data = normalizedCachedRows;
             return {
                 success: true,
-                data: applyFilter(cache.current.data),
+                data: applyFilter(normalizedCachedRows),
             };
         }
 
         const byUniqueKey = new Map<string, {
             name: string;
+            label: string;
+            confidential: boolean;
             metadata: Record<string, any>;
         }>();
         const namesMap = new Map<string, Set<string>>();
@@ -180,6 +208,8 @@ export const getDataKeysUsageExportRows = async (params?: {
         dataKeysRes.data.forEach(dataKey => {
             if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, {
                 name: dataKey.name,
+                label: dataKey.label || '',
+                confidential: !!dataKey.confidential,
                 metadata: dataKey.metadata || {},
             });
             if (dataKey.name) {
@@ -211,27 +241,23 @@ export const getDataKeysUsageExportRows = async (params?: {
             keyId,
             keyName,
             scriptTitle,
-            confidential,
         }: {
             keyId?: string | null;
             keyName?: string | null;
             scriptTitle: string;
-            confidential?: boolean;
         }) => {
             const dataKey = resolveDataKey(keyId, keyName);
             if (!dataKey) return;
-            const defaultConfidential = !!dataKey.metadata?.confidential;
-            const confidentialValue = typeof confidential === 'boolean'
-                ? confidential
-                : defaultConfidential;
+            const confidentialValue = !!dataKey.confidential;
 
             const row: DataKeysUsageExportRow = {
-                DataKey: dataKey.name,
+                DataKeyKey: dataKey.name,
+                DataKeyLabel: dataKey.label || '',
                 ScriptTitle: scriptTitle || '',
                 Confidential: confidentialValue ? 'true' : 'false',
             };
 
-            const mapKey = `${row.DataKey}|||${row.ScriptTitle}|||${row.Confidential}`;
+            const mapKey = `${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}`;
             rowsMap.set(mapKey, row);
         };
 
@@ -242,7 +268,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                 keyId: screen.keyId,
                 keyName: screen.key,
                 scriptTitle,
-                confidential: !!screen.confidential,
             });
 
             (screen.fields || []).forEach(field => {
@@ -250,7 +275,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                     keyId: field.keyId,
                     keyName: field.key,
                     scriptTitle,
-                    confidential: !!field.confidential,
                 });
 
                 (field.items || []).forEach(item => {
@@ -258,7 +282,6 @@ export const getDataKeysUsageExportRows = async (params?: {
                         keyId: item.keyId,
                         keyName: `${item.value || ''}` || `${item.label || ''}`,
                         scriptTitle,
-                        confidential: !!field.confidential,
                     });
                 });
             });
@@ -268,14 +291,14 @@ export const getDataKeysUsageExportRows = async (params?: {
                     keyId: item.keyId,
                     keyName: item.key || item.id,
                     scriptTitle,
-                    confidential: !!item.confidential,
                 });
             });
         });
 
-        const data = Array.from(rowsMap.values())
+        const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
             .sort((a, b) => {
-                if (a.DataKey !== b.DataKey) return a.DataKey.localeCompare(b.DataKey);
+                if (a.DataKeyKey !== b.DataKeyKey) return a.DataKeyKey.localeCompare(b.DataKeyKey);
+                if (a.DataKeyLabel !== b.DataKeyLabel) return a.DataKeyLabel.localeCompare(b.DataKeyLabel);
                 if (a.ScriptTitle !== b.ScriptTitle) return a.ScriptTitle.localeCompare(b.ScriptTitle);
                 return a.Confidential.localeCompare(b.Confidential);
             });
