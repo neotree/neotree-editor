@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
-import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -37,10 +37,13 @@ import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
 import { SelectModal } from "@/components/select-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
 
@@ -318,45 +321,102 @@ function Form({
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
 
+        const usageByScript = new Map<string, NonNullable<UpdateDataKeysRefsResponse['affected']>['usages']>();
+        (affected.usages || []).forEach((usage) => {
+            const current = usageByScript.get(usage.scriptId) || [];
+            current.push(usage);
+            usageByScript.set(usage.scriptId, current);
+        });
+
+        const scriptRows = (affected.scripts || []).map((script) => ({
+            ...script,
+            usages: usageByScript.get(script.scriptId) || [],
+        }));
+
         return (
             <div className="space-y-3">
                 <DataTable
-                    title={`Scripts (${affected.scripts.length})`}
+                    title={`Affected scripts (${scriptRows.length})`}
+                    rowRenderer={({ props, cells, rowIndex }) => {
+                        const row = scriptRows[rowIndex];
+                        if (!row) return null;
+
+                        return (
+                            <>
+                                <TableRow {...props}>
+                                    {cells}
+                                </TableRow>
+
+                                {!!row.usages.length && (
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                        <TableCell colSpan={cells.length} className="p-0">
+                                            <div className="flex flex-col gap-y-2">
+                                                {row.usages.map((usage, index) => {
+                                                    const href =
+                                                        usage.screenId
+                                                            ? `/script/${usage.scriptId}/screen/${usage.screenId}`
+                                                            : usage.diagnosisId
+                                                                ? `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`
+                                                                : `/script/${usage.scriptId}`;
+
+                                                    return (
+                                                        <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
+                                                            <div className="flex items-center gap-x-2 p-2 px-4">
+                                                                <div className="font-medium">{usage.title}</div>
+                                                                <div className="text-muted-foreground">{usage.location}</div>
+                                                                <div className="ml-auto flex gap-x-2">
+                                                                    <Link
+                                                                        href={href}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-x-1"
+                                                                    >
+                                                                        {usage.kind.replace(/_/g, ' ')}
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                </div>
+                                                            </div>
+                                                            {(index < row.usages.length - 1) && <Separator />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        );
+                    }}
                     columns={[
                         { name: 'Script title' },
                         { name: 'Script ID' },
+                        { name: 'Matches', align: 'right' },
+                        {
+                            name: '',
+                            align: 'right',
+                            cellClassName: 'w-12',
+                            cellRenderer({ rowIndex }) {
+                                const script = scriptRows[rowIndex];
+                                if (!script?.scriptId) return null;
+
+                                return (
+                                    <Link
+                                        href={`/script/${script.scriptId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Open script"
+                                    >
+                                        <ExternalLinkIcon className="h-4 w-4 text-primary" />
+                                    </Link>
+                                );
+                            },
+                        },
                     ]}
-                    data={affected.scripts.map(s => [
+                    data={scriptRows.map(s => [
                         s.scriptTitle || '',
                         s.scriptId || '',
-                    ])}
-                />
-
-                <DataTable
-                    title={`Screens (${affected.screens.length})`}
-                    columns={[
-                        { name: 'Screen title' },
-                        { name: 'Script title' },
-                        { name: 'Screen ID' },
-                    ]}
-                    data={affected.screens.map(s => [
-                        s.title || '',
-                        s.scriptTitle || '',
-                        s.id || '',
-                    ])}
-                />
-
-                <DataTable
-                    title={`Diagnoses (${affected.diagnoses.length})`}
-                    columns={[
-                        { name: 'Diagnosis name' },
-                        { name: 'Script title' },
-                        { name: 'Diagnosis ID' },
-                    ]}
-                    data={affected.diagnoses.map(d => [
-                        d.title || '',
-                        d.scriptTitle || '',
-                        d.id || '',
+                        `${s.usages.length}`,
+                        '',
                     ])}
                 />
             </div>
