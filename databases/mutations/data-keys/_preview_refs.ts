@@ -65,6 +65,7 @@ export async function _previewDataKeysRefsImpact({
                     scripts: [],
                     screens: [],
                     diagnoses: [],
+                    usages: [],
                 },
             };
         }
