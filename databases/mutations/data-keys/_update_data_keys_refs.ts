@@ -55,6 +55,10 @@ type AffectedUsage = {
     scriptTitle?: string;
     screenId?: string;
     diagnosisId?: string;
+    screenItemIndex?: number;
+    fieldIndex?: number;
+    fieldItemIndex?: number;
+    diagnosisSymptomIndex?: number;
 };
 
 export type UpdateDataKeysRefsResponse = {
@@ -241,6 +245,7 @@ export async function _updateDataKeysRefs({
             if (source === 'legacyName') stats.matchedByLegacyName++;
             if (source === 'legacyLabel') stats.matchedByLegacyLabel++;
         };
+        const getDataKeyOptional = (key?: DataKey) => !!(key?.metadata as Record<string, any> | undefined)?.optional;
 
         const usagesMap = new Map<string, AffectedUsage>();
         const addUsage = (usage: AffectedUsage) => {
@@ -468,6 +473,7 @@ export async function _updateDataKeysRefs({
                         scriptId: s.scriptId,
                         scriptTitle: s.scriptTitle || undefined,
                         screenId: s.screenId,
+                        screenItemIndex: itemIndex,
                     });
                 }
                 return {
@@ -534,6 +540,7 @@ export async function _updateDataKeysRefs({
                         scriptId: s.scriptId,
                         scriptTitle: s.scriptTitle || undefined,
                         screenId: s.screenId,
+                        fieldIndex,
                     });
                 }
 
@@ -544,6 +551,7 @@ export async function _updateDataKeysRefs({
                         key: fieldDataKey.name,
                         label: fieldDataKey.label,
                         confidential: !!fieldDataKey.confidential,
+                        optional: getDataKeyOptional(fieldDataKey),
                     }),
                     ...(!refKeyDataKey ? {} : {
                         refKeyId: refKeyDataKey.uniqueKey,
@@ -584,6 +592,8 @@ export async function _updateDataKeysRefs({
                                 scriptId: s.scriptId,
                                 scriptTitle: s.scriptTitle || undefined,
                                 screenId: s.screenId,
+                                fieldIndex,
+                                fieldItemIndex,
                             });
                         }
                         return {
@@ -659,6 +669,7 @@ export async function _updateDataKeysRefs({
                         scriptId: d.scriptId,
                         scriptTitle: d.scriptTitle || undefined,
                         diagnosisId: d.diagnosisId,
+                        diagnosisSymptomIndex: symptomIndex,
                     });
                 }
                 return {

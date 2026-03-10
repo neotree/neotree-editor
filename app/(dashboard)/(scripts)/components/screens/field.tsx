@@ -207,7 +207,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
           resetForm(getDefaultValues())
           setShowForm(!!field)
         }}
-        title={field ? "New field" : "Edit field"}
+        title={field ? "Edit field" : "New field"}
         actions={
           <>
             <span className={cn("text-danger text-xs", disabled && "hidden")}>* Required</span>
