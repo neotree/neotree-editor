@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useState, Fragment,useEffect } from "react";
+import { useCallback, useMemo, useState, Fragment,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { Controller } from "react-hook-form";
 import { v4 } from "uuid";
 import axios from 'axios';
+import Link from "next/link";
 
 import { getLeanAlias } from '@/app/actions/aliases'
 import { KeyValueTextarea } from "@/components/key-value-textarea";
@@ -37,7 +38,7 @@ import { Loader } from "@/components/loader";
 import { ScreenFormDataType } from "@/contexts/scripts";
 import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
-import { nuidSearchOptions } from "@/constants/fields";``
+import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
 import { Separator } from "@/components/ui/separator";
 import edlizSummaryData from "@/constants/edliz-summary-table";
@@ -53,6 +54,9 @@ import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
 import { LockStatus } from "@/components/lock-status";
 import { ScriptType } from "@/databases/queries/scripts";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useDataKeysCtx } from "@/contexts/data-keys";
 
 type Props = {
     scriptId: string;
@@ -71,6 +75,8 @@ export function ScreenForm(props: Props) {
     } = props;
 
     const router = useRouter();
+    const { alert } = useAlertModal();
+    const { extractDataKeys } = useDataKeysCtx();
     const [showForm, setShowForm] = useState(!!formData);
 
     const form = useScreenForm(props);
@@ -94,6 +100,7 @@ export function ScreenForm(props: Props) {
     const skippable = watch('skippable');
     const printable = watch('printable');
     const confidential = watch('confidential');
+    const keyId = watch('keyId');
     const prePopulate = watch('prePopulate');
     const image1 = watch('image1');
     const image2 = watch('image2');
@@ -106,6 +113,11 @@ export function ScreenForm(props: Props) {
     const key = watch('key');
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
+    const selectedDataKey = useMemo(() => {
+        const [dataKey] = !keyId ? [null] : extractDataKeys([keyId]);
+        return dataKey;
+    }, [extractDataKeys, keyId]);
+    const inheritedConfidential = !!selectedDataKey?.confidential;
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -125,6 +137,12 @@ export function ScreenForm(props: Props) {
     useEffect(() => {
         getAlias(key)
     }, [getAlias,key]);
+
+    useEffect(() => {
+        if (confidential !== inheritedConfidential) {
+            setValue('confidential', inheritedConfidential, { shouldDirty: true, });
+        }
+    }, [confidential, inheritedConfidential, setValue]);
 
     const lockStatus = !(isLocked || isScriptLocked) ? null : (
         <div>
@@ -258,7 +276,7 @@ export function ScreenForm(props: Props) {
                     setValue('key', key, { shouldDirty: true, });
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
-                    setValue('confidential', !!dataKey?.metadata?.confidential, { shouldDirty: true, });
+                    setValue('confidential', !!dataKey?.confidential, { shouldDirty: true, });
                     if (hasItems) setValue('items', [], { shouldDirty: true, });
                     if (hasFields) setValue('fields', [], { shouldDirty: true, });
 
@@ -815,15 +833,45 @@ export function ScreenForm(props: Props) {
 
                 {(isYesNoScreen || isTimerScreen || isSelectScreen) && (
                     <>
-                        <div className="flex-1 flex items-center space-x-2">
-                            <Switch
-                                id="confidential"
-                                checked={confidential}
-                                disabled={disabled}
-                                onCheckedChange={checked => setValue('confidential', checked, { shouldDirty: true, })}
-                            />
-                            <Label secondary htmlFor="confidential">Confidential</Label>
-                        </div>
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                                        onClick={() =>
+                                            alert({
+                                                title: "Confidentiality is managed in Data Keys",
+                                                message: "Change this in the Data Key. Screens inherit confidential status automatically.",
+                                                variant: "info",
+                                            })
+                                        }
+                                    >
+                                        <Switch
+                                            id="confidential"
+                                            checked={!!confidential}
+                                            disabled
+                                        />
+                                        <Label secondary htmlFor="confidential">Confidential</Label>
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <div className="flex flex-col gap-y-1">
+                                        <span>Change confidentiality in the Data Key library.</span>
+                                        {!!keyId && (
+                                            <Link
+                                                href={`/data-keys/edit/${keyId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="underline"
+                                            >
+                                                Open Data Key
+                                            </Link>
+                                        )}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </>
                 )}
 

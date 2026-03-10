@@ -16,6 +16,13 @@ export async function GET(req: NextRequest) {
         const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
 
         res = await _getDataKeys(params);
+        res = {
+            ...res,
+            data: res.data.map(item => ({
+                ...item,
+                metadata: item.metadata ?? {},
+            })),
+        };
 
 		return NextResponse.json(res);
 	} catch(e: any) {
@@ -29,6 +36,9 @@ export async function DELETE(req: NextRequest) {
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
+        if (!['admin', 'super_user'].includes(isAuthorised.user?.role || '')) {
+            return NextResponse.json({ errors: ['Forbidden'] }, { status: 403 });
+        }
 
         const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
 
