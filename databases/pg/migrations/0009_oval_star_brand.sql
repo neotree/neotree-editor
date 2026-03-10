@@ -1,5 +1,49 @@
 ALTER TABLE "nt_data_keys" ADD COLUMN IF NOT EXISTS "confidential" boolean;
 
+CREATE OR REPLACE FUNCTION __nt_try_parse_jsonb_array(input text)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  parsed jsonb;
+BEGIN
+  BEGIN
+    parsed := input::jsonb;
+  EXCEPTION
+    WHEN others THEN
+      RETURN '[]'::jsonb;
+  END;
+
+  IF jsonb_typeof(parsed) = 'array' THEN
+    RETURN parsed;
+  END IF;
+
+  RETURN '[]'::jsonb;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION __nt_try_parse_jsonb_object(input text)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  parsed jsonb;
+BEGIN
+  BEGIN
+    parsed := input::jsonb;
+  EXCEPTION
+    WHEN others THEN
+      RETURN '{}'::jsonb;
+  END;
+
+  IF jsonb_typeof(parsed) = 'object' THEN
+    RETURN parsed;
+  END IF;
+
+  RETURN '{}'::jsonb;
+END;
+$$;
+
 UPDATE "nt_data_keys"
 SET "confidential" = false
 WHERE "confidential" IS NULL;
@@ -9,14 +53,14 @@ WITH normalized_screens AS (
     s.*,
     CASE
       WHEN jsonb_typeof(s."fields") = 'array' THEN s."fields"
-      WHEN jsonb_typeof(s."fields") = 'string' AND (s."fields" #>> '{}') ~ '^\s*\['
-        THEN (s."fields" #>> '{}')::jsonb
+      WHEN jsonb_typeof(s."fields") = 'string'
+        THEN __nt_try_parse_jsonb_array(s."fields" #>> '{}')
       ELSE '[]'::jsonb
     END AS fields_json,
     CASE
       WHEN jsonb_typeof(s."items") = 'array' THEN s."items"
-      WHEN jsonb_typeof(s."items") = 'string' AND (s."items" #>> '{}') ~ '^\s*\['
-        THEN (s."items" #>> '{}')::jsonb
+      WHEN jsonb_typeof(s."items") = 'string'
+        THEN __nt_try_parse_jsonb_array(s."items" #>> '{}')
       ELSE '[]'::jsonb
     END AS items_json
   FROM "nt_screens" s
@@ -26,8 +70,8 @@ normalized_drafts AS (
     sd.*,
     CASE
       WHEN jsonb_typeof(sd."data") = 'object' THEN sd."data"
-      WHEN jsonb_typeof(sd."data") = 'string' AND (sd."data" #>> '{}') ~ '^\s*\{'
-        THEN (sd."data" #>> '{}')::jsonb
+      WHEN jsonb_typeof(sd."data") = 'string'
+        THEN __nt_try_parse_jsonb_object(sd."data" #>> '{}')
       ELSE '{}'::jsonb
     END AS data_obj
   FROM "nt_screens_drafts" sd
@@ -68,8 +112,8 @@ WHERE dk."confidential" = false
         FROM jsonb_array_elements(
           CASE
             WHEN jsonb_typeof(sd.data_obj->'fields') = 'array' THEN sd.data_obj->'fields'
-            WHEN jsonb_typeof(sd.data_obj->'fields') = 'string' AND (sd.data_obj->'fields' #>> '{}') ~ '^\s*\['
-              THEN (sd.data_obj->'fields' #>> '{}')::jsonb
+            WHEN jsonb_typeof(sd.data_obj->'fields') = 'string'
+              THEN __nt_try_parse_jsonb_array(sd.data_obj->'fields' #>> '{}')
             ELSE '[]'::jsonb
           END
         ) f
@@ -81,8 +125,8 @@ WHERE dk."confidential" = false
         FROM jsonb_array_elements(
           CASE
             WHEN jsonb_typeof(sd.data_obj->'items') = 'array' THEN sd.data_obj->'items'
-            WHEN jsonb_typeof(sd.data_obj->'items') = 'string' AND (sd.data_obj->'items' #>> '{}') ~ '^\s*\['
-              THEN (sd.data_obj->'items' #>> '{}')::jsonb
+            WHEN jsonb_typeof(sd.data_obj->'items') = 'string'
+              THEN __nt_try_parse_jsonb_array(sd.data_obj->'items' #>> '{}')
             ELSE '[]'::jsonb
           END
         ) i
@@ -94,3 +138,6 @@ WHERE dk."confidential" = false
 
 ALTER TABLE "nt_data_keys" ALTER COLUMN "confidential" SET DEFAULT true;
 ALTER TABLE "nt_data_keys" ALTER COLUMN "confidential" SET NOT NULL;
+
+DROP FUNCTION IF EXISTS __nt_try_parse_jsonb_array(text);
+DROP FUNCTION IF EXISTS __nt_try_parse_jsonb_object(text);
