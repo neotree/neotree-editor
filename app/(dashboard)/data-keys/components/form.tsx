@@ -564,31 +564,6 @@ function Form({
 
                         <Controller
                             control={control}
-                            name="metadata"
-                            render={({ field: { value, onChange, }, }) => {
-                                return (
-                                    <>
-                                        <div className="px-4 flex items-center space-x-2">
-                                            <Checkbox
-                                                id="optional"
-                                                checked={!!value.optional}
-                                                disabled={isFormDisabled}
-                                                onCheckedChange={checked => {
-                                                    onChange({
-                                                        ...value,
-                                                        optional: checked,
-                                                    })
-                                                }}
-                                            />
-                                            <Label htmlFor="optional">Optional</Label>
-                                        </div>
-                                    </>
-                                )
-                            }}
-                        />
-
-                        <Controller
-                            control={control}
                             name="options"
                             disabled={isFormDisabled}
                             render={({ field: { value, onChange, }, }) => {
