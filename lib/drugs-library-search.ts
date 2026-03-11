@@ -81,7 +81,7 @@ export function parseDrugsLibrarySearchResults({
     if (!normalizedValue) return [];
 
     const matchesSearch = (value: string) => {
-        const candidate = value.toLowerCase();
+        const candidate = isExactMatch ? value : value.toLowerCase();
         return isExactMatch ? candidate === normalizedValue : candidate.includes(normalizedValue);
     };
 
@@ -239,7 +239,7 @@ export function filterDrugsLibrarySearchResults({
             const matchedFilter = matchedFieldFilterMap[match.field];
             if (matchedFilter !== filter) return false;
 
-            const candidate = `${match.fieldValue}`.toLowerCase();
+            const candidate = isExactMatch ? `${match.fieldValue}` : `${match.fieldValue}`.toLowerCase();
             if (isExactMatch ? candidate !== normalizedValue : !candidate.includes(normalizedValue)) return false;
 
             return true;

@@ -1,7 +1,7 @@
 import { and, desc, eq, sql, inArray, or, ilike, asc } from "drizzle-orm"
 import * as uuid from "uuid"
 import db from "@/databases/pg/drizzle"
-import { changeLogs, users } from "@/databases/pg/schema"
+import { changeLogs, users, scripts } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
 
 export type DataVersionSummaryParams = {
@@ -102,10 +102,11 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
           ilike(changeLogs.description, `%${normalizedSearch}%`),
           ilike(changeLogs.changeReason, `%${normalizedSearch}%`),
           sql`${changeLogs.changes}::text ILIKE ${"%" + normalizedSearch + "%"}`,
-          ilike(changeLogs.entityId, `%${normalizedSearch}%`),
+          sql`${changeLogs.entityId}::text ILIKE ${"%" + normalizedSearch + "%"}`,
           isUuidSearch ? eq(changeLogs.entityId, normalizedSearch) : undefined,
-          ilike(changeLogs.entityType, `%${normalizedSearch}%`),
+          sql`${changeLogs.entityType}::text ILIKE ${"%" + normalizedSearch + "%"}`,
           matchedEntityTypes.length ? inArray(changeLogs.entityType, matchedEntityTypes) : undefined,
+          ilike(scripts.title, `%${normalizedSearch}%`),
           ilike(users.displayName, `%${normalizedSearch}%`),
           ilike(users.email, `%${normalizedSearch}%`),
         )
@@ -134,6 +135,7 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
         changeCount: changeCountExpr,
       })
       .from(changeLogs)
+      .leftJoin(scripts, eq(scripts.scriptId, changeLogs.scriptId))
       .leftJoin(users, eq(users.userId, changeLogs.userId))
       .where(
         and(
@@ -152,6 +154,7 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
         total: sql<number>`count(distinct ${changeLogs.dataVersion})`,
       })
       .from(changeLogs)
+      .leftJoin(scripts, eq(scripts.scriptId, changeLogs.scriptId))
       .leftJoin(users, eq(users.userId, changeLogs.userId))
       .where(
         and(
@@ -181,6 +184,7 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
         },
       })
       .from(changeLogs)
+      .leftJoin(scripts, eq(scripts.scriptId, changeLogs.scriptId))
       .leftJoin(users, eq(users.userId, changeLogs.userId))
       .where(
         and(

@@ -30,7 +30,7 @@ export async function _searchScripts({
 
         if (!normalizedSearchValue) return { data: [], };
 
-        const searchTerm = normalizedSearchValue;
+        const searchTerm = normalizedSearchValue.toLowerCase();
 
         // SCRIPTS
         const scriptsDrafts = !returnDraftsIfExist ? [] : await db.query.scriptsDrafts.findMany({

@@ -3,6 +3,7 @@ import { createHash } from "crypto"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
+import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
@@ -162,13 +163,13 @@ function computeSnapshotHash(snapshot: any) {
 
 async function resolveUserId(data: SaveChangeLogData) {
   const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""
-  const hasValidUserId = rawUserId && uuid.validate(rawUserId)
+  const hasValidUserId = rawUserId && isUuidLike(rawUserId)
 
   if (!rawUserId || !hasValidUserId) {
     try {
       const authUser = await getAuthenticatedUser()
       const authUserId = authUser?.userId
-      if (authUserId && uuid.validate(authUserId)) {
+      if (authUserId && isUuidLike(authUserId)) {
         logger.error("saveChangeLog warning: invalid or missing userId; using authenticated userId", {
           providedUserId: data.userId,
           authenticatedUserId: authUserId,
@@ -193,7 +194,7 @@ async function resolveUserId(data: SaveChangeLogData) {
 
 function validateEntityAlignment(data: SaveChangeLogData) {
   if (!uuid.validate(data.entityId)) throw new Error("Invalid entityId")
-  if (!uuid.validate(data.userId)) throw new Error("Invalid userId")
+  if (!isUuidLike(data.userId)) throw new Error("Invalid userId")
 
   if (NO_FK_ENTITY_TYPES.includes(data.entityType)) {
     const populatedFks = Object.values(ENTITY_TYPE_TO_FK)

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
-import { MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
@@ -27,16 +28,26 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAlertModal } from "@/hooks/use-alert-modal";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from '@/components/data-table';
 import { dataKeyTypes } from '@/constants';
 import { Loader } from '@/components/loader';
 import { SelectModal } from "@/components/select-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
+import { cn } from "@/lib/utils";
+import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
+import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
+
+type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
 const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
     uuid?: string;
@@ -58,6 +69,7 @@ const buildTrackableDataKey = (source?: Partial<DataKeyFormData> & {
         name: source.name ?? "",
         refId: source.refId ?? "",
         dataType: source.dataType ?? "",
+        confidential: !!source.confidential,
         label: source.label ?? "",
         options: Array.isArray(source.options) ? source.options : [],
         metadata: source.metadata ?? {},
@@ -84,7 +96,8 @@ function Form({
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
-    const { authenticatedUser } = useAppContext();
+    const { alert } = useAlertModal();
+    const { authenticatedUser, viewOnly } = useAppContext();
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -96,7 +109,7 @@ function Form({
         userId: dataKey?.draftCreatedByUserId,
     });
 
-    disabled = disabled || isLocked;
+    const isReadOnly = !!disabled || isLocked || viewOnly;
 
     const {
         control,
@@ -104,12 +117,14 @@ function Form({
         handleSubmit,
         watch,
         setValue,
+        getValues,
     } = useForm({
         defaultValues: {
             ...dataKey,
             name: dataKey?.name || '',
             refId: dataKey?.refId || '',
             dataType: dataKey?.dataType || '',
+            confidential: dataKey ? !!dataKey.confidential : true,
             label: dataKey?.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
@@ -155,10 +170,86 @@ function Form({
 
     const dataType = watch('dataType');
     const options = watch('options');
+    const nameValue = watch('name');
+    const labelValue = watch('label');
+    const confidential = !!watch('confidential');
+
+    const [previewingImpact, setPreviewingImpact] = useState(false);
+    const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
+    const [impactPreviewStats, setImpactPreviewStats] = useState<UpdateDataKeysRefsResponse['info']>();
+    const [saveImpact, setSaveImpact] = useState<SaveRefsImpact>();
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
+    const buildPreviewPayload = useCallback(() => {
+        const values = getValues();
+        return [{
+            uuid: (values as any)?.uuid || dataKey?.uuid || '',
+            uniqueKey: (values as any)?.uniqueKey || dataKey?.uniqueKey || '',
+            name: values.name || '',
+            label: values.label || '',
+            dataType: values.dataType || '',
+            confidential: !!values.confidential,
+            refId: values.refId || '',
+            options: values.options || [],
+            metadata: values.metadata || {},
+            version: typeof values.version === 'string' ? Number(values.version) : values.version,
+        }];
+    }, [getValues, dataKey?.uuid, dataKey?.uniqueKey]);
+
+    const loadImpactPreview = useCallback(async () => {
+        if (!dataKey?.uuid && !dataKey?.uniqueKey) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+            return;
+        }
+
+        try {
+            setPreviewingImpact(true);
+            const response = await axios.post<UpdateDataKeysRefsResponse>('/api/data-keys/refs-preview', {
+                data: buildPreviewPayload(),
+            });
+            setImpactPreview(response.data.affected);
+            setImpactPreviewStats(response.data.info);
+        } catch (e: any) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+        } finally {
+            setPreviewingImpact(false);
+        }
+    }, [dataKey?.uuid, dataKey?.uniqueKey, buildPreviewPayload]);
+
+    useEffect(() => {
+        if (!dataKey) return;
+        const changed = (
+            `${nameValue || ''}` !== `${dataKey.name || ''}` ||
+            `${labelValue || ''}` !== `${dataKey.label || ''}` ||
+            `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
+            !!confidential !== !!dataKey.confidential
+        );
+        if (!changed) {
+            setImpactPreview(undefined);
+            setImpactPreviewStats(undefined);
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            loadImpactPreview();
+        }, 350);
+
+        return () => clearTimeout(timeout);
+    }, [
+        dataKey,
+        nameValue,
+        labelValue,
+        dataType,
+        confidential,
+        loadImpactPreview,
+    ]);
+
     const onSave = handleSubmit(async (data) => {
+        if (isReadOnly) return;
+
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
         const payload = {
@@ -213,18 +304,144 @@ function Form({
             await changeTrackerRef.current.trackChanges(trackablePayload, "Data key saved");
         }
 
-        await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }], (err) => {
-            if (!err) window.location.href = "/data-keys";
-        });
+        const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+        if (res && 'info' in res) {
+            setSaveImpact(res.info?.refs);
+        }
     });
 
-    const isFormDisabled = disabled || saving;
+    const isFormDisabled = isReadOnly || saving;
 
     const children = useMemo(() => {
         return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
     }, [dataKeys, options]);
 
     const displayLoader = loadingDataKeys || saving;
+
+    const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
+        if (!affected) return null;
+
+        const usageByScript = new Map<string, NonNullable<UpdateDataKeysRefsResponse['affected']>['usages']>();
+        (affected.usages || []).forEach((usage) => {
+            const current = usageByScript.get(usage.scriptId) || [];
+            current.push(usage);
+            usageByScript.set(usage.scriptId, current);
+        });
+
+        const scriptRows = (affected.scripts || []).map((script) => ({
+            ...script,
+            usages: usageByScript.get(script.scriptId) || [],
+        }));
+
+        return (
+            <div className="space-y-3">
+                <DataTable
+                    title={`Affected scripts (${scriptRows.length})`}
+                    rowRenderer={({ props, cells, rowIndex }) => {
+                        const row = scriptRows[rowIndex];
+                        if (!row) return null;
+
+                        return (
+                            <>
+                                <TableRow {...props}>
+                                    {cells}
+                                </TableRow>
+
+                                {!!row.usages.length && (
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                        <TableCell colSpan={cells.length} className="p-0">
+                                            <div className="flex flex-col gap-y-2">
+                                                {row.usages.map((usage, index) => {
+                                                    const linkLabel = (() => {
+                                                        if (usage.kind === 'screen') return 'screen';
+                                                        if (usage.kind === 'screen_field') return 'field';
+                                                        if (usage.kind === 'screen_item') return 'item';
+                                                        if (usage.kind === 'screen_field_item') return 'field item';
+                                                        if (usage.kind === 'diagnosis') return 'diagnosis';
+                                                        if (usage.kind === 'diagnosis_symptom') return 'symptom';
+                                                        return 'open';
+                                                    })();
+                                                    const href = (() => {
+                                                        if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
+                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        }
+                                                        if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
+                                                        if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+                                                        return `/script/${usage.scriptId}`;
+                                                    })();
+
+                                                    return (
+                                                        <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
+                                                            <div className="flex items-center gap-x-2 p-2 px-4">
+                                                                <div className="font-medium">{usage.title}</div>
+                                                                <div className="text-muted-foreground">{usage.location}</div>
+                                                                <div className="ml-auto flex gap-x-2">
+                                                                    <Link
+                                                                        href={href}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-x-1"
+                                                                    >
+                                                                        {linkLabel}
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                </div>
+                                                            </div>
+                                                            {(index < row.usages.length - 1) && <Separator />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        );
+                    }}
+                    columns={[
+                        { name: 'Script title' },
+                        { name: 'Script ID' },
+                        { name: 'Matches', align: 'right' },
+                        {
+                            name: '',
+                            align: 'right',
+                            cellClassName: 'w-12',
+                            cellRenderer({ rowIndex }) {
+                                const script = scriptRows[rowIndex];
+                                if (!script?.scriptId) return null;
+
+                                return (
+                                    <Link
+                                        href={`/script/${script.scriptId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Open script"
+                                    >
+                                        <ExternalLinkIcon className="h-4 w-4 text-primary" />
+                                    </Link>
+                                );
+                            },
+                        },
+                    ]}
+                    data={scriptRows.map(s => [
+                        s.scriptTitle || '',
+                        s.scriptId || '',
+                        `${s.usages.length}`,
+                        '',
+                    ])}
+                />
+            </div>
+        );
+    }, []);
 
 
     return (
@@ -316,6 +533,35 @@ function Form({
                             />
                         </div>
 
+                        <div className="px-4">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="dataKeyConfidential"
+                                    checked={confidential}
+                                    disabled={isFormDisabled}
+                                    onCheckedChange={checked => {
+                                        if (!checked && confidential) {
+                                            confirm(
+                                                () => setValue('confidential', false, { shouldDirty: true }),
+                                                {
+                                                    title: 'Disable confidentiality?',
+                                                    message: 'You are about to mark this Data Key as non-confidential. This can expose sensitive data in linked scripts. Only continue if you fully understand the impact.',
+                                                    danger: true,
+                                                },
+                                            );
+                                            return;
+                                        }
+
+                                        setValue('confidential', checked, { shouldDirty: true });
+                                    }}
+                                />
+                                <Label htmlFor="dataKeyConfidential">Confidential</Label>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Fields and items that reference this Data Key inherit this setting.
+                            </span>
+                        </div>
+
                         <Controller
                             control={control}
                             name="options"
@@ -326,14 +572,15 @@ function Form({
                                 return (
                                     <div className="mt-4 pt-4 border-t border-t-border">
                                         <DataTable 
-                                            sortable={!disabled}
+                                            sortable={!isReadOnly}
                                             onSort={(oldIndex: number, newIndex: number) => {
+                                                if (isReadOnly) return;
                                                 const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
                                                 onChange(sorted);
                                             }}
                                             search={{}}
                                             title="Options"
-                                            headerActions={(
+                                            headerActions={isReadOnly ? null : (
                                                 <>
                                                     <SelectModal 
                                                         multiple
@@ -384,7 +631,7 @@ function Form({
                                                     cellRenderer({ rowIndex }) {
                                                         const child = value[rowIndex];
 
-                                                        if (!child || disabled) return null;
+                                                        if (!child || isReadOnly) return null;
 
                                                         return (
                                                             <>
@@ -432,6 +679,61 @@ function Form({
 
                     <br />
 
+                    <div className="px-4 space-y-4">
+                        {(!!dataKey || !!saveImpact?.affected) && (
+                            <div className="rounded-md border border-border p-3 space-y-3">
+                                <div className="flex items-center justify-between gap-x-2">
+                                    <div className="font-medium">Affected entities</div>
+                                    {!!dataKey && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={previewingImpact || isFormDisabled}
+                                            onClick={() => loadImpactPreview()}
+                                        >
+                                            {previewingImpact ? 'Refreshing...' : 'Refresh Preview'}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {!!impactPreview && (
+                                    <>
+                                        <div className="text-sm">
+                                            Before update: {(impactPreview.scripts?.length || 0)} scripts, {(impactPreview.screens?.length || 0)} screens, {(impactPreview.diagnoses?.length || 0)} diagnoses
+                                        </div>
+                                        {renderAffectedTables(impactPreview)}
+                                    </>
+                                )}
+                                {!impactPreview && !!dataKey && !previewingImpact && (
+                                    <div className="text-sm text-muted-foreground">
+                                        No pending impact preview yet. Change key, label, type, or confidentiality to load preview.
+                                    </div>
+                                )}
+
+                                {!!saveImpact?.affected && (
+                                    <>
+                                        <div className="text-sm">
+                                            After update: {(saveImpact.affected.scripts?.length || 0)} scripts, {(saveImpact.affected.screens?.length || 0)} screens, {(saveImpact.affected.diagnoses?.length || 0)} diagnoses
+                                        </div>
+                                        {renderAffectedTables(saveImpact.affected)}
+                                    </>
+                                )}
+
+                                {!!impactPreviewStats && (
+                                    <div className="text-xs text-muted-foreground">
+                                        Preview matching: {impactPreviewStats.matchedByUniqueKey} key-id, {impactPreviewStats.matchedByLegacyName} legacy-name, {impactPreviewStats.matchedByLegacyLabel} legacy-label, {impactPreviewStats.ambiguousLegacySkips} ambiguous skipped
+                                    </div>
+                                )}
+
+                                {!!saveImpact?.info && (
+                                    <div className="text-xs text-muted-foreground">
+                                        Save matching: {saveImpact.info.matchedByUniqueKey} key-id, {saveImpact.info.matchedByLegacyName} legacy-name, {saveImpact.info.matchedByLegacyLabel} legacy-label, {saveImpact.info.ambiguousLegacySkips} ambiguous skipped
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     <CardFooter className="gap-x-2">
                         <div className="ml-auto" />
 
@@ -442,10 +744,10 @@ function Form({
                             <Link href="/data-keys">Cancel</Link>
                         </Button>
 
-                        {!disabled && (
+                        {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
-                                disabled={isFormDisabled}
+                                disabled={isFormDisabled || previewingImpact}
                             >
                                 Save
                             </Button>

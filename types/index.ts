@@ -52,6 +52,7 @@ export type ScriptItem = {
     confidential: boolean;
     checked: boolean;
     enterValueManually?: boolean;
+    enterValueManuallyLabel?: string;
     severity_order: string;
     summary: string;
     key: string;
@@ -111,6 +112,7 @@ export type ScriptField = {
         exclusiveGroup?: string;
         forbidWith?: string[];
         enterValueManually?: boolean;
+        enterValueManuallyLabel?: string;
         keyId?: string;
     }[];
 };
