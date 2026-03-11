@@ -8,10 +8,10 @@ import { DataKeysTable } from '../components/table';
 export const dynamic = 'force-dynamic';
 
 export default async function DataKeysPage() { 
-    const [{ isSuperUser, isAdmin }] = await Promise.all([
+    const [{ isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
-    const canManageDataKeys = isSuperUser || isAdmin;
+    const canManageDataKeys = isSuperUser;
 
     return (
         <>
