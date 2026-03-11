@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { MoreVertical, EditIcon, EyeIcon, TrashIcon } from 'lucide-react';
+import { MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
@@ -71,6 +71,13 @@ export function DataKeysTableRowActions({
                                     <EditIcon className="h-4 w-4 mr-2" /> Edit
                                 </>
                             )}
+                        </Link>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem asChild>
+                        <Link target="_blank" href={`/data-keys/${dataKey.uuid}/metadata`}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View metadata
                         </Link>
                     </DropdownMenuItem>
 

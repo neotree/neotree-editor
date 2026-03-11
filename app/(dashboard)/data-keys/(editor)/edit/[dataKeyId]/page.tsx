@@ -11,6 +11,7 @@ export default async function EditDataKeyPage() {
     const [{ isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
+    const canManageDataKeys = isSuperUser;
 
     return (
         <>
@@ -21,7 +22,7 @@ export default async function EditDataKeyPage() {
                     <CardContent className="p-0">
                         <DataKeyForm 
                             {...actions}
-                            disabled={!isSuperUser}
+                            disabled={!canManageDataKeys}
                         />
                     </CardContent>
                 </Card>

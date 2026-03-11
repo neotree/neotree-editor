@@ -7,9 +7,9 @@ import { ActionsBar } from "@/components/actions-bar";
 import { useConfigKeysContext } from "@/contexts/config-keys";
 
 export function BottomActions() {
-    const { selected, configKeys, onDelete, } = useConfigKeysContext();
+    const { selected, configKeys, onDelete, disabled, } = useConfigKeysContext();
 
-    if (!selected.length) return null;
+    if (disabled || !selected.length) return null;
 
     const configKeysIds = configKeys.data.filter((_, i) => selected.includes(i)).map(s => s.configKeyId);
 

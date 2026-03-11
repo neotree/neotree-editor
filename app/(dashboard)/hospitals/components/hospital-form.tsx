@@ -22,11 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
-import { useEffectOnce } from '@/hooks/use-effect-once';
-import { useEffectIfMounted } from "@/hooks/use-effect-if-mounted";
-import { useMount } from "react-use";
 import { LockStatus } from '@/components/lock-status';
 import { useIsLocked } from "@/hooks/use-is-locked"
+import { useAppContext } from "@/contexts/app";
 
 type Role = Awaited<ReturnType<typeof getRoles>>[0]['name'];
 
@@ -57,11 +55,13 @@ export function HospitalForm({
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [hospital, setHospital] = useState<Awaited<ReturnType<typeof getHospital>>['data']>();
+    const { viewOnly } = useAppContext();
     
     const isLocked = useIsLocked({
         isDraft: !!hospital?.isDraft,
         userId: hospital?.draftCreatedByUserId,
     })
+    const isReadOnly = viewOnly || isLocked;
 
     const {
         setValue,
@@ -116,6 +116,8 @@ export function HospitalForm({
     }, [load])
 
     const onSave = handleSubmit(data => {
+        if (isReadOnly) return;
+
         (async () => {
             try {
                 setSubmitting(true);
@@ -200,7 +202,7 @@ export function HospitalForm({
                         <div>
                             <Label htmlFor="name">Hospital Name</Label>
                             <Input 
-                                {...register('name', { required: true, disabled: submitting || isLocked, })}
+                                {...register('name', { required: true, disabled: submitting || isReadOnly, })}
                                 placeholder="Hospital Name"
                                 className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                             />
@@ -216,12 +218,14 @@ export function HospitalForm({
                             </Button>
                         </SheetClose>
 
-                        <Button
-                            onClick={onSave}
-                            disabled={isLocked}
-                        >
-                            Save
-                        </Button>
+                        {!isReadOnly && (
+                            <Button
+                                onClick={onSave}
+                                disabled={submitting || isReadOnly}
+                            >
+                                Save
+                            </Button>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>
