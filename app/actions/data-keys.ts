@@ -13,8 +13,8 @@ import { count, isNull, max } from 'drizzle-orm';
 
 function assertCanManageDataKeys(user?: { role?: string | null } | null) {
     const role = user?.role;
-    const allowed = role === 'admin' || role === 'super_user';
-    if (!allowed) throw new Error('Forbidden: only admin or super_user can manage data keys');
+    const allowed = role === 'super_user';
+    if (!allowed) throw new Error('Forbidden: only super_user can add or edit data keys');
 }
 
 export const saveDataKeys: typeof _saveDataKeys = async params => {
