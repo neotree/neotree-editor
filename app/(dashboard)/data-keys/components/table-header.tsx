@@ -21,14 +21,14 @@ import {
 } from '@/components/ui/select';
 
 export function DataKeysTableHeader() {
-    const { isAdmin, isSuperUser, viewOnly } = useAppContext();
+    const { isSuperUser, viewOnly } = useAppContext();
     const { 
         sort,
         filter,
         onSort,
         setFilter,
     } = useDataKeysCtx();
-    const canManageDataKeys = (isAdmin || isSuperUser) && !viewOnly;
+    const canManageDataKeys = isSuperUser && !viewOnly;
 
     return (
         <>
