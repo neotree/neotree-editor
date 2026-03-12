@@ -57,15 +57,31 @@ export type GetScriptsMetadataResponse = {
                 key: string;
                 type: string;
                 dataType: string | null;
-                value: any;
-                valueLabel: null | string;
+                value?: any;
+                valueLabel?: null | string;
                 optional?: boolean;
                 confidential: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
+                options?: {
+                    value: string;
+                    valueLabel: string;
+                    disabledOtherOptionsIfSelected?: boolean;
+                    forbidWIth?: string[];
+                }[];
                 disableOtherOptionsIfSelected?: boolean;
                 forbidWith?: string[];
+            }[];
+            items?: {
+                itemId: string;
+                key: string;
+                value: string;
+                label: string;
+                valueLabel?: string;
+                disabledOtherOptionsIfSelected?: boolean;
+                forbidWIth?: string[];
+                condition?: string | null;
             }[];
         }[];
         diagnoses: {
@@ -86,18 +102,25 @@ export type GetScriptsMetadataResponse = {
             image2: null | ScriptImage;
             image3: null | ScriptImage;
             symptoms: DiagnosisSymptom[];
-            fields: {
-                label: string;
-                key: string;
-                type: string;
-                dataType: string | null;
-                value: any;
-                valueLabel: null | string;
-                optional?: boolean;
-                confidential: boolean;
-                minValue?: string | number | null;
-                maxValue?: string | number | null;
-            }[];
+                fields: {
+                    label: string;
+                    key: string;
+                    type: string;
+                    dataType: string | null;
+                value?: any;
+                valueLabel?: null | string;
+                    optional?: boolean;
+                    confidential: boolean;
+                    minValue?: string | number | null;
+                    maxValue?: string | number | null;
+                    condition?: string | null;
+                    options?: {
+                        value: string;
+                        valueLabel: string;
+                        disabledOtherOptionsIfSelected?: boolean;
+                        forbidWIth?: string[];
+                    }[];
+                }[];
         }[];
     }[],
     errors?: string[];
@@ -290,6 +313,24 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             image3: sanitizeImage(screen.image3),
                         },
                     };
+                    const screenItems = items.map(item => ({
+                        itemId: `${item.itemId || ''}`,
+                        key: `${item.key || item.id || ''}`,
+                        value: `${item.id || ''}`,
+                        label: `${item.label || ''}`,
+                        valueLabel: `${item.label || ''}`,
+                        disabledOtherOptionsIfSelected: !!item.exclusive,
+                        forbidWIth: (item.forbidWith || [])
+                            .map(forbidWithItemId => items.find(option => option.itemId === forbidWithItemId)?.id)
+                            .filter((v): v is string => !!v),
+                        condition: `${(item as any)?.condition || ''}`,
+                    }));
+                    const screenOptions = screenItems.map(item => ({
+                        value: item.value,
+                        valueLabel: item.label,
+                        disabledOtherOptionsIfSelected: item.disabledOtherOptionsIfSelected,
+                        forbidWIth: item.forbidWIth,
+                    }));
 
                     let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0])[] = [{
                         label: screen.label,
@@ -309,6 +350,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         confidential: screen.confidential,
                                         minValue: screen.minValue,
                                         maxValue: screen.maxValue,
+                                        condition: screen.condition || '',
                                     };
                             }
                         })(),
@@ -324,47 +366,51 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             break;
 
                         case 'yesno':
-                            fields = [
-                                { value: 'true', label: screen.positiveLabel || 'Yes', },
-                                { value: 'false', label: screen.negativeLabel || 'Yes', },
-                            ].map(o => {
-                                return {
-                                    label: screen.label,
-                                    key: screen.key,
-                                    type: screen.type,
-                                    dataType: 'boolean',
-                                    value: o.value,
-                                    valueLabel: o.label,
-                                    optional: screen.skippable,
-                                    confidential: screen.confidential,
-                                };
-                            });
+                            fields = [{
+                                label: screen.label,
+                                key: screen.key,
+                                type: screen.type,
+                                dataType: 'boolean',
+                                optional: screen.skippable,
+                                confidential: screen.confidential,
+                                condition: screen.condition || '',
+                                options: [
+                                    {
+                                        value: 'true',
+                                        valueLabel: screen.positiveLabel || 'Yes',
+                                    },
+                                    {
+                                        value: 'false',
+                                        valueLabel: screen.negativeLabel || 'No',
+                                    },
+                                ],
+                            }];
                             break;
 
                         case 'diagnosis':
-                            fields = items.map(item => ({
-                                value: item.id,
-                                valueLabel: item.label,
-                                label: item.label,
-                                key: item.id,
+                            fields = [{
+                                label: screen.label,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'diagnosis',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
-                            }));
+                                condition: screen.condition || '',
+                                options: screenOptions,
+                            }];
                             break;
 
                         case 'checklist':
-                            fields = items.map(item => ({
-                                value: item.id,
-                                valueLabel: item.label,
-                                label: item.label,
-                                key: item.key,
+                            fields = [{
+                                label: screen.label,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: null,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
-                            }));
+                                condition: screen.condition || '',
+                                options: screenOptions,
+                            }];
                             break;
 
                         case 'form':
@@ -433,20 +479,23 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         }));
                                     }
 
-                                    return opts.map(o => {
-                                        return {
-                                            label: f.label,
-                                            key: f.key,
-                                            type: f.type,
-                                            dataType,
-                                            value: o.value,
-                                            valueLabel: o.label,
-                                            optional: f.optional,
-                                            confidential: f.confidential,
-                                            disableOtherOptionsIfSelected: dataType === 'multi_select' ? !!o.disableOtherOptionsIfSelected : undefined,
-                                            forbidWith: dataType === 'multi_select' ? (o.forbidWith || []) : undefined,
-                                        };
-                                    });
+                                    const options = opts.map(o => ({
+                                        value: `${o.value || ''}`,
+                                        valueLabel: `${o.label || ''}`,
+                                        disabledOtherOptionsIfSelected: dataType === 'multi_select' ? !!o.disableOtherOptionsIfSelected : undefined,
+                                        forbidWIth: dataType === 'multi_select' ? (o.forbidWith || []) : undefined,
+                                    }));
+
+                                    return [{
+                                        label: f.label,
+                                        key: f.key,
+                                        type: f.type,
+                                        dataType,
+                                        optional: f.optional,
+                                        confidential: f.confidential,
+                                        condition: f.condition || '',
+                                        options,
+                                    }];
                                 }
 
                                 return [{
@@ -469,33 +518,29 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             break;
 
                         case 'single_select':
-                            fields = items.map(item => ({
+                            fields = [{
                                 label: screen.label,
                                 key: screen.key,
                                 type: screen.type,
                                 dataType: 'single_select_option',
-                                value: item.id,
-                                valueLabel: item.label,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
-                            }));
+                                condition: screen.condition || '',
+                                options: screenOptions,
+                            }];
                             break;
 
                         case 'multi_select':
-                            fields = items.map(item => ({
+                            fields = [{
                                 label: screen.label,
                                 key: screen.key,
                                 type: screen.type,
                                 dataType: 'multi_select_option',
-                                value: item.id,
-                                valueLabel: item.label,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
-                                disableOtherOptionsIfSelected: !!item.exclusive,
-                                forbidWith: (item.forbidWith || [])
-                                    .map(forbidWithItemId => items.find(option => option.itemId === forbidWithItemId)?.id)
-                                    .filter((v): v is string => !!v),
-                            }));
+                                condition: screen.condition || '',
+                                options: screenOptions,
+                            }];
                             break;
                         default:
                         // do nothing
@@ -511,6 +556,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         skipToScreen,
                         managementMetadata,
                         fields,
+                        items: screen.type === 'multi_select' ? undefined : screenItems,
                     };
                 }),
             });
