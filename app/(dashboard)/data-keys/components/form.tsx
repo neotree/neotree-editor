@@ -557,9 +557,7 @@ function Form({
                                 />
                                 <Label htmlFor="dataKeyConfidential">Confidential</Label>
                             </div>
-                            <span className="text-xs text-muted-foreground">
-                                Fields and items that reference this Data Key inherit this setting.
-                            </span>
+            
                         </div>
 
                         <Controller
