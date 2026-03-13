@@ -122,6 +122,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       collectionLabel: formData?.collectionLabel || "",
       listStyle: formData?.listStyle || "none",
       printDisplayColumns: formData?.printDisplayColumns || 2,
+      rankItems: formData?.rankItems || false,
     } satisfies ScreenFormDataType
   }, [formData, scriptId, generateScreenId])
 
