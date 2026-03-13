@@ -54,6 +54,7 @@ export type DataTableHeaderProps = {
     title?: React.ReactNode;
     headerActions?: React.ReactNode;
     search?: DataTableSearchOptions;
+    headerContent?: React.ReactNode;
 };
 
 export type DataTableProps = DataTableHeaderProps & {

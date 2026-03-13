@@ -13,6 +13,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { ItemsBottomActions } from "./items-bottom-actions";
 import { Item } from "./item";
@@ -36,6 +38,9 @@ export function Items({
     const { confirm } = useConfirmModal();
 
     const items = form.watch('items');
+    const rankItems = form.watch('rankItems');
+    
+    const canRankItems = screenType === 'multi_select';
 
     const [showAddItemForm, setShowAddItemForm] = useState(false);
     const [activeItem, setActiveItem] = useState<null | {
@@ -144,6 +149,26 @@ export function Items({
                             <Plus className="h-4 w-4 mr-1" />
                             New item
                         </Button>
+                    </>
+                )}
+                headerContent={(
+                    <>
+                        {canRankItems && (
+                            <div className="flex items-start space-x-2">
+                                <Checkbox
+                                    id="rankItems"
+                                    checked={rankItems}
+                                    disabled={disabled}
+                                    onCheckedChange={() => {
+                                        form.setValue('rankItems', !rankItems, { shouldDirty: true, });
+                                    }}
+                                />
+                                <Label htmlFor="rankItems" className="flex flex-col gap-y-2">
+                                    <span>Rank items</span>
+                                    <span className="opacity-60 font-normal">If checked, you&apos;ll be able to set a <b>ranking score</b> on each item and allow a user to re-order the items on the app.</span>
+                                </Label>
+                            </div>
+                        )}
                     </>
                 )}
                 columns={[

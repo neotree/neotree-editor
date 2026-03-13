@@ -11,6 +11,7 @@ export function DataTableHeader({
     title,
     search,
     headerActions,
+    headerContent,
 }: DataTableHeaderProps) {
     const hidden = !search && !title && !headerActions;
 
@@ -83,6 +84,12 @@ export function DataTableHeader({
                     </div>
                 </div>
             </div>
+
+            {!!headerContent && (
+                <div className="p-4">
+                    {headerContent}
+                </div>
+            )}
         </>
     );
 }

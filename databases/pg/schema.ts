@@ -718,6 +718,7 @@ export const screens = pgTable(
     reasons: jsonb("reasons").default("[]").notNull().$type<{ key: string; value: string }[]>(),
     listStyle: listStyleEnum("list_style").default("none").notNull(),
     printDisplayColumns: integer('print_display_columns').default(2).notNull(),
+    rankItems: boolean("rank_items").notNull().default(false),
 
     publishDate: timestamp("publish_date").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
