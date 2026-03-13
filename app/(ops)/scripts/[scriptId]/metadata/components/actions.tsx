@@ -29,7 +29,10 @@ export function ScriptMetaActions({ data }: {
                 Confidential: string;
                 Optional: string;
                 'Field Condition': string;
+                'Field Options': string;
                 'Screen Condition': string;
+                'Item Condition': string;
+                'Item Options': string;
                 'Skip To Screen Conditional Expression': string;
                 'Skip To Screen': string;
                 'Disable other options if selected': string;
@@ -53,7 +56,10 @@ export function ScriptMetaActions({ data }: {
                         Confidential: '',
                         Optional: '',
                         'Field Condition': '',
+                        'Field Options': '',
                         'Screen Condition': screen.condition || '',
+                        'Item Condition': '',
+                        'Item Options': '',
                         'Skip To Screen Conditional Expression': screen.skipToCondition || '',
                         'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
                         'Disable other options if selected': '',
@@ -77,7 +83,10 @@ export function ScriptMetaActions({ data }: {
                         Confidential: f.confidential ? 'Yes' : 'No',
                         Optional: f.optional ? 'Yes' : 'No',
                         'Field Condition': f.condition || '',
+                        'Field Options': f.options?.length ? JSON.stringify(f.options) : '',
                         'Screen Condition': screen.condition || '',
+                        'Item Condition': '',
+                        'Item Options': '',
                         'Skip To Screen Conditional Expression': screen.skipToCondition || '',
                         'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
                         'Disable other options if selected': typeof f.disableOtherOptionsIfSelected === 'boolean'
