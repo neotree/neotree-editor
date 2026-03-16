@@ -185,11 +185,27 @@ export function parseScriptsSearchResults({
                 });
             }
 
+            if (`${f.refKey || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'field_refKey',
+                    fieldIndex: i,
+                    fieldValue: f.refKey,
+                });
+            }
+
             if (`${f.condition || ''}`.match(searchRegex)) {
                 matches.push({
                     field: 'field_condition',
                     fieldIndex: i,
                     fieldValue: f.condition,
+                });
+            }
+
+            if (`${f.calculation || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'field_calculation',
+                    fieldIndex: i,
+                    fieldValue: f.calculation,
                 });
             }
 
@@ -453,6 +469,7 @@ export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResult
 const matchedFieldFilterMap: Record<string, string> = {
     key: 'data_key',
     field_key: 'data_key',
+    field_refKey: 'data_key',
     field_item_key: 'data_key',
     field_id: 'data_key',
     item_id: 'data_key',
@@ -465,6 +482,7 @@ const matchedFieldFilterMap: Record<string, string> = {
     item_label: 'label',
     condition: 'condition',
     field_condition: 'condition',
+    field_calculation: 'condition',
     item_condition: 'condition',
     field_item_manual_entry: 'manual_entry',
     item_manual_entry: 'manual_entry',
