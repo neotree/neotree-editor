@@ -100,8 +100,15 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
     return or(...clauses) as SQL;
 }
 
+function normalizeLookupDataType(dataType?: string | null) {
+    const normalized = `${dataType || ''}`.trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'option' || normalized.endsWith('_option')) return 'option';
+    return normalized;
+}
+
 function buildLegacyLookupKey(value: string, dataType?: string | null) {
-    return `${`${dataType || ''}`.trim()}::${value.trim()}`;
+    return `${normalizeLookupDataType(dataType)}::${value.trim()}`;
 }
 
 function escapeLikePattern(value: string) {
