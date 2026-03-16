@@ -7,6 +7,7 @@ import { diagnoses, diagnosesDrafts, screens, screensDrafts } from '@/databases/
 import { _getScreens, _getDiagnoses } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
+import { buildNormalizedDataKeyMatchKey } from '@/lib/data-key-types';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -100,15 +101,8 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
     return or(...clauses) as SQL;
 }
 
-function normalizeLookupDataType(dataType?: string | null) {
-    const normalized = `${dataType || ''}`.trim().toLowerCase();
-    if (!normalized) return '';
-    if (normalized === 'option' || normalized.endsWith('_option')) return 'option';
-    return normalized;
-}
-
 function buildLegacyLookupKey(value: string, dataType?: string | null) {
-    return `${normalizeLookupDataType(dataType)}::${value.trim()}`;
+    return buildNormalizedDataKeyMatchKey(value, dataType);
 }
 
 function escapeLikePattern(value: string) {
@@ -165,8 +159,12 @@ export async function _updateDataKeysRefs({
         const changedUniqueKeys = Array.from(byUniqueKey.keys());
         const legacyNameToUniqueKey = new Map<string, string>();
         const legacyLabelToUniqueKey = new Map<string, string>();
+        const legacyNameFallbackToUniqueKey = new Map<string, string>();
+        const legacyLabelFallbackToUniqueKey = new Map<string, string>();
         const legacyNameConflicts = new Set<string>();
         const legacyLabelConflicts = new Set<string>();
+        const legacyNameFallbackConflicts = new Set<string>();
+        const legacyLabelFallbackConflicts = new Set<string>();
         const oldNames = new Set<string>();
         const oldLabels = new Set<string>();
 
@@ -184,6 +182,11 @@ export async function _updateDataKeysRefs({
                 const existing = legacyNameToUniqueKey.get(lookupKey);
                 if (existing && existing !== current.uniqueKey) legacyNameConflicts.add(lookupKey);
                 legacyNameToUniqueKey.set(lookupKey, current.uniqueKey);
+
+                const fallbackLookupKey = buildLegacyLookupKey(oldName);
+                const fallbackExisting = legacyNameFallbackToUniqueKey.get(fallbackLookupKey);
+                if (fallbackExisting && fallbackExisting !== current.uniqueKey) legacyNameFallbackConflicts.add(fallbackLookupKey);
+                legacyNameFallbackToUniqueKey.set(fallbackLookupKey, current.uniqueKey);
             }
 
             if (oldLabel && oldLabel !== current.label) {
@@ -192,6 +195,11 @@ export async function _updateDataKeysRefs({
                 const existing = legacyLabelToUniqueKey.get(lookupKey);
                 if (existing && existing !== current.uniqueKey) legacyLabelConflicts.add(lookupKey);
                 legacyLabelToUniqueKey.set(lookupKey, current.uniqueKey);
+
+                const fallbackLookupKey = buildLegacyLookupKey(oldLabel);
+                const fallbackExisting = legacyLabelFallbackToUniqueKey.get(fallbackLookupKey);
+                if (fallbackExisting && fallbackExisting !== current.uniqueKey) legacyLabelFallbackConflicts.add(fallbackLookupKey);
+                legacyLabelFallbackToUniqueKey.set(fallbackLookupKey, current.uniqueKey);
             }
         });
 
@@ -229,6 +237,17 @@ export async function _updateDataKeysRefs({
                         if (matched) return { dataKey: matched, source: 'legacyName' };
                     }
                 }
+
+                const fallbackLookupKey = buildLegacyLookupKey(trimmedKey);
+                if (legacyNameFallbackConflicts.has(fallbackLookupKey)) {
+                    stats.ambiguousLegacySkips++;
+                } else {
+                    const matchedUniqueKey = legacyNameFallbackToUniqueKey.get(fallbackLookupKey);
+                    if (matchedUniqueKey) {
+                        const matched = byUniqueKey.get(matchedUniqueKey);
+                        if (matched) return { dataKey: matched, source: 'legacyName' };
+                    }
+                }
             }
 
             if (trimmedLabel) {
@@ -237,6 +256,17 @@ export async function _updateDataKeysRefs({
                     stats.ambiguousLegacySkips++;
                 } else {
                     const matchedUniqueKey = legacyLabelToUniqueKey.get(legacyLookupKey);
+                    if (matchedUniqueKey) {
+                        const matched = byUniqueKey.get(matchedUniqueKey);
+                        if (matched) return { dataKey: matched, source: 'legacyLabel' };
+                    }
+                }
+
+                const fallbackLookupKey = buildLegacyLookupKey(trimmedLabel);
+                if (legacyLabelFallbackConflicts.has(fallbackLookupKey)) {
+                    stats.ambiguousLegacySkips++;
+                } else {
+                    const matchedUniqueKey = legacyLabelFallbackToUniqueKey.get(fallbackLookupKey);
                     if (matchedUniqueKey) {
                         const matched = byUniqueKey.get(matchedUniqueKey);
                         if (matched) return { dataKey: matched, source: 'legacyLabel' };
