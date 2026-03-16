@@ -1,0 +1,1 @@
+ALTER TABLE "nt_screens" ADD COLUMN "rank_items" boolean DEFAULT false NOT NULL;
