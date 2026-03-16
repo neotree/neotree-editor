@@ -4,6 +4,7 @@ import { _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
+import { normalizeDataKeyType } from "@/lib/data-key-types";
 
 type KeyWithoutOptions = {
     name: string;
@@ -48,7 +49,10 @@ export function dataKeyToJSON(key: KeyWithoutOptions, opts?: {
     lowerCase?: boolean;
 }) {
     const lowerCase = opts?.lowerCase !== false;
-    let json = JSON.stringify(getDataKeysQueryFields([key])[0]);
+    let json = JSON.stringify({
+        ...getDataKeysQueryFields([key])[0],
+        dataType: normalizeDataKeyType(key.dataType),
+    });
     if (lowerCase) json = json.toLowerCase();
     return json;
 }
