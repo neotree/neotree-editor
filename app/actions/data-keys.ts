@@ -2,7 +2,7 @@
 
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
-import { _getScreens } from '@/databases/queries/scripts';
+import { _getDiagnoses, _getScreens } from '@/databases/queries/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
@@ -10,6 +10,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, isNull, max } from 'drizzle-orm';
+import { scanDataKeyIntegrity } from '@/lib/data-key-integrity';
 
 function assertCanManageDataKeys(user?: { role?: string | null } | null) {
     const role = user?.role;
@@ -72,6 +73,52 @@ export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = asyn
 export const getDataKeys = async (params?: GetDataKeysParams) => {
     const res = await _getDataKeys(params);
     return res;
+}
+
+export const getDataKeysIntegrity = async (params?: {
+    scriptsIds?: string[];
+    onlyIssues?: boolean;
+}) => {
+    try {
+        await isAllowed();
+
+        const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+        ]);
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+        ];
+
+        if (errors.length) {
+            return {
+                success: false,
+                data: null,
+                errors,
+            };
+        }
+
+        return {
+            success: true,
+            data: scanDataKeyIntegrity({
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                onlyIssues: params?.onlyIssues !== false,
+            }),
+        };
+    } catch (e: any) {
+        logger.error('getDataKeysIntegrity ERROR', e.message);
+        return {
+            success: false,
+            data: null,
+            errors: [e.message],
+        };
+    }
 }
 
 type UsageExportCache = {

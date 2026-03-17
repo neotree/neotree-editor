@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
+import { eq } from "drizzle-orm"
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
@@ -20,8 +21,94 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
+import { buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
+import db from "@/databases/pg/drizzle"
+import { dataKeysDrafts, diagnosesDrafts, screensDrafts } from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
+
+async function getScopedIntegrityData(userId?: string | null): Promise<{
+  dataKeysRes: Awaited<ReturnType<typeof dataKeysQueries._getDataKeys>>
+  screensRes: Awaited<ReturnType<typeof scriptsQueries._getScreens>>
+  diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
+}> {
+  if (!userId) {
+    const { dataKeysRes, screensRes, diagnosesRes } = await getScopedIntegrityData(userId)
+
+    return { dataKeysRes, screensRes, diagnosesRes }
+  }
+
+  const [publishedDataKeysRes, publishedScreensRes, publishedDiagnosesRes, userDataKeyDrafts, userScreenDrafts, userDiagnosisDrafts] = await Promise.all([
+    dataKeysQueries._getDataKeys({ returnDraftsIfExist: false }),
+    scriptsQueries._getScreens({ returnDraftsIfExist: false }),
+    scriptsQueries._getDiagnoses({ returnDraftsIfExist: false }),
+    db.query.dataKeysDrafts.findMany({ where: eq(dataKeysDrafts.createdByUserId, userId) }),
+    db.query.screensDrafts.findMany({ where: eq(screensDrafts.createdByUserId, userId) }),
+    db.query.diagnosesDrafts.findMany({ where: eq(diagnosesDrafts.createdByUserId, userId) }),
+  ])
+
+  const dataKeysMap = new Map<string, typeof publishedDataKeysRes.data[number]>()
+  publishedDataKeysRes.data.forEach((item) => {
+    dataKeysMap.set(item.uuid, item)
+    dataKeysMap.set(item.uniqueKey, item)
+  })
+  userDataKeyDrafts.forEach((draft) => {
+    const data = {
+      ...draft.data,
+      isDraft: true,
+      isDeleted: false,
+      draftCreatedByUserId: draft.createdByUserId,
+    }
+    if (draft.dataKeyId) dataKeysMap.set(draft.dataKeyId, data as typeof publishedDataKeysRes.data[number])
+    dataKeysMap.set(draft.uuid, data as typeof publishedDataKeysRes.data[number])
+    dataKeysMap.set(draft.uniqueKey, data as typeof publishedDataKeysRes.data[number])
+  })
+
+  const screensMap = new Map<string, typeof publishedScreensRes.data[number]>()
+  publishedScreensRes.data.forEach((item) => {
+    screensMap.set(item.screenId, item)
+  })
+  userScreenDrafts.forEach((draft) => {
+    const data = {
+      ...draft.data,
+      isDraft: true,
+      isDeleted: false,
+      draftCreatedByUserId: draft.createdByUserId,
+    }
+    screensMap.set(draft.screenId || draft.screenDraftId, data as typeof publishedScreensRes.data[number])
+    screensMap.set(draft.screenDraftId, data as typeof publishedScreensRes.data[number])
+  })
+
+  const diagnosesMap = new Map<string, typeof publishedDiagnosesRes.data[number]>()
+  publishedDiagnosesRes.data.forEach((item) => {
+    diagnosesMap.set(item.diagnosisId, item)
+  })
+  userDiagnosisDrafts.forEach((draft) => {
+    const data = {
+      ...draft.data,
+      isDraft: true,
+      isDeleted: false,
+      draftCreatedByUserId: draft.createdByUserId,
+    }
+    diagnosesMap.set(draft.diagnosisId || draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
+    diagnosesMap.set(draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
+  })
+
+  return {
+    dataKeysRes: {
+      data: Array.from(new Map(Array.from(dataKeysMap.values()).map((item) => [item.uniqueKey || item.uuid, item])).values()),
+      errors: publishedDataKeysRes.errors,
+    },
+    screensRes: {
+      data: Array.from(new Map(Array.from(screensMap.values()).map((item) => [item.screenId, item])).values()),
+      errors: publishedScreensRes.errors,
+    },
+    diagnosesRes: {
+      data: Array.from(new Map(Array.from(diagnosesMap.values()).map((item) => [item.diagnosisId, item])).values()),
+      errors: publishedDiagnosesRes.errors,
+    },
+  }
+}
 
 export async function getEditorDetails(): Promise<{
   errors?: string[]
@@ -130,6 +217,63 @@ export async function publishData({
 
     // The next version will be currentDataVersion + 1
     const nextDataVersion = currentDataVersion + 1
+
+    const { dataKeysRes, screensRes, diagnosesRes } = await getScopedIntegrityData(userId)
+
+    const integrityErrors = [
+      ...(dataKeysRes.errors || []),
+      ...(screensRes.errors || []),
+      ...(diagnosesRes.errors || []),
+    ]
+
+    if (integrityErrors.length) {
+      results.success = false
+      results.errors = integrityErrors
+      return results
+    }
+
+    const repairs = repairDataKeyIntegrityReferences({
+      dataKeys: dataKeysRes.data,
+      screens: screensRes.data,
+      diagnoses: diagnosesRes.data,
+    })
+
+    if (repairs.screens.length) {
+      const repairedScreens = await scriptsMutations._saveScreens({
+        data: repairs.screens,
+        userId: publisherUserId || undefined,
+      })
+      if (repairedScreens.errors?.length) {
+        results.success = false
+        results.errors = repairedScreens.errors
+        return results
+      }
+    }
+
+    if (repairs.diagnoses.length) {
+      const repairedDiagnoses = await scriptsMutations._saveDiagnoses({
+        data: repairs.diagnoses,
+        userId: publisherUserId || undefined,
+      })
+      if (repairedDiagnoses.errors?.length) {
+        results.success = false
+        results.errors = repairedDiagnoses.errors
+        return results
+      }
+    }
+
+    const postRepairReport = scanDataKeyIntegrity({
+      dataKeys: dataKeysRes.data,
+      screens: repairs.screens.length ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen) : screensRes.data,
+      diagnoses: repairs.diagnoses.length ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis) : diagnosesRes.data,
+      onlyIssues: true,
+    })
+    const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(postRepairReport)
+    if (publishIntegrityErrors.length) {
+      results.success = false
+      results.errors = publishIntegrityErrors
+      return results
+    }
 
     const publishConfigKeys = await configKeysMutations._publishConfigKeys({
       userId,

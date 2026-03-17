@@ -1,66 +1,199 @@
 'use client';
 
+import { useState } from "react";
 import { ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
+import type { DataKeyIntegrityReport } from "@/lib/data-key-integrity";
 
-export function ScriptDataKeysTable({ data: { title, dataKeys, }, }: {
+const statusStyles = {
+    resolved: "bg-emerald-100 text-emerald-800",
+    out_of_sync: "bg-amber-100 text-amber-800",
+    missing: "bg-red-100 text-red-800",
+    legacy_match: "bg-blue-100 text-blue-800",
+    conflict: "bg-rose-100 text-rose-800",
+    unmanaged: "bg-slate-100 text-slate-800",
+} satisfies Record<NonNullable<DataKeyIntegrityReport>["entries"][number]["status"], string>;
+
+export function ScriptDataKeysTable({ data: { title }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
+    integrity?: DataKeyIntegrityReport | null;
 }) {
+    const [viewFilter, setViewFilter] = useState<"all" | "blocking" | "issues" | "resolved">("all");
+    const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
+
+    const entries = [...(integrity?.entries || [])].sort((a, b) => {
+        const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
+        const keyB = `${b.currentKey || b.matchedName || ""}`.trim().toLowerCase();
+        if (keyA !== keyB) return keyA.localeCompare(keyB);
+
+        const labelA = `${a.currentLabel || a.matchedLabel || ""}`.trim().toLowerCase();
+        const labelB = `${b.currentLabel || b.matchedLabel || ""}`.trim().toLowerCase();
+        if (labelA !== labelB) return labelA.localeCompare(labelB);
+
+        return `${a.location || ""}`.trim().toLowerCase().localeCompare(`${b.location || ""}`.trim().toLowerCase());
+    });
+    const summary = integrity?.summary;
+    const filteredEntries = entries.filter((entry) => {
+        if (viewFilter === "blocking" && !["missing", "legacy_match", "conflict"].includes(entry.status)) return false;
+        if (viewFilter === "issues" && entry.status === "resolved") return false;
+        if (viewFilter === "resolved" && entry.status !== "resolved") return false;
+        if (statusFilter !== "all" && entry.status !== statusFilter) return false;
+        return true;
+    });
+
     return (
         <>
-            <Title>{title + ' - data keys'}</Title>
+            <Title>{title + ' - data key integrity'}</Title>
             <PageContainer>
-                <div className="p-4 text-2xl">{title}</div>
-                <DataTable 
-                    search={{ inputPlaceholder: 'Search', }}
-                    getRowOptions={({ rowIndex, }) => {
-                        const key = dataKeys[rowIndex];
+                <div className="p-4 space-y-4">
+                    <div className="text-2xl">{title}</div>
 
-                        return {
-                            className: cn(!key?.uniqueKey && 'bg-red-400/20 hover:bg-red-400/30'),
-                        };
-                    }}
-                    columns={[
-                        {
-                            name: 'Key',
-                        },
-                        {
-                            name: 'Label',
-                        },
-                        {
-                            name: 'Type',
-                        },
-                        {
-                            name: '',
-                            cellRenderer({ rowIndex, }) {
-                                const key = dataKeys[rowIndex];
+                    {!!summary && (
+                        <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+                            {[
+                                { label: "Total", value: summary.total },
+                                { label: "Resolved", value: summary.resolved },
+                                { label: "Blocking", value: summary.blocking },
+                                { label: "Missing", value: summary.missing },
+                                { label: "Legacy Match", value: summary.legacy_match },
+                                { label: "Conflict", value: summary.conflict },
+                                { label: "Out Of Sync", value: summary.out_of_sync },
+                                { label: "Unmanaged", value: summary.unmanaged },
+                            ].map((item) => (
+                                <div key={item.label} className="rounded-md border p-3">
+                                    <div className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</div>
+                                    <div className="text-2xl font-semibold">{item.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
-                                if (!key?.uniqueKey) return null;
+                    <div className="text-sm text-muted-foreground">
+                        This view shows all scanned script references. Blocking issues stop publish. Unmanaged references are legacy or local script keys that are not explicitly linked to the data key library.
+                    </div>
 
-                                return (
-                                    <div className="flex items-center gap-x-2">
-                                        <Link href={`/data-keys/edit/${key.uniqueKey}`}>
-                                            <ExternalLinkIcon className="text-primary w-4 h-4" />
-                                        </Link>
-                                    </div>
-                                )
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { label: "All", value: "all" },
+                                { label: "Blocking", value: "blocking" },
+                                { label: "Issues Only", value: "issues" },
+                                { label: "Resolved Only", value: "resolved" },
+                            ].map((filter) => (
+                                <Button
+                                    key={filter.value}
+                                    type="button"
+                                    size="sm"
+                                    variant={viewFilter === filter.value ? "default" : "outline"}
+                                    onClick={() => setViewFilter(filter.value as typeof viewFilter)}
+                                >
+                                    {filter.label}
+                                </Button>
+                            ))}
+                        </div>
+
+                        <div className="w-full md:w-[220px]">
+                            <Select
+                                value={statusFilter}
+                                onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Filter by status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All statuses</SelectItem>
+                                    <SelectItem value="resolved">Resolved</SelectItem>
+                                    <SelectItem value="out_of_sync">Out of sync</SelectItem>
+                                    <SelectItem value="missing">Missing</SelectItem>
+                                    <SelectItem value="legacy_match">Legacy match</SelectItem>
+                                    <SelectItem value="conflict">Conflict</SelectItem>
+                                    <SelectItem value="unmanaged">Unmanaged</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                        Showing {filteredEntries.length} of {entries.length} references.
+                    </div>
+
+                    <DataTable
+                        search={{ inputPlaceholder: 'Search data key references' }}
+                        getRowOptions={({ rowIndex }) => {
+                            const issue = filteredEntries[rowIndex];
+                            return {
+                                className: cn(
+                                    issue?.status === "resolved" && "bg-emerald-50 hover:bg-emerald-100",
+                                    issue?.status === "missing" && "bg-red-50 hover:bg-red-100",
+                                    issue?.status === "conflict" && "bg-rose-50 hover:bg-rose-100",
+                                    issue?.status === "legacy_match" && "bg-blue-50 hover:bg-blue-100",
+                                    issue?.status === "out_of_sync" && "bg-amber-50 hover:bg-amber-100",
+                                    issue?.status === "unmanaged" && "bg-slate-50 hover:bg-slate-100",
+                                ),
+                            };
+                        }}
+                        noDataMessage="No data key references found for this script"
+                        columns={[
+                            {
+                                name: "Status",
+                                cellRenderer({ rowIndex }) {
+                                    const issue = filteredEntries[rowIndex];
+                                    if (!issue) return null;
+                                    return (
+                                        <span className={cn("inline-flex rounded px-2 py-1 text-xs font-medium", statusStyles[issue.status])}>
+                                            {issue.status.replace(/_/g, " ")}
+                                        </span>
+                                    );
+                                },
                             },
-                        },
-                    ]}
-                    data={dataKeys.map(k => [
-                        k.name,
-                        k.label,
-                        k.dataType,
-                        '',
-                    ])}
-                />
+                            { name: "Key" },
+                            { name: "Label" },
+                            { name: "Type" },
+                            { name: "Location" },
+                            { name: "Reason" },
+                            { name: "Suggested" },
+                            {
+                                name: "",
+                                cellRenderer({ rowIndex }) {
+                                    const issue = filteredEntries[rowIndex];
+                                    if (!issue || issue.status === "unmanaged") return null;
+                                    const href = issue?.matchedUniqueKey
+                                        ? `/data-keys/edit/${issue.matchedUniqueKey}`
+                                        : `/data-keys/new?name=${encodeURIComponent(issue?.currentKey || "")}&label=${encodeURIComponent(issue?.currentLabel || issue?.currentKey || "")}&dataType=${encodeURIComponent(issue?.expectedDataType || "")}`;
+
+                                    return (
+                                        <div className="flex items-center justify-end gap-x-2">
+                                            <Link href={href}>
+                                                <ExternalLinkIcon className="text-primary w-4 h-4" />
+                                            </Link>
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                        data={filteredEntries.map((issue) => [
+                            issue.status.replace(/_/g, " "),
+                            issue.currentKey || issue.matchedName || "",
+                            issue.currentLabel || issue.matchedLabel || "",
+                            issue.expectedDataType,
+                            issue.location,
+                            issue.reason,
+                            issue.status === "unmanaged"
+                                ? "Legacy/local reference"
+                                : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
+                            "",
+                        ])}
+                    />
+                </div>
             </PageContainer>
         </>
-    )
+    );
 }
