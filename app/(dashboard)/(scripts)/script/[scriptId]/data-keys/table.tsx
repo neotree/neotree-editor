@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { useState, useTransition } from "react";
+import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
+import { resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
@@ -22,10 +26,13 @@ const statusStyles = {
     unmanaged: "bg-slate-100 text-slate-800",
 } satisfies Record<NonNullable<DataKeyIntegrityReport>["entries"][number]["status"], string>;
 
-export function ScriptDataKeysTable({ data: { title }, integrity }: {
+export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
     integrity?: DataKeyIntegrityReport | null;
 }) {
+    const router = useRouter();
+    const [isRepairing, startRepairTransition] = useTransition();
+    const [resolvingKey, setResolvingKey] = useState<string | null>(null);
     const [viewFilter, setViewFilter] = useState<"all" | "blocking" | "issues" | "resolved">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
 
@@ -48,6 +55,125 @@ export function ScriptDataKeysTable({ data: { title }, integrity }: {
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         return true;
     });
+
+    const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
+
+    const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
+        if (!scriptId || isRepairing) return;
+        startRepairTransition(async () => {
+            setResolvingKey(getEntryKey(entry));
+            const res = await resolveDataKeyIntegrityEntry({ entry });
+
+            if (!res.success) {
+                toast.error(res.errors?.join(", ") || "Failed to repair data key references");
+                setResolvingKey(null);
+                return;
+            }
+
+            if (!res.changed) {
+                toast.message("No safe change was applied for this reference");
+            } else {
+                toast.success(`Resolved ${entry.status.replace(/_/g, " ")} issue for ${entry.currentKey || entry.currentLabel || entry.location}`);
+            }
+
+            setResolvingKey(null);
+            router.refresh();
+        });
+    };
+
+    const renderActions = (entry: DataKeyIntegrityReport["entries"][number]) => {
+        const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
+        const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
+        const usageHref = entry.diagnosisId
+            ? `/script/${entry.scriptId}/diagnosis/${entry.diagnosisId}`
+            : entry.screenId
+                ? `/script/${entry.scriptId}/screen/${entry.screenId}`
+                : `/script/${entry.scriptId}`;
+        const canSafeResolve = entry.status === "out_of_sync" || entry.status === "legacy_match";
+        const isResolvingThisEntry = resolvingKey === getEntryKey(entry) && isRepairing;
+        const libraryHref = "/data-keys";
+        const displayReference = entry.currentKey || entry.currentLabel || entry.location;
+
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                        <Link href={usageHref} target="_blank" rel="noreferrer">
+                            <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                            View usage
+                        </Link>
+                    </DropdownMenuItem>
+
+                    {canSafeResolve && (
+                        <DropdownMenuItem onClick={() => handleResolveEntry(entry)} disabled={isRepairing}>
+                            <WrenchIcon className="mr-2 h-4 w-4" />
+                            {isResolvingThisEntry ? "Resolving..." : "Resolve"}
+                        </DropdownMenuItem>
+                    )}
+
+                    {editHref && (
+                        <DropdownMenuItem asChild>
+                            <Link href={editHref}>
+                                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                                Open matched data key
+                            </Link>
+                        </DropdownMenuItem>
+                    )}
+
+                    {(entry.status === "missing" || entry.status === "unmanaged") && (
+                        <DropdownMenuItem asChild>
+                            <Link href={createHref}>
+                                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                                Create data key
+                            </Link>
+                        </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuItem
+                        onClick={async () => {
+                            try {
+                                await navigator.clipboard.writeText(displayReference);
+                                toast.success(`Copied ${displayReference}`);
+                            } catch {
+                                toast.error("Failed to copy reference");
+                            }
+                        }}
+                    >
+                        <CopyIcon className="mr-2 h-4 w-4" />
+                        Copy reference
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem asChild>
+                        <Link href={libraryHref}>
+                            <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                            Open data key library
+                        </Link>
+                    </DropdownMenuItem>
+
+                    {(canSafeResolve || editHref || entry.status === "missing" || entry.status === "unmanaged") && (
+                        <DropdownMenuSeparator />
+                    )}
+
+                    {!editHref && entry.status === "conflict" && (
+                        <DropdownMenuItem disabled>
+                            Review matching data keys manually
+                        </DropdownMenuItem>
+                    )}
+
+                    {entry.status === "resolved" && (
+                        <DropdownMenuItem disabled>
+                            No action needed
+                        </DropdownMenuItem>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    };
 
     return (
         <>
@@ -81,23 +207,29 @@ export function ScriptDataKeysTable({ data: { title }, integrity }: {
                     </div>
 
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { label: "All", value: "all" },
-                                { label: "Blocking", value: "blocking" },
-                                { label: "Issues Only", value: "issues" },
-                                { label: "Resolved Only", value: "resolved" },
-                            ].map((filter) => (
-                                <Button
-                                    key={filter.value}
-                                    type="button"
-                                    size="sm"
-                                    variant={viewFilter === filter.value ? "default" : "outline"}
-                                    onClick={() => setViewFilter(filter.value as typeof viewFilter)}
-                                >
-                                    {filter.label}
-                                </Button>
-                            ))}
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { label: "All", value: "all" },
+                                    { label: "Blocking", value: "blocking" },
+                                    { label: "Issues Only", value: "issues" },
+                                    { label: "Resolved Only", value: "resolved" },
+                                ].map((filter) => (
+                                    <Button
+                                        key={filter.value}
+                                        type="button"
+                                        size="sm"
+                                        variant={viewFilter === filter.value ? "default" : "outline"}
+                                        onClick={() => setViewFilter(filter.value as typeof viewFilter)}
+                                    >
+                                        {filter.label}
+                                    </Button>
+                                ))}
+                            </div>
+
+                            <div className="text-sm text-muted-foreground">
+                                Use the row action menu to review or resolve one issue at a time. Resolve is available only when the system can make a safe deterministic fix.
+                            </div>
                         </div>
 
                         <div className="w-full md:w-[220px]">
@@ -164,18 +296,8 @@ export function ScriptDataKeysTable({ data: { title }, integrity }: {
                                 name: "",
                                 cellRenderer({ rowIndex }) {
                                     const issue = filteredEntries[rowIndex];
-                                    if (!issue || issue.status === "unmanaged") return null;
-                                    const href = issue?.matchedUniqueKey
-                                        ? `/data-keys/edit/${issue.matchedUniqueKey}`
-                                        : `/data-keys/new?name=${encodeURIComponent(issue?.currentKey || "")}&label=${encodeURIComponent(issue?.currentLabel || issue?.currentKey || "")}&dataType=${encodeURIComponent(issue?.expectedDataType || "")}`;
-
-                                    return (
-                                        <div className="flex items-center justify-end gap-x-2">
-                                            <Link href={href}>
-                                                <ExternalLinkIcon className="text-primary w-4 h-4" />
-                                            </Link>
-                                        </div>
-                                    );
+                                    if (!issue) return null;
+                                    return <div className="flex items-center justify-end">{renderActions(issue)}</div>;
                                 },
                             },
                         ]}
@@ -186,9 +308,13 @@ export function ScriptDataKeysTable({ data: { title }, integrity }: {
                             issue.expectedDataType,
                             issue.location,
                             issue.reason,
-                            issue.status === "unmanaged"
-                                ? "Legacy/local reference"
-                                : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
+                            issue.status === "out_of_sync"
+                                ? "Resolve available"
+                                : issue.status === "legacy_match"
+                                    ? "Resolve available"
+                                    : issue.status === "unmanaged"
+                                        ? "Legacy/local reference"
+                                        : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
                             "",
                         ])}
                     />

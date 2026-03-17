@@ -71,6 +71,16 @@ export type DataKeyIntegrityReport = {
     };
 };
 
+function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "location">) {
+    return (
+        target.kind === candidate.kind &&
+        target.scriptId === candidate.scriptId &&
+        (target.screenId || "") === (candidate.screenId || "") &&
+        (target.diagnosisId || "") === (candidate.diagnosisId || "") &&
+        target.location === candidate.location
+    );
+}
+
 type CandidateMatch = {
     matched?: DataKey;
     candidates: DataKey[];
@@ -769,6 +779,276 @@ export function repairDataKeyIntegrityReferences({
             value: {
                 ...syncedDiagnosis.value,
                 symptoms,
+            },
+            changed,
+        };
+    });
+
+    return {
+        screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
+        diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
+    };
+}
+
+export function repairSingleDataKeyIntegrityReference({
+    entry,
+    screens = [],
+    diagnoses = [],
+    dataKeys = [],
+}: {
+    entry: DataKeyIntegrityEntry;
+    screens?: ScreenType[];
+    diagnoses?: DiagnosisType[];
+    dataKeys?: DataKey[];
+}) {
+    const byUniqueKey = new Map<string, DataKey>();
+    dataKeys.forEach((dataKey) => {
+        if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
+    });
+    const legacyMaps = buildLegacyMaps(dataKeys);
+
+    const repairedScreens = screens.map((screen) => {
+        let changed = false;
+        const screenBase = {
+            scriptId: screen.scriptId,
+            screenId: screen.screenId,
+            location: screen.title || screen.label || screen.refId || screen.screenId,
+        };
+
+        let nextScreen = screen;
+
+        if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen" })) {
+            const screenDataKey = resolveDataKeyMatch({
+                currentUniqueKey: screen.keyId || undefined,
+                currentKey: screen.key || undefined,
+                currentLabel: screen.label || undefined,
+                expectedDataType: screen.type || "",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const syncedScreen = syncScreenEntityReference(nextScreen, screenDataKey);
+            if (syncedScreen.changed) changed = true;
+            nextScreen = syncedScreen.value;
+        }
+
+        if (screen.refId || screen.refIdDataKey) {
+            if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_ref" })) {
+                const refIdDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: nextScreen.refIdDataKey || undefined,
+                    currentKey: nextScreen.refId || undefined,
+                    expectedDataType: "",
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const syncedRefScreen = syncKeyOnlyReference(nextScreen, refIdDataKey, { id: "refIdDataKey", name: "refId" });
+                if (syncedRefScreen.changed) changed = true;
+                nextScreen = syncedRefScreen.value;
+            }
+        }
+
+        let nextItems = nextScreen.items || [];
+        if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_option_collection" })) {
+            const screenDataKey = resolveDataKeyMatch({
+                currentUniqueKey: nextScreen.keyId || undefined,
+                currentKey: nextScreen.key || undefined,
+                currentLabel: nextScreen.label || undefined,
+                expectedDataType: nextScreen.type || "",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const rebuiltScreenItems = applyOwnedOptionCollectionSync(
+                nextItems,
+                shouldSyncScreenOwnedOptions({
+                    screenType: nextScreen.type,
+                    dataKey: screenDataKey,
+                    currentItemsCount: nextItems.length,
+                }),
+                () => rebuildScreenItemsFromDataKeyOptions({
+                    currentItems: nextItems,
+                    optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
+                    screenType: nextScreen.type,
+                }),
+            );
+            if (rebuiltScreenItems.changed) changed = true;
+            nextItems = rebuiltScreenItems.value;
+        } else {
+            nextItems = nextItems.map((item, itemIndex) => {
+                const itemLocation = `${screenBase.location} > item ${itemIndex + 1}`;
+                if (!matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_item", location: itemLocation })) return item;
+                const itemDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: item.keyId || undefined,
+                    currentKey: item.key || item.id || undefined,
+                    currentLabel: item.label || undefined,
+                    expectedDataType: nextScreen.type === "diagnosis" ? "diagnosis" : "option",
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const synced = syncScreenReference(item, itemDataKey);
+                if (synced.changed) changed = true;
+                return synced.value;
+            });
+        }
+
+        const nextFields = (nextScreen.fields || []).map((field, fieldIndex) => {
+            const fieldBase = {
+                ...screenBase,
+                location: `${screenBase.location} > ${field.label || field.key || `field ${fieldIndex + 1}`}`,
+            };
+            let nextField = field;
+
+            if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field" })) {
+                const fieldDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: field.keyId || undefined,
+                    currentKey: field.key || undefined,
+                    currentLabel: field.label || undefined,
+                    expectedDataType: field.type || "",
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const syncedField = syncFieldReference(nextField, fieldDataKey);
+                if (syncedField.changed) changed = true;
+                nextField = syncedField.value;
+            }
+
+            const keyOnlyRefSpecs: Array<{
+                kind: DataKeyIntegrityKind;
+                id: "refKeyId" | "minDateKeyId" | "maxDateKeyId" | "minTimeKeyId" | "maxTimeKeyId";
+                name: "refKey" | "minDateKey" | "maxDateKey" | "minTimeKey" | "maxTimeKey";
+                expectedDataType: string;
+            }> = [
+                { kind: "field_ref", id: "refKeyId", name: "refKey", expectedDataType: "" },
+                { kind: "field_min_date", id: "minDateKeyId", name: "minDateKey", expectedDataType: "date" },
+                { kind: "field_max_date", id: "maxDateKeyId", name: "maxDateKey", expectedDataType: "date" },
+                { kind: "field_min_time", id: "minTimeKeyId", name: "minTimeKey", expectedDataType: "time" },
+                { kind: "field_max_time", id: "maxTimeKeyId", name: "maxTimeKey", expectedDataType: "time" },
+            ];
+
+            keyOnlyRefSpecs.forEach((spec) => {
+                if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: spec.kind })) return;
+                const matchedDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: nextField[spec.id] || undefined,
+                    currentKey: nextField[spec.name] || undefined,
+                    expectedDataType: spec.expectedDataType,
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const syncedField = syncKeyOnlyReference(nextField, matchedDataKey, { id: spec.id, name: spec.name });
+                if (syncedField.changed) changed = true;
+                nextField = syncedField.value;
+            });
+
+            let nextFieldItems = nextField.items || [];
+            if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_option_collection" })) {
+                const fieldDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: nextField.keyId || undefined,
+                    currentKey: nextField.key || undefined,
+                    currentLabel: nextField.label || undefined,
+                    expectedDataType: nextField.type || "",
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const rebuiltFieldItems = applyOwnedOptionCollectionSync(
+                    nextFieldItems,
+                    shouldSyncFieldOwnedOptions({
+                        fieldType: nextField.type,
+                        dataKey: fieldDataKey,
+                        currentItemsCount: nextFieldItems.length,
+                    }),
+                    () => rebuildFieldItemsFromDataKeyOptions({
+                        currentItems: nextFieldItems,
+                        optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),
+                    }),
+                );
+                if (rebuiltFieldItems.changed) changed = true;
+                nextFieldItems = rebuiltFieldItems.value;
+            } else {
+                nextFieldItems = nextFieldItems.map((item, fieldItemIndex) => {
+                    const itemLocation = `${fieldBase.location} > option ${fieldItemIndex + 1}`;
+                    if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_item", location: itemLocation })) return item;
+                    const fieldItemDataKey = resolveDataKeyMatch({
+                        currentUniqueKey: item.keyId || undefined,
+                        currentKey: `${item.value || ""}` || undefined,
+                        currentLabel: `${item.label || ""}` || undefined,
+                        expectedDataType: "option",
+                        byUniqueKey,
+                        legacyMaps,
+                    });
+                    const syncedFieldItem = syncKeyOnlyReference(item, fieldItemDataKey, {
+                        id: "keyId",
+                        name: "value",
+                    });
+                    const fieldItemValue = fieldItemDataKey ? {
+                        ...syncedFieldItem.value,
+                        label: fieldItemDataKey.label,
+                    } : item;
+                    if (JSON.stringify(fieldItemValue) !== JSON.stringify(item)) changed = true;
+                    return fieldItemValue;
+                });
+            }
+
+            return {
+                ...nextField,
+                items: nextFieldItems,
+            };
+        });
+
+        return {
+            value: {
+                ...nextScreen,
+                items: nextItems,
+                fields: nextFields,
+            },
+            changed,
+        };
+    });
+
+    const repairedDiagnoses = diagnoses.map((diagnosis) => {
+        let changed = false;
+        const diagnosisBase = {
+            scriptId: diagnosis.scriptId,
+            diagnosisId: diagnosis.diagnosisId,
+            location: diagnosis.name || diagnosis.key || diagnosis.diagnosisId,
+        };
+
+        let nextDiagnosis = diagnosis;
+
+        if (matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis" })) {
+            const diagnosisDataKey = resolveDataKeyMatch({
+                currentUniqueKey: diagnosis.keyId || undefined,
+                currentKey: diagnosis.key || undefined,
+                currentLabel: diagnosis.name || undefined,
+                expectedDataType: "diagnosis",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const syncedDiagnosis = syncDiagnosisReference({
+                ...nextDiagnosis,
+                key: nextDiagnosis.key || nextDiagnosis.name || "",
+            }, diagnosisDataKey);
+            if (syncedDiagnosis.changed) changed = true;
+            nextDiagnosis = syncedDiagnosis.value;
+        }
+
+        const nextSymptoms = (nextDiagnosis.symptoms || []).map((symptom, symptomIndex) => {
+            const symptomLocation = `${diagnosisBase.location} > symptom ${symptomIndex + 1}`;
+            if (!matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis_symptom", location: symptomLocation })) return symptom;
+            const symptomDataKey = resolveDataKeyMatch({
+                currentUniqueKey: symptom.keyId || undefined,
+                currentKey: symptom.key || undefined,
+                currentLabel: symptom.name || undefined,
+                expectedDataType: `diagnosis_symptom_${symptom.type}`,
+                byUniqueKey,
+                legacyMaps,
+            });
+            const syncedSymptom = syncDiagnosisReference(symptom, symptomDataKey);
+            if (syncedSymptom.changed) changed = true;
+            return syncedSymptom.value;
+        });
+
+        return {
+            value: {
+                ...nextDiagnosis,
+                symptoms: nextSymptoms,
             },
             changed,
         };
