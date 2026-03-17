@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useCallback, useState } from "react";
-import { Edit, MoreVertical, Trash, Plus } from "lucide-react"
+import { Edit, MoreVertical, Trash, Plus, AlertCircle } from "lucide-react"
 import { useQueryState } from 'nuqs';
 
 import {
@@ -10,6 +10,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import {
     Dialog,
     DialogContent,
@@ -235,6 +240,24 @@ export function EdlizSummary({
 
                                             return (
                                                 <>
+                                                    {!item.itemId && (
+                                                        <>
+                                                            <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button variant="ghost">
+                                                                        <AlertCircle className="size-4 text-destructive" />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+
+                                                                <PopoverContent
+                                                                    className="bg-red-100 text-destructive"
+                                                                >
+                                                                    Please re-select item to link it to the datakey library.
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </>
+                                                    )}
+                                                    
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button 
