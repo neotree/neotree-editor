@@ -173,6 +173,8 @@ function Form({
     const nameValue = watch('name');
     const labelValue = watch('label');
     const confidential = !!watch('confidential');
+    const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
+    const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -225,7 +227,8 @@ function Form({
             `${nameValue || ''}` !== `${dataKey.name || ''}` ||
             `${labelValue || ''}` !== `${dataKey.label || ''}` ||
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
-            !!confidential !== !!dataKey.confidential
+            !!confidential !== !!dataKey.confidential ||
+            optionsSignature !== savedOptionsSignature
         );
         if (!changed) {
             setImpactPreview(undefined);
@@ -244,6 +247,8 @@ function Form({
         labelValue,
         dataType,
         confidential,
+        optionsSignature,
+        savedOptionsSignature,
         loadImpactPreview,
     ]);
 

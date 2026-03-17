@@ -8,6 +8,7 @@ import { _getScreens, _getDiagnoses } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
 import { buildNormalizedDataKeyMatchKey } from '@/lib/data-key-types';
+import { rebuildFieldItemsFromDataKeyOptions, rebuildScreenItemsFromDataKeyOptions } from './_update_data_keys_refs.helpers';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -524,6 +525,22 @@ export async function _updateDataKeysRefs({
                     }),
                 };
             });
+            const shouldRebuildScreenItems = !!screenDataKey && (
+                !!(screenDataKey.options || []).length ||
+                !!(s.items || []).length
+            );
+            const rebuiltItems = shouldRebuildScreenItems
+                ? rebuildScreenItemsFromDataKeyOptions({
+                    currentItems: items,
+                    optionDataKeys: (screenDataKey?.options || [])
+                        .map(uniqueKey => byUniqueKey.get(uniqueKey))
+                        .filter((item): item is DataKey => !!item),
+                    screenType: s.type,
+                })
+                : items;
+            if (screenDataKey && JSON.stringify(rebuiltItems) !== JSON.stringify(items)) {
+                updated = true;
+            }
 
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
@@ -581,6 +598,54 @@ export async function _updateDataKeysRefs({
                     });
                 }
 
+                const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
+                    const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                        key: `${item.value || ''}`,
+                        label: `${item.label || ''}`,
+                        dataType: 'option',
+                    });
+                    trackMatchSource(fieldItemMatchSource);
+
+                    if (fieldItemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
+                            kind: 'screen_field_item',
+                            title: `${item.label || item.value || (fieldItemIndex + 1)}`,
+                            location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            fieldIndex,
+                            fieldItemIndex,
+                        });
+                    }
+                    return {
+                        ...item,
+                        ...(!fieldItemDataKey ? {} : {
+                            keyId: fieldItemDataKey.uniqueKey,
+                            value: fieldItemDataKey.name,
+                            label: fieldItemDataKey.label,
+                        }),
+                    };
+                });
+                const shouldRebuildFieldItems = !!fieldDataKey && (
+                    !!(fieldDataKey.options || []).length ||
+                    !!(field.items || []).length
+                );
+                const rebuiltFieldItems = shouldRebuildFieldItems
+                    ? rebuildFieldItemsFromDataKeyOptions({
+                        currentItems: fieldItems,
+                        optionDataKeys: (fieldDataKey?.options || [])
+                            .map(uniqueKey => byUniqueKey.get(uniqueKey))
+                            .filter((item): item is DataKey => !!item),
+                    })
+                    : fieldItems;
+                if (fieldDataKey && JSON.stringify(rebuiltFieldItems) !== JSON.stringify(fieldItems)) {
+                    updated = true;
+                }
+
                 return {
                     ...field,
                     ...(!fieldDataKey ? {} : {
@@ -610,45 +675,14 @@ export async function _updateDataKeysRefs({
                         maxTimeKeyId: maxTimeKeyDataKey.uniqueKey,
                         maxTimeKey: maxTimeKeyDataKey.name,
                     }),
-                    items: (field.items || []).map((item, fieldItemIndex) => {
-                        const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
-                            uniqueKey: item.keyId,
-                            key: `${item.value || ''}`,
-                            label: `${item.label || ''}`,
-                            dataType: 'option',
-                        });
-                        trackMatchSource(fieldItemMatchSource);
-
-                        if (fieldItemDataKey) {
-                            updated = true;
-                            addUsage({
-                                id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
-                                kind: 'screen_field_item',
-                                title: `${item.label || item.value || (fieldItemIndex + 1)}`,
-                                location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
-                                scriptId: s.scriptId,
-                                scriptTitle: s.scriptTitle || undefined,
-                                screenId: s.screenId,
-                                fieldIndex,
-                                fieldItemIndex,
-                            });
-                        }
-                        return {
-                            ...item,
-                            ...(!fieldItemDataKey ? {} : {
-                                keyId: fieldItemDataKey.uniqueKey,
-                                value: fieldItemDataKey.name,
-                                label: fieldItemDataKey.label,
-                            }),
-                        };
-                    }),
+                    items: rebuiltFieldItems,
                 };
             });
 
             return {
                 ...s,
                 updated,
-                items,
+                items: rebuiltItems,
                 fields,
                 ...(!screenDataKey ? {} : {
                     keyId: screenDataKey.uniqueKey,
