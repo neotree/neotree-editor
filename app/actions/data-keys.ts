@@ -3,6 +3,7 @@
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
 import { _getDiagnoses, _getScreens } from '@/databases/queries/scripts';
+import { _saveDiagnoses, _saveScreens } from '@/databases/mutations/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
@@ -10,7 +11,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, isNull, max } from 'drizzle-orm';
-import { scanDataKeyIntegrity } from '@/lib/data-key-integrity';
+import { repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 
 function assertCanManageDataKeys(user?: { role?: string | null } | null) {
     const role = user?.role;
@@ -116,6 +117,113 @@ export const getDataKeysIntegrity = async (params?: {
         return {
             success: false,
             data: null,
+            errors: [e.message],
+        };
+    }
+}
+
+export const resolveDataKeyIntegrityEntry = async (params: {
+    entry: DataKeyIntegrityEntry;
+}) => {
+    try {
+        const session = await isAllowed();
+
+        const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: [params.entry.scriptId], returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: [params.entry.scriptId], returnDraftsIfExist: true }),
+        ]);
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+        ];
+
+        if (errors.length) {
+            return {
+                success: false,
+                changed: false,
+                reportAfter: null,
+                errors,
+            };
+        }
+
+        const repairs = repairSingleDataKeyIntegrityReference({
+            entry: params.entry,
+            dataKeys: dataKeysRes.data,
+            screens: screensRes.data,
+            diagnoses: diagnosesRes.data,
+        });
+
+        if (!repairs.screens.length && !repairs.diagnoses.length) {
+            return {
+                success: true,
+                changed: false,
+                reportAfter: scanDataKeyIntegrity({
+                    dataKeys: dataKeysRes.data,
+                    screens: screensRes.data,
+                    diagnoses: diagnosesRes.data,
+                    onlyIssues: false,
+                }),
+                errors: [],
+            };
+        }
+
+        if (repairs.screens.length) {
+            const repairedScreens = await _saveScreens({
+                data: repairs.screens,
+                userId: session.user?.userId,
+            });
+            if (repairedScreens.errors?.length) {
+                return {
+                    success: false,
+                    changed: false,
+                    reportAfter: null,
+                    errors: repairedScreens.errors,
+                };
+            }
+        }
+
+        if (repairs.diagnoses.length) {
+            const repairedDiagnoses = await _saveDiagnoses({
+                data: repairs.diagnoses,
+                userId: session.user?.userId,
+            });
+            if (repairedDiagnoses.errors?.length) {
+                return {
+                    success: false,
+                    changed: false,
+                    reportAfter: null,
+                    errors: repairedDiagnoses.errors,
+                };
+            }
+        }
+
+        const screensAfter = repairs.screens.length
+            ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen)
+            : screensRes.data;
+        const diagnosesAfter = repairs.diagnoses.length
+            ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis)
+            : diagnosesRes.data;
+
+        return {
+            success: true,
+            changed: true,
+            reportAfter: scanDataKeyIntegrity({
+                dataKeys: dataKeysRes.data,
+                screens: screensAfter,
+                diagnoses: diagnosesAfter,
+                onlyIssues: false,
+            }),
+            errors: [],
+        };
+    } catch (e: any) {
+        logger.error('resolveDataKeyIntegrityEntry ERROR', e.message);
+        return {
+            success: false,
+            changed: false,
+            reportAfter: null,
             errors: [e.message],
         };
     }
