@@ -8,7 +8,17 @@ import { _getScreens, _getDiagnoses } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
 import { buildNormalizedDataKeyMatchKey } from '@/lib/data-key-types';
-import { rebuildFieldItemsFromDataKeyOptions, rebuildScreenItemsFromDataKeyOptions } from './_update_data_keys_refs.helpers';
+import {
+    applyOwnedOptionCollectionSync,
+    resolveOwnedOptionDataKeys,
+    rebuildFieldItemsFromDataKeyOptions,
+    rebuildScreenItemsFromDataKeyOptions,
+    syncDiagnosisReference,
+    syncFieldReference,
+    syncKeyOnlyReference,
+    syncScreenEntityReference,
+    syncScreenReference,
+} from './_update_data_keys_refs.helpers';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -283,7 +293,6 @@ export async function _updateDataKeysRefs({
             if (source === 'legacyName') stats.matchedByLegacyName++;
             if (source === 'legacyLabel') stats.matchedByLegacyLabel++;
         };
-        const getDataKeyOptional = (key?: DataKey) => !!(key?.metadata as Record<string, any> | undefined)?.optional;
 
         const usagesMap = new Map<string, AffectedUsage>();
         const addUsage = (usage: AffectedUsage) => {
@@ -514,31 +523,26 @@ export async function _updateDataKeysRefs({
                         screenItemIndex: itemIndex,
                     });
                 }
+                const syncedItem = syncScreenReference(item, itemDataKey);
+                if (syncedItem.changed) {
+                    updated = true;
+                }
                 return {
                     ...item,
-                    ...(!itemDataKey ? {} : {
-                        keyId: itemDataKey.uniqueKey,
-                        label: itemDataKey.label,
-                        confidential: !!itemDataKey.confidential,
-                        ...(!(`${item.key || ''}`.length) ? {} : { key: itemDataKey.name, }),
-                        ...(!(`${item.id || ''}`.length) ? {} : { id: itemDataKey.name, }),
-                    }),
+                    ...syncedItem.value,
                 };
             });
-            const shouldRebuildScreenItems = !!screenDataKey && (
-                !!(screenDataKey.options || []).length ||
-                !!(s.items || []).length
-            );
-            const rebuiltItems = shouldRebuildScreenItems
-                ? rebuildScreenItemsFromDataKeyOptions({
+            const screenOptionSync = applyOwnedOptionCollectionSync(
+                items,
+                !!screenDataKey && (!!(screenDataKey.options || []).length || !!(s.items || []).length),
+                () => rebuildScreenItemsFromDataKeyOptions({
                     currentItems: items,
-                    optionDataKeys: (screenDataKey?.options || [])
-                        .map(uniqueKey => byUniqueKey.get(uniqueKey))
-                        .filter((item): item is DataKey => !!item),
+                    optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
                     screenType: s.type,
-                })
-                : items;
-            if (screenDataKey && JSON.stringify(rebuiltItems) !== JSON.stringify(items)) {
+                }),
+            );
+            const rebuiltItems = screenOptionSync.value;
+            if (screenOptionSync.changed) {
                 updated = true;
             }
 
@@ -581,10 +585,6 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(maxTimeMatchSource);
 
-                if (fieldDataKey || refKeyDataKey || minDateKeyDataKey || maxDateKeyDataKey || minTimeKeyDataKey || maxTimeKeyDataKey) {
-                    updated = true;
-                }
-
                 if (fieldDataKey) {
                     addUsage({
                         id: field.fieldId || `${s.screenId}:field:${fieldIndex}`,
@@ -621,79 +621,86 @@ export async function _updateDataKeysRefs({
                             fieldItemIndex,
                         });
                     }
+                    const syncedFieldItem = syncKeyOnlyReference(item, fieldItemDataKey, {
+                        id: "keyId",
+                        name: "value",
+                    });
+                    const fieldItemValue = fieldItemDataKey ? {
+                        ...syncedFieldItem.value,
+                        label: fieldItemDataKey.label,
+                    } : item;
+                    if (JSON.stringify(fieldItemValue) !== JSON.stringify(item)) {
+                        updated = true;
+                    }
                     return {
                         ...item,
-                        ...(!fieldItemDataKey ? {} : {
-                            keyId: fieldItemDataKey.uniqueKey,
-                            value: fieldItemDataKey.name,
-                            label: fieldItemDataKey.label,
-                        }),
+                        ...fieldItemValue,
                     };
                 });
-                const shouldRebuildFieldItems = !!fieldDataKey && (
-                    !!(fieldDataKey.options || []).length ||
-                    !!(field.items || []).length
-                );
-                const rebuiltFieldItems = shouldRebuildFieldItems
-                    ? rebuildFieldItemsFromDataKeyOptions({
+                const rebuiltFieldItemsSync = applyOwnedOptionCollectionSync(
+                    fieldItems,
+                    !!fieldDataKey && (!!(fieldDataKey.options || []).length || !!(field.items || []).length),
+                    () => rebuildFieldItemsFromDataKeyOptions({
                         currentItems: fieldItems,
-                        optionDataKeys: (fieldDataKey?.options || [])
-                            .map(uniqueKey => byUniqueKey.get(uniqueKey))
-                            .filter((item): item is DataKey => !!item),
-                    })
-                    : fieldItems;
-                if (fieldDataKey && JSON.stringify(rebuiltFieldItems) !== JSON.stringify(fieldItems)) {
+                        optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),
+                    }),
+                );
+                const rebuiltFieldItems = rebuiltFieldItemsSync.value;
+                if (rebuiltFieldItemsSync.changed) {
+                    updated = true;
+                }
+                const syncedField = syncFieldReference(field, fieldDataKey);
+                const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
+                    id: "refKeyId",
+                    name: "refKey",
+                });
+                const syncedMinDateField = syncKeyOnlyReference(syncedRefField.value, minDateKeyDataKey, {
+                    id: "minDateKeyId",
+                    name: "minDateKey",
+                });
+                const syncedMaxDateField = syncKeyOnlyReference(syncedMinDateField.value, maxDateKeyDataKey, {
+                    id: "maxDateKeyId",
+                    name: "maxDateKey",
+                });
+                const syncedMinTimeField = syncKeyOnlyReference(syncedMaxDateField.value, minTimeKeyDataKey, {
+                    id: "minTimeKeyId",
+                    name: "minTimeKey",
+                });
+                const syncedMaxTimeField = syncKeyOnlyReference(syncedMinTimeField.value, maxTimeKeyDataKey, {
+                    id: "maxTimeKeyId",
+                    name: "maxTimeKey",
+                });
+                if (
+                    syncedField.changed ||
+                    syncedRefField.changed ||
+                    syncedMinDateField.changed ||
+                    syncedMaxDateField.changed ||
+                    syncedMinTimeField.changed ||
+                    syncedMaxTimeField.changed
+                ) {
                     updated = true;
                 }
 
                 return {
-                    ...field,
-                    ...(!fieldDataKey ? {} : {
-                        keyId: fieldDataKey.uniqueKey,
-                        key: fieldDataKey.name,
-                        label: fieldDataKey.label,
-                        confidential: !!fieldDataKey.confidential,
-                        optional: getDataKeyOptional(fieldDataKey),
-                    }),
-                    ...(!refKeyDataKey ? {} : {
-                        refKeyId: refKeyDataKey.uniqueKey,
-                        refKey: refKeyDataKey.name,
-                    }),
-                    ...(!minDateKeyDataKey ? {} : {
-                        minDateKeyId: minDateKeyDataKey.uniqueKey,
-                        minDateKey: minDateKeyDataKey.name,
-                    }),
-                    ...(!maxDateKeyDataKey ? {} : {
-                        maxDateKeyId: maxDateKeyDataKey.uniqueKey,
-                        maxDateKey: maxDateKeyDataKey.name,
-                    }),
-                    ...(!minTimeKeyDataKey ? {} : {
-                        minTimeKeyId: minTimeKeyDataKey.uniqueKey,
-                        minTimeKey: minTimeKeyDataKey.name,
-                    }),
-                    ...(!maxTimeKeyDataKey ? {} : {
-                        maxTimeKeyId: maxTimeKeyDataKey.uniqueKey,
-                        maxTimeKey: maxTimeKeyDataKey.name,
-                    }),
+                    ...syncedMaxTimeField.value,
                     items: rebuiltFieldItems,
                 };
             });
 
+            const syncedScreen = syncScreenEntityReference(s, screenDataKey);
+            const syncedRefScreen = syncKeyOnlyReference(syncedScreen.value, refIdDataKey, {
+                id: "refIdDataKey",
+                name: "refId",
+            });
+            if (syncedScreen.changed || syncedRefScreen.changed) {
+                updated = true;
+            }
+
             return {
-                ...s,
+                ...syncedRefScreen.value,
                 updated,
                 items: rebuiltItems,
                 fields,
-                ...(!screenDataKey ? {} : {
-                    keyId: screenDataKey.uniqueKey,
-                    key: screenDataKey.name,
-                    label: screenDataKey.label,
-                    confidential: !!screenDataKey.confidential,
-                }),
-                ...(!refIdDataKey ? {} : {
-                    refId: refIdDataKey.name,
-                    refIdDataKey: refIdDataKey.uniqueKey,
-                }),
             };
         }).filter(s => !!s.updated).map(({ updated, ...s }) => s);
 
@@ -743,26 +750,27 @@ export async function _updateDataKeysRefs({
                         diagnosisSymptomIndex: symptomIndex,
                     });
                 }
+                const syncedSymptom = syncDiagnosisReference(item, symptomDataKey);
+                if (syncedSymptom.changed) {
+                    updated = true;
+                }
                 return {
                     ...item,
-                    ...(!symptomDataKey ? {} : {
-                        keyId: symptomDataKey.uniqueKey,
-                        key: symptomDataKey.name,
-                        name: symptomDataKey.label,
-                    }),
+                    ...syncedSymptom.value,
                 };
             });
-
-            return {
+            const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
+            }, diagnosisDataKey);
+            if (syncedDiagnosis.changed) {
+                updated = true;
+            }
+
+            return {
+                ...syncedDiagnosis.value,
                 symptoms,
                 updated,
-                ...(!diagnosisDataKey ? {} : {
-                    keyId: diagnosisDataKey.uniqueKey,
-                    key: diagnosisDataKey.name,
-                    name: diagnosisDataKey.label,
-                }),
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
