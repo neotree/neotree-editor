@@ -15,7 +15,8 @@
         "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
         "start:production": "NODE_ENV=production pm2 start pm2.production.json",
         "tsx": "tsx $1",
-        "test:changelog-sanitize": "tsx tests/changelog-sanitize.test.ts"
+        "test:changelog-sanitize": "tsx tests/changelog-sanitize.test.ts",
+        "test:data-key-option-sync": "tsx tests/data-key-option-sync.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
