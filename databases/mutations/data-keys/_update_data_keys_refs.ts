@@ -13,6 +13,8 @@ import {
     resolveOwnedOptionDataKeys,
     rebuildFieldItemsFromDataKeyOptions,
     rebuildScreenItemsFromDataKeyOptions,
+    shouldSyncFieldOwnedOptions,
+    shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
     syncFieldReference,
     syncKeyOnlyReference,
@@ -534,7 +536,11 @@ export async function _updateDataKeysRefs({
             });
             const screenOptionSync = applyOwnedOptionCollectionSync(
                 items,
-                !!screenDataKey && (!!(screenDataKey.options || []).length || !!(s.items || []).length),
+                shouldSyncScreenOwnedOptions({
+                    screenType: s.type,
+                    dataKey: screenDataKey,
+                    currentItemsCount: (s.items || []).length,
+                }),
                 () => rebuildScreenItemsFromDataKeyOptions({
                     currentItems: items,
                     optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
@@ -639,7 +645,11 @@ export async function _updateDataKeysRefs({
                 });
                 const rebuiltFieldItemsSync = applyOwnedOptionCollectionSync(
                     fieldItems,
-                    !!fieldDataKey && (!!(fieldDataKey.options || []).length || !!(field.items || []).length),
+                    shouldSyncFieldOwnedOptions({
+                        fieldType: field.type,
+                        dataKey: fieldDataKey,
+                        currentItemsCount: (field.items || []).length,
+                    }),
                     () => rebuildFieldItemsFromDataKeyOptions({
                         currentItems: fieldItems,
                         optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),

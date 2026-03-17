@@ -60,6 +60,36 @@ function inferScreenItemDataType(screenType?: string | null) {
     }
 }
 
+export function shouldSyncScreenOwnedOptions({
+    screenType,
+    dataKey,
+    currentItemsCount,
+}: {
+    screenType?: string | null;
+    dataKey?: DataKey;
+    currentItemsCount: number;
+}) {
+    const type = `${screenType || ""}`.trim().toLowerCase();
+    const ownsChildren = ["checklist", "multi_select", "single_select"].includes(type);
+    if (!ownsChildren) return false;
+    return !!dataKey && (!!(dataKey.options || []).length || currentItemsCount > 0);
+}
+
+export function shouldSyncFieldOwnedOptions({
+    fieldType,
+    dataKey,
+    currentItemsCount,
+}: {
+    fieldType?: string | null;
+    dataKey?: DataKey;
+    currentItemsCount: number;
+}) {
+    const type = `${fieldType || ""}`.trim().toLowerCase();
+    const ownsChildren = ["dropdown", "multi_select"].includes(type);
+    if (!ownsChildren) return false;
+    return !!dataKey && (!!(dataKey.options || []).length || currentItemsCount > 0);
+}
+
 export function applyDataKeySync<T extends SyncableObject>(
     current: T,
     dataKey: DataKey | undefined,

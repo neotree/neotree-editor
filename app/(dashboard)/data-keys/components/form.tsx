@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
 import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
@@ -93,6 +93,7 @@ function Form({
     disabled?: boolean;
 }) {
     const { dataKeyId, } = useParams();
+    const searchParams = useSearchParams();
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
@@ -103,6 +104,11 @@ function Form({
         (k.uuid === dataKeyId) ||
         (k.uniqueKey === dataKeyId)
     )), [dataKeys, dataKeyId]);
+    const prefill = useMemo(() => ({
+        name: searchParams.get('name') || '',
+        label: searchParams.get('label') || '',
+        dataType: searchParams.get('dataType') || '',
+    }), [searchParams]);
 
     const isLocked = useIsLocked({
         isDraft: !!dataKey?.isDraft,
@@ -121,11 +127,11 @@ function Form({
     } = useForm({
         defaultValues: {
             ...dataKey,
-            name: dataKey?.name || '',
+            name: dataKey?.name || prefill.name || '',
             refId: dataKey?.refId || '',
-            dataType: dataKey?.dataType || '',
+            dataType: dataKey?.dataType || prefill.dataType || '',
             confidential: dataKey ? !!dataKey.confidential : true,
-            label: dataKey?.label || '',
+            label: dataKey?.label || prefill.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
             version: dataKey?.version || 1,
