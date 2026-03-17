@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { buildNormalizedDataKeyMatchKey } from "@/lib/data-key-types";
+import type { DataKey } from "@/databases/queries/data-keys";
 import type { ScriptItem, ScriptField } from "@/types";
 
 type OptionDataKey = {
@@ -13,6 +14,9 @@ type OptionDataKey = {
 
 type ExistingFieldItem = NonNullable<ScriptField["items"]>[number];
 type ExistingScreenItem = ScriptItem;
+type SyncableObject = Record<string, unknown>;
+type SyncPatch<T> = Partial<T>;
+type SyncPatchBuilder<T extends SyncableObject> = (dataKey: DataKey, current: T) => SyncPatch<T>;
 
 function buildExistingOptionMaps<T extends { keyId?: string; label?: unknown }>(
     items: T[],
@@ -43,7 +47,7 @@ function buildExistingOptionMaps<T extends { keyId?: string; label?: unknown }>(
     return { byUniqueKey, byLegacyKey };
 }
 
-function inferScreenItemDataType(screenType?: string) {
+function inferScreenItemDataType(screenType?: string | null) {
     switch (`${screenType || ""}`) {
         case "checklist":
             return "boolean";
@@ -54,6 +58,107 @@ function inferScreenItemDataType(screenType?: string) {
         default:
             return null;
     }
+}
+
+export function applyDataKeySync<T extends SyncableObject>(
+    current: T,
+    dataKey: DataKey | undefined,
+    buildPatch: SyncPatchBuilder<T>,
+) {
+    if (!dataKey) {
+        return { value: current, changed: false };
+    }
+
+    const patch = buildPatch(dataKey, current);
+    const value = {
+        ...current,
+        ...patch,
+    };
+
+    return {
+        value,
+        changed: JSON.stringify(value) !== JSON.stringify(current),
+    };
+}
+
+export function applyOwnedOptionCollectionSync<T>(
+    currentItems: T[],
+    ownsChildren: boolean,
+    rebuild: () => T[],
+) {
+    if (!ownsChildren) {
+        return { value: currentItems, changed: false };
+    }
+
+    const value = rebuild();
+    return {
+        value,
+        changed: JSON.stringify(value) !== JSON.stringify(currentItems),
+    };
+}
+
+export function resolveOwnedOptionDataKeys(
+    dataKey: DataKey | undefined,
+    byUniqueKey: Map<string, DataKey>,
+) {
+    if (!dataKey) return [];
+    return (dataKey.options || [])
+        .map(uniqueKey => byUniqueKey.get(uniqueKey))
+        .filter((item): item is DataKey => !!item);
+}
+
+export function syncScreenReference(current: ExistingScreenItem, dataKey?: DataKey) {
+    return applyDataKeySync(current, dataKey, (item, existing) => ({
+        keyId: item.uniqueKey,
+        label: item.label,
+        confidential: !!item.confidential,
+        ...(!(`${existing.key || ""}`.length) ? {} : { key: item.name }),
+        ...(!(`${existing.id || ""}`.length) ? {} : { id: item.name }),
+    }));
+}
+
+export function syncFieldReference(current: ScriptField, dataKey?: DataKey) {
+    return applyDataKeySync(current, dataKey, (item) => ({
+        keyId: item.uniqueKey,
+        key: item.name,
+        label: item.label,
+        confidential: !!item.confidential,
+        optional: !!(item.metadata as Record<string, unknown> | undefined)?.optional,
+    }));
+}
+
+export function syncScreenEntityReference<T extends { key?: string; keyId?: string; label?: string; confidential?: boolean }>(
+    current: T,
+    dataKey?: DataKey,
+) {
+    return applyDataKeySync(current as SyncableObject as T, dataKey, (item) => ({
+        keyId: item.uniqueKey,
+        key: item.name,
+        label: item.label,
+        confidential: !!item.confidential,
+    } as SyncPatch<T>));
+}
+
+export function syncDiagnosisReference<T extends { key?: string; keyId?: string; name?: string }>(current: T, dataKey?: DataKey) {
+    return applyDataKeySync(current as SyncableObject as T, dataKey, (item) => ({
+        keyId: item.uniqueKey,
+        key: item.name,
+        name: item.label,
+    } as SyncPatch<T>));
+}
+
+export function syncKeyOnlyReference<T extends SyncableObject>(
+    current: T,
+    dataKey: DataKey | undefined,
+    fields: {
+        id: keyof T;
+        name: keyof T;
+    },
+) {
+    return applyDataKeySync(current, dataKey, (item) => ({
+        [fields.id]: item.uniqueKey,
+        [fields.name]: item.name,
+    } as SyncPatch<T>));
 }
 
 export function rebuildFieldItemsFromDataKeyOptions({
