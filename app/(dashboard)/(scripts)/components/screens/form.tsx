@@ -597,23 +597,6 @@ export function ScreenForm(props: Props) {
                 )}
 
                 <div>
-                    <Label secondary htmlFor="sectionTitle">Print section title *</Label>
-                    <Input
-                        {...register('sectionTitle', { disabled, required: false, })}
-                        name="sectionTitle"
-                        noRing={false}
-                    />
-                    <PreferencesForm
-                        id="sectionTitle"
-                        title="Print section title"
-                        disabled={disabled}
-                        data={preferences}
-                        onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                        hide={false}
-                    />
-                </div>
-
-                <div>
                     <Label secondary htmlFor="actionText">Action</Label>
                     <Input
                         {...register('actionText', { disabled, })}
