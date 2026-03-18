@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/users/reset-passwords/route.ts
+// File: /home/watkay/ReactProjects/neotree-editor/app/api/users/reset-passwords/route.ts
 import * as entry from '../../../../../../app/api/users/reset-passwords/route.js'
 import type { NextRequest } from 'next/server.js'
 
