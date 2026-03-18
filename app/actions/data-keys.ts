@@ -6,21 +6,33 @@ import { _getScreens } from '@/databases/queries/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
+import { validateApiKey, validateHeadersItem } from './authenticate';
 import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, isNull, max } from 'drizzle-orm';
 
-function assertCanManageDataKeys(user?: { role?: string | null } | null) {
+async function assertCanManageDataKeys(
+    user?: { role?: string | null } | null,
+    options?: { allowApiKeyAuth?: boolean; },
+) {
     const role = user?.role;
-    const allowed = role === 'super_user';
+    let allowed = role === 'super_user';
+    let allowedByApiKey = false;
+
+    if (!allowed && options?.allowApiKeyAuth) {
+        allowedByApiKey = await validateHeadersItem('x-api-key', validateApiKey);
+        allowed = allowedByApiKey;
+    }
+
+    if (!allowed) logger.error('assertCanManageDataKeys ERROR', JSON.stringify({ role, allowApiKeyAuth: !!options?.allowApiKeyAuth, allowedByApiKey }));
     if (!allowed) throw new Error('Forbidden: only super_user can add or edit data keys');
 }
 
 export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
-        assertCanManageDataKeys(session.user);
+        await assertCanManageDataKeys(session.user);
         return await _saveDataKeys({
             ...params,
             userId: session.user?.userId,
@@ -34,7 +46,7 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
 export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async params => {
     try {
         const session = await isAllowed();
-        assertCanManageDataKeys(session.user);
+        await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysIfNotExist({
             ...params,
             userId: session.user?.userId,
@@ -48,7 +60,7 @@ export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async para
 export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = async params => {
     try {
         const session = await isAllowed();
-        assertCanManageDataKeys(session.user);
+        await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysUpdateIfExist({
             ...params,
             userId: session.user?.userId,
@@ -348,7 +360,7 @@ export const exportDataKeys = async ({
 }> => {
     try {
         const session = await isAllowed();
-        assertCanManageDataKeys(session.user);
+        await assertCanManageDataKeys(session.user);
 
         const axiosClient = await getSiteAxiosClient(siteId);
         
@@ -384,11 +396,16 @@ export const exportDataKeys = async ({
             }
         }
 
+        if (errors.length) {
+            logger.error('exportDataKeys remote import ERROR', JSON.stringify({ siteId, overwriteExisting: !!overwriteExisting, errors }));
+        }
+
         return {
             success: !errors.length,
-            errors: errors.length ? errors : undefined,
+            errors: errors.length ? errors.map(error => `Target site import failed: ${error}`) : undefined,
         };
     } catch(e: any) {
+        logger.error('exportDataKeys ERROR', JSON.stringify({ siteId, overwriteExisting: !!overwriteExisting, message: e.message }));
         return {
             success: false,
             errors: [e.message],
