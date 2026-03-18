@@ -119,7 +119,24 @@ function getReplaceItems({
 }
 
 function sanitizeSearchValue(searchValue = '') {
-    return searchValue.replace(/\"(.*?)\"/, '$1');
+    let sanitised = searchValue.trim();
+
+    if (
+        (
+            (sanitised[0] === `"`) ||
+            (sanitised[0] === `'`) || 
+            (sanitised[0] === '`')
+        ) &&
+        (
+            (sanitised[sanitised.length - 1] === `"`) ||
+            (sanitised[sanitised.length - 1] === `'`) || 
+            (sanitised[sanitised.length - 1] === '`')
+        ) 
+    ) {
+        sanitised = sanitised.substring(1, sanitised.length - 1);
+    }
+
+    return sanitised;
 }
 
 const filterOptions = [
