@@ -1,11 +1,10 @@
 import { useCallback, useState, useRef } from "react";
 import { arrayMoveImmutable } from "array-move";
-import { Plus, MoreVertical, Trash, Edit, Copy } from "lucide-react";
+import { Plus, MoreVertical, Trash, Edit } from "lucide-react";
+import { useQueryState } from "nuqs";
 
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,6 +30,23 @@ export function Symptoms({
     const { confirm } = useConfirmModal();
 
     const symptoms = form.watch('symptoms');
+    const [currentSymptom, setCurrentSymptom] = useQueryState('symptom', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+    const parsedCurrentSymptomIndex = currentSymptom === 'new'
+        ? -1
+        : null;
+    const activeSymptom = currentSymptom === 'new'
+        ? undefined
+        : symptoms.find((symptom) => symptom.symptomId === currentSymptom)
+            || (Number.isInteger(Number(currentSymptom)) ? symptoms[Number(currentSymptom)] : undefined);
+    const activeSymptomIndex = currentSymptom === 'new'
+        ? -1
+        : symptoms.findIndex((symptom) => symptom.symptomId === currentSymptom);
+    const resolvedCurrentSymptomIndex = activeSymptomIndex >= 0
+        ? activeSymptomIndex
+        : (Number.isInteger(Number(currentSymptom)) ? Number(currentSymptom) : parsedCurrentSymptomIndex);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...symptoms], oldIndex, newIndex);
@@ -95,6 +111,19 @@ export function Symptoms({
         <>
             <button ref={btnRef} />
 
+            {!!currentSymptom && (currentSymptom === 'new' || !!activeSymptom) && (
+                <Symptom
+                    open={!!currentSymptom}
+                    onClose={() => setCurrentSymptom('')}
+                    disabled={disabled}
+                    form={form}
+                    symptom={!activeSymptom || resolvedCurrentSymptomIndex === null || resolvedCurrentSymptomIndex < 0 ? undefined : {
+                        data: activeSymptom,
+                        index: resolvedCurrentSymptomIndex,
+                    }}
+                />
+            )}
+
             <DataTable 
                 title="Symptoms"
                 sortable={!disabled}
@@ -107,19 +136,16 @@ export function Symptoms({
                 }}
                 headerActions={(
                     <>
-                        <Symptom
-                            form={form}
-                            disabled={disabled}
-                        >
-                            {!disabled && (
-                                <DialogTrigger asChild>
-                                    <Button className="text-primary border-primary" variant="outline">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        New symptom
-                                    </Button>
-                                </DialogTrigger>
-                            )}
-                        </Symptom>
+                        {!disabled && (
+                            <Button
+                                className="text-primary border-primary"
+                                variant="outline"
+                                onClick={() => setCurrentSymptom('new')}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New symptom
+                            </Button>
+                        )}
                     </>
                 )}
                 columns={[
@@ -148,25 +174,9 @@ export function Symptoms({
                                     </DropdownMenuTrigger>
 
                                     <DropdownMenuContent>
-                                        <DropdownMenuItem asChild>
-                                            <Symptom 
-                                                disabled={disabled} 
-                                                form={form}
-                                                symptom={{
-                                                    data: symptom,
-                                                    index: rowIndex,
-                                                }}
-                                            >
-                                                {({ extraProps }) => (
-                                                    <DialogTrigger 
-                                                        {...extraProps}
-                                                        className={cn(extraProps?.className, 'w-full')}
-                                                    >
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        <span>{disabled ? 'View' : 'Edit'}</span>
-                                                    </DialogTrigger>
-                                                )}
-                                            </Symptom>
+                                        <DropdownMenuItem onClick={() => setTimeout(() => setCurrentSymptom(symptoms[rowIndex]?.symptomId || `${rowIndex}`), 0)}>
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            <span>{disabled ? 'View' : 'Edit'}</span>
                                         </DropdownMenuItem>
 
                                         {/* <DropdownMenuSymptom 
