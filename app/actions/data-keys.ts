@@ -96,6 +96,11 @@ export const getDataKeysIntegrity = async (params?: {
         ];
 
         if (errors.length) {
+            logger.appError('getDataKeysIntegrity RETURNED_ERRORS', {
+                scriptsIds: params?.scriptsIds || [],
+                onlyIssues: params?.onlyIssues,
+                errors,
+            });
             return {
                 success: false,
                 data: null,
@@ -141,6 +146,10 @@ export const resolveDataKeyIntegrityEntry = async (params: {
         ];
 
         if (errors.length) {
+            logger.appError('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
+                entry: params.entry,
+                errors,
+            });
             return {
                 success: false,
                 changed: false,
@@ -176,6 +185,11 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 userId: session.user?.userId,
             });
             if (repairedScreens.errors?.length) {
+                logger.appError('resolveDataKeyIntegrityEntry SAVE_SCREENS_ERRORS', {
+                    entry: params.entry,
+                    screensCount: repairs.screens.length,
+                    errors: repairedScreens.errors,
+                });
                 return {
                     success: false,
                     changed: false,
@@ -191,6 +205,11 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 userId: session.user?.userId,
             });
             if (repairedDiagnoses.errors?.length) {
+                logger.appError('resolveDataKeyIntegrityEntry SAVE_DIAGNOSES_ERRORS', {
+                    entry: params.entry,
+                    diagnosesCount: repairs.diagnoses.length,
+                    errors: repairedDiagnoses.errors,
+                });
                 return {
                     success: false,
                     changed: false,
@@ -219,7 +238,11 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             errors: [],
         };
     } catch (e: any) {
-        logger.error('resolveDataKeyIntegrityEntry ERROR', e.message);
+        logger.appError('resolveDataKeyIntegrityEntry ERROR', {
+            entry: params.entry,
+            error: e.message,
+            stack: e.stack,
+        });
         return {
             success: false,
             changed: false,

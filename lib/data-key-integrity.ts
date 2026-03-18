@@ -268,6 +268,10 @@ function compareOwnedOptionCollection({
     return false;
 }
 
+function hasReferenceIdentity(values: Array<string | undefined | null>) {
+    return values.some((value) => `${value || ""}`.trim().length > 0);
+}
+
 export function scanDataKeyIntegrity({
     screens = [],
     diagnoses = [],
@@ -300,22 +304,24 @@ export function scanDataKeyIntegrity({
             location: screen.title || screen.label || screen.refId || screen.screenId,
         };
 
-        pushEntry(evaluateReference({
-            currentUniqueKey: screen.keyId || undefined,
-            currentKey: screen.key || undefined,
-            currentLabel: screen.label || undefined,
-            expectedDataType: screen.type || "",
-            base: {
-                ...screenBase,
-                kind: "screen",
-                expectedDataType: screen.type || "",
+        if (hasReferenceIdentity([screen.keyId, screen.key])) {
+            pushEntry(evaluateReference({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,
                 currentLabel: screen.label || undefined,
-            },
-            byUniqueKey,
-            legacyMaps,
-        }));
+                expectedDataType: screen.type || "",
+                base: {
+                    ...screenBase,
+                    kind: "screen",
+                    expectedDataType: screen.type || "",
+                    currentUniqueKey: screen.keyId || undefined,
+                    currentKey: screen.key || undefined,
+                    currentLabel: screen.label || undefined,
+                },
+                byUniqueKey,
+                legacyMaps,
+            }));
+        }
 
         if (screen.refId || screen.refIdDataKey) {
         pushEntry(evaluateReference({
@@ -379,21 +385,23 @@ export function scanDataKeyIntegrity({
                 expectedDataType: field.type || "",
             };
 
-            pushEntry(evaluateReference({
-                currentUniqueKey: field.keyId || undefined,
-                currentKey: field.key || undefined,
-                currentLabel: field.label || undefined,
-                expectedDataType: field.type || "",
-                base: {
-                    ...fieldBase,
-                    kind: "field",
+            if (hasReferenceIdentity([field.keyId, field.key])) {
+                pushEntry(evaluateReference({
                     currentUniqueKey: field.keyId || undefined,
                     currentKey: field.key || undefined,
                     currentLabel: field.label || undefined,
-                },
-                byUniqueKey,
-                legacyMaps,
-            }));
+                    expectedDataType: field.type || "",
+                    base: {
+                        ...fieldBase,
+                        kind: "field",
+                        currentUniqueKey: field.keyId || undefined,
+                        currentKey: field.key || undefined,
+                        currentLabel: field.label || undefined,
+                    },
+                    byUniqueKey,
+                    legacyMaps,
+                }));
+            }
 
             const fieldDataKey = field.keyId ? byUniqueKey.get(field.keyId) : undefined;
             const fieldOwnedOptions = resolveOwnedOptions(fieldDataKey, byUniqueKey);
