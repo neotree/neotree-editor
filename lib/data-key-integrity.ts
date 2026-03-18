@@ -280,6 +280,10 @@ function hasReferenceIdentity(values: Array<string | undefined | null>) {
     return values.some((value) => `${value || ""}`.trim().length > 0);
 }
 
+function screenItemsUseDataKeys(screenType?: string | null) {
+    return `${screenType || ""}`.trim().toLowerCase() !== "progress";
+}
+
 export function scanDataKeyIntegrity({
     screens = [],
     diagnoses = [],
@@ -367,7 +371,7 @@ export function scanDataKeyIntegrity({
             }, "out_of_sync", "Screen options have drifted from the parent data key option list", screenDataKey));
         }
 
-        if (!ownsScreenOptionCollection) {
+        if (!ownsScreenOptionCollection && screenItemsUseDataKeys(screen.type)) {
             (screen.items || []).forEach((item, itemIndex) => {
                 pushEntry(evaluateReference({
                     currentUniqueKey: item.keyId || undefined,
@@ -629,19 +633,21 @@ export function repairDataKeyIntegrityReferences({
             legacyMaps,
         });
 
-        const items = (screen.items || []).map((item) => {
-            const itemDataKey = resolveDataKeyMatch({
-                currentUniqueKey: item.keyId || undefined,
-                currentKey: item.key || item.id || undefined,
-                currentLabel: item.label || undefined,
-                expectedDataType: screen.type === "diagnosis" ? "diagnosis" : "option",
-                byUniqueKey,
-                legacyMaps,
+        const items = !screenItemsUseDataKeys(screen.type)
+            ? (screen.items || [])
+            : (screen.items || []).map((item) => {
+                const itemDataKey = resolveDataKeyMatch({
+                    currentUniqueKey: item.keyId || undefined,
+                    currentKey: item.key || item.id || undefined,
+                    currentLabel: item.label || undefined,
+                    expectedDataType: screen.type === "diagnosis" ? "diagnosis" : "option",
+                    byUniqueKey,
+                    legacyMaps,
+                });
+                const synced = syncScreenReference(item, itemDataKey);
+                if (synced.changed) changed = true;
+                return synced.value;
             });
-            const synced = syncScreenReference(item, itemDataKey);
-            if (synced.changed) changed = true;
-            return synced.value;
-        });
 
         const rebuiltScreenItems = applyOwnedOptionCollectionSync(
             items,
@@ -902,7 +908,7 @@ export function repairSingleDataKeyIntegrityReference({
             if (rebuiltScreenItems.changed) changed = true;
             nextItems = rebuiltScreenItems.value;
         } else {
-            nextItems = nextItems.map((item, itemIndex) => {
+            nextItems = !screenItemsUseDataKeys(nextScreen.type) ? nextItems : nextItems.map((item, itemIndex) => {
                 const itemLocation = `${screenBase.location} > item ${itemIndex + 1}`;
                 if (!matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_item", location: itemLocation })) return item;
                 const itemDataKey = resolveDataKeyMatch({
