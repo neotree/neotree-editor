@@ -475,12 +475,6 @@ export async function _updateDataKeysRefs({
         stats.fetchedDiagnoses = diagnosesArr.length;
 
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
-            const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
-                uniqueKey: s.refIdDataKey || s.refId,
-                key: s.refId,
-            });
-            trackMatchSource(refMatchSource);
-
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
                 key: s.key,
@@ -501,7 +495,7 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!screenDataKey || !!refIdDataKey;
+            let updated = !!screenDataKey;
 
             const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
                 ? (s.items || [])
@@ -700,16 +694,12 @@ export async function _updateDataKeysRefs({
             });
 
             const syncedScreen = syncScreenEntityReference(s, screenDataKey);
-            const syncedRefScreen = syncKeyOnlyReference(syncedScreen.value, refIdDataKey, {
-                id: "refIdDataKey",
-                name: "refId",
-            });
-            if (syncedScreen.changed || syncedRefScreen.changed) {
+            if (syncedScreen.changed) {
                 updated = true;
             }
 
             return {
-                ...syncedRefScreen.value,
+                ...syncedScreen.value,
                 updated,
                 items: rebuiltItems,
                 fields,

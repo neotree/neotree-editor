@@ -335,24 +335,6 @@ export function scanDataKeyIntegrity({
             }));
         }
 
-        if (screen.refId || screen.refIdDataKey) {
-        pushEntry(evaluateReference({
-            currentUniqueKey: screen.refIdDataKey || undefined,
-            currentKey: screen.refId || undefined,
-            expectedDataType: "",
-            base: {
-                ...screenBase,
-                kind: "screen_ref",
-                expectedDataType: "",
-                currentUniqueKey: screen.refIdDataKey || undefined,
-                currentKey: screen.refId || undefined,
-            },
-                byUniqueKey,
-                legacyMaps,
-                compareAgainstResolved: false,
-            }));
-        }
-
         const screenDataKey = screen.keyId ? byUniqueKey.get(screen.keyId) : undefined;
         const screenOwnedOptions = resolveOwnedOptions(screenDataKey, byUniqueKey);
         const ownsScreenOptionCollection = shouldSyncScreenOwnedOptions({
@@ -625,14 +607,6 @@ export function repairDataKeyIntegrityReferences({
             byUniqueKey,
             legacyMaps,
         });
-        const refIdDataKey = resolveDataKeyMatch({
-            currentUniqueKey: screen.refIdDataKey || undefined,
-            currentKey: screen.refId || undefined,
-            expectedDataType: "",
-            byUniqueKey,
-            legacyMaps,
-        });
-
         const items = !screenItemsUseDataKeys(screen.type)
             ? (screen.items || [])
             : (screen.items || []).map((item) => {
@@ -767,12 +741,11 @@ export function repairDataKeyIntegrityReferences({
         });
 
         const syncedScreen = syncScreenEntityReference(screen, screenDataKey);
-        const syncedRefScreen = syncKeyOnlyReference(syncedScreen.value, refIdDataKey, { id: "refIdDataKey", name: "refId" });
-        if (syncedScreen.changed || syncedRefScreen.changed) changed = true;
+        if (syncedScreen.changed) changed = true;
 
         return {
             value: {
-                ...syncedRefScreen.value,
+                ...syncedScreen.value,
                 items: rebuiltScreenItems.value,
                 fields,
             },
@@ -865,21 +838,6 @@ export function repairSingleDataKeyIntegrityReference({
             const syncedScreen = syncScreenEntityReference(nextScreen, screenDataKey);
             if (syncedScreen.changed) changed = true;
             nextScreen = syncedScreen.value;
-        }
-
-        if (screen.refId || screen.refIdDataKey) {
-            if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_ref" })) {
-                const refIdDataKey = resolveDataKeyMatch({
-                    currentUniqueKey: nextScreen.refIdDataKey || undefined,
-                    currentKey: nextScreen.refId || undefined,
-                    expectedDataType: "",
-                    byUniqueKey,
-                    legacyMaps,
-                });
-                const syncedRefScreen = syncKeyOnlyReference(nextScreen, refIdDataKey, { id: "refIdDataKey", name: "refId" });
-                if (syncedRefScreen.changed) changed = true;
-                nextScreen = syncedRefScreen.value;
-            }
         }
 
         let nextItems = nextScreen.items || [];
