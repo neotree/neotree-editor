@@ -165,7 +165,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                     {editHref && (
                         <DropdownMenuItem asChild>
-                            <Link href={editHref}>
+                            <Link href={editHref} target="_blank" rel="noreferrer">
                                 <ExternalLinkIcon className="mr-2 h-4 w-4" />
                                 Open matched data key
                             </Link>
@@ -174,7 +174,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                     {(entry.status === "missing" || entry.status === "unmanaged") && (
                         <DropdownMenuItem asChild>
-                            <Link href={createHref}>
+                            <Link href={createHref} target="_blank" rel="noreferrer">
                                 <ExternalLinkIcon className="mr-2 h-4 w-4" />
                                 Create data key
                             </Link>
@@ -201,7 +201,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem asChild>
-                        <Link href={libraryHref}>
+                        <Link href={libraryHref} target="_blank" rel="noreferrer">
                             <ExternalLinkIcon className="mr-2 h-4 w-4" />
                             Open data key library
                         </Link>

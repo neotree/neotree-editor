@@ -16,6 +16,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { isNumericQueryValue } from "@/lib/query-state";
 import { ItemsBottomActions } from "./items-bottom-actions";
 import { Item } from "./item";
 
@@ -111,13 +112,13 @@ export function Items({
     const activeItem = currentItem === 'new'
         ? undefined
         : items.find((item) => item.itemId === currentItem)
-            || (Number.isInteger(Number(currentItem)) ? items[Number(currentItem)] : undefined);
+            || (isNumericQueryValue(currentItem) ? items[Number(currentItem)] : undefined);
     const activeItemIndex = currentItem === 'new'
         ? -1
         : items.findIndex((item) => item.itemId === currentItem);
     const resolvedCurrentItemIndex = activeItemIndex >= 0
         ? activeItemIndex
-        : (Number.isInteger(Number(currentItem)) ? Number(currentItem) : parsedCurrentItemIndex);
+        : (isNumericQueryValue(currentItem) ? Number(currentItem) : parsedCurrentItemIndex);
 
     return (
         <>

@@ -14,6 +14,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
 
@@ -151,13 +152,13 @@ export function Fields({
     const activeField = currentField === 'new'
         ? undefined
         : fields.find((field) => field.fieldId === currentField)
-            || (Number.isInteger(Number(currentField)) ? fields[Number(currentField)] : undefined);
+            || (isNumericQueryValue(currentField) ? fields[Number(currentField)] : undefined);
     const activeFieldIndex = currentField === 'new'
         ? -1
         : fields.findIndex((field) => field.fieldId === currentField);
     const resolvedFieldIndex = activeFieldIndex >= 0
         ? activeFieldIndex
-        : (Number.isInteger(Number(currentField)) ? Number(currentField) : parsedCurrentFieldIndex);
+        : (isNumericQueryValue(currentField) ? Number(currentField) : parsedCurrentFieldIndex);
 
     return (
         <>

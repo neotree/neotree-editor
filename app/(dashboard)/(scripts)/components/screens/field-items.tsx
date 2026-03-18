@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
+import { isNumericQueryValue } from "@/lib/query-state"
 import { SelectDataKey } from "@/components/select-data-key"
 import { SelectModal } from "@/components/select-modal"
 
@@ -49,13 +50,13 @@ export function FieldItems({
     currentItem === "new"
       ? null
       : items.find((item) => item.itemId === currentItem)
-        || (Number.isInteger(Number(currentItem)) ? items[Number(currentItem)] || null : null)
+        || (isNumericQueryValue(currentItem) ? items[Number(currentItem)] || null : null)
   const resolvedCurrentItemIndex = currentItem === "new"
     ? -1
     : (() => {
         const indexById = items.findIndex((item) => item.itemId === currentItem)
         if (indexById >= 0) return indexById
-        return Number.isInteger(Number(currentItem)) ? Number(currentItem) : null
+        return isNumericQueryValue(currentItem) ? Number(currentItem) : null
       })()
   const showForm = currentItem === "new" || !!activeItem
 

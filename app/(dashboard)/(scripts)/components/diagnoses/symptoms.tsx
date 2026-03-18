@@ -12,9 +12,11 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { isNumericQueryValue } from "@/lib/query-state";
 import { SymptomsBottomActions } from "./symptoms-bottom-actions";
 import { Symptom } from "./symptom";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
+import { cn } from "@/lib/utils";
 
 type Props = {
     disabled?: boolean;
@@ -40,13 +42,13 @@ export function Symptoms({
     const activeSymptom = currentSymptom === 'new'
         ? undefined
         : symptoms.find((symptom) => symptom.symptomId === currentSymptom)
-            || (Number.isInteger(Number(currentSymptom)) ? symptoms[Number(currentSymptom)] : undefined);
+            || (isNumericQueryValue(currentSymptom) ? symptoms[Number(currentSymptom)] : undefined);
     const activeSymptomIndex = currentSymptom === 'new'
         ? -1
         : symptoms.findIndex((symptom) => symptom.symptomId === currentSymptom);
     const resolvedCurrentSymptomIndex = activeSymptomIndex >= 0
         ? activeSymptomIndex
-        : (Number.isInteger(Number(currentSymptom)) ? Number(currentSymptom) : parsedCurrentSymptomIndex);
+        : (isNumericQueryValue(currentSymptom) ? Number(currentSymptom) : parsedCurrentSymptomIndex);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...symptoms], oldIndex, newIndex);
