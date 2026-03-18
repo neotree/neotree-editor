@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
+import { dataKeyTypes } from "@/constants";
+import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
@@ -31,10 +33,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     integrity?: DataKeyIntegrityReport | null;
 }) {
     const router = useRouter();
+    const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
     const [viewFilter, setViewFilter] = useState<"all" | "blocking" | "issues" | "resolved">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
+    const [typeFilter, setTypeFilter] = useState<string>("all");
 
     const entries = [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
@@ -48,11 +52,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return `${a.location || ""}`.trim().toLowerCase().localeCompare(`${b.location || ""}`.trim().toLowerCase());
     });
     const summary = integrity?.summary;
+    const availableTypes = dataKeyTypes.filter((type) =>
+        entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
+    );
     const filteredEntries = entries.filter((entry) => {
         if (viewFilter === "blocking" && !["missing", "legacy_match", "conflict"].includes(entry.status)) return false;
         if (viewFilter === "issues" && entry.status === "resolved") return false;
         if (viewFilter === "resolved" && entry.status !== "resolved") return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
+        if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
     });
 
@@ -65,7 +73,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             const res = await resolveDataKeyIntegrityEntry({ entry });
 
             if (!res.success) {
-                toast.error(res.errors?.join(", ") || "Failed to repair data key references");
+                alert({
+                    title: "Resolve failed",
+                    message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
+                    variant: "error",
+                    buttonLabel: "Close",
+                });
                 setResolvingKey(null);
                 return;
             }
@@ -140,7 +153,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 await navigator.clipboard.writeText(displayReference);
                                 toast.success(`Copied ${displayReference}`);
                             } catch {
-                                toast.error("Failed to copy reference");
+                                alert({
+                                    title: "Copy failed",
+                                    message: "Failed to copy reference",
+                                    variant: "error",
+                                    buttonLabel: "Close",
+                                });
                             }
                         }}
                     >
@@ -232,24 +250,45 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             </div>
                         </div>
 
-                        <div className="w-full md:w-[220px]">
-                            <Select
-                                value={statusFilter}
-                                onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Filter by status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All statuses</SelectItem>
-                                    <SelectItem value="resolved">Resolved</SelectItem>
-                                    <SelectItem value="out_of_sync">Out of sync</SelectItem>
-                                    <SelectItem value="missing">Missing</SelectItem>
-                                    <SelectItem value="legacy_match">Legacy match</SelectItem>
-                                    <SelectItem value="conflict">Conflict</SelectItem>
-                                    <SelectItem value="unmanaged">Unmanaged</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+                            <div className="w-full md:w-[220px]">
+                                <Select
+                                    value={statusFilter}
+                                    onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Filter by status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All statuses</SelectItem>
+                                        <SelectItem value="resolved">Resolved</SelectItem>
+                                        <SelectItem value="out_of_sync">Out of sync</SelectItem>
+                                        <SelectItem value="missing">Missing</SelectItem>
+                                        <SelectItem value="legacy_match">Legacy match</SelectItem>
+                                        <SelectItem value="conflict">Conflict</SelectItem>
+                                        <SelectItem value="unmanaged">Unmanaged</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="w-full md:w-[220px]">
+                                <Select
+                                    value={typeFilter}
+                                    onValueChange={setTypeFilter}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Filter by type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All types</SelectItem>
+                                        {availableTypes.map((type) => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
 
