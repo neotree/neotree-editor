@@ -503,37 +503,39 @@ export async function _updateDataKeysRefs({
 
             let updated = !!screenDataKey || !!refIdDataKey;
 
-            const items = (s.items || []).map((item, itemIndex) => {
-                const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
-                    uniqueKey: item.keyId,
-                    key: item.key || item.id,
-                    label: item.label,
-                    dataType: s.type === 'diagnosis' ? 'diagnosis' : 'option',
-                });
-                trackMatchSource(itemMatchSource);
-
-                if (itemDataKey) {
-                    updated = true;
-                    addUsage({
-                        id: item.itemId || `${s.screenId}:item:${itemIndex}`,
-                        kind: 'screen_item',
-                        title: item.label || item.key || item.id || `${itemIndex + 1}`,
-                        location: s.title || s.label || s.refId || s.screenId,
-                        scriptId: s.scriptId,
-                        scriptTitle: s.scriptTitle || undefined,
-                        screenId: s.screenId,
-                        screenItemIndex: itemIndex,
+            const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
+                ? (s.items || [])
+                : (s.items || []).map((item, itemIndex) => {
+                    const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                        key: item.key || item.id,
+                        label: item.label,
+                        dataType: s.type === 'diagnosis' ? 'diagnosis' : 'option',
                     });
-                }
-                const syncedItem = syncScreenReference(item, itemDataKey);
-                if (syncedItem.changed) {
-                    updated = true;
-                }
-                return {
-                    ...item,
-                    ...syncedItem.value,
-                };
-            });
+                    trackMatchSource(itemMatchSource);
+
+                    if (itemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                            kind: 'screen_item',
+                            title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                            location: s.title || s.label || s.refId || s.screenId,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            screenItemIndex: itemIndex,
+                        });
+                    }
+                    const syncedItem = syncScreenReference(item, itemDataKey);
+                    if (syncedItem.changed) {
+                        updated = true;
+                    }
+                    return {
+                        ...item,
+                        ...syncedItem.value,
+                    };
+                });
             const screenOptionSync = applyOwnedOptionCollectionSync(
                 items,
                 shouldSyncScreenOwnedOptions({

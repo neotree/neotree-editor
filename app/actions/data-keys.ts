@@ -463,6 +463,7 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         screensRes.data.forEach(screen => {
             const scriptTitle = screen.scriptTitle || '';
+            const includeScreenItems = `${screen.type || ''}`.trim().toLowerCase() !== 'progress';
 
             addRow({
                 keyId: screen.keyId,
@@ -486,13 +487,15 @@ export const getDataKeysUsageExportRows = async (params?: {
                 });
             });
 
-            (screen.items || []).forEach(item => {
-                addRow({
-                    keyId: item.keyId,
-                    keyName: item.key || item.id,
-                    scriptTitle,
+            if (includeScreenItems) {
+                (screen.items || []).forEach(item => {
+                    addRow({
+                        keyId: item.keyId,
+                        keyName: item.key || item.id,
+                        scriptTitle,
+                    });
                 });
-            });
+            }
         });
 
         const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
