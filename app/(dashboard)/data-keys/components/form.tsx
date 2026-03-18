@@ -373,14 +373,42 @@ function Form({
                                                         return 'open';
                                                     })();
                                                     const href = (() => {
+                                                        if (usage.kind === 'screen_field' && usage.screenId && usage.id) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.id}`;
+                                                        }
                                                         if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
                                                             return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'screen_item' && usage.screenId && usage.id) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.id}`;
                                                         }
                                                         if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
                                                             return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
                                                         }
+                                                        if (
+                                                            usage.kind === 'screen_field_item'
+                                                            && usage.screenId
+                                                            && Number.isFinite(usage.fieldIndex)
+                                                            && usage.id
+                                                        ) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.id}`;
+                                                        }
+                                                        if (
+                                                            usage.kind === 'screen_field_item'
+                                                            && usage.screenId
+                                                            && Number.isFinite(usage.fieldIndex)
+                                                            && Number.isFinite(usage.fieldItemIndex)
+                                                        ) {
+                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.fieldItemIndex}`;
+                                                        }
                                                         if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
                                                             return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+                                                        }
+                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && usage.id) {
+                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.id}`;
+                                                        }
+                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && Number.isFinite(usage.diagnosisSymptomIndex)) {
+                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.diagnosisSymptomIndex}`;
                                                         }
                                                         if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
                                                             return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;

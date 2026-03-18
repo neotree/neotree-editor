@@ -28,6 +28,44 @@ const statusStyles = {
     unmanaged: "bg-slate-100 text-slate-800",
 } satisfies Record<NonNullable<DataKeyIntegrityReport>["entries"][number]["status"], string>;
 
+function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
+    if (entry.diagnosisId) {
+        const params = new URLSearchParams();
+        if (entry.kind === "diagnosis_symptom") {
+            if (entry.symptomId) params.set("symptom", entry.symptomId);
+            else if (Number.isInteger(entry.symptomIndex)) params.set("symptom", `${entry.symptomIndex}`);
+        }
+        const query = params.toString();
+        return `/script/${entry.scriptId}/diagnosis/${entry.diagnosisId}${query ? `?${query}` : ""}`;
+    }
+
+    if (entry.screenId) {
+        const params = new URLSearchParams();
+
+        if (
+            ["field", "field_ref", "field_min_date", "field_max_date", "field_min_time", "field_max_time", "field_option_collection", "field_item"].includes(entry.kind)
+        ) {
+            if (entry.fieldId) params.set("field", entry.fieldId);
+            else if (Number.isInteger(entry.fieldIndex)) params.set("field", `${entry.fieldIndex}`);
+        }
+
+        if (entry.kind === "screen_item") {
+            if (entry.screenItemId) params.set("item", entry.screenItemId);
+            else if (Number.isInteger(entry.screenItemIndex)) params.set("item", `${entry.screenItemIndex}`);
+        }
+
+        if (entry.kind === "field_item") {
+            if (entry.fieldItemId) params.set("fieldItem", entry.fieldItemId);
+            else if (Number.isInteger(entry.fieldItemIndex)) params.set("fieldItem", `${entry.fieldItemIndex}`);
+        }
+
+        const query = params.toString();
+        return `/script/${entry.scriptId}/screen/${entry.screenId}${query ? `?${query}` : ""}`;
+    }
+
+    return `/script/${entry.scriptId}`;
+}
+
 export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
     integrity?: DataKeyIntegrityReport | null;
@@ -97,11 +135,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const renderActions = (entry: DataKeyIntegrityReport["entries"][number]) => {
         const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
         const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
-        const usageHref = entry.diagnosisId
-            ? `/script/${entry.scriptId}/diagnosis/${entry.diagnosisId}`
-            : entry.screenId
-                ? `/script/${entry.scriptId}/screen/${entry.screenId}`
-                : `/script/${entry.scriptId}`;
+        const usageHref = buildUsageHref(entry);
         const canSafeResolve = entry.status === "out_of_sync" || entry.status === "legacy_match";
         const isResolvingThisEntry = resolvingKey === getEntryKey(entry) && isRepairing;
         const libraryHref = "/data-keys";

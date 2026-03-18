@@ -47,6 +47,14 @@ export type DataKeyIntegrityEntry = {
     scriptTitle?: string;
     screenId?: string;
     diagnosisId?: string;
+    fieldId?: string;
+    fieldIndex?: number;
+    screenItemId?: string;
+    screenItemIndex?: number;
+    fieldItemId?: string;
+    fieldItemIndex?: number;
+    symptomId?: string;
+    symptomIndex?: number;
     location: string;
     expectedDataType: string;
     currentUniqueKey?: string;
@@ -343,11 +351,12 @@ export function scanDataKeyIntegrity({
 
         const screenDataKey = screen.keyId ? byUniqueKey.get(screen.keyId) : undefined;
         const screenOwnedOptions = resolveOwnedOptions(screenDataKey, byUniqueKey);
-        if (shouldSyncScreenOwnedOptions({
+        const ownsScreenOptionCollection = shouldSyncScreenOwnedOptions({
             screenType: screen.type,
             dataKey: screenDataKey,
             currentItemsCount: (screen.items || []).length,
-        }) && compareOwnedOptionCollection({ currentItems: screen.items || [], expectedOptions: screenOwnedOptions })) {
+        });
+        if (ownsScreenOptionCollection && compareOwnedOptionCollection({ currentItems: screen.items || [], expectedOptions: screenOwnedOptions })) {
             pushEntry(createEntry({
                 ...screenBase,
                 kind: "screen_option_collection",
@@ -358,29 +367,35 @@ export function scanDataKeyIntegrity({
             }, "out_of_sync", "Screen options have drifted from the parent data key option list", screenDataKey));
         }
 
-        (screen.items || []).forEach((item, itemIndex) => {
-            pushEntry(evaluateReference({
-                currentUniqueKey: item.keyId || undefined,
-                currentKey: item.key || item.id || undefined,
-                currentLabel: item.label || undefined,
-                expectedDataType: screen.type === "diagnosis" ? "diagnosis" : "option",
-                base: {
-                    ...screenBase,
-                    kind: "screen_item",
+        if (!ownsScreenOptionCollection) {
+            (screen.items || []).forEach((item, itemIndex) => {
+                pushEntry(evaluateReference({
+                    currentUniqueKey: item.keyId || undefined,
+                    currentKey: item.key || item.id || undefined,
+                    currentLabel: item.label || undefined,
+                    expectedDataType: screen.type === "diagnosis" ? "diagnosis" : "option",
+                    base: {
+                        ...screenBase,
+                        kind: "screen_item",
                     expectedDataType: screen.type === "diagnosis" ? "diagnosis" : "option",
                     currentUniqueKey: item.keyId || undefined,
                     currentKey: item.key || item.id || undefined,
                     currentLabel: item.label || undefined,
+                    screenItemId: item.itemId || undefined,
+                    screenItemIndex: itemIndex,
                     location: `${screenBase.location} > item ${itemIndex + 1}`,
                 },
-                byUniqueKey,
-                legacyMaps,
-            }));
-        });
+                    byUniqueKey,
+                    legacyMaps,
+                }));
+            });
+        }
 
         (screen.fields || []).forEach((field, fieldIndex) => {
             const fieldBase = {
                 ...screenBase,
+                fieldId: field.fieldId || undefined,
+                fieldIndex,
                 location: `${screenBase.location} > ${field.label || field.key || `field ${fieldIndex + 1}`}`,
                 expectedDataType: field.type || "",
             };
@@ -405,11 +420,12 @@ export function scanDataKeyIntegrity({
 
             const fieldDataKey = field.keyId ? byUniqueKey.get(field.keyId) : undefined;
             const fieldOwnedOptions = resolveOwnedOptions(fieldDataKey, byUniqueKey);
-            if (shouldSyncFieldOwnedOptions({
+            const ownsFieldOptionCollection = shouldSyncFieldOwnedOptions({
                 fieldType: field.type,
                 dataKey: fieldDataKey,
                 currentItemsCount: (field.items || []).length,
-            }) && compareOwnedOptionCollection({ currentItems: field.items || [], expectedOptions: fieldOwnedOptions })) {
+            });
+            if (ownsFieldOptionCollection && compareOwnedOptionCollection({ currentItems: field.items || [], expectedOptions: fieldOwnedOptions })) {
                 pushEntry(createEntry({
                     ...fieldBase,
                     kind: "field_option_collection",
@@ -450,25 +466,29 @@ export function scanDataKeyIntegrity({
                 }));
             });
 
-            (field.items || []).forEach((item, fieldItemIndex) => {
-                pushEntry(evaluateReference({
-                    currentUniqueKey: item.keyId || undefined,
-                    currentKey: `${item.value || ""}` || undefined,
-                    currentLabel: `${item.label || ""}` || undefined,
-                    expectedDataType: "option",
-                    base: {
-                        ...fieldBase,
-                        kind: "field_item",
-                        expectedDataType: "option",
+            if (!ownsFieldOptionCollection) {
+                (field.items || []).forEach((item, fieldItemIndex) => {
+                    pushEntry(evaluateReference({
                         currentUniqueKey: item.keyId || undefined,
                         currentKey: `${item.value || ""}` || undefined,
                         currentLabel: `${item.label || ""}` || undefined,
-                        location: `${fieldBase.location} > option ${fieldItemIndex + 1}`,
-                    },
-                    byUniqueKey,
-                    legacyMaps,
-                }));
-            });
+                        expectedDataType: "option",
+                        base: {
+                            ...fieldBase,
+                            kind: "field_item",
+                            expectedDataType: "option",
+                            currentUniqueKey: item.keyId || undefined,
+                            currentKey: `${item.value || ""}` || undefined,
+                            currentLabel: `${item.label || ""}` || undefined,
+                            fieldItemId: item.itemId || undefined,
+                            fieldItemIndex: fieldItemIndex,
+                            location: `${fieldBase.location} > option ${fieldItemIndex + 1}`,
+                        },
+                        byUniqueKey,
+                        legacyMaps,
+                    }));
+                });
+            }
         });
     }
 
@@ -510,6 +530,8 @@ export function scanDataKeyIntegrity({
                     currentUniqueKey: symptom.keyId || undefined,
                     currentKey: symptom.key || undefined,
                     currentLabel: symptom.name || undefined,
+                    symptomId: symptom.symptomId || undefined,
+                    symptomIndex,
                     location: `${diagnosisBase.location} > symptom ${symptomIndex + 1}`,
                 },
                 byUniqueKey,
