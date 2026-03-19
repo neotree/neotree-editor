@@ -95,7 +95,7 @@ type CandidateMatch = {
 };
 
 function isBlockingStatus(status: DataKeyIntegrityStatus) {
-    return status === "missing" || status === "legacy_match" || status === "conflict";
+    return status === "missing" || status === "legacy_match";
 }
 
 function buildLegacyMaps(dataKeys: DataKey[]) {

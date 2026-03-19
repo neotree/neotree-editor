@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
+import { previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntriesBulk, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
 import { dataKeyTypes } from "@/constants";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,23 @@ const statusStyles = {
     conflict: "bg-rose-100 text-rose-800",
     unmanaged: "bg-slate-100 text-slate-800",
 } satisfies Record<NonNullable<DataKeyIntegrityReport>["entries"][number]["status"], string>;
+
+const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], string> = {
+    screen: "Screen key",
+    screen_ref: "Screen ref",
+    screen_item: "Screen option",
+    screen_option_collection: "Screen options",
+    field: "Field key",
+    field_ref: "Field ref",
+    field_min_date: "Field min date",
+    field_max_date: "Field max date",
+    field_min_time: "Field min time",
+    field_max_time: "Field max time",
+    field_item: "Field option",
+    field_option_collection: "Field options",
+    diagnosis: "Diagnosis key",
+    diagnosis_symptom: "Diagnosis symptom",
+};
 
 function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
     if (entry.diagnosisId) {
@@ -81,6 +98,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
+    const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
 
     const entries = [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
@@ -98,7 +116,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     );
     const filteredEntries = entries.filter((entry) => {
-        if (viewFilter === "blocking" && !["missing", "legacy_match", "conflict"].includes(entry.status)) return false;
+        if (viewFilter === "blocking" && !["missing", "legacy_match"].includes(entry.status)) return false;
         if (viewFilter === "issues" && entry.status === "resolved") return false;
         if (viewFilter === "resolved" && entry.status !== "resolved") return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
@@ -107,6 +125,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     });
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
+    const bulkResolvableEntries = {
+        out_of_sync: entries.filter((entry) => entry.status === "out_of_sync"),
+        legacy_match: entries.filter((entry) => entry.status === "legacy_match"),
+    };
 
     const closeRepairModal = () => {
         if (isRepairing || loadingRepairPreview) return;
@@ -172,6 +194,46 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             setResolvingKey(null);
             setRepairModalEntry(null);
             setRepairPreview(null);
+            router.refresh();
+        });
+    };
+
+    const handleBulkResolve = (status: "out_of_sync" | "legacy_match") => {
+        if (!scriptId || isRepairing) return;
+        const entriesToResolve = bulkResolvableEntries[status];
+        if (!entriesToResolve.length) return;
+
+        startRepairTransition(async () => {
+            setResolvingKey(`bulk:${status}`);
+            const res = await resolveDataKeyIntegrityEntriesBulk({ entries: entriesToResolve });
+
+            if (!res.success) {
+                alert({
+                    title: "Bulk resolve failed",
+                    message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
+                    variant: "error",
+                    buttonLabel: "Close",
+                });
+                setResolvingKey(null);
+                return;
+            }
+
+            if (!res.changed) {
+                toast.message(`No ${status.replace(/_/g, " ")} references needed changes`);
+            } else {
+                toast.success(`Saved ${res.resolvedCount} ${status.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
+                if (res.warnings?.length) {
+                    alert({
+                        title: "Bulk repair saved with warnings",
+                        message: res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join(""),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                }
+            }
+
+            setResolvingKey(null);
+            setBulkResolveStatus(null);
             router.refresh();
         });
     };
@@ -305,6 +367,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     <div className="space-y-4 text-sm">
                         <div className="rounded-md border p-3 space-y-2">
                             <div><span className="font-medium">Reference:</span> {repairModalEntry.currentKey || repairModalEntry.currentLabel || repairModalEntry.location}</div>
+                            <div><span className="font-medium">Reference kind:</span> {kindLabels[repairModalEntry.kind]}</div>
                             <div><span className="font-medium">Location:</span> {repairModalEntry.location}</div>
                             <div><span className="font-medium">Issue:</span> {repairModalEntry.status.replace(/_/g, " ")}</div>
                             <div><span className="font-medium">Reason:</span> {repairModalEntry.reason}</div>
@@ -346,6 +409,57 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 )}
             </Modal>
 
+            <Modal
+                open={!!bulkResolveStatus}
+                onOpenChange={(open) => {
+                    if (!open && !isRepairing) setBulkResolveStatus(null);
+                }}
+                title={bulkResolveStatus ? `Resolve ${bulkResolveStatus.replace(/_/g, " ")}` : "Resolve by status"}
+                description="This saves draft repairs only for the selected status in the current script."
+                actions={(
+                    <>
+                        <Button variant="ghost" onClick={() => setBulkResolveStatus(null)} disabled={isRepairing}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => bulkResolveStatus && handleBulkResolve(bulkResolveStatus)}
+                            disabled={!bulkResolveStatus || isRepairing || !bulkResolvableEntries[bulkResolveStatus]?.length}
+                        >
+                            {isRepairing ? "Saving Drafts..." : "Save Repair Drafts"}
+                        </Button>
+                    </>
+                )}
+            >
+                {!bulkResolveStatus ? null : (
+                    <div className="space-y-4 text-sm">
+                        <div className="rounded-md border p-3 space-y-2">
+                            <div><span className="font-medium">Status:</span> {bulkResolveStatus.replace(/_/g, " ")}</div>
+                            <div><span className="font-medium">Entries:</span> {bulkResolvableEntries[bulkResolveStatus].length}</div>
+                            <div className="text-muted-foreground">
+                                Only references with this status in the current script will be repaired. Nothing is published automatically.
+                            </div>
+                        </div>
+
+                        <div className="rounded-md border p-3 space-y-2">
+                            <div className="font-medium">Affected references</div>
+                            <div className="space-y-1">
+                                {bulkResolvableEntries[bulkResolveStatus].slice(0, 8).map((entry) => (
+                                    <div key={getEntryKey(entry)}>
+                                        {entry.currentKey || entry.currentLabel || entry.location}
+                                        <span className="text-muted-foreground"> · {kindLabels[entry.kind]} · {entry.location}</span>
+                                    </div>
+                                ))}
+                                {bulkResolvableEntries[bulkResolveStatus].length > 8 && (
+                                    <div className="text-muted-foreground">
+                                        And {bulkResolvableEntries[bulkResolveStatus].length - 8} more…
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             <Title>{title + ' - data key integrity'}</Title>
             <PageContainer>
                 <div className="p-4 space-y-4">
@@ -372,7 +486,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                        This view shows all scanned script references. Blocking issues stop publish. Unmanaged references are legacy or local script keys that are not explicitly linked to the data key library.
+                        This view shows all scanned script references. Only missing and legacy-match issues stop publish. Conflicts stay visible for manual cleanup but do not block publishing. Unmanaged references are legacy or local script keys that are not explicitly linked to the data key library.
                     </div>
 
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -398,6 +512,27 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                             <div className="text-sm text-muted-foreground">
                                 Use the row action menu to review or resolve one issue at a time. Resolve is available only when the system can make a safe deterministic fix.
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!bulkResolvableEntries.out_of_sync.length || isRepairing}
+                                    onClick={() => setBulkResolveStatus("out_of_sync")}
+                                >
+                                    Resolve All Out Of Sync ({bulkResolvableEntries.out_of_sync.length})
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!bulkResolvableEntries.legacy_match.length || isRepairing}
+                                    onClick={() => setBulkResolveStatus("legacy_match")}
+                                >
+                                    Resolve All Legacy Matches ({bulkResolvableEntries.legacy_match.length})
+                                </Button>
                             </div>
                         </div>
 
@@ -479,6 +614,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             { name: "Key" },
                             { name: "Label" },
                             { name: "Type" },
+                            { name: "Reference" },
                             { name: "Location" },
                             { name: "Reason" },
                             { name: "Suggested" },
@@ -496,6 +632,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             issue.currentKey || issue.matchedName || "",
                             issue.currentLabel || issue.matchedLabel || "",
                             issue.expectedDataType,
+                            kindLabels[issue.kind],
                             issue.location,
                             issue.reason,
                             issue.status === "out_of_sync"

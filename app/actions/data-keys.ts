@@ -186,7 +186,7 @@ export const getDataKeysIntegrity = async (params?: {
         ];
 
         if (errors.length) {
-            logger.appError('getDataKeysIntegrity RETURNED_ERRORS', {
+            logger.error('getDataKeysIntegrity RETURNED_ERRORS', {
                 scriptsIds: params?.scriptsIds || [],
                 onlyIssues: params?.onlyIssues,
                 errors,
@@ -223,10 +223,16 @@ export const resolveDataKeyIntegrityEntry = async (params: {
     try {
         const session = await isAllowed();
         const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry);
-        const prepared = cached || await prepareDataKeyIntegrityEntryRepair(params.entry);
+        const prepared = cached
+            ? {
+                success: true as const,
+                errors: [] as string[],
+                repairs: cached.repairs,
+            }
+            : await prepareDataKeyIntegrityEntryRepair(params.entry);
 
         if (!prepared.success) {
-            logger.appError('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
+            logger.error('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
                 entry: params.entry,
                 errors: prepared.errors,
                 cacheHit: !!cached,
@@ -260,7 +266,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 userId: session.user?.userId,
             });
             if (repairedScreens.errors?.length) {
-                logger.appError('resolveDataKeyIntegrityEntry SAVE_SCREENS_ERRORS', {
+                logger.error('resolveDataKeyIntegrityEntry SAVE_SCREENS_ERRORS', {
                     entry: params.entry,
                     screensCount: repairs.screens.length,
                     errors: repairedScreens.errors,
@@ -282,7 +288,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 userId: session.user?.userId,
             });
             if (repairedDiagnoses.errors?.length) {
-                logger.appError('resolveDataKeyIntegrityEntry SAVE_DIAGNOSES_ERRORS', {
+                logger.error('resolveDataKeyIntegrityEntry SAVE_DIAGNOSES_ERRORS', {
                     entry: params.entry,
                     diagnosesCount: repairs.diagnoses.length,
                     errors: repairedDiagnoses.errors,
@@ -306,7 +312,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             warnings,
         };
     } catch (e: any) {
-        logger.appError('resolveDataKeyIntegrityEntry ERROR', {
+        logger.error('resolveDataKeyIntegrityEntry ERROR', {
             entry: params.entry,
             error: e.message,
             stack: e.stack,
@@ -315,6 +321,164 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             success: false,
             changed: false,
             reportAfter: null,
+            errors: [e.message],
+            warnings: [],
+        };
+    }
+}
+
+export const resolveDataKeyIntegrityEntriesBulk = async (params: {
+    entries: DataKeyIntegrityEntry[];
+}) => {
+    try {
+        const session = await isAllowed();
+        const entries = params.entries || [];
+        if (!entries.length) {
+            return {
+                success: true,
+                changed: false,
+                resolvedCount: 0,
+                errors: [],
+                warnings: [],
+            };
+        }
+
+        const scriptIds = Array.from(new Set(entries.map((entry) => entry.scriptId).filter(Boolean)));
+        if (scriptIds.length !== 1) {
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                errors: ['Bulk resolve currently supports one script at a time'],
+                warnings: [],
+            };
+        }
+
+        const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+        ]);
+
+        const fetchErrors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+        ];
+        if (fetchErrors.length) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk FETCH_ERRORS', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                errors: fetchErrors,
+            });
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                errors: fetchErrors,
+                warnings: [],
+            };
+        }
+
+        let currentScreens = screensRes.data;
+        let currentDiagnoses = diagnosesRes.data;
+        let resolvedCount = 0;
+        const warnings: string[] = [];
+
+        for (const entry of entries) {
+            const repairs = repairSingleDataKeyIntegrityReference({
+                entry,
+                dataKeys: dataKeysRes.data,
+                screens: currentScreens,
+                diagnoses: currentDiagnoses,
+            });
+
+            if (!repairs.screens.length && !repairs.diagnoses.length) continue;
+
+            resolvedCount++;
+            if (repairs.screens.length) {
+                currentScreens = currentScreens.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen);
+            }
+            if (repairs.diagnoses.length) {
+                currentDiagnoses = currentDiagnoses.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis);
+            }
+        }
+
+        const changedScreens = currentScreens.filter((screen, index) => JSON.stringify(screen) !== JSON.stringify(screensRes.data[index]));
+        const changedDiagnoses = currentDiagnoses.filter((diagnosis, index) => JSON.stringify(diagnosis) !== JSON.stringify(diagnosesRes.data[index]));
+
+        if (!changedScreens.length && !changedDiagnoses.length) {
+            return {
+                success: true,
+                changed: false,
+                resolvedCount: 0,
+                errors: [],
+                warnings: [],
+            };
+        }
+
+        if (changedScreens.length) {
+            const repairedScreens = await _saveScreens({
+                data: changedScreens,
+                userId: session.user?.userId,
+            });
+            if (repairedScreens.errors?.length) {
+                logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_SCREENS_ERRORS', {
+                    entriesCount: entries.length,
+                    screensCount: changedScreens.length,
+                    errors: repairedScreens.errors,
+                });
+                return {
+                    success: false,
+                    changed: false,
+                    resolvedCount: 0,
+                    errors: repairedScreens.errors,
+                    warnings: repairedScreens.warnings || [],
+                };
+            }
+            warnings.push(...(repairedScreens.warnings || []));
+        }
+
+        if (changedDiagnoses.length) {
+            const repairedDiagnoses = await _saveDiagnoses({
+                data: changedDiagnoses,
+                userId: session.user?.userId,
+            });
+            if (repairedDiagnoses.errors?.length) {
+                logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_DIAGNOSES_ERRORS', {
+                    entriesCount: entries.length,
+                    diagnosesCount: changedDiagnoses.length,
+                    errors: repairedDiagnoses.errors,
+                });
+                return {
+                    success: false,
+                    changed: false,
+                    resolvedCount: 0,
+                    errors: repairedDiagnoses.errors,
+                    warnings,
+                };
+            }
+        }
+
+        entries.forEach((entry) => clearPreparedIntegrityRepair(session.user?.userId, entry));
+
+        return {
+            success: true,
+            changed: true,
+            resolvedCount,
+            errors: [],
+            warnings,
+        };
+    } catch (e: any) {
+        logger.error('resolveDataKeyIntegrityEntriesBulk ERROR', {
+            error: e.message,
+            stack: e.stack,
+            entriesCount: params.entries?.length || 0,
+        });
+        return {
+            success: false,
+            changed: false,
+            resolvedCount: 0,
             errors: [e.message],
             warnings: [],
         };
@@ -364,7 +528,7 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             errors: [],
         };
     } catch (e: any) {
-        logger.appError('previewDataKeyIntegrityEntryRepair ERROR', {
+        logger.error('previewDataKeyIntegrityEntryRepair ERROR', {
             entry: params.entry,
             error: e.message,
             stack: e.stack,
