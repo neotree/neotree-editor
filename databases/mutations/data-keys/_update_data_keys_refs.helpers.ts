@@ -47,6 +47,16 @@ function buildExistingOptionMaps<T extends { keyId?: string; label?: unknown }>(
     return { byUniqueKey, byLegacyKey };
 }
 
+function takeUnusedExisting<T>(used: Set<T>, ...candidates: Array<T | undefined>) {
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        if (used.has(candidate)) continue;
+        used.add(candidate);
+        return candidate;
+    }
+    return undefined;
+}
+
 function inferScreenItemDataType(screenType?: string | null) {
     switch (`${screenType || ""}`) {
         case "checklist":
@@ -203,9 +213,14 @@ export function rebuildFieldItemsFromDataKeyOptions({
         optionDataKeys,
         (item) => [`${item.value || ""}`, `${item.label || ""}`],
     );
+    const usedExisting = new Set<ExistingFieldItem>();
 
     return optionDataKeys.map((item) => {
-        const existing = maps.byUniqueKey.get(item.uniqueKey) || maps.byLegacyKey.get(item.uniqueKey);
+        const existing = takeUnusedExisting(
+            usedExisting,
+            maps.byUniqueKey.get(item.uniqueKey),
+            maps.byLegacyKey.get(item.uniqueKey),
+        );
         return {
             ...existing,
             itemId: `${existing?.itemId || ""}` || randomUUID(),
@@ -230,9 +245,14 @@ export function rebuildScreenItemsFromDataKeyOptions({
         optionDataKeys,
         (item) => [`${item.id || ""}`, `${item.key || ""}`, `${item.label || ""}`],
     );
+    const usedExisting = new Set<ExistingScreenItem>();
 
     return optionDataKeys.map((item, index) => {
-        const existing = maps.byUniqueKey.get(item.uniqueKey) || maps.byLegacyKey.get(item.uniqueKey);
+        const existing = takeUnusedExisting(
+            usedExisting,
+            maps.byUniqueKey.get(item.uniqueKey),
+            maps.byLegacyKey.get(item.uniqueKey),
+        );
         return {
             ...existing,
             itemId: `${existing?.itemId || ""}` || randomUUID(),

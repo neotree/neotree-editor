@@ -14,6 +14,84 @@ import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg
 import { count, isNull, max } from 'drizzle-orm';
 import { repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 
+type PreparedIntegrityRepair = {
+    entry: DataKeyIntegrityEntry;
+    repairs: ReturnType<typeof repairSingleDataKeyIntegrityReference>;
+    preparedAt: number;
+};
+
+const PREPARED_INTEGRITY_REPAIR_CACHE_TTL_MS = 2 * 60 * 1000;
+const PREPARED_INTEGRITY_REPAIR_CACHE_KEY = '__prepared_data_key_integrity_repair_cache__';
+
+function getPreparedIntegrityRepairStore(): Map<string, PreparedIntegrityRepair> {
+    const globalWithCache = globalThis as typeof globalThis & {
+        [PREPARED_INTEGRITY_REPAIR_CACHE_KEY]?: Map<string, PreparedIntegrityRepair>;
+    };
+    if (!globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY]) {
+        globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY] = new Map<string, PreparedIntegrityRepair>();
+    }
+    return globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY]!;
+}
+
+function buildPreparedIntegrityRepairCacheId(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
+    return `${userId || 'anonymous'}::${JSON.stringify(entry)}`;
+}
+
+function getPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
+    const store = getPreparedIntegrityRepairStore();
+    const cacheId = buildPreparedIntegrityRepairCacheId(userId, entry);
+    const cached = store.get(cacheId);
+    if (!cached) return null;
+    if ((Date.now() - cached.preparedAt) > PREPARED_INTEGRITY_REPAIR_CACHE_TTL_MS) {
+        store.delete(cacheId);
+        return null;
+    }
+    return cached;
+}
+
+function setPreparedIntegrityRepair(userId: string | null | undefined, payload: PreparedIntegrityRepair) {
+    const store = getPreparedIntegrityRepairStore();
+    const cacheId = buildPreparedIntegrityRepairCacheId(userId, payload.entry);
+    store.set(cacheId, payload);
+}
+
+function clearPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
+    getPreparedIntegrityRepairStore().delete(buildPreparedIntegrityRepairCacheId(userId, entry));
+}
+
+async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry) {
+    const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
+        _getDataKeys({ returnDraftsIfExist: true }),
+        _getScreens({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+        _getDiagnoses({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+    ]);
+
+    const errors = [
+        ...(dataKeysRes.errors || []),
+        ...(screensRes.errors || []),
+        ...(diagnosesRes.errors || []),
+    ];
+
+    if (errors.length) {
+        return {
+            success: false as const,
+            errors,
+            repairs: null,
+        };
+    }
+
+    return {
+        success: true as const,
+        errors: [] as string[],
+        repairs: repairSingleDataKeyIntegrityReference({
+            entry,
+            dataKeys: dataKeysRes.data,
+            screens: screensRes.data,
+            diagnoses: diagnosesRes.data,
+        }),
+    };
+}
+
 async function assertCanManageDataKeys(
     user?: { role?: string | null } | null,
     options?: { allowApiKeyAuth?: boolean; },
@@ -144,52 +222,37 @@ export const resolveDataKeyIntegrityEntry = async (params: {
 }) => {
     try {
         const session = await isAllowed();
+        const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry);
+        const prepared = cached || await prepareDataKeyIntegrityEntryRepair(params.entry);
 
-        const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
-            _getDataKeys({ returnDraftsIfExist: true }),
-            _getScreens({ scriptsIds: [params.entry.scriptId], returnDraftsIfExist: true }),
-            _getDiagnoses({ scriptsIds: [params.entry.scriptId], returnDraftsIfExist: true }),
-        ]);
-
-        const errors = [
-            ...(dataKeysRes.errors || []),
-            ...(screensRes.errors || []),
-            ...(diagnosesRes.errors || []),
-        ];
-
-        if (errors.length) {
+        if (!prepared.success) {
             logger.appError('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
                 entry: params.entry,
-                errors,
+                errors: prepared.errors,
+                cacheHit: !!cached,
             });
             return {
                 success: false,
                 changed: false,
                 reportAfter: null,
-                errors,
+                errors: prepared.errors,
+                warnings: [],
             };
         }
-
-        const repairs = repairSingleDataKeyIntegrityReference({
-            entry: params.entry,
-            dataKeys: dataKeysRes.data,
-            screens: screensRes.data,
-            diagnoses: diagnosesRes.data,
-        });
+        const repairs = prepared.repairs;
 
         if (!repairs.screens.length && !repairs.diagnoses.length) {
+            clearPreparedIntegrityRepair(session.user?.userId, params.entry);
             return {
                 success: true,
                 changed: false,
-                reportAfter: scanDataKeyIntegrity({
-                    dataKeys: dataKeysRes.data,
-                    screens: screensRes.data,
-                    diagnoses: diagnosesRes.data,
-                    onlyIssues: false,
-                }),
+                reportAfter: null,
                 errors: [],
+                warnings: [],
             };
         }
+
+        const warnings: string[] = [];
 
         if (repairs.screens.length) {
             const repairedScreens = await _saveScreens({
@@ -207,8 +270,10 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                     changed: false,
                     reportAfter: null,
                     errors: repairedScreens.errors,
+                    warnings: repairedScreens.warnings || [],
                 };
             }
+            warnings.push(...(repairedScreens.warnings || []));
         }
 
         if (repairs.diagnoses.length) {
@@ -227,27 +292,18 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                     changed: false,
                     reportAfter: null,
                     errors: repairedDiagnoses.errors,
+                    warnings,
                 };
             }
         }
-
-        const screensAfter = repairs.screens.length
-            ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen)
-            : screensRes.data;
-        const diagnosesAfter = repairs.diagnoses.length
-            ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis)
-            : diagnosesRes.data;
+        clearPreparedIntegrityRepair(session.user?.userId, params.entry);
 
         return {
             success: true,
             changed: true,
-            reportAfter: scanDataKeyIntegrity({
-                dataKeys: dataKeysRes.data,
-                screens: screensAfter,
-                diagnoses: diagnosesAfter,
-                onlyIssues: false,
-            }),
+            reportAfter: null,
             errors: [],
+            warnings,
         };
     } catch (e: any) {
         logger.appError('resolveDataKeyIntegrityEntry ERROR', {
@@ -259,6 +315,64 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             success: false,
             changed: false,
             reportAfter: null,
+            errors: [e.message],
+            warnings: [],
+        };
+    }
+}
+
+export const previewDataKeyIntegrityEntryRepair = async (params: {
+    entry: DataKeyIntegrityEntry;
+}) => {
+    try {
+        const session = await isAllowed();
+        const prepared = await prepareDataKeyIntegrityEntryRepair(params.entry);
+
+        if (!prepared.success) {
+            return {
+                success: false,
+                changed: false,
+                preview: null,
+                errors: prepared.errors,
+            };
+        }
+        const repairs = prepared.repairs;
+        setPreparedIntegrityRepair(session.user?.userId, {
+            entry: params.entry,
+            repairs,
+            preparedAt: Date.now(),
+        });
+
+        return {
+            success: true,
+            changed: !!repairs.screens.length || !!repairs.diagnoses.length,
+            preview: {
+                entry: params.entry,
+                screens: repairs.screens.map((screen) => ({
+                    screenId: screen.screenId,
+                    title: screen.title || screen.label || screen.refId || screen.screenId,
+                    scriptId: screen.scriptId,
+                })),
+                diagnoses: repairs.diagnoses.map((diagnosis) => ({
+                    diagnosisId: diagnosis.diagnosisId,
+                    title: diagnosis.name || diagnosis.key || diagnosis.diagnosisId,
+                    scriptId: diagnosis.scriptId,
+                })),
+                savesAsDraft: true,
+                publishRequired: true,
+            },
+            errors: [],
+        };
+    } catch (e: any) {
+        logger.appError('previewDataKeyIntegrityEntryRepair ERROR', {
+            entry: params.entry,
+            error: e.message,
+            stack: e.stack,
+        });
+        return {
+            success: false,
+            changed: false,
+            preview: null,
             errors: [e.message],
         };
     }

@@ -203,8 +203,11 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
       router.refresh()
       alert({
-        variant: "success",
-        message: "Screen draft was saved successfully!",
+        variant: res.warnings?.length ? "info" : "success",
+        title: res.warnings?.length ? "Screen draft saved with warnings" : undefined,
+        message: res.warnings?.length
+          ? `Screen draft was saved successfully.<br /><br />${res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join("")}`
+          : "Screen draft was saved successfully!",
         onClose: () => router.push(scriptPageHref),
       })
     } catch (e: any) {

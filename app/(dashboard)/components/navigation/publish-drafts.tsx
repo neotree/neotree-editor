@@ -60,9 +60,11 @@ export function PublishDrafts({ variant }: Props) {
         await pendingChangesAPI.clearAllChanges()
 
         alert({
-          variant: "success",
-          title: "Success",
-          message: "Data published successfully!",
+          variant: res.warnings?.length ? "info" : "success",
+          title: res.warnings?.length ? "Published with warnings" : "Success",
+          message: res.warnings?.length
+            ? `Data published successfully.<br /><br />${res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join("")}`
+            : "Data published successfully!",
           onClose: () => window.location.reload(),
         })
       }

@@ -23,7 +23,7 @@ import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/e
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
-import { dataKeysDrafts, diagnosesDrafts, screensDrafts } from "@/databases/pg/schema"
+import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, screensDrafts } from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -38,13 +38,62 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     return { dataKeysRes, screensRes, diagnosesRes }
   }
 
-  const [publishedDataKeysRes, publishedScreensRes, publishedDiagnosesRes, userDataKeyDrafts, userScreenDrafts, userDiagnosisDrafts] = await Promise.all([
-    dataKeysQueries._getDataKeys({ returnDraftsIfExist: false }),
-    scriptsQueries._getScreens({ returnDraftsIfExist: false }),
-    scriptsQueries._getDiagnoses({ returnDraftsIfExist: false }),
+  const [userDataKeyDrafts, userScreenDrafts, userDiagnosisDrafts, userPendingDeletion] = await Promise.all([
     db.query.dataKeysDrafts.findMany({ where: eq(dataKeysDrafts.createdByUserId, userId) }),
     db.query.screensDrafts.findMany({ where: eq(screensDrafts.createdByUserId, userId) }),
     db.query.diagnosesDrafts.findMany({ where: eq(diagnosesDrafts.createdByUserId, userId) }),
+    db.query.pendingDeletion.findMany({
+      where: eq(pendingDeletion.createdByUserId, userId),
+      columns: {
+        scriptId: true,
+        screenScriptId: true,
+        diagnosisScriptId: true,
+      },
+    }),
+  ])
+
+  const hasDataKeyDrafts = userDataKeyDrafts.length > 0
+  const affectedScriptIds = hasDataKeyDrafts
+    ? null
+    : Array.from(new Set([
+        ...userScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+        ...userDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+        ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId]).filter((id): id is string => !!id),
+      ]))
+  const shouldLimitToAffectedScripts = !hasDataKeyDrafts
+  const hasAffectedScripts = !!affectedScriptIds?.length
+  const affectedScriptsSet = new Set(affectedScriptIds || [])
+  const scopedUserScreenDrafts = shouldLimitToAffectedScripts
+    ? userScreenDrafts.filter((draft) => {
+        const scriptId = draft.scriptId || draft.scriptDraftId
+        return !!scriptId && affectedScriptsSet.has(scriptId)
+      })
+    : userScreenDrafts
+  const scopedUserDiagnosisDrafts = shouldLimitToAffectedScripts
+    ? userDiagnosisDrafts.filter((draft) => {
+        const scriptId = draft.scriptId || draft.scriptDraftId
+        return !!scriptId && affectedScriptsSet.has(scriptId)
+      })
+    : userDiagnosisDrafts
+
+  const [publishedDataKeysRes, publishedScreensRes, publishedDiagnosesRes] = await Promise.all([
+    dataKeysQueries._getDataKeys({ returnDraftsIfExist: false }),
+    shouldLimitToAffectedScripts
+      ? (hasAffectedScripts
+        ? scriptsQueries._getScreens({
+            returnDraftsIfExist: false,
+            scriptsIds: affectedScriptIds,
+          })
+        : Promise.resolve({ data: [], errors: undefined }))
+      : scriptsQueries._getScreens({ returnDraftsIfExist: false }),
+    shouldLimitToAffectedScripts
+      ? (hasAffectedScripts
+        ? scriptsQueries._getDiagnoses({
+            returnDraftsIfExist: false,
+            scriptsIds: affectedScriptIds,
+          })
+        : Promise.resolve({ data: [], errors: undefined }))
+      : scriptsQueries._getDiagnoses({ returnDraftsIfExist: false }),
   ])
 
   const dataKeysMap = new Map<string, typeof publishedDataKeysRes.data[number]>()
@@ -68,7 +117,7 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   publishedScreensRes.data.forEach((item) => {
     screensMap.set(item.screenId, item)
   })
-  userScreenDrafts.forEach((draft) => {
+  scopedUserScreenDrafts.forEach((draft) => {
     const data = {
       ...draft.data,
       isDraft: true,
@@ -83,7 +132,7 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   publishedDiagnosesRes.data.forEach((item) => {
     diagnosesMap.set(item.diagnosisId, item)
   })
-  userDiagnosisDrafts.forEach((draft) => {
+  scopedUserDiagnosisDrafts.forEach((draft) => {
     const data = {
       ...draft.data,
       isDraft: true,
@@ -193,7 +242,7 @@ export async function publishData({
 }: {
   scope: number
 }) {
-  const results: { success: boolean; errors?: string[] } = { success: true }
+  const results: { success: boolean; errors?: string[]; warnings?: string[] } = { success: true }
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -247,6 +296,9 @@ export async function publishData({
         results.success = false
         results.errors = repairedScreens.errors
         return results
+      }
+      if (repairedScreens.warnings?.length) {
+        results.warnings = [...(results.warnings || []), ...repairedScreens.warnings]
       }
     }
 
