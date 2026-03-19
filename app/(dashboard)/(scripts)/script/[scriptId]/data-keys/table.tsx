@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
+import { previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
 import { dataKeyTypes } from "@/constants";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
+import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -77,6 +78,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [viewFilter, setViewFilter] = useState<"all" | "blocking" | "issues" | "resolved">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
+    const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
+    const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
+    const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
 
     const entries = [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
@@ -104,6 +108,36 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
 
+    const closeRepairModal = () => {
+        if (isRepairing || loadingRepairPreview) return;
+        setRepairModalEntry(null);
+        setRepairPreview(null);
+    };
+
+    const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
+        if (!scriptId || isRepairing || loadingRepairPreview) return;
+        setRepairModalEntry(entry);
+        setRepairPreview(null);
+        setLoadingRepairPreview(true);
+
+        const res = await previewDataKeyIntegrityEntryRepair({ entry });
+        if (!res.success) {
+            setRepairModalEntry(null);
+            setRepairPreview(null);
+            setLoadingRepairPreview(false);
+            alert({
+                title: "Preview failed",
+                message: (res.errors?.length ? res.errors.join("<br />") : "Failed to preview repair"),
+                variant: "error",
+                buttonLabel: "Close",
+            });
+            return;
+        }
+
+        setRepairPreview(res.preview);
+        setLoadingRepairPreview(false);
+    };
+
     const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || isRepairing) return;
         startRepairTransition(async () => {
@@ -124,10 +158,20 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             if (!res.changed) {
                 toast.message("No safe change was applied for this reference");
             } else {
-                toast.success(`Resolved ${entry.status.replace(/_/g, " ")} issue for ${entry.currentKey || entry.currentLabel || entry.location}`);
+                toast.success(`Repair draft saved for ${entry.currentKey || entry.currentLabel || entry.location}`);
+                if (res.warnings?.length) {
+                    alert({
+                        title: "Repair saved with warnings",
+                        message: res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join(""),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                }
             }
 
             setResolvingKey(null);
+            setRepairModalEntry(null);
+            setRepairPreview(null);
             router.refresh();
         });
     };
@@ -157,7 +201,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </DropdownMenuItem>
 
                     {canSafeResolve && (
-                        <DropdownMenuItem onClick={() => handleResolveEntry(entry)} disabled={isRepairing}>
+                        <DropdownMenuItem onClick={() => openRepairModal(entry)} disabled={isRepairing || loadingRepairPreview}>
                             <WrenchIcon className="mr-2 h-4 w-4" />
                             {isResolvingThisEntry ? "Resolving..." : "Resolve"}
                         </DropdownMenuItem>
@@ -229,6 +273,79 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     return (
         <>
+            <Modal
+                open={!!repairModalEntry}
+                onOpenChange={(open) => {
+                    if (!open) closeRepairModal();
+                }}
+                title="Repair Data Key Reference"
+                description="Repairs are saved as drafts only. Nothing is published automatically."
+                actions={(
+                    <>
+                        <Button variant="ghost" onClick={closeRepairModal} disabled={isRepairing || loadingRepairPreview}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => repairModalEntry && handleResolveEntry(repairModalEntry)}
+                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !repairPreview?.screens.length && !repairPreview?.diagnoses.length}
+                        >
+                            {isRepairing ? "Saving Draft..." : "Save Repair Draft"}
+                        </Button>
+                    </>
+                )}
+            >
+                {!repairModalEntry || loadingRepairPreview ? (
+                    <div className="text-sm text-muted-foreground">Preparing repair preview...</div>
+                ) : !repairPreview?.screens.length && !repairPreview?.diagnoses.length ? (
+                    <div className="space-y-2 text-sm">
+                        <div>No deterministic draft repair is available for this reference.</div>
+                        <div className="text-muted-foreground">Review and update it manually if needed.</div>
+                    </div>
+                ) : (
+                    <div className="space-y-4 text-sm">
+                        <div className="rounded-md border p-3 space-y-2">
+                            <div><span className="font-medium">Reference:</span> {repairModalEntry.currentKey || repairModalEntry.currentLabel || repairModalEntry.location}</div>
+                            <div><span className="font-medium">Location:</span> {repairModalEntry.location}</div>
+                            <div><span className="font-medium">Issue:</span> {repairModalEntry.status.replace(/_/g, " ")}</div>
+                            <div><span className="font-medium">Reason:</span> {repairModalEntry.reason}</div>
+                            {!!repairModalEntry.matchedName && (
+                                <div><span className="font-medium">Target data key:</span> {repairModalEntry.matchedName}{repairModalEntry.matchedLabel ? ` (${repairModalEntry.matchedLabel})` : ""}</div>
+                            )}
+                        </div>
+
+                        <div className="rounded-md border p-3 space-y-3">
+                            <div className="font-medium">Draft updates that will be created</div>
+
+                            {!!repairPreview.screens.length && (
+                                <div>
+                                    <div className="text-muted-foreground">Screens</div>
+                                    <div className="space-y-1">
+                                        {repairPreview.screens.map((screen) => (
+                                            <div key={screen.screenId}>{screen.title}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {!!repairPreview.diagnoses.length && (
+                                <div>
+                                    <div className="text-muted-foreground">Diagnoses</div>
+                                    <div className="space-y-1">
+                                        {repairPreview.diagnoses.map((diagnosis) => (
+                                            <div key={diagnosis.diagnosisId}>{diagnosis.title}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="text-muted-foreground">
+                                Saving this repair follows the normal draft flow. You will still need to publish the script changes separately.
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             <Title>{title + ' - data key integrity'}</Title>
             <PageContainer>
                 <div className="p-4 space-y-4">
