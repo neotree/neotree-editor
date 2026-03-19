@@ -92,7 +92,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
-    const [viewFilter, setViewFilter] = useState<"all" | "blocking" | "issues" | "resolved">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
@@ -116,9 +115,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     );
     const filteredEntries = entries.filter((entry) => {
-        if (viewFilter === "blocking" && !["missing", "legacy_match"].includes(entry.status)) return false;
-        if (viewFilter === "issues" && entry.status === "resolved") return false;
-        if (viewFilter === "resolved" && entry.status !== "resolved") return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
@@ -129,6 +125,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         out_of_sync: entries.filter((entry) => entry.status === "out_of_sync"),
         legacy_match: entries.filter((entry) => entry.status === "legacy_match"),
     };
+    const hasBulkResolveActions = !!bulkResolvableEntries.out_of_sync.length || !!bulkResolvableEntries.legacy_match.length;
 
     const closeRepairModal = () => {
         if (isRepairing || loadingRepairPreview) return;
@@ -486,54 +483,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                        This view shows all scanned script references. Only missing and legacy-match issues stop publish. Conflicts stay visible for manual cleanup but do not block publishing. Unmanaged references are legacy or local script keys that are not explicitly linked to the data key library.
+                        This view shows all scanned script references. Only missing and legacy-match issues stop publish. Conflicts stay visible for manual cleanup but do not block publishing.
                     </div>
 
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div className="flex flex-col gap-3">
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    { label: "All", value: "all" },
-                                    { label: "Blocking", value: "blocking" },
-                                    { label: "Issues Only", value: "issues" },
-                                    { label: "Resolved Only", value: "resolved" },
-                                ].map((filter) => (
-                                    <Button
-                                        key={filter.value}
-                                        type="button"
-                                        size="sm"
-                                        variant={viewFilter === filter.value ? "default" : "outline"}
-                                        onClick={() => setViewFilter(filter.value as typeof viewFilter)}
-                                    >
-                                        {filter.label}
-                                    </Button>
-                                ))}
-                            </div>
-
-                            <div className="text-sm text-muted-foreground">
-                                Use the row action menu to review or resolve one issue at a time. Resolve is available only when the system can make a safe deterministic fix.
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!bulkResolvableEntries.out_of_sync.length || isRepairing}
-                                    onClick={() => setBulkResolveStatus("out_of_sync")}
-                                >
-                                    Resolve All Out Of Sync ({bulkResolvableEntries.out_of_sync.length})
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!bulkResolvableEntries.legacy_match.length || isRepairing}
-                                    onClick={() => setBulkResolveStatus("legacy_match")}
-                                >
-                                    Resolve All Legacy Matches ({bulkResolvableEntries.legacy_match.length})
-                                </Button>
-                            </div>
+                    <div className="rounded-md border p-3 space-y-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="flex flex-col gap-3">
+                                <div className="text-sm text-muted-foreground">
+                                    Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script.
+                                </div>
                         </div>
 
                         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
@@ -545,17 +503,17 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     <SelectTrigger>
                                         <SelectValue placeholder="Filter by status" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All statuses</SelectItem>
-                                        <SelectItem value="resolved">Resolved</SelectItem>
-                                        <SelectItem value="out_of_sync">Out of sync</SelectItem>
-                                        <SelectItem value="missing">Missing</SelectItem>
-                                        <SelectItem value="legacy_match">Legacy match</SelectItem>
-                                        <SelectItem value="conflict">Conflict</SelectItem>
-                                        <SelectItem value="unmanaged">Unmanaged</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                        <SelectContent>
+                                            <SelectItem value="all">All statuses</SelectItem>
+                                            <SelectItem value="resolved">Resolved</SelectItem>
+                                            <SelectItem value="out_of_sync">Out of sync</SelectItem>
+                                            <SelectItem value="missing">Missing</SelectItem>
+                                            <SelectItem value="legacy_match">Legacy match</SelectItem>
+                                            <SelectItem value="conflict">Conflict</SelectItem>
+                                            <SelectItem value="unmanaged">Unmanaged</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
                             <div className="w-full md:w-[220px]">
                                 <Select
@@ -576,6 +534,35 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 </Select>
                             </div>
                         </div>
+                        </div>
+
+                        {hasBulkResolveActions && (
+                            <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bulk resolve</span>
+                                {!!bulkResolvableEntries.out_of_sync.length && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isRepairing}
+                                        onClick={() => setBulkResolveStatus("out_of_sync")}
+                                    >
+                                        Out of sync ({bulkResolvableEntries.out_of_sync.length})
+                                    </Button>
+                                )}
+                                {!!bulkResolvableEntries.legacy_match.length && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isRepairing}
+                                        onClick={() => setBulkResolveStatus("legacy_match")}
+                                    >
+                                        Legacy match ({bulkResolvableEntries.legacy_match.length})
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="text-sm text-muted-foreground">

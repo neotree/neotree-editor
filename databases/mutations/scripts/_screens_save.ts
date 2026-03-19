@@ -19,6 +19,37 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
+function summarizeSelectionRuleWarnings(contextLabel: string, warnings: string[]) {
+    if (!warnings.length) return [];
+
+    const counters = {
+        assignedItemIds: 0,
+        remappedDuplicateItemIds: 0,
+        remappedForbidWith: 0,
+        droppedSelfForbidWith: 0,
+        droppedUnknownForbidWith: 0,
+        other: [] as string[],
+    };
+
+    warnings.forEach((warning) => {
+        if (warning.startsWith('Assigned generated itemId ')) counters.assignedItemIds++;
+        else if (warning.startsWith('Remapped duplicate itemId ')) counters.remappedDuplicateItemIds++;
+        else if (warning.startsWith('Remapped forbidWith ')) counters.remappedForbidWith++;
+        else if (warning.startsWith('Dropped self-referencing forbidWith ')) counters.droppedSelfForbidWith++;
+        else if (warning.startsWith('Dropped unknown forbidWith ')) counters.droppedUnknownForbidWith++;
+        else counters.other.push(warning);
+    });
+
+    const summary: string[] = [];
+    if (counters.assignedItemIds) summary.push(`${contextLabel}: assigned generated itemIds to ${counters.assignedItemIds} item${counters.assignedItemIds === 1 ? '' : 's'}`);
+    if (counters.remappedDuplicateItemIds) summary.push(`${contextLabel}: remapped ${counters.remappedDuplicateItemIds} duplicate itemId${counters.remappedDuplicateItemIds === 1 ? '' : 's'}`);
+    if (counters.remappedForbidWith) summary.push(`${contextLabel}: remapped ${counters.remappedForbidWith} forbidWith link${counters.remappedForbidWith === 1 ? '' : 's'}`);
+    if (counters.droppedSelfForbidWith) summary.push(`${contextLabel}: dropped ${counters.droppedSelfForbidWith} self-referencing forbidWith link${counters.droppedSelfForbidWith === 1 ? '' : 's'}`);
+    if (counters.droppedUnknownForbidWith) summary.push(`${contextLabel}: dropped ${counters.droppedUnknownForbidWith} unknown forbidWith link${counters.droppedUnknownForbidWith === 1 ? '' : 's'}`);
+
+    return [...summary, ...counters.other.map((warning) => `${contextLabel}: ${warning}`)];
+}
+
 function normalizeScreenSelectionRuleItemIds(screen: SaveScreensData): {
     value: SaveScreensData;
     warnings: string[];
@@ -27,10 +58,8 @@ function normalizeScreenSelectionRuleItemIds(screen: SaveScreensData): {
     const fieldWarnings: string[] = [];
     const fields = (screen.fields || []).map((field, fieldIndex) => {
         const result = normalizeSelectionRuleItems(field.items || [], () => uuid.v4());
-        if (result.warnings.length) {
-            const fieldLabel = field.label || field.key || `field ${fieldIndex}`;
-            fieldWarnings.push(...result.warnings.map((warning) => `Field "${fieldLabel}" items: ${warning}`));
-        }
+        const fieldLabel = field.label || field.key || `field ${fieldIndex}`;
+        fieldWarnings.push(...summarizeSelectionRuleWarnings(`Field "${fieldLabel}" items`, result.warnings));
         return {
             ...field,
             items: result.items,
@@ -44,7 +73,7 @@ function normalizeScreenSelectionRuleItemIds(screen: SaveScreensData): {
             fields,
         },
         warnings: [
-            ...screenItems.warnings.map((warning) => `Screen items: ${warning}`),
+            ...summarizeSelectionRuleWarnings('Screen items', screenItems.warnings),
             ...fieldWarnings,
         ],
     };
