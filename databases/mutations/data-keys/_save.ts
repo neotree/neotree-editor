@@ -26,7 +26,9 @@ export type SaveDataKeysResponse = {
     };
 };
 
-async function createNewUniqueKey(uniqueKey = uuid.v4()) {
+async function createNewUniqueKey(uniqueKey?: string) {
+    uniqueKey = `${uniqueKey || ''}`.trim();
+    uniqueKey = uniqueKey || uuid.v4()
     const [{ count: existing, }] = await db
         .select({ count: count(dataKeys.uniqueKey), })
         .from(dataKeys)
@@ -145,7 +147,7 @@ export async function _saveDataKeys({
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
                     } else {
-                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(item.uniqueKey);
+                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(item.uniqueKey || '');
 
                         const data = {
                             ...published,
