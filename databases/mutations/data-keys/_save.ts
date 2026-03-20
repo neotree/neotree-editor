@@ -26,12 +26,14 @@ export type SaveDataKeysResponse = {
     };
 };
 
-async function createNewUniqueKey(uniqueKey = uuid.v4()) {
+async function createNewUniqueKey(uniqueKey?: string) {
+    uniqueKey = `${uniqueKey || ''}`.trim();
+    uniqueKey = uniqueKey || uuid.v4()
     const [{ count: existing, }] = await db
         .select({ count: count(dataKeys.uniqueKey), })
         .from(dataKeys)
         .where(eq(dataKeys.uniqueKey, uniqueKey));
-    if (existing) return await createNewUniqueKey(uuid.v4());
+    if (existing) return await createNewUniqueKey();
     return uniqueKey;
 }
 
@@ -145,7 +147,7 @@ export async function _saveDataKeys({
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
                     } else {
-                        const uniqueKey = published?.uniqueKey || item.uniqueKey || await createNewUniqueKey();
+                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(item.uniqueKey || '');
 
                         const data = {
                             ...published,
