@@ -1,4 +1,4 @@
-import { eq, or } from 'drizzle-orm';
+import { count, eq, or } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -25,6 +25,17 @@ export type SaveDataKeysResponse = {
         refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
     };
 };
+
+async function createNewUniqueKey(uniqueKey?: string) {
+    uniqueKey = `${uniqueKey || ''}`.trim();
+    uniqueKey = uniqueKey || uuid.v4()
+    const [{ count: existing, }] = await db
+        .select({ count: count(dataKeys.uniqueKey), })
+        .from(dataKeys)
+        .where(eq(dataKeys.uniqueKey, uniqueKey));
+    if (existing) return await createNewUniqueKey();
+    return uniqueKey;
+}
 
 export async function _saveDataKeys({ 
     data: dataParam, 
@@ -136,7 +147,7 @@ export async function _saveDataKeys({
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
                     } else {
-                        const uniqueKey = published?.uniqueKey || item.uniqueKey || uuid.v4();
+                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(item.uniqueKey || '');
 
                         const data = {
                             ...published,
