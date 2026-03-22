@@ -291,7 +291,7 @@ export async function discardDrafts({
 }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
-    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_screens"])
+    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_diagnoses", "delete_screens"])
 
     let userId = session?.user?.userId
 
@@ -304,6 +304,7 @@ export async function discardDrafts({
     await scriptsMutations._deleteAllScriptsDrafts({ userId })
     await scriptsMutations._deleteAllScreensDrafts({ userId })
     await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
+    await scriptsMutations._deleteAllProblemsDrafts({ userId })
     await _clearPendingDeletion({ userId })
 
     socket.emit("data_changed", "discard_drafts")
