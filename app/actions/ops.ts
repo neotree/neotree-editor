@@ -118,6 +118,8 @@ export async function publishData({
       "update_scripts",
       "create_diagnoses",
       "update_diagnoses",
+      "create_problems",
+      "update_problems",
       "create_screens",
       "update_screens",
     ])
@@ -171,6 +173,11 @@ export async function publishData({
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    const publishProblems = await scriptsMutations._publishProblems({
+      userId,
+      publisherUserId,
+      dataVersion: nextDataVersion,
+    })
     const processPendingDeletion = await _processPendingDeletion({
       userId,
       publisherUserId: publisherUserId || undefined,
@@ -209,6 +216,11 @@ export async function publishData({
     if (publishDiagnoses.errors) {
       results.success = false
       results.errors = [...(results.errors || []), ...publishDiagnoses.errors]
+    }
+
+    if (publishProblems.errors) {
+      results.success = false
+      results.errors = [...(results.errors || []), ...publishProblems.errors]
     }
 
     if (processPendingDeletion.errors) {

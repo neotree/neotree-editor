@@ -8,6 +8,7 @@ import {
   scripts,
   screensDrafts,
   diagnosesDrafts,
+  problemsDrafts,
   pendingDeletion,
   scriptsHistory,
   scriptsDrafts,
@@ -115,6 +116,11 @@ export async function _publishScripts({
           .update(diagnosesDrafts)
           .set({ scriptId })
           .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
+
+        await db
+          .update(problemsDrafts)
+          .set({ scriptId })
+          .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
       }
       const insertChangeLogs = await _saveScriptsHistory({
         drafts: inserts,
