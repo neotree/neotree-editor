@@ -151,6 +151,20 @@ export async function isAllowed(action?: PermissionParam) {
                     break;
                 case 'search_diagnoses':
                     break;
+
+                // diagnoses actions
+                case 'create_problems':
+                    break; 
+                case 'update_problems':
+                    break; 
+                case 'delete_problems':
+                    break; 
+                case 'get_problems':
+                    break;
+                case 'get_problem':
+                    break;
+                case 'search_problems':
+                    break;
         
                 default:
                     break;

@@ -1,0 +1,43 @@
+'use client';
+
+import { Trash, Copy } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { IScriptsContext } from "@/contexts/scripts";
+import { ActionsBar } from "@/components/actions-bar";
+
+type Props = {
+    disabled?: boolean;
+    selected: number[];
+    onDelete: () => void;
+    onCopy: () => void;
+};
+
+export function ProblemsTableBottomActions({ disabled, selected, onDelete, onCopy, }: Props) {
+    return (
+        <>
+            {!!selected.length && (
+                <ActionsBar>
+                    <Button
+                        variant="destructive"
+                        className="h-auto w-auto"
+                        disabled={disabled}
+                        onClick={() => setTimeout(() => onDelete(), 0)}
+                    >
+                        <Trash className="h-4 w-4 mr-1" />
+                        <span>{selected.length > 1 ? `Delete ${selected.length} problems` : 'Delete problem'}</span>
+                    </Button>
+
+                    <Button
+                        className="h-auto w-auto"
+                        disabled={disabled}
+                        onClick={() => setTimeout(() => onCopy(), 0)}
+                    >
+                        <Copy className="h-4 w-4 mr-1" />
+                        <span>{selected.length > 1 ? `Copy ${selected.length} problems` : 'Copy problem'}</span>
+                    </Button>
+                </ActionsBar>
+            )}
+        </>
+    );
+}

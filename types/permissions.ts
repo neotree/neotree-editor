@@ -76,4 +76,12 @@ export type DataAction =
     'delete_diagnoses' | 
     'get_diagnoses' |
     'get_diagnosis' |
-    'search_diagnoses';
+    'search_diagnoses' |
+    
+    // problems actions
+    'create_problems' | 
+    'update_problems' | 
+    'delete_problems' | 
+    'get_problems' |
+    'get_problem' |
+    'search_problems';

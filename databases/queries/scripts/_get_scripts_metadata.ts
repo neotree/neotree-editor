@@ -1,7 +1,7 @@
 import { and, inArray, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, screens, hospitals, scriptsDrafts } from "@/databases/pg/schema";
+import { scripts, screens, hospitals, scriptsDrafts, problems, diagnoses } from "@/databases/pg/schema";
 import { DiagnosisSymptom, ScriptField, ScriptImage, ScriptItem } from "@/types";
 import * as uuid from "uuid";
 
@@ -122,6 +122,43 @@ export type GetScriptsMetadataResponse = {
                     }[];
                 }[];
         }[];
+        problems: {
+            problemId: string;
+            name: string;
+            key: string;
+            keyId: string;
+            position: number | null;
+            source: string | null;
+            severityOrder?: string | number | null;
+            expression?: string | number | null;
+            expressionMeaning?: string | null;
+            description?: string | null;
+            text1: string | null;
+            text2: string | null;
+            text3: string | null;
+            image1: null | ScriptImage;
+            image2: null | ScriptImage;
+            image3: null | ScriptImage;
+            fields: {
+                label: string;
+                key: string;
+                type: string;
+                dataType: string | null;
+            value?: any;
+            valueLabel?: null | string;
+                optional?: boolean;
+                confidential: boolean;
+                minValue?: string | number | null;
+                maxValue?: string | number | null;
+                condition?: string | null;
+                options?: {
+                    value: string;
+                    valueLabel: string;
+                    disabledOtherOptionsIfSelected?: boolean;
+                    forbidWIth?: string[];
+                }[];
+            }[];
+        }[];
     }[],
     errors?: string[];
 };
@@ -181,6 +218,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
             with: {
                 screensDrafts: true,
                 diagnosesDrafts: true,
+                problemsDrafts: true,
             }
         });
 
@@ -198,7 +236,13 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                     },
                 },
                 diagnoses: {
-                    where: isNull(screens.deletedAt),
+                    where: isNull(diagnoses.deletedAt),
+                    with: {
+                        draft: !returnDraftsIfExist ? undefined : true,
+                    },
+                },
+                problems: {
+                    where: isNull(problems.deletedAt),
                     with: {
                         draft: !returnDraftsIfExist ? undefined : true,
                     },
@@ -213,6 +257,8 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 .sort((a, b) => a.position - b.position),
             diagnoses: s.diagnoses
                 .sort((a, b) => a.position - b.position),
+            problems: s.problems
+                .sort((a, b) => a.position - b.position),
         }));
 
         const unpublisedScripts = unpublisedScriptsRes.map(s => {
@@ -226,7 +272,11 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                 diagnoses: s.diagnosesDrafts.map(diagnosisDraft => ({
                     ...diagnosisDraft.data,
                     diagnosisId: diagnosisDraft.diagnosisDraftId,
-                }))
+                })),
+                problems: s.problemsDrafts.map(problemDraft => ({
+                    ...problemDraft.data,
+                    problemId: problemDraft.problemDraftId,
+                })),
             }
         }) as typeof publishedScripts;
 
@@ -266,6 +316,27 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         image2: sanitizeImage(d.image2),
                         image3: sanitizeImage(d.image3),
                         symptoms,
+                        fields: [],
+                    };
+                }),
+                problems: script.problems.map(d => {
+                    return {
+                        problemId: d.problemId,
+                        name: d.name,
+                        key: d.key || d.name,
+                        keyId: d.keyId || '',
+                        position: d.position ?? null,
+                        source: d.source || '',
+                        severityOrder: d.severityOrder || '',
+                        expression: d.expression || '',
+                        expressionMeaning: d.expressionMeaning || '',
+                        description: d.description || '',
+                        text1: d.text1 || '',
+                        text2: d.text2 || '',
+                        text3: d.text3 || '',
+                        image1: sanitizeImage(d.image1),
+                        image2: sanitizeImage(d.image2),
+                        image3: sanitizeImage(d.image3),
                         fields: [],
                     };
                 }),

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { _getScripts, _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
+import { _getScripts, _getScreens, _getDiagnoses, _getProblems } from "@/databases/queries/scripts";
 import {_getAllAliases} from '@/databases/queries/aliases'
 import { _getConfigKeys, } from "@/databases/queries/config-keys";
 import { _getHospitals, } from "@/databases/queries/hospitals";
-import { mapNewConfigKeysToOld, mapNewDiagnosisToOld, mapNewScreenToOld, mapNewScriptToOld } from '@/lib/map-old-and-new';
+import { mapNewConfigKeysToOld, mapNewDiagnosisToOld, mapNewProblemToOld, mapNewScreenToOld, mapNewScriptToOld } from '@/lib/map-old-and-new';
 import { isValidUrl } from "@/lib/urls";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { getDevice } from "../get-device-registration/get-device";
@@ -48,9 +48,11 @@ export async function GET(req: NextRequest) {
         const [
             getScreens,
             getDiagnoses,
+            getProblems,
         ] = await Promise.all([
             !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
             !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getProblems({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
         ]);
 
         const getImageUrl = (suffix: string) => {
@@ -176,6 +178,32 @@ export async function GET(req: NextRequest) {
         })();
         const deletedDiagnoses = getDiagnoses.data.filter(s => s.isDeleted)?.map(s => mapNewDiagnosisToOld(s));
 
+        // problems
+        const problems = (() => {
+            const _problems = getProblems.data.filter(s => !s.isDeleted)?.map(s => mapNewProblemToOld({
+                ...s,
+                oldScriptId: scriptIdToOldScriptId[s.scriptId],
+            }));
+            const obj = _problems.reduce((acc, s) => {
+                acc[s.script_id] = acc[s.script_id] || [];
+                acc[s.script_id].push(s);
+                return acc;
+            }, {} as { [key: string]: (typeof _problems[0])[]; });
+            
+            let sorted: (typeof _problems[0])[] = [];
+
+            Object.values(obj).forEach(s => {
+                sorted = [...sorted, ...s.sort((a, b) => a.position - b.position)?.map((s, i) => ({
+                    ...s,
+                    position: i + 1,
+                    data: { ...s.data, position: i + 1, },
+                }))];
+            });
+
+            return sorted;
+        })();
+        const deletedProblems = getProblems.data.filter(s => s.isDeleted)?.map(s => mapNewProblemToOld(s));
+
         logger.log(`[GET - finish]: ${req.url}`);
 
 		return NextResponse.json({
@@ -186,9 +214,11 @@ export async function GET(req: NextRequest) {
             drugsLibrary,
             deletedDrugsLibrary,
             deletedDiagnoses,
+            deletedProblems,
             deletedScreens,
             deletedScripts,
             diagnoses,
+            problems,
             screens,
             scripts,
             aliases
