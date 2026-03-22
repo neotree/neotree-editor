@@ -15,10 +15,12 @@ export default async function NewScreenPage({ params: { scriptId, } }: Props) {
     const [
         script,
         countDiagnosesScreens,
+        countProblemsScreens,
         screens,
     ] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
         countScreens({ types: ['diagnosis'], scriptsIds: [scriptId], }),
+        countScreens({ types: ['problems'], scriptsIds: [scriptId], }),
         listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
     ]);
 
@@ -54,6 +56,7 @@ export default async function NewScreenPage({ params: { scriptId, } }: Props) {
                     screens={screens.data}
                     scriptId={scriptId} 
                     countDiagnosesScreens={countDiagnosesScreens.data.allPublished || countDiagnosesScreens.data.allDrafts}
+                    countProblemsScreens={countProblemsScreens.data.allPublished || countProblemsScreens.data.allDrafts}
                 />
             </PageContainer>
         </>

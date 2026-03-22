@@ -1,6 +1,6 @@
 import { v4 as uuidV4 } from "uuid";
 
-import { _getScreens, _getDiagnoses } from "@/databases/queries/scripts";
+import { _getScreens, _getDiagnoses, _getProblems } from "@/databases/queries/scripts";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
@@ -24,7 +24,7 @@ type Scrapped = {
             children: KeyWithoutOptions[];
         })[];
     };
-    type: 'dff' | 'diagnosis' | 'screen';
+    type: 'dff' | 'diagnosis' | 'screen' | 'problem';
     id: string;
 };
 
@@ -70,6 +70,7 @@ export function pickDataKey(keys: (KeyWithoutOptions & { options: string[]; })[]
 type ScrapDataKeysParams = {
     screens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     diagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
+    problems?: Awaited<ReturnType<typeof _getProblems>>['data'];
     drugsLibrary?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
     importedDataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
     dataKeys?: Awaited<ReturnType<typeof _getDataKeys>>['data'];
@@ -79,6 +80,7 @@ type ScrapDataKeysParams = {
 export async function scrapDataKeys({
     screens = [],
     diagnoses = [],
+    problems = [],
     dataKeys: dataKeysParam,
     linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
@@ -100,6 +102,20 @@ export async function scrapDataKeys({
                         children: [],
                     };
                 }),
+            },
+        };
+    });
+
+    let problemsKeys: Scrapped[] = problems.map(s => {
+        const name = s.key || s.name;
+        return {
+            id: s.problemId,
+            type: 'problem',
+            key: {
+                label: s.name,
+                name,
+                dataType: 'problem',
+                children: [],
             },
         };
     });
@@ -153,7 +169,7 @@ export async function scrapDataKeys({
         };
     });
 
-    const mergedKeys = mergeScrappedKeys(diagnosesKeys, screensKeys);
+    const mergedKeys = mergeScrappedKeys(diagnosesKeys, problemsKeys, screensKeys);
     let scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
 
     const { data: dataKeys, } = dataKeysParam ? { data: dataKeysParam, } : (
@@ -209,6 +225,7 @@ export async function parseImportedDataKeys({
     importedDataKeys = [], 
     importedScreens = [],
     importedDiagnoses = [],
+    importedProblems = [],
     importedDrugsLibraryItems = [],
 }: {
     localDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
@@ -216,6 +233,7 @@ export async function parseImportedDataKeys({
     importedScrappedKeys: Awaited<ReturnType<typeof scrapDataKeys>>;
     importedScreens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     importedDiagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
+    importedProblems?: Awaited<ReturnType<typeof _getProblems>>['data'];
     importedDrugsLibraryItems?: Awaited<ReturnType<typeof _getDrugsLibraryItems>>['data'];
 }) {
     const importedUniqueIdDataKeyMap: Record<string, DataKey> = {};
@@ -323,6 +341,20 @@ export async function parseImportedDataKeys({
                         keyId,
                     }
                 }),
+            };
+        }),
+
+        problems: importedProblems.map(s => {
+            const name = s.key || s.name;
+            const k = {
+                label: s.name,
+                name,
+                dataType: 'problem',
+            }; 
+            const keyId = pickDataKey(parsed, k)?.uniqueKey;
+            return {
+                ...s,
+                keyId,
             };
         }),
 

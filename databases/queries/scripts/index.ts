@@ -10,6 +10,10 @@ export * from './_diagnoses_count';
 export * from './_diagnoses_get';
 export * from './_get_diagnoses_change_history';
 
+export * from './_problems_count';
+export * from './_problems_get';
+export * from './_get_problems_change_history';
+
 export * from './_get_scripts_metadata';
 
 export * from './_scripts_get _drugs_library';
