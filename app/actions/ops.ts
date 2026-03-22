@@ -79,6 +79,7 @@ export const countAllDrafts = async () => {
     const screens = await scriptsQueries._countScreens()
     const scripts = await scriptsQueries._countScripts()
     const diagnoses = await scriptsQueries._countDiagnoses()
+    const problems = await scriptsQueries._countProblems()
 
     return {
       configKeys: configKeys.data.allDrafts,
@@ -87,6 +88,7 @@ export const countAllDrafts = async () => {
       screens: screens.data.allDrafts,
       scripts: scripts.data.allDrafts,
       diagnoses: diagnoses.data.allDrafts,
+      problems: problems.data.allDrafts,
       dataKeys: dataKeys.data.allDrafts,
     }
   } catch (e: any) {
@@ -97,6 +99,7 @@ export const countAllDrafts = async () => {
       configKeys: 0,
       hospitals: 0,
       diagnoses: 0,
+      problems: 0,
     }
   }
 }

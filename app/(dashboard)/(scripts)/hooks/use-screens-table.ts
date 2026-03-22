@@ -183,6 +183,7 @@ export function useScreensTable({
             searchValue: value,
             diagnoses: [],
             scripts: [],
+            problems: [],
             screens: screens.data.map(s => ({
               ...s,
               scriptTitle: '',

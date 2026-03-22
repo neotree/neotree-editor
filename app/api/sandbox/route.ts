@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/databases/pg/drizzle";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
-import { diagnoses, diagnosesDrafts, screens, screensDrafts } from "@/databases/pg/schema";
+import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts } from "@/databases/pg/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
              db.query.screensDrafts.findMany(),
              db.query.diagnoses.findMany(),
              db.query.diagnosesDrafts.findMany(),
+             db.query.problems.findMany(),
+             db.query.problemsDrafts.findMany(),
         ]);
 
         const matched = data.map(items => {
@@ -45,6 +47,8 @@ export async function GET(req: NextRequest) {
             screensDraftsArr,
             diagnosesArr,
             diagnosesDraftsArr,
+            problemsArr,
+            problemsDraftsArr,
         ] = matched;
 
         await Promise.all([
@@ -52,6 +56,8 @@ export async function GET(req: NextRequest) {
             ...screensDraftsArr.map((s: any) => db.update(screensDrafts).set(s).where(eq(screensDrafts.id, s.id))),
             ...diagnosesArr.map((s: any) => db.update(diagnoses).set(s).where(eq(diagnoses.id, s.id))),
             ...diagnosesDraftsArr.map((s: any) => db.update(diagnosesDrafts).set(s).where(eq(diagnosesDrafts.id, s.id))),
+            ...problemsArr.map((s: any) => db.update(problems).set(s).where(eq(problems.id, s.id))),
+            ...problemsDraftsArr.map((s: any) => db.update(problemsDrafts).set(s).where(eq(problemsDrafts.id, s.id))),
         ]);
 
 		return NextResponse.json({ 
@@ -60,6 +66,8 @@ export async function GET(req: NextRequest) {
                 screensDrafts: screensDraftsArr.length,
                 diagnoses: diagnosesArr.length,
                 diagnosesDrafts: diagnosesDraftsArr.length,
+                problems: problemsArr.length,
+                problemsDrafts: problemsDraftsArr.length,
             },
             success: true, 
         });

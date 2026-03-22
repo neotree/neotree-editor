@@ -1,12 +1,12 @@
 import { isNotNull, and, isNull, inArray, sql, eq } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { configKeys, dataKeys, diagnoses, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
+import { configKeys, dataKeys, diagnoses, problems, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 
 export async function _clearPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'problems' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
     userId?: string | null;
 }): Promise<{ success: boolean; errors?: string[]; }> {
@@ -24,6 +24,7 @@ export async function _clearPendingDeletion(params?: {
             ) : undefined,
             items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
             items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
+            items === 'problems' ? isNotNull(pendingDeletion.problemId) : undefined,
             !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
         ];
 
@@ -39,7 +40,7 @@ export async function _clearPendingDeletion(params?: {
 }
 
 export async function _processPendingDeletion(params?: {
-    items?: 'screens' | 'scripts' | 'diagnoses' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
+    items?: 'screens' | 'scripts' | 'diagnoses' | 'problems' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
     broadcastAction?: boolean;
     userId?: string | null;
     publisherUserId?: string | null;
@@ -113,6 +114,10 @@ export async function _processPendingDeletion(params?: {
             await db.update(diagnoses)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(diagnoses.scriptId, _scripts.map(c => c.scriptId!)));
+
+            await db.update(problems)
+                .set({ deletedAt: new Date(), })
+                .where(inArray(problems.scriptId, _scripts.map(c => c.scriptId!)));
         }
 
         const _screens = await db.query.pendingDeletion.findMany({
@@ -139,6 +144,19 @@ export async function _processPendingDeletion(params?: {
             await db.update(diagnoses)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(diagnoses.diagnosisId, _diagnoses.map(c => c.diagnosisId!)));
+        }
+
+        const _problems = await db.query.pendingDeletion.findMany({
+            where: and(
+                items === 'problems' ? isNotNull(pendingDeletion.problemId) : undefined,
+                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
+            ),
+        });
+
+        if (_problems.length) {
+            await db.update(problems)
+                .set({ deletedAt: new Date(), })
+                .where(inArray(problems.problemId, _problems.map(c => c.problemId!)));
         }
 
         await _clearPendingDeletion(params);
