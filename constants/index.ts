@@ -23,7 +23,7 @@ export const defaultPreferences = {
 
 export const scriptsPageTabs = [
     { value: 'screens', label: 'Screens', },
-    { value: 'diagnoses', label: 'Diagnoses', },
+    { value: 'diagnoses', label: 'Problems & Diagnoses', },
     { value: 'print', label: 'Print', },
 ];
 
@@ -50,7 +50,8 @@ export const screenTypes: { label: string; value: ScreenType['type'] }[] = [
     // { value: 'feeds', label: 'Feeds' },
     { value: 'zw_edliz_summary_table', label: 'EDLIZ summary table (ZW)' },
     { value: 'mwi_edliz_summary_table', label: 'EDLIZ summary table (MWI)' },
-    { value: 'diagnosis', label: 'Diagnosis' }
+    { value: 'diagnosis', label: 'Diagnosis' },
+    { value: 'problems', label: 'Problems' }
 ];
 
 export const SymptomTypes = [
@@ -139,6 +140,11 @@ export const dataKeyTypes: {
         value: 'mwi_edliz_summary_table',
         label: 'mwi_edliz_summary_table',
         hasChildren: true,
+    },
+    {
+        value: 'problem',
+        label: 'problem',
+        hasChildren: false,
     },
     {
         value: 'diagnosis',

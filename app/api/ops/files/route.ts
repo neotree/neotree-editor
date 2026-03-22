@@ -7,7 +7,7 @@ import axios from 'axios';
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { screens as screensTable, diagnoses as diagnosesTable, files } from "@/databases/pg/schema";
+import { screens as screensTable, diagnoses as diagnosesTable, problems as problemsTable, files } from "@/databases/pg/schema";
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
 import { getAppUrl, getUploadUrl } from "@/lib/urls";
 import { getRemoteImageSize } from "@/lib/image-size";
@@ -148,9 +148,39 @@ export async function GET(req: NextRequest) {
             j++;
         }
 
+        const problemsRes = await db.query.problems.findMany({
+            where: or(
+                isNotNull(problemsTable.image1),
+                isNotNull(problemsTable.image2),
+                isNotNull(problemsTable.image3)
+            ),
+            columns: {
+                problemId: true,
+                image1: true,
+                image2: true,
+                image3: true,
+            }
+        });
+
+        const problems = problemsRes
+            .filter(s => {
+                return isDataURL(s.image1) || isDataURL(s.image2) || isDataURL(s.image3);
+            });
+
+        let k = 0;
+        for (const d of problems) {
+            const res = await upload([d.image1, d.image2, d.image3]);
+            problems[i].image1 = res[0];
+            problems[i].image2 = res[1];
+            problems[i].image3 = res[2];
+            await db.update(problemsTable).set(d).where(eq(problemsTable.problemId, d.problemId));
+            k++;
+        }
+
         return NextResponse.json({
             screens,
             diagnoses,
+            problems,
         });
     } catch(e: any) {
         logger.log('/api/ops/files', e);

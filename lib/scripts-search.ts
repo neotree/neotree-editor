@@ -14,6 +14,10 @@ type Diagnosis = typeof schema.diagnoses.$inferSelect & {
     isDraft: boolean;
 };
 
+type Problem = typeof schema.problems.$inferSelect & {
+    isDraft: boolean;
+};
+
 export type ScriptsSearchResultsItem = {
     scriptId: string;
     title: string;
@@ -40,6 +44,14 @@ export type ScriptsSearchResultsItem = {
         matches: ScriptsSearchResultsItem['matches'];
         position: number;
     }[];
+    problems: {
+        title: string;
+        isDraft: boolean;
+        problemId: string;
+        fields: { label: string; type: string, }[];
+        matches: ScriptsSearchResultsItem['matches'];
+        position: number;
+    }[];
 };
 
 export type ParseScriptsSearchResultsParams = {
@@ -53,6 +65,10 @@ export type ParseScriptsSearchResultsParams = {
         scriptTitle: string;
         scriptPosition: number;
     })[];
+    problems: (Problem & {
+        scriptTitle: string;
+        scriptPosition: number;
+    })[];
 };
 
 export function parseScriptsSearchResults({
@@ -60,6 +76,7 @@ export function parseScriptsSearchResults({
     scripts,
     screens,
     diagnoses,
+    problems,
 }: ParseScriptsSearchResultsParams): ScriptsSearchResultsItem[] {
     const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
 
@@ -103,6 +120,7 @@ export function parseScriptsSearchResults({
                 scriptId: s.scriptId,
                 position: s.position,
                 diagnoses: [],
+                problems: [],
                 screens: [],
                 matches,
             };
@@ -326,6 +344,7 @@ export function parseScriptsSearchResults({
                 scriptId: s.scriptId,
                 position: s.scriptPosition,
                 diagnoses: [],
+                problems: [],
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
@@ -408,6 +427,7 @@ export function parseScriptsSearchResults({
                 scriptId: s.scriptId,
                 position: s.scriptPosition,
                 diagnoses: [],
+                problems: [],
                 screens: [],
                 matches: [],
             } satisfies ScriptsSearchResultsItem;
@@ -426,6 +446,54 @@ export function parseScriptsSearchResults({
                         type: 'diagnosis_symptom',
                     })),
                 ],
+            });
+        }
+    });
+
+    problems.forEach(s => {
+        const matches: ScriptsSearchResultsItem['matches'] = [];
+
+        if (`${s.name || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'name',
+                fieldValue: s.name!,
+            });
+        }
+
+        if (`${s.key || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'key',
+                fieldValue: s.key!,
+            });
+        }
+
+        if (`${s.expression || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'expression',
+                fieldValue: s.expression!,
+            });
+        }
+
+        if (matches.length) {
+            resultsMap[s.scriptId] = resultsMap[s.scriptId] || {
+                title: '',
+                scriptId: s.scriptId,
+                position: s.scriptPosition,
+                diagnoses: [],
+                problems: [],
+                screens: [],
+                matches: [],
+            } satisfies ScriptsSearchResultsItem;
+
+            resultsMap[s.scriptId].title = resultsMap[s.scriptId].title || s.scriptTitle;
+
+            resultsMap[s.scriptId].problems.push({
+                title: s.name || '',
+                position: s.position,
+                matches,
+                problemId: s.problemId,
+                isDraft: s.isDraft,
+                fields: [],
             });
         }
     });
@@ -518,11 +586,18 @@ export function filterScriptsSearchResults({ searchValue, filter, results, }: {
                     matches: s.matches.filter(m => filterFn(m)),
                 };
             }),  
+            problems: r.problems.filter(s => s.matches.find(m => filterFn(m))).map(s => {
+                return {
+                    ...s,
+                    matches: s.matches.filter(m => filterFn(m)),
+                };
+            }),  
         };
     }).filter(r => (
         r.matches.length ||
         r.screens.length ||
-        r.diagnoses.length
+        r.diagnoses.length ||
+        r.problems.length
     ));
 
     return filtered;

@@ -108,6 +108,28 @@ export async function _searchScripts({
             ),
         ));
 
+        // PROOBLEMS
+        const problemsDrafts = !returnDraftsIfExist ? [] : await db.query.problemsDrafts.findMany({
+            where: sql`lower(${schema.problemsDrafts.data}::text) like ${`%${searchTerm}%`}`,
+        });
+
+        const problems = await db.select({
+            pendingDeletion: schema.pendingDeletion,
+            problem: schema.problems,
+        })
+        .from(schema.problems)
+        .leftJoin(schema.pendingDeletion, eq(schema.pendingDeletion.problemId, schema.problems.problemId))
+        .where(and(
+            isNull(schema.pendingDeletion),
+            isNull(schema.problems.deletedAt),
+            !problemsDrafts.length ? undefined : notInArray(schema.problems.problemId, problemsDrafts.map(d => d.problemDraftId)),
+            or(
+                sql`lower(${schema.problems.name}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.expression}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.key}::text) like ${`%${searchTerm}%`}`,
+            ),
+        ));
+
         const scriptsArr = [
             ...scriptsDrafts.map(d => ({
                 ...d.data,
@@ -146,8 +168,22 @@ export async function _searchScripts({
             })),
         ].sort((a, b) => a.position - b.position);
 
+        const problemsArr = [
+            ...problemsDrafts.map(d => ({
+                ...d.data,
+                scriptId: (d.scriptId || d.scriptDraftId)!,
+                problemId: d.problemId || d.problemDraftId,
+                isDraft: true,
+            })),
+            ...problems.map(s => ({
+                ...s.problem,
+                isDraft: false,
+            })),
+        ].sort((a, b) => a.position - b.position);
+
         let scriptsIdsFromItems = [
             ...diagnosesArr.map(d => d.scriptId),
+            ...problemsArr.map(d => d.scriptId),
             ...screensArr.map(s => s.scriptId),
         ];
 
@@ -195,6 +231,11 @@ export async function _searchScripts({
                 scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.title || '',
                 scriptPosition: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.position || 0,
             })) as ParseScriptsSearchResultsParams['diagnoses'],
+            problems: problemsArr.map(d => ({
+                ...d,
+                scriptTitle: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.title || '',
+                scriptPosition: scriptsFromItemsArr.find(script => script.scriptId === d.scriptId)?.position || 0,
+            })) as ParseScriptsSearchResultsParams['problems'],
             scripts: scriptsArr as ParseScriptsSearchResultsParams['scripts'],
         });
 
