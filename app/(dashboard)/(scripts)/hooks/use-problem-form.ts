@@ -32,7 +32,7 @@ export function useProblemForm({
     const { alert } = useAlertModal();
     const { viewOnly, authenticatedUser } = useAppContext();
 
-    const scriptPageHref = useMemo(() => `/script/${scriptId}?section=problems`, [scriptId]);
+    const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
     const isNewProblem = !formData?.problemId;
     const generateProblemId = useCallback(
         () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()),
