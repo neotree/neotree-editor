@@ -94,6 +94,8 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       instructions4: formData?.instructions4 || "",
       hcwDiagnosesInstructions: formData?.hcwDiagnosesInstructions || "",
       suggestedDiagnosesInstructions: formData?.suggestedDiagnosesInstructions || "",
+      hcwProblemsInstructions: formData?.hcwProblemsInstructions || "",
+      suggestedProblemsInstructions: formData?.suggestedProblemsInstructions || "",
       notes: formData?.notes || "",
       dataType: formData?.dataType || "",
       key: formData?.key || "",

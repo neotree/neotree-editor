@@ -2,9 +2,11 @@ import * as schema from '@/databases/pg/schema';
 import { _getScripts } from '@/databases/queries/scripts/_scripts_get';
 import { _getScreens } from '@/databases/queries/scripts/_screens_get';
 import { _getDiagnoses } from '@/databases/queries/scripts/_diagnoses_get';
+import { _getProblems } from '@/databases/queries/scripts/_problems_get';
 import { _saveScripts } from '@/databases/mutations/scripts/_scripts_save';
 import { _saveScreens } from '@/databases/mutations/scripts/_screens_save';
 import { _saveDiagnoses } from '@/databases/mutations/scripts/_diagnoses_save';
+import { _saveProblems } from '@/databases/mutations/scripts/_problems_save';
 
 export type SavePartialParams = {
     broadcastAction?: boolean;
@@ -35,6 +37,15 @@ export type SavePartialParams = {
             }[];
         })>;
     }[];
+    problems?: {
+        problemId: string;
+        data: Partial<(typeof schema.problems.$inferSelect & {
+            _fields?: {
+                index: number;
+                data: any;
+            }[];
+        })>;
+    }[];
 };
 
 export type SavePartialResponse = {
@@ -48,6 +59,7 @@ export async function savePartial({
     scripts: scriptsParam = [],
     screens: screensParam = [],
     diagnoses: diagnosesParam = [],
+    problems: problemsParam = [],
 }: SavePartialParams): Promise<SavePartialResponse> {
     try {
         let errors: string[] = [];
@@ -63,6 +75,10 @@ export async function savePartial({
 
         const diagnoses = !diagnosesParam.length ? { data: [], } : await _getDiagnoses({
             diagnosesIds: diagnosesParam.map(s => s.diagnosisId),
+        });
+
+        const problems = !problemsParam.length ? { data: [], } : await _getProblems({
+            problemsIds: problemsParam.map(s => s.problemId),
         });
 
         if (scripts.data.length) {
@@ -129,6 +145,30 @@ export async function savePartial({
                         ...partialData
                     } = diagnosesParam.find(diagnosis => diagnosis.diagnosisId === d.diagnosisId)?.data as (typeof d & {
                         _fields: NonNullable<SavePartialParams['diagnoses']>[0]['data']['_fields']; // TODO: diagnoses symptoms???
+                    });
+
+                    return {
+                        ...d,
+                        ...partialData,
+                    };
+                }),
+            });
+
+            if (res.errors) errors = [...errors, ...res.errors];
+
+            success = !res.errors?.length || res.success;
+        }
+
+        if (problems.data.length) {
+            const res = await _saveProblems({
+                userId,
+                broadcastAction,
+                data: problems.data.map(d => {
+                    const {
+                        _fields = [],
+                        ...partialData
+                    } = problemsParam.find(problem => problem.problemId === d.problemId)?.data as (typeof d & {
+                        _fields: NonNullable<SavePartialParams['problems']>[0]['data']['_fields']; // TODO: problems symptoms???
                     });
 
                     return {

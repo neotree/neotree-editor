@@ -12,6 +12,7 @@ import {
   configKeys,
   dataKeys,
   diagnoses,
+  problems,
   drugsLibrary,
   hospitals,
   screens,
@@ -40,6 +41,7 @@ export type SaveChangeLogData = {
   scriptId?: string | null
   screenId?: string | null
   diagnosisId?: string | null
+  problemId?: string | null
   configKeyId?: string | null
   drugsLibraryItemId?: string | null
   dataKeyId?: string | null
@@ -57,6 +59,7 @@ const ENTITY_TYPE_TO_FK: Partial<Record<SaveChangeLogData["entityType"], keyof S
   script: "scriptId",
   screen: "screenId",
   diagnosis: "diagnosisId",
+  problem: "problemId",
   config_key: "configKeyId",
   drugs_library: "drugsLibraryItemId",
   data_key: "dataKeyId",
@@ -68,6 +71,7 @@ const ENTITY_TYPE_TO_FK: Partial<Record<SaveChangeLogData["entityType"], keyof S
 const ENTITY_TYPE_ALLOWED_CONTEXT_FKS: Partial<Record<SaveChangeLogData["entityType"], (keyof SaveChangeLogData)[]>> = {
   screen: ["scriptId"],
   diagnosis: ["scriptId"],
+  problem: ["problemId"],
 }
 
 type EntityVersionConfig = {
@@ -90,6 +94,7 @@ const VERSIONED_ENTITY_TYPES = [
   "script",
   "screen",
   "diagnosis",
+  'problem',
   "config_key",
   "drugs_library",
   "data_key",
@@ -105,6 +110,12 @@ const ENTITY_VERSION_CONFIG: Record<VersionedEntityType, EntityVersionConfig> = 
     idColumn: diagnoses.diagnosisId,
     versionColumn: diagnoses.version,
     entityLabel: "diagnosis",
+  },
+  problem: {
+    table: problems,
+    idColumn: problems.problemId,
+    versionColumn: problems.version,
+    entityLabel: "problem",
   },
   config_key: {
     table: configKeys,
@@ -131,6 +142,7 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   script: { table: scripts, idColumn: scripts.scriptId, entityLabel: "script" },
   screen: { table: screens, idColumn: screens.screenId, entityLabel: "screen" },
   diagnosis: { table: diagnoses, idColumn: diagnoses.diagnosisId, entityLabel: "diagnosis" },
+  problem: { table: problems, idColumn: problems.problemId, entityLabel: "problem" },
   config_key: { table: configKeys, idColumn: configKeys.configKeyId, entityLabel: "config key" },
   drugs_library: { table: drugsLibrary, idColumn: drugsLibrary.itemId, entityLabel: "drugs library item" },
   data_key: { table: dataKeys, idColumn: dataKeys.uuid, entityLabel: "data key" },
@@ -356,6 +368,7 @@ async function ensureBaselineChangeLog({
     scriptId: data.scriptId,
     screenId: data.screenId,
     diagnosisId: data.diagnosisId,
+    problemId: data.problemId,
     configKeyId: data.configKeyId,
     hospitalId: data.hospitalId,
     drugsLibraryItemId: data.drugsLibraryItemId,
@@ -506,6 +519,7 @@ export async function _saveChangeLog({
         scriptId: resolvedData.scriptId,
         screenId: resolvedData.screenId,
         diagnosisId: resolvedData.diagnosisId,
+        problemId: resolvedData.problemId,
         configKeyId: resolvedData.configKeyId,
         hospitalId: resolvedData.hospitalId,
         drugsLibraryItemId: resolvedData.drugsLibraryItemId,

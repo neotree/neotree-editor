@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, } from "@/databases/pg/schema";
+import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, problemsDrafts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
 import { _getScreens } from "./_screens_get";
@@ -290,10 +290,12 @@ export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
     const data: {
         hasDraftedScreens: boolean;
         hasDraftedDiagnoses: boolean;
+        hasDraftedProblems: boolean;
         hasDeletedItems: boolean;
         hasChangedItems: boolean;
         screensDraftsCreatedByUserId: string | null | undefined;
         diagnosesDraftsCreatedByUserId: string | null | undefined;
+        problemsDraftsCreatedByUserId: string | null | undefined;
         itemsDeletedByUserId: string | null | undefined;
         itemsChangedByUserId: string | null | undefined;
     }[] = [];
@@ -320,11 +322,22 @@ export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
                 },
             });
 
+            const problemDraft = await db.query.problemsDrafts.findFirst({
+                where: or(
+                    eq(problemsDrafts.scriptDraftId, scriptId),
+                    eq(problemsDrafts.scriptId, scriptId),
+                ),
+                columns: {
+                    createdByUserId: true,
+                },
+            });
+
             const _pendingDeletion = await db.query.pendingDeletion.findMany({
                 where: or(
                     eq(pendingDeletion.scriptDraftId, scriptId),
                     eq(pendingDeletion.screenScriptId, scriptId),
                     eq(pendingDeletion.diagnosisScriptId, scriptId),
+                    eq(pendingDeletion.problemScriptId, scriptId),
                     // eq(pendingDeletion.scriptId, scriptId),
                 ),
                 columns: {
@@ -337,12 +350,14 @@ export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
             const _data: typeof data[0] = {
                 hasDraftedScreens: !!screenDraft?.createdByUserId,
                 hasDraftedDiagnoses: !!diagnosisDraft?.createdByUserId,
+                hasDraftedProblems: !!problemDraft?.createdByUserId,
                 hasDeletedItems: !!_pendingDeletion?.length,
-                hasChangedItems: !!screenDraft?.createdByUserId || !!diagnosisDraft?.createdByUserId || !!_pendingDeletion?.length,
+                hasChangedItems: !!screenDraft?.createdByUserId || !!diagnosisDraft?.createdByUserId || !!problemDraft?.createdByUserId || !!_pendingDeletion?.length,
                 screensDraftsCreatedByUserId: screenDraft?.createdByUserId,
                 diagnosesDraftsCreatedByUserId: diagnosisDraft?.createdByUserId,
+                problemsDraftsCreatedByUserId: problemDraft?.createdByUserId,
                 itemsDeletedByUserId: pendingDeletionBy?.createdByUserId,
-                itemsChangedByUserId: screenDraft?.createdByUserId || diagnosisDraft?.createdByUserId || pendingDeletionBy?.createdByUserId,
+                itemsChangedByUserId: screenDraft?.createdByUserId || diagnosisDraft?.createdByUserId || problemDraft?.createdByUserId || pendingDeletionBy?.createdByUserId,
             };
 
             data.push(_data);

@@ -125,6 +125,25 @@ export function ScriptsTable(props: Props) {
                                     }).filter(f => f.isMatch),
                                 };
                             }),
+                            ...searchResults.problems.map(s => {
+                                const link = `/script/${searchResults.scriptId}/problem/${s.problemId}`;
+                                return {
+                                    id: s.problemId,
+                                    title: s.title,
+                                    type: 'problem',
+                                    link,
+                                    fields: s.fields.map((f, i) => {
+                                        const isMatch = !!s.matches.find(m => m.fieldIndex === i);
+                                        return {
+                                            id: i,
+                                            title: f.label,
+                                            type: f.type,
+                                            link: `${link}?`,
+                                            isMatch,
+                                        };
+                                    }).filter(f => f.isMatch),
+                                };
+                            }),
                         ];
 
                         return (

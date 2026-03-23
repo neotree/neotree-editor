@@ -8,6 +8,7 @@ import {
   scripts,
   screensDrafts,
   diagnosesDrafts,
+  problemsDrafts,
   pendingDeletion,
   scriptsHistory,
   scriptsDrafts,
@@ -16,6 +17,7 @@ import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
 import { _publishScreens } from "./_screens_publish"
 import { _publishDiagnoses } from "./_diagnoses_publish"
+import { _publishProblems } from "./_problems_publish"
 
 export async function _publishScripts({
   userId,
@@ -114,6 +116,11 @@ export async function _publishScripts({
           .update(diagnosesDrafts)
           .set({ scriptId })
           .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
+
+        await db
+          .update(problemsDrafts)
+          .set({ scriptId })
+          .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
       }
       const insertChangeLogs = await _saveScriptsHistory({
         drafts: inserts,
@@ -142,6 +149,14 @@ export async function _publishScripts({
         dataVersion,
       })
       if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(", "))
+
+      const publishProblems = await _publishProblems({
+        userId,
+        publisherUserId,
+        scriptsIds: processedScripts.map((s) => s.scriptId),
+        dataVersion,
+      })
+      if (publishProblems.errors) throw new Error(publishProblems.errors.join(", "))
     }
 
     let deleted = await db.query.pendingDeletion.findMany({

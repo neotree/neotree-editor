@@ -29,6 +29,7 @@ import { ScriptItemsFab } from "./script-items-fab";
 import { useScriptForm } from "../hooks/use-script-form";
 import { PreferencesForm } from "@/components/preferences-form";
 import Screens from './screens';
+import Problems from './problems';
 import Diagnoses from './diagnoses';
 import { ScriptPrintSetup } from './print';
 import { Separator } from "@/components/ui/separator";
@@ -312,11 +313,21 @@ export function ScriptForm(props: Props) {
                     )}
 
                     {section === 'diagnoses' && (
-                        <Diagnoses
-                            scriptId={props.formData.scriptId!}
-                            isScriptLocked={isLocked}
-                            scriptLockedByUserId={lockedByUserId}
-                        />
+                        <>
+                            <Diagnoses
+                                scriptId={props.formData.scriptId!}
+                                isScriptLocked={isLocked}
+                                scriptLockedByUserId={lockedByUserId}
+                            />
+
+                            <br /><br />
+
+                            <Problems
+                                scriptId={props.formData.scriptId!}
+                                isScriptLocked={isLocked}
+                                scriptLockedByUserId={lockedByUserId}
+                            />
+                        </>
                     )}
 
                     {section === 'print' && (

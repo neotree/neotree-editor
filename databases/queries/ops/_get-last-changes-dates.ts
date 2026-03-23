@@ -4,10 +4,12 @@ import logger from '@/lib/logger';
 import { 
     configKeys, 
     diagnoses,
+    problems,
     screens, 
     scripts,
     configKeysDrafts,
     diagnosesDrafts,
+    problemsDrafts,
     screensDrafts,
     scriptsDrafts ,
     pendingDeletion
@@ -17,10 +19,12 @@ import db from '../../pg/drizzle';
 export const defaultChangesDates = {
     configKeys: null as null | Date, 
     diagnoses: null as null | Date,
+    problems: null as null | Date,
     screens: null as null | Date, 
     scripts: null as null | Date,
     configKeysDrafts: null as null | Date,
     diagnosesDrafts: null as null | Date,
+    problemsDrafts: null as null | Date,
     screensDrafts: null as null | Date,
     scriptsDrafts: null as null | Date ,
     pendingDeletion: null as null | Date,
@@ -43,6 +47,11 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
             .from(diagnosesDrafts).orderBy(desc(diagnosesDrafts.updatedAt))
             .limit(1);
 
+        const problemsDraftsRes = await db
+            .select({ problemsDrafts: problemsDrafts.updatedAt, })
+            .from(problemsDrafts).orderBy(desc(problemsDrafts.updatedAt))
+            .limit(1);
+
         const screensDraftsRes = await db
             .select({ screensDrafts: screensDrafts.updatedAt, })
             .from(screensDrafts).orderBy(desc(screensDrafts.updatedAt))
@@ -61,6 +70,11 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
         const diagnosesRes = await db
             .select({ diagnoses: diagnoses.updatedAt, })
             .from(diagnoses).orderBy(desc(diagnoses.updatedAt))
+            .limit(1);
+
+        const problemsRes = await db
+            .select({ problems: problems.updatedAt, })
+            .from(problems).orderBy(desc(problems.updatedAt))
             .limit(1);
 
         const screensRes = await db
@@ -82,10 +96,12 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
             ...defaultChangesDates,
             ...configKeysDraftsRes[0],
             ...diagnosesDraftsRes[0],
+            ...problemsDraftsRes[0],
             ...screensDraftsRes[0],
             ...scriptsDraftsRes[0],
             ...configKeysRes[0],
             ...diagnosesRes[0],
+            ...problemsRes[0],
             ...screensRes[0],
             ...scriptsRes[0],
             ...pendingDeletionRes[0],
