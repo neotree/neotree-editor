@@ -5,6 +5,7 @@ import {
     configKeysDrafts,
     hospitalsDrafts,
     diagnosesDrafts,
+    problemsDrafts,
     screensDrafts,
     scriptsDrafts ,
     pendingDeletion,
@@ -29,6 +30,7 @@ export const defaultCountDraftsData = {
     scripts: 0,
     screens: 0,
     diagnoses: 0,
+    problems: 0,
     configKeys: 0,
     hospitals: 0,
     drugsLibraryItems: 0,
@@ -50,6 +52,9 @@ export async function _countDrafts(): Promise<typeof defaultCountDraftsData & {
 
         const diagnoses = await db.select({ count: count(), }).from(diagnosesDrafts);
         data.diagnoses = diagnoses[0]?.count || 0;
+
+        const problems = await db.select({ count: count(), }).from(problemsDrafts);
+        data.problems = problems[0]?.count || 0;
 
         const configKeys = await db.select({ count: count(), }).from(configKeysDrafts);
         data.configKeys = configKeys[0]?.count || 0;

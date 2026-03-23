@@ -10,6 +10,7 @@ import {
   configKeys,
   dataKeys,
   diagnoses,
+  problems,
   drugsLibrary,
   editorInfo,
   hospitals,
@@ -65,6 +66,15 @@ const ENTITY_BINDINGS: Partial<Record<(typeof changeLogs.$inferSelect)["entityTy
     table: diagnoses,
     pk: diagnoses.diagnosisId,
     pkKey: "diagnosisId",
+    versionKey: "version",
+    publishDateKey: "publishDate",
+    numericKeys: ["position", "severityOrder"],
+    timestampKeys: ["publishDate", "createdAt", "updatedAt", "deletedAt"],
+  },
+  problem: {
+    table: problems,
+    pk: problems.problemId,
+    pkKey: "problemId",
     versionKey: "version",
     publishDateKey: "publishDate",
     numericKeys: ["position", "severityOrder"],
@@ -406,7 +416,7 @@ export async function _rollbackDataVersion({
           createdInCurrentVersion: effectiveScriptTarget.dataVersion === currentDataVersion,
         })
 
-        const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis"]
+        const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis", "problem"]
         for (const childType of childTypes) {
           const children = currentChanges.filter(
             (c) => c.entityType === childType && c.scriptId === scriptChange.scriptId,
@@ -472,6 +482,7 @@ export async function _rollbackDataVersion({
             scriptId: current.scriptId,
             screenId: current.screenId,
             diagnosisId: current.diagnosisId,
+            problemId: current.problemId,
             configKeyId: current.configKeyId,
             drugsLibraryItemId: current.drugsLibraryItemId,
             dataKeyId: current.dataKeyId,
@@ -548,6 +559,7 @@ export async function _rollbackDataVersion({
           scriptId: current.scriptId,
           screenId: current.screenId,
           diagnosisId: current.diagnosisId,
+          problemId: current.problemId,
           configKeyId: current.configKeyId,
           drugsLibraryItemId: current.drugsLibraryItemId,
           dataKeyId: current.dataKeyId,

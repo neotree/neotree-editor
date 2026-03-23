@@ -10,3 +10,7 @@ export * from './_screens_publish';
 export * from './_diagnoses_save';
 export * from './_diagnoses_delete';
 export * from './_diagnoses_publish';
+
+export * from './_problems_save';
+export * from './_problems_delete';
+export * from './_problems_publish';

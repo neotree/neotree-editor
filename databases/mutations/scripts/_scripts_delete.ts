@@ -6,6 +6,7 @@ import { scripts, scriptsDrafts, pendingDeletion, } from '@/databases/pg/schema'
 import socket from '@/lib/socket';
 import { _deleteScreens } from './_screens_delete';
 import { _deleteDiagnoses } from './_diagnoses_delete';
+import { _deleteProblems } from './_problems_delete';
 
 export type DeleteScriptsData = {
     scriptsIds?: string[];
@@ -68,6 +69,7 @@ export async function _deleteScripts(
             await db.insert(pendingDeletion).values(scriptsToDelete.map(s => ({ scriptId: s.scriptId, })));
             await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
             await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
+            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
         }
 
         response.success = true;
