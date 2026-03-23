@@ -182,6 +182,7 @@ export function useDiagnosesTable({
             searchValue: value,
             screens: [],
             scripts: [],
+            problems: [],
             diagnoses: diagnoses.data.map(d => ({
               ...d,
               scriptTitle: '',

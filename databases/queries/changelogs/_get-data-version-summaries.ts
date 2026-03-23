@@ -85,6 +85,7 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
       script: ["script", "scripts"],
       screen: ["screen", "screens"],
       diagnosis: ["diagnosis", "diagnoses"],
+      problem: ["problem", "problems"],
       config_key: ["config key", "config keys", "config-key", "configkey", "configkeys"],
       drugs_library: ["drugs library", "drug library", "drugs-library", "drug-library", "drugs library item"],
       data_key: ["data key", "data keys", "data-key", "datakey", "datakeys"],

@@ -1,4 +1,4 @@
-import { configKeys, diagnoses, screens, scripts } from "@/databases/pg/schema";
+import { configKeys, diagnoses, problems, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
@@ -70,6 +70,51 @@ export function mapNewDiagnosisToOld(s: typeof diagnoses.$inferSelect) {
     };
 }
 
+export function mapNewProblemToOld(s: typeof problems.$inferSelect) {
+    return {
+        id: s.id,
+        problem_id: s.problemId,
+        position: s.position,
+        script_id: s.oldScriptId || s.scriptId,
+        deletedAt: s.deletedAt,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        data: {
+            createdAt: s.createdAt,
+            description: s.description,
+            diagnosisId: s.problemId,
+            expression: s.expression,
+            name: s.name,
+            source: s.source,
+            updatedAt: s.updatedAt,
+            diagnosis_id: s.problemId,
+            scriptId: s.oldScriptId || s.scriptId,
+            script_id: s.oldScriptId || s.scriptId,
+            position: s.position,
+            image1: !s.image1 ? null : {
+                ...s.image1,
+                data: (s.image1 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
+            },
+            image2: !s.image2 ? null : {
+                ...s.image2,
+                data: (s.image2 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image2,
+            },
+            image3: !s.image3 ? null : {
+                ...s.image3,
+                data: (s.image3 as any)?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image3,
+            },
+            text1: s.text1,
+            text2: s.text2,
+            text3: s.text3,
+            deletedAt: s.deletedAt,
+            expressionMeaning: s.expressionMeaning,
+            key: s.key,
+            severity_order: s.severityOrder,
+            preferences: s.preferences,
+        },
+    };
+}
+
 export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
     return {
         id: s.id,
@@ -107,6 +152,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             instructions4: s.instructions4,
             hcwDiagnosesInstructions: s.hcwDiagnosesInstructions,
             suggestedDiagnosesInstructions: s.suggestedDiagnosesInstructions,
+            hcwProblemsInstructions: s.hcwProblemsInstructions,
+            suggestedProblemsInstructions: s.suggestedProblemsInstructions,
             notes: s.notes,
             type: s.type,
             screenId: s.oldScreenId || s.screenId,

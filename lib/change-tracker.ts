@@ -2,7 +2,7 @@ import { pendingChangesAPI } from "./indexed-db"
 
 export interface ChangeTrackerOptions {
   entityId: string
-  entityType: "script" | "screen" | "diagnosis" | "configKey" | "drugsLibraryItem" | "dataKey" | "alias"
+  entityType: "script" | "screen" | "diagnosis" | "problem" | "configKey" | "drugsLibraryItem" | "dataKey" | "alias"
   userId?: string
   userName?: string
   entityTitle?: string

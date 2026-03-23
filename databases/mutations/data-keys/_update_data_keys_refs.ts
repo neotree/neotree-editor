@@ -3,9 +3,9 @@ import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import socket from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
-import { diagnoses, diagnosesDrafts, screens, screensDrafts } from '@/databases/pg/schema';
-import { _getScreens, _getDiagnoses } from '@/databases/queries/scripts';
-import { _saveScreens, _saveDiagnoses } from '@/databases/mutations/scripts';
+import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts } from '@/databases/pg/schema';
+import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
+import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
 import { buildNormalizedDataKeyMatchKey } from '@/lib/data-key-types';
 
@@ -28,10 +28,13 @@ type UpdateStats = {
     candidateScripts: number;
     fetchedScreens: number;
     fetchedDiagnoses: number;
+    fetchedProblems: number;
     updatedScreens: number;
     updatedDiagnoses: number;
+    updatedProblems: number;
     savedScreens: number;
     savedDiagnoses: number;
+    savedProblems: number;
     chunkRetries: number;
     matchedByUniqueKey: number;
     matchedByLegacyName: number;
@@ -44,18 +47,19 @@ type AffectedEntity = {
     scriptId: string;
     scriptTitle?: string;
     title: string;
-    type: 'screen' | 'diagnosis';
+    type: 'screen' | 'diagnosis' | 'problem';
 };
 
 type AffectedUsage = {
     id: string;
-    kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom';
+    kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem';
     title: string;
     location: string;
     scriptId: string;
     scriptTitle?: string;
     screenId?: string;
     diagnosisId?: string;
+    problemId?: string;
     screenItemIndex?: number;
     fieldIndex?: number;
     fieldItemIndex?: number;
@@ -70,6 +74,7 @@ export type UpdateDataKeysRefsResponse = {
         scripts: { scriptId: string; scriptTitle?: string; }[];
         screens: AffectedEntity[];
         diagnoses: AffectedEntity[];
+        problems: AffectedEntity[];
         usages: AffectedUsage[];
     };
 };
@@ -140,10 +145,13 @@ export async function _updateDataKeysRefs({
             candidateScripts: 0,
             fetchedScreens: 0,
             fetchedDiagnoses: 0,
+            fetchedProblems: 0,
             updatedScreens: 0,
             updatedDiagnoses: 0,
+            updatedProblems: 0,
             savedScreens: 0,
             savedDiagnoses: 0,
+            savedProblems: 0,
             chunkRetries: 0,
             matchedByUniqueKey: 0,
             matchedByLegacyName: 0,
@@ -391,6 +399,22 @@ export async function _updateDataKeysRefs({
                 if (row.scriptId) candidateScripts.add(row.scriptId);
             });
 
+            const problemsPublishedCandidates = await db
+                .select({ scriptId: problems.scriptId })
+                .from(problems)
+                .where(and(
+                    isNull(problems.deletedAt),
+                    or(
+                        changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
+                        oldNamesArr.length ? inArray(problems.key, oldNamesArr) : undefined,
+                        oldLabelsArr.length ? inArray(problems.name, oldLabelsArr) : undefined,
+                    ),
+                ));
+
+            problemsPublishedCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+            });
+
             if (likePatterns.length) {
                 const screensDraftCandidates = await db
                     .select({
@@ -417,6 +441,19 @@ export async function _updateDataKeysRefs({
                     if (row.scriptId) candidateScripts.add(row.scriptId);
                     if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
                 });
+
+                const problemsDraftCandidates = await db
+                    .select({
+                        scriptId: problemsDrafts.scriptId,
+                        scriptDraftId: problemsDrafts.scriptDraftId,
+                    })
+                    .from(problemsDrafts)
+                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, likePatterns));
+
+                problemsDraftCandidates.forEach(row => {
+                    if (row.scriptId) candidateScripts.add(row.scriptId);
+                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+                });
             }
         }
 
@@ -438,6 +475,7 @@ export async function _updateDataKeysRefs({
                     scripts: [],
                     screens: [],
                     diagnoses: [],
+                    problems: [],
                     usages: [],
                 },
             };
@@ -451,6 +489,10 @@ export async function _updateDataKeysRefs({
             scriptsIds?.length ? { scriptsIds } : undefined
         );
 
+        const { data: problemsArr, errors: problemsGetErrors } = await _getProblems(
+            scriptsIds?.length ? { scriptsIds } : undefined
+        );
+
         const prefetchErrors = [
             ...(screensGetErrors || []),
             ...(diagnosesGetErrors || []),
@@ -461,6 +503,7 @@ export async function _updateDataKeysRefs({
 
         stats.fetchedScreens = screensArr.length;
         stats.fetchedDiagnoses = diagnosesArr.length;
+        stats.fetchedProblems = problemsArr.length;
 
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
             const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
@@ -732,8 +775,45 @@ export async function _updateDataKeysRefs({
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
+        let problemsUpdatedData: typeof problemsArr = problemsArr.map(d => {
+            const name = d.key || d.name || '';
+            const { dataKey: problemDataKey, source: problemMatchSource } = getUpdatedDataKey({
+                uniqueKey: d.keyId,
+                key: d.key,
+                label: d.name,
+                dataType: 'problem',
+            });
+            trackMatchSource(problemMatchSource);
+
+            if (problemDataKey) {
+                addUsage({
+                    id: d.problemId,
+                    kind: 'problem',
+                    title: d.name || d.key || d.problemId,
+                    location: 'Problem',
+                    scriptId: d.scriptId,
+                    scriptTitle: d.scriptTitle || undefined,
+                    diagnosisId: d.problemId,
+                });
+            }
+
+            let updated = !!problemDataKey;
+
+            return {
+                ...d,
+                key: name,
+                updated,
+                ...(!problemDataKey ? {} : {
+                    keyId: problemDataKey.uniqueKey,
+                    key: problemDataKey.name,
+                    name: problemDataKey.label,
+                }),
+            };
+        }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
+
         stats.updatedScreens = screensUpdatedData.length;
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
+        stats.updatedProblems = problemsUpdatedData.length;
 
         const affectedScreens: AffectedEntity[] = screensUpdatedData.map(s => ({
             id: s.screenId,
@@ -749,6 +829,13 @@ export async function _updateDataKeysRefs({
             title: d.name || d.key || d.diagnosisId,
             type: 'diagnosis',
         }));
+        const affectedProblems: AffectedEntity[] = problemsUpdatedData.map(d => ({
+            id: d.problemId,
+            scriptId: d.scriptId,
+            scriptTitle: d.scriptTitle || undefined,
+            title: d.name || d.key || d.problemId,
+            type: 'problem',
+        }));
         const affectedScriptsMap: { [key: string]: { scriptId: string; scriptTitle?: string; }; } = {};
         [...affectedScreens, ...affectedDiagnoses].forEach(entity => {
             if (!entity.scriptId) return;
@@ -763,6 +850,7 @@ export async function _updateDataKeysRefs({
             scripts: Object.values(affectedScriptsMap),
             screens: affectedScreens,
             diagnoses: affectedDiagnoses,
+            problems: affectedProblems,
             usages: Array.from(usagesMap.values()),
         };
 
@@ -795,6 +883,25 @@ export async function _updateDataKeysRefs({
             }
         };
 
+        const saveProblemsTask = async () => {
+            for (const chunk of chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE)) {
+                const res = await _saveProblems({ data: chunk, userId, });
+                if (res.errors?.length) {
+                    stats.chunkRetries++;
+                    await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (problem) => {
+                        const singleRes = await _saveDiagnoses({ data: [problem], userId, });
+                        if (singleRes.errors?.length) {
+                            saveErrors.push(...singleRes.errors.map(e => `[problem:${problem.problemId}] ${e}`));
+                        } else {
+                            stats.savedProblems++;
+                        }
+                    });
+                } else {
+                    stats.savedProblems += chunk.length;
+                }
+            }
+        };
+
         const saveScreensTask = async () => {
             for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
                 const res = await _saveScreens({ data: chunk, userId, });
@@ -814,7 +921,7 @@ export async function _updateDataKeysRefs({
             }
         };
 
-        await Promise.all([saveDiagnosesTask(), saveScreensTask()]);
+        await Promise.all([saveDiagnosesTask(), saveProblemsTask(), saveScreensTask()]);
 
         if (saveErrors.length) {
             return {
@@ -825,7 +932,7 @@ export async function _updateDataKeysRefs({
             };
         }
 
-        const saved = stats.savedDiagnoses + stats.savedScreens;
+        const saved = stats.savedDiagnoses + stats.savedProblems + stats.savedScreens;
         if (broadcastAction && saved) socket.emit('data_changed', 'save_scripts');
 
         return { success: true, info: stats, affected };
