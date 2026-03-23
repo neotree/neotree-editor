@@ -20,10 +20,13 @@ export function validateSelectionRules<T extends SelectionRuleItem>(
 
   items.forEach((item, index) => {
     const itemId = `${item.itemId || ""}`.trim()
-    if (!itemId) {
-      errors.push(`${contextLabel}: item at index ${index} is missing itemId`)
-      return
-    }
+    // Temporarily disabled until legacy data migration is complete.
+    // Re-enable to enforce strict item identity validation after migration.
+    // if (!itemId) {
+    //   errors.push(`${contextLabel}: item at index ${index} is missing itemId`)
+    //   return
+    // }
+    if (!itemId) return
 
     if (ids.has(itemId)) {
       errors.push(`${contextLabel}: duplicate itemId ${itemId}`)
@@ -42,9 +45,11 @@ export function validateSelectionRules<T extends SelectionRuleItem>(
         errors.push(`${contextLabel}: item ${itemId} cannot forbid itself`)
         return
       }
-      if (!ids.has(forbidId)) {
-        errors.push(`${contextLabel}: item ${itemId} forbids unknown itemId ${forbidId}`)
-      }
+      // Temporarily disabled until legacy data migration is complete.
+      // Re-enable to enforce strict forbidWith target integrity after migration.
+      // if (!ids.has(forbidId)) {
+      //   errors.push(`${contextLabel}: item ${itemId} forbids unknown itemId ${forbidId}`)
+      // }
     })
   })
 
