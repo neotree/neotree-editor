@@ -152,6 +152,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             instructions4: s.instructions4,
             hcwDiagnosesInstructions: s.hcwDiagnosesInstructions,
             suggestedDiagnosesInstructions: s.suggestedDiagnosesInstructions,
+            hcwProblemsInstructions: s.hcwProblemsInstructions,
+            suggestedProblemsInstructions: s.suggestedProblemsInstructions,
             notes: s.notes,
             type: s.type,
             screenId: s.oldScreenId || s.screenId,
