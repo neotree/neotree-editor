@@ -55,6 +55,8 @@ export type ScreenFormDataType = Parameters<IScriptsContext['saveScreens']>[0]['
 
 export type DiagnosisFormDataType = Parameters<IScriptsContext['saveDiagnoses']>[0]['data'][0];
 
+export type ProblemFormDataType = Parameters<IScriptsContext['saveProblems']>[0]['data'][0];
+
 function useScriptsContentHook({}: ScriptsContextProviderProps) {
     const router = useRouter();
     const { scriptId, } = useParams();

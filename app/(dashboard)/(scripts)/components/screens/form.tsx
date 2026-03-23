@@ -39,7 +39,7 @@ import { ScreenFormDataType } from "@/contexts/scripts";
 import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
-import { WHY_DIAGNOSIS_OPTION_DISABLED } from "@/constants/copy";
+import { WHY_DIAGNOSIS_OPTION_DISABLED, WHY_PROBLEMS_OPTION_DISABLED, } from "@/constants/copy";
 import { Separator } from "@/components/ui/separator";
 import edlizSummaryData from "@/constants/edliz-summary-table";
 import { ScriptField, ScriptItem } from "@/types";
@@ -62,6 +62,7 @@ type Props = {
     scriptId: string;
     formData?: ScreenFormDataType;
     countDiagnosesScreens?: number;
+    countProblemsScreens?: number;
     screens: Awaited<ReturnType<typeof listScreens>>['data'];
     script?: ScriptType;
 };
@@ -71,6 +72,7 @@ export function ScreenForm(props: Props) {
         formData,
         scriptId,
         countDiagnosesScreens,
+        countProblemsScreens,
         screens,
     } = props;
 
@@ -178,10 +180,17 @@ export function ScreenForm(props: Props) {
                             {screenTypes.map(t => {
                                 let disabled = false;
                                 let helperText = '';
+
                                 if (t.value === 'diagnosis') {
                                     disabled = !!countDiagnosesScreens;
                                     helperText = !disabled ? '' : WHY_DIAGNOSIS_OPTION_DISABLED;
                                 }
+
+                                if (t.value === 'problems') {
+                                    disabled = !!countProblemsScreens;
+                                    helperText = !disabled ? '' : WHY_PROBLEMS_OPTION_DISABLED;
+                                }
+
                                 return (
                                     <div key={t.value} className="flex items-center space-x-2">
                                         <RadioGroupItem
@@ -238,6 +247,7 @@ export function ScreenForm(props: Props) {
     }
 
     const isDiagnosisScreen = type === 'diagnosis';
+    const isProblemsScreen = type === 'problems';
     const isProgressScreen = type === 'progress';
     const isFormScreen = type === 'form';
     const isChecklistScreen = type === 'checklist';
@@ -253,8 +263,8 @@ export function ScreenForm(props: Props) {
     const isDrugsScreen = type === 'drugs';
     const isFluidsScreen = type === 'fluids';
     const canConfigureNuidSearch = isYesNoScreen || isSelectScreen || isTimerScreen;
-    const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen || isFormScreen;
-    const hasItems = isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen;
+    const canConfigurePrint = isYesNoScreen || isSelectScreen || isTimerScreen || isManagementScreen || isDiagnosisScreen || isProblemsScreen || isFormScreen;
+    const hasItems = isSingleSelectScreen || isMultiSelectScreen || isChecklistScreen || isProgressScreen || isDiagnosisScreen || isProblemsScreen;
     const hasFields = isFormScreen;
 
     const hasSinglePrintColumnField = isMultiSelectScreen;
@@ -524,7 +534,7 @@ export function ScreenForm(props: Props) {
                     />
                 </div>
 
-                {isDiagnosisScreen && (
+                {(isDiagnosisScreen || isProblemsScreen) && (
                     <>
                         <div>
                             <Label secondary htmlFor="title2">Title 2 *</Label>
@@ -877,40 +887,6 @@ export function ScreenForm(props: Props) {
 
                 {isDiagnosisScreen && (
                     <>
-                        {/* <div>
-                            <Label secondary htmlFor="instructions2">Instructions 2</Label>
-                            <Textarea
-                                {...register('instructions2', { disabled, })}
-                                name="instructions2"
-                                noRing={false}
-                                rows={5}
-                            />
-                            <PreferencesForm
-                                id="instructions2"
-                                title="Instructions 2"
-                                disabled={disabled}
-                                data={preferences}
-                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                            />
-                        </div>
-
-                        <div>
-                            <Label secondary htmlFor="instructions3">Instructions 3</Label>
-                            <Textarea
-                                {...register('instructions3', { disabled, })}
-                                name="instructions3"
-                                noRing={false}
-                                rows={5}
-                            />
-                            <PreferencesForm
-                                id="instructions3"
-                                title="Instructions 3"
-                                disabled={disabled}
-                                data={preferences}
-                                onSave={data => setValue('preferences', data, { shouldDirty: true, })}
-                            />
-                        </div> */}
-
                         <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                             <div>
                                 <Label secondary htmlFor="hcwDiagnosesInstructions">HCW diagnoses instructions</Label>
@@ -940,6 +916,46 @@ export function ScreenForm(props: Props) {
                                 <PreferencesForm
                                     id="suggestedDiagnosesInstructions"
                                     title="Suggested diagnoses instructions"
+                                    disabled={disabled}
+                                    data={preferences}
+                                    onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                />
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {isProblemsScreen && (
+                    <>
+                        <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
+                            <div>
+                                <Label secondary htmlFor="hcwProblemsInstructions">HCW problems instructions</Label>
+                                <Textarea
+                                    {...register('hcwProblemsInstructions', { disabled, })}
+                                    name="hcwProblemsInstructions"
+                                    noRing={false}
+                                    rows={5}
+                                />
+                                <PreferencesForm
+                                    id="hcwProblemsInstructions"
+                                    title="HCW problems instructions"
+                                    disabled={disabled}
+                                    data={preferences}
+                                    onSave={data => setValue('preferences', data, { shouldDirty: true, })}
+                                />
+                            </div>
+
+                            <div>
+                                <Label secondary htmlFor="suggestedProblemsInstructions">Suggested problems instructions</Label>
+                                <Textarea
+                                    {...register('suggestedProblemsInstructions', { disabled, })}
+                                    name="suggestedProblemsInstructions"
+                                    noRing={false}
+                                    rows={5}
+                                />
+                                <PreferencesForm
+                                    id="suggestedProblemsInstructions"
+                                    title="Suggested problems instructions"
                                     disabled={disabled}
                                     data={preferences}
                                     onSave={data => setValue('preferences', data, { shouldDirty: true, })}
@@ -1103,7 +1119,7 @@ export function ScreenForm(props: Props) {
                     </>
                 )}
 
-                {(isChecklistScreen || isMultiSelectScreen || isEdlizScreen || isDiagnosisScreen) && (
+                {(isChecklistScreen || isMultiSelectScreen || isEdlizScreen || isDiagnosisScreen || isProblemsScreen) && (
                     <>
                         <div>
                             <Label secondary htmlFor="listStyle">List style</Label>

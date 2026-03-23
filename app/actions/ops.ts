@@ -79,6 +79,7 @@ export const countAllDrafts = async () => {
     const screens = await scriptsQueries._countScreens()
     const scripts = await scriptsQueries._countScripts()
     const diagnoses = await scriptsQueries._countDiagnoses()
+    const problems = await scriptsQueries._countProblems()
 
     return {
       configKeys: configKeys.data.allDrafts,
@@ -87,6 +88,7 @@ export const countAllDrafts = async () => {
       screens: screens.data.allDrafts,
       scripts: scripts.data.allDrafts,
       diagnoses: diagnoses.data.allDrafts,
+      problems: problems.data.allDrafts,
       dataKeys: dataKeys.data.allDrafts,
     }
   } catch (e: any) {
@@ -97,6 +99,7 @@ export const countAllDrafts = async () => {
       configKeys: 0,
       hospitals: 0,
       diagnoses: 0,
+      problems: 0,
     }
   }
 }
@@ -115,6 +118,8 @@ export async function publishData({
       "update_scripts",
       "create_diagnoses",
       "update_diagnoses",
+      "create_problems",
+      "update_problems",
       "create_screens",
       "update_screens",
     ])
@@ -168,6 +173,11 @@ export async function publishData({
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    const publishProblems = await scriptsMutations._publishProblems({
+      userId,
+      publisherUserId,
+      dataVersion: nextDataVersion,
+    })
     const processPendingDeletion = await _processPendingDeletion({
       userId,
       publisherUserId: publisherUserId || undefined,
@@ -206,6 +216,11 @@ export async function publishData({
     if (publishDiagnoses.errors) {
       results.success = false
       results.errors = [...(results.errors || []), ...publishDiagnoses.errors]
+    }
+
+    if (publishProblems.errors) {
+      results.success = false
+      results.errors = [...(results.errors || []), ...publishProblems.errors]
     }
 
     if (processPendingDeletion.errors) {
@@ -276,7 +291,7 @@ export async function discardDrafts({
 }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
-    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_screens"])
+    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_diagnoses", "delete_screens"])
 
     let userId = session?.user?.userId
 
@@ -289,6 +304,7 @@ export async function discardDrafts({
     await scriptsMutations._deleteAllScriptsDrafts({ userId })
     await scriptsMutations._deleteAllScreensDrafts({ userId })
     await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
+    await scriptsMutations._deleteAllProblemsDrafts({ userId })
     await _clearPendingDeletion({ userId })
 
     socket.emit("data_changed", "discard_drafts")

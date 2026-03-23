@@ -9,8 +9,10 @@ type DataKeyUsage = {
         fetchedDiagnoses: number;
         updatedScreens: number;
         updatedDiagnoses: number;
+        updatedProblems: number;
         savedScreens: number;
         savedDiagnoses: number;
+        savedProblems: number;
         chunkRetries: number;
         matchedByUniqueKey: number;
         matchedByLegacyName: number;
@@ -19,11 +21,12 @@ type DataKeyUsage = {
     };
     affected?: {
         scripts: { scriptId: string; scriptTitle?: string }[];
-        screens: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
-        diagnoses: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' }[];
+        screens: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' | 'problem', }[];
+        diagnoses: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' | 'problem', }[];
+        problems: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' | 'problem', }[];
         usages: {
             id: string;
-            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom';
+            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem';
             title: string;
             location: string;
             scriptId: string;

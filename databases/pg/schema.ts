@@ -64,6 +64,7 @@ export const scriptTypeEnum = pgEnum("script_type", ["admission", "discharge", "
 // SCREEN TYPES ENUM
 export const screenTypeEnum = pgEnum("screen_type", [
   "diagnosis",
+  "problems",
   "checklist",
   "form",
   "management",
@@ -103,6 +104,7 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "script",
   "screen",
   "diagnosis",
+  "problem",
   "config_key",
   "drugs_library",
   "data_key",
@@ -581,6 +583,9 @@ export const scriptsRelations = relations(scripts, ({ many, one }) => ({
   diagnoses: many(diagnoses),
   diagnosesDrafts: many(diagnosesDrafts),
   diagnosesHistory: many(diagnosesHistory),
+  problems: many(problems),
+  problemsDrafts: many(problemsDrafts),
+  problemsHistory: many(problemsHistory),
   history: many(scriptsHistory),
   drugsLibrary: many(drugsLibrary),
   draft: one(scriptsDrafts, {
@@ -613,6 +618,7 @@ export const scriptsDrafts = pgTable("nt_scripts_drafts", {
 export const scriptsDraftsRelations = relations(scriptsDrafts, ({ one, many }) => ({
   screensDrafts: many(screensDrafts),
   diagnosesDrafts: many(diagnosesDrafts),
+  problemsDrafts: many(problemsDrafts),
   script: one(scripts, {
     fields: [scriptsDrafts.scriptId],
     references: [scripts.scriptId],
@@ -693,6 +699,8 @@ export const screens = pgTable(
     instructions4: text("instructions4").notNull().default(""),
     hcwDiagnosesInstructions: text("hcw_diagnoses_instructions").notNull().default(""),
     suggestedDiagnosesInstructions: text("suggested_diagnoses_instructions").notNull().default(""),
+    hcwProblemsInstructions: text("hcw_problems_instructions").notNull().default(""),
+    suggestedProblemsInstructions: text("suggested_problems_instructions").notNull().default(""),
     notes: text("notes").notNull().default(""),
     dataType: text("data_type").notNull().default(""),
     key: text("key").notNull().default(""),
@@ -943,6 +951,129 @@ export const diagnosesHistoryRelations = relations(diagnosesHistory, ({ one }) =
   }),
 }))
 
+// PROBLEMS
+export const problems = pgTable(
+  "nt_problems",
+  {
+    id: serial("id").primaryKey(),
+    problemId: uuid("problem_id").notNull().unique().defaultRandom(),
+    oldScriptId: text("old_script_id"),
+    version: integer("version").notNull(),
+    scriptId: uuid("script_id")
+      .references(() => scripts.scriptId, { onDelete: "cascade" })
+      .notNull(),
+
+    position: integer("position").notNull(),
+    source: text("source").default("editor"),
+    expression: text("expression").notNull(),
+    name: text("name").notNull().default(""),
+    description: text("description").notNull().default(""),
+    key: text("key").default(""),
+    keyId: text("key_id").notNull().default(""),
+    severityOrder: integer("severity_order"),
+    expressionMeaning: text("expression_meaning").notNull().default(""),
+    text1: text("text1").notNull().default(""),
+    text2: text("text2").notNull().default(""),
+    text3: text("text3").notNull().default(""),
+    image1: jsonb("image1").$type<null | ScriptImage>(),
+    image2: jsonb("image2").$type<null | ScriptImage>(),
+    image3: jsonb("image3").$type<null | ScriptImage>(),
+    preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
+
+    publishDate: timestamp("publish_date").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => ({
+    searchIndex: index("problems_search_index").using(
+      "gin",
+      sql`(
+                    to_tsvector('english', ${table.name})
+                )`,
+    ),
+  }),
+)
+
+export const problemsRelations = relations(problems, ({ many, one }) => ({
+  history: many(problemsHistory),
+  script: one(scripts, {
+    fields: [problems.scriptId],
+    references: [scripts.scriptId],
+  }),
+  draft: one(problemsDrafts, {
+    fields: [problems.problemId],
+    references: [problemsDrafts.problemId],
+  }),
+}))
+
+// DIAGNOSES DRAFTS
+export const problemsDrafts = pgTable("nt_problems_drafts", {
+  id: serial("id").primaryKey(),
+  problemDraftId: uuid("problem_draft_id").notNull().unique().defaultRandom(),
+  problemId: uuid("problem_id").references(() => problems.problemId, { onDelete: "cascade" }),
+  scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
+  scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  data: jsonb("data").$type<typeof problems.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+})
+
+export const problemsDraftsRelations = relations(problemsDrafts, ({ one }) => ({
+  problem: one(problems, {
+    fields: [problemsDrafts.problemId],
+    references: [problems.problemId],
+  }),
+  scriptDraft: one(scriptsDrafts, {
+    fields: [problemsDrafts.scriptDraftId],
+    references: [scriptsDrafts.scriptDraftId],
+  }),
+  script: one(scripts, {
+    fields: [problemsDrafts.scriptId],
+    references: [scripts.scriptId],
+  }),
+  createdBy: one(users, {
+    fields: [problemsDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// DIAGNOSES HISTORY
+export const problemsHistory = pgTable("nt_problems_history", {
+  id: serial("id").primaryKey(),
+  version: integer("version").notNull(),
+  problemId: uuid("problem_id")
+    .references(() => problems.problemId, { onDelete: "cascade" })
+    .notNull(),
+  scriptId: uuid("script_id")
+    .references(() => scripts.scriptId, { onDelete: "cascade" })
+    .notNull(),
+  restoreKey: text("restore_key"),
+  changes: jsonb("data").default([]),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export const problemsHistoryRelations = relations(problemsHistory, ({ one }) => ({
+  problem: one(problems, {
+    fields: [problemsHistory.problemId],
+    references: [problems.problemId],
+  }),
+  script: one(scripts, {
+    fields: [problemsHistory.scriptId],
+    references: [scripts.scriptId],
+  }),
+}))
+
 // DRUGS LIBRARY
 export const drugsLibraryItemValidationType = pgEnum("dff_item_validation_type", ["default", "condition"])
 
@@ -1056,13 +1187,18 @@ export const pendingDeletion = pgTable("nt_pending_deletion", {
   screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "cascade" }),
   screenScriptId: uuid("screen_script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "cascade" }),
+  problemId: uuid("problem_id").references(() => problems.problemId, { onDelete: "cascade" }),
   diagnosisScriptId: uuid("diagnosis_script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
+  problemScriptId: uuid("problem_script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "cascade" }),
   hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "cascade" }),
   drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "cascade" }),
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   screenDraftId: uuid("screen_draft_id").references(() => screensDrafts.screenDraftId, { onDelete: "cascade" }),
   diagnosisDraftId: uuid("diagnosis_draft_id").references(() => diagnosesDrafts.diagnosisDraftId, {
+    onDelete: "cascade",
+  }),
+  problemDraftId: uuid("problem_draft_id").references(() => problemsDrafts.problemDraftId, {
     onDelete: "cascade",
   }),
   configKeyDraftId: uuid("config_key_draft_id").references(() => configKeysDrafts.configKeyDraftId, {
@@ -1102,6 +1238,14 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
     fields: [pendingDeletion.diagnosisScriptId],
     references: [scripts.scriptId],
   }),
+  problem: one(problems, {
+    fields: [pendingDeletion.problemId],
+    references: [problems.problemId],
+  }),
+  problemScript: one(scripts, {
+    fields: [pendingDeletion.problemDraftId],
+    references: [scripts.scriptId],
+  }),
   configKey: one(configKeys, {
     fields: [pendingDeletion.configKeyId],
     references: [configKeys.configKeyId],
@@ -1125,6 +1269,10 @@ export const pendingDeletionRelations = relations(pendingDeletion, ({ one }) => 
   diagnosisDraft: one(diagnosesDrafts, {
     fields: [pendingDeletion.diagnosisId],
     references: [diagnosesDrafts.diagnosisDraftId],
+  }),
+  problemDraft: one(problemsDrafts, {
+    fields: [pendingDeletion.problemId],
+    references: [problemsDrafts.problemDraftId],
   }),
   configKeyDraft: one(configKeysDrafts, {
     fields: [pendingDeletion.configKeyId],
@@ -1179,6 +1327,7 @@ export const changeLogs = pgTable(
     scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "set null" }),
     screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "set null" }),
     diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "set null" }),
+    problemId: uuid("problem_id").references(() => problems.problemId, { onDelete: "set null" }),
     configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "set null" }),
     hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
     drugsLibraryItemId: uuid("drugs_library_item_id").references(() => drugsLibrary.itemId, { onDelete: "set null" }),
@@ -1257,6 +1406,10 @@ export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
   diagnosis: one(diagnoses, {
     fields: [changeLogs.diagnosisId],
     references: [diagnoses.diagnosisId],
+  }),
+  problem: one(problems, {
+    fields: [changeLogs.problemId],
+    references: [problems.problemId],
   }),
   configKey: one(configKeys, {
     fields: [changeLogs.configKeyId],
