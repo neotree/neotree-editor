@@ -231,6 +231,154 @@ export const getDataKeysIntegrity = async (params?: {
     }
 }
 
+export const getDataKeysDeleteImpact = async (params?: {
+    dataKeysIds?: string[];
+    uniqueKeys?: string[];
+}): Promise<{
+    success: boolean;
+    data: Array<{
+        dataKeyId: string;
+        uniqueKey: string;
+        name: string;
+        label: string;
+        scripts: Array<{
+            scriptId: string;
+            scriptTitle: string;
+        }>;
+    }>;
+    errors?: string[];
+}> => {
+    try {
+        await isAllowed();
+
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ returnDraftsIfExist: true }),
+            _getDiagnoses({ returnDraftsIfExist: true }),
+            _getProblems({ returnDraftsIfExist: true }),
+        ]);
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+            ...(problemsRes.errors || []),
+        ];
+
+        if (errors.length) return { success: false, data: [], errors };
+
+        const requestedIds = new Set((params?.dataKeysIds || []).filter(Boolean));
+        const requestedUniqueKeys = new Set((params?.uniqueKeys || []).filter(Boolean));
+        const targets = dataKeysRes.data.filter((dataKey) => (
+            (dataKey.uuid && requestedIds.has(dataKey.uuid)) ||
+            (dataKey.uniqueKey && requestedUniqueKeys.has(dataKey.uniqueKey))
+        ));
+
+        if (!targets.length) {
+            return {
+                success: true,
+                data: [],
+            };
+        }
+
+        const uniqueTargetNames = new Map<string, string>();
+        const dataKeyNameCounts = new Map<string, number>();
+        dataKeysRes.data.forEach((dataKey) => {
+            const name = `${dataKey.name || ''}`.trim();
+            if (!name) return;
+            dataKeyNameCounts.set(name, (dataKeyNameCounts.get(name) || 0) + 1);
+        });
+        targets.forEach((dataKey) => {
+            const name = `${dataKey.name || ''}`.trim();
+            if (!name) return;
+            if (dataKeyNameCounts.get(name) === 1) {
+                uniqueTargetNames.set(name, dataKey.uniqueKey);
+            }
+        });
+
+        const scriptsByTarget = new Map<string, Map<string, { scriptId: string; scriptTitle: string }>>();
+        targets.forEach((target) => {
+            scriptsByTarget.set(target.uniqueKey, new Map());
+        });
+
+        const addScriptUsage = (scriptId?: string | null, scriptTitle?: string | null, keyId?: string | null, keyName?: string | null) => {
+            const normalizedScriptId = `${scriptId || ''}`.trim();
+            const normalizedScriptTitle = `${scriptTitle || ''}`.trim();
+            if (!normalizedScriptId || !normalizedScriptTitle) return;
+
+            const matchedUniqueKey = (() => {
+                const normalizedKeyId = `${keyId || ''}`.trim();
+                if (normalizedKeyId && scriptsByTarget.has(normalizedKeyId)) return normalizedKeyId;
+
+                const normalizedKeyName = `${keyName || ''}`.trim();
+                if (!normalizedKeyName) return '';
+                return uniqueTargetNames.get(normalizedKeyName) || '';
+            })();
+
+            if (!matchedUniqueKey) return;
+
+            const scripts = scriptsByTarget.get(matchedUniqueKey);
+            if (!scripts) return;
+            scripts.set(normalizedScriptId, {
+                scriptId: normalizedScriptId,
+                scriptTitle: normalizedScriptTitle,
+            });
+        };
+
+        screensRes.data.forEach((screen) => {
+            addScriptUsage(screen.scriptId, screen.scriptTitle, screen.keyId, screen.key);
+
+            (screen.items || []).forEach((item) => {
+                addScriptUsage(screen.scriptId, screen.scriptTitle, item.keyId, item.key || item.id);
+            });
+
+            (screen.fields || []).forEach((field) => {
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.keyId, field.key);
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.refKeyId, field.refKey);
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.minDateKeyId, field.minDateKey);
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.maxDateKeyId, field.maxDateKey);
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.minTimeKeyId, field.minTimeKey);
+                addScriptUsage(screen.scriptId, screen.scriptTitle, field.maxTimeKeyId, field.maxTimeKey);
+
+                (field.items || []).forEach((item) => {
+                    addScriptUsage(screen.scriptId, screen.scriptTitle, item.keyId, `${item.value || ''}` || `${item.label || ''}`);
+                });
+            });
+        });
+
+        diagnosesRes.data.forEach((diagnosis) => {
+            addScriptUsage(diagnosis.scriptId, diagnosis.scriptTitle, diagnosis.keyId, diagnosis.key || diagnosis.name);
+
+            (diagnosis.symptoms || []).forEach((symptom) => {
+                addScriptUsage(diagnosis.scriptId, diagnosis.scriptTitle, symptom.keyId, symptom.key || symptom.name);
+            });
+        });
+
+        problemsRes.data.forEach((problem) => {
+            addScriptUsage(problem.scriptId, problem.scriptTitle, problem.keyId, problem.key || problem.name);
+        });
+
+        return {
+            success: true,
+            data: targets.map((target) => ({
+                dataKeyId: target.uuid,
+                uniqueKey: target.uniqueKey,
+                name: target.name || '',
+                label: target.label || '',
+                scripts: Array.from(scriptsByTarget.get(target.uniqueKey)?.values() || [])
+                    .sort((a, b) => a.scriptTitle.localeCompare(b.scriptTitle)),
+            })),
+        };
+    } catch (e: any) {
+        logger.error('getDataKeysDeleteImpact ERROR', e.message);
+        return {
+            success: false,
+            data: [],
+            errors: [e.message],
+        };
+    }
+}
+
 export const resolveDataKeyIntegrityEntry = async (params: {
     entry: DataKeyIntegrityEntry;
     selectedTargetUniqueKey?: string;
