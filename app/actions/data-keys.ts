@@ -16,6 +16,7 @@ import { repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataK
 
 type PreparedIntegrityRepair = {
     entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
     repairs: ReturnType<typeof repairSingleDataKeyIntegrityReference>;
     preparedAt: number;
 };
@@ -33,13 +34,13 @@ function getPreparedIntegrityRepairStore(): Map<string, PreparedIntegrityRepair>
     return globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY]!;
 }
 
-function buildPreparedIntegrityRepairCacheId(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
-    return `${userId || 'anonymous'}::${JSON.stringify(entry)}`;
+function buildPreparedIntegrityRepairCacheId(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
+    return `${userId || 'anonymous'}::${selectedTargetUniqueKey || ''}::${JSON.stringify(entry)}`;
 }
 
-function getPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
+function getPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
     const store = getPreparedIntegrityRepairStore();
-    const cacheId = buildPreparedIntegrityRepairCacheId(userId, entry);
+    const cacheId = buildPreparedIntegrityRepairCacheId(userId, entry, selectedTargetUniqueKey);
     const cached = store.get(cacheId);
     if (!cached) return null;
     if ((Date.now() - cached.preparedAt) > PREPARED_INTEGRITY_REPAIR_CACHE_TTL_MS) {
@@ -51,15 +52,15 @@ function getPreparedIntegrityRepair(userId: string | null | undefined, entry: Da
 
 function setPreparedIntegrityRepair(userId: string | null | undefined, payload: PreparedIntegrityRepair) {
     const store = getPreparedIntegrityRepairStore();
-    const cacheId = buildPreparedIntegrityRepairCacheId(userId, payload.entry);
+    const cacheId = buildPreparedIntegrityRepairCacheId(userId, payload.entry, payload.selectedTargetUniqueKey);
     store.set(cacheId, payload);
 }
 
-function clearPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry) {
-    getPreparedIntegrityRepairStore().delete(buildPreparedIntegrityRepairCacheId(userId, entry));
+function clearPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
+    getPreparedIntegrityRepairStore().delete(buildPreparedIntegrityRepairCacheId(userId, entry, selectedTargetUniqueKey));
 }
 
-async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry) {
+async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
     const [dataKeysRes, screensRes, diagnosesRes] = await Promise.all([
         _getDataKeys({ returnDraftsIfExist: true }),
         _getScreens({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
@@ -88,6 +89,7 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry) 
             dataKeys: dataKeysRes.data,
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
+            overrideTargetUniqueKey: selectedTargetUniqueKey,
         }),
     };
 }
@@ -219,17 +221,18 @@ export const getDataKeysIntegrity = async (params?: {
 
 export const resolveDataKeyIntegrityEntry = async (params: {
     entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
 }) => {
     try {
         const session = await isAllowed();
-        const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry);
+        const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
         const prepared = cached
             ? {
                 success: true as const,
                 errors: [] as string[],
                 repairs: cached.repairs,
             }
-            : await prepareDataKeyIntegrityEntryRepair(params.entry);
+            : await prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey);
 
         if (!prepared.success) {
             logger.error('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
@@ -248,7 +251,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
         const repairs = prepared.repairs;
 
         if (!repairs.screens.length && !repairs.diagnoses.length) {
-            clearPreparedIntegrityRepair(session.user?.userId, params.entry);
+            clearPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
             return {
                 success: true,
                 changed: false,
@@ -302,7 +305,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 };
             }
         }
-        clearPreparedIntegrityRepair(session.user?.userId, params.entry);
+        clearPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
 
         return {
             success: true,
@@ -487,10 +490,14 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
 
 export const previewDataKeyIntegrityEntryRepair = async (params: {
     entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
 }) => {
     try {
         const session = await isAllowed();
-        const prepared = await prepareDataKeyIntegrityEntryRepair(params.entry);
+        const [prepared, dataKeysRes] = await Promise.all([
+            prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey),
+            _getDataKeys({ returnDraftsIfExist: true }),
+        ]);
 
         if (!prepared.success) {
             return {
@@ -500,9 +507,22 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
                 errors: prepared.errors,
             };
         }
+        if (dataKeysRes.errors?.length) {
+            return {
+                success: false,
+                changed: false,
+                preview: null,
+                errors: dataKeysRes.errors,
+            };
+        }
         const repairs = prepared.repairs;
+        const preferredUniqueKey = params.selectedTargetUniqueKey || params.entry.matchedUniqueKey || params.entry.currentUniqueKey;
+        const matchedDataKey = preferredUniqueKey
+            ? dataKeysRes.data.find((dataKey) => dataKey.uniqueKey === preferredUniqueKey)
+            : undefined;
         setPreparedIntegrityRepair(session.user?.userId, {
             entry: params.entry,
+            selectedTargetUniqueKey: params.selectedTargetUniqueKey,
             repairs,
             preparedAt: Date.now(),
         });
@@ -512,6 +532,17 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             changed: !!repairs.screens.length || !!repairs.diagnoses.length,
             preview: {
                 entry: params.entry,
+                targetDataKey: !matchedDataKey ? null : {
+                    uniqueKey: matchedDataKey.uniqueKey,
+                    name: matchedDataKey.name || '',
+                    label: matchedDataKey.label || '',
+                    dataType: matchedDataKey.dataType || '',
+                    confidential: !!matchedDataKey.confidential,
+                    isDraft: !!matchedDataKey.isDraft,
+                    isDeleted: !!matchedDataKey.isDeleted,
+                    optionsCount: Array.isArray(matchedDataKey.options) ? matchedDataKey.options.length : 0,
+                    metadata: (matchedDataKey.metadata || {}) as Record<string, any>,
+                },
                 screens: repairs.screens.map((screen) => ({
                     screenId: screen.screenId,
                     title: screen.title || screen.label || screen.refId || screen.screenId,
