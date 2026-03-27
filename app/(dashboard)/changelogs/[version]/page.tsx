@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { getChangeLogs } from "@/app/actions/change-logs"
 import { DataVersionChangesTable } from "../components/data-version-changes-table"
+import { DataVersionScriptGroups } from "../components/data-version-script-groups"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
+import { buildDataVersionGroupedView } from "@/lib/changelog-data-version-groups"
 
 function normalizeChangeCount(changes: ChangeLogType["changes"]): number {
   if (Array.isArray(changes)) {
@@ -27,6 +29,7 @@ const entityTypeLabels: Record<string, string> = {
   script: "Script",
   screen: "Screen",
   diagnosis: "Diagnosis",
+  problem: "Problem",
   config_key: "Config Key",
   drugs_library: "Drugs Library",
   data_key: "Data Key",
@@ -131,6 +134,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
   }
 
   const entitySummary = formatEntitySummary(entityCounts)
+  const groupedView = buildDataVersionGroupedView(visibleChanges)
 
   return (
     <>
@@ -189,7 +193,28 @@ export default async function DataVersionPage({ params }: { params: Params }) {
 
             <Separator />
 
-            <DataVersionChangesTable changes={visibleChanges} dataVersion={numericVersion} />
+            <DataVersionScriptGroups groupedView={groupedView} dataVersion={numericVersion} />
+
+            <Separator />
+
+            <details className="rounded-lg border border-border/70 bg-muted/20">
+              <summary className="cursor-pointer list-none px-4 py-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Raw Timeline</div>
+                    <div className="text-xs text-muted-foreground">
+                      Full chronological changelog entries for audit-level inspection.
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">
+                    {visibleChanges.length} entries
+                  </Badge>
+                </div>
+              </summary>
+              <div className="border-t border-border/60 p-4">
+                <DataVersionChangesTable changes={visibleChanges} dataVersion={numericVersion} />
+              </div>
+            </details>
           </CardContent>
         </Card>
       </Content>

@@ -71,7 +71,7 @@ const ENTITY_TYPE_TO_FK: Partial<Record<SaveChangeLogData["entityType"], keyof S
 const ENTITY_TYPE_ALLOWED_CONTEXT_FKS: Partial<Record<SaveChangeLogData["entityType"], (keyof SaveChangeLogData)[]>> = {
   screen: ["scriptId"],
   diagnosis: ["scriptId"],
-  problem: ["problemId"],
+  problem: ["scriptId"],
 }
 
 type EntityVersionConfig = {
