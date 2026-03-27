@@ -20,7 +20,6 @@ export async function _previewDataKeysRefsImpact({
             if (item.uniqueKey) existingMap[item.uniqueKey] = item;
         });
 
-        const previousDataKeys: NonNullable<Parameters<typeof _updateDataKeysRefs>[0]['previousDataKeys']> = [];
         const dataKeysToEvaluate: typeof byUuid.data = [];
 
         data.forEach(item => {
@@ -29,13 +28,6 @@ export async function _previewDataKeysRefsImpact({
                 (item.uniqueKey ? existingMap[item.uniqueKey] : undefined)
             );
             if (!existing?.uniqueKey) return;
-
-            previousDataKeys.push({
-                uniqueKey: existing.uniqueKey,
-                name: existing.name,
-                label: existing.label,
-                dataType: existing.dataType,
-            });
 
             dataKeysToEvaluate.push({
                 ...existing,
@@ -76,7 +68,6 @@ export async function _previewDataKeysRefsImpact({
 
         return await _updateDataKeysRefs({
             dataKeys: dataKeysToEvaluate,
-            previousDataKeys,
             dryRun: true,
         });
     } catch (e: any) {
