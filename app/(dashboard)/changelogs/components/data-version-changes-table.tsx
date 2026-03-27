@@ -22,6 +22,7 @@ const entityTypeLabels: Record<string, string> = {
   script: "Script",
   screen: "Screen",
   diagnosis: "Diagnosis",
+  problem: "Problem",
   config_key: "Config Key",
   drugs_library: "Drugs Library",
   data_key: "Data Key",
