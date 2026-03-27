@@ -804,17 +804,20 @@ export function repairSingleDataKeyIntegrityReference({
     screens = [],
     diagnoses = [],
     dataKeys = [],
+    overrideTargetUniqueKey,
 }: {
     entry: DataKeyIntegrityEntry;
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     dataKeys?: DataKey[];
+    overrideTargetUniqueKey?: string;
 }) {
     const byUniqueKey = new Map<string, DataKey>();
     dataKeys.forEach((dataKey) => {
         if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
     });
     const legacyMaps = buildLegacyMaps(dataKeys);
+    const overrideTarget = overrideTargetUniqueKey ? byUniqueKey.get(overrideTargetUniqueKey) : undefined;
 
     const repairedScreens = screens.map((screen) => {
         let changed = false;
@@ -827,7 +830,7 @@ export function repairSingleDataKeyIntegrityReference({
         let nextScreen = screen;
 
         if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen" })) {
-            const screenDataKey = resolveDataKeyMatch({
+            const screenDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,
                 currentLabel: screen.label || undefined,
@@ -842,7 +845,7 @@ export function repairSingleDataKeyIntegrityReference({
 
         let nextItems = nextScreen.items || [];
         if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_option_collection" })) {
-            const screenDataKey = resolveDataKeyMatch({
+            const screenDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: nextScreen.keyId || undefined,
                 currentKey: nextScreen.key || undefined,
                 currentLabel: nextScreen.label || undefined,
@@ -869,7 +872,7 @@ export function repairSingleDataKeyIntegrityReference({
             nextItems = !screenItemsUseDataKeys(nextScreen.type) ? nextItems : nextItems.map((item, itemIndex) => {
                 const itemLocation = `${screenBase.location} > item ${itemIndex + 1}`;
                 if (!matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_item", location: itemLocation })) return item;
-                const itemDataKey = resolveDataKeyMatch({
+                const itemDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: item.keyId || undefined,
                     currentKey: item.key || item.id || undefined,
                     currentLabel: item.label || undefined,
@@ -891,7 +894,7 @@ export function repairSingleDataKeyIntegrityReference({
             let nextField = field;
 
             if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field" })) {
-                const fieldDataKey = resolveDataKeyMatch({
+                const fieldDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: field.keyId || undefined,
                     currentKey: field.key || undefined,
                     currentLabel: field.label || undefined,
@@ -919,7 +922,7 @@ export function repairSingleDataKeyIntegrityReference({
 
             keyOnlyRefSpecs.forEach((spec) => {
                 if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: spec.kind })) return;
-                const matchedDataKey = resolveDataKeyMatch({
+                const matchedDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: nextField[spec.id] || undefined,
                     currentKey: nextField[spec.name] || undefined,
                     expectedDataType: spec.expectedDataType,
@@ -933,7 +936,7 @@ export function repairSingleDataKeyIntegrityReference({
 
             let nextFieldItems = nextField.items || [];
             if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_option_collection" })) {
-                const fieldDataKey = resolveDataKeyMatch({
+                const fieldDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: nextField.keyId || undefined,
                     currentKey: nextField.key || undefined,
                     currentLabel: nextField.label || undefined,
@@ -959,7 +962,7 @@ export function repairSingleDataKeyIntegrityReference({
                 nextFieldItems = nextFieldItems.map((item, fieldItemIndex) => {
                     const itemLocation = `${fieldBase.location} > option ${fieldItemIndex + 1}`;
                     if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_item", location: itemLocation })) return item;
-                    const fieldItemDataKey = resolveDataKeyMatch({
+                    const fieldItemDataKey = overrideTarget || resolveDataKeyMatch({
                         currentUniqueKey: item.keyId || undefined,
                         currentKey: `${item.value || ""}` || undefined,
                         currentLabel: `${item.label || ""}` || undefined,
@@ -1007,7 +1010,7 @@ export function repairSingleDataKeyIntegrityReference({
         let nextDiagnosis = diagnosis;
 
         if (matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis" })) {
-            const diagnosisDataKey = resolveDataKeyMatch({
+            const diagnosisDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: diagnosis.keyId || undefined,
                 currentKey: diagnosis.key || undefined,
                 currentLabel: diagnosis.name || undefined,
@@ -1026,7 +1029,7 @@ export function repairSingleDataKeyIntegrityReference({
         const nextSymptoms = (nextDiagnosis.symptoms || []).map((symptom, symptomIndex) => {
             const symptomLocation = `${diagnosisBase.location} > symptom ${symptomIndex + 1}`;
             if (!matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis_symptom", location: symptomLocation })) return symptom;
-            const symptomDataKey = resolveDataKeyMatch({
+            const symptomDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: symptom.keyId || undefined,
                 currentKey: symptom.key || undefined,
                 currentLabel: symptom.name || undefined,

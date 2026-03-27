@@ -12,8 +12,11 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
 import { Modal } from "@/components/modal";
+import { SelectDataKey } from "@/components/select-data-key";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
@@ -45,6 +48,27 @@ const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], stri
     diagnosis: "Diagnosis key",
     diagnosis_symptom: "Diagnosis symptom",
 };
+
+function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
+    switch (status) {
+        case "out_of_sync":
+            return "Out of sync";
+        case "legacy_match":
+            return "Not linked properly";
+        case "missing":
+            return "Missing from library";
+        case "conflict":
+            return "Needs manual review";
+        case "unmanaged":
+            return "Not managed by library";
+        default:
+            return "Resolved";
+    }
+}
+
+function formatReferenceLabel(entry: DataKeyIntegrityReport["entries"][number]) {
+    return entry.currentKey || entry.currentLabel || entry.location || "Unnamed reference";
+}
 
 function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
     if (entry.diagnosisId) {
@@ -97,6 +121,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
+    const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
+    const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
 
     const entries = [...(integrity?.entries || [])].sort((a, b) => {
@@ -131,19 +157,50 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         if (isRepairing || loadingRepairPreview) return;
         setRepairModalEntry(null);
         setRepairPreview(null);
+        setSelectedTargetUniqueKey("");
+        setReviewAcknowledged(false);
+    };
+
+    const loadRepairPreview = async ({
+        entry,
+        nextSelectedTargetUniqueKey,
+    }: {
+        entry: DataKeyIntegrityReport["entries"][number];
+        nextSelectedTargetUniqueKey?: string;
+    }) => {
+        setLoadingRepairPreview(true);
+        const res = await previewDataKeyIntegrityEntryRepair({
+            entry,
+            selectedTargetUniqueKey: nextSelectedTargetUniqueKey || undefined,
+        });
+        if (!res.success) {
+            setLoadingRepairPreview(false);
+            return res;
+        }
+
+        setRepairPreview(res.preview);
+        setSelectedTargetUniqueKey(
+            nextSelectedTargetUniqueKey
+                || res.preview?.targetDataKey?.uniqueKey
+                || entry.matchedUniqueKey
+                || entry.currentUniqueKey
+                || ""
+        );
+        setLoadingRepairPreview(false);
+        return res;
     };
 
     const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || isRepairing || loadingRepairPreview) return;
         setRepairModalEntry(entry);
         setRepairPreview(null);
-        setLoadingRepairPreview(true);
-
-        const res = await previewDataKeyIntegrityEntryRepair({ entry });
+        setSelectedTargetUniqueKey("");
+        setReviewAcknowledged(false);
+        const res = await loadRepairPreview({ entry });
         if (!res.success) {
             setRepairModalEntry(null);
             setRepairPreview(null);
-            setLoadingRepairPreview(false);
+            setSelectedTargetUniqueKey("");
             alert({
                 title: "Preview failed",
                 message: (res.errors?.length ? res.errors.join("<br />") : "Failed to preview repair"),
@@ -152,16 +209,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             });
             return;
         }
-
-        setRepairPreview(res.preview);
-        setLoadingRepairPreview(false);
     };
 
     const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || isRepairing) return;
         startRepairTransition(async () => {
             setResolvingKey(getEntryKey(entry));
-            const res = await resolveDataKeyIntegrityEntry({ entry });
+            const res = await resolveDataKeyIntegrityEntry({
+                entry,
+                selectedTargetUniqueKey: selectedTargetUniqueKey || undefined,
+            });
 
             if (!res.success) {
                 alert({
@@ -191,6 +248,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             setResolvingKey(null);
             setRepairModalEntry(null);
             setRepairPreview(null);
+            setReviewAcknowledged(false);
             router.refresh();
         });
     };
@@ -346,7 +404,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </Button>
                         <Button
                             onClick={() => repairModalEntry && handleResolveEntry(repairModalEntry)}
-                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !repairPreview?.screens.length && !repairPreview?.diagnoses.length}
+                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !reviewAcknowledged || !repairPreview?.screens.length && !repairPreview?.diagnoses.length}
                         >
                             {isRepairing ? "Saving Draft..." : "Save Repair Draft"}
                         </Button>
@@ -362,14 +420,94 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
                 ) : (
                     <div className="space-y-4 text-sm">
+                        <div className="rounded-md border p-3 space-y-3">
+                            <div className="font-medium">What will change</div>
+                            <div className="text-muted-foreground">
+                                This repair will update the current script draft so this reference points to the library data key shown below.
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-2">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-red-700">From</div>
+                                    <div className="font-medium text-red-950">{formatReferenceLabel(repairModalEntry)}</div>
+                                    <div className="text-red-900">
+                                        {formatIssueLabel(repairModalEntry.status)}
+                                    </div>
+                                    <div className="text-sm text-red-900">
+                                        {repairModalEntry.reason}
+                                    </div>
+                                    <div className="text-xs text-red-800">
+                                        Used in {repairModalEntry.location}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
+                                    <div className="font-medium text-emerald-950">Choose the data key to link this reference to</div>
+                                    <SelectDataKey
+                                        modal
+                                        value={repairPreview?.targetDataKey?.name || repairPreview?.targetDataKey?.label || ""}
+                                        placeholder="Select data key"
+                                        type={repairModalEntry.expectedDataType || undefined}
+                                        disabled={isRepairing || loadingRepairPreview}
+                                        onChange={async ([dataKey]) => {
+                                            const nextUniqueKey = dataKey?.uniqueKey || "";
+                                            setReviewAcknowledged(false);
+                                            const previewRes = await loadRepairPreview({
+                                                entry: repairModalEntry,
+                                                nextSelectedTargetUniqueKey: nextUniqueKey,
+                                            });
+
+                                            if (!previewRes.success) {
+                                                alert({
+                                                    title: "Preview failed",
+                                                    message: (previewRes.errors?.length ? previewRes.errors.join("<br />") : "Failed to preview repair"),
+                                                    variant: "error",
+                                                    buttonLabel: "Close",
+                                                });
+                                            }
+                                        }}
+                                    />
+                                    <div className="text-sm text-emerald-900">
+                                        {repairPreview?.targetDataKey?.label
+                                            ? `Label: ${repairPreview.targetDataKey.label}`
+                                            : "Select the correct library data key before saving this repair draft."}
+                                    </div>
+                                    {!!repairPreview?.targetDataKey?.dataType && (
+                                        <div className="text-xs text-emerald-800">
+                                            Type: {repairPreview.targetDataKey.dataType}
+                                        </div>
+                                    )}
+                                    {!!repairPreview?.targetDataKey?.optionsCount && (
+                                        <div className="text-xs text-emerald-800">
+                                            Linked options: {repairPreview.targetDataKey.optionsCount}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="rounded-md border p-3 space-y-2">
-                            <div><span className="font-medium">Reference:</span> {repairModalEntry.currentKey || repairModalEntry.currentLabel || repairModalEntry.location}</div>
-                            <div><span className="font-medium">Reference kind:</span> {kindLabels[repairModalEntry.kind]}</div>
-                            <div><span className="font-medium">Location:</span> {repairModalEntry.location}</div>
-                            <div><span className="font-medium">Issue:</span> {repairModalEntry.status.replace(/_/g, " ")}</div>
-                            <div><span className="font-medium">Reason:</span> {repairModalEntry.reason}</div>
-                            {!!repairModalEntry.matchedName && (
-                                <div><span className="font-medium">Target data key:</span> {repairModalEntry.matchedName}{repairModalEntry.matchedLabel ? ` (${repairModalEntry.matchedLabel})` : ""}</div>
+                            <div className="font-medium">Review details</div>
+                            <div><span className="font-medium">Reference type:</span> {kindLabels[repairModalEntry.kind]}</div>
+                            <div><span className="font-medium">Expected type:</span> {repairModalEntry.expectedDataType || "Not specified"}</div>
+                            {!!repairModalEntry.currentUniqueKey && (
+                                <div><span className="font-medium">Current linked unique key:</span> {repairModalEntry.currentUniqueKey}</div>
+                            )}
+                            {!!repairPreview?.targetDataKey && (
+                                <>
+                                    <div><span className="font-medium">New linked unique key:</span> {repairPreview.targetDataKey.uniqueKey}</div>
+                                    <div><span className="font-medium">Confidential:</span> {repairPreview.targetDataKey.confidential ? "Yes" : "No"}</div>
+                                    <div><span className="font-medium">Library state:</span> {repairPreview.targetDataKey.isDraft ? "Draft exists" : "Published only"}</div>
+                                    {!!Object.keys(repairPreview.targetDataKey.metadata || {}).length && (
+                                        <div className="space-y-1">
+                                            <div><span className="font-medium">Metadata:</span></div>
+                                            <pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-xs">
+                                                {JSON.stringify(repairPreview.targetDataKey.metadata, null, 2)}
+                                            </pre>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
@@ -378,7 +516,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                             {!!repairPreview.screens.length && (
                                 <div>
-                                    <div className="text-muted-foreground">Screens</div>
+                                    <div className="text-muted-foreground">Affected screens</div>
                                     <div className="space-y-1">
                                         {repairPreview.screens.map((screen) => (
                                             <div key={screen.screenId}>{screen.title}</div>
@@ -389,7 +527,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                             {!!repairPreview.diagnoses.length && (
                                 <div>
-                                    <div className="text-muted-foreground">Diagnoses</div>
+                                    <div className="text-muted-foreground">Affected diagnoses</div>
                                     <div className="space-y-1">
                                         {repairPreview.diagnoses.map((diagnosis) => (
                                             <div key={diagnosis.diagnosisId}>{diagnosis.title}</div>
@@ -399,8 +537,19 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             )}
 
                             <div className="text-muted-foreground">
-                                Saving this repair follows the normal draft flow. You will still need to publish the script changes separately.
+                                This only updates the draft. Nothing is published yet, and script changes will still need to be published separately.
                             </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 rounded-md border p-3">
+                            <Checkbox
+                                id="confirm-integrity-repair-review"
+                                checked={reviewAcknowledged}
+                                onCheckedChange={(checked) => setReviewAcknowledged(checked === true)}
+                            />
+                            <Label htmlFor="confirm-integrity-repair-review" className="leading-5">
+                                I have reviewed the target data key details and I want to save this singular repair draft against this specific data key.
+                            </Label>
                         </div>
                     </div>
                 )}
