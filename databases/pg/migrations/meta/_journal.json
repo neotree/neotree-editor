@@ -78,6 +78,13 @@
       "when": 1773389441378,
       "tag": "0010_dark_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774595494848,
+      "tag": "0011_tearful_angel",
+      "breakpoints": true
     }
   ]
 }
