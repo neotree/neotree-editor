@@ -23,7 +23,7 @@ import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/e
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
-import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts } from "@/databases/pg/schema"
+import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -32,20 +32,17 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   screensRes: Awaited<ReturnType<typeof scriptsQueries._getScreens>>
   diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
   problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
+  shouldRunIntegrityChecks: boolean
+  shouldBlockPublishOnIntegrity: boolean
 }> {
-  if (!userId) {
-    const { dataKeysRes, screensRes, diagnosesRes, problemsRes } = await getScopedIntegrityData(userId)
-
-    return { dataKeysRes, screensRes, diagnosesRes, problemsRes }
-  }
-
-  const [userDataKeyDrafts, userScreenDrafts, userDiagnosisDrafts, userProblemDrafts, userPendingDeletion] = await Promise.all([
-    db.query.dataKeysDrafts.findMany({ where: eq(dataKeysDrafts.createdByUserId, userId) }),
-    db.query.screensDrafts.findMany({ where: eq(screensDrafts.createdByUserId, userId) }),
-    db.query.diagnosesDrafts.findMany({ where: eq(diagnosesDrafts.createdByUserId, userId) }),
-    db.query.problemsDrafts.findMany({ where: eq(problemsDrafts.createdByUserId, userId) }),
+  const [userDataKeyDrafts, userScriptDrafts, userScreenDrafts, userDiagnosisDrafts, userProblemDrafts, userPendingDeletion] = await Promise.all([
+    db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined }),
+    db.query.scriptsDrafts.findMany({ where: userId ? eq(scriptsDrafts.createdByUserId, userId) : undefined }),
+    db.query.screensDrafts.findMany({ where: userId ? eq(screensDrafts.createdByUserId, userId) : undefined }),
+    db.query.diagnosesDrafts.findMany({ where: userId ? eq(diagnosesDrafts.createdByUserId, userId) : undefined }),
+    db.query.problemsDrafts.findMany({ where: userId ? eq(problemsDrafts.createdByUserId, userId) : undefined }),
     db.query.pendingDeletion.findMany({
-      where: eq(pendingDeletion.createdByUserId, userId),
+      where: userId ? eq(pendingDeletion.createdByUserId, userId) : undefined,
       columns: {
         scriptId: true,
         screenScriptId: true,
@@ -56,18 +53,39 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     }),
   ])
 
-  const hasExistingDataKeyDrafts = userDataKeyDrafts.some((draft) => !!draft.dataKeyId)
+  const hasDataKeyDrafts = userDataKeyDrafts.length > 0
   const hasDataKeyDeletions = userPendingDeletion.some((entry) => !!entry.dataKeyId)
-  const shouldScanAllScripts = hasExistingDataKeyDrafts || hasDataKeyDeletions
-  const affectedScriptIds = shouldScanAllScripts
-    ? null
-    : Array.from(new Set([
-        ...userScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-        ...userDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-        ...userProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-        ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
-      ]))
-  const shouldLimitToAffectedScripts = !shouldScanAllScripts
+  const hasDataKeyLibraryChanges = hasDataKeyDrafts || hasDataKeyDeletions
+  const hasScriptFamilyChanges =
+    userScriptDrafts.length > 0 ||
+    userScreenDrafts.length > 0 ||
+    userDiagnosisDrafts.length > 0 ||
+    userProblemDrafts.length > 0 ||
+    userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
+
+  const shouldRunIntegrityChecks = hasScriptFamilyChanges
+  const shouldBlockPublishOnIntegrity = !hasDataKeyLibraryChanges
+
+  if (!shouldRunIntegrityChecks) {
+    return {
+      dataKeysRes: { data: [], errors: undefined },
+      screensRes: { data: [], errors: undefined },
+      diagnosesRes: { data: [], errors: undefined },
+      problemsRes: { data: [], errors: undefined },
+      shouldRunIntegrityChecks,
+      shouldBlockPublishOnIntegrity,
+    }
+  }
+
+  const affectedScriptIds = Array.from(new Set([
+    ...userScriptDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...userScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...userDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...userProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
+  ]))
+
+  const shouldLimitToAffectedScripts = !!userId
   const hasAffectedScripts = !!affectedScriptIds?.length
   const affectedScriptsSet = new Set(affectedScriptIds || [])
   const scopedUserScreenDrafts = shouldLimitToAffectedScripts
@@ -196,6 +214,8 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
       data: Array.from(new Map(Array.from(problemsMap.values()).map((item) => [item.problemId, item])).values()),
       errors: publishedProblemsRes.errors,
     },
+    shouldRunIntegrityChecks,
+    shouldBlockPublishOnIntegrity,
   }
 }
 
@@ -312,7 +332,14 @@ export async function publishData({
     // The next version will be currentDataVersion + 1
     const nextDataVersion = currentDataVersion + 1
 
-    const { dataKeysRes, screensRes, diagnosesRes, problemsRes } = await getScopedIntegrityData(userId)
+    const {
+      dataKeysRes,
+      screensRes,
+      diagnosesRes,
+      problemsRes,
+      shouldRunIntegrityChecks,
+      shouldBlockPublishOnIntegrity,
+    } = await getScopedIntegrityData(userId)
 
     const integrityErrors = [
       ...(dataKeysRes.errors || []),
@@ -327,12 +354,14 @@ export async function publishData({
       return results
     }
 
-    const repairs = repairDataKeyIntegrityReferences({
-      dataKeys: dataKeysRes.data,
-      screens: screensRes.data,
-      diagnoses: diagnosesRes.data,
-      problems: problemsRes.data,
-    })
+    const repairs = !shouldRunIntegrityChecks
+      ? { screens: [], diagnoses: [], problems: [] }
+      : repairDataKeyIntegrityReferences({
+          dataKeys: dataKeysRes.data,
+          screens: screensRes.data,
+          diagnoses: diagnosesRes.data,
+          problems: problemsRes.data,
+        })
 
     if (repairs.screens.length) {
       const repairedScreens = await scriptsMutations._saveScreens({
@@ -373,18 +402,24 @@ export async function publishData({
       }
     }
 
-    const postRepairReport = scanDataKeyIntegrity({
-      dataKeys: dataKeysRes.data,
-      screens: repairs.screens.length ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen) : screensRes.data,
-      diagnoses: repairs.diagnoses.length ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis) : diagnosesRes.data,
-      problems: repairs.problems.length ? problemsRes.data.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem) : problemsRes.data,
-      onlyIssues: true,
-    })
-    const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(postRepairReport)
+    const postRepairReport = !shouldRunIntegrityChecks
+      ? null
+      : scanDataKeyIntegrity({
+          dataKeys: dataKeysRes.data,
+          screens: repairs.screens.length ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen) : screensRes.data,
+          diagnoses: repairs.diagnoses.length ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis) : diagnosesRes.data,
+          problems: repairs.problems.length ? problemsRes.data.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem) : problemsRes.data,
+          onlyIssues: true,
+        })
+    const publishIntegrityErrors = postRepairReport ? buildDataKeyIntegrityPublishErrors(postRepairReport) : []
     if (publishIntegrityErrors.length) {
-      results.success = false
-      results.errors = publishIntegrityErrors
-      return results
+      if (shouldBlockPublishOnIntegrity) {
+        results.success = false
+        results.errors = publishIntegrityErrors
+        return results
+      }
+
+      results.warnings = [...(results.warnings || []), ...publishIntegrityErrors]
     }
 
     const publishConfigKeys = await configKeysMutations._publishConfigKeys({

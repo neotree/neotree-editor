@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
@@ -16,6 +16,7 @@ import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact } from './delete-confirmation';
 
 export function DataKeysTableRowActions({ 
     rowIndex, 
@@ -27,6 +28,7 @@ export function DataKeysTableRowActions({
     setCurrentDataKeyUuid: (uuid: string) => void;
 }) {
     const [isTransitionPending, startTransition] = useTransition();
+    const [isPreparingDelete, setIsPreparingDelete] = useState(false);
 
     const { dataKeys, deleteDataKeys, } = useDataKeysCtx();
     const { confirm } = useConfirmModal();
@@ -47,7 +49,7 @@ export function DataKeysTableRowActions({
 
     return (
         <div className="flex gap-x-2">
-            {isTransitionPending && <Loader overlay />}
+            {(isTransitionPending || isPreparingDelete) && <Loader overlay />}
 
             <LockStatus {...lockStatusParams} />
 
@@ -83,11 +85,19 @@ export function DataKeysTableRowActions({
 
                     <DropdownMenuItem 
                         className={cn('text-destructive', disabled && 'hidden')}
-                        onClick={() => setTimeout(() => {
-                            confirm(() => deleteDataKeys([dataKey.uuid]), {
-                                title: 'Delete data key',
-                                message: 'Are you sure?',
-                            });
+                        onClick={() => setTimeout(async () => {
+                            try {
+                                setIsPreparingDelete(true);
+                                const impact = await fetchDataKeyDeleteImpact([dataKey.uuid]);
+                                confirm(() => deleteDataKeys([dataKey.uuid]), {
+                                    title: 'Delete data key',
+                                    message: buildDeleteConfirmationMessage(impact),
+                                    positiveLabel: 'Delete anyway',
+                                    danger: true,
+                                });
+                            } finally {
+                                setIsPreparingDelete(false);
+                            }
                         }, 0)}
                     >
                         <TrashIcon className="h-4 w-4 mr-2" /> Delete
