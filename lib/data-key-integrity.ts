@@ -1,6 +1,6 @@
 import { buildNormalizedDataKeyMatchKey, normalizeDataKeyType } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
-import type { DiagnosisType, ScreenType } from "@/databases/queries/scripts";
+import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import {
     applyOwnedOptionCollectionSync,
     resolveOwnedOptionDataKeys,
@@ -37,7 +37,8 @@ export type DataKeyIntegrityKind =
     | "field_item"
     | "field_option_collection"
     | "diagnosis"
-    | "diagnosis_symptom";
+    | "diagnosis_symptom"
+    | "problem";
 
 export type DataKeyIntegrityEntry = {
     status: DataKeyIntegrityStatus;
@@ -47,6 +48,7 @@ export type DataKeyIntegrityEntry = {
     scriptTitle?: string;
     screenId?: string;
     diagnosisId?: string;
+    problemId?: string;
     fieldId?: string;
     fieldIndex?: number;
     screenItemId?: string;
@@ -79,12 +81,13 @@ export type DataKeyIntegrityReport = {
     };
 };
 
-function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "location">) {
+function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "problemId" | "location">) {
     return (
         target.kind === candidate.kind &&
         target.scriptId === candidate.scriptId &&
         (target.screenId || "") === (candidate.screenId || "") &&
         (target.diagnosisId || "") === (candidate.diagnosisId || "") &&
+        (target.problemId || "") === (candidate.problemId || "") &&
         target.location === candidate.location
     );
 }
@@ -287,11 +290,13 @@ function screenItemsUseDataKeys(screenType?: string | null) {
 export function scanDataKeyIntegrity({
     screens = [],
     diagnoses = [],
+    problems = [],
     dataKeys = [],
     onlyIssues = false,
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
+    problems?: ProblemType[];
     dataKeys?: DataKey[];
     onlyIssues?: boolean;
 }): DataKeyIntegrityReport {
@@ -526,6 +531,28 @@ export function scanDataKeyIntegrity({
         });
     }
 
+    for (const problem of problems) {
+        pushEntry(evaluateReference({
+            currentUniqueKey: problem.keyId || undefined,
+            currentKey: problem.key || undefined,
+            currentLabel: problem.name || undefined,
+            expectedDataType: "problem",
+            base: {
+                scriptId: problem.scriptId,
+                scriptTitle: problem.scriptTitle || undefined,
+                problemId: problem.problemId,
+                location: problem.name || problem.key || problem.problemId,
+                kind: "problem",
+                expectedDataType: "problem",
+                currentUniqueKey: problem.keyId || undefined,
+                currentKey: problem.key || undefined,
+                currentLabel: problem.name || undefined,
+            },
+            byUniqueKey,
+            legacyMaps,
+        }));
+    }
+
     const summary = {
         total: entries.length,
         resolved: entries.filter((entry) => entry.status === "resolved").length,
@@ -584,10 +611,12 @@ function resolveOwnedOptions(dataKey: DataKey | undefined, byUniqueKey: Map<stri
 export function repairDataKeyIntegrityReferences({
     screens = [],
     diagnoses = [],
+    problems = [],
     dataKeys = [],
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
+    problems?: ProblemType[];
     dataKeys?: DataKey[];
 }) {
     const byUniqueKey = new Map<string, DataKey>();
@@ -793,9 +822,33 @@ export function repairDataKeyIntegrityReferences({
         };
     });
 
+    const repairedProblems = problems.map((problem) => {
+        let changed = false;
+        const problemDataKey = resolveDataKeyMatch({
+            currentUniqueKey: problem.keyId || undefined,
+            currentKey: problem.key || undefined,
+            currentLabel: problem.name || undefined,
+            expectedDataType: "problem",
+            byUniqueKey,
+            legacyMaps,
+        });
+
+        const syncedProblem = syncDiagnosisReference({
+            ...problem,
+            key: problem.key || problem.name || "",
+        }, problemDataKey);
+        if (syncedProblem.changed) changed = true;
+
+        return {
+            value: syncedProblem.value,
+            changed,
+        };
+    });
+
     return {
         screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
         diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
+        problems: repairedProblems.filter((item) => item.changed).map((item) => item.value),
     };
 }
 
@@ -803,12 +856,14 @@ export function repairSingleDataKeyIntegrityReference({
     entry,
     screens = [],
     diagnoses = [],
+    problems = [],
     dataKeys = [],
     overrideTargetUniqueKey,
 }: {
     entry: DataKeyIntegrityEntry;
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
+    problems?: ProblemType[];
     dataKeys?: DataKey[];
     overrideTargetUniqueKey?: string;
 }) {
@@ -1051,8 +1106,42 @@ export function repairSingleDataKeyIntegrityReference({
         };
     });
 
+    const repairedProblems = problems.map((problem) => {
+        let changed = false;
+        const problemBase = {
+            scriptId: problem.scriptId,
+            problemId: problem.problemId,
+            location: problem.name || problem.key || problem.problemId,
+        };
+
+        let nextProblem = problem;
+
+        if (matchesIntegrityEntry(entry, { ...problemBase, kind: "problem" })) {
+            const problemDataKey = overrideTarget || resolveDataKeyMatch({
+                currentUniqueKey: problem.keyId || undefined,
+                currentKey: problem.key || undefined,
+                currentLabel: problem.name || undefined,
+                expectedDataType: "problem",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const syncedProblem = syncDiagnosisReference({
+                ...nextProblem,
+                key: nextProblem.key || nextProblem.name || "",
+            }, problemDataKey);
+            if (syncedProblem.changed) changed = true;
+            nextProblem = syncedProblem.value;
+        }
+
+        return {
+            value: nextProblem,
+            changed,
+        };
+    });
+
     return {
         screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
         diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
+        problems: repairedProblems.filter((item) => item.changed).map((item) => item.value),
     };
 }

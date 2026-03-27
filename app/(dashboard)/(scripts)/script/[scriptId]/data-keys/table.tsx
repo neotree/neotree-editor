@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryState } from "nuqs";
 import { toast } from "sonner";
 
-import { previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntriesBulk, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
+import { previewDataKeyIntegrityEntriesBulk, previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntriesBulk, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
 import { dataKeyTypes } from "@/constants";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
@@ -47,6 +49,7 @@ const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], stri
     field_option_collection: "Field options",
     diagnosis: "Diagnosis key",
     diagnosis_symptom: "Diagnosis symptom",
+    problem: "Problem key",
 };
 
 function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
@@ -71,6 +74,10 @@ function formatReferenceLabel(entry: DataKeyIntegrityReport["entries"][number]) 
 }
 
 function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
+    if (entry.problemId) {
+        return `/script/${entry.scriptId}/problem/${entry.problemId}`;
+    }
+
     if (entry.diagnosisId) {
         const params = new URLSearchParams();
         if (entry.kind === "diagnosis_symptom") {
@@ -124,6 +131,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
     const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
+    const [bulkReviewItems, setBulkReviewItems] = useState<Array<Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number]>>([]);
+    const [loadingBulkPreview, setLoadingBulkPreview] = useState(false);
+    const [repairEntryParam, setRepairEntryParam] = useQueryState("dataKeyRepair", {
+        defaultValue: "",
+        clearOnDefault: true,
+    });
+    const [bulkStatusParam, setBulkStatusParam] = useQueryState("dataKeyBulkResolve", {
+        defaultValue: "",
+        clearOnDefault: true,
+    });
 
     const entries = [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
@@ -159,6 +176,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         setRepairPreview(null);
         setSelectedTargetUniqueKey("");
         setReviewAcknowledged(false);
+        void setRepairEntryParam("");
+    };
+
+    const closeBulkReviewDrawer = () => {
+        if (isRepairing || loadingBulkPreview) return;
+        setBulkResolveStatus(null);
+        setBulkReviewItems([]);
+        void setBulkStatusParam("");
     };
 
     const loadRepairPreview = async ({
@@ -190,8 +215,34 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return res;
     };
 
+    const loadBulkRepairPreview = async ({
+        items,
+        status,
+    }: {
+        items: Array<{
+            entry: DataKeyIntegrityReport["entries"][number];
+            selectedTargetUniqueKey?: string;
+            reviewed?: boolean;
+        }>;
+        status: "out_of_sync" | "legacy_match";
+    }) => {
+        setLoadingBulkPreview(true);
+        const res = await previewDataKeyIntegrityEntriesBulk({ items });
+        if (!res.success) {
+            setLoadingBulkPreview(false);
+            return res;
+        }
+
+        setBulkResolveStatus(status);
+        setBulkReviewItems(res.previews);
+        setLoadingBulkPreview(false);
+        return res;
+    };
+
     const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || isRepairing || loadingRepairPreview) return;
+        await setBulkStatusParam("");
+        await setRepairEntryParam(getEntryKey(entry));
         setRepairModalEntry(entry);
         setRepairPreview(null);
         setSelectedTargetUniqueKey("");
@@ -201,6 +252,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             setRepairModalEntry(null);
             setRepairPreview(null);
             setSelectedTargetUniqueKey("");
+            await setRepairEntryParam("");
             alert({
                 title: "Preview failed",
                 message: (res.errors?.length ? res.errors.join("<br />") : "Failed to preview repair"),
@@ -236,12 +288,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             } else {
                 toast.success(`Repair draft saved for ${entry.currentKey || entry.currentLabel || entry.location}`);
                 if (res.warnings?.length) {
-                    alert({
-                        title: "Repair saved with warnings",
-                        message: res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join(""),
-                        variant: "info",
-                        buttonLabel: "Close",
-                    });
+                    toast.message(res.warnings.join(" "));
                 }
             }
 
@@ -253,14 +300,47 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         });
     };
 
-    const handleBulkResolve = (status: "out_of_sync" | "legacy_match") => {
-        if (!scriptId || isRepairing) return;
+    const openBulkResolveDrawer = async (status: "out_of_sync" | "legacy_match") => {
+        if (!scriptId || isRepairing || loadingBulkPreview) return;
         const entriesToResolve = bulkResolvableEntries[status];
         if (!entriesToResolve.length) return;
+        await setRepairEntryParam("");
+        await setBulkStatusParam(status);
+
+        const res = await loadBulkRepairPreview({
+            status,
+            items: entriesToResolve.map((entry) => ({
+                entry,
+                selectedTargetUniqueKey: entry.matchedUniqueKey || entry.currentUniqueKey || "",
+                reviewed: false,
+            })),
+        });
+
+        if (!res.success) {
+            await setBulkStatusParam("");
+            alert({
+                title: "Bulk preview failed",
+                message: (res.errors?.length ? res.errors.join("<br />") : "Failed to prepare bulk review"),
+                variant: "error",
+                buttonLabel: "Close",
+            });
+        }
+    };
+
+    const handleBulkResolve = () => {
+        if (!scriptId || isRepairing || !bulkResolveStatus) return;
+        const reviewedItems = bulkReviewItems.filter((item) => item.reviewed);
+        if (!reviewedItems.length) return;
 
         startRepairTransition(async () => {
-            setResolvingKey(`bulk:${status}`);
-            const res = await resolveDataKeyIntegrityEntriesBulk({ entries: entriesToResolve });
+            setResolvingKey(`bulk:${bulkResolveStatus}`);
+            const res = await resolveDataKeyIntegrityEntriesBulk({
+                items: reviewedItems.map((item) => ({
+                    entry: item.entry,
+                    selectedTargetUniqueKey: item.selectedTargetUniqueKey || undefined,
+                    reviewed: item.reviewed,
+                })),
+            });
 
             if (!res.success) {
                 alert({
@@ -274,21 +354,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             }
 
             if (!res.changed) {
-                toast.message(`No ${status.replace(/_/g, " ")} references needed changes`);
+                toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
             } else {
-                toast.success(`Saved ${res.resolvedCount} ${status.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
+                toast.success(`Saved ${res.resolvedCount} ${bulkResolveStatus.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
                 if (res.warnings?.length) {
-                    alert({
-                        title: "Bulk repair saved with warnings",
-                        message: res.warnings.map((warning) => `<div class="mb-1 text-sm">${warning}</div>`).join(""),
-                        variant: "info",
-                        buttonLabel: "Close",
-                    });
+                    toast.message(res.warnings.join(" "));
                 }
             }
 
             setResolvingKey(null);
-            setBulkResolveStatus(null);
+            closeBulkReviewDrawer();
             router.refresh();
         });
     };
@@ -388,6 +463,32 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         );
     };
 
+    const bulkReviewableItems = bulkReviewItems.filter((item) => item.changed);
+    const reviewedBulkItemsCount = bulkReviewableItems.filter((item) => item.reviewed).length;
+
+    useEffect(() => {
+        if (!repairEntryParam || repairModalEntry || isRepairing || loadingRepairPreview) return;
+        const matchedEntry = entries.find((entry) => getEntryKey(entry) === repairEntryParam);
+        if (!matchedEntry) {
+            void setRepairEntryParam("");
+            return;
+        }
+        void openRepairModal(matchedEntry);
+    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, setRepairEntryParam]);
+
+    useEffect(() => {
+        if (!bulkStatusParam || bulkResolveStatus || isRepairing || loadingBulkPreview) return;
+        if (bulkStatusParam !== "out_of_sync" && bulkStatusParam !== "legacy_match") {
+            void setBulkStatusParam("");
+            return;
+        }
+        if (!bulkResolvableEntries[bulkStatusParam].length) {
+            void setBulkStatusParam("");
+            return;
+        }
+        void openBulkResolveDrawer(bulkStatusParam);
+    }, [bulkResolvableEntries, bulkResolveStatus, bulkStatusParam, isRepairing, loadingBulkPreview, openBulkResolveDrawer, setBulkStatusParam]);
+
     return (
         <>
             <Modal
@@ -404,7 +505,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </Button>
                         <Button
                             onClick={() => repairModalEntry && handleResolveEntry(repairModalEntry)}
-                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !reviewAcknowledged || !repairPreview?.screens.length && !repairPreview?.diagnoses.length}
+                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !reviewAcknowledged || (!repairPreview?.screens.length && !repairPreview?.diagnoses.length && !repairPreview?.problems.length)}
                         >
                             {isRepairing ? "Saving Draft..." : "Save Repair Draft"}
                         </Button>
@@ -413,7 +514,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             >
                 {!repairModalEntry || loadingRepairPreview ? (
                     <div className="text-sm text-muted-foreground">Preparing repair preview...</div>
-                ) : !repairPreview?.screens.length && !repairPreview?.diagnoses.length ? (
+                ) : !repairPreview?.screens.length && !repairPreview?.diagnoses.length && !repairPreview?.problems.length ? (
                     <div className="space-y-2 text-sm">
                         <div>No deterministic draft repair is available for this reference.</div>
                         <div className="text-muted-foreground">Review and update it manually if needed.</div>
@@ -554,6 +655,26 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     </div>
                                 </div>
                             )}
+
+                            {!!repairPreview.problems.length && (
+                                <div>
+                                    <div className="text-muted-foreground">Affected problems</div>
+                                    <div className="space-y-1">
+                                        {repairPreview.problems.map((problem) => (
+                                            <Link
+                                                key={problem.problemId}
+                                                href={`/script/${problem.scriptId}/problem/${problem.problemId}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                            >
+                                                <span>{problem.title}</span>
+                                                <ExternalLinkIcon className="h-3 w-3" />
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-start gap-3 rounded-md border p-3">
@@ -571,7 +692,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             </Modal>
 
             <Modal
-                open={!!bulkResolveStatus}
+                open={false}
                 onOpenChange={(open) => {
                     if (!open && !isRepairing) setBulkResolveStatus(null);
                 }}
@@ -583,7 +704,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             Cancel
                         </Button>
                         <Button
-                            onClick={() => bulkResolveStatus && handleBulkResolve(bulkResolveStatus)}
+                            onClick={() => handleBulkResolve()}
                             disabled={!bulkResolveStatus || isRepairing || !bulkResolvableEntries[bulkResolveStatus]?.length}
                         >
                             {isRepairing ? "Saving Drafts..." : "Save Repair Drafts"}
@@ -620,6 +741,188 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
                 )}
             </Modal>
+
+            <Sheet open={!!bulkResolveStatus} onOpenChange={(open) => { if (!open) closeBulkReviewDrawer(); }}>
+                <SheetContent hideCloseButton side="right" className="p-0 m-0 flex flex-col sm:max-w-3xl w-full">
+                    <SheetHeader className="py-4 px-4 border-b border-b-border text-left">
+                        <SheetTitle>
+                            {bulkResolveStatus ? `Review ${bulkResolveStatus.replace(/_/g, " ")} repairs` : "Review bulk repairs"}
+                        </SheetTitle>
+                        <SheetDescription>
+                            Review each suggested repair, change the data key if needed, and tick each item when you are satisfied.
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                        {loadingBulkPreview ? (
+                            <div className="text-sm text-muted-foreground">Preparing bulk repair review...</div>
+                        ) : !bulkReviewableItems.length ? (
+                            <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                                No deterministic repair drafts are available for the selected entries.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                                    {reviewedBulkItemsCount} of {bulkReviewableItems.length} suggested repairs are marked for save. Unreviewed entries will be left unchanged.
+                                </div>
+
+                                {bulkReviewableItems.map((item, index) => {
+                                    const usageHref = buildUsageHref(item.entry);
+
+                                    return (
+                                        <div key={`${getEntryKey(item.entry)}::${index}`} className="rounded-md border p-4 space-y-4">
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    id={`bulk-review-${index}`}
+                                                    checked={item.reviewed === true}
+                                                    onCheckedChange={(checked) => {
+                                                        setBulkReviewItems((current) => current.map((candidate, candidateIndex) => (
+                                                            candidateIndex !== index
+                                                                ? candidate
+                                                                : {
+                                                                    ...candidate,
+                                                                    reviewed: checked === true,
+                                                                }
+                                                        )));
+                                                    }}
+                                                />
+
+                                                <div className="flex-1 space-y-3">
+                                                    <Label htmlFor={`bulk-review-${index}`} className="leading-5">
+                                                        I have reviewed this suggested repair
+                                                    </Label>
+
+                                                    <div className="grid gap-3 md:grid-cols-2">
+                                                        <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-2">
+                                                            <div className="text-xs font-semibold uppercase tracking-wide text-red-700">From</div>
+                                                            <div className="font-medium text-red-950">{formatReferenceLabel(item.entry)}</div>
+                                                            <div className="text-sm text-red-900">{item.entry.reason}</div>
+                                                            <Link href={usageHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-red-900 underline-offset-4 hover:underline">
+                                                                <span>Open usage</span>
+                                                                <ExternalLinkIcon className="h-3 w-3" />
+                                                            </Link>
+                                                        </div>
+
+                                                        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                                                            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
+                                                            <div className="font-medium text-emerald-950">Suggested data key</div>
+                                                            <SelectDataKey
+                                                                modal
+                                                                value={item.targetDataKey?.name || item.targetDataKey?.label || ""}
+                                                                placeholder="Select data key"
+                                                                type={item.entry.expectedDataType || undefined}
+                                                                disabled={isRepairing || loadingBulkPreview}
+                                                                onChange={async ([dataKey]) => {
+                                                                    const nextItems = bulkReviewItems.map((candidate, candidateIndex) => (
+                                                                        candidateIndex !== index
+                                                                            ? candidate
+                                                                            : {
+                                                                                ...candidate,
+                                                                                reviewed: false,
+                                                                                selectedTargetUniqueKey: dataKey?.uniqueKey || "",
+                                                                            }
+                                                                    ));
+                                                                    setBulkReviewItems(nextItems);
+                                                                    const previewRes = await loadBulkRepairPreview({
+                                                                        status: bulkResolveStatus!,
+                                                                        items: nextItems.map((candidate) => ({
+                                                                            entry: candidate.entry,
+                                                                            reviewed: candidate.reviewed,
+                                                                            selectedTargetUniqueKey: candidate.selectedTargetUniqueKey || undefined,
+                                                                        })),
+                                                                    });
+                                                                    if (!previewRes.success) {
+                                                                        alert({
+                                                                            title: "Bulk preview failed",
+                                                                            message: (previewRes.errors?.length ? previewRes.errors.join("<br />") : "Failed to preview bulk repair"),
+                                                                            variant: "error",
+                                                                            buttonLabel: "Close",
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div className="text-sm text-emerald-900">
+                                                                Use the suggested data key, or pick a different one.
+                                                            </div>
+                                                            {!!item.targetDataKey?.label && (
+                                                                <div className="text-xs text-emerald-800">Label: {item.targetDataKey.label}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="rounded-md border p-3 space-y-2">
+                                                        <div className="font-medium">Affected usage</div>
+                                                        {!!item.screens.length && (
+                                                            <div className="space-y-1">
+                                                                {item.screens.map((screen) => (
+                                                                    <Link
+                                                                        key={screen.screenId}
+                                                                        href={`/script/${screen.scriptId}/screen/${screen.screenId}`}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                                                    >
+                                                                        <span>{screen.title}</span>
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {!!item.diagnoses.length && (
+                                                            <div className="space-y-1">
+                                                                {item.diagnoses.map((diagnosis) => (
+                                                                    <Link
+                                                                        key={diagnosis.diagnosisId}
+                                                                        href={`/script/${diagnosis.scriptId}/diagnosis/${diagnosis.diagnosisId}`}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                                                    >
+                                                                        <span>{diagnosis.title}</span>
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {!!item.problems.length && (
+                                                            <div className="space-y-1">
+                                                                {item.problems.map((problem) => (
+                                                                    <Link
+                                                                        key={problem.problemId}
+                                                                        href={`/script/${problem.scriptId}/problem/${problem.problemId}`}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                                                    >
+                                                                        <span>{problem.title}</span>
+                                                                        <ExternalLinkIcon className="h-3 w-3" />
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </>
+                        )}
+                    </div>
+
+                    <SheetFooter className="px-4 py-4 border-t border-t-border">
+                        <Button variant="ghost" onClick={closeBulkReviewDrawer} disabled={isRepairing || loadingBulkPreview}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => handleBulkResolve()}
+                            disabled={!bulkResolveStatus || isRepairing || loadingBulkPreview || reviewedBulkItemsCount === 0}
+                        >
+                            {isRepairing ? "Saving Drafts..." : `Save ${reviewedBulkItemsCount || ""} Reviewed Repair Draft${reviewedBulkItemsCount === 1 ? "" : "s"}`}
+                        </Button>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
 
             <Title>{title + ' - data key integrity'}</Title>
             <PageContainer>
@@ -709,7 +1012,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                         size="sm"
                                         variant="outline"
                                         disabled={isRepairing}
-                                        onClick={() => setBulkResolveStatus("out_of_sync")}
+                                        onClick={() => openBulkResolveDrawer("out_of_sync")}
                                     >
                                         Out of sync ({bulkResolvableEntries.out_of_sync.length})
                                     </Button>
@@ -720,7 +1023,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                         size="sm"
                                         variant="outline"
                                         disabled={isRepairing}
-                                        onClick={() => setBulkResolveStatus("legacy_match")}
+                                        onClick={() => openBulkResolveDrawer("legacy_match")}
                                     >
                                         Legacy match ({bulkResolvableEntries.legacy_match.length})
                                     </Button>
