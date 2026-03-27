@@ -3,6 +3,7 @@ import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { problemsDrafts, problems, problemsHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
+import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveProblemsHistory({
   previous,
@@ -64,6 +65,7 @@ export async function _saveProblemsHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {})
+        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: problemId,
@@ -75,6 +77,7 @@ export async function _saveProblemsHistory({
           previousSnapshot,
           baselineSnapshot: previousSnapshot,
           description: changeDescription,
+          changeReason,
           userId,
           scriptId: c?.data?.scriptId || null,
           problemId,
