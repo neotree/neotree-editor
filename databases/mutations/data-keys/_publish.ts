@@ -39,6 +39,7 @@ export async function _publishDataKeys(opts?: {
         .update(dataKeys)
         .set({
           deletedAt,
+          uniqueKey: sql`CONCAT(${dataKeys.uniqueKey}, '_', ${dataKeys.uuid})`, // make the unique key available for use
         })
         .where(
           inArray(
@@ -55,8 +56,8 @@ export async function _publishDataKeys(opts?: {
           changes: {
             action: "delete_data_key",
             description: "Delete data key",
-            oldValues: [{ deletedAt: null }],
-            newValues: [{ deletedAt }],
+            oldValues: [{ deletedAt: null, uniqueKey: c.dataKey?.uniqueKey, }],
+            newValues: [{ deletedAt, uniqueKey: [c.dataKey?.uniqueKey || '', c.dataKey?.uuid || ''].filter(s => s).join('_'), }],
           },
         }
       })
