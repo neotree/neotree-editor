@@ -21,7 +21,7 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-import { buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
+import { repairDataKeyIntegrityReferences } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
 import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -33,7 +33,6 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
   problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
   shouldRunIntegrityChecks: boolean
-  shouldBlockPublishOnIntegrity: boolean
 }> {
   const [userDataKeyDrafts, userScriptDrafts, userScreenDrafts, userDiagnosisDrafts, userProblemDrafts, userPendingDeletion] = await Promise.all([
     db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined }),
@@ -53,9 +52,6 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     }),
   ])
 
-  const hasDataKeyDrafts = userDataKeyDrafts.length > 0
-  const hasDataKeyDeletions = userPendingDeletion.some((entry) => !!entry.dataKeyId)
-  const hasDataKeyLibraryChanges = hasDataKeyDrafts || hasDataKeyDeletions
   const hasScriptFamilyChanges =
     userScriptDrafts.length > 0 ||
     userScreenDrafts.length > 0 ||
@@ -64,7 +60,6 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
 
   const shouldRunIntegrityChecks = hasScriptFamilyChanges
-  const shouldBlockPublishOnIntegrity = !hasDataKeyLibraryChanges
 
   if (!shouldRunIntegrityChecks) {
     return {
@@ -73,7 +68,6 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks,
-      shouldBlockPublishOnIntegrity,
     }
   }
 
@@ -215,7 +209,6 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
       errors: publishedProblemsRes.errors,
     },
     shouldRunIntegrityChecks,
-    shouldBlockPublishOnIntegrity,
   }
 }
 
@@ -338,7 +331,6 @@ export async function publishData({
       diagnosesRes,
       problemsRes,
       shouldRunIntegrityChecks,
-      shouldBlockPublishOnIntegrity,
     } = await getScopedIntegrityData(userId)
 
     const integrityErrors = [
@@ -400,26 +392,6 @@ export async function publishData({
         results.errors = repairedProblems.errors
         return results
       }
-    }
-
-    const postRepairReport = !shouldRunIntegrityChecks
-      ? null
-      : scanDataKeyIntegrity({
-          dataKeys: dataKeysRes.data,
-          screens: repairs.screens.length ? screensRes.data.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen) : screensRes.data,
-          diagnoses: repairs.diagnoses.length ? diagnosesRes.data.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis) : diagnosesRes.data,
-          problems: repairs.problems.length ? problemsRes.data.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem) : problemsRes.data,
-          onlyIssues: true,
-        })
-    const publishIntegrityErrors = postRepairReport ? buildDataKeyIntegrityPublishErrors(postRepairReport) : []
-    if (publishIntegrityErrors.length) {
-      if (shouldBlockPublishOnIntegrity) {
-        results.success = false
-        results.errors = publishIntegrityErrors
-        return results
-      }
-
-      results.warnings = [...(results.warnings || []), ...publishIntegrityErrors]
     }
 
     const publishConfigKeys = await configKeysMutations._publishConfigKeys({
