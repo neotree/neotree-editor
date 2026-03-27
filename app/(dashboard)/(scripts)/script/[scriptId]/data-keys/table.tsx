@@ -423,7 +423,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         <div className="rounded-md border p-3 space-y-3">
                             <div className="font-medium">What will change</div>
                             <div className="text-muted-foreground">
-                                This repair will update the current script draft so this reference points to the library data key shown below.
+                                This repair will update the current script draft so this reference points to the data key shown below.
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2">
@@ -443,7 +443,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
                                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2">
                                     <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
-                                    <div className="font-medium text-emerald-950">Choose the data key to link this reference to</div>
+                                    <div className="font-medium text-emerald-950">Suggested data key</div>
                                     <SelectDataKey
                                         modal
                                         value={repairPreview?.targetDataKey?.name || repairPreview?.targetDataKey?.label || ""}
@@ -469,9 +469,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                         }}
                                     />
                                     <div className="text-sm text-emerald-900">
-                                        {repairPreview?.targetDataKey?.label
-                                            ? `Label: ${repairPreview.targetDataKey.label}`
-                                            : "Select the correct library data key before saving this repair draft."}
+                                        Use the suggested data key, or pick a different one.
                                     </div>
                                     {!!repairPreview?.targetDataKey?.dataType && (
                                         <div className="text-xs text-emerald-800">
@@ -512,14 +510,26 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </div>
 
                         <div className="rounded-md border p-3 space-y-3">
-                            <div className="font-medium">Draft updates that will be created</div>
+                            <div className="font-medium">Review affected usage</div>
+                            <div className="text-muted-foreground">
+                                Open the affected script location before saving if you want to verify the exact reference being repaired.
+                            </div>
 
                             {!!repairPreview.screens.length && (
                                 <div>
                                     <div className="text-muted-foreground">Affected screens</div>
                                     <div className="space-y-1">
                                         {repairPreview.screens.map((screen) => (
-                                            <div key={screen.screenId}>{screen.title}</div>
+                                            <Link
+                                                key={screen.screenId}
+                                                href={`/script/${screen.scriptId}/screen/${screen.screenId}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                            >
+                                                <span>{screen.title}</span>
+                                                <ExternalLinkIcon className="h-3 w-3" />
+                                            </Link>
                                         ))}
                                     </div>
                                 </div>
@@ -530,15 +540,20 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     <div className="text-muted-foreground">Affected diagnoses</div>
                                     <div className="space-y-1">
                                         {repairPreview.diagnoses.map((diagnosis) => (
-                                            <div key={diagnosis.diagnosisId}>{diagnosis.title}</div>
+                                            <Link
+                                                key={diagnosis.diagnosisId}
+                                                href={`/script/${diagnosis.scriptId}/diagnosis/${diagnosis.diagnosisId}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                                            >
+                                                <span>{diagnosis.title}</span>
+                                                <ExternalLinkIcon className="h-3 w-3" />
+                                            </Link>
                                         ))}
                                     </div>
                                 </div>
                             )}
-
-                            <div className="text-muted-foreground">
-                                This only updates the draft. Nothing is published yet, and script changes will still need to be published separately.
-                            </div>
                         </div>
 
                         <div className="flex items-start gap-3 rounded-md border p-3">
