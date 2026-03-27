@@ -7,22 +7,15 @@ import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensD
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
-import { buildNormalizedDataKeyMatchKey } from '@/lib/data-key-types';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
     dataKeys: DataKey[];
     dryRun?: boolean;
-    previousDataKeys?: Array<{
-        uniqueKey: string;
-        name?: string | null;
-        label?: string | null;
-        dataType?: string | null;
-    }>;
     userId?: string;
 };
 
-type MatchSource = 'uniqueKey' | 'legacyName' | 'legacyLabel';
+type MatchSource = 'uniqueKey';
 
 type UpdateStats = {
     candidateScripts: number;
@@ -88,7 +81,6 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 
 const SAVE_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_SIZE, 50);
 const SAVE_RETRY_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_RETRY_CONCURRENCY, 5);
-const ALLOW_LEGACY_DATA_KEY_MATCH = process.env.DATA_KEYS_REFS_ALLOW_LEGACY_MATCH !== 'false';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
     if (size <= 0) return [arr];
@@ -104,10 +96,6 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
     const clauses = patterns.map(pattern => sql`${column}::text ILIKE ${pattern}`);
     if (clauses.length === 1) return clauses[0];
     return or(...clauses) as SQL;
-}
-
-function buildLegacyLookupKey(value: string, dataType?: string | null) {
-    return buildNormalizedDataKeyMatchKey(value, dataType);
 }
 
 function escapeLikePattern(value: string) {
@@ -136,7 +124,6 @@ async function mapWithConcurrency<T>(
 export async function _updateDataKeysRefs({
     dataKeys,
     dryRun = false,
-    previousDataKeys = [],
     broadcastAction,
     userId,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
@@ -165,121 +152,15 @@ export async function _updateDataKeysRefs({
         });
 
         const changedUniqueKeys = Array.from(byUniqueKey.keys());
-        const legacyNameToUniqueKey = new Map<string, string>();
-        const legacyLabelToUniqueKey = new Map<string, string>();
-        const legacyNameFallbackToUniqueKey = new Map<string, string>();
-        const legacyLabelFallbackToUniqueKey = new Map<string, string>();
-        const legacyNameConflicts = new Set<string>();
-        const legacyLabelConflicts = new Set<string>();
-        const legacyNameFallbackConflicts = new Set<string>();
-        const legacyLabelFallbackConflicts = new Set<string>();
-        const oldNames = new Set<string>();
-        const oldLabels = new Set<string>();
-
-        previousDataKeys.forEach(prev => {
-            if (!prev.uniqueKey) return;
-            const current = byUniqueKey.get(prev.uniqueKey);
-            if (!current) return;
-
-            const oldName = `${prev.name || ''}`.trim();
-            const oldLabel = `${prev.label || ''}`.trim();
-
-            if (oldName && oldName !== current.name) {
-                oldNames.add(oldName);
-                const lookupKey = buildLegacyLookupKey(oldName, prev.dataType);
-                const existing = legacyNameToUniqueKey.get(lookupKey);
-                if (existing && existing !== current.uniqueKey) legacyNameConflicts.add(lookupKey);
-                legacyNameToUniqueKey.set(lookupKey, current.uniqueKey);
-
-                const fallbackLookupKey = buildLegacyLookupKey(oldName);
-                const fallbackExisting = legacyNameFallbackToUniqueKey.get(fallbackLookupKey);
-                if (fallbackExisting && fallbackExisting !== current.uniqueKey) legacyNameFallbackConflicts.add(fallbackLookupKey);
-                legacyNameFallbackToUniqueKey.set(fallbackLookupKey, current.uniqueKey);
-            }
-
-            if (oldLabel && oldLabel !== current.label) {
-                oldLabels.add(oldLabel);
-                const lookupKey = buildLegacyLookupKey(oldLabel, prev.dataType);
-                const existing = legacyLabelToUniqueKey.get(lookupKey);
-                if (existing && existing !== current.uniqueKey) legacyLabelConflicts.add(lookupKey);
-                legacyLabelToUniqueKey.set(lookupKey, current.uniqueKey);
-
-                const fallbackLookupKey = buildLegacyLookupKey(oldLabel);
-                const fallbackExisting = legacyLabelFallbackToUniqueKey.get(fallbackLookupKey);
-                if (fallbackExisting && fallbackExisting !== current.uniqueKey) legacyLabelFallbackConflicts.add(fallbackLookupKey);
-                legacyLabelFallbackToUniqueKey.set(fallbackLookupKey, current.uniqueKey);
-            }
-        });
 
         const getUpdatedDataKey = ({
             uniqueKey,
-            key,
-            label,
-            dataType,
         }: {
             uniqueKey?: string | null;
-            key?: string | null;
-            label?: string | null;
-            dataType?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
                 const keyById = byUniqueKey.get(uniqueKey);
                 if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
-            }
-
-            if (!ALLOW_LEGACY_DATA_KEY_MATCH) {
-                return {};
-            }
-
-            const trimmedKey = `${key || ''}`.trim();
-            const trimmedLabel = `${label || ''}`.trim();
-
-            if (trimmedKey) {
-                const legacyLookupKey = buildLegacyLookupKey(trimmedKey, dataType);
-                if (legacyNameConflicts.has(legacyLookupKey)) {
-                    stats.ambiguousLegacySkips++;
-                } else {
-                    const matchedUniqueKey = legacyNameToUniqueKey.get(legacyLookupKey);
-                    if (matchedUniqueKey) {
-                        const matched = byUniqueKey.get(matchedUniqueKey);
-                        if (matched) return { dataKey: matched, source: 'legacyName' };
-                    }
-                }
-
-                const fallbackLookupKey = buildLegacyLookupKey(trimmedKey);
-                if (legacyNameFallbackConflicts.has(fallbackLookupKey)) {
-                    stats.ambiguousLegacySkips++;
-                } else {
-                    const matchedUniqueKey = legacyNameFallbackToUniqueKey.get(fallbackLookupKey);
-                    if (matchedUniqueKey) {
-                        const matched = byUniqueKey.get(matchedUniqueKey);
-                        if (matched) return { dataKey: matched, source: 'legacyName' };
-                    }
-                }
-            }
-
-            if (trimmedLabel) {
-                const legacyLookupKey = buildLegacyLookupKey(trimmedLabel, dataType);
-                if (legacyLabelConflicts.has(legacyLookupKey)) {
-                    stats.ambiguousLegacySkips++;
-                } else {
-                    const matchedUniqueKey = legacyLabelToUniqueKey.get(legacyLookupKey);
-                    if (matchedUniqueKey) {
-                        const matched = byUniqueKey.get(matchedUniqueKey);
-                        if (matched) return { dataKey: matched, source: 'legacyLabel' };
-                    }
-                }
-
-                const fallbackLookupKey = buildLegacyLookupKey(trimmedLabel);
-                if (legacyLabelFallbackConflicts.has(fallbackLookupKey)) {
-                    stats.ambiguousLegacySkips++;
-                } else {
-                    const matchedUniqueKey = legacyLabelFallbackToUniqueKey.get(fallbackLookupKey);
-                    if (matchedUniqueKey) {
-                        const matched = byUniqueKey.get(matchedUniqueKey);
-                        if (matched) return { dataKey: matched, source: 'legacyLabel' };
-                    }
-                }
             }
 
             return {};
@@ -287,8 +168,6 @@ export async function _updateDataKeysRefs({
 
         const trackMatchSource = (source?: MatchSource) => {
             if (source === 'uniqueKey') stats.matchedByUniqueKey++;
-            if (source === 'legacyName') stats.matchedByLegacyName++;
-            if (source === 'legacyLabel') stats.matchedByLegacyLabel++;
         };
         const getDataKeyOptional = (key?: DataKey) => !!(key?.metadata as Record<string, any> | undefined)?.optional;
 
@@ -305,9 +184,6 @@ export async function _updateDataKeysRefs({
             usagesMap.set(dedupeKey, usage);
         };
 
-        const oldNamesArr = Array.from(oldNames);
-        const oldLabelsArr = Array.from(oldLabels);
-
         const keyIdPatterns = changedUniqueKeys
             .filter(Boolean)
             .slice(0, 120)
@@ -319,49 +195,13 @@ export async function _updateDataKeysRefs({
                     `%\"keyId\"%\"${id}\"%`,
                 ];
             });
-        const oldNamePatterns = oldNamesArr
-            .filter(Boolean)
-            .slice(0, 80)
-            .flatMap(name => {
-                const n = escapeLikePattern(name);
-                return [
-                    `%\"key\":\"${n}\"%`,
-                    `%\"key\": \"${n}\"%`,
-                    `%\"key\"%\"${n}\"%`,
-                    `%\"id\":\"${n}\"%`,
-                    `%\"id\": \"${n}\"%`,
-                    `%\"id\"%\"${n}\"%`,
-                    `%\"value\":\"${n}\"%`,
-                    `%\"value\": \"${n}\"%`,
-                    `%\"value\"%\"${n}\"%`,
-                    `%\"refKey\":\"${n}\"%`,
-                    `%\"refKey\": \"${n}\"%`,
-                    `%\"refKey\"%\"${n}\"%`,
-                ];
-            });
-        const oldLabelPatterns = oldLabelsArr
-            .filter(Boolean)
-            .slice(0, 80)
-            .flatMap(label => {
-                const l = escapeLikePattern(label);
-                return [
-                    `%\"label\":\"${l}\"%`,
-                    `%\"label\": \"${l}\"%`,
-                    `%\"label\"%\"${l}\"%`,
-                    `%\"name\":\"${l}\"%`,
-                    `%\"name\": \"${l}\"%`,
-                    `%\"name\"%\"${l}\"%`,
-                ];
-            });
         const likePatterns = Array.from(new Set([
             ...keyIdPatterns,
-            ...oldNamePatterns,
-            ...oldLabelPatterns,
         ])).slice(0, 240);
 
         const candidateScripts = new Set<string>();
 
-        if (changedUniqueKeys.length || oldNames.size || oldLabels.size || likePatterns.length) {
+        if (changedUniqueKeys.length || likePatterns.length) {
             const screensPublishedCandidates = await db
                 .select({ scriptId: screens.scriptId })
                 .from(screens)
@@ -370,9 +210,6 @@ export async function _updateDataKeysRefs({
                     or(
                         changedUniqueKeys.length ? inArray(screens.keyId, changedUniqueKeys) : undefined,
                         changedUniqueKeys.length ? inArray(screens.refIdDataKey, changedUniqueKeys) : undefined,
-                        oldNamesArr.length ? inArray(screens.key, oldNamesArr) : undefined,
-                        oldLabelsArr.length ? inArray(screens.label, oldLabelsArr) : undefined,
-                        oldNamesArr.length ? inArray(screens.refId, oldNamesArr) : undefined,
                         buildLikeClauses(sql`${screens.fields}`, likePatterns),
                         buildLikeClauses(sql`${screens.items}`, likePatterns),
                     ),
@@ -389,8 +226,6 @@ export async function _updateDataKeysRefs({
                     isNull(diagnoses.deletedAt),
                     or(
                         changedUniqueKeys.length ? inArray(diagnoses.keyId, changedUniqueKeys) : undefined,
-                        oldNamesArr.length ? inArray(diagnoses.key, oldNamesArr) : undefined,
-                        oldLabelsArr.length ? inArray(diagnoses.name, oldLabelsArr) : undefined,
                         buildLikeClauses(sql`${diagnoses.symptoms}`, likePatterns),
                     ),
                 ));
@@ -406,8 +241,6 @@ export async function _updateDataKeysRefs({
                     isNull(problems.deletedAt),
                     or(
                         changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
-                        oldNamesArr.length ? inArray(problems.key, oldNamesArr) : undefined,
-                        oldLabelsArr.length ? inArray(problems.name, oldLabelsArr) : undefined,
                     ),
                 ));
 
@@ -459,11 +292,7 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        const shouldFallbackToFullScan = !candidateScripts.size && (
-            changedUniqueKeys.length > 0 ||
-            oldNamesArr.length > 0 ||
-            oldLabelsArr.length > 0
-        );
+        const shouldFallbackToFullScan = !candidateScripts.size && changedUniqueKeys.length > 0;
 
         const useFullScan = dryRun || shouldFallbackToFullScan;
 
@@ -508,15 +337,11 @@ export async function _updateDataKeysRefs({
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
             const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.refIdDataKey || s.refId,
-                key: s.refId,
             });
             trackMatchSource(refMatchSource);
 
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
-                key: s.key,
-                label: s.label,
-                dataType: s.type || undefined,
             });
             trackMatchSource(screenMatchSource);
 
@@ -537,9 +362,6 @@ export async function _updateDataKeysRefs({
             const items = (s.items || []).map((item, itemIndex) => {
                 const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
-                    key: item.key || item.id,
-                    label: item.label,
-                    dataType: s.type === 'diagnosis' ? 'diagnosis' : 'option',
                 });
                 trackMatchSource(itemMatchSource);
 
@@ -571,39 +393,31 @@ export async function _updateDataKeysRefs({
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
-                    key: field.key,
-                    label: field.label,
-                    dataType: field.type || undefined,
                 });
                 trackMatchSource(fieldMatchSource);
 
                 const { dataKey: refKeyDataKey, source: refKeyMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.refKeyId,
-                    key: field.refKey,
                 });
                 trackMatchSource(refKeyMatchSource);
 
                 const { dataKey: minDateKeyDataKey, source: minDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minDateKeyId,
-                    key: field.minDateKey,
                 });
                 trackMatchSource(minDateMatchSource);
 
                 const { dataKey: maxDateKeyDataKey, source: maxDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxDateKeyId,
-                    key: field.maxDateKey,
                 });
                 trackMatchSource(maxDateMatchSource);
 
                 const { dataKey: minTimeKeyDataKey, source: minTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minTimeKeyId,
-                    key: field.minTimeKey,
                 });
                 trackMatchSource(minTimeMatchSource);
 
                 const { dataKey: maxTimeKeyDataKey, source: maxTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxTimeKeyId,
-                    key: field.maxTimeKey,
                 });
                 trackMatchSource(maxTimeMatchSource);
 
@@ -656,9 +470,6 @@ export async function _updateDataKeysRefs({
                     items: (field.items || []).map((item, fieldItemIndex) => {
                         const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                             uniqueKey: item.keyId,
-                            key: `${item.value || ''}`,
-                            label: `${item.label || ''}`,
-                            dataType: 'option',
                         });
                         trackMatchSource(fieldItemMatchSource);
 
@@ -710,9 +521,6 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: diagnosisDataKey, source: diagnosisMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
-                key: d.key,
-                label: d.name,
-                dataType: 'diagnosis',
             });
             trackMatchSource(diagnosisMatchSource);
 
@@ -733,9 +541,6 @@ export async function _updateDataKeysRefs({
             const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
-                    key: item.key,
-                    label: item.name,
-                    dataType: `diagnosis_symptom_${item.type}`,
                 });
                 trackMatchSource(symptomMatchSource);
 
@@ -779,9 +584,6 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: problemDataKey, source: problemMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
-                key: d.key,
-                label: d.name,
-                dataType: 'problem',
             });
             trackMatchSource(problemMatchSource);
 
@@ -837,7 +639,7 @@ export async function _updateDataKeysRefs({
             type: 'problem',
         }));
         const affectedScriptsMap: { [key: string]: { scriptId: string; scriptTitle?: string; }; } = {};
-        [...affectedScreens, ...affectedDiagnoses].forEach(entity => {
+        [...affectedScreens, ...affectedDiagnoses, ...affectedProblems].forEach(entity => {
             if (!entity.scriptId) return;
             if (!affectedScriptsMap[entity.scriptId]) {
                 affectedScriptsMap[entity.scriptId] = {
@@ -889,7 +691,7 @@ export async function _updateDataKeysRefs({
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (problem) => {
-                        const singleRes = await _saveDiagnoses({ data: [problem], userId, });
+                        const singleRes = await _saveProblems({ data: [problem], userId, });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[problem:${problem.problemId}] ${e}`));
                         } else {
