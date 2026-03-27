@@ -28,6 +28,7 @@ export type ChangeLogType = typeof changeLogs.$inferSelect & {
     userName?: string;
     userEmail?: string;
     entityName?: string;
+    scriptTitle?: string;
 };
 
 const SENSITIVE_KEYS = ["password", "secret", "token", "credential", "auth", "privatekey", "apikey", "salt"];
@@ -133,9 +134,13 @@ export async function _getChangeLogs(
                     name: users.displayName,
                     email: users.email,
                 },
+                script: {
+                    title: scripts.title,
+                },
             })
             .from(changeLogs)
             .leftJoin(users, eq(users.userId, changeLogs.userId))
+            .leftJoin(scripts, eq(scripts.scriptId, changeLogs.scriptId))
             .where(and(
                 !changeLogIds.length ? undefined : inArray(changeLogs.changeLogId, changeLogIds),
                 !entityIds.length ? undefined : inArray(changeLogs.entityId, entityIds),
@@ -162,6 +167,7 @@ export async function _getChangeLogs(
             userName: item.user?.name || '',
             userEmail: item.user?.email || '',
             entityName: deriveEntityName(item.changeLog),
+            scriptTitle: item.script?.title || '',
         }));
 
         const totalRes = await db
@@ -280,9 +286,13 @@ export async function _getChangeLog(
                     name: users.displayName,
                     email: users.email,
                 },
+                script: {
+                    title: scripts.title,
+                },
             })
             .from(changeLogs)
             .leftJoin(users, eq(users.userId, changeLogs.userId))
+            .leftJoin(scripts, eq(scripts.scriptId, changeLogs.scriptId))
             .where(whereChangeLogId || whereEntityAndVersion)
             .limit(1);
 
@@ -292,6 +302,7 @@ export async function _getChangeLog(
             ...changeLogRes[0].changeLog,
             userName: changeLogRes[0].user?.name || '',
             userEmail: changeLogRes[0].user?.email || '',
+            scriptTitle: changeLogRes[0].script?.title || '',
         });
 
         return { data: responseData };
