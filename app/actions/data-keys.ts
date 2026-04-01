@@ -12,7 +12,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, isNull, max } from 'drizzle-orm';
-import { repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 
 type PreparedIntegrityRepair = {
     entry: DataKeyIntegrityEntry;
@@ -120,6 +120,16 @@ async function assertCanManageDataKeys(
     if (!allowed) throw new Error('Forbidden: only super_user can add or edit data keys');
 }
 
+async function assertCanManageEditorDrafts(
+    user?: { role?: string | null } | null,
+) {
+    const role = `${user?.role || ''}`.trim();
+    const allowed = role === 'admin' || role === 'super_user';
+
+    if (!allowed) logger.error('assertCanManageEditorDrafts ERROR', JSON.stringify({ role }));
+    if (!allowed) throw new Error('Forbidden: only admin or super_user can update script integrity drafts');
+}
+
 export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
@@ -211,15 +221,55 @@ export const getDataKeysIntegrity = async (params?: {
             };
         }
 
+        const rawReport = scanDataKeyIntegrity({
+            dataKeys: dataKeysRes.data,
+            screens: screensRes.data,
+            diagnoses: diagnosesRes.data,
+            problems: problemsRes.data,
+            onlyIssues: params?.onlyIssues !== false,
+        });
+
+        const repairs = repairDataKeyIntegrityReferences({
+            dataKeys: dataKeysRes.data,
+            screens: screensRes.data,
+            diagnoses: diagnosesRes.data,
+            problems: problemsRes.data,
+        });
+
+        const mergeById = <T extends Record<string, any>>(
+            current: T[],
+            updates: T[],
+            getId: (item: T) => string | undefined,
+        ) => {
+            if (!updates.length) return current;
+            const updatesMap = new Map(
+                updates
+                    .map((item) => [getId(item), item] as const)
+                    .filter(([id]) => !!id)
+            );
+            return current.map((item) => {
+                const id = getId(item);
+                return (id && updatesMap.get(id)) || item;
+            });
+        };
+
+        const publishAlignedReport = scanDataKeyIntegrity({
+            dataKeys: dataKeysRes.data,
+            screens: mergeById(screensRes.data, repairs.screens, (item) => item.screenId),
+            diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
+            problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
+            onlyIssues: true,
+        });
+
         return {
             success: true,
-            data: scanDataKeyIntegrity({
-                dataKeys: dataKeysRes.data,
-                screens: screensRes.data,
-                diagnoses: diagnosesRes.data,
-                problems: problemsRes.data,
-                onlyIssues: params?.onlyIssues !== false,
-            }),
+            data: {
+                ...rawReport,
+                summary: {
+                    ...rawReport.summary,
+                    blocking: publishAlignedReport.summary.blocking,
+                },
+            },
         };
     } catch (e: any) {
         logger.error('getDataKeysIntegrity ERROR', e.message);
@@ -385,6 +435,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
 }) => {
     try {
         const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
         const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
         const prepared = cached
             ? {
@@ -517,6 +568,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
 }) => {
     try {
         const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
         const items: BulkIntegrityRepairItemInput[] = (params.items?.length
             ? params.items
             : (params.entries || []).map((entry) => ({ entry })))
@@ -712,7 +764,8 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
     items?: BulkIntegrityRepairItemInput[];
 }) => {
     try {
-        await isAllowed();
+        const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
 
         const items: BulkIntegrityRepairItemInput[] = (params.items?.length
             ? params.items
@@ -830,6 +883,7 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
 }) => {
     try {
         const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
         const [prepared, dataKeysRes] = await Promise.all([
             prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey),
             _getDataKeys({ returnDraftsIfExist: true }),

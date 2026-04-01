@@ -61,7 +61,7 @@ export function Modal({
                 <DialogContent 
                     hideCloseButton
                     className={cn(
-                        'flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl',
+                        'flex min-h-0 flex-col max-h-[90vh] overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',
                         contentProps?.className,
                     )}
                     {...contentProps}
@@ -85,7 +85,7 @@ export function Modal({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex-1 flex flex-col overflow-y-auto px-4 py-2">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2">
                         {children}
                     </div>
                     

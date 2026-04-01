@@ -2,10 +2,6 @@ import { buildNormalizedDataKeyMatchKey, normalizeDataKeyType } from "@/lib/data
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import {
-    applyOwnedOptionCollectionSync,
-    resolveOwnedOptionDataKeys,
-    rebuildFieldItemsFromDataKeyOptions,
-    rebuildScreenItemsFromDataKeyOptions,
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
@@ -38,7 +34,8 @@ export type DataKeyIntegrityKind =
     | "field_option_collection"
     | "diagnosis"
     | "diagnosis_symptom"
-    | "problem";
+    | "problem"
+    | "duplicate_parent_data_key";
 
 export type DataKeyIntegrityEntry = {
     status: DataKeyIntegrityStatus;
@@ -81,6 +78,34 @@ export type DataKeyIntegrityReport = {
     };
 };
 
+export type DataKeyIntegrityPublishIssue = {
+    scriptId: string;
+    scriptTitle: string;
+    ruleLabel: string;
+    displayName: string;
+    reason: string;
+    location: string;
+    usageHref: string;
+    registryHref: string;
+    scriptHref: string;
+};
+
+export type DataKeyIntegrityPublishScriptGroup = {
+    scriptId: string;
+    scriptTitle: string;
+    totalIssues: number;
+    issues: DataKeyIntegrityPublishIssue[];
+    registryHref: string;
+    scriptHref: string;
+};
+
+export type DataKeyIntegrityPublishDetails = {
+    totalIssues: number;
+    totalScripts: number;
+    summary: string[];
+    scripts: DataKeyIntegrityPublishScriptGroup[];
+};
+
 function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "problemId" | "location">) {
     return (
         target.kind === candidate.kind &&
@@ -99,6 +124,57 @@ type CandidateMatch = {
 
 function isBlockingStatus(status: DataKeyIntegrityStatus) {
     return status === "missing" || status === "legacy_match";
+}
+
+function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
+    if (isBlockingStatus(entry.status)) return true;
+    return (
+        entry.kind === "screen_option_collection" ||
+        entry.kind === "field_option_collection" ||
+        entry.kind === "duplicate_parent_data_key"
+    );
+}
+
+function buildIntegrityEntryUsageHref(entry: DataKeyIntegrityEntry) {
+    if (entry.problemId) {
+        return `/script/${entry.scriptId}/problem/${entry.problemId}`;
+    }
+
+    if (entry.diagnosisId) {
+        const params = new URLSearchParams();
+        if (entry.kind === "diagnosis_symptom") {
+            if (entry.symptomId) params.set("symptom", entry.symptomId);
+            else if (Number.isInteger(entry.symptomIndex)) params.set("symptom", `${entry.symptomIndex}`);
+        }
+        const query = params.toString();
+        return `/script/${entry.scriptId}/diagnosis/${entry.diagnosisId}${query ? `?${query}` : ""}`;
+    }
+
+    if (entry.screenId) {
+        const params = new URLSearchParams();
+
+        if (
+            ["field", "field_ref", "field_min_date", "field_max_date", "field_min_time", "field_max_time", "field_option_collection", "field_item"].includes(entry.kind)
+        ) {
+            if (entry.fieldId) params.set("field", entry.fieldId);
+            else if (Number.isInteger(entry.fieldIndex)) params.set("field", `${entry.fieldIndex}`);
+        }
+
+        if (entry.kind === "screen_item") {
+            if (entry.screenItemId) params.set("item", entry.screenItemId);
+            else if (Number.isInteger(entry.screenItemIndex)) params.set("item", `${entry.screenItemIndex}`);
+        }
+
+        if (entry.kind === "field_item") {
+            if (entry.fieldItemId) params.set("fieldItem", entry.fieldItemId);
+            else if (Number.isInteger(entry.fieldItemIndex)) params.set("fieldItem", `${entry.fieldItemIndex}`);
+        }
+
+        const query = params.toString();
+        return `/script/${entry.scriptId}/screen/${entry.screenId}${query ? `?${query}` : ""}`;
+    }
+
+    return `/script/${entry.scriptId}`;
 }
 
 function buildLegacyMaps(dataKeys: DataKey[]) {
@@ -260,23 +336,14 @@ function compareOwnedOptionCollection({
     currentItems: Array<{ keyId?: string; value?: string | number; label?: string | number; key?: string; id?: string }>;
     expectedOptions: DataKey[];
 }) {
-    if (!expectedOptions.length && !currentItems.length) return false;
-    if (currentItems.length !== expectedOptions.length) return true;
+    if (!currentItems.length) return false;
 
-    for (let index = 0; index < expectedOptions.length; index++) {
-        const expected = expectedOptions[index];
-        const current = currentItems[index];
-        if (!current) return true;
-
-        const currentName = `${current.value || current.key || current.id || ""}`.trim();
-        const currentLabel = `${current.label || ""}`.trim();
-
-        if ((current.keyId || "") !== expected.uniqueKey) return true;
-        if (currentName !== `${expected.name || ""}`.trim()) return true;
-        if (currentLabel !== `${expected.label || ""}`.trim()) return true;
-    }
-
-    return false;
+    const byUniqueKey = new Map(expectedOptions.map((item) => [item.uniqueKey, item]));
+    return currentItems.some((current) => {
+        const keyId = `${current.keyId || ""}`.trim();
+        if (!keyId) return false;
+        return !byUniqueKey.has(keyId);
+    });
 }
 
 function hasReferenceIdentity(values: Array<string | undefined | null>) {
@@ -285,6 +352,53 @@ function hasReferenceIdentity(values: Array<string | undefined | null>) {
 
 function screenItemsUseDataKeys(screenType?: string | null) {
     return `${screenType || ""}`.trim().toLowerCase() !== "progress";
+}
+
+function createInvalidOptionCollectionReason(options: string[]) {
+    const cleaned = Array.from(new Set(options.map((option) => `${option || ""}`.trim()).filter(Boolean)));
+    if (!cleaned.length) {
+        return "Script contains option(s) that no longer exist in the parent data key option pool";
+    }
+    return `Script contains option(s) that no longer exist in the parent data key option pool: ${cleaned.join(", ")}`;
+}
+
+function collectDuplicateParentEntries(entries: DataKeyIntegrityEntry[]) {
+    const parentEntries = entries.filter((entry) => (
+        (entry.kind === "screen" || entry.kind === "field") &&
+        !!(entry.currentUniqueKey || entry.matchedUniqueKey)
+    ));
+
+    const grouped = new Map<string, DataKeyIntegrityEntry[]>();
+    parentEntries.forEach((entry) => {
+        const uniqueKey = entry.currentUniqueKey || entry.matchedUniqueKey;
+        if (!uniqueKey) return;
+        const key = `${entry.scriptId}::${uniqueKey}`;
+        const current = grouped.get(key) || [];
+        current.push(entry);
+        grouped.set(key, current);
+    });
+
+    const duplicates: DataKeyIntegrityEntry[] = [];
+    grouped.forEach((group) => {
+        if (group.length < 2) return;
+
+        const parentName = group[0]?.matchedName || group[0]?.currentKey || group[0]?.currentLabel || "Data key";
+        const sharedUniqueKey = group[0]?.currentUniqueKey || group[0]?.matchedUniqueKey;
+
+        group.forEach((entry) => {
+            duplicates.push({
+                ...entry,
+                kind: "duplicate_parent_data_key",
+                status: "conflict",
+                reason: `Parent data key "${parentName}" is used more than once in this script`,
+                matchedUniqueKey: entry.matchedUniqueKey || sharedUniqueKey,
+                matchedName: entry.matchedName || parentName,
+                matchedLabel: entry.matchedLabel || entry.currentLabel,
+            });
+        });
+    });
+
+    return duplicates;
 }
 
 export function scanDataKeyIntegrity({
@@ -348,6 +462,13 @@ export function scanDataKeyIntegrity({
             currentItemsCount: (screen.items || []).length,
         });
         if (ownsScreenOptionCollection && compareOwnedOptionCollection({ currentItems: screen.items || [], expectedOptions: screenOwnedOptions })) {
+            const invalidOptions = (screen.items || [])
+                .filter((item) => {
+                    const keyId = `${item.keyId || ""}`.trim();
+                    if (!keyId) return false;
+                    return !screenOwnedOptions.find((option) => option.uniqueKey === keyId);
+                })
+                .map((item) => `${item.label || item.key || item.id || item.keyId || ""}`);
             pushEntry(createEntry({
                 ...screenBase,
                 kind: "screen_option_collection",
@@ -355,10 +476,10 @@ export function scanDataKeyIntegrity({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,
                 currentLabel: screen.label || undefined,
-            }, "out_of_sync", "Screen options have drifted from the parent data key option list", screenDataKey));
+            }, "out_of_sync", createInvalidOptionCollectionReason(invalidOptions), screenDataKey));
         }
 
-        if (!ownsScreenOptionCollection && screenItemsUseDataKeys(screen.type)) {
+        if (screenItemsUseDataKeys(screen.type)) {
             (screen.items || []).forEach((item, itemIndex) => {
                 pushEntry(evaluateReference({
                     currentUniqueKey: item.keyId || undefined,
@@ -417,13 +538,20 @@ export function scanDataKeyIntegrity({
                 currentItemsCount: (field.items || []).length,
             });
             if (ownsFieldOptionCollection && compareOwnedOptionCollection({ currentItems: field.items || [], expectedOptions: fieldOwnedOptions })) {
+                const invalidOptions = (field.items || [])
+                    .filter((item) => {
+                        const keyId = `${item.keyId || ""}`.trim();
+                        if (!keyId) return false;
+                        return !fieldOwnedOptions.find((option) => option.uniqueKey === keyId);
+                    })
+                    .map((item) => `${item.label || item.value || item.keyId || ""}`);
                 pushEntry(createEntry({
                     ...fieldBase,
                     kind: "field_option_collection",
                     currentUniqueKey: field.keyId || undefined,
                     currentKey: field.key || undefined,
                     currentLabel: field.label || undefined,
-                }, "out_of_sync", "Field options have drifted from the parent data key option list", fieldDataKey));
+                }, "out_of_sync", createInvalidOptionCollectionReason(invalidOptions), fieldDataKey));
             }
 
             const keyOnlyRefs: Array<{
@@ -457,29 +585,27 @@ export function scanDataKeyIntegrity({
                 }));
             });
 
-            if (!ownsFieldOptionCollection) {
-                (field.items || []).forEach((item, fieldItemIndex) => {
-                    pushEntry(evaluateReference({
+            (field.items || []).forEach((item, fieldItemIndex) => {
+                pushEntry(evaluateReference({
+                    currentUniqueKey: item.keyId || undefined,
+                    currentKey: `${item.value || ""}` || undefined,
+                    currentLabel: `${item.label || ""}` || undefined,
+                    expectedDataType: "option",
+                    base: {
+                        ...fieldBase,
+                        kind: "field_item",
+                        expectedDataType: "option",
                         currentUniqueKey: item.keyId || undefined,
                         currentKey: `${item.value || ""}` || undefined,
                         currentLabel: `${item.label || ""}` || undefined,
-                        expectedDataType: "option",
-                        base: {
-                            ...fieldBase,
-                            kind: "field_item",
-                            expectedDataType: "option",
-                            currentUniqueKey: item.keyId || undefined,
-                            currentKey: `${item.value || ""}` || undefined,
-                            currentLabel: `${item.label || ""}` || undefined,
-                            fieldItemId: item.itemId || undefined,
-                            fieldItemIndex: fieldItemIndex,
-                            location: `${fieldBase.location} > option ${fieldItemIndex + 1}`,
-                        },
-                        byUniqueKey,
-                        legacyMaps,
-                    }));
-                });
-            }
+                        fieldItemId: item.itemId || undefined,
+                        fieldItemIndex: fieldItemIndex,
+                        location: `${fieldBase.location} > option ${fieldItemIndex + 1}`,
+                    },
+                    byUniqueKey,
+                    legacyMaps,
+                }));
+            });
         });
     }
 
@@ -553,6 +679,9 @@ export function scanDataKeyIntegrity({
         }));
     }
 
+    const duplicateParentEntries = collectDuplicateParentEntries(entries);
+    duplicateParentEntries.forEach((entry) => pushEntry(entry));
+
     const summary = {
         total: entries.length,
         resolved: entries.filter((entry) => entry.status === "resolved").length,
@@ -561,43 +690,97 @@ export function scanDataKeyIntegrity({
         legacy_match: entries.filter((entry) => entry.status === "legacy_match").length,
         conflict: entries.filter((entry) => entry.status === "conflict").length,
         unmanaged: entries.filter((entry) => entry.status === "unmanaged").length,
-        blocking: entries.filter((entry) => isBlockingStatus(entry.status)).length,
+        blocking: entries.filter((entry) => isBlockingEntry(entry)).length,
     };
 
     return { entries, summary };
 }
 
-export function buildDataKeyIntegrityPublishErrors(report: DataKeyIntegrityReport) {
-    const blocking = report.entries.filter((entry) => isBlockingStatus(entry.status));
-    if (!blocking.length) return [];
+function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
+    return `${entry.currentLabel || entry.matchedLabel || entry.currentKey || entry.matchedName || entry.location || "Data key"}`.trim();
+}
+
+function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
+    if (entry.kind === "duplicate_parent_data_key") return "duplicate parent datakey";
+    if (entry.kind === "screen_option_collection" || entry.kind === "field_option_collection") {
+        return "invalid script option";
+    }
+    if (entry.status === "missing") return "missing datakey";
+    if (entry.status === "legacy_match") return "unlinked datakey";
+    return entry.status.replace(/_/g, " ");
+}
+
+export function buildDataKeyIntegrityPublishDetails(report: DataKeyIntegrityReport): DataKeyIntegrityPublishDetails | null {
+    const blocking = report.entries.filter((entry) => isBlockingEntry(entry));
+    if (!blocking.length) return null;
 
     const grouped = new Map<string, DataKeyIntegrityEntry[]>();
     for (const entry of blocking) {
-        const key = `${entry.scriptTitle || entry.scriptId}`;
+        const key = `${entry.scriptId}::${entry.scriptTitle || entry.scriptId}`;
         const current = grouped.get(key) || [];
         current.push(entry);
         grouped.set(key, current);
     }
 
-    const errors = [
-        `Publish blocked: ${blocking.length} unresolved data key integrity issue${blocking.length === 1 ? "" : "s"} found across ${grouped.size} script${grouped.size === 1 ? "" : "s"}.`,
-    ];
+    const countsByRule = blocking.reduce((acc, entry) => {
+        const bucket = getPublishEntryRuleLabel(entry);
+        acc[bucket] = (acc[bucket] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const topLevelSummary = Object.entries(countsByRule)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([label, count]) => `${count} ${label}${count === 1 ? "" : "s"}`)
+        .join(", ");
 
-    Array.from(grouped.entries()).slice(0, 8).forEach(([script, entries]) => {
-        const statuses = entries.reduce((acc, entry) => {
-            acc[entry.status] = (acc[entry.status] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-        const statusSummary = Object.entries(statuses)
-            .map(([status, count]) => `${count} ${status.replace(/_/g, " ")}`)
-            .join(", ");
-        errors.push(`${script}: ${statusSummary}`);
+    return {
+        totalIssues: blocking.length,
+        totalScripts: grouped.size,
+        summary: [
+            `Publish blocked: ${blocking.length} data key validation issue${blocking.length === 1 ? "" : "s"} found across ${grouped.size} script${grouped.size === 1 ? "" : "s"}.`,
+            `Blocking rules triggered: ${topLevelSummary}.`,
+        ],
+        scripts: Array.from(grouped.entries()).map(([groupKey, entries]) => {
+            const [scriptId, scriptTitleRaw] = groupKey.split("::");
+            const scriptTitle = scriptTitleRaw || scriptId;
+            return {
+                scriptId,
+                scriptTitle,
+                totalIssues: entries.length,
+                registryHref: `/script/${scriptId}/data-keys`,
+                scriptHref: `/script/${scriptId}`,
+                issues: entries.map((entry) => ({
+                    scriptId,
+                    scriptTitle,
+                    ruleLabel: getPublishEntryRuleLabel(entry),
+                    displayName: getPublishEntryDisplayName(entry),
+                    reason: entry.reason,
+                    location: entry.location,
+                    usageHref: buildIntegrityEntryUsageHref(entry),
+                    registryHref: `/script/${scriptId}/data-keys`,
+                    scriptHref: `/script/${scriptId}`,
+                })),
+            };
+        }),
+    };
+}
+
+export function buildDataKeyIntegrityPublishErrors(report: DataKeyIntegrityReport) {
+    const details = buildDataKeyIntegrityPublishDetails(report);
+    if (!details) return [];
+
+    const errors = [...details.summary];
+    details.scripts.slice(0, 8).forEach((script) => {
+        const lines = script.issues.slice(0, 3).map((issue) => (
+            `${issue.ruleLabel} "${issue.displayName}"${issue.reason ? ` (${issue.reason})` : ""}`
+        ));
+        errors.push(`${script.scriptTitle}: ${lines.join("; ")}`);
+        if (script.totalIssues > 3) {
+            errors.push(`${script.scriptTitle}: additional blocking issues ${script.totalIssues - 3}`);
+        }
     });
-
-    if (grouped.size > 8) {
-        errors.push(`Additional affected scripts: ${grouped.size - 8}`);
+    if (details.totalScripts > 8) {
+        errors.push(`Additional affected scripts: ${details.totalScripts - 8}`);
     }
-
     return errors;
 }
 
@@ -651,21 +834,6 @@ export function repairDataKeyIntegrityReferences({
                 if (synced.changed) changed = true;
                 return synced.value;
             });
-
-        const rebuiltScreenItems = applyOwnedOptionCollectionSync(
-            items,
-            shouldSyncScreenOwnedOptions({
-                screenType: screen.type,
-                dataKey: screenDataKey,
-                currentItemsCount: (screen.items || []).length,
-            }),
-            () => rebuildScreenItemsFromDataKeyOptions({
-                currentItems: items,
-                optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
-                screenType: screen.type,
-            }),
-        );
-        if (rebuiltScreenItems.changed) changed = true;
 
         const fields = (screen.fields || []).map((field) => {
             const fieldDataKey = resolveDataKeyMatch({
@@ -733,20 +901,6 @@ export function repairDataKeyIntegrityReferences({
                 return fieldItemValue;
             });
 
-            const rebuiltFieldItems = applyOwnedOptionCollectionSync(
-                fieldItems,
-                shouldSyncFieldOwnedOptions({
-                    fieldType: field.type,
-                    dataKey: fieldDataKey,
-                    currentItemsCount: (field.items || []).length,
-                }),
-                () => rebuildFieldItemsFromDataKeyOptions({
-                    currentItems: fieldItems,
-                    optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),
-                }),
-            );
-            if (rebuiltFieldItems.changed) changed = true;
-
             const syncedField = syncFieldReference(field, fieldDataKey);
             const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, { id: "refKeyId", name: "refKey" });
             const syncedMinDateField = syncKeyOnlyReference(syncedRefField.value, minDateKeyDataKey, { id: "minDateKeyId", name: "minDateKey" });
@@ -765,7 +919,7 @@ export function repairDataKeyIntegrityReferences({
 
             return {
                 ...syncedMaxTimeField.value,
-                items: rebuiltFieldItems.value,
+                items: fieldItems,
             };
         });
 
@@ -775,7 +929,7 @@ export function repairDataKeyIntegrityReferences({
         return {
             value: {
                 ...syncedScreen.value,
-                items: rebuiltScreenItems.value,
+                items,
                 fields,
             },
             changed,
@@ -899,32 +1053,7 @@ export function repairSingleDataKeyIntegrityReference({
         }
 
         let nextItems = nextScreen.items || [];
-        if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_option_collection" })) {
-            const screenDataKey = overrideTarget || resolveDataKeyMatch({
-                currentUniqueKey: nextScreen.keyId || undefined,
-                currentKey: nextScreen.key || undefined,
-                currentLabel: nextScreen.label || undefined,
-                expectedDataType: nextScreen.type || "",
-                byUniqueKey,
-                legacyMaps,
-            });
-            const rebuiltScreenItems = applyOwnedOptionCollectionSync(
-                nextItems,
-                shouldSyncScreenOwnedOptions({
-                    screenType: nextScreen.type,
-                    dataKey: screenDataKey,
-                    currentItemsCount: nextItems.length,
-                }),
-                () => rebuildScreenItemsFromDataKeyOptions({
-                    currentItems: nextItems,
-                    optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
-                    screenType: nextScreen.type,
-                }),
-            );
-            if (rebuiltScreenItems.changed) changed = true;
-            nextItems = rebuiltScreenItems.value;
-        } else {
-            nextItems = !screenItemsUseDataKeys(nextScreen.type) ? nextItems : nextItems.map((item, itemIndex) => {
+        nextItems = !screenItemsUseDataKeys(nextScreen.type) ? nextItems : nextItems.map((item, itemIndex) => {
                 const itemLocation = `${screenBase.location} > item ${itemIndex + 1}`;
                 if (!matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_item", location: itemLocation })) return item;
                 const itemDataKey = overrideTarget || resolveDataKeyMatch({
@@ -939,7 +1068,6 @@ export function repairSingleDataKeyIntegrityReference({
                 if (synced.changed) changed = true;
                 return synced.value;
             });
-        }
 
         const nextFields = (nextScreen.fields || []).map((field, fieldIndex) => {
             const fieldBase = {
@@ -990,31 +1118,7 @@ export function repairSingleDataKeyIntegrityReference({
             });
 
             let nextFieldItems = nextField.items || [];
-            if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_option_collection" })) {
-                const fieldDataKey = overrideTarget || resolveDataKeyMatch({
-                    currentUniqueKey: nextField.keyId || undefined,
-                    currentKey: nextField.key || undefined,
-                    currentLabel: nextField.label || undefined,
-                    expectedDataType: nextField.type || "",
-                    byUniqueKey,
-                    legacyMaps,
-                });
-                const rebuiltFieldItems = applyOwnedOptionCollectionSync(
-                    nextFieldItems,
-                    shouldSyncFieldOwnedOptions({
-                        fieldType: nextField.type,
-                        dataKey: fieldDataKey,
-                        currentItemsCount: nextFieldItems.length,
-                    }),
-                    () => rebuildFieldItemsFromDataKeyOptions({
-                        currentItems: nextFieldItems,
-                        optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),
-                    }),
-                );
-                if (rebuiltFieldItems.changed) changed = true;
-                nextFieldItems = rebuiltFieldItems.value;
-            } else {
-                nextFieldItems = nextFieldItems.map((item, fieldItemIndex) => {
+            nextFieldItems = nextFieldItems.map((item, fieldItemIndex) => {
                     const itemLocation = `${fieldBase.location} > option ${fieldItemIndex + 1}`;
                     if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_item", location: itemLocation })) return item;
                     const fieldItemDataKey = overrideTarget || resolveDataKeyMatch({
@@ -1036,7 +1140,6 @@ export function repairSingleDataKeyIntegrityReference({
                     if (JSON.stringify(fieldItemValue) !== JSON.stringify(item)) changed = true;
                     return fieldItemValue;
                 });
-            }
 
             return {
                 ...nextField,

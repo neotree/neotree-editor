@@ -50,6 +50,7 @@ const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], stri
     diagnosis: "Diagnosis key",
     diagnosis_symptom: "Diagnosis symptom",
     problem: "Problem key",
+    duplicate_parent_data_key: "Duplicate parent key",
 };
 
 function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
@@ -61,7 +62,7 @@ function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["sta
         case "missing":
             return "Missing from library";
         case "conflict":
-            return "Needs manual review";
+            return "Conflict";
         case "unmanaged":
             return "Not managed by library";
         default:
@@ -165,7 +166,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
     const bulkResolvableEntries = {
-        out_of_sync: entries.filter((entry) => entry.status === "out_of_sync"),
+        out_of_sync: entries.filter((entry) => (
+            entry.status === "out_of_sync" &&
+            entry.kind !== "screen_option_collection" &&
+            entry.kind !== "field_option_collection"
+        )),
         legacy_match: entries.filter((entry) => entry.status === "legacy_match"),
     };
     const hasBulkResolveActions = !!bulkResolvableEntries.out_of_sync.length || !!bulkResolvableEntries.legacy_match.length;
@@ -372,7 +377,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
         const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
         const usageHref = buildUsageHref(entry);
-        const canSafeResolve = entry.status === "out_of_sync" || entry.status === "legacy_match";
+        const canSafeResolve = (
+            entry.status === "legacy_match" ||
+            (
+                entry.status === "out_of_sync" &&
+                entry.kind !== "screen_option_collection" &&
+                entry.kind !== "field_option_collection"
+            )
+        );
         const isResolvingThisEntry = resolvingKey === getEntryKey(entry) && isRepairing;
         const libraryHref = "/data-keys";
         const displayReference = entry.currentKey || entry.currentLabel || entry.location;
@@ -950,7 +962,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                        This view shows all scanned script references. Only missing and legacy-match issues stop publish. Conflicts stay visible for manual cleanup but do not block publishing.
+                        This view shows all scanned script references. Blocking issues behave consistently with publish across the registry and publish flow, including missing links, legacy matches, duplicate parent data keys in the same script, and script options that no longer exist in the parent data key pool.
                     </div>
 
                     <div className="rounded-md border p-3 space-y-4">
@@ -1089,7 +1101,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             kindLabels[issue.kind],
                             issue.location,
                             issue.reason,
-                            issue.status === "out_of_sync"
+                            issue.status === "out_of_sync" && issue.kind !== "screen_option_collection" && issue.kind !== "field_option_collection"
                                 ? "Resolve available"
                                 : issue.status === "legacy_match"
                                     ? "Resolve available"

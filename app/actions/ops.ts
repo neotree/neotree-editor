@@ -21,7 +21,7 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-import { repairDataKeyIntegrityReferences } from "@/lib/data-key-integrity"
+import { buildDataKeyIntegrityPublishDetails, buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
 import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -58,8 +58,11 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     userDiagnosisDrafts.length > 0 ||
     userProblemDrafts.length > 0 ||
     userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
+  const hasDataKeyLibraryChanges =
+    userDataKeyDrafts.length > 0 ||
+    userPendingDeletion.some((entry) => !!entry.dataKeyId)
 
-  const shouldRunIntegrityChecks = hasScriptFamilyChanges
+  const shouldRunIntegrityChecks = hasScriptFamilyChanges || hasDataKeyLibraryChanges
 
   if (!shouldRunIntegrityChecks) {
     return {
@@ -79,7 +82,7 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
   ]))
 
-  const shouldLimitToAffectedScripts = !!userId
+  const shouldLimitToAffectedScripts = !!userId && !hasDataKeyLibraryChanges
   const hasAffectedScripts = !!affectedScriptIds?.length
   const affectedScriptsSet = new Set(affectedScriptIds || [])
   const scopedUserScreenDrafts = shouldLimitToAffectedScripts
@@ -298,7 +301,12 @@ export async function publishData({
 }: {
   scope: number
 }) {
-  const results: { success: boolean; errors?: string[]; warnings?: string[] } = { success: true }
+  const results: {
+    success: boolean;
+    errors?: string[];
+    warnings?: string[];
+    blockingDetails?: ReturnType<typeof buildDataKeyIntegrityPublishDetails>;
+  } = { success: true }
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -355,6 +363,37 @@ export async function publishData({
           problems: problemsRes.data,
         })
 
+    if (shouldRunIntegrityChecks) {
+      const mergeById = <T extends Record<string, any>>(
+        current: T[],
+        updates: T[],
+        getId: (item: T) => string | undefined,
+      ) => {
+        if (!updates.length) return current
+        const updatesMap = new Map(updates.map((item) => [getId(item), item] as const).filter(([id]) => !!id))
+        return current.map((item) => {
+          const id = getId(item)
+          return (id && updatesMap.get(id)) || item
+        })
+      }
+
+      const integrityReport = scanDataKeyIntegrity({
+        dataKeys: dataKeysRes.data,
+        screens: mergeById(screensRes.data, repairs.screens, (item) => item.screenId),
+        diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
+        problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
+        onlyIssues: true,
+      })
+      const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(integrityReport)
+      const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(integrityReport)
+      if (publishIntegrityErrors.length) {
+        results.success = false
+        results.errors = publishIntegrityErrors
+        results.blockingDetails = publishIntegrityDetails
+        return results
+      }
+    }
+
     if (repairs.screens.length) {
       const repairedScreens = await scriptsMutations._saveScreens({
         data: repairs.screens,
@@ -394,97 +433,73 @@ export async function publishData({
       }
     }
 
+    const failPublish = (errors?: string[]) => {
+      results.success = false
+      results.errors = errors?.length ? errors : ["Publish failed"]
+      return results
+    }
+
     const publishConfigKeys = await configKeysMutations._publishConfigKeys({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishConfigKeys.errors?.length) return failPublish(publishConfigKeys.errors)
 
     const publishHospitals = await hospitalsMutations._publishHospitals({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishHospitals.errors?.length) return failPublish(publishHospitals.errors)
 
     const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishDrugsLibraryItems.errors?.length) return failPublish(publishDrugsLibraryItems.errors)
+
     const publishDataKeys = await dataKeysMutations._publishDataKeys({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishDataKeys.errors?.length) return failPublish(publishDataKeys.errors)
+
     const publishScripts = await scriptsMutations._publishScripts({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishScripts.errors?.length) return failPublish(publishScripts.errors)
+
     const publishScreens = await scriptsMutations._publishScreens({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishScreens.errors?.length) return failPublish(publishScreens.errors)
+
     const publishDiagnoses = await scriptsMutations._publishDiagnoses({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishDiagnoses.errors?.length) return failPublish(publishDiagnoses.errors)
+
     const publishProblems = await scriptsMutations._publishProblems({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
     })
+    if (publishProblems.errors?.length) return failPublish(publishProblems.errors)
+
     const processPendingDeletion = await _processPendingDeletion({
       userId,
       publisherUserId: publisherUserId || undefined,
     })
-
-    if (publishDataKeys.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDataKeys.errors]
-    }
-
-    if (publishConfigKeys.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishConfigKeys.errors]
-    }
-
-    if (publishHospitals.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishHospitals.errors]
-    }
-
-    if (publishDrugsLibraryItems.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDrugsLibraryItems.errors]
-    }
-
-    if (publishScripts.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishScripts.errors]
-    }
-
-    if (publishScreens.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishScreens.errors]
-    }
-
-    if (publishDiagnoses.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDiagnoses.errors]
-    }
-
-    if (publishProblems.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishProblems.errors]
-    }
-
-    if (processPendingDeletion.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...processPendingDeletion.errors]
-    }
+    if (processPendingDeletion.errors?.length) return failPublish(processPendingDeletion.errors)
 
     const editorInfoSave = await _saveEditorInfo({
       increaseVersion: results.success,
