@@ -1,4 +1,4 @@
-import { buildNormalizedDataKeyMatchKey, normalizeDataKeyType } from "@/lib/data-key-types";
+import { buildNormalizedDataKeyMatchKey, normalizeDataKeyMatchValue, normalizeDataKeyType } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import {
@@ -62,6 +62,7 @@ export type DataKeyIntegrityEntry = {
     matchedUniqueKey?: string;
     matchedName?: string;
     matchedLabel?: string;
+    suggestedUniqueKeys?: string[];
 };
 
 export type DataKeyIntegrityReport = {
@@ -122,13 +123,11 @@ type CandidateMatch = {
     candidates: DataKey[];
 };
 
-function isBlockingStatus(status: DataKeyIntegrityStatus) {
-    return status === "missing" || status === "legacy_match";
-}
-
 function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
-    if (isBlockingStatus(entry.status)) return true;
     return (
+        entry.status === "missing" ||
+        entry.status === "legacy_match" ||
+        entry.status === "unmanaged" ||
         entry.kind === "screen_option_collection" ||
         entry.kind === "field_option_collection" ||
         entry.kind === "duplicate_parent_data_key"
@@ -226,6 +225,57 @@ function getCandidateMatches({
     };
 }
 
+function getStrictSuggestedCandidates({
+    currentKey,
+    currentLabel,
+    expectedDataType,
+    dataKeys,
+}: {
+    currentKey?: string;
+    currentLabel?: string;
+    expectedDataType: string;
+    dataKeys: DataKey[];
+}) {
+    const normalizedExpectedType = normalizeDataKeyType(expectedDataType);
+    const currentTexts = Array.from(new Set(
+        [currentKey, currentLabel]
+            .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
+            .filter((value) => value.length >= 3)
+    ));
+
+    if (!currentTexts.length) return [];
+
+    const scoreCandidate = (candidate: DataKey) => {
+        const candidateTexts = Array.from(new Set(
+            [candidate.name, candidate.label]
+                .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
+                .filter((value) => value.length >= 3)
+        ));
+        if (!candidateTexts.length) return 0;
+
+        let score = 0;
+        for (const currentText of currentTexts) {
+            for (const candidateText of candidateTexts) {
+                if (candidateText === currentText) return 100;
+                if (candidateText.startsWith(currentText) || currentText.startsWith(candidateText)) {
+                    score = Math.max(score, 75);
+                } else if (candidateText.includes(currentText) || currentText.includes(candidateText)) {
+                    score = Math.max(score, 60);
+                }
+            }
+        }
+        return score;
+    };
+
+    return dataKeys
+        .filter((candidate) => normalizeDataKeyType(candidate.dataType) === normalizedExpectedType)
+        .map((candidate) => ({ candidate, score: scoreCandidate(candidate) }))
+        .filter((item) => item.score >= 60)
+        .sort((a, b) => b.score - a.score || `${a.candidate.label || a.candidate.name || ""}`.localeCompare(`${b.candidate.label || b.candidate.name || ""}`))
+        .map((item) => item.candidate)
+        .slice(0, 5);
+}
+
 function resolveDataKeyMatch({
     currentUniqueKey,
     currentKey,
@@ -253,7 +303,13 @@ function compareOptionalDataKeyText(current: string | undefined, expected: strin
     return currentValue !== expectedValue;
 }
 
-function createEntry(base: Omit<DataKeyIntegrityEntry, "status" | "reason">, status: DataKeyIntegrityStatus, reason: string, matched?: DataKey): DataKeyIntegrityEntry {
+function createEntry(
+    base: Omit<DataKeyIntegrityEntry, "status" | "reason">,
+    status: DataKeyIntegrityStatus,
+    reason: string,
+    matched?: DataKey,
+    suggested?: DataKey[],
+): DataKeyIntegrityEntry {
     return {
         ...base,
         status,
@@ -261,6 +317,7 @@ function createEntry(base: Omit<DataKeyIntegrityEntry, "status" | "reason">, sta
         matchedUniqueKey: matched?.uniqueKey,
         matchedName: matched?.name,
         matchedLabel: matched?.label,
+        suggestedUniqueKeys: suggested?.map((item) => item.uniqueKey).filter(Boolean),
     };
 }
 
@@ -311,22 +368,30 @@ function evaluateReference({
         expectedDataType,
         maps: legacyMaps,
     });
+    const suggestedCandidates = candidates.candidates.length
+        ? candidates.candidates
+        : getStrictSuggestedCandidates({
+            currentKey,
+            currentLabel,
+            expectedDataType,
+            dataKeys: Array.from(byUniqueKey.values()),
+        });
 
     if (!candidates.candidates.length) {
         if (!currentUniqueKey && !requireLibraryLink) {
-            return createEntry(base, "unmanaged", "Reference is script-local or legacy and is not explicitly linked to the data key library");
+            return createEntry(base, "unmanaged", "Reference is script-local or legacy and is not explicitly linked to the data key library", undefined, suggestedCandidates);
         }
-        return createEntry(base, "missing", "Referenced data key does not exist in the library");
+        return createEntry(base, "missing", "Referenced data key does not exist in the library", undefined, suggestedCandidates);
     }
 
     if (candidates.candidates.length > 1) {
         if (!currentUniqueKey && !requireLibraryLink) {
-            return createEntry(base, "unmanaged", "Reference is script-local or legacy and multiple library candidates exist");
+            return createEntry(base, "unmanaged", "Reference is script-local or legacy and multiple library candidates exist", undefined, candidates.candidates);
         }
-        return createEntry(base, "conflict", "Multiple data keys could match this reference");
+        return createEntry(base, "conflict", "Multiple data keys could match this reference", undefined, candidates.candidates);
     }
 
-    return createEntry(base, "legacy_match", "A matching data key exists, but this reference is not linked by unique key", candidates.matched);
+    return createEntry(base, "legacy_match", "A matching data key exists, but this reference is not linked by unique key", candidates.matched, candidates.candidates);
 }
 
 function compareOwnedOptionCollection({
@@ -707,6 +772,7 @@ function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
     }
     if (entry.status === "missing") return "missing datakey";
     if (entry.status === "legacy_match") return "unlinked datakey";
+    if (entry.status === "unmanaged") return "unmanaged datakey";
     return entry.status.replace(/_/g, " ");
 }
 

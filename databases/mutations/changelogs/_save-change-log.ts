@@ -573,10 +573,12 @@ export async function _saveChangeLogs({
   data,
   broadcastAction,
   allowPartial,
+  client,
 }: {
   data: SaveChangeLogData[]
   broadcastAction?: boolean
   allowPartial?: boolean
+  client?: DbOrTransaction
 }): Promise<{ success: boolean; errors?: string[]; saved: number }> {
   let saved = 0
   const errors: string[] = []
@@ -588,7 +590,7 @@ export async function _saveChangeLogs({
 
     if (allowPartial) {
       for (const changeLogData of data) {
-        const res = await _saveChangeLog({ data: changeLogData })
+        const res = await _saveChangeLog({ data: changeLogData, client })
         if (res.errors?.length) {
           errors.push(...res.errors)
           continue
@@ -596,7 +598,7 @@ export async function _saveChangeLogs({
         saved++
       }
     } else {
-      await db.transaction(async (tx) => {
+      const executor = async (tx: DbOrTransaction) => {
         for (const changeLogData of data) {
           const res = await _saveChangeLog({ data: changeLogData, client: tx })
 
@@ -607,7 +609,13 @@ export async function _saveChangeLogs({
 
           saved++
         }
-      })
+      }
+
+      if (client) {
+        await executor(client)
+      } else {
+        await db.transaction(executor)
+      }
     }
 
     if (broadcastAction && !errors.length) {

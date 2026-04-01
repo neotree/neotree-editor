@@ -5,18 +5,25 @@ import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
 
+type DbClient = typeof db
+type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
+type DbOrTransaction = DbClient | TransactionClient
+
 export async function _saveScreensHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof screensDrafts.$inferSelect[]
   previous: typeof screens.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof screensHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -93,7 +100,7 @@ export async function _saveScreensHistory({
     }
 
     if (insertData.length) {
-      await db.insert(screensHistory).values(insertData)
+      await executor.insert(screensHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

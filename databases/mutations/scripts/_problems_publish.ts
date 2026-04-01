@@ -8,6 +8,10 @@ import { _saveProblemsHistory } from "./_problems_history"
 import { v4 } from "uuid"
 import { removeHexCharacters } from "@/databases/utils"
 
+type DbClient = typeof db
+type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
+type DbOrTransaction = DbClient | TransactionClient
+
 export async function _publishProblems(opts?: {
   scriptsIds?: string[]
   problemsIds?: string[]
@@ -15,6 +19,7 @@ export async function _publishProblems(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const { scriptsIds, problemsIds } = { ...opts }
 
@@ -23,11 +28,12 @@ export async function _publishProblems(opts?: {
   const changeLogs: SaveChangeLogData[] = []
 
   try {
+    const executor = opts?.client || db
     let updates: (typeof problemsDrafts.$inferSelect)[] = []
     let inserts: (typeof problemsDrafts.$inferSelect)[] = []
 
     if (scriptsIds?.length || problemsIds?.length) {
-      const res = await db.query.problemsDrafts.findMany({
+      const res = await executor.query.problemsDrafts.findMany({
         where: and(
           or(
             !scriptsIds?.length ? undefined : inArray(problemsDrafts.scriptId, scriptsIds),
@@ -42,7 +48,7 @@ export async function _publishProblems(opts?: {
       updates = res.filter((s) => s.problemId)
       inserts = res.filter((s) => !s.problemId)
     } else {
-      const _problemsDrafts = await db.query.problemsDrafts.findMany({
+      const _problemsDrafts = await executor.query.problemsDrafts.findMany({
         where: and(
           isNotNull(problemsDrafts.scriptId),
           !opts?.userId ? undefined : eq(problemsDrafts.createdByUserId, opts.userId),
@@ -56,7 +62,7 @@ export async function _publishProblems(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof problems.$inferSelect)[] = []
       if (updates.filter((c) => c.problemId).length) {
-        dataBefore = await db.query.problems.findMany({
+        dataBefore = await executor.query.problems.findMany({
           where: inArray(
             problems.problemId,
             updates.filter((c) => c.problemId).map((c) => c.problemId!),
@@ -74,13 +80,14 @@ export async function _publishProblems(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(problems).set(updates).where(eq(problems.problemId, problemId)).returning()
+        await executor.update(problems).set(updates).where(eq(problems.problemId, problemId)).returning()
       }
 
       const updateChangeLogs = await _saveProblemsHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -92,7 +99,7 @@ export async function _publishProblems(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof problems.$inferSelect)[] = []
       if (inserts.filter((c) => c.problemId).length) {
-        dataBefore = await db.query.problems.findMany({
+        dataBefore = await executor.query.problems.findMany({
           where: inArray(
             problems.problemId,
             inserts.filter((c) => c.problemId).map((c) => c.problemId!),
@@ -110,13 +117,14 @@ export async function _publishProblems(opts?: {
           return d
         })
 
-        await db.insert(problems).values(payload)
+        await executor.insert(problems).values(payload)
       }
 
       const insertChangeLogs = await _saveProblemsHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -124,9 +132,9 @@ export async function _publishProblems(opts?: {
       })))
     }
 
-    await db.delete(problemsDrafts).where(!opts?.userId ? undefined : eq(problemsDrafts.createdByUserId, opts.userId))
+    await executor.delete(problemsDrafts).where(!opts?.userId ? undefined : eq(problemsDrafts.createdByUserId, opts.userId))
 
-    let deleted = await db.query.pendingDeletion.findMany({
+    let deleted = await executor.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.problemId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -142,7 +150,7 @@ export async function _publishProblems(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await executor
         .update(problems)
         .set({ deletedAt })
         .where(
@@ -164,7 +172,7 @@ export async function _publishProblems(opts?: {
         },
       }))
 
-      await db.insert(problemsHistory).values(historyPayload)
+      await executor.insert(problemsHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -195,7 +203,7 @@ export async function _publishProblems(opts?: {
       }
     }
 
-    await db
+    await executor
       .delete(pendingDeletion)
       .where(
         and(
@@ -211,14 +219,14 @@ export async function _publishProblems(opts?: {
     ]
 
     if (published.length) {
-      await db
+      await executor
         .update(problems)
         .set({ version: sql`${problems.version} + 1` })
         .where(inArray(problems.problemId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
         logger.error("_publishProblems changelog warnings", saveResult.errors.join(", "))
       }
