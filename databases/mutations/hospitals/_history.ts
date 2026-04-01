@@ -3,18 +3,25 @@ import db from "@/databases/pg/drizzle"
 import logger from "@/lib/logger"
 import { hospitalsDrafts, hospitals, hospitalsHistory } from "@/databases/pg/schema"
 
+type DbClient = typeof db
+type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
+type DbOrTransaction = DbClient | TransactionClient
+
 export async function _saveHospitalsHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof hospitalsDrafts.$inferSelect[]
   previous: typeof hospitals.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof hospitalsHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -87,7 +94,7 @@ export async function _saveHospitalsHistory({
     }
 
     if (insertData.length) {
-      await db.insert(hospitalsHistory).values(insertData)
+      await executor.insert(hospitalsHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

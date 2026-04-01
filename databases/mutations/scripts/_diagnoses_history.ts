@@ -5,18 +5,25 @@ import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/sch
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
 
+type DbClient = typeof db
+type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
+type DbOrTransaction = DbClient | TransactionClient
+
 export async function _saveDiagnosesHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof diagnosesDrafts.$inferSelect[]
   previous: typeof diagnoses.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof diagnosesHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -86,7 +93,7 @@ export async function _saveDiagnosesHistory({
     }
 
     if (insertData.length) {
-      await db.insert(diagnosesHistory).values(insertData)
+      await executor.insert(diagnosesHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

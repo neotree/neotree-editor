@@ -9,6 +9,10 @@ import { v4 } from "uuid"
 import { _generateScreenAliases } from "../aliases/_aliases_save"
 import { removeHexCharacters } from "@/databases/utils"
 
+type DbClient = typeof db
+type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
+type DbOrTransaction = DbClient | TransactionClient
+
 export async function _publishScreens(opts?: {
   scriptsIds?: string[]
   screensIds?: string[]
@@ -16,6 +20,7 @@ export async function _publishScreens(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const { scriptsIds, screensIds } = { ...opts }
 
@@ -26,11 +31,12 @@ export async function _publishScreens(opts?: {
   const changeLogs: SaveChangeLogData[] = []
 
   try {
+    const executor = opts?.client || db
     let updates: (typeof screensDrafts.$inferSelect)[] = []
     let inserts: (typeof screensDrafts.$inferSelect)[] = []
 
     if (scriptsIds?.length || screensIds?.length) {
-      const res = await db.query.screensDrafts.findMany({
+      const res = await executor.query.screensDrafts.findMany({
         where: and(
           or(
             !scriptsIds?.length ? undefined : inArray(screensDrafts.scriptId, scriptsIds),
@@ -45,7 +51,7 @@ export async function _publishScreens(opts?: {
       updates = res.filter((s) => s.screenId)
       inserts = res.filter((s) => !s.screenId)
     } else {
-      const _screensDrafts = await db.query.screensDrafts.findMany({
+      const _screensDrafts = await executor.query.screensDrafts.findMany({
         where: and(
           isNotNull(screensDrafts.scriptId),
           !opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId),
@@ -59,7 +65,7 @@ export async function _publishScreens(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof screens.$inferSelect)[] = []
       if (updates.filter((c) => c.screenId).length) {
-        dataBefore = await db.query.screens.findMany({
+        dataBefore = await executor.query.screens.findMany({
           where: inArray(
             screens.screenId,
             updates.filter((c) => c.screenId).map((c) => c.screenId!),
@@ -76,13 +82,14 @@ export async function _publishScreens(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(screens).set(updates).where(eq(screens.screenId, screenId)).returning()
+        await executor.update(screens).set(updates).where(eq(screens.screenId, screenId)).returning()
       }
 
       const updateChangeLogs = await _saveScreensHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -94,7 +101,7 @@ export async function _publishScreens(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof screens.$inferSelect)[] = []
       if (inserts.filter((c) => c.screenId).length) {
-        dataBefore = await db.query.screens.findMany({
+        dataBefore = await executor.query.screens.findMany({
           where: inArray(
             screens.screenId,
             inserts.filter((c) => c.screenId).map((c) => c.screenId!),
@@ -112,13 +119,14 @@ export async function _publishScreens(opts?: {
           return d
         })
 
-        await db.insert(screens).values(payload)
+        await executor.insert(screens).values(payload)
       }
 
       const insertChangeLogs = await _saveScreensHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -126,9 +134,9 @@ export async function _publishScreens(opts?: {
       })))
     }
 
-    await db.delete(screensDrafts).where(!opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId))
+    await executor.delete(screensDrafts).where(!opts?.userId ? undefined : eq(screensDrafts.createdByUserId, opts.userId))
 
-    let deleted = await db.query.pendingDeletion.findMany({
+    let deleted = await executor.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.screenId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -144,7 +152,7 @@ export async function _publishScreens(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await executor
         .update(screens)
         .set({ deletedAt })
         .where(
@@ -166,7 +174,7 @@ export async function _publishScreens(opts?: {
         },
       }))
 
-      await db.insert(screensHistory).values(historyPayload)
+      await executor.insert(screensHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -197,7 +205,7 @@ export async function _publishScreens(opts?: {
       }
     }
 
-    await db
+    await executor
       .delete(pendingDeletion)
       .where(
         and(
@@ -220,14 +228,14 @@ export async function _publishScreens(opts?: {
     }
 
     if (published.length) {
-      await db
+      await executor
         .update(screens)
         .set({ version: sql`${screens.version} + 1` })
         .where(inArray(screens.screenId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
         logger.error("_publishScreens changelog warnings", saveResult.errors.join(", "))
       }

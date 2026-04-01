@@ -27,6 +27,14 @@ import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, scree
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
+function assertCanPublishDrafts(user?: { role?: string | null } | null) {
+  const role = `${user?.role || ""}`.trim()
+  const allowed = role === "admin" || role === "super_user"
+
+  if (!allowed) logger.error("assertCanPublishDrafts ERROR", JSON.stringify({ role }))
+  if (!allowed) throw new Error("Forbidden: only admin or super_user can publish drafts")
+}
+
 async function getScopedIntegrityData(userId?: string | null): Promise<{
   dataKeysRes: Awaited<ReturnType<typeof dataKeysQueries._getDataKeys>>
   screensRes: Awaited<ReturnType<typeof scriptsQueries._getScreens>>
@@ -85,6 +93,11 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   const shouldLimitToAffectedScripts = !!userId && !hasDataKeyLibraryChanges
   const hasAffectedScripts = !!affectedScriptIds?.length
   const affectedScriptsSet = new Set(affectedScriptIds || [])
+  const deletedDataKeyIds = new Set(
+    userPendingDeletion
+      .map((entry) => entry.dataKeyId)
+      .filter((id): id is string => !!id)
+  )
   const scopedUserScreenDrafts = shouldLimitToAffectedScripts
     ? userScreenDrafts.filter((draft) => {
         const scriptId = draft.scriptId || draft.scriptDraftId
@@ -196,7 +209,8 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
 
   return {
     dataKeysRes: {
-      data: Array.from(new Map(Array.from(dataKeysMap.values()).map((item) => [item.uniqueKey || item.uuid, item])).values()),
+      data: Array.from(new Map(Array.from(dataKeysMap.values()).map((item) => [item.uniqueKey || item.uuid, item])).values())
+        .filter((item) => !deletedDataKeyIds.has(item.uuid)),
       errors: publishedDataKeysRes.errors,
     },
     screensRes: {
@@ -320,6 +334,7 @@ export async function publishData({
       "create_screens",
       "update_screens",
     ])
+    assertCanPublishDrafts(session.user)
 
     const publisherUserId = session?.user?.userId || null
 
@@ -439,73 +454,98 @@ export async function publishData({
       return results
     }
 
-    const publishConfigKeys = await configKeysMutations._publishConfigKeys({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishConfigKeys.errors?.length) return failPublish(publishConfigKeys.errors)
+    const publishTransactionResult = await db.transaction(async (tx) => {
+      const publishConfigKeys = await configKeysMutations._publishConfigKeys({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishConfigKeys.errors?.length) throw new Error(publishConfigKeys.errors.join(", "))
 
-    const publishHospitals = await hospitalsMutations._publishHospitals({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishHospitals.errors?.length) return failPublish(publishHospitals.errors)
+      const publishHospitals = await hospitalsMutations._publishHospitals({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishHospitals.errors?.length) throw new Error(publishHospitals.errors.join(", "))
 
-    const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishDrugsLibraryItems.errors?.length) return failPublish(publishDrugsLibraryItems.errors)
+      const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDrugsLibraryItems.errors?.length) throw new Error(publishDrugsLibraryItems.errors.join(", "))
 
-    const publishDataKeys = await dataKeysMutations._publishDataKeys({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishDataKeys.errors?.length) return failPublish(publishDataKeys.errors)
+      const publishDataKeys = await dataKeysMutations._publishDataKeys({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDataKeys.errors?.length) throw new Error(publishDataKeys.errors.join(", "))
 
-    const publishScripts = await scriptsMutations._publishScripts({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishScripts.errors?.length) return failPublish(publishScripts.errors)
+      const publishScripts = await scriptsMutations._publishScripts({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishScripts.errors?.length) throw new Error(publishScripts.errors.join(", "))
 
-    const publishScreens = await scriptsMutations._publishScreens({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishScreens.errors?.length) return failPublish(publishScreens.errors)
+      const publishScreens = await scriptsMutations._publishScreens({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishScreens.errors?.length) throw new Error(publishScreens.errors.join(", "))
 
-    const publishDiagnoses = await scriptsMutations._publishDiagnoses({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishDiagnoses.errors?.length) return failPublish(publishDiagnoses.errors)
+      const publishDiagnoses = await scriptsMutations._publishDiagnoses({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDiagnoses.errors?.length) throw new Error(publishDiagnoses.errors.join(", "))
 
-    const publishProblems = await scriptsMutations._publishProblems({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    if (publishProblems.errors?.length) return failPublish(publishProblems.errors)
+      const publishProblems = await scriptsMutations._publishProblems({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
 
-    const processPendingDeletion = await _processPendingDeletion({
-      userId,
-      publisherUserId: publisherUserId || undefined,
-    })
-    if (processPendingDeletion.errors?.length) return failPublish(processPendingDeletion.errors)
+      const processPendingDeletion = await _processPendingDeletion({
+        userId,
+        publisherUserId: publisherUserId || undefined,
+        client: tx,
+      })
+      if (processPendingDeletion.errors?.length) throw new Error(processPendingDeletion.errors.join(", "))
 
-    const editorInfoSave = await _saveEditorInfo({
-      increaseVersion: results.success,
-      broadcastAction: true,
-      data: { lastPublishDate: new Date() },
-    })
+      const editorInfoSave = await _saveEditorInfo({
+        increaseVersion: results.success,
+        broadcastAction: false,
+        data: { lastPublishDate: new Date() },
+        client: tx,
+      })
+      if (editorInfoSave.errors?.length) throw new Error(editorInfoSave.errors.join(", "))
+
+      return { editorInfoSave }
+    }).catch((error: any) => ({
+      errors: [error?.message || "Publish failed"],
+    }))
+
+    if ("errors" in publishTransactionResult && publishTransactionResult.errors?.length) {
+      return failPublish(publishTransactionResult.errors)
+    }
+
+    const editorInfoSave = ("editorInfoSave" in publishTransactionResult)
+      ? publishTransactionResult.editorInfoSave
+      : { data: null, success: false, errors: ["Publish failed"] }
 
     if (results.success && editorInfoSave.success && editorInfoSave.data?.dataVersion && publisherUserId) {
       const releaseDataVersion = editorInfoSave.data.dataVersion

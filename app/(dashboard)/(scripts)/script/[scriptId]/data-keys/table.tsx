@@ -213,6 +213,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             nextSelectedTargetUniqueKey
                 || res.preview?.targetDataKey?.uniqueKey
                 || entry.matchedUniqueKey
+                || entry.suggestedUniqueKeys?.[0]
                 || entry.currentUniqueKey
                 || ""
         );
@@ -379,6 +380,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         const usageHref = buildUsageHref(entry);
         const canSafeResolve = (
             entry.status === "legacy_match" ||
+            (
+                (entry.status === "missing" || entry.status === "unmanaged") &&
+                !!entry.suggestedUniqueKeys?.length
+            ) ||
             (
                 entry.status === "out_of_sync" &&
                 entry.kind !== "screen_option_collection" &&
@@ -962,7 +967,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                        This view shows all scanned script references. Blocking issues behave consistently with publish across the registry and publish flow, including missing links, legacy matches, duplicate parent data keys in the same script, and script options that no longer exist in the parent data key pool.
+                        This view shows all scanned script references. Blocking issues behave consistently with publish across the registry and publish flow. Publishing is blocked by missing, unlinked, or unmanaged datakeys, duplicate parent datakeys in the same script, and script options that no longer exist in the parent datakey pool.
                     </div>
 
                     <div className="rounded-md border p-3 space-y-4">

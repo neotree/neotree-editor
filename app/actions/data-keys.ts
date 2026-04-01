@@ -10,8 +10,8 @@ import { isAllowed } from './is-allowed';
 import { validateApiKey, validateHeadersItem } from './authenticate';
 import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
-import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
-import { count, isNull, max } from 'drizzle-orm';
+import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
+import { count, eq, isNull, max } from 'drizzle-orm';
 import { repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 
 type PreparedIntegrityRepair = {
@@ -192,7 +192,8 @@ export const getDataKeysIntegrity = async (params?: {
     onlyIssues?: boolean;
 }) => {
     try {
-        await isAllowed();
+        const session = await isAllowed();
+        const userId = session.user?.userId;
 
         const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
@@ -200,6 +201,16 @@ export const getDataKeysIntegrity = async (params?: {
             _getDiagnoses({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
             _getProblems({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
         ]);
+        const pendingDeletedDataKeys = userId
+            ? await db.query.pendingDeletion.findMany({
+                where: eq(pendingDeletion.createdByUserId, userId),
+                columns: { dataKeyId: true },
+            })
+            : [];
+        const pendingDeletedDataKeyIds = new Set(
+            pendingDeletedDataKeys.map((entry) => entry.dataKeyId).filter((id): id is string => !!id)
+        );
+        const scopedDataKeys = dataKeysRes.data.filter((item) => !pendingDeletedDataKeyIds.has(item.uuid));
 
         const errors = [
             ...(dataKeysRes.errors || []),
@@ -222,7 +233,7 @@ export const getDataKeysIntegrity = async (params?: {
         }
 
         const rawReport = scanDataKeyIntegrity({
-            dataKeys: dataKeysRes.data,
+            dataKeys: scopedDataKeys,
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
@@ -230,7 +241,7 @@ export const getDataKeysIntegrity = async (params?: {
         });
 
         const repairs = repairDataKeyIntegrityReferences({
-            dataKeys: dataKeysRes.data,
+            dataKeys: scopedDataKeys,
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
@@ -254,7 +265,7 @@ export const getDataKeysIntegrity = async (params?: {
         };
 
         const publishAlignedReport = scanDataKeyIntegrity({
-            dataKeys: dataKeysRes.data,
+            dataKeys: scopedDataKeys,
             screens: mergeById(screensRes.data, repairs.screens, (item) => item.screenId),
             diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
             problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
@@ -819,7 +830,10 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
             });
 
-            const preferredUniqueKey = item.selectedTargetUniqueKey || item.entry.matchedUniqueKey || item.entry.currentUniqueKey;
+            const preferredUniqueKey = item.selectedTargetUniqueKey
+                || item.entry.matchedUniqueKey
+                || item.entry.suggestedUniqueKeys?.[0]
+                || item.entry.currentUniqueKey;
             const matchedDataKey = preferredUniqueKey
                 ? dataKeysRes.data.find((dataKey) => dataKey.uniqueKey === preferredUniqueKey)
                 : undefined;
@@ -906,7 +920,11 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             };
         }
         const repairs = prepared.repairs;
-        const preferredUniqueKey = params.selectedTargetUniqueKey || params.entry.matchedUniqueKey || params.entry.currentUniqueKey;
+        const preferredUniqueKey =
+            params.selectedTargetUniqueKey
+            || params.entry.matchedUniqueKey
+            || params.entry.suggestedUniqueKeys?.[0]
+            || params.entry.currentUniqueKey;
         const matchedDataKey = preferredUniqueKey
             ? dataKeysRes.data.find((dataKey) => dataKey.uniqueKey === preferredUniqueKey)
             : undefined;
