@@ -6,6 +6,14 @@ export function normalizeDataKeyType(dataType?: string | null) {
         return 'option';
     }
 
+    if (normalized === 'single_select' || normalized === 'dropdown') {
+        return 'single_select';
+    }
+
+    if (normalized === 'number' || normalized === 'timer') {
+        return 'number';
+    }
+
     return normalized;
 }
 

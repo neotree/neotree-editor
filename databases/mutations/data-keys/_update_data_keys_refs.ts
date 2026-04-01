@@ -8,10 +8,6 @@ import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/sc
 import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
 import {
-    applyOwnedOptionCollectionSync,
-    resolveOwnedOptionDataKeys,
-    rebuildFieldItemsFromDataKeyOptions,
-    rebuildScreenItemsFromDataKeyOptions,
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
@@ -184,6 +180,7 @@ export async function _updateDataKeysRefs({
         };
 
         const usagesMap = new Map<string, AffectedUsage>();
+        const warningOnlyScreensMap = new Map<string, AffectedEntity>();
         const addUsage = (usage: AffectedUsage) => {
             const dedupeKey = [
                 usage.kind,
@@ -194,6 +191,23 @@ export async function _updateDataKeysRefs({
                 usage.title,
             ].join('|');
             usagesMap.set(dedupeKey, usage);
+        };
+        const addWarningOnlyScreen = (screen: {
+            screenId: string;
+            scriptId: string;
+            scriptTitle?: string | null;
+            title?: string | null;
+            label?: string | null;
+            refId?: string | null;
+        }) => {
+            if (!screen.screenId || !screen.scriptId) return;
+            warningOnlyScreensMap.set(screen.screenId, {
+                id: screen.screenId,
+                scriptId: screen.scriptId,
+                scriptTitle: screen.scriptTitle || undefined,
+                title: screen.title || screen.label || screen.refId || screen.screenId,
+                type: 'screen',
+            });
         };
 
         const keyIdPatterns = changedUniqueKeys
@@ -337,6 +351,7 @@ export async function _updateDataKeysRefs({
         const prefetchErrors = [
             ...(screensGetErrors || []),
             ...(diagnosesGetErrors || []),
+            ...(problemsGetErrors || []),
         ];
         if (prefetchErrors.length) {
             return { success: false, errors: prefetchErrors, info: stats };
@@ -369,6 +384,7 @@ export async function _updateDataKeysRefs({
             }
 
             let updated = !!screenDataKey || !!refIdDataKey;
+            const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
 
             const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
                 ? (s.items || [])
@@ -391,6 +407,27 @@ export async function _updateDataKeysRefs({
                             screenItemIndex: itemIndex,
                         });
                     }
+                    if (
+                        shouldSyncScreenOwnedOptions({
+                            screenType: s.type,
+                            dataKey: screenDataKey,
+                            currentItemsCount: (s.items || []).length,
+                        })
+                    ) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !screenOptionUniqueKeys.has(keyId)) {
+                            addUsage({
+                                id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                                kind: 'screen_item',
+                                title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                                location: s.title || s.label || s.refId || s.screenId,
+                                scriptId: s.scriptId,
+                                scriptTitle: s.scriptTitle || undefined,
+                                screenId: s.screenId,
+                                screenItemIndex: itemIndex,
+                            });
+                        }
+                    }
                     const syncedItem = syncScreenReference(item, itemDataKey);
                     if (syncedItem.changed) {
                         updated = true;
@@ -400,22 +437,11 @@ export async function _updateDataKeysRefs({
                         ...syncedItem.value,
                     };
                 });
-            const screenOptionSync = applyOwnedOptionCollectionSync(
-                items,
-                shouldSyncScreenOwnedOptions({
-                    screenType: s.type,
-                    dataKey: screenDataKey,
-                    currentItemsCount: (s.items || []).length,
-                }),
-                () => rebuildScreenItemsFromDataKeyOptions({
-                    currentItems: items,
-                    optionDataKeys: resolveOwnedOptionDataKeys(screenDataKey, byUniqueKey),
-                    screenType: s.type,
-                }),
-            );
-            const rebuiltItems = screenOptionSync.value;
-            if (screenOptionSync.changed) {
-                updated = true;
+            if ((items || []).some((item) => {
+                const keyId = `${item.keyId || ''}`.trim();
+                return !!keyId && !screenOptionUniqueKeys.has(keyId);
+            })) {
+                addWarningOnlyScreen(s);
             }
 
             const fields = (s.fields || []).map((field, fieldIndex) => {
@@ -462,6 +488,7 @@ export async function _updateDataKeysRefs({
                     });
                 }
 
+                const fieldOptionUniqueKeys = new Set((fieldDataKey?.options || []).filter(Boolean));
                 const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
                     const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
@@ -482,6 +509,29 @@ export async function _updateDataKeysRefs({
                             fieldItemIndex,
                         });
                     }
+                    if (
+                        shouldSyncFieldOwnedOptions({
+                            fieldType: field.type,
+                            dataKey: fieldDataKey,
+                            currentItemsCount: (field.items || []).length,
+                        })
+                    ) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !fieldOptionUniqueKeys.has(keyId)) {
+                            addWarningOnlyScreen(s);
+                            addUsage({
+                                id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
+                                kind: 'screen_field_item',
+                                title: `${item.label || item.value || (fieldItemIndex + 1)}`,
+                                location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
+                                scriptId: s.scriptId,
+                                scriptTitle: s.scriptTitle || undefined,
+                                screenId: s.screenId,
+                                fieldIndex,
+                                fieldItemIndex,
+                            });
+                        }
+                    }
                     const syncedFieldItem = syncKeyOnlyReference(item, fieldItemDataKey, {
                         id: "keyId",
                         name: "value",
@@ -498,22 +548,6 @@ export async function _updateDataKeysRefs({
                         ...fieldItemValue,
                     };
                 });
-                const rebuiltFieldItemsSync = applyOwnedOptionCollectionSync(
-                    fieldItems,
-                    shouldSyncFieldOwnedOptions({
-                        fieldType: field.type,
-                        dataKey: fieldDataKey,
-                        currentItemsCount: (field.items || []).length,
-                    }),
-                    () => rebuildFieldItemsFromDataKeyOptions({
-                        currentItems: fieldItems,
-                        optionDataKeys: resolveOwnedOptionDataKeys(fieldDataKey, byUniqueKey),
-                    }),
-                );
-                const rebuiltFieldItems = rebuiltFieldItemsSync.value;
-                if (rebuiltFieldItemsSync.changed) {
-                    updated = true;
-                }
                 const syncedField = syncFieldReference(field, fieldDataKey);
                 const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
                     id: "refKeyId",
@@ -548,7 +582,7 @@ export async function _updateDataKeysRefs({
 
                 return {
                     ...syncedMaxTimeField.value,
-                    items: rebuiltFieldItems,
+                    items: fieldItems,
                 };
             });
 
@@ -567,7 +601,7 @@ export async function _updateDataKeysRefs({
             return {
                 ...syncedRefScreen.value,
                 updated,
-                items: rebuiltItems,
+                items,
                 fields,
             };
         }).filter(s => !!s.updated).map(({ updated, ...s }) => s);
@@ -651,7 +685,7 @@ export async function _updateDataKeysRefs({
                     location: 'Problem',
                     scriptId: d.scriptId,
                     scriptTitle: d.scriptTitle || undefined,
-                    diagnosisId: d.problemId,
+                    problemId: d.problemId,
                 });
             }
 
@@ -673,13 +707,20 @@ export async function _updateDataKeysRefs({
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
         stats.updatedProblems = problemsUpdatedData.length;
 
-        const affectedScreens: AffectedEntity[] = screensUpdatedData.map(s => ({
-            id: s.screenId,
-            scriptId: s.scriptId,
-            scriptTitle: s.scriptTitle || undefined,
-            title: s.title || s.label || s.refId || s.screenId,
-            type: 'screen',
-        }));
+        const affectedScreensMap = new Map<string, AffectedEntity>();
+        screensUpdatedData.forEach((s) => {
+            affectedScreensMap.set(s.screenId, {
+                id: s.screenId,
+                scriptId: s.scriptId,
+                scriptTitle: s.scriptTitle || undefined,
+                title: s.title || s.label || s.refId || s.screenId,
+                type: 'screen',
+            });
+        });
+        warningOnlyScreensMap.forEach((screen) => {
+            affectedScreensMap.set(screen.id, screen);
+        });
+        const affectedScreens: AffectedEntity[] = Array.from(affectedScreensMap.values());
         const affectedDiagnoses: AffectedEntity[] = diagnosesUpdatedData.map(d => ({
             id: d.diagnosisId,
             scriptId: d.scriptId,
