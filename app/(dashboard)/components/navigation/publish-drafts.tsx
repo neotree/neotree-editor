@@ -142,7 +142,7 @@ export function PublishDrafts({ variant }: Props) {
         title="Publish blocked"
         description="Resolve the blocking data key validation issues below before publishing."
         contentProps={{
-          className: "sm:max-w-3xl h-[85vh] overflow-hidden",
+          className: "sm:max-w-3xl max-h-[85vh] overflow-hidden",
         }}
         actions={(
           <Button
