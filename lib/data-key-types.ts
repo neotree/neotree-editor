@@ -19,6 +19,10 @@ export function normalizeDataKeyType(dataType?: string | null) {
         return 'datetime';
     }
 
+    if (normalized === 'date' || normalized === 'datetime') {
+        return 'date';
+    }
+
     if (
         normalized === 'edliz_table' ||
         normalized === 'edliz_summary_table' ||
