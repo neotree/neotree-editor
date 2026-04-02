@@ -1,4 +1,4 @@
-import { and, desc, eq, Query } from "drizzle-orm"
+import { and, desc, eq, inArray, Query } from "drizzle-orm"
 
 import { _getLeanScriptIds } from "@/databases/queries/scripts"
 import db from "@/databases/pg/drizzle"
@@ -63,16 +63,6 @@ function excludedScreenType(type: string) {
   return excluded.includes(type)
 }
 
-async function aliasExists(
-  executor: DbOrTransaction,
-  opts: { script: string; name: string }
-) {
-  const duplicate = await executor.query.aliases.findFirst({
-    where: and(eq(aliases.script, opts.script), eq(aliases.name, opts.name)),
-  })
-  return !!duplicate
-}
-
 async function aliasSeeded(executor: DbOrTransaction) {
   const exists = await executor.query.aliases.findFirst()
   return !!exists
@@ -103,29 +93,57 @@ async function getScriptScreens(executor: DbOrTransaction, scriptId: string) {
   })
 }
 
-async function assignAliases(
+async function getExistingAliasNames(
   executor: DbOrTransaction,
+  scriptIds: string[]
+): Promise<Map<string, Set<string>>> {
+  const scopedScriptIds = Array.from(new Set(scriptIds.filter(Boolean)))
+  const existing = new Map<string, Set<string>>()
+  if (!scopedScriptIds.length) return existing
+
+  const rows = await executor.query.aliases.findMany({
+    where: inArray(aliases.script, scopedScriptIds),
+    columns: { script: true, name: true },
+  })
+
+  for (const row of rows) {
+    const scriptId = `${row.script || ""}`.trim()
+    const name = `${row.name || ""}`.trim()
+    if (!scriptId || !name) continue
+    if (!existing.has(scriptId)) existing.set(scriptId, new Set())
+    existing.get(scriptId)!.add(name)
+  }
+
+  return existing
+}
+
+function assignAliases(
   scriptId: string,
   scriptScreens: any[],
   lastAlias: string | null,
-  oldScript: string | null
-): Promise<AliasDraft[]> {
+  oldScript: string | null,
+  existingAliasNames: Set<string>
+): AliasDraft[] {
   const updated: AliasDraft[] = []
   let currentAlias = lastAlias
+  const usedNames = new Set(existingAliasNames)
 
   for (const screen of scriptScreens) {
     if (excludedScreenType(screen.type)) continue
 
     if (screen.type === "form" && Array.isArray(screen.fields)) {
       for (const field of screen.fields) {
+        const name = `${field.key || ""}`.trim()
         if (
+          name &&
           Array.isArray(field.prePopulate) &&
           field.prePopulate.length > 0 &&
-          !(await aliasExists(executor, { name: field.key, script: scriptId }))
+          !usedNames.has(name)
         ) {
           currentAlias = getNextAlias(currentAlias)
+          usedNames.add(name)
           updated.push({
-            name: field.key,
+            name,
             alias: currentAlias,
             script: scriptId,
             oldScript,
@@ -136,13 +154,16 @@ async function assignAliases(
     }
 
     if (
+      `${screen.key || ""}`.trim() &&
       Array.isArray(screen.prePopulate) &&
-      screen.prePopulate.length > 0 &&
-      !(await aliasExists(executor, { name: screen.key, script: scriptId }))
+      screen.prePopulate.length > 0
     ) {
+      const name = `${screen.key || ""}`.trim()
+      if (usedNames.has(name)) continue
       currentAlias = getNextAlias(currentAlias)
+      usedNames.add(name)
       updated.push({
-        name: screen.key,
+        name,
         alias: currentAlias,
         script: scriptId,
         oldScript,
@@ -163,21 +184,34 @@ export async function _saveAliases(
   const executor = opts?.client || db
 
   try {
+    const scriptIds = Array.from(new Set(alls.map((item) => item.script).filter(Boolean)))
+    const existingAliasNames = await getExistingAliasNames(executor, scriptIds)
+    const insertData: AliasDraft[] = []
+    const seen = new Set<string>()
+
     for (const al of alls) {
-      const duplicate = await executor.query.aliases.findFirst({
-        where: and(eq(aliases.script, al.script), eq(aliases.name, al.name)),
-        orderBy: desc(aliases.createdAt),
+      const scriptId = `${al.script || ""}`.trim()
+      const name = `${al.name || ""}`.trim()
+      if (!scriptId || !name) continue
+
+      const cacheKey = `${scriptId}::${name}`
+      if (seen.has(cacheKey)) continue
+      seen.add(cacheKey)
+
+      const namesForScript = existingAliasNames.get(scriptId) || new Set<string>()
+      if (namesForScript.has(name)) continue
+      namesForScript.add(name)
+      existingAliasNames.set(scriptId, namesForScript)
+
+      insertData.push({
+        ...al,
+        script: scriptId,
+        name,
       })
+    }
 
-      if (duplicate) continue
-
-      const q = executor.insert(aliases).values({
-        alias: al.alias,
-        name: al.name,
-        script: al.script,
-        oldScript: al.oldScript,
-      })
-
+    if (insertData.length) {
+      const q = executor.insert(aliases).values(insertData)
       info.query = q.toSQL()
       await q.execute()
     }
@@ -213,6 +247,9 @@ export async function _generateScreenAliases(
   const errors: string[] = []
 
   try {
+    const existingAliasNames = await getExistingAliasNames(executor, scriptsIds)
+    const aliasesToSave: AliasDraft[] = []
+
     for (const scriptId of scriptsIds) {
       if (!scriptId) continue
 
@@ -222,13 +259,19 @@ export async function _generateScreenAliases(
         getScriptScreens(executor, scriptId),
       ])
 
-      const aliasesToSave = await assignAliases(executor, scriptId, scriptScreens, lastAlias, oldScript)
-      if (!aliasesToSave.length) continue
+      const scriptAliasDrafts = assignAliases(
+        scriptId,
+        scriptScreens,
+        lastAlias,
+        oldScript,
+        existingAliasNames.get(scriptId) || new Set<string>()
+      )
+      aliasesToSave.push(...scriptAliasDrafts)
+    }
 
+    if (aliasesToSave.length) {
       const res = await _saveAliases(aliasesToSave, { client: executor })
-      if (!res.success) {
-        errors.push(...(res.errors || ["Failed to save aliases"]))
-      }
+      if (!res.success) errors.push(...(res.errors || ["Failed to save aliases"]))
     }
 
     return {
