@@ -176,7 +176,7 @@ function assignAliases(
 
 export async function _saveAliases(
   alls: AliasDraft[],
-  opts?: { client?: DbOrTransaction }
+  opts?: { client?: DbOrTransaction; existingAliasNames?: Map<string, Set<string>> }
 ): Promise<SaveAliasesResponse> {
   const response: SaveAliasesResponse = { success: false }
   const errors: string[] = []
@@ -185,7 +185,7 @@ export async function _saveAliases(
 
   try {
     const scriptIds = Array.from(new Set(alls.map((item) => item.script).filter(Boolean)))
-    const existingAliasNames = await getExistingAliasNames(executor, scriptIds)
+    const existingAliasNames = opts?.existingAliasNames || await getExistingAliasNames(executor, scriptIds)
     const insertData: AliasDraft[] = []
     const seen = new Set<string>()
 
@@ -270,7 +270,10 @@ export async function _generateScreenAliases(
     }
 
     if (aliasesToSave.length) {
-      const res = await _saveAliases(aliasesToSave, { client: executor })
+      const res = await _saveAliases(aliasesToSave, {
+        client: executor,
+        existingAliasNames,
+      })
       if (!res.success) errors.push(...(res.errors || ["Failed to save aliases"]))
     }
 

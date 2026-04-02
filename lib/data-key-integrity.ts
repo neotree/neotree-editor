@@ -1,4 +1,4 @@
-import { buildNormalizedDataKeyMatchKey, normalizeDataKeyMatchValue, normalizeDataKeyType } from "@/lib/data-key-types";
+import { buildNormalizedDataKeyMatchKey, normalizeDataKeyCompatibilityType, normalizeDataKeyMatchValue } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import {
@@ -135,7 +135,7 @@ export type DataKeyIntegrityContext = {
     strictSuggestionsByType: Map<string, StrictSuggestionCandidate[]>;
 };
 
-function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
+export function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
     return (
         entry.status === "missing" ||
         entry.status === "legacy_match" ||
@@ -213,7 +213,7 @@ export function buildDataKeyIntegrityContext(dataKeys: DataKey[]): DataKeyIntegr
     dataKeys.forEach((dataKey) => {
         if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
 
-        const normalizedType = normalizeDataKeyType(dataKey.dataType);
+        const normalizedType = normalizeDataKeyCompatibilityType(dataKey.dataType);
         const texts = Array.from(new Set(
             [dataKey.name, dataKey.label]
                 .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
@@ -258,7 +258,7 @@ function getCandidateMatches({
         }
     };
 
-    const normalizedType = normalizeDataKeyType(expectedDataType);
+    const normalizedType = normalizeDataKeyCompatibilityType(expectedDataType);
     if (currentKey) addCandidates(maps.byTypedName.get(buildNormalizedDataKeyMatchKey(currentKey, normalizedType)) || []);
     if (currentLabel) addCandidates(maps.byTypedLabel.get(buildNormalizedDataKeyMatchKey(currentLabel, normalizedType)) || []);
 
@@ -279,7 +279,7 @@ function getStrictSuggestedCandidates({
     expectedDataType: string;
     context: DataKeyIntegrityContext;
 }) {
-    const normalizedExpectedType = normalizeDataKeyType(expectedDataType);
+    const normalizedExpectedType = normalizeDataKeyCompatibilityType(expectedDataType);
     const currentTexts = Array.from(new Set(
         [currentKey, currentLabel]
             .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
@@ -379,8 +379,8 @@ function evaluateReference({
     const current = currentUniqueKey ? byUniqueKey.get(currentUniqueKey) : undefined;
 
     if (current) {
-        const normalizedExpectedType = normalizeDataKeyType(expectedDataType);
-        const normalizedResolvedType = normalizeDataKeyType(current.dataType);
+        const normalizedExpectedType = normalizeDataKeyCompatibilityType(expectedDataType);
+        const normalizedResolvedType = normalizeDataKeyCompatibilityType(current.dataType);
         if (normalizedExpectedType && normalizedResolvedType && normalizedExpectedType !== normalizedResolvedType) {
             return createEntry(base, "conflict", `Expected ${expectedDataType} but resolved data key is ${current.dataType}`, current);
         }

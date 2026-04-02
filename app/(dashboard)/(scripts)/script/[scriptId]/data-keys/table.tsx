@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
-import type { DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
 import { useAppContext } from "@/contexts/app";
 
 const statusStyles = {
@@ -126,6 +126,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+    const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "non_blocking">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
@@ -161,6 +162,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     );
     const filteredEntries = entries.filter((entry) => {
+        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
+        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
@@ -1006,6 +1009,22 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </div>
 
                         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+                            <div className="w-full md:w-[220px]">
+                                <Select
+                                    value={issueScopeFilter}
+                                    onValueChange={(value) => setIssueScopeFilter(value as typeof issueScopeFilter)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Filter by issue scope" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All issues</SelectItem>
+                                        <SelectItem value="blocking">Blocking issues</SelectItem>
+                                        <SelectItem value="non_blocking">Non-blocking issues</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             <div className="w-full md:w-[220px]">
                                 <Select
                                     value={statusFilter}
