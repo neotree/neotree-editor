@@ -2,16 +2,13 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { pendingDeletion, screens, screensDrafts, screensHistory } from "@/databases/pg/schema"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import { _saveScreensHistory } from "./_screens_history"
 import { v4 } from "uuid"
 import { _generateScreenAliases } from "../aliases/_aliases_save"
 import { removeHexCharacters } from "@/databases/utils"
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 export async function _publishScreens(opts?: {
   scriptsIds?: string[]
@@ -224,7 +221,10 @@ export async function _publishScreens(opts?: {
       new Set((updates ?? []).map((ud) => ud.scriptId).filter((id): id is string => Boolean(id))),
     )
     if (updatedScripts.length) {
-      await _generateScreenAliases(updatedScripts)
+      const aliasesResult = await _generateScreenAliases(updatedScripts, { client: executor })
+      if (aliasesResult.errors?.length) {
+        throw new Error(aliasesResult.errors.join(", "))
+      }
     }
 
     if (published.length) {

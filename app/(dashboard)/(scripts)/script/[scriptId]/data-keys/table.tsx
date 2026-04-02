@@ -301,7 +301,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             setResolvingKey(null);
             setRepairModalEntry(null);
             setRepairPreview(null);
+            setSelectedTargetUniqueKey("");
             setReviewAcknowledged(false);
+            await setRepairEntryParam("");
             router.refresh();
         });
     };

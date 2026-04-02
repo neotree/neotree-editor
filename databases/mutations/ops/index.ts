@@ -1,13 +1,10 @@
 import { isNotNull, and, isNull, inArray, sql, eq } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { configKeys, dataKeys, diagnoses, problems, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
-
-type DbClient = typeof db;
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
-type DbOrTransaction = DbClient | TransactionClient;
 
 export async function _clearPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'problems' | 'configKeys' | 'drugsLibrary' | 'dataKeys',

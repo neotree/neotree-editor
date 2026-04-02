@@ -5,6 +5,7 @@ import * as uuid from "uuid"
 import logger from "@/lib/logger"
 import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
+import type { DbClient, DbOrTransaction, TransactionClient } from "@/databases/pg/db-client"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
   aliases,
@@ -150,10 +151,6 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   hospital: { table: hospitals, idColumn: hospitals.hospitalId, entityLabel: "hospital" },
 }
 
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 function hashToInt32(value: string): number {
   let hash = 0

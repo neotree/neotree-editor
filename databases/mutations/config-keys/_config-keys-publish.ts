@@ -3,13 +3,10 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveConfigKeysHistory } from "./_config-keys-history"
 import { v4 } from "uuid"
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 export async function _publishConfigKeys(opts?: {
   broadcastAction?: boolean
