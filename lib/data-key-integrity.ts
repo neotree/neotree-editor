@@ -123,6 +123,18 @@ type CandidateMatch = {
     candidates: DataKey[];
 };
 
+type StrictSuggestionCandidate = {
+    candidate: DataKey;
+    texts: string[];
+    sortText: string;
+};
+
+export type DataKeyIntegrityContext = {
+    byUniqueKey: Map<string, DataKey>;
+    legacyMaps: ReturnType<typeof buildLegacyMaps>;
+    strictSuggestionsByType: Map<string, StrictSuggestionCandidate[]>;
+};
+
 function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
     return (
         entry.status === "missing" ||
@@ -194,6 +206,37 @@ function buildLegacyMaps(dataKeys: DataKey[]) {
     return { byTypedName, byTypedLabel };
 }
 
+export function buildDataKeyIntegrityContext(dataKeys: DataKey[]): DataKeyIntegrityContext {
+    const byUniqueKey = new Map<string, DataKey>();
+    const strictSuggestionsByType = new Map<string, StrictSuggestionCandidate[]>();
+
+    dataKeys.forEach((dataKey) => {
+        if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
+
+        const normalizedType = normalizeDataKeyType(dataKey.dataType);
+        const texts = Array.from(new Set(
+            [dataKey.name, dataKey.label]
+                .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
+                .filter((value) => value.length >= 3)
+        ));
+        if (!texts.length) return;
+
+        const current = strictSuggestionsByType.get(normalizedType) || [];
+        current.push({
+            candidate: dataKey,
+            texts,
+            sortText: `${dataKey.label || dataKey.name || ""}`.trim().toLowerCase(),
+        });
+        strictSuggestionsByType.set(normalizedType, current);
+    });
+
+    return {
+        byUniqueKey,
+        legacyMaps: buildLegacyMaps(dataKeys),
+        strictSuggestionsByType,
+    };
+}
+
 function getCandidateMatches({
     currentKey,
     currentLabel,
@@ -229,12 +272,12 @@ function getStrictSuggestedCandidates({
     currentKey,
     currentLabel,
     expectedDataType,
-    dataKeys,
+    context,
 }: {
     currentKey?: string;
     currentLabel?: string;
     expectedDataType: string;
-    dataKeys: DataKey[];
+    context: DataKeyIntegrityContext;
 }) {
     const normalizedExpectedType = normalizeDataKeyType(expectedDataType);
     const currentTexts = Array.from(new Set(
@@ -245,14 +288,7 @@ function getStrictSuggestedCandidates({
 
     if (!currentTexts.length) return [];
 
-    const scoreCandidate = (candidate: DataKey) => {
-        const candidateTexts = Array.from(new Set(
-            [candidate.name, candidate.label]
-                .map((value) => normalizeDataKeyMatchValue(`${value || ""}`))
-                .filter((value) => value.length >= 3)
-        ));
-        if (!candidateTexts.length) return 0;
-
+    const scoreCandidate = (candidateTexts: string[]) => {
         let score = 0;
         for (const currentText of currentTexts) {
             for (const candidateText of candidateTexts) {
@@ -267,11 +303,10 @@ function getStrictSuggestedCandidates({
         return score;
     };
 
-    return dataKeys
-        .filter((candidate) => normalizeDataKeyType(candidate.dataType) === normalizedExpectedType)
-        .map((candidate) => ({ candidate, score: scoreCandidate(candidate) }))
+    return (context.strictSuggestionsByType.get(normalizedExpectedType) || [])
+        .map((item) => ({ ...item, score: scoreCandidate(item.texts) }))
         .filter((item) => item.score >= 60)
-        .sort((a, b) => b.score - a.score || `${a.candidate.label || a.candidate.name || ""}`.localeCompare(`${b.candidate.label || b.candidate.name || ""}`))
+        .sort((a, b) => b.score - a.score || a.sortText.localeCompare(b.sortText))
         .map((item) => item.candidate)
         .slice(0, 5);
 }
@@ -327,8 +362,7 @@ function evaluateReference({
     currentLabel,
     expectedDataType,
     base,
-    byUniqueKey,
-    legacyMaps,
+    context,
     compareAgainstResolved = true,
     requireLibraryLink = false,
 }: {
@@ -337,11 +371,11 @@ function evaluateReference({
     currentLabel?: string;
     expectedDataType: string;
     base: Omit<DataKeyIntegrityEntry, "status" | "reason">;
-    byUniqueKey: Map<string, DataKey>;
-    legacyMaps: ReturnType<typeof buildLegacyMaps>;
+    context: DataKeyIntegrityContext;
     compareAgainstResolved?: boolean;
     requireLibraryLink?: boolean;
 }) {
+    const { byUniqueKey, legacyMaps } = context;
     const current = currentUniqueKey ? byUniqueKey.get(currentUniqueKey) : undefined;
 
     if (current) {
@@ -374,7 +408,7 @@ function evaluateReference({
             currentKey,
             currentLabel,
             expectedDataType,
-            dataKeys: Array.from(byUniqueKey.values()),
+            context,
         });
 
     if (!candidates.candidates.length) {
@@ -403,11 +437,11 @@ function compareOwnedOptionCollection({
 }) {
     if (!currentItems.length) return false;
 
-    const byUniqueKey = new Map(expectedOptions.map((item) => [item.uniqueKey, item]));
+    const expectedUniqueKeys = new Set(expectedOptions.map((item) => item.uniqueKey));
     return currentItems.some((current) => {
         const keyId = `${current.keyId || ""}`.trim();
         if (!keyId) return false;
-        return !byUniqueKey.has(keyId);
+        return !expectedUniqueKeys.has(keyId);
     });
 }
 
@@ -472,19 +506,17 @@ export function scanDataKeyIntegrity({
     problems = [],
     dataKeys = [],
     onlyIssues = false,
+    context,
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     problems?: ProblemType[];
     dataKeys?: DataKey[];
     onlyIssues?: boolean;
+    context?: DataKeyIntegrityContext;
 }): DataKeyIntegrityReport {
-    const byUniqueKey = new Map<string, DataKey>();
-    dataKeys.forEach((dataKey) => {
-        if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
-    });
-
-    const legacyMaps = buildLegacyMaps(dataKeys);
+    const resolvedContext = context || buildDataKeyIntegrityContext(dataKeys);
+    const { byUniqueKey } = resolvedContext;
     const entries: DataKeyIntegrityEntry[] = [];
 
     const pushEntry = (entry: DataKeyIntegrityEntry) => {
@@ -514,13 +546,13 @@ export function scanDataKeyIntegrity({
                     currentKey: screen.key || undefined,
                     currentLabel: screen.label || undefined,
                 },
-                byUniqueKey,
-                legacyMaps,
+                context: resolvedContext,
             }));
         }
 
         const screenDataKey = screen.keyId ? byUniqueKey.get(screen.keyId) : undefined;
         const screenOwnedOptions = resolveOwnedOptions(screenDataKey, byUniqueKey);
+        const screenOwnedOptionKeys = new Set(screenOwnedOptions.map((option) => option.uniqueKey));
         const ownsScreenOptionCollection = shouldSyncScreenOwnedOptions({
             screenType: screen.type,
             dataKey: screenDataKey,
@@ -531,7 +563,7 @@ export function scanDataKeyIntegrity({
                 .filter((item) => {
                     const keyId = `${item.keyId || ""}`.trim();
                     if (!keyId) return false;
-                    return !screenOwnedOptions.find((option) => option.uniqueKey === keyId);
+                    return !screenOwnedOptionKeys.has(keyId);
                 })
                 .map((item) => `${item.label || item.key || item.id || item.keyId || ""}`);
             pushEntry(createEntry({
@@ -562,8 +594,7 @@ export function scanDataKeyIntegrity({
                     screenItemIndex: itemIndex,
                     location: `${screenBase.location} > item ${itemIndex + 1}`,
                 },
-                    byUniqueKey,
-                    legacyMaps,
+                    context: resolvedContext,
                 }));
             });
         }
@@ -590,13 +621,13 @@ export function scanDataKeyIntegrity({
                         currentKey: field.key || undefined,
                         currentLabel: field.label || undefined,
                     },
-                    byUniqueKey,
-                    legacyMaps,
+                    context: resolvedContext,
                 }));
             }
 
             const fieldDataKey = field.keyId ? byUniqueKey.get(field.keyId) : undefined;
             const fieldOwnedOptions = resolveOwnedOptions(fieldDataKey, byUniqueKey);
+            const fieldOwnedOptionKeys = new Set(fieldOwnedOptions.map((option) => option.uniqueKey));
             const ownsFieldOptionCollection = shouldSyncFieldOwnedOptions({
                 fieldType: field.type,
                 dataKey: fieldDataKey,
@@ -607,7 +638,7 @@ export function scanDataKeyIntegrity({
                     .filter((item) => {
                         const keyId = `${item.keyId || ""}`.trim();
                         if (!keyId) return false;
-                        return !fieldOwnedOptions.find((option) => option.uniqueKey === keyId);
+                        return !fieldOwnedOptionKeys.has(keyId);
                     })
                     .map((item) => `${item.label || item.value || item.keyId || ""}`);
                 pushEntry(createEntry({
@@ -644,8 +675,7 @@ export function scanDataKeyIntegrity({
                         currentUniqueKey: ref.uniqueKey,
                         currentKey: ref.key,
                     },
-                    byUniqueKey,
-                    legacyMaps,
+                    context: resolvedContext,
                     compareAgainstResolved: false,
                 }));
             });
@@ -667,8 +697,7 @@ export function scanDataKeyIntegrity({
                         fieldItemIndex: fieldItemIndex,
                         location: `${fieldBase.location} > option ${fieldItemIndex + 1}`,
                     },
-                    byUniqueKey,
-                    legacyMaps,
+                    context: resolvedContext,
                 }));
             });
         });
@@ -695,8 +724,7 @@ export function scanDataKeyIntegrity({
                 currentKey: diagnosis.key || undefined,
                 currentLabel: diagnosis.name || undefined,
             },
-            byUniqueKey,
-            legacyMaps,
+            context: resolvedContext,
         }));
 
         (diagnosis.symptoms || []).forEach((symptom, symptomIndex) => {
@@ -716,8 +744,7 @@ export function scanDataKeyIntegrity({
                     symptomIndex,
                     location: `${diagnosisBase.location} > symptom ${symptomIndex + 1}`,
                 },
-                byUniqueKey,
-                legacyMaps,
+                context: resolvedContext,
             }));
         });
     }
@@ -739,8 +766,7 @@ export function scanDataKeyIntegrity({
                 currentKey: problem.key || undefined,
                 currentLabel: problem.name || undefined,
             },
-            byUniqueKey,
-            legacyMaps,
+            context: resolvedContext,
         }));
     }
 
@@ -749,14 +775,18 @@ export function scanDataKeyIntegrity({
 
     const summary = {
         total: entries.length,
-        resolved: entries.filter((entry) => entry.status === "resolved").length,
-        out_of_sync: entries.filter((entry) => entry.status === "out_of_sync").length,
-        missing: entries.filter((entry) => entry.status === "missing").length,
-        legacy_match: entries.filter((entry) => entry.status === "legacy_match").length,
-        conflict: entries.filter((entry) => entry.status === "conflict").length,
-        unmanaged: entries.filter((entry) => entry.status === "unmanaged").length,
-        blocking: entries.filter((entry) => isBlockingEntry(entry)).length,
+        resolved: 0,
+        out_of_sync: 0,
+        missing: 0,
+        legacy_match: 0,
+        conflict: 0,
+        unmanaged: 0,
+        blocking: 0,
     };
+    entries.forEach((entry) => {
+        summary[entry.status] += 1;
+        if (isBlockingEntry(entry)) summary.blocking += 1;
+    });
 
     return { entries, summary };
 }
@@ -862,17 +892,16 @@ export function repairDataKeyIntegrityReferences({
     diagnoses = [],
     problems = [],
     dataKeys = [],
+    context,
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     problems?: ProblemType[];
     dataKeys?: DataKey[];
+    context?: DataKeyIntegrityContext;
 }) {
-    const byUniqueKey = new Map<string, DataKey>();
-    dataKeys.forEach((dataKey) => {
-        if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
-    });
-    const legacyMaps = buildLegacyMaps(dataKeys);
+    const resolvedContext = context || buildDataKeyIntegrityContext(dataKeys);
+    const { byUniqueKey, legacyMaps } = resolvedContext;
 
     const repairedScreens = screens.map((screen) => {
         let changed = false;
@@ -1079,6 +1108,7 @@ export function repairSingleDataKeyIntegrityReference({
     problems = [],
     dataKeys = [],
     overrideTargetUniqueKey,
+    context,
 }: {
     entry: DataKeyIntegrityEntry;
     screens?: ScreenType[];
@@ -1086,12 +1116,10 @@ export function repairSingleDataKeyIntegrityReference({
     problems?: ProblemType[];
     dataKeys?: DataKey[];
     overrideTargetUniqueKey?: string;
+    context?: DataKeyIntegrityContext;
 }) {
-    const byUniqueKey = new Map<string, DataKey>();
-    dataKeys.forEach((dataKey) => {
-        if (dataKey.uniqueKey) byUniqueKey.set(dataKey.uniqueKey, dataKey);
-    });
-    const legacyMaps = buildLegacyMaps(dataKeys);
+    const resolvedContext = context || buildDataKeyIntegrityContext(dataKeys);
+    const { byUniqueKey, legacyMaps } = resolvedContext;
     const overrideTarget = overrideTargetUniqueKey ? byUniqueKey.get(overrideTargetUniqueKey) : undefined;
 
     const repairedScreens = screens.map((screen) => {

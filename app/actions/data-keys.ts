@@ -12,7 +12,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 
 type PreparedIntegrityRepair = {
     entry: DataKeyIntegrityEntry;
@@ -92,14 +92,18 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
     return {
         success: true as const,
         errors: [] as string[],
-        repairs: repairSingleDataKeyIntegrityReference({
-            entry,
-            dataKeys: dataKeysRes.data,
-            screens: screensRes.data,
-            diagnoses: diagnosesRes.data,
-            problems: problemsRes.data,
-            overrideTargetUniqueKey: selectedTargetUniqueKey,
-        }),
+        repairs: (() => {
+            const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
+            return repairSingleDataKeyIntegrityReference({
+                entry,
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                problems: problemsRes.data,
+                overrideTargetUniqueKey: selectedTargetUniqueKey,
+                context: integrityContext,
+            });
+        })(),
     };
 }
 
@@ -232,12 +236,15 @@ export const getDataKeysIntegrity = async (params?: {
             };
         }
 
+        const integrityContext = buildDataKeyIntegrityContext(scopedDataKeys);
+
         const rawReport = scanDataKeyIntegrity({
             dataKeys: scopedDataKeys,
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
             onlyIssues: params?.onlyIssues !== false,
+            context: integrityContext,
         });
 
         const repairs = repairDataKeyIntegrityReferences({
@@ -245,6 +252,7 @@ export const getDataKeysIntegrity = async (params?: {
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
+            context: integrityContext,
         });
 
         const mergeById = <T extends Record<string, any>>(
@@ -270,6 +278,7 @@ export const getDataKeysIntegrity = async (params?: {
             diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
             problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
             onlyIssues: true,
+            context: integrityContext,
         });
 
         return {
@@ -820,6 +829,9 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
             };
         }
 
+        const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
+        const dataKeysByUniqueKey = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uniqueKey, dataKey] as const));
+
         const previews = items.map((item) => {
             const repairs = repairSingleDataKeyIntegrityReference({
                 entry: item.entry,
@@ -828,15 +840,14 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
                 diagnoses: diagnosesRes.data,
                 problems: problemsRes.data,
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
+                context: integrityContext,
             });
 
             const preferredUniqueKey = item.selectedTargetUniqueKey
                 || item.entry.matchedUniqueKey
                 || item.entry.suggestedUniqueKeys?.[0]
                 || item.entry.currentUniqueKey;
-            const matchedDataKey = preferredUniqueKey
-                ? dataKeysRes.data.find((dataKey) => dataKey.uniqueKey === preferredUniqueKey)
-                : undefined;
+            const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
 
             return {
                 entry: item.entry,
@@ -920,14 +931,13 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             };
         }
         const repairs = prepared.repairs;
+        const dataKeysByUniqueKey = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uniqueKey, dataKey] as const));
         const preferredUniqueKey =
             params.selectedTargetUniqueKey
             || params.entry.matchedUniqueKey
             || params.entry.suggestedUniqueKeys?.[0]
             || params.entry.currentUniqueKey;
-        const matchedDataKey = preferredUniqueKey
-            ? dataKeysRes.data.find((dataKey) => dataKey.uniqueKey === preferredUniqueKey)
-            : undefined;
+        const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
         setPreparedIntegrityRepair(session.user?.userId, {
             entry: params.entry,
             selectedTargetUniqueKey: params.selectedTargetUniqueKey,

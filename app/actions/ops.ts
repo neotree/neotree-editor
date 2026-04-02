@@ -21,7 +21,7 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-import { buildDataKeyIntegrityPublishDetails, buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
+import { buildDataKeyIntegrityContext, buildDataKeyIntegrityPublishDetails, buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
 import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -369,6 +369,7 @@ export async function publishData({
       return results
     }
 
+    const integrityContext = shouldRunIntegrityChecks ? buildDataKeyIntegrityContext(dataKeysRes.data) : null
     const repairs = !shouldRunIntegrityChecks
       ? { screens: [], diagnoses: [], problems: [] }
       : repairDataKeyIntegrityReferences({
@@ -376,6 +377,7 @@ export async function publishData({
           screens: screensRes.data,
           diagnoses: diagnosesRes.data,
           problems: problemsRes.data,
+          context: integrityContext || undefined,
         })
 
     if (shouldRunIntegrityChecks) {
@@ -398,6 +400,7 @@ export async function publishData({
         diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
         problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
         onlyIssues: true,
+        context: integrityContext || undefined,
       })
       const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(integrityReport)
       const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(integrityReport)
