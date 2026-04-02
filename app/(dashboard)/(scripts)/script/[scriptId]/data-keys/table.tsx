@@ -54,6 +54,16 @@ const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], stri
     duplicate_parent_data_key: "Duplicate parent key",
 };
 
+const statusFilterOptions = [
+    { value: "all", label: "All statuses" },
+    { value: "resolved", label: "Resolved" },
+    { value: "out_of_sync", label: "Out of sync" },
+    { value: "missing", label: "Missing" },
+    { value: "legacy_match", label: "Legacy match" },
+    { value: "conflict", label: "Conflict" },
+    { value: "unmanaged", label: "Unmanaged" },
+] as const;
+
 function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
     switch (status) {
         case "out_of_sync":
@@ -161,6 +171,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const availableTypes = dataKeyTypes.filter((type) =>
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     );
+    const availableStatusOptions = statusFilterOptions.filter((option) => {
+        if (option.value === "all") return true;
+        if (issueScopeFilter === "blocking") {
+            return option.value !== "resolved";
+        }
+        if (issueScopeFilter === "non_blocking") {
+            return !["missing", "legacy_match", "unmanaged"].includes(option.value);
+        }
+        return true;
+    });
     const filteredEntries = entries.filter((entry) => {
         if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
         if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
@@ -179,6 +199,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         legacy_match: entries.filter((entry) => entry.status === "legacy_match"),
     };
     const hasBulkResolveActions = !!bulkResolvableEntries.out_of_sync.length || !!bulkResolvableEntries.legacy_match.length;
+    const hasActiveFilters = issueScopeFilter !== "all" || statusFilter !== "all" || typeFilter !== "all";
+
+    useEffect(() => {
+        const selectedOptionStillAvailable = availableStatusOptions.some((option) => option.value === statusFilter);
+        if (!selectedOptionStillAvailable) setStatusFilter("all");
+    }, [availableStatusOptions, statusFilter]);
 
     const closeRepairModal = () => {
         if (isRepairing || loadingRepairPreview) return;
@@ -1033,17 +1059,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     <SelectTrigger>
                                         <SelectValue placeholder="Filter by status" />
                                     </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All statuses</SelectItem>
-                                            <SelectItem value="resolved">Resolved</SelectItem>
-                                            <SelectItem value="out_of_sync">Out of sync</SelectItem>
-                                            <SelectItem value="missing">Missing</SelectItem>
-                                            <SelectItem value="legacy_match">Legacy match</SelectItem>
-                                            <SelectItem value="conflict">Conflict</SelectItem>
-                                            <SelectItem value="unmanaged">Unmanaged</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                    <SelectContent>
+                                        {availableStatusOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
                             <div className="w-full md:w-[220px]">
                                 <Select
@@ -1063,6 +1087,26 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            <div className="flex items-center">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={!hasActiveFilters}
+                                    onClick={() => {
+                                        setIssueScopeFilter("all");
+                                        setStatusFilter("all");
+                                        setTypeFilter("all");
+                                    }}
+                                >
+                                    Clear filters
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground">
+                            Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope.
                         </div>
 
                         {!viewOnly && hasBulkResolveActions && (
