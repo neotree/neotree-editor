@@ -24,6 +24,7 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
 import type { DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { useAppContext } from "@/contexts/app";
 
 const statusStyles = {
     resolved: "bg-emerald-100 text-emerald-800",
@@ -121,6 +122,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     integrity?: DataKeyIntegrityReport | null;
 }) {
     const router = useRouter();
+    const { viewOnly } = useAppContext();
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
@@ -246,7 +248,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     };
 
     const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
-        if (!scriptId || isRepairing || loadingRepairPreview) return;
+        if (!scriptId || viewOnly || isRepairing || loadingRepairPreview) return;
         await setBulkStatusParam("");
         await setRepairEntryParam(getEntryKey(entry));
         setRepairModalEntry(entry);
@@ -270,7 +272,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     };
 
     const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
-        if (!scriptId || isRepairing) return;
+        if (!scriptId || viewOnly || isRepairing) return;
         startRepairTransition(async () => {
             setResolvingKey(getEntryKey(entry));
             const res = await resolveDataKeyIntegrityEntry({
@@ -309,7 +311,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     };
 
     const openBulkResolveDrawer = async (status: "out_of_sync" | "legacy_match") => {
-        if (!scriptId || isRepairing || loadingBulkPreview) return;
+        if (!scriptId || viewOnly || isRepairing || loadingBulkPreview) return;
         const entriesToResolve = bulkResolvableEntries[status];
         if (!entriesToResolve.length) return;
         await setRepairEntryParam("");
@@ -336,7 +338,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     };
 
     const handleBulkResolve = () => {
-        if (!scriptId || isRepairing || !bulkResolveStatus) return;
+        if (!scriptId || viewOnly || isRepairing || !bulkResolveStatus) return;
         const reviewedItems = bulkReviewItems.filter((item) => item.reviewed);
         if (!reviewedItems.length) return;
 
@@ -380,7 +382,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
         const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
         const usageHref = buildUsageHref(entry);
-        const canSafeResolve = (
+        const canSafeResolve = !viewOnly && (
             entry.status === "legacy_match" ||
             (
                 (entry.status === "missing" || entry.status === "unmanaged") &&
@@ -486,6 +488,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const reviewedBulkItemsCount = bulkReviewableItems.filter((item) => item.reviewed).length;
 
     useEffect(() => {
+        if (viewOnly) return;
         if (!repairEntryParam || repairModalEntry || isRepairing || loadingRepairPreview) return;
         const matchedEntry = entries.find((entry) => getEntryKey(entry) === repairEntryParam);
         if (!matchedEntry) {
@@ -493,9 +496,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             return;
         }
         void openRepairModal(matchedEntry);
-    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, setRepairEntryParam]);
+    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, setRepairEntryParam, viewOnly]);
 
     useEffect(() => {
+        if (viewOnly) return;
         if (!bulkStatusParam || bulkResolveStatus || isRepairing || loadingBulkPreview) return;
         if (bulkStatusParam !== "out_of_sync" && bulkStatusParam !== "legacy_match") {
             void setBulkStatusParam("");
@@ -506,7 +510,19 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             return;
         }
         void openBulkResolveDrawer(bulkStatusParam);
-    }, [bulkResolvableEntries, bulkResolveStatus, bulkStatusParam, isRepairing, loadingBulkPreview, openBulkResolveDrawer, setBulkStatusParam]);
+    }, [bulkResolvableEntries, bulkResolveStatus, bulkStatusParam, isRepairing, loadingBulkPreview, openBulkResolveDrawer, setBulkStatusParam, viewOnly]);
+
+    useEffect(() => {
+        if (!viewOnly) return;
+        setRepairModalEntry(null);
+        setRepairPreview(null);
+        setSelectedTargetUniqueKey("");
+        setReviewAcknowledged(false);
+        setBulkResolveStatus(null);
+        setBulkReviewItems([]);
+        void setRepairEntryParam("");
+        void setBulkStatusParam("");
+    }, [setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
     return (
         <>
@@ -972,12 +988,21 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         This view shows all scanned script references. Blocking issues behave consistently with publish across the registry and publish flow. Publishing is blocked by missing, unlinked, or unmanaged datakeys, duplicate parent datakeys in the same script, and script options that no longer exist in the parent datakey pool.
                     </div>
 
+                    {viewOnly && (
+                        <div className="text-sm text-muted-foreground">
+                            You are in view mode. Repairs and bulk resolve are disabled on this screen until you switch back to development mode.
+                        </div>
+                    )}
+
                     <div className="rounded-md border p-3 space-y-4">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                             <div className="flex flex-col gap-3">
                                 <div className="text-sm text-muted-foreground">
-                                    Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script.
+                                    {viewOnly
+                                        ? "Review issues from the row menu. Repair actions are disabled in view mode."
+                                        : "Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script."}
                                 </div>
+                            </div>
                         </div>
 
                         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
@@ -1020,9 +1045,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 </Select>
                             </div>
                         </div>
-                        </div>
 
-                        {hasBulkResolveActions && (
+                        {!viewOnly && hasBulkResolveActions && (
                             <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bulk resolve</span>
                                 {!!bulkResolvableEntries.out_of_sync.length && (
