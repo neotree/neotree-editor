@@ -4,6 +4,7 @@ import { v4 } from "uuid"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import {
   scripts,
   screensDrafts,
@@ -18,10 +19,6 @@ import { _saveScriptsHistory } from "./_scripts_history"
 import { _publishScreens } from "./_screens_publish"
 import { _publishDiagnoses } from "./_diagnoses_publish"
 import { _publishProblems } from "./_problems_publish"
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 export async function _publishScripts({
   userId,

@@ -1,13 +1,10 @@
 import { eq } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { editorInfo } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
-
-type DbClient = typeof db;
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
-type DbOrTransaction = DbClient | TransactionClient;
 
 export type SaveEditorInfoParams = {
     data: Partial<typeof editorInfo.$inferSelect>;

@@ -1,13 +1,10 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 export async function _saveDiagnosesHistory({
   previous,

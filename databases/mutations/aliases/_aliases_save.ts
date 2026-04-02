@@ -1,234 +1,245 @@
-import { _getLeanScriptIds, _getScreens, _getScript,_getOldScript} from "@/databases/queries/scripts";
-import { _saveEditorInfo } from "../editor-info";
-import { _publishScripts } from "../scripts/_scripts_publish";
-import db from '@/databases/pg/drizzle';
-import { desc, eq, and, Query } from 'drizzle-orm';
-import { aliases } from "@/databases/pg/schema";
-import logger from '@/lib/logger';
+import { and, desc, eq, Query } from "drizzle-orm"
+
+import { _getLeanScriptIds } from "@/databases/queries/scripts"
+import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
+import { aliases, scripts, screens } from "@/databases/pg/schema"
+import logger from "@/lib/logger"
 
 export type SaveAliasesResponse = {
-  success: boolean;
-  errors?: string[];
-  info?: { query?: Query; };
-};
+  success: boolean
+  errors?: string[]
+  info?: { query?: Query }
+}
 
-
+type AliasDraft = {
+  alias: string
+  name: string
+  script: string
+  oldScript: string | null
+}
 
 function getNextAlias(prev: string | null): string {
-  if (!prev || prev === '') return 'A';
+  if (!prev || prev === "") return "A"
 
-  const match = prev.match(/^([A-Z]+)(\d*)$/);
-  if (!match) throw new Error('Invalid alias format');
+  const match = prev.match(/^([A-Z]+)(\d*)$/)
+  if (!match) throw new Error("Invalid alias format")
 
-  const [_, letters, numStr] = match;
-  const num = numStr ? parseInt(numStr, 10) : 0;
+  const [, letters, numStr] = match
+  const num = numStr ? parseInt(numStr, 10) : 0
 
-  // Convert letters to a number (base 26)
-  const toNumber = (s: string) => {
-    return s.split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 65), 0);
-  };
-
-  // Convert a number to base 26 letters
+  const toNumber = (s: string) => s.split("").reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 65), 0)
   const toLetters = (n: number): string => {
-    let str = '';
+    let str = ""
     do {
-      str = String.fromCharCode((n % 26) + 65) + str;
-      n = Math.floor(n / 26) - 1;
-    } while (n >= 0);
-    return str;
-  };
-
-  let nextLettersNum = toNumber(letters) + 1;
-  let nextLetters = toLetters(nextLettersNum);
-
-  // Wrap from Z to A1, Z1 to A2, etc.
-  if (nextLetters.length > letters.length) {
-    nextLetters = 'A';
-    return nextLetters + (num + 1);
+      str = String.fromCharCode((n % 26) + 65) + str
+      n = Math.floor(n / 26) - 1
+    } while (n >= 0)
+    return str
   }
 
-  return nextLetters + (numStr || '');
+  const nextLettersNum = toNumber(letters) + 1
+  let nextLetters = toLetters(nextLettersNum)
+
+  if (nextLetters.length > letters.length) {
+    nextLetters = "A"
+    return nextLetters + (num + 1)
+  }
+
+  return nextLetters + (numStr || "")
 }
 
 function excludedScreenType(type: string) {
-  const excluded = ['management'
-    , 'mwi_edliz_summary_table'
-    , 'progress'
-    , 'zw_edliz_summary_table'
-    , 'diagnosis'
-    , 'drugs',
-    'fluids',
-    'feeds',
-  ];
+  const excluded = [
+    "management",
+    "mwi_edliz_summary_table",
+    "progress",
+    "zw_edliz_summary_table",
+    "diagnosis",
+    "drugs",
+    "fluids",
+    "feeds",
+  ]
   return excluded.includes(type)
-
 }
+
+async function aliasExists(
+  executor: DbOrTransaction,
+  opts: { script: string; name: string }
+) {
+  const duplicate = await executor.query.aliases.findFirst({
+    where: and(eq(aliases.script, opts.script), eq(aliases.name, opts.name)),
+  })
+  return !!duplicate
+}
+
+async function aliasSeeded(executor: DbOrTransaction) {
+  const exists = await executor.query.aliases.findFirst()
+  return !!exists
+}
+
+async function getLastAlias(executor: DbOrTransaction, scriptId: string) {
+  if (!scriptId) return ""
+  const lastAlias = await executor.query.aliases.findFirst({
+    where: eq(aliases.script, scriptId),
+    orderBy: desc(aliases.createdAt),
+  })
+
+  return lastAlias?.alias || ""
+}
+
+async function getOldScript(executor: DbOrTransaction, scriptId: string) {
+  const oldScript = await executor.query.scripts.findFirst({
+    where: eq(scripts.scriptId, scriptId),
+    columns: { oldScriptId: true },
+  })
+
+  return oldScript?.oldScriptId || null
+}
+
+async function getScriptScreens(executor: DbOrTransaction, scriptId: string) {
+  return executor.query.screens.findMany({
+    where: eq(screens.scriptId, scriptId),
+  })
+}
+
 async function assignAliases(
+  executor: DbOrTransaction,
   scriptId: string,
-  screens: any[],
+  scriptScreens: any[],
   lastAlias: string | null,
   oldScript: string | null
-): Promise<any[]> {
-  let updated: any[] = [];
-  let currentAlias = lastAlias;
+): Promise<AliasDraft[]> {
+  const updated: AliasDraft[] = []
+  let currentAlias = lastAlias
 
-  for (const screen of screens) {
-    if (excludedScreenType(screen.type)) {
-      continue;
-    }
+  for (const screen of scriptScreens) {
+    if (excludedScreenType(screen.type)) continue
 
     if (screen.type === "form" && Array.isArray(screen.fields)) {
       for (const field of screen.fields) {
         if (
           Array.isArray(field.prePopulate) &&
           field.prePopulate.length > 0 &&
-          !(await aliasExists({ name: field.key, script: scriptId }))
+          !(await aliasExists(executor, { name: field.key, script: scriptId }))
         ) {
-          currentAlias = getNextAlias(currentAlias);
-
-          if (currentAlias) {
-            updated.push({
-              name: field.key,
-              alias: currentAlias,
-              script: scriptId,
-              oldScript: oldScript
-            });
-          }
+          currentAlias = getNextAlias(currentAlias)
+          updated.push({
+            name: field.key,
+            alias: currentAlias,
+            script: scriptId,
+            oldScript,
+          })
         }
       }
-    } else if (
+      continue
+    }
+
+    if (
       Array.isArray(screen.prePopulate) &&
       screen.prePopulate.length > 0 &&
-      !(await aliasExists({ name: screen.key, script: scriptId }))
+      !(await aliasExists(executor, { name: screen.key, script: scriptId }))
     ) {
-      currentAlias = getNextAlias(currentAlias);
-      if (currentAlias) {
-        updated.push({
-          name: screen.key,
-          alias: currentAlias,
-          script: scriptId,
-          oldScript: oldScript
-        });
-      }
+      currentAlias = getNextAlias(currentAlias)
+      updated.push({
+        name: screen.key,
+        alias: currentAlias,
+        script: scriptId,
+        oldScript,
+      })
     }
   }
 
-  return updated;
-}
-
-
-async function aliasExists(opts:{
-  script: string,
-  name: string
-}){
-  const duplicate = await db.query.aliases.findFirst({
-          where: (and(eq(aliases.script, opts.script),
-            eq(aliases.name, opts.name)
-          ))
-        })
-return !!duplicate
-}
-async function aliasSeeded(){
-  const exists = await db.query.aliases.findFirst()
-
-return !!exists
+  return updated
 }
 
 export async function _saveAliases(
-alls: any[]) {
-  const response: SaveAliasesResponse = { success: false, };
-  const errors = [];
-  const info: SaveAliasesResponse['info'] = {};
+  alls: AliasDraft[],
+  opts?: { client?: DbOrTransaction }
+): Promise<SaveAliasesResponse> {
+  const response: SaveAliasesResponse = { success: false }
+  const errors: string[] = []
+  const info: SaveAliasesResponse["info"] = {}
+  const executor = opts?.client || db
+
   try {
     for (const al of alls) {
-      try {
-        const duplicate = await db.query.aliases.findFirst({
-          where: (and(eq(aliases.script, al.script),
-            eq(aliases.name, al.name)
-          )),
-          orderBy: desc(aliases.createdAt)
-        })
-        if (!duplicate) {
+      const duplicate = await executor.query.aliases.findFirst({
+        where: and(eq(aliases.script, al.script), eq(aliases.name, al.name)),
+        orderBy: desc(aliases.createdAt),
+      })
 
-          const q = db.insert(aliases).values({
-            alias: al.alias,
-            name: al.name,
-            script: al.script,
-            oldScript:al.oldScript
+      if (duplicate) continue
 
-          })
-          info.query = q.toSQL();
-          await q.execute();
-        }
-      } catch (ex: any) {
-         logger.error(ex.message)
-        errors.push(ex.message);
-      }
+      const q = executor.insert(aliases).values({
+        alias: al.alias,
+        name: al.name,
+        script: al.script,
+        oldScript: al.oldScript,
+      })
 
+      info.query = q.toSQL()
+      await q.execute()
     }
 
-    if (errors.length) {
-      response.errors = errors;
-      response.info = info;
-    } else {
-      response.success = true;
-    }
+    response.success = true
+    return response
   } catch (ex: any) {
-     response.success = false;
-        response.errors = [ex.message];
-        response.info = info;
-        
+    logger.error(ex.message)
+    errors.push(ex.message)
+    response.errors = errors
+    response.info = info
+    return response
   }
-
 }
-async function _getLastAlias(
-  script: string
-) {
-  try{
-  const lastAlias = !script ? '' : await db.query.aliases.findFirst({
-    where: eq(aliases.script, script),
-    orderBy: desc(aliases.createdAt)
-  })
-
-  return lastAlias?lastAlias.alias:''
-}catch(e:any){
-}
-}
-
-
 
 export async function _seedAliases() {
   try {
-    const leanScripts = await _getLeanScriptIds();
-    const alreadySeeded = await aliasSeeded()
-    if(!alreadySeeded){
-     await _generateScreenAliases(leanScripts)
+    const leanScripts = await _getLeanScriptIds()
+    const alreadySeeded = await aliasSeeded(db)
+    if (!alreadySeeded) {
+      await _generateScreenAliases(leanScripts)
     }
-
-  } catch (e:any) {
+  } catch (e: any) {
+    logger.error("_seedAliases ERROR", e?.message || e)
   }
 }
 
-export async function _generateScreenAliases(scriptsIds: string[]) {
+export async function _generateScreenAliases(
+  scriptsIds: string[],
+  opts?: { client?: DbOrTransaction }
+): Promise<SaveAliasesResponse> {
+  const executor = opts?.client || db
+  const errors: string[] = []
+
   try {
     for (const scriptId of scriptsIds) {
-   
-      if (scriptId) {
-        const oldScript = await _getOldScript(scriptId)
-        const lastAlias = await _getLastAlias(scriptId);
-        const sids = [scriptId];
-        const { data, errors } = await _getScreens({ scriptsIds: sids });
+      if (!scriptId) continue
 
-        if (!errors || errors.length === 0) {
-          const aliases = await assignAliases(scriptId, data, lastAlias || '',oldScript?.[0] ?? null);
+      const [oldScript, lastAlias, scriptScreens] = await Promise.all([
+        getOldScript(executor, scriptId),
+        getLastAlias(executor, scriptId),
+        getScriptScreens(executor, scriptId),
+      ])
 
-          if (aliases && aliases.length > 0) {
-            await _saveAliases(aliases);
-          }
-        }
+      const aliasesToSave = await assignAliases(executor, scriptId, scriptScreens, lastAlias, oldScript)
+      if (!aliasesToSave.length) continue
+
+      const res = await _saveAliases(aliasesToSave, { client: executor })
+      if (!res.success) {
+        errors.push(...(res.errors || ["Failed to save aliases"]))
       }
     }
-  } catch (e) {
-    logger.error("Error in _generateScreenAliases:", e);
+
+    return {
+      success: !errors.length,
+      errors: errors.length ? errors : undefined,
+    }
+  } catch (e: any) {
+    logger.error("Error in _generateScreenAliases:", e)
+    return {
+      success: false,
+      errors: [e?.message || "Failed to generate screen aliases"],
+    }
   }
 }

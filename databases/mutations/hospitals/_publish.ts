@@ -3,13 +3,10 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { hospitals, hospitalsDrafts, hospitalsHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveHospitalsHistory } from "./_history"
 import { v4 } from "uuid"
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 export async function _publishHospitals(opts?: {
   broadcastAction?: boolean
