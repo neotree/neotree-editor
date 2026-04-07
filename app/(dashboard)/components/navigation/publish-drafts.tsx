@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ExternalLink } from "lucide-react"
 
 import { useAppContext } from "@/contexts/app"
@@ -39,6 +40,7 @@ const DETAILED_SCRIPT_THRESHOLD = 3
 
 export function PublishDrafts({ variant }: Props) {
   const { alert } = useAlertModal()
+  const pathname = usePathname()
   const [loading, setLoading] = useState(false)
   const [scope, setScope] = useState<"0" | "1">("0")
   const [publishBlockingErrors, setPublishBlockingErrors] = useState<string[]>([])
@@ -46,6 +48,17 @@ export function PublishDrafts({ variant }: Props) {
   const [publishBlockingModalOpen, setPublishBlockingModalOpen] = useState(false)
 
   const { publishData: _publishData, discardDrafts: _discardDrafts } = useAppContext()
+  const isCreatingDataKey = pathname === "/data-keys/new"
+
+  const closePublishBlockingModal = useCallback(() => {
+    setPublishBlockingModalOpen(false)
+    setPublishBlockingErrors([])
+    setPublishBlockingDetails(null)
+  }, [])
+
+  useEffect(() => {
+    closePublishBlockingModal()
+  }, [pathname, closePublishBlockingModal])
 
   const publishData = useCallback(async () => {
     try {
@@ -62,7 +75,7 @@ export function PublishDrafts({ variant }: Props) {
       if (res.errors) {
         setPublishBlockingErrors(res.errors)
         setPublishBlockingDetails(res.blockingDetails || null)
-        setPublishBlockingModalOpen(true)
+        setPublishBlockingModalOpen(!isCreatingDataKey)
       } else {
         await pendingChangesAPI.clearAllChanges()
 
@@ -84,7 +97,7 @@ export function PublishDrafts({ variant }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [scope, _publishData, alert])
+  }, [scope, _publishData, alert, isCreatingDataKey])
 
   const discardDrafts = useCallback(async () => {
     try {
@@ -137,7 +150,7 @@ export function PublishDrafts({ variant }: Props) {
   return (
     <>
       <Modal
-        open={publishBlockingModalOpen}
+        open={publishBlockingModalOpen && !isCreatingDataKey}
         onOpenChange={setPublishBlockingModalOpen}
         title="Publish blocked"
         description="Resolve the blocking data key validation issues below before publishing."
@@ -147,7 +160,7 @@ export function PublishDrafts({ variant }: Props) {
         actions={(
           <Button
             variant="outline"
-            onClick={() => setPublishBlockingModalOpen(false)}
+            onClick={closePublishBlockingModal}
           >
             Close
           </Button>
@@ -193,14 +206,14 @@ export function PublishDrafts({ variant }: Props) {
 
                       <div className="flex flex-wrap gap-2">
                         <Button asChild variant="outline" size="sm">
-                          <Link href={script.scriptHref} target="_blank" rel="noreferrer">
+                          <Link href={script.scriptHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
                             Open script
                             <ExternalLink className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
 
                         <Button asChild variant="outline" size="sm">
-                          <Link href={script.registryHref} target="_blank" rel="noreferrer">
+                          <Link href={script.registryHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
                             Open datakey integrity registry
                             <ExternalLink className="ml-2 h-4 w-4" />
                           </Link>
@@ -221,7 +234,7 @@ export function PublishDrafts({ variant }: Props) {
                               </div>
 
                               <Button asChild variant="ghost" size="sm" className="justify-start sm:justify-center">
-                                <Link href={issue.usageHref} target="_blank" rel="noreferrer">
+                                <Link href={issue.usageHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
                                   Open usage
                                   <ExternalLink className="ml-2 h-4 w-4" />
                                 </Link>

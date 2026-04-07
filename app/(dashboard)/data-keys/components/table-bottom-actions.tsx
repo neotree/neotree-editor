@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ActionsBar } from '@/components/actions-bar';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { ExportModal } from './export-modal';
-import { buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact } from './delete-confirmation';
+import { buildDeleteConfirmationFooterMessage, buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact } from './delete-confirmation';
 import { Loader } from '@/components/loader';
 
 export function DataKeysTableBottomActions({ disabled, }: {
@@ -45,6 +45,7 @@ export function DataKeysTableBottomActions({ disabled, }: {
                             confirm(() => deleteDataKeys(uuids), {
                                 title: 'Delete data keys',
                                 message: buildDeleteConfirmationMessage(impact),
+                                footerMessage: buildDeleteConfirmationFooterMessage(impact),
                                 positiveLabel: 'Delete anyway',
                                 danger: true,
                             });

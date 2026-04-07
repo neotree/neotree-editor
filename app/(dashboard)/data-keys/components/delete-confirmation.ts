@@ -10,6 +10,10 @@ type DeleteImpactItem = {
     scripts: Array<{
         scriptId: string;
         scriptTitle: string;
+        usages?: Array<{
+            label: string;
+            href: string;
+        }>;
     }>;
 };
 
@@ -24,6 +28,16 @@ function escapeHtml(value: string) {
 
 function getDataKeyDisplayName(item: DeleteImpactItem) {
     return item.name || item.label || item.uniqueKey || 'Data key';
+}
+
+export function buildDeleteConfirmationFooterMessage(items: DeleteImpactItem[]) {
+    const usedItems = items.filter((item) => item.scripts.length);
+    if (!usedItems.length) return '';
+
+    return [
+        `<div>If you continue, the data key will still be deleted.</div>`,
+        `<div style="margin-top:4px; font-weight:600;">Are you sure you want to continue?</div>`,
+    ].join('');
 }
 
 export async function fetchDataKeyDeleteImpact(dataKeysIds: string[]) {
@@ -53,13 +67,32 @@ export function buildDeleteConfirmationMessage(items: DeleteImpactItem[]) {
 
     const groupedHtml = usedItems.map((item) => {
         const scriptsHtml = item.scripts
-            .map((script) => `<li>${escapeHtml(script.scriptTitle)}</li>`)
+            .map((script) => {
+                const usage = script.usages?.[0];
+                const remainingUsages = Math.max(0, (script.usages?.length || 0) - 1);
+                const usageHtml = !usage
+                    ? ''
+                    : [
+                        `<div style="margin-top:2px; font-size:12px; color:#64748b;">`,
+                        `<a href="${escapeHtml(usage.href)}" target="_blank" rel="noopener noreferrer" style="color:#0f766e; text-decoration:underline;">${escapeHtml(usage.label || 'Open usage')}</a>`,
+                        remainingUsages > 0 ? ` <span>+${remainingUsages} more</span>` : '',
+                        `</div>`,
+                    ].join('');
+
+                return [
+                    `<li style="padding:8px 0; border-top:1px solid #e5e7eb;">`,
+                    `<div style="font-weight:500;">${escapeHtml(script.scriptTitle)}</div>`,
+                    usageHtml,
+                    `</li>`,
+                ].join('');
+            })
             .join('');
 
         return [
-            `<div style="margin-top:12px;">`,
-            `<div><strong>${escapeHtml(getDataKeyDisplayName(item))}</strong></div>`,
-            `<ul style="margin:6px 0 0 18px; padding:0;">${scriptsHtml}</ul>`,
+            `<div style="margin-top:12px; border:1px solid #e5e7eb; border-radius:8px; padding:12px;">`,
+            `<div style="font-weight:700;">${escapeHtml(getDataKeyDisplayName(item))}</div>`,
+            `<div style="margin-top:2px; font-size:12px; color:#64748b;">${item.scripts.length} affected script${item.scripts.length === 1 ? '' : 's'}</div>`,
+            `<ul style="margin:8px 0 0 0; padding:0; list-style:none;">${scriptsHtml}</ul>`,
             `</div>`,
         ].join('');
     }).join('');
@@ -71,7 +104,5 @@ export function buildDeleteConfirmationMessage(items: DeleteImpactItem[]) {
     return [
         `<div>${escapeHtml(intro)}</div>`,
         groupedHtml,
-        `<div style="margin-top:12px;">If you continue, the data key will still be deleted.</div>`,
-        `<div style="margin-top:8px;">Are you sure you want to continue?</div>`,
     ].join('');
 }

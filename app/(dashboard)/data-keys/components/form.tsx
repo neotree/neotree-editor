@@ -332,6 +332,64 @@ function Form({
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
 
+        const getUsageLinkLabel = (usage: NonNullable<UpdateDataKeysRefsResponse['affected']>['usages'][number]) => {
+            if (usage.kind === 'screen') return 'screen';
+            if (usage.kind === 'screen_field') return 'field';
+            if (usage.kind === 'screen_item') return 'item';
+            if (usage.kind === 'screen_field_item') return 'field item';
+            if (usage.kind === 'diagnosis') return 'diagnosis';
+            if (usage.kind === 'diagnosis_symptom') return 'symptom';
+            if (usage.kind === 'problem') return 'problem';
+            return 'open';
+        };
+
+        const getUsageHref = (usage: NonNullable<UpdateDataKeysRefsResponse['affected']>['usages'][number]) => {
+            if (usage.kind === 'screen_field' && usage.screenId && usage.id) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.id}`;
+            }
+            if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+            }
+            if (usage.kind === 'screen_item' && usage.screenId && usage.id) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.id}`;
+            }
+            if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
+            }
+            if (
+                usage.kind === 'screen_field_item'
+                && usage.screenId
+                && Number.isFinite(usage.fieldIndex)
+                && usage.id
+            ) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.id}`;
+            }
+            if (
+                usage.kind === 'screen_field_item'
+                && usage.screenId
+                && Number.isFinite(usage.fieldIndex)
+                && Number.isFinite(usage.fieldItemIndex)
+            ) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.fieldItemIndex}`;
+            }
+            if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && usage.id) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.id}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && Number.isFinite(usage.diagnosisSymptomIndex)) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.diagnosisSymptomIndex}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+            }
+            if (usage.problemId) return `/script/${usage.scriptId}/problem/${usage.problemId}`;
+            if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+            if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
+            return `/script/${usage.scriptId}`;
+        };
+
         const usageByScript = new Map<string, NonNullable<UpdateDataKeysRefsResponse['affected']>['usages']>();
         (affected.usages || []).forEach((usage) => {
             const current = usageByScript.get(usage.scriptId) || [];
@@ -363,61 +421,6 @@ function Form({
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {row.usages.map((usage, index) => {
-                                                    const linkLabel = (() => {
-                                                        if (usage.kind === 'screen') return 'screen';
-                                                        if (usage.kind === 'screen_field') return 'field';
-                                                        if (usage.kind === 'screen_item') return 'item';
-                                                        if (usage.kind === 'screen_field_item') return 'field item';
-                                                        if (usage.kind === 'diagnosis') return 'diagnosis';
-                                                        if (usage.kind === 'diagnosis_symptom') return 'symptom';
-                                                        return 'open';
-                                                    })();
-                                                    const href = (() => {
-                                                        if (usage.kind === 'screen_field' && usage.screenId && usage.id) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.id}`;
-                                                        }
-                                                        if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
-                                                        }
-                                                        if (usage.kind === 'screen_item' && usage.screenId && usage.id) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.id}`;
-                                                        }
-                                                        if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
-                                                        }
-                                                        if (
-                                                            usage.kind === 'screen_field_item'
-                                                            && usage.screenId
-                                                            && Number.isFinite(usage.fieldIndex)
-                                                            && usage.id
-                                                        ) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.id}`;
-                                                        }
-                                                        if (
-                                                            usage.kind === 'screen_field_item'
-                                                            && usage.screenId
-                                                            && Number.isFinite(usage.fieldIndex)
-                                                            && Number.isFinite(usage.fieldItemIndex)
-                                                        ) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.fieldItemIndex}`;
-                                                        }
-                                                        if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
-                                                        }
-                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && usage.id) {
-                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.id}`;
-                                                        }
-                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && Number.isFinite(usage.diagnosisSymptomIndex)) {
-                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.diagnosisSymptomIndex}`;
-                                                        }
-                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
-                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
-                                                        }
-                                                        if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
-                                                        if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
-                                                        return `/script/${usage.scriptId}`;
-                                                    })();
-
                                                     return (
                                                         <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
                                                             <div className="flex items-center gap-x-2 p-2 px-4">
@@ -425,12 +428,12 @@ function Form({
                                                                 <div className="text-muted-foreground">{usage.location}</div>
                                                                 <div className="ml-auto flex gap-x-2">
                                                                     <Link
-                                                                        href={href}
+                                                                        href={getUsageHref(usage)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="flex items-center gap-x-1"
                                                                     >
-                                                                        {linkLabel}
+                                                                        {getUsageLinkLabel(usage)}
                                                                         <ExternalLinkIcon className="h-3 w-3" />
                                                                     </Link>
                                                                 </div>
@@ -450,6 +453,40 @@ function Form({
                         { name: 'Script title' },
                         { name: 'Script ID' },
                         { name: 'Matches', align: 'right' },
+                        {
+                            name: 'Usage links',
+                            cellClassName: 'min-w-[220px]',
+                            cellRenderer({ rowIndex }) {
+                                const script = scriptRows[rowIndex];
+                                if (!script?.usages.length) {
+                                    return <span className="text-xs text-muted-foreground">No direct usage links</span>;
+                                }
+
+                                const visibleUsages = script.usages.slice(0, 3);
+
+                                return (
+                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                        {visibleUsages.map((usage, index) => (
+                                            <Link
+                                                key={`${usage.kind}-${usage.id}-${index}`}
+                                                href={getUsageHref(usage)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 rounded border px-2 py-1 text-primary hover:bg-primary/10"
+                                            >
+                                                <span>{usage.title || getUsageLinkLabel(usage)}</span>
+                                                <ExternalLinkIcon className="h-3 w-3" />
+                                            </Link>
+                                        ))}
+                                        {script.usages.length > visibleUsages.length && (
+                                            <span className="text-muted-foreground">
+                                                +{script.usages.length - visibleUsages.length} more
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            },
+                        },
                         {
                             name: '',
                             align: 'right',
@@ -475,6 +512,7 @@ function Form({
                         s.scriptTitle || '',
                         s.scriptId || '',
                         `${s.usages.length}`,
+                        '',
                         '',
                     ])}
                 />
@@ -771,7 +809,7 @@ function Form({
                         )}
                     </div>
 
-                    <CardFooter className="gap-x-2">
+                    <CardFooter className="gap-x-2 mt-4">
                         <div className="ml-auto" />
 
                         <Button
