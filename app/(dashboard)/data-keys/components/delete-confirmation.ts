@@ -34,8 +34,10 @@ export function buildDeleteConfirmationFooterMessage(items: DeleteImpactItem[]) 
     const usedItems = items.filter((item) => item.scripts.length);
     if (!usedItems.length) return '';
 
+    const deletedSubject = usedItems.length === 1 ? 'the data key' : 'these data keys';
+
     return [
-        `<div>If you continue, the data key will still be deleted.</div>`,
+        `<div>If you continue, ${deletedSubject} will still be deleted.</div>`,
         `<div style="margin-top:4px; font-weight:600;">Are you sure you want to continue?</div>`,
     ].join('');
 }
