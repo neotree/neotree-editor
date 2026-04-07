@@ -21,6 +21,7 @@ export function ConfirmModal() {
         danger,
         title, 
         message, 
+        footerMessage,
         positiveLabel, 
         negativeLabel, 
         close, 
@@ -49,19 +50,28 @@ export function ConfirmModal() {
                     <div dangerouslySetInnerHTML={{ __html: message, }} />
                 </div>
 
-                <AlertDialogFooter className="px-4 py-2">
-                    <AlertDialogCancel>{negativeLabel}</AlertDialogCancel>
-                    <Button
-                        variant={danger ? 'destructive' : undefined}
-                        asChild
-                    >
-                        <AlertDialogAction
-                            onClick={() => onConfirm?.()}
+                <div className="border-t border-border px-4 py-3">
+                    {!!footerMessage && (
+                        <div
+                            className="mb-3 text-sm text-muted-foreground"
+                            dangerouslySetInnerHTML={{ __html: footerMessage }}
+                        />
+                    )}
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>{negativeLabel}</AlertDialogCancel>
+                        <Button
+                            variant={danger ? 'destructive' : undefined}
+                            asChild
                         >
-                            {positiveLabel}
-                        </AlertDialogAction>
-                    </Button>
-                </AlertDialogFooter>
+                            <AlertDialogAction
+                                onClick={() => onConfirm?.()}
+                            >
+                                {positiveLabel}
+                            </AlertDialogAction>
+                        </Button>
+                    </AlertDialogFooter>
+                </div>
             </AlertDialogContent>
         </AlertDialog>
     );

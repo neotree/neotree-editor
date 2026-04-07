@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
@@ -23,7 +23,7 @@ import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/e
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildDataKeyIntegrityContext, buildDataKeyIntegrityPublishDetails, buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
 import db from "@/databases/pg/drizzle"
-import { dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
+import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -66,15 +66,55 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     userDiagnosisDrafts.length > 0 ||
     userProblemDrafts.length > 0 ||
     userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
-  const hasDataKeyLibraryChanges =
-    userDataKeyDrafts.length > 0 ||
+  const hasExistingDataKeyLibraryChanges =
+    userDataKeyDrafts.some((draft) => !!draft.dataKeyId) ||
     userPendingDeletion.some((entry) => !!entry.dataKeyId)
 
-  const shouldRunIntegrityChecks = hasScriptFamilyChanges || hasDataKeyLibraryChanges
+  const shouldRunIntegrityChecks = hasScriptFamilyChanges || hasExistingDataKeyLibraryChanges
 
   if (!shouldRunIntegrityChecks) {
     return {
       dataKeysRes: { data: [], errors: undefined },
+      screensRes: { data: [], errors: undefined },
+      diagnosesRes: { data: [], errors: undefined },
+      problemsRes: { data: [], errors: undefined },
+      shouldRunIntegrityChecks,
+    }
+  }
+
+  const deletedDataKeyIds = new Set(
+    userPendingDeletion
+      .map((entry) => entry.dataKeyId)
+      .filter((id): id is string => !!id)
+  )
+  const deletedDataKeys = !deletedDataKeyIds.size
+    ? []
+    : await db.query.dataKeys.findMany({
+        where: inArray(dataKeys.uuid, Array.from(deletedDataKeyIds)),
+      })
+  const dataKeysForImpact = [
+    ...userDataKeyDrafts
+      .filter((draft) => !!draft.dataKeyId)
+      .map((draft) => ({
+        ...draft.data,
+        uuid: draft.dataKeyId || draft.data.uuid,
+        uniqueKey: draft.data.uniqueKey,
+      })),
+    ...deletedDataKeys,
+  ].filter((item) => !!item.uniqueKey) as dataKeysQueries.DataKey[]
+  const dataKeyImpact = !dataKeysForImpact.length
+    ? null
+    : await dataKeysMutations._updateDataKeysRefs({
+        dataKeys: dataKeysForImpact,
+        dryRun: true,
+      })
+  const dataKeyImpactScriptIds = dataKeyImpact?.affected?.scripts
+    ?.map((script) => script.scriptId)
+    .filter((id): id is string => !!id) || []
+
+  if (dataKeyImpact?.errors?.length) {
+    return {
+      dataKeysRes: { data: [], errors: dataKeyImpact.errors },
       screensRes: { data: [], errors: undefined },
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
@@ -88,16 +128,22 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     ...userDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...userProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
+    ...dataKeyImpactScriptIds,
   ]))
 
-  const shouldLimitToAffectedScripts = !!userId && !hasDataKeyLibraryChanges
+  const shouldLimitToAffectedScripts = !!userId
   const hasAffectedScripts = !!affectedScriptIds?.length
+  if (shouldLimitToAffectedScripts && !hasAffectedScripts) {
+    return {
+      dataKeysRes: { data: [], errors: undefined },
+      screensRes: { data: [], errors: undefined },
+      diagnosesRes: { data: [], errors: undefined },
+      problemsRes: { data: [], errors: undefined },
+      shouldRunIntegrityChecks: false,
+    }
+  }
+
   const affectedScriptsSet = new Set(affectedScriptIds || [])
-  const deletedDataKeyIds = new Set(
-    userPendingDeletion
-      .map((entry) => entry.dataKeyId)
-      .filter((id): id is string => !!id)
-  )
   const scopedUserScreenDrafts = shouldLimitToAffectedScripts
     ? userScreenDrafts.filter((draft) => {
         const scriptId = draft.scriptId || draft.scriptDraftId

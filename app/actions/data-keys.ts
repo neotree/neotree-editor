@@ -314,6 +314,10 @@ export const getDataKeysDeleteImpact = async (params?: {
         scripts: Array<{
             scriptId: string;
             scriptTitle: string;
+            usages: Array<{
+                label: string;
+                href: string;
+            }>;
         }>;
     }>;
     errors?: string[];
@@ -366,12 +370,26 @@ export const getDataKeysDeleteImpact = async (params?: {
             }
         });
 
-        const scriptsByTarget = new Map<string, Map<string, { scriptId: string; scriptTitle: string }>>();
+        const scriptsByTarget = new Map<string, Map<string, { scriptId: string; scriptTitle: string; usages: Array<{ label: string; href: string }> }>>();
         targets.forEach((target) => {
             scriptsByTarget.set(target.uniqueKey, new Map());
         });
 
-        const addScriptUsage = (scriptId?: string | null, scriptTitle?: string | null, keyId?: string | null, keyName?: string | null) => {
+        const addScriptUsage = ({
+            scriptId,
+            scriptTitle,
+            keyId,
+            keyName,
+            label,
+            href,
+        }: {
+            scriptId?: string | null;
+            scriptTitle?: string | null;
+            keyId?: string | null;
+            keyName?: string | null;
+            label: string;
+            href: string;
+        }) => {
             const normalizedScriptId = `${scriptId || ''}`.trim();
             const normalizedScriptTitle = `${scriptTitle || ''}`.trim();
             if (!normalizedScriptId || !normalizedScriptTitle) return;
@@ -389,43 +407,146 @@ export const getDataKeysDeleteImpact = async (params?: {
 
             const scripts = scriptsByTarget.get(matchedUniqueKey);
             if (!scripts) return;
+            const existing = scripts.get(normalizedScriptId);
+            const usage = {
+                label,
+                href,
+            };
+            if (existing) {
+                const usageKey = `${usage.label}::${usage.href}`;
+                if (!existing.usages.some((item) => `${item.label}::${item.href}` === usageKey)) {
+                    existing.usages.push(usage);
+                }
+                return;
+            }
             scripts.set(normalizedScriptId, {
                 scriptId: normalizedScriptId,
                 scriptTitle: normalizedScriptTitle,
+                usages: [usage],
             });
         };
 
         screensRes.data.forEach((screen) => {
-            addScriptUsage(screen.scriptId, screen.scriptTitle, screen.keyId, screen.key);
-
-            (screen.items || []).forEach((item) => {
-                addScriptUsage(screen.scriptId, screen.scriptTitle, item.keyId, item.key || item.id);
+            const screenHref = `/script/${screen.scriptId}/screen/${screen.screenId}`;
+            const screenLabel = screen.title || screen.label || screen.refId || 'screen';
+            addScriptUsage({
+                scriptId: screen.scriptId,
+                scriptTitle: screen.scriptTitle,
+                keyId: screen.keyId,
+                keyName: screen.key,
+                label: screenLabel,
+                href: screenHref,
             });
 
-            (screen.fields || []).forEach((field) => {
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.keyId, field.key);
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.refKeyId, field.refKey);
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.minDateKeyId, field.minDateKey);
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.maxDateKeyId, field.maxDateKey);
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.minTimeKeyId, field.minTimeKey);
-                addScriptUsage(screen.scriptId, screen.scriptTitle, field.maxTimeKeyId, field.maxTimeKey);
+            (screen.items || []).forEach((item, itemIndex) => {
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: item.keyId,
+                    keyName: item.key || item.id,
+                    label: `${screenLabel} > ${item.label || item.key || item.id || `item ${itemIndex + 1}`}`,
+                    href: `${screenHref}?item=${item.itemId || itemIndex}`,
+                });
+            });
 
-                (field.items || []).forEach((item) => {
-                    addScriptUsage(screen.scriptId, screen.scriptTitle, item.keyId, `${item.value || ''}` || `${item.label || ''}`);
+            (screen.fields || []).forEach((field, fieldIndex) => {
+                const fieldHref = `${screenHref}?field=${field.fieldId || fieldIndex}`;
+                const fieldLabel = `${screenLabel} > ${field.label || field.key || `field ${fieldIndex + 1}`}`;
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.keyId,
+                    keyName: field.key,
+                    label: fieldLabel,
+                    href: fieldHref,
+                });
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.refKeyId,
+                    keyName: field.refKey,
+                    label: `${fieldLabel} > ref key`,
+                    href: fieldHref,
+                });
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.minDateKeyId,
+                    keyName: field.minDateKey,
+                    label: `${fieldLabel} > min date`,
+                    href: fieldHref,
+                });
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.maxDateKeyId,
+                    keyName: field.maxDateKey,
+                    label: `${fieldLabel} > max date`,
+                    href: fieldHref,
+                });
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.minTimeKeyId,
+                    keyName: field.minTimeKey,
+                    label: `${fieldLabel} > min time`,
+                    href: fieldHref,
+                });
+                addScriptUsage({
+                    scriptId: screen.scriptId,
+                    scriptTitle: screen.scriptTitle,
+                    keyId: field.maxTimeKeyId,
+                    keyName: field.maxTimeKey,
+                    label: `${fieldLabel} > max time`,
+                    href: fieldHref,
+                });
+
+                (field.items || []).forEach((item, fieldItemIndex) => {
+                    addScriptUsage({
+                        scriptId: screen.scriptId,
+                        scriptTitle: screen.scriptTitle,
+                        keyId: item.keyId,
+                        keyName: `${item.value || ''}` || `${item.label || ''}`,
+                        label: `${fieldLabel} > ${item.label || item.value || `option ${fieldItemIndex + 1}`}`,
+                        href: `${fieldHref}&fieldItem=${item.itemId || fieldItemIndex}`,
+                    });
                 });
             });
         });
 
         diagnosesRes.data.forEach((diagnosis) => {
-            addScriptUsage(diagnosis.scriptId, diagnosis.scriptTitle, diagnosis.keyId, diagnosis.key || diagnosis.name);
+            const diagnosisHref = `/script/${diagnosis.scriptId}/diagnosis/${diagnosis.diagnosisId}`;
+            const diagnosisLabel = diagnosis.name || diagnosis.key || 'diagnosis';
+            addScriptUsage({
+                scriptId: diagnosis.scriptId,
+                scriptTitle: diagnosis.scriptTitle,
+                keyId: diagnosis.keyId,
+                keyName: diagnosis.key || diagnosis.name,
+                label: diagnosisLabel,
+                href: diagnosisHref,
+            });
 
-            (diagnosis.symptoms || []).forEach((symptom) => {
-                addScriptUsage(diagnosis.scriptId, diagnosis.scriptTitle, symptom.keyId, symptom.key || symptom.name);
+            (diagnosis.symptoms || []).forEach((symptom, symptomIndex) => {
+                addScriptUsage({
+                    scriptId: diagnosis.scriptId,
+                    scriptTitle: diagnosis.scriptTitle,
+                    keyId: symptom.keyId,
+                    keyName: symptom.key || symptom.name,
+                    label: `${diagnosisLabel} > ${symptom.name || symptom.key || `symptom ${symptomIndex + 1}`}`,
+                    href: `${diagnosisHref}?symptom=${symptom.symptomId || symptomIndex}`,
+                });
             });
         });
 
         problemsRes.data.forEach((problem) => {
-            addScriptUsage(problem.scriptId, problem.scriptTitle, problem.keyId, problem.key || problem.name);
+            addScriptUsage({
+                scriptId: problem.scriptId,
+                scriptTitle: problem.scriptTitle,
+                keyId: problem.keyId,
+                keyName: problem.key || problem.name,
+                label: problem.name || problem.key || 'problem',
+                href: `/script/${problem.scriptId}/problem/${problem.problemId}`,
+            });
         });
 
         return {

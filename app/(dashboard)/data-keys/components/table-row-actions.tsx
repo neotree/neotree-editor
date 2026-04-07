@@ -16,7 +16,7 @@ import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
-import { buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact } from './delete-confirmation';
+import { buildDeleteConfirmationFooterMessage, buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact } from './delete-confirmation';
 
 export function DataKeysTableRowActions({ 
     rowIndex, 
@@ -92,6 +92,7 @@ export function DataKeysTableRowActions({
                                 confirm(() => deleteDataKeys([dataKey.uuid]), {
                                     title: 'Delete data key',
                                     message: buildDeleteConfirmationMessage(impact),
+                                    footerMessage: buildDeleteConfirmationFooterMessage(impact),
                                     positiveLabel: 'Delete anyway',
                                     danger: true,
                                 });

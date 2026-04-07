@@ -318,9 +318,7 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        const shouldFallbackToFullScan = !candidateScripts.size && changedUniqueKeys.length > 0;
-
-        const useFullScan = dryRun || shouldFallbackToFullScan;
+        const useFullScan = false;
 
         if (!candidateScripts.size && !useFullScan) {
             return {
@@ -385,6 +383,11 @@ export async function _updateDataKeysRefs({
 
             let updated = !!screenDataKey || !!refIdDataKey;
             const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
+            const shouldSyncScreenOptions = shouldSyncScreenOwnedOptions({
+                screenType: s.type,
+                dataKey: screenDataKey,
+                currentItemsCount: (s.items || []).length,
+            });
 
             const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
                 ? (s.items || [])
@@ -407,13 +410,7 @@ export async function _updateDataKeysRefs({
                             screenItemIndex: itemIndex,
                         });
                     }
-                    if (
-                        shouldSyncScreenOwnedOptions({
-                            screenType: s.type,
-                            dataKey: screenDataKey,
-                            currentItemsCount: (s.items || []).length,
-                        })
-                    ) {
+                    if (shouldSyncScreenOptions) {
                         const keyId = `${item.keyId || ''}`.trim();
                         if (keyId && !screenOptionUniqueKeys.has(keyId)) {
                             addUsage({
@@ -437,7 +434,7 @@ export async function _updateDataKeysRefs({
                         ...syncedItem.value,
                     };
                 });
-            if ((items || []).some((item) => {
+            if (shouldSyncScreenOptions && (items || []).some((item) => {
                 const keyId = `${item.keyId || ''}`.trim();
                 return !!keyId && !screenOptionUniqueKeys.has(keyId);
             })) {
