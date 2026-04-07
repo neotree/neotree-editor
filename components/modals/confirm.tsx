@@ -33,7 +33,7 @@ export function ConfirmModal() {
             open={isOpen}
             onOpenChange={close}
         >
-            <AlertDialogContent className="p-0 max-h-[80%] flex flex-col">
+            <AlertDialogContent className="p-0 max-h-[80%] flex flex-col sm:max-w-2xl">
                 {!!title && (
                     <AlertDialogHeader className="py-2 px-4">
                         <AlertDialogTitle>{title}</AlertDialogTitle>

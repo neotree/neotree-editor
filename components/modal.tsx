@@ -26,6 +26,7 @@ export type ModalProps = DialogProps & {
     actions?: React.ReactNode;
     trigger?: React.ReactNode;
     contentProps?: DialogContentProps;
+    bodyProps?: React.HTMLAttributes<HTMLDivElement>;
     footerProps?: DialogFooterProps;
 };
 
@@ -37,10 +38,12 @@ export function Modal({
     actions,
     trigger,
     contentProps,
+    bodyProps,
     footerProps,
     ...props
 }: ModalProps) {
     const { close, isOpen, set } = useModalState();
+    const open = id ? (isOpen(id) || props.open) : props.open;
 
     useEffect(() => {
         if (id) set({ [id]: false, });
@@ -50,7 +53,7 @@ export function Modal({
         <>
             <Dialog 
                 {...props}
-                open={(!id ? undefined : isOpen(id)) || props.open}
+                open={open}
                 onOpenChange={open => {
                     if (id) set({ [id]: open, });
                     props?.onOpenChange?.(open);
@@ -61,7 +64,7 @@ export function Modal({
                 <DialogContent 
                     hideCloseButton
                     className={cn(
-                        'flex min-h-0 flex-col max-h-[90vh] overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',
+                        '!flex min-h-0 max-h-[90dvh] flex-col overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',
                         contentProps?.className,
                     )}
                     {...contentProps}
@@ -69,7 +72,7 @@ export function Modal({
                     <DialogHeader 
                         className={cn(
                             !title && !description ? 'hidden' : '',
-                            'border-b border-b-border px-4 py-4',
+                            'shrink-0 border-b border-b-border px-4 py-4',
                         )}
                     >
                         <DialogTitle
@@ -85,13 +88,19 @@ export function Modal({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2">
+                    <div
+                        className={cn(
+                            "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-2",
+                            bodyProps?.className,
+                        )}
+                        {...bodyProps}
+                    >
                         {children}
                     </div>
                     
                     <DialogFooter 
                         className={cn(
-                            'border-t border-t-border px-4 py-2 items-center w-full',
+                            'shrink-0 border-t border-t-border px-4 py-2 items-center w-full',
                             actions ? '' : 'hidden',
                             footerProps?.className
                         )}
