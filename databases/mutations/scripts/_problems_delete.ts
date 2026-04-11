@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { problems, problemsDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
@@ -11,6 +12,7 @@ export type DeleteProblemsData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
+    client?: DbOrTransaction;
 };
 
 export type DeleteProblemsResponse = { 
@@ -36,16 +38,18 @@ export async function _deleteProblems(
         confirmDeleteAll,
         broadcastAction, 
         userId,
+        client,
     }: DeleteProblemsData,
 ) {
     const response: DeleteProblemsResponse = { success: false, };
+    const executor = client ?? db;
 
     try {
         const shouldConfirmDeleteAll = !scriptsIds.length && !problemsIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the problems, please confirm this action!');
 
         // delete drafts
-        await db.delete(problemsDrafts).where(and(
+        await executor.delete(problemsDrafts).where(and(
             !problemsIds.length ? undefined : inArray(problemsDrafts.problemDraftId, problemsIds),
             !scriptsIds.length ? undefined : or(
                 inArray(problemsDrafts.scriptId, scriptsIds),
@@ -54,7 +58,7 @@ export async function _deleteProblems(
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
-        const problemsArr = await db
+        const problemsArr = await executor
             .select({
                 problemId: problems.problemId,
                 problemScriptId: problems.scriptId,
@@ -76,7 +80,7 @@ export async function _deleteProblems(
             createdByUserId: userId,
         }));
         
-        if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
+        if (pendingDeletionInsertData.length) await executor.insert(pendingDeletion).values(pendingDeletionInsertData);
 
         response.success = true;
     } catch(e: any) {
@@ -84,7 +88,7 @@ export async function _deleteProblems(
         response.errors = [e.message];
         logger.error('_deleteProblems ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_problems');
+        if (!response?.errors?.length && broadcastAction && !client) socket.emit('data_changed', 'delete_problems');
         return response;
     }
 }

@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { drugsLibraryDrafts, drugsLibrary, drugsLibraryHistory } from "@/databases/pg/schema"
 
@@ -7,14 +8,17 @@ export async function _saveDrugsLibraryItemsHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof drugsLibraryDrafts.$inferSelect[]
   previous: typeof drugsLibrary.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client ?? db
     const insertData: typeof drugsLibraryHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -80,10 +84,11 @@ export async function _saveDrugsLibraryItemsHistory({
     }
 
     if (insertData.length) {
-      await db.insert(drugsLibraryHistory).values(insertData)
+      await executor.insert(drugsLibraryHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)
+    throw e
   }
 
   return changeLogsData

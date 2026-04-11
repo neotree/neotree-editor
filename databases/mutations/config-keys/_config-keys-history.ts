@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema"
 
@@ -7,14 +8,17 @@ export async function _saveConfigKeysHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof configKeysDrafts.$inferSelect[]
   previous: typeof configKeys.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client ?? db
     const insertData: typeof configKeysHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -85,10 +89,11 @@ export async function _saveConfigKeysHistory({
     }
 
     if (insertData.length) {
-      await db.insert(configKeysHistory).values(insertData)
+      await executor.insert(configKeysHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)
+    throw e
   }
 
   return changeLogsData

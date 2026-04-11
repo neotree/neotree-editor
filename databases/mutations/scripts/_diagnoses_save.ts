@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
@@ -15,17 +16,18 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, }: {
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
-    
+    client?: DbOrTransaction;
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     let sqlInfo: { [key: string]: Query; } = {};
+    const executor = client ?? db;
 
     try {
         let index = 0;
@@ -36,7 +38,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const getDiagnosisDraftQuery = db.query.diagnosesDrafts.findFirst({
+                    const getDiagnosisDraftQuery = executor.query.diagnosesDrafts.findFirst({
                         where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
                     });
 
@@ -44,7 +46,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
 
                     const draft = !itemDiagnosisId ? null : await getDiagnosisDraftQuery.execute();
 
-                    const getPublishedDiagnosisQuery = db.query.diagnoses.findFirst({
+                    const getPublishedDiagnosisQuery = executor.query.diagnoses.findFirst({
                         where: eq(diagnoses.diagnosisId, diagnosisId),
                     });
 
@@ -58,7 +60,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const q = executor
                             .update(diagnosesDrafts)
                             .set({
                                 data,
@@ -71,12 +73,12 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const diagnosis = await db.query.diagnoses.findFirst({
+                            const diagnosis = await executor.query.diagnoses.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnoses.position),
                             });
 
-                            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
+                            const diagnosisDraft = await executor.query.diagnosesDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnosesDrafts.position),
                             });
@@ -93,18 +95,18 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
                                 where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
                                 columns: { scriptDraftId: true, },
                             });
 
-                            const publishedScript = await db.query.scripts.findFirst({
+                            const publishedScript = await executor.query.scripts.findFirst({
                                 where: eq(scripts.scriptId, data.scriptId),
                                 columns: { scriptId: true, },
                             });
 
                             if (scriptDraft || publishedScript) {
-                                const q = db.insert(diagnosesDrafts).values({
+                                const q = executor.insert(diagnosesDrafts).values({
                                     data,
                                     scriptId: publishedScript?.scriptId,
                                     scriptDraftId: scriptDraft?.scriptDraftId,
@@ -141,7 +143,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
         response.errors = [e.message];
         logger.error('_saveDiagnoses ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !syncSilently) socket.emit('data_changed', 'save_diagnoses');
+        if (!response?.errors?.length && broadcastAction && !syncSilently && !client) socket.emit('data_changed', 'save_diagnoses');
         return response;
     }
 }

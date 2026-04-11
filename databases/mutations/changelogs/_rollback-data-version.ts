@@ -25,6 +25,7 @@ import {
   type VersionedEntityBinding,
 } from "./_rollback-shared"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
+import { buildReleasePublishChangeLog } from "./_release-log"
 
 export type RollbackDataVersionParams = {
   dataVersion?: number
@@ -370,6 +371,30 @@ export async function _rollbackDataVersion({
           .update(editorInfo)
           .set({ dataVersion: targetDataVersion, lastPublishDate: new Date() })
           .where(eq(editorInfo.id, editor.id))
+      }
+
+      const releaseLog = await _saveChangeLog({
+        data: buildReleasePublishChangeLog({
+          dataVersion: targetDataVersion,
+          userId,
+          description: `Release v${targetDataVersion} published via rollback from v${currentDataVersion} to state of v${restoreSourceDataVersion}`,
+          changeReason:
+            changeReason ||
+            `Release v${targetDataVersion} published via rollback from v${currentDataVersion} to state of v${restoreSourceDataVersion}`,
+          changes: [
+            {
+              action: "publish",
+              description: `Release v${targetDataVersion} published via rollback`,
+              fromDataVersion: currentDataVersion,
+              toDataVersion: targetDataVersion,
+              rollbackSourceDataVersion: restoreSourceDataVersion,
+            },
+          ],
+        }),
+        client: tx,
+      })
+      if (!releaseLog.success) {
+        throw new Error(releaseLog.errors?.join(", ") || "Failed to save rollback release changelog")
       }
     })
 

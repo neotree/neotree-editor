@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveConfigKeysHistory } from "./_config-keys-history"
 import { v4 } from "uuid"
@@ -12,16 +13,18 @@ export async function _publishConfigKeys(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   try {
+    const client = opts?.client ?? db
     let updates: (typeof configKeysDrafts.$inferSelect)[] = []
     let inserts: (typeof configKeysDrafts.$inferSelect)[] = []
 
-    const res = await db.query.configKeysDrafts.findMany({
+    const res = await client.query.configKeysDrafts.findMany({
       where: !opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts?.userId),
     })
 
@@ -32,7 +35,7 @@ export async function _publishConfigKeys(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof configKeys.$inferSelect)[] = []
       if (updates.filter((c) => c.configKeyId).length) {
-        dataBefore = await db.query.configKeys.findMany({
+        dataBefore = await client.query.configKeys.findMany({
           where: inArray(
             configKeys.configKeyId,
             updates.filter((c) => c.configKeyId).map((c) => c.configKeyId!),
@@ -50,13 +53,14 @@ export async function _publishConfigKeys(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(configKeys).set(updates).where(eq(configKeys.configKeyId, configKeyId)).returning()
+        await client.update(configKeys).set(updates).where(eq(configKeys.configKeyId, configKeyId)).returning()
       }
 
       const updateChangeLogs = await _saveConfigKeysHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -68,7 +72,7 @@ export async function _publishConfigKeys(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof configKeys.$inferSelect)[] = []
       if (inserts.filter((c) => c.configKeyId).length) {
-        dataBefore = await db.query.configKeys.findMany({
+        dataBefore = await client.query.configKeys.findMany({
           where: inArray(
             configKeys.configKeyId,
             inserts.filter((c) => c.configKeyId).map((c) => c.configKeyId!),
@@ -85,13 +89,14 @@ export async function _publishConfigKeys(opts?: {
           return d
         })
 
-        await db.insert(configKeys).values(payload)
+        await client.insert(configKeys).values(payload)
       }
 
       const insertChangeLogs = await _saveConfigKeysHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -99,11 +104,11 @@ export async function _publishConfigKeys(opts?: {
       })))
     }
 
-    await db
+    await client
       .delete(configKeysDrafts)
       .where(!opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts.userId))
 
-    let deleted = await db.query.pendingDeletion.findMany({
+    let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.configKeyId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -119,7 +124,7 @@ export async function _publishConfigKeys(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await client
         .update(configKeys)
         .set({ deletedAt })
         .where(
@@ -140,7 +145,7 @@ export async function _publishConfigKeys(opts?: {
         },
       }))
 
-      await db.insert(configKeysHistory).values(historyPayload)
+      await client.insert(configKeysHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -172,7 +177,7 @@ export async function _publishConfigKeys(opts?: {
       }
     }
 
-    await db
+    await client
       .delete(pendingDeletion)
       .where(
         and(
@@ -188,17 +193,15 @@ export async function _publishConfigKeys(opts?: {
     ]
 
     if (published.length) {
-      await db
+      await client
         .update(configKeys)
         .set({ version: sql`${configKeys.version} + 1` })
         .where(inArray(configKeys.configKeyId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
-      if (saveResult.errors?.length) {
-        logger.error("_publishConfigKeys changelog warnings", saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save config key changelogs")
     }
 
     results.success = true

@@ -20,6 +20,7 @@ import {
   normalizeSnapshot,
 } from "./_rollback-shared"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
+import { buildReleasePublishChangeLog } from "./_release-log"
 
 export type RollbackChangeLogParams = {
   entityId: string
@@ -346,6 +347,30 @@ export async function _rollbackChangeLog({
           .update(editorInfo)
           .set({ dataVersion: nextDataVersion, lastPublishDate: new Date() })
           .where(eq(editorInfo.id, editor.id))
+      }
+
+      const releaseLog = await _saveChangeLog({
+        data: buildReleasePublishChangeLog({
+          dataVersion: nextDataVersion,
+          userId,
+          description: `Release v${nextDataVersion} published via rollback of ${entityType} ${entityId}`,
+          changeReason: changeReason || `Release v${nextDataVersion} published via rollback of ${entityType} ${entityId}`,
+          changes: [
+            {
+              action: "publish",
+              description: `Release v${nextDataVersion} published via entity rollback`,
+              rolledBackEntityId: entityId,
+              rolledBackEntityType: entityType,
+              rollbackTargetVersion: target.version,
+              fromDataVersion: current.dataVersion,
+              toDataVersion: nextDataVersion,
+            },
+          ],
+        }),
+        client: tx,
+      })
+      if (!releaseLog.success) {
+        throw new Error(releaseLog.errors?.join(", ") || "Failed to save rollback release changelog")
       }
 
       return savedRoot

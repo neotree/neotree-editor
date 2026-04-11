@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { dataKeys, dataKeysDrafts, dataKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveDataKeysHistory } from "./_history"
 import { v4 } from "uuid"
@@ -13,13 +14,15 @@ export async function _publishDataKeys(opts?: {
   publisherUserId?: string | null
   dataVersion?: number
   allowConfidentialDowngrade?: boolean
+  client?: DbOrTransaction
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   try {
-    let deleted = await db.query.pendingDeletion.findMany({
+    const client = opts?.client ?? db
+    let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.dataKeyId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -35,7 +38,7 @@ export async function _publishDataKeys(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await client
         .update(dataKeys)
         .set({
           deletedAt,
@@ -62,7 +65,7 @@ export async function _publishDataKeys(opts?: {
         }
       })
 
-      await db.insert(dataKeysHistory).values(historyPayload)
+      await client.insert(dataKeysHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -93,7 +96,7 @@ export async function _publishDataKeys(opts?: {
       }
     }
 
-    await db
+    await client
       .delete(pendingDeletion)
       .where(
         and(
@@ -105,7 +108,7 @@ export async function _publishDataKeys(opts?: {
     let updates: (typeof dataKeysDrafts.$inferSelect)[] = []
     let inserts: (typeof dataKeysDrafts.$inferSelect)[] = []
 
-    const res = await db.query.dataKeysDrafts.findMany({
+    const res = await client.query.dataKeysDrafts.findMany({
       where: !opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts?.userId),
     })
 
@@ -116,7 +119,7 @@ export async function _publishDataKeys(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof dataKeys.$inferSelect)[] = []
       if (updates.filter((c) => c.dataKeyId).length) {
-        dataBefore = await db.query.dataKeys.findMany({
+        dataBefore = await client.query.dataKeys.findMany({
           where: inArray(
             dataKeys.uuid,
             updates.filter((c) => c.dataKeyId).map((c) => c.dataKeyId!),
@@ -143,13 +146,14 @@ export async function _publishDataKeys(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(dataKeys).set(updates).where(eq(dataKeys.uuid, dataKeyId)).returning()
+        await client.update(dataKeys).set(updates).where(eq(dataKeys.uuid, dataKeyId)).returning()
       }
 
       const updateChangeLogs = await _saveDataKeysHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -167,7 +171,7 @@ export async function _publishDataKeys(opts?: {
       // we'll use data before to compare changes
       let dataBefore: (typeof dataKeys.$inferSelect)[] = []
       if (inserts.filter((c) => c.dataKeyId).length) {
-        dataBefore = await db.query.dataKeys.findMany({
+        dataBefore = await client.query.dataKeys.findMany({
           where: inArray(
             dataKeys.uuid,
             inserts.filter((c) => c.dataKeyId).map((c) => c.dataKeyId!),
@@ -183,13 +187,14 @@ export async function _publishDataKeys(opts?: {
           return d
         })
 
-        await db.insert(dataKeys).values(payload)
+        await client.insert(dataKeys).values(payload)
       }
 
       const insertChangeLogs = await _saveDataKeysHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -203,7 +208,7 @@ export async function _publishDataKeys(opts?: {
       }
     }
 
-    await db.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
+    await client.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
 
     const published = [
       ...updates.map((c) => c.dataKeyId!),
@@ -211,17 +216,15 @@ export async function _publishDataKeys(opts?: {
     ]
 
     if (published.length) {
-      await db
+      await client
         .update(dataKeys)
         .set({ version: sql`${dataKeys.version} + 1` })
         .where(inArray(dataKeys.uuid, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
-      if (saveResult.errors?.length) {
-        logger.error("_publishDataKeys changelog warnings", saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save data key changelogs")
     }
 
     if (errors.length) {
