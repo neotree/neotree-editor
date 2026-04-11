@@ -5,6 +5,7 @@ import * as uuid from "uuid"
 import logger from "@/lib/logger"
 import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
   aliases,
@@ -149,11 +150,6 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   alias: { table: aliases, idColumn: aliases.uuid, entityLabel: "alias" },
   hospital: { table: hospitals, idColumn: hospitals.hospitalId, entityLabel: "hospital" },
 }
-
-
-type DbClient = typeof db
-type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
-type DbOrTransaction = DbClient | TransactionClient
 
 function hashToInt32(value: string): number {
   let hash = 0
@@ -573,10 +569,12 @@ export async function _saveChangeLogs({
   data,
   broadcastAction,
   allowPartial,
+  client,
 }: {
   data: SaveChangeLogData[]
   broadcastAction?: boolean
   allowPartial?: boolean
+  client?: DbOrTransaction
 }): Promise<{ success: boolean; errors?: string[]; saved: number }> {
   let saved = 0
   const errors: string[] = []
@@ -588,7 +586,7 @@ export async function _saveChangeLogs({
 
     if (allowPartial) {
       for (const changeLogData of data) {
-        const res = await _saveChangeLog({ data: changeLogData })
+        const res = await _saveChangeLog({ data: changeLogData, client })
         if (res.errors?.length) {
           errors.push(...res.errors)
           continue
@@ -596,7 +594,7 @@ export async function _saveChangeLogs({
         saved++
       }
     } else {
-      await db.transaction(async (tx) => {
+      const executor = async (tx: DbOrTransaction) => {
         for (const changeLogData of data) {
           const res = await _saveChangeLog({ data: changeLogData, client: tx })
 
@@ -607,7 +605,13 @@ export async function _saveChangeLogs({
 
           saved++
         }
-      })
+      }
+
+      if (client) {
+        await executor(client)
+      } else {
+        await db.transaction(executor)
+      }
     }
 
     if (broadcastAction && !errors.length) {

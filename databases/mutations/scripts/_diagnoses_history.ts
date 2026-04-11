@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
@@ -9,14 +10,17 @@ export async function _saveDiagnosesHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof diagnosesDrafts.$inferSelect[]
   previous: typeof diagnoses.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client ?? db
     const insertData: typeof diagnosesHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -86,10 +90,11 @@ export async function _saveDiagnosesHistory({
     }
 
     if (insertData.length) {
-      await db.insert(diagnosesHistory).values(insertData)
+      await executor.insert(diagnosesHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)
+    throw e
   }
 
   return changeLogsData

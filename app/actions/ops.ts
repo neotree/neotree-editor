@@ -17,11 +17,12 @@ import * as drugsLibraryMutations from "@/databases/mutations/drugs-library"
 import * as drugsLibraryQueries from "@/databases/queries/drugs-library"
 import * as dataKeysMutations from "@/databases/mutations/data-keys"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
-import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-
-const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
+import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
+import db from "@/databases/pg/drizzle"
+import { editorInfo } from "@/databases/pg/schema"
+import { eq, sql } from "drizzle-orm"
 
 export async function getEditorDetails(): Promise<{
   errors?: string[]
@@ -130,149 +131,107 @@ export async function publishData({
 
     if (scope === 1) userId = null
 
-    const editorInfoResult = await _getEditorInfo()
-    const currentDataVersion = editorInfoResult.data?.dataVersion || 1
-
-    // The next version will be currentDataVersion + 1
-    const nextDataVersion = currentDataVersion + 1
-
-    const publishConfigKeys = await configKeysMutations._publishConfigKeys({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-
-    const publishHospitals = await hospitalsMutations._publishHospitals({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-
-    const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const publishDataKeys = await dataKeysMutations._publishDataKeys({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const publishScripts = await scriptsMutations._publishScripts({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const publishScreens = await scriptsMutations._publishScreens({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const publishDiagnoses = await scriptsMutations._publishDiagnoses({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const publishProblems = await scriptsMutations._publishProblems({
-      userId,
-      publisherUserId,
-      dataVersion: nextDataVersion,
-    })
-    const processPendingDeletion = await _processPendingDeletion({
-      userId,
-      publisherUserId: publisherUserId || undefined,
-    })
-
-    if (publishDataKeys.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDataKeys.errors]
-    }
-
-    if (publishConfigKeys.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishConfigKeys.errors]
-    }
-
-    if (publishHospitals.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishHospitals.errors]
-    }
-
-    if (publishDrugsLibraryItems.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDrugsLibraryItems.errors]
-    }
-
-    if (publishScripts.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishScripts.errors]
-    }
-
-    if (publishScreens.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishScreens.errors]
-    }
-
-    if (publishDiagnoses.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishDiagnoses.errors]
-    }
-
-    if (publishProblems.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...publishProblems.errors]
-    }
-
-    if (processPendingDeletion.errors) {
-      results.success = false
-      results.errors = [...(results.errors || []), ...processPendingDeletion.errors]
-    }
-
-    const editorInfoSave = await _saveEditorInfo({
-      increaseVersion: results.success,
-      broadcastAction: true,
-      data: { lastPublishDate: new Date() },
-    })
-
-    if (results.success && editorInfoSave.success && editorInfoSave.data?.dataVersion && publisherUserId) {
-      const releaseDataVersion = editorInfoSave.data.dataVersion
-      const now = new Date()
-      const releaseLog = await _saveChangeLog({
-        data: {
-          entityId: RELEASE_CHANGELOG_ENTITY_ID,
-          entityType: "release",
-          action: "publish",
-          dataVersion: releaseDataVersion,
-          changes: [
-            {
-              action: "publish",
-              description: `Release v${releaseDataVersion} published`,
-              fromDataVersion: releaseDataVersion - 1,
-              toDataVersion: releaseDataVersion,
-            },
-          ],
-          fullSnapshot: {
-            dataVersion: releaseDataVersion,
-            publishedAt: now.toISOString(),
-            publishedBy: publisherUserId,
-          },
-          previousSnapshot: {},
-          baselineSnapshot: {
-            dataVersion: releaseDataVersion,
-            publishedAt: now.toISOString(),
-            publishedBy: publisherUserId,
-          },
-          description: `Release v${releaseDataVersion} published`,
-          changeReason: `Release v${releaseDataVersion} published`,
-          isActive: false,
-          userId: publisherUserId,
-        },
-      })
-
-      if (!releaseLog.success) {
-        logger.error("publishData release changelog warning", releaseLog.errors?.join(", ") || "Unknown error")
+    await db.transaction(async (tx) => {
+      const lockedEditor = await tx.execute<{ id: number; dataVersion: number }>(
+        sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
+      )
+      const editor = lockedEditor?.[0]
+      if (!editor?.id || !Number.isFinite(editor.dataVersion)) {
+        throw new Error("Failed to lock editor info")
       }
-    }
+
+      const nextDataVersion = Number(editor.dataVersion) + 1
+
+      const publishConfigKeys = await configKeysMutations._publishConfigKeys({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishConfigKeys.errors?.length) throw new Error(publishConfigKeys.errors.join(", "))
+
+      const publishHospitals = await hospitalsMutations._publishHospitals({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishHospitals.errors?.length) throw new Error(publishHospitals.errors.join(", "))
+
+      const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDrugsLibraryItems.errors?.length) throw new Error(publishDrugsLibraryItems.errors.join(", "))
+
+      const publishDataKeys = await dataKeysMutations._publishDataKeys({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDataKeys.errors?.length) throw new Error(publishDataKeys.errors.join(", "))
+
+      const publishScripts = await scriptsMutations._publishScripts({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishScripts.errors?.length) throw new Error(publishScripts.errors.join(", "))
+
+      const publishScreens = await scriptsMutations._publishScreens({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishScreens.errors?.length) throw new Error(publishScreens.errors.join(", "))
+
+      const publishDiagnoses = await scriptsMutations._publishDiagnoses({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishDiagnoses.errors?.length) throw new Error(publishDiagnoses.errors.join(", "))
+
+      const publishProblems = await scriptsMutations._publishProblems({
+        userId,
+        publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
+
+      const processPendingDeletion = await _processPendingDeletion({
+        userId,
+        publisherUserId: publisherUserId || undefined,
+        client: tx,
+      })
+      if (processPendingDeletion.errors?.length) throw new Error(processPendingDeletion.errors.join(", "))
+
+      await tx
+        .update(editorInfo)
+        .set({ dataVersion: nextDataVersion, lastPublishDate: new Date() })
+        .where(eq(editorInfo.id, editor.id))
+
+      if (publisherUserId) {
+        const releaseLog = await _saveChangeLog({
+          data: buildReleasePublishChangeLog({
+            dataVersion: nextDataVersion,
+            userId: publisherUserId,
+          }),
+          client: tx,
+        })
+
+        if (!releaseLog.success) {
+          throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
+        }
+      }
+    })
 
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {

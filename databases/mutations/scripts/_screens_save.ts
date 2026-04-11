@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
@@ -74,16 +75,18 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
     }
 }
 
-export async function _saveScreens({ data, broadcastAction, userId, }: {
+export async function _saveScreens({ data, broadcastAction, userId, client, }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
     userId?: string;
+    client?: DbOrTransaction;
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     const info: SaveScreensResponse['info'] = {};
     const confidentialDataKeyIds = new Set<string>();
+    const executor = client ?? db;
     
     try {
         let index = 0;
@@ -111,11 +114,11 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                 getConfidentialDataKeyIds(item).forEach((id) => confidentialDataKeyIds.add(id));
 
                 if (!errors.length) {
-                    const draft = !itemScreenId ? null : await db.query.screensDrafts.findFirst({
+                    const draft = !itemScreenId ? null : await executor.query.screensDrafts.findFirst({
                         where: eq(screensDrafts.screenDraftId, screenId),
                     });
 
-                    const published = (draft || !itemScreenId) ? null : await db.query.screens.findFirst({
+                    const published = (draft || !itemScreenId) ? null : await executor.query.screens.findFirst({
                         where: eq(screens.screenId, screenId),
                     });
 
@@ -125,7 +128,7 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const q = executor
                             .update(screensDrafts)
                             .set({
                                 data,
@@ -138,12 +141,12 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const screen = await db.query.screens.findFirst({
+                            const screen = await executor.query.screens.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screens.position),
                             });
 
-                            const screenDraft = await db.query.screensDrafts.findFirst({
+                            const screenDraft = await executor.query.screensDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screensDrafts.position),
                             });
@@ -160,18 +163,18 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                         } as typeof screensDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
                                 where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
                                 columns: { scriptDraftId: true, },
                             });
 
-                            const publishedScript = await db.query.scripts.findFirst({
+                            const publishedScript = await executor.query.scripts.findFirst({
                                 where: eq(scripts.scriptId, data.scriptId),
                                 columns: { scriptId: true, },
                             });
 
                             if (scriptDraft || publishedScript) {
-                                const q = db.insert(screensDrafts).values({
+                                const q = executor.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
                                     scriptId: publishedScript?.scriptId,
@@ -213,7 +216,7 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
         response.info = info;
         logger.error('_saveScreens ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_screens');
+        if (!response?.errors?.length && broadcastAction && !client) socket.emit('data_changed', 'save_screens');
         return response;
     }
 }

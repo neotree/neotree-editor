@@ -5,6 +5,8 @@ import queryString from "query-string";
 
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
+import db from "@/databases/pg/drizzle";
 import { _saveDrugsLibraryItemsUpdateIfExists, _saveDrugsLibraryItemsIfKeysNotExist } from "@/databases/mutations/drugs-library";
 import { _saveDataKeys } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
@@ -311,10 +313,16 @@ export async function saveScriptScreens({
     screens,
     scriptId,
     preserveScreensIds,
+    client,
+    userId,
+    oldScriptId,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
+    client?: DbOrTransaction;
+    userId?: string;
+    oldScriptId?: string | null;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -323,10 +331,13 @@ export async function saveScriptScreens({
     try {
         let saved = 0;
         const errors: string[] = [];
-
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        let inheritedOldScriptId = oldScriptId;
+        if (typeof inheritedOldScriptId === 'undefined') {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            inheritedOldScriptId = script.data.oldScriptId;
+        }
 
         for (const screen of screens) {
             const {
@@ -365,11 +376,21 @@ export async function saveScriptScreens({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveScreens({
+            const res = client ? await mutations._saveScreens({
+                userId,
+                client,
                 data: [{
                     ...s,
                     scriptId,
-                    oldScriptId: script.data.oldScriptId,
+                    oldScriptId: inheritedOldScriptId,
+                    screenId,
+                    version: 1,
+                }],
+            }) : await saveScreens({
+                data: [{
+                    ...s,
+                    scriptId,
+                    oldScriptId: inheritedOldScriptId,
                     screenId,
                     version: 1,
                 }],
@@ -393,10 +414,16 @@ export async function saveScriptDiagnoses({
     diagnoses,
     scriptId,
     preserveDiagnosesIds,
+    client,
+    userId,
+    oldScriptId,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+    client?: DbOrTransaction;
+    userId?: string;
+    oldScriptId?: string | null;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -405,10 +432,13 @@ export async function saveScriptDiagnoses({
     try {
         let saved = 0;
         const errors: string[] = [];
-
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        let inheritedOldScriptId = oldScriptId;
+        if (typeof inheritedOldScriptId === 'undefined') {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            inheritedOldScriptId = script.data.oldScriptId;
+        }
 
         for (const diagnosis of diagnoses) {
             const {
@@ -446,11 +476,21 @@ export async function saveScriptDiagnoses({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveDiagnoses({
+            const res = client ? await mutations._saveDiagnoses({
+                userId,
+                client,
                 data: [{
                     ...d,
                     scriptId,
-                    oldScriptId: script.data.oldScriptId,
+                    oldScriptId: inheritedOldScriptId,
+                    diagnosisId,
+                    version: 1,
+                }],
+            }) : await saveDiagnoses({
+                data: [{
+                    ...d,
+                    scriptId,
+                    oldScriptId: inheritedOldScriptId,
                     diagnosisId,
                     version: 1,
                 }],
@@ -474,10 +514,16 @@ export async function saveScriptProblems({
     problems,
     scriptId,
     preserveProblemsIds,
+    client,
+    userId,
+    oldScriptId,
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
+    client?: DbOrTransaction;
+    userId?: string;
+    oldScriptId?: string | null;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -486,10 +532,13 @@ export async function saveScriptProblems({
     try {
         let saved = 0;
         const errors: string[] = [];
-
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        let inheritedOldScriptId = oldScriptId;
+        if (typeof inheritedOldScriptId === 'undefined') {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            inheritedOldScriptId = script.data.oldScriptId;
+        }
 
         for (const problem of problems) {
             const {
@@ -526,11 +575,21 @@ export async function saveScriptProblems({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveProblems({
+            const res = client ? await mutations._saveProblems({
+                userId,
+                client,
                 data: [{
                     ...d,
                     scriptId,
-                    oldScriptId: script.data.oldScriptId,
+                    oldScriptId: inheritedOldScriptId,
+                    problemId,
+                    version: 1,
+                }],
+            }) : await saveProblems({
+                data: [{
+                    ...d,
+                    scriptId,
+                    oldScriptId: inheritedOldScriptId,
                     problemId,
                     version: 1,
                 }],
@@ -550,8 +609,10 @@ export async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, }: {
+export async function deleteScriptsItems({ scriptsIds, client, userId, }: {
     scriptsIds: string[];
+    client?: DbOrTransaction;
+    userId?: string | null;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -559,13 +620,13 @@ export async function deleteScriptsItems({ scriptsIds, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, });
+        const delScreens = client ? await mutations._deleteScreens({ scriptsIds, client, userId }) : await deleteScreens({ scriptsIds, });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, });
+        const delDiagnoses = client ? await mutations._deleteDiagnoses({ scriptsIds, client, userId }) : await deleteDiagnoses({ scriptsIds, });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, });
+        const delProblems = client ? await mutations._deleteProblems({ scriptsIds, client, userId }) : await deleteProblems({ scriptsIds, });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -598,116 +659,147 @@ export async function saveScriptsWithItems({ data, }: {
     const info = { ...saveScriptsWithItemsInfo };
 
     try {
+        const session = await isAllowed();
         const errors: string[] = [];
+        await db.transaction(async (tx) => {
+            for (const { overWriteScriptWithId, ...script } of data) {
+                const overWriteScript = !overWriteScriptWithId ? { data: null, errors: undefined } : await getScript({
+                    scriptId: overWriteScriptWithId,
+                    returnDraftIfExists: true,
+                });
 
-        for (const { overWriteScriptWithId, ...script } of data) {
-            const overWriteScript = !overWriteScriptWithId ? { data: null, } : await getScript({
-                scriptId: overWriteScriptWithId,
-                returnDraftIfExists: true,
-            });
+                overWriteScript.errors?.forEach(e => errors.push(e));
+                if (errors.length) throw new Error(errors.join(', '));
 
-            overWriteScript.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                if (overWriteScriptWithId && !overWriteScript?.data) {
+                    throw new Error('Overwrite script was not found');
+                }
 
-            if (overWriteScriptWithId && !overWriteScript?.data) {
-                errors.push('Overwrite script was not found');
-                continue;
-            }
+                if (overWriteScript?.data) {
+                    const res = await deleteScriptsItems({
+                        scriptsIds: [overWriteScript.data.scriptId],
+                        client: tx,
+                        userId: session.user?.userId,
+                    });
+                    res.errors?.forEach(e => errors.push(e));
+                    if (errors.length) throw new Error(errors.join(', '));
+                }
 
-            if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({ scriptsIds: [overWriteScript.data.scriptId], });
-                res.errors?.forEach(e => errors.push(e));
-                if (errors.length) continue;
-            }
+                const {
+                    id,
+                    screens: copiedScreens = [],
+                    diagnoses: copiedDiagnoses = [],
+                    problems: copiedProblems = [],
+                    drugsLibrary = [],
+                    dataKeys = [],
+                    publishDate,
+                    createdAt,
+                    updatedAt,
+                    isDraft,
+                    deletedAt,
+                    version,
+                    oldScriptId,
+                    scriptId: _ignoreScriptId,
+                    position,
+                    printSections = [],
+                    reviewConfigurations = [],
+                    ...s 
+                } = script;
 
-            const {
-                id,
-                screens: copiedScreens = [],
-                diagnoses: copiedDiagnoses = [],
-                problems: copiedProblems = [],
-                drugsLibrary = [],
-                dataKeys = [],
-                publishDate,
-                createdAt,
-                updatedAt,
-                isDraft,
-                deletedAt,
-                version,
-                oldScriptId,
-                scriptId: _ignoreScriptId,
-                position,
-                printSections = [],
-                reviewConfigurations = [],
-                ...s 
-            } = script;
+                const oldScreensIdsMap: { [key: string]: string; } = {};
+                const oldDiagnosesIdsMap: { [key: string]: string; } = {};
 
-            const oldScreensIdsMap: { [key: string]: string; } = {};
-            const oldDiagnosesIdsMap: { [key: string]: string; } = {};
+                let screens = copiedScreens.map(s => {
+                    const screenId = v4();
+                    oldScreensIdsMap[s.screenId] = screenId;
+                    if (s.oldScreenId) oldScreensIdsMap[s.oldScreenId] = screenId;
+                    return { 
+                        ...s, 
+                        screenId,
+                    };
+                });
 
-            let screens = copiedScreens.map(s => {
-                const screenId = v4();
-                oldScreensIdsMap[s.screenId] = screenId;
-                if (s.oldScreenId) oldScreensIdsMap[s.oldScreenId] = screenId;
-                return { 
-                    ...s, 
-                    screenId,
-                };
-            });
-
-            screens = screens.map(s => {
-                return {
-                    ...s,
-                    skipToScreenId: (!s.skipToScreenId ? null : oldScreensIdsMap[s.skipToScreenId]) || null,
-                };
-            });
-
-            const diagnoses = copiedDiagnoses.map(d => {
-                const diagnosisId = v4();
-                oldDiagnosesIdsMap[d.diagnosisId] = diagnosisId;
-                if (d.oldDiagnosisId) oldDiagnosesIdsMap[d.oldDiagnosisId] = diagnosisId;
-                return { ...d, diagnosisId, };
-            });
-
-            const problems = copiedProblems.map(d => {
-                const diagnosisId = v4();
-                return { ...d, diagnosisId, };
-            });
-
-            const scriptId = overWriteScript?.data?.scriptId || v4();
-
-            const res = await saveScripts({
-                data: [{
-                    ...s,
-                    scriptId,
-                    version: 1,
-                    printSections: printSections.map(s => ({
+                screens = screens.map(s => {
+                    return {
                         ...s,
-                        screensIds: s.screensIds.map(id => oldScreensIdsMap[id]).filter(id => id),
-                    })),
-                    reviewConfigurations: reviewConfigurations.map(c => ({
-                        ...c,
-                        screen: oldScreensIdsMap[c.screen],
-                    })).filter(c => c.screen),
-                }],
-            });
+                        skipToScreenId: (!s.skipToScreenId ? null : oldScreensIdsMap[s.skipToScreenId]) || null,
+                    };
+                });
 
-            res.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                const diagnoses = copiedDiagnoses.map(d => {
+                    const diagnosisId = v4();
+                    oldDiagnosesIdsMap[d.diagnosisId] = diagnosisId;
+                    if (d.oldDiagnosisId) oldDiagnosesIdsMap[d.oldDiagnosisId] = diagnosisId;
+                    return { ...d, diagnosisId, };
+                });
 
-            info.scripts++;
+                const problems = copiedProblems.map(d => {
+                    const problemId = v4();
+                    return { ...d, problemId, };
+                });
 
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, });
-            // saveScreens.errors?.forEach(e => errors.push(e));
-            info.screens += saveScreens.saved;
+                const scriptId = overWriteScript?.data?.scriptId || v4();
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, });
-            // saveDiagnoses.errors?.forEach(e => errors.push(e));
-            info.diagnoses += saveDiagnoses.saved;
+                const res = await mutations._saveScripts({
+                    userId: session.user?.userId,
+                    client: tx,
+                    data: [{
+                        ...s,
+                        scriptId,
+                        version: 1,
+                        printSections: printSections.map(s => ({
+                            ...s,
+                            screensIds: s.screensIds.map(id => oldScreensIdsMap[id]).filter(id => id),
+                        })),
+                        reviewConfigurations: reviewConfigurations.map(c => ({
+                            ...c,
+                            screen: oldScreensIdsMap[c.screen],
+                        })).filter(c => c.screen),
+                    }],
+                });
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, });
-            // saveDiagnoses.errors?.forEach(e => errors.push(e));
-            info.problems += saveProblems.saved;
-        }
+                res.errors?.forEach(e => errors.push(e));
+                if (errors.length) throw new Error(errors.join(', '));
+
+                info.scripts++;
+
+                const saveScreens = await saveScriptScreens({
+                    preserveScreensIds: true,
+                    scriptId,
+                    screens,
+                    client: tx,
+                    userId: session.user?.userId,
+                    oldScriptId: oldScriptId || overWriteScript?.data?.oldScriptId || null,
+                });
+                saveScreens.errors?.forEach(e => errors.push(`(scriptId=${scriptId}) ${e}`));
+                if (errors.length) throw new Error(errors.join(', '));
+                info.screens += saveScreens.saved;
+
+                const saveDiagnoses = await saveScriptDiagnoses({
+                    preserveDiagnosesIds: true,
+                    scriptId,
+                    diagnoses,
+                    client: tx,
+                    userId: session.user?.userId,
+                    oldScriptId: oldScriptId || overWriteScript?.data?.oldScriptId || null,
+                });
+                saveDiagnoses.errors?.forEach(e => errors.push(`(scriptId=${scriptId}) ${e}`));
+                if (errors.length) throw new Error(errors.join(', '));
+                info.diagnoses += saveDiagnoses.saved;
+
+                const saveProblems = await saveScriptProblems({
+                    preserveProblemsIds: true,
+                    scriptId,
+                    problems,
+                    client: tx,
+                    userId: session.user?.userId,
+                    oldScriptId: oldScriptId || overWriteScript?.data?.oldScriptId || null,
+                });
+                saveProblems.errors?.forEach(e => errors.push(`(scriptId=${scriptId}) ${e}`));
+                if (errors.length) throw new Error(errors.join(', '));
+                info.problems += saveProblems.saved;
+            }
+        });
 
         if (errors.length) return { success: false, errors, info, };
 

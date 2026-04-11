@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history"
 import { v4 } from "uuid"
@@ -13,13 +14,15 @@ export async function _publishDrugsLibraryItems(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   try {
-    let deleted = await db.query.pendingDeletion.findMany({
+    const client = opts?.client ?? db
+    let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.drugsLibraryItemId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -35,7 +38,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await client
         .update(drugsLibrary)
         .set({
           deletedAt,
@@ -59,7 +62,7 @@ export async function _publishDrugsLibraryItems(opts?: {
         },
       }))
 
-      await db.insert(drugsLibraryHistory).values(historyPayload)
+      await client.insert(drugsLibraryHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -90,7 +93,7 @@ export async function _publishDrugsLibraryItems(opts?: {
       }
     }
 
-    await db
+    await client
       .delete(pendingDeletion)
       .where(
         and(
@@ -102,7 +105,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     let updates: (typeof drugsLibraryDrafts.$inferSelect)[] = []
     let inserts: (typeof drugsLibraryDrafts.$inferSelect)[] = []
 
-    const res = await db.query.drugsLibraryDrafts.findMany({
+    const res = await client.query.drugsLibraryDrafts.findMany({
       where: !opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts?.userId),
     })
 
@@ -112,7 +115,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (updates.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
       if (updates.filter((c) => c.itemId).length) {
-        dataBefore = await db.query.drugsLibrary.findMany({
+        dataBefore = await client.query.drugsLibrary.findMany({
           where: inArray(
             drugsLibrary.itemId,
             updates.filter((c) => c.itemId).map((c) => c.itemId!),
@@ -130,13 +133,14 @@ export async function _publishDrugsLibraryItems(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(drugsLibrary).set(updates).where(eq(drugsLibrary.itemId, itemId)).returning()
+        await client.update(drugsLibrary).set(updates).where(eq(drugsLibrary.itemId, itemId)).returning()
       }
 
       const updateChangeLogs = await _saveDrugsLibraryItemsHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -147,7 +151,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (inserts.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
       if (inserts.filter((c) => c.itemId).length) {
-        dataBefore = await db.query.drugsLibrary.findMany({
+        dataBefore = await client.query.drugsLibrary.findMany({
           where: inArray(
             drugsLibrary.itemId,
             inserts.filter((c) => c.itemId).map((c) => c.itemId!),
@@ -164,13 +168,14 @@ export async function _publishDrugsLibraryItems(opts?: {
           return d
         })
 
-        await db.insert(drugsLibrary).values(payload)
+        await client.insert(drugsLibrary).values(payload)
       }
 
       const insertChangeLogs = await _saveDrugsLibraryItemsHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -178,24 +183,22 @@ export async function _publishDrugsLibraryItems(opts?: {
       })))
     }
 
-    await db
+    await client
       .delete(drugsLibraryDrafts)
       .where(!opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId))
 
     const published = [...updates.map((c) => c.itemId!), ...deleted.map((c) => c.drugsLibraryItemId!)]
 
     if (published.length) {
-      await db
+      await client
         .update(drugsLibrary)
         .set({ version: sql`${drugsLibrary.version} + 1` })
         .where(inArray(drugsLibrary.itemId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
-      if (saveResult.errors?.length) {
-        logger.error("_publishDrugsLibraryItems changelog warnings", saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save drugs library changelogs")
     }
 
     results.success = true
