@@ -189,7 +189,7 @@ export async function _publishProblems(opts?: {
             userId: opts.publisherUserId,
             scriptId: entry.problem?.scriptId || null,
             problemId: entry.problemId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

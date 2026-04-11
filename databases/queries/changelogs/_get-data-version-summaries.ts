@@ -3,6 +3,7 @@ import * as uuid from "uuid"
 import db from "@/databases/pg/drizzle"
 import { changeLogs, users, scripts } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
+import { buildDataVersionSummary } from "@/lib/changelog-data-version-summary"
 
 export type DataVersionSummaryParams = {
   searchTerm?: string
@@ -244,59 +245,14 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
       latestVersionMap.set(`${row.entityType}:${row.entityId}`, Number(row.latestVersion))
     }
 
-    const summaries: DataVersionSummary[] = paginatedVersions.map((dv) => {
-      const versionLogs = grouped.get(dv) || []
-      const latestChange = versionLogs[0]
-      
-      const publishEntry =
-        versionLogs.find((l) => l.changeLog.action === "publish" && l.changeLog.entityType === "release") ||
-        versionLogs.find((l) => l.changeLog.action === "publish") ||
-        latestChange
-
-      const rollbackEntry = versionLogs.find((l) => l.changeLog.action === "rollback")
-      
-      const entityCounts: Record<string, number> = {}
-      const actionCounts: Record<string, number> = {}
-      const descriptionsSet = new Set<string>()
-
-      versionLogs.forEach((l) => {
-        const type = l.changeLog.entityType
-        const act = l.changeLog.action
-        entityCounts[type] = (entityCounts[type] || 0) + 1
-        actionCounts[act] = (actionCounts[act] || 0) + 1
-        if (l.changeLog.description) descriptionsSet.add(l.changeLog.description)
-      })
-
-      const hasActiveChanges = versionLogs.some((l) => {
-        const key = `${l.changeLog.entityType}:${l.changeLog.entityId}`
-        const latest = latestVersionMap.get(key)
-        return latest !== undefined ? l.changeLog.version === latest : l.changeLog.isActive
-      })
-
-      const rollbackChanges = Array.isArray(rollbackEntry?.changeLog?.changes) ? rollbackEntry?.changeLog?.changes : []
-      const rollbackToVersion =
-        rollbackChanges.find((c: any) => Number.isFinite(c?.toVersion))?.toVersion ??
-        rollbackChanges.find((c: any) => Number.isFinite(c?.to_version))?.to_version ??
-        rollbackEntry?.changeLog?.changes?.[0]?.toVersion ??
-        null
-
-      return {
+    const summaries: DataVersionSummary[] = paginatedVersions.map((dv) =>
+      buildDataVersionSummary({
         dataVersion: dv,
-        publishedAt:
-          publishEntry?.changeLog?.dateOfChange?.toISOString() ||
-          latestChange?.changeLog?.dateOfChange?.toISOString() ||
-          null,
-        publishedByName: publishEntry?.user?.name || "Unknown user",
-        publishedByEmail: publishEntry?.user?.email || undefined,
-        totalChanges: versionLogs.length,
-        hasActiveChanges,
-        isLatestVersion: latestDataVersion ? dv === latestDataVersion : false,
-        entityCounts,
-        actionCounts,
-        descriptions: Array.from(descriptionsSet).slice(0, 5),
-        rollbackSourceVersion: rollbackEntry ? rollbackToVersion : null,
-      }
-    })
+        versionLogs: grouped.get(dv) || [],
+        latestDataVersion,
+        latestVersionMap,
+      }),
+    )
 
     return {
       data: summaries,

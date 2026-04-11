@@ -164,7 +164,7 @@ export async function _publishHospitals(opts?: {
             description: history.changes.description,
             userId: opts.publisherUserId,
             hospitalId: entry.hospitalId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

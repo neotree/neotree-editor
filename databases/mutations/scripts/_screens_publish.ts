@@ -191,7 +191,7 @@ export async function _publishScreens(opts?: {
             userId: opts.publisherUserId,
             scriptId: entry.screen?.scriptId || null,
             screenId: entry.screenId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

@@ -189,7 +189,7 @@ export async function _publishDiagnoses(opts?: {
             userId: opts.publisherUserId,
             scriptId: entry.diagnosis?.scriptId || null,
             diagnosisId: entry.diagnosisId,
-            isActive: false,
+            isActive: true,
           })
         }
       }
