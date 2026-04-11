@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { MoreVertical, Search } from "lucide-react"
@@ -45,6 +45,10 @@ import {
   useChangelogsTable,
 } from "../hooks/use-changelogs-table"
 import { resolveEntityTitle } from "@/lib/changelog-utils"
+import {
+  DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY,
+  RELEASE_ROLLBACK_MAX_RECENT_DEPTH,
+} from "@/lib/changelog-rollback"
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
@@ -150,6 +154,7 @@ export function ChangelogsTable(props: Props) {
     setCurrentPage,
     loadChangelogs,
     clearFilters,
+    latestDataVersion,
     detailsByVersion,
     detailsLoadingByVersion,
     loadVersionDetails,
@@ -163,7 +168,10 @@ export function ChangelogsTable(props: Props) {
   const [rollbacking, setRollbacking] = useState<number | null>(null)
   const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
   const [showEntityDetails, setShowEntityDetails] = useState(false)
-  const [softDeleteCreated, setSoftDeleteCreated] = useState(false)
+  const [softDeleteCreated, setSoftDeleteCreated] =
+    useState(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
+  const [allowDeepRollback, setAllowDeepRollback] = useState(false)
+  const [targetRollbackVersion, setTargetRollbackVersion] = useState<number | null>(null)
 
   useEffect(() => {
     if (pendingRollbackEntry) {
@@ -175,8 +183,21 @@ export function ChangelogsTable(props: Props) {
     if (!viewOnly) return
     setPendingRollbackEntry(null)
     setShowEntityDetails(false)
-    setSoftDeleteCreated(false)
+    setSoftDeleteCreated(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
+    setAllowDeepRollback(false)
+    setTargetRollbackVersion(null)
   }, [viewOnly])
+
+  const currentRollbackVersion = pendingRollbackEntry?.dataVersion ?? latestDataVersion ?? null
+  const recentRollbackTargets = useMemo(() => {
+    if (!currentRollbackVersion || currentRollbackVersion < 2) return []
+    const targets: number[] = []
+    const minVersion = Math.max(1, currentRollbackVersion - RELEASE_ROLLBACK_MAX_RECENT_DEPTH)
+    for (let version = currentRollbackVersion - 1; version >= minVersion; version--) {
+      targets.push(version)
+    }
+    return targets
+  }, [currentRollbackVersion])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -235,15 +256,29 @@ export function ChangelogsTable(props: Props) {
     router.push(buildDetailsHref(version))
   }
 
-  const handleRollbackDataVersion = async (dataVersion: number) => {
+  const handleRollbackDataVersion = async (
+    dataVersion: number,
+    restoreToVersion: number,
+    deepRollbackOverride: boolean,
+  ) => {
     if (viewOnly) return
     if (dataVersion < 2) return
+    if (!Number.isFinite(restoreToVersion) || restoreToVersion < 1 || restoreToVersion >= dataVersion) {
+      alert({
+        title: "Invalid rollback target",
+        message: "Choose an older published release to restore.",
+        variant: "error",
+      })
+      return
+    }
 
     try {
       setRollbacking(dataVersion)
       const res = await axios.post("/api/changelogs/rollback-data-version", {
         dataVersion,
-        changeReason: `Rollback release v${dataVersion} to v${dataVersion - 1}`,
+        toDataVersion: restoreToVersion,
+        allowDeepRollback: deepRollbackOverride,
+        changeReason: `Rollback release v${dataVersion} to state of v${restoreToVersion}`,
         createdEntityPolicy: softDeleteCreated ? "soft_delete" : "keep",
       })
 
@@ -253,7 +288,7 @@ export function ChangelogsTable(props: Props) {
 
       alert({
         title: "Rollback queued",
-        message: `Release v${dataVersion} will be rolled back to the state of v${dataVersion - 1}. New release v${dataVersion + 1} will be created. Refreshing...`,
+        message: `Release v${dataVersion} will be rolled back to the state of v${restoreToVersion}. New release v${dataVersion + 1} will be created. Refreshing...`,
         variant: "success",
         onClose: () => window.location.reload(),
       })
@@ -266,7 +301,9 @@ export function ChangelogsTable(props: Props) {
     } finally {
       setRollbacking(null)
       setPendingRollbackEntry(null)
-      setSoftDeleteCreated(false)
+      setSoftDeleteCreated(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
+      setAllowDeepRollback(false)
+      setTargetRollbackVersion(null)
     }
   }
 
@@ -472,7 +509,11 @@ export function ChangelogsTable(props: Props) {
                             {isSuperUser && !viewOnly && entry.isLatestVersion && entry.dataVersion > 1 && (
                               <DropdownMenuItem
                                 disabled={rollbacking === entry.dataVersion}
-                                onClick={() => setPendingRollbackEntry(entry)}
+                                onClick={() => {
+                                  setPendingRollbackEntry(entry)
+                                  setAllowDeepRollback(false)
+                                  setTargetRollbackVersion(entry.dataVersion - 1)
+                                }}
                                 className="cursor-pointer text-orange-600 focus:text-orange-700"
                               >
                                 {rollbacking === entry.dataVersion
@@ -530,7 +571,9 @@ export function ChangelogsTable(props: Props) {
           if (!open) {
             setPendingRollbackEntry(null)
             setShowEntityDetails(false)
-            setSoftDeleteCreated(false)
+            setSoftDeleteCreated(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
+            setAllowDeepRollback(false)
+            setTargetRollbackVersion(null)
           }
         }}
       >
@@ -543,7 +586,7 @@ export function ChangelogsTable(props: Props) {
                   <>
                     <p>
                       You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state
-                      of the previous release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
+                      of an earlier release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
                     </p>
                     {rollbacking !== null && (
                       <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>
@@ -575,6 +618,57 @@ export function ChangelogsTable(props: Props) {
                       )}
                     </div>
                     <div className="pt-1">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Restore to release</label>
+                        {!allowDeepRollback ? (
+                          <select
+                            value={targetRollbackVersion ?? ""}
+                            onChange={(event) => setTargetRollbackVersion(Number(event.target.value))}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            disabled={viewOnly || rollbacking !== null}
+                          >
+                            {recentRollbackTargets.map((version) => (
+                              <option key={version} value={version}>
+                                v{version}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            type="number"
+                            min={1}
+                            max={pendingRollbackEntry.dataVersion - 1}
+                            value={targetRollbackVersion ?? ""}
+                            onChange={(event) => setTargetRollbackVersion(Number(event.target.value))}
+                            disabled={viewOnly || rollbacking !== null}
+                            placeholder={`Enter target release version`}
+                          />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Standard rollback is limited to the last {RELEASE_ROLLBACK_MAX_RECENT_DEPTH} prior releases.
+                        </p>
+                      </div>
+                      <label className="mt-3 flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={allowDeepRollback}
+                          onChange={(event) => {
+                            const checked = event.target.checked
+                            setAllowDeepRollback(checked)
+                            if (!checked) {
+                              setTargetRollbackVersion(pendingRollbackEntry.dataVersion - 1)
+                            }
+                          }}
+                          className="rounded"
+                          disabled={viewOnly || rollbacking !== null}
+                        />
+                        <span>Deep restore override for older releases</span>
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Superuser-only. Enable this only when you intentionally need to restore further back than the recent rollback window.
+                      </p>
+                    </div>
+                    <div className="pt-1">
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
                         <input
                           type="checkbox"
@@ -586,7 +680,7 @@ export function ChangelogsTable(props: Props) {
                         <span>Soft delete items created in this release</span>
                       </label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Newly created entities with no prior snapshot will be marked deleted instead of kept.
+                        Recommended. Newly created entities with no prior snapshot will be marked deleted so the rollback matches the previous published release.
                       </p>
                     </div>
                   </>
@@ -601,10 +695,21 @@ export function ChangelogsTable(props: Props) {
             <AlertDialogCancel onClick={() => setPendingRollbackEntry(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-orange-600 hover:bg-orange-700 text-white"
-              disabled={viewOnly || rollbacking !== null}
+              disabled={
+                viewOnly ||
+                rollbacking !== null ||
+                pendingRollbackEntry === null ||
+                !targetRollbackVersion ||
+                targetRollbackVersion < 1 ||
+                targetRollbackVersion >= pendingRollbackEntry.dataVersion
+              }
               onClick={() => {
-                if (pendingRollbackEntry !== null) {
-                  handleRollbackDataVersion(pendingRollbackEntry.dataVersion)
+                if (pendingRollbackEntry !== null && targetRollbackVersion) {
+                  handleRollbackDataVersion(
+                    pendingRollbackEntry.dataVersion,
+                    targetRollbackVersion,
+                    allowDeepRollback,
+                  )
                 }
               }}
             >

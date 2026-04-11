@@ -11,13 +11,14 @@ import { useAppContext } from "@/contexts/app"
 
 type Props = {
   entityId: string
+  entityType: string
   targetVersion?: number | null
   currentVersion: number
   dataVersion?: number | null
   disabled?: boolean
 }
 
-export function RollbackButton({ entityId, targetVersion, currentVersion, dataVersion, disabled }: Props) {
+export function RollbackButton({ entityId, entityType, targetVersion, currentVersion, dataVersion, disabled }: Props) {
   const { alert } = useAlertModal()
   const { viewOnly } = useAppContext()
   const [loading, setLoading] = useState(false)
@@ -25,7 +26,7 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
   const handleRollback = useCallback(async () => {
     if (viewOnly) return
 
-    if (!targetVersion || targetVersion < 1) {
+    if (targetVersion === null || targetVersion === undefined || targetVersion < 0) {
       alert({
         title: "No previous version",
         message: "There is no previous published version to restore.",
@@ -36,8 +37,11 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
     }
 
     const expectedNextDataVersion = (dataVersion ?? 0) + 1
+    const rollingBackCreation = targetVersion === 0
     const confirmed = window.confirm(
-      `Restore this entity from v${currentVersion} back to v${targetVersion}? This will create a new changelog entry and publish data version v${expectedNextDataVersion}.`,
+      rollingBackCreation
+        ? `Rollback this newly created entity from v${currentVersion} to its pre-creation state? This will create a new changelog entry and publish data version v${expectedNextDataVersion}.`
+        : `Restore this entity from v${currentVersion} back to v${targetVersion}? This will create a new changelog entry and publish data version v${expectedNextDataVersion}.`,
     )
     if (!confirmed) return
 
@@ -45,6 +49,7 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
       setLoading(true)
       const response = await axios.post("/api/changelogs/rollback", {
         entityId,
+        entityType,
         toVersion: targetVersion,
         changeReason: `Rollback from v${currentVersion} to v${targetVersion}`,
       })
@@ -57,7 +62,9 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
 
       alert({
         title: "Rollback scheduled",
-        message: `Restored to v${targetVersion}. A new changelog entry was created (data v${nextDataVersion}).`,
+        message: rollingBackCreation
+          ? `Entity rolled back to its pre-creation state. A new changelog entry was created (data v${nextDataVersion}).`
+          : `Restored to v${targetVersion}. A new changelog entry was created (data v${nextDataVersion}).`,
         variant: "success",
         buttonLabel: "Refresh",
         onClose: () => window.location.reload(),
@@ -72,7 +79,7 @@ export function RollbackButton({ entityId, targetVersion, currentVersion, dataVe
     } finally {
       setLoading(false)
     }
-  }, [alert, currentVersion, dataVersion, entityId, targetVersion, viewOnly])
+  }, [alert, currentVersion, dataVersion, entityId, entityType, targetVersion, viewOnly])
 
   return (
     <div className="relative">

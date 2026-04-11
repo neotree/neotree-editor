@@ -328,7 +328,7 @@ export type GetEntityHistoryResults = {
 export async function _getEntityHistory(
     params: GetEntityHistoryParams
 ): Promise<GetEntityHistoryResults> {
-    const { entityId, entityType, includeInactive = false, limit } = { ...params };
+    const { entityId, entityType, includeInactive = true, limit } = { ...params };
 
     try {
         if (!entityId || !uuid.validate(entityId)) {
@@ -428,6 +428,7 @@ export async function _getActiveVersion(
 
 export type GetVersionChainParams = {
     entityId: string;
+    entityType?: (typeof changeLogs.$inferSelect)['entityType'];
     fromVersion?: number;
     includeInactive?: boolean;
 };
@@ -440,7 +441,7 @@ export type GetVersionChainResults = {
 export async function _getVersionChain(
     params: GetVersionChainParams
 ): Promise<GetVersionChainResults> {
-    const { entityId, fromVersion, includeInactive = false } = { ...params };
+    const { entityId, entityType, fromVersion, includeInactive = false } = { ...params };
 
     try {
         if (!entityId || !uuid.validate(entityId)) {
@@ -453,7 +454,11 @@ export async function _getVersionChain(
             const latestRes = await db
                 .select({ version: changeLogs.version })
                 .from(changeLogs)
-                .where(eq(changeLogs.entityId, entityId))
+                .where(and(
+                    eq(changeLogs.entityId, entityId),
+                    entityType ? eq(changeLogs.entityType, entityType) : undefined,
+                    !includeInactive ? eq(changeLogs.isActive, true) : undefined,
+                ))
                 .orderBy(desc(changeLogs.version))
                 .limit(1);
             
@@ -461,6 +466,21 @@ export async function _getVersionChain(
         }
 
         if (!currentVersion) return { data: [] };
+
+        if (!includeInactive && fromVersion) {
+            const activeMatch = await db
+                .select({ version: changeLogs.version })
+                .from(changeLogs)
+                .where(and(
+                    eq(changeLogs.entityId, entityId),
+                    entityType ? eq(changeLogs.entityType, entityType) : undefined,
+                    eq(changeLogs.version, currentVersion),
+                    eq(changeLogs.isActive, true),
+                ))
+                .limit(1);
+
+            if (!activeMatch[0]) return { data: [] };
+        }
 
         const chain: ChangeLogType[] = [];
         let nextVersion: number | null = currentVersion;
@@ -479,8 +499,8 @@ export async function _getVersionChain(
                 .leftJoin(users, eq(users.userId, changeLogs.userId))
                 .where(and(
                     eq(changeLogs.entityId, entityId),
+                    entityType ? eq(changeLogs.entityType, entityType) : undefined,
                     eq(changeLogs.version, nextVersion),
-                    !includeInactive ? eq(changeLogs.isActive, true) : undefined,
                 ))
                 .limit(1);
 

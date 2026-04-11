@@ -87,7 +87,7 @@ export async function _publishDataKeys(opts?: {
             description: history.changes.description,
             userId: opts.publisherUserId,
             dataKeyId: entry.dataKeyId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

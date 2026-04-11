@@ -135,6 +135,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
               <div className="flex justify-end">
                 <RollbackButton
                   entityId={change.entityId}
+                  entityType={change.entityType}
                   targetVersion={change.parentVersion}
                   currentVersion={change.version}
                   dataVersion={dataVersion ?? null}

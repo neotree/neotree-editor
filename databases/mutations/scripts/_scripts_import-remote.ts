@@ -1,9 +1,6 @@
-import { eq, inArray } from 'drizzle-orm';
-
 import logger from '@/lib/logger';
-import db from '@/databases/pg/drizzle';
-import { scripts, scriptsDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { runRemoteScriptImports } from '@/lib/scripts-remote-import';
 
 export type ImportRemoteScriptsData = {
     siteId: string;
@@ -25,13 +22,22 @@ export async function _importRemoteScripts(
     const response: ImportRemoteScriptsResponse = { success: false, };
 
     try {
-        // TODO: Implement this
-        throw new Error('Functionality not yet implemented!');
+        const { copyScripts } = await import('@/app/actions/scripts');
+        const result = await runRemoteScriptImports({
+            siteId,
+            scriptsToImport,
+            copyScript: copyScripts,
+        });
+
+        if (result.errors?.length) {
+            response.errors = result.errors;
+            throw new Error(result.errors.join(', '));
+        }
         
         response.success = true;
     } catch(e: any) {
         response.success = false;
-        response.errors = [e.message];
+        response.errors = response.errors?.length ? response.errors : [e.message];
         logger.error('_importRemoteScripts ERROR', e.message);
     } finally {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'create_scripts');

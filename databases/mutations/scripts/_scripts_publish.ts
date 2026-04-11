@@ -37,14 +37,15 @@ export async function _publishScripts({
     })
     const inserts = drafts
       .filter((c) => !c.scriptId)
-      .map((s) => ({
-        ...s,
-        scriptId: s.data.scriptId || v4(),
-        data: { ...s.data, scriptId: s.data.scriptId || v4() },
-      }))
+      .map((draft) => {
+        const resolvedScriptId = draft.data.scriptId || draft.scriptDraftId || v4()
+        return {
+          ...draft,
+          scriptId: resolvedScriptId,
+          data: { ...draft.data, scriptId: resolvedScriptId },
+        }
+      })
     const updates = drafts.filter((c) => c.scriptId)
-
-    const scriptsIdsAndScriptsDraftsIds = [...inserts.map((s) => s.scriptId!), ...updates.map((s) => s.scriptId!)]
 
     const errors: string[] = []
     const processedScripts: { scriptId: string; errors?: string[] }[] = []
@@ -99,28 +100,50 @@ export async function _publishScripts({
 
       const insertData = inserts.map((s) => ({
         ...s.data,
-        scriptId: s.scriptDraftId,
+        scriptId: s.data.scriptId,
       }))
 
       await db.insert(scripts).values(insertData)
 
-      for (const { scriptId } of insertData) {
+      for (const insertedScript of inserts) {
+        const scriptId = insertedScript.data.scriptId!
         processedScripts.push({ scriptId })
 
         await db
           .update(screensDrafts)
           .set({ scriptId })
-          .where(or(eq(screensDrafts.scriptId, scriptId), eq(screensDrafts.scriptDraftId, scriptId)))
+          .where(
+            or(
+              eq(screensDrafts.scriptId, insertedScript.scriptDraftId),
+              eq(screensDrafts.scriptDraftId, insertedScript.scriptDraftId),
+              eq(screensDrafts.scriptId, scriptId),
+              eq(screensDrafts.scriptDraftId, scriptId),
+            ),
+          )
 
         await db
           .update(diagnosesDrafts)
           .set({ scriptId })
-          .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
+          .where(
+            or(
+              eq(diagnosesDrafts.scriptId, insertedScript.scriptDraftId),
+              eq(diagnosesDrafts.scriptDraftId, insertedScript.scriptDraftId),
+              eq(diagnosesDrafts.scriptId, scriptId),
+              eq(diagnosesDrafts.scriptDraftId, scriptId),
+            ),
+          )
 
         await db
           .update(problemsDrafts)
           .set({ scriptId })
-          .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
+          .where(
+            or(
+              eq(problemsDrafts.scriptId, insertedScript.scriptDraftId),
+              eq(problemsDrafts.scriptDraftId, insertedScript.scriptDraftId),
+              eq(problemsDrafts.scriptId, scriptId),
+              eq(problemsDrafts.scriptDraftId, scriptId),
+            ),
+          )
       }
       const insertChangeLogs = await _saveScriptsHistory({
         drafts: inserts,
@@ -191,8 +214,8 @@ export async function _publishScripts({
         version: c.script!.version,
         scriptId: c.scriptId!,
         changes: {
-          action: "delete_config_key",
-          description: "Delete config key",
+          action: "delete_script",
+          description: "Delete script",
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -224,7 +247,7 @@ export async function _publishScripts({
             description: history.changes.description,
             userId: publisherUserId,
             scriptId: entry.scriptId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

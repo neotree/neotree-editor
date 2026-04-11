@@ -84,7 +84,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             description: history.changes.description,
             userId: opts.publisherUserId,
             drugsLibraryItemId: entry.drugsLibraryItemId,
-            isActive: false,
+            isActive: true,
           })
         }
       }

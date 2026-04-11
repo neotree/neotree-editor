@@ -166,7 +166,7 @@ export async function _publishConfigKeys(opts?: {
             description: history.changes.description,
             userId: opts.publisherUserId,
             configKeyId: entry.configKeyId,
-            isActive: false,
+            isActive: true,
           })
         }
       }
