@@ -9,6 +9,8 @@ import { _saveScreensHistory } from "./_screens_history"
 import { v4 } from "uuid"
 import { _generateScreenAliases } from "../aliases/_aliases_save"
 import { removeHexCharacters } from "@/databases/utils"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
 
 export async function _publishScreens(opts?: {
   scriptsIds?: string[]
@@ -18,17 +20,23 @@ export async function _publishScreens(opts?: {
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const { scriptsIds, screensIds } = { ...opts }
 
   // GENERATE ALIASES FOR ALL UPDATED SCREENS
 
   const results: { success: boolean; errors?: string[] } = { success: false }
-  const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
+    return {
+      success: false,
+      errors: ["Screen publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const client = opts?.client ?? db
+    const client = opts.client
     let updates: (typeof screensDrafts.$inferSelect)[] = []
     let inserts: (typeof screensDrafts.$inferSelect)[] = []
 
@@ -61,6 +69,7 @@ export async function _publishScreens(opts?: {
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof screens.$inferSelect)[] = []
+      const persistedUpdates: typeof screensDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.screenId).length) {
         dataBefore = await client.query.screens.findMany({
           where: inArray(
@@ -72,18 +81,21 @@ export async function _publishScreens(opts?: {
 
       for (const { screenId: _screenId, data: c } of updates) {
         const screenId = _screenId!
+        const sourceDraft = updates.find((draft) => draft.screenId === screenId)
         const { screenId: __screenId, id, oldScreenId, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${screens.version} + 1`,
         }
 
-        await client.update(screens).set(updates).where(eq(screens.screenId, screenId)).returning()
+        const [persisted] = await client.update(screens).set(nextData).where(eq(screens.screenId, screenId)).returning()
+        if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
       const updateChangeLogs = await _saveScreensHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -97,6 +109,7 @@ export async function _publishScreens(opts?: {
     if (inserts.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof screens.$inferSelect)[] = []
+      const persistedInserts: typeof screensDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.screenId).length) {
         dataBefore = await client.query.screens.findMany({
           where: inArray(
@@ -109,18 +122,25 @@ export async function _publishScreens(opts?: {
       for (const { id, scriptId: _scriptId, scriptDraftId, data } of inserts) {
         const screenId = data.screenId || v4()
         const scriptId = (data.scriptId || _scriptId || scriptDraftId)!
-        const payload = { ...data, screenId, scriptId }
+        const payload = {
+          ...data,
+          screenId,
+          scriptId,
+          version: getPublishedEntityVersion({ currentVersion: data.version, isCreate: true }),
+        }
 
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.screenId = screenId
           return d
         })
 
-        await client.insert(screens).values(payload)
+        const [persisted] = await client.insert(screens).values(payload).returning()
+        const sourceDraft = inserts.find((draft) => draft.id === id)
+        if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
 
       const insertChangeLogs = await _saveScreensHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -154,18 +174,20 @@ export async function _publishScreens(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await client
+      const deletedRows = await client
         .update(screens)
-        .set({ deletedAt })
+        .set({ deletedAt, version: sql`${screens.version} + 1` })
         .where(
           inArray(
             screens.screenId,
             deleted.map((c) => c.screenId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.screenId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: c.screen!.version,
+        version: deletedById.get(c.screenId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.screen!.version, isCreate: false }),
         screenId: c.screenId!,
         scriptId: c.screen!.scriptId,
         changes: {
@@ -184,19 +206,22 @@ export async function _publishScreens(opts?: {
           const history = historyPayload[index]
           if (!entry?.screenId) continue
 
-          const snapshot = removeHexCharacters({
-            ...(entry.screen ?? {}),
-            deletedAt,
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.screen ?? {},
+            deletedFields: { deletedAt },
+            sanitize: removeHexCharacters,
           })
 
           changeLogs.push({
             entityId: entry.screenId,
             entityType: "screen",
             action: "delete",
-            version: history.version || 1,
+            version: history.version,
             dataVersion: opts.dataVersion,
             changes: history.changes,
-            fullSnapshot: snapshot,
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: opts.publisherUserId,
             scriptId: entry.screen?.scriptId || null,
@@ -211,24 +236,11 @@ export async function _publishScreens(opts?: {
       await client.delete(pendingDeletion).where(inArray(pendingDeletion.id, deleted.map((entry) => entry.id)))
     }
 
-    const published = [
-      // ...inserts.map(c => c.screenId! || c.screenDraftId),
-      ...updates.map((c) => c.screenId!),
-      ...deleted.map((c) => c.screenId!),
-    ]
-
     const updatedScripts = Array.from(
       new Set((updates ?? []).map((ud) => ud.scriptId).filter((id): id is string => Boolean(id))),
     )
     if (updatedScripts.length) {
       await _generateScreenAliases(updatedScripts, client)
-    }
-
-    if (published.length) {
-      await client
-        .update(screens)
-        .set({ version: sql`${screens.version} + 1` })
-        .where(inArray(screens.screenId, published))
     }
 
     if (changeLogs.length) {
@@ -241,7 +253,7 @@ export async function _publishScreens(opts?: {
     results.success = false
     results.errors = [e.message]
     logger.error("_publishScreens ERROR", e)
-  } finally {
-    return results
   }
+
+  return results
 }

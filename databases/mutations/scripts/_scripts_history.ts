@@ -5,6 +5,7 @@ import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 
 export async function _saveScriptsHistory({
   previous,
@@ -26,14 +27,15 @@ export async function _saveScriptsHistory({
     for (const c of drafts) {
       const scriptId = c?.data?.scriptId
       if (!scriptId) continue
+      const prev = previous.find((prevC) => prevC.scriptId === scriptId)
+      const isCreate = !prev
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof scriptsHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: versionValue,
         scriptId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -43,8 +45,6 @@ export async function _saveScriptsHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.scriptId === scriptId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 

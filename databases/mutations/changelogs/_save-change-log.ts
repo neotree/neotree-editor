@@ -294,20 +294,6 @@ async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: stri
   return rows?.[0]?.version as number | undefined
 }
 
-async function getEntitySnapshot(client: DbOrTransaction, data: SaveChangeLogData) {
-  const config = ENTITY_FETCH_CONFIG[data.entityType]
-  if (!config) throw new Error(`Unknown entityType ${data.entityType}`)
-
-  const rows = await client
-    .select()
-    .from(config.table)
-    .where(eq(config.idColumn, data.entityId))
-    .limit(1)
-
-  if (!rows?.[0]) throw new Error(`Entity not found for snapshot (${config.entityLabel} ${data.entityId})`)
-  return rows[0]
-}
-
 async function ensureBaselineChangeLog({
   client,
   data,
@@ -328,15 +314,11 @@ async function ensureBaselineChangeLog({
   let snapshotForBaseline = baselineSnapshot ?? data.previousSnapshot
 
   if (snapshotForBaseline === undefined) {
-    try {
-      snapshotForBaseline = await getEntitySnapshot(client, data)
-      logger.error("saveChangeLog baselineSnapshot missing; captured current entity state as baseline", {
-        entityId: data.entityId,
-        entityType: data.entityType,
-      })
-    } catch (e: any) {
+    if (computedVersion <= 1) {
+      snapshotForBaseline = {}
+    } else {
       throw new Error(
-        "baselineSnapshot is required for the first changelog of an entity to capture the pre-change state",
+        "baselineSnapshot or previousSnapshot is required for the first changelog of an existing entity",
       )
     }
   }
@@ -417,26 +399,16 @@ export async function _saveChangeLog({
         })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
-          if (providedVersion < computedVersion) {
-            // logger.error("saveChangeLog versionless stale providedVersion, auto-upgrading", {
-            //   entityType: data.entityType,
-            //   entityId: data.entityId,
-            //   providedVersion,
-            //   latestChangeLogVersion: latestVersion,
-            //   computedVersion,
-            // })
-          } else {
-            logger.error("saveChangeLog versionless mismatch", {
-              entityType: resolvedData.entityType,
-              entityId: resolvedData.entityId,
-              providedVersion,
-              latestChangeLogVersion: latestVersion,
-              computedVersion,
-            })
-            throw new Error(
-              `Provided version (${resolvedData.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${resolvedData.entityType}`,
-            )
-          }
+          logger.error("saveChangeLog versionless mismatch", {
+            entityType: resolvedData.entityType,
+            entityId: resolvedData.entityId,
+            providedVersion,
+            latestChangeLogVersion: latestVersion,
+            computedVersion,
+          })
+          throw new Error(
+            `Provided version (${resolvedData.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${resolvedData.entityType}`,
+          )
         }
       } else {
         const entityType = resolvedData.entityType as VersionedEntityType
@@ -445,11 +417,21 @@ export async function _saveChangeLog({
         const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
         latestChangeLogVersion = latestVersion
 
-        // Prefer the entity's version, but if legacy data has higher changelog versions already,
-        // continue the changelog sequence to avoid blocking writes.
         if (Number.isFinite(latestVersion)) {
-          const nextSequential = Number(latestVersion) + 1
-          computedVersion = entityVersion <= Number(latestVersion) ? nextSequential : entityVersion
+          const expectedNextVersion = Number(latestVersion) + 1
+          if (entityVersion !== expectedNextVersion) {
+            logger.error("saveChangeLog entity/changelog drift", {
+              entityType: resolvedData.entityType,
+              entityId: resolvedData.entityId,
+              entityVersion,
+              latestChangeLogVersion: latestVersion,
+              expectedNextVersion,
+            })
+            throw new Error(
+              `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
+            )
+          }
+          computedVersion = entityVersion
         } else {
           computedVersion = entityVersion
         }
@@ -463,28 +445,17 @@ export async function _saveChangeLog({
         })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
-          if (providedVersion < computedVersion) {
-            // logger.error("saveChangeLog stale providedVersion, auto-upgrading", {
-            //   entityType: data.entityType,
-            //   entityId: data.entityId,
-            //   providedVersion,
-            //   entityVersion,
-            //   latestChangeLogVersion: latestVersion,
-            //   computedVersion,
-            // })
-          } else {
-            logger.error("saveChangeLog version mismatch", {
-              entityType: resolvedData.entityType,
-              entityId: resolvedData.entityId,
-              providedVersion,
-              entityVersion,
-              latestChangeLogVersion: latestVersion,
-              computedVersion,
-            })
-            throw new Error(
-              `Provided version (${resolvedData.version}) does not match ${config.entityLabel} version (${computedVersion})`,
-            )
-          }
+          logger.error("saveChangeLog version mismatch", {
+            entityType: resolvedData.entityType,
+            entityId: resolvedData.entityId,
+            providedVersion,
+            entityVersion,
+            latestChangeLogVersion: latestVersion,
+            computedVersion,
+          })
+          throw new Error(
+            `Provided version (${resolvedData.version}) does not match ${config.entityLabel} version (${computedVersion})`,
+          )
         }
       }
 

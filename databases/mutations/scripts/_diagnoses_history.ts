@@ -5,6 +5,7 @@ import logger from "@/lib/logger"
 import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 
 export async function _saveDiagnosesHistory({
   previous,
@@ -27,7 +28,8 @@ export async function _saveDiagnosesHistory({
       const diagnosisId = c?.data?.diagnosisId
       if (!diagnosisId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create diagnosis" : "Update diagnosis"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -37,7 +39,7 @@ export async function _saveDiagnosesHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof diagnosesHistory.$inferInsert = {
         version: versionValue,
@@ -47,8 +49,6 @@ export async function _saveDiagnosesHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {

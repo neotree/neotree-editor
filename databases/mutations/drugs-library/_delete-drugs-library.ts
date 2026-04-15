@@ -7,6 +7,7 @@ import { _getScreens } from '@/databases/queries/scripts';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
+import { and } from 'drizzle-orm';
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
@@ -42,7 +43,10 @@ export async function _deleteDrugsLibraryItems(
             const drugsLibraryItems = await _getDrugsLibraryItems({ itemsIds, returnDraftsIfExist: true, });
 
             // delete drafts
-            await db.delete(drugsLibraryDrafts).where(inArray(drugsLibraryDrafts.itemDraftId, itemsIds));
+            await db.delete(drugsLibraryDrafts).where(and(
+                inArray(drugsLibraryDrafts.itemDraftId, itemsIds),
+                !userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, userId),
+            ));
 
             const pendingDeletionInsertData = drugsLibraryItems.data.filter(s => !s.isDraft).map(s => ({
                 drugsLibraryItemId: s.itemId,

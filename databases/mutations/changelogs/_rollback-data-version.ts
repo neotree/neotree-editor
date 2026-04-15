@@ -2,11 +2,12 @@ import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm"
 
 import logger from "@/lib/logger"
 import {
+  applySoftDeleteRollbackSideEffects,
   DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY,
   RELEASE_ROLLBACK_MAX_RECENT_DEPTH,
   SCRIPT_CHILD_ENTITY_TYPES,
-  getRollbackAppliedEntityVersion,
   getRollbackParentVersion,
+  isChangeAlreadyAlignedToRollbackTarget,
   isReleaseRollbackWithinRecentWindow,
   normalizePublishedRollbackVersion,
   partitionReleaseRollbackCandidates,
@@ -21,6 +22,7 @@ import {
   assertSnapshotIntegrity,
   CHANGELOG_ENTITY_BINDINGS,
   lockEntityRow,
+  lockChangeLogChain,
   normalizeSnapshot,
   type VersionedEntityBinding,
 } from "./_rollback-shared"
@@ -116,7 +118,7 @@ export async function _rollbackDataVersion({
       }
 
       const targetDataVersion = currentDataVersion + 1
-      restoredVersion = targetDataVersion
+      restoredVersion = restoreSourceDataVersion
 
       const currentChanges = await tx.query.changeLogs.findMany({
         where: and(
@@ -160,6 +162,7 @@ export async function _rollbackDataVersion({
         const binding = CHANGELOG_ENTITY_BINDINGS[scriptChange.entityType]
         if (!binding) throw new Error(`Unsupported entity type ${scriptChange.entityType}`)
         await lockEntityRow({ tx, binding, entityId: scriptChange.entityId })
+        await lockChangeLogChain(tx, scriptChange.entityType, scriptChange.entityId)
 
         const scriptTarget = await tx.query.changeLogs.findFirst({
           where: and(
@@ -173,6 +176,13 @@ export async function _rollbackDataVersion({
         if (effectiveScriptTarget && !effectiveScriptTarget.fullSnapshot) {
           throw new Error(`Missing previous script snapshot ${scriptChange.entityId}`)
         }
+        const scriptTargetDataVersion = Number(effectiveScriptTarget?.dataVersion)
+        if (!Number.isFinite(scriptTargetDataVersion)) {
+          throw new Error(
+            `Script rollback requires a target changelog with dataVersion to restore a release-consistent child bundle (${scriptChange.entityId})`,
+          )
+        }
+        const scriptScopeId = scriptChange.scriptId ?? scriptChange.entityId
 
         const plan: {
           current: typeof changeLogs.$inferSelect
@@ -192,55 +202,129 @@ export async function _rollbackDataVersion({
         })
 
         const childTypes = [...SCRIPT_CHILD_ENTITY_TYPES] as (typeof changeLogs.$inferSelect)["entityType"][]
+        const targetBundleChildren = await tx.query.changeLogs.findMany({
+          where: and(
+            eq(changeLogs.scriptId, scriptScopeId),
+            lte(changeLogs.dataVersion, scriptTargetDataVersion),
+          ),
+          orderBy: (changeLogs, { desc, asc }) => [
+            asc(changeLogs.entityType),
+            asc(changeLogs.entityId),
+            desc(changeLogs.dataVersion),
+            desc(changeLogs.version),
+          ],
+        })
+        const targetChildrenByEntity = new Map<string, typeof changeLogs.$inferSelect>()
+        for (const entry of targetBundleChildren) {
+          if (!childTypes.includes(entry.entityType)) continue
+          const key = `${entry.entityType}:${entry.entityId}`
+          if (!targetChildrenByEntity.has(key)) {
+            targetChildrenByEntity.set(key, entry)
+          }
+        }
+        const childStubsByEntity = new Map<string, typeof changeLogs.$inferSelect>()
         for (const childType of childTypes) {
           const children = rollbackCandidates.filter(
             (c) => c.entityType === childType && c.scriptId === scriptChange.scriptId,
           )
           for (const child of children) {
-            const childBinding = CHANGELOG_ENTITY_BINDINGS[childType]
-            if (!childBinding) throw new Error(`Unsupported entity type ${childType}`)
-            await lockEntityRow({ tx, binding: childBinding, entityId: child.entityId })
-            const targetChild = await tx.query.changeLogs.findFirst({
-              where: and(
-                eq(changeLogs.entityId, child.entityId),
-                eq(changeLogs.entityType, child.entityType),
-                lte(changeLogs.dataVersion, restoreSourceDataVersion),
-              ),
-              orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
-            })
-            const fallbackChildTarget = await findRollbackTargetChangeLog(tx, child, restoreSourceDataVersion)
-            const effectiveChildTarget = targetChild ?? fallbackChildTarget
-            if (effectiveChildTarget && !effectiveChildTarget.fullSnapshot) {
-              throw new Error(`Missing previous snapshot for child entity ${child.entityId}`)
-            }
-            plan.push({
-              current: child,
-              target: effectiveChildTarget,
-              binding: childBinding,
-              createdInCurrentVersion: wasCreatedInCurrentDataVersion({
-                currentVersion: child.version,
-                directPreviousPublishedVersion: targetChild?.version,
-                fallbackPreviousVersion: effectiveChildTarget?.version,
-              }),
-            })
+            childStubsByEntity.set(`${child.entityType}:${child.entityId}`, child)
           }
+        }
+        for (const entry of Array.from(targetChildrenByEntity.values())) {
+          const key = `${entry.entityType}:${entry.entityId}`
+          if (!childStubsByEntity.has(key)) {
+            childStubsByEntity.set(key, entry)
+          }
+        }
+        for (const childStub of Array.from(childStubsByEntity.values())) {
+          const childBinding = CHANGELOG_ENTITY_BINDINGS[childStub.entityType]
+          if (!childBinding) throw new Error(`Unsupported entity type ${childStub.entityType}`)
+          await lockEntityRow({ tx, binding: childBinding, entityId: childStub.entityId })
+          await lockChangeLogChain(tx, childStub.entityType, childStub.entityId)
+
+          const childActive = await tx.query.changeLogs.findFirst({
+            where: and(
+              eq(changeLogs.entityId, childStub.entityId),
+              eq(changeLogs.entityType, childStub.entityType),
+              eq(changeLogs.isActive, true),
+            ),
+            orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+          })
+          const childCurrent =
+            childActive ??
+            (await tx.query.changeLogs.findFirst({
+              where: and(eq(changeLogs.entityId, childStub.entityId), eq(changeLogs.entityType, childStub.entityType)),
+              orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+            }))
+          if (!childCurrent) {
+            throw new Error(`No changelog history found for child entity ${childStub.entityId}`)
+          }
+
+          const targetChild = targetChildrenByEntity.get(`${childStub.entityType}:${childStub.entityId}`) ?? null
+          if (targetChild) {
+            await assertSnapshotIntegrity(tx, targetChild, targetChild.entityId)
+          }
+          if (
+            !!childActive &&
+            isChangeAlreadyAlignedToRollbackTarget({
+              currentDataVersion: childCurrent.dataVersion,
+              targetDataVersion: scriptTargetDataVersion,
+            })
+          ) {
+            continue
+          }
+
+          const effectiveChildTarget =
+            targetChild ??
+            (await findRollbackTargetChangeLog(tx, childCurrent, restoreSourceDataVersion))
+          if (effectiveChildTarget && !effectiveChildTarget.fullSnapshot) {
+            throw new Error(`Missing previous snapshot for child entity ${childCurrent.entityId}`)
+          }
+          plan.push({
+            current: childCurrent,
+            target: effectiveChildTarget,
+            binding: childBinding,
+            createdInCurrentVersion: wasCreatedInCurrentDataVersion({
+              currentVersion: childCurrent.version,
+              directPreviousPublishedVersion: targetChild?.version,
+              fallbackPreviousVersion: effectiveChildTarget?.version,
+            }),
+          })
         }
 
         // Apply plan atomically
         for (const { current, target, binding, createdInCurrentVersion } of plan) {
           const effectiveTarget = target ?? current
           const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${restoreSourceDataVersion})`
-          const targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
+          let targetSnapshot = normalizeSnapshot(effectiveTarget.fullSnapshot)
           const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
           const shouldSoftDelete = shouldSoftDeleteCreated && createdInCurrentVersion
           const restoredVersion = normalizePublishedRollbackVersion(effectiveTarget.version)
           if (shouldSoftDelete) {
-            targetSnapshot.deletedAt = new Date().toISOString()
+            targetSnapshot = applySoftDeleteRollbackSideEffects({
+              entityType: current.entityType,
+              entityId: current.entityId,
+              snapshot: targetSnapshot,
+            })
           }
+          const nextVersion = current.version + 1
+
+          const applied = await applyRollbackSnapshot({
+            tx,
+            binding,
+            entityId: current.entityId,
+            snapshot: targetSnapshot,
+            newVersion: nextVersion,
+          })
+
+          if (!applied) throw new Error(`Failed to stage rollback snapshot for ${current.entityId}`)
+
           const rollbackChangeLog: SaveChangeLogData = {
             entityId: current.entityId,
             entityType: current.entityType,
             action: "rollback",
+            version: nextVersion,
             changes: [
               {
                 action: "rollback",
@@ -255,7 +339,8 @@ export async function _rollbackDataVersion({
             previousSnapshot: currentSnapshot,
             description,
             changeReason: changeReason || description,
-            parentVersion: restoredVersion !== null ? getRollbackParentVersion(restoredVersion) : null,
+            parentVersion: getRollbackParentVersion(current.version),
+            mergedFromVersion: restoredVersion,
             dataVersion: targetDataVersion,
             isActive: true,
             userId,
@@ -274,16 +359,6 @@ export async function _rollbackDataVersion({
           if (!saved.success || !saved.data) {
             throw new Error(saved.errors?.join(", ") || `Failed to rollback ${current.entityId}`)
           }
-
-          const applied = await applyRollbackSnapshot({
-            tx,
-            binding,
-            entityId: current.entityId,
-            snapshot: targetSnapshot,
-            newVersion: getRollbackAppliedEntityVersion(saved.data.version),
-          })
-
-          if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)
         }
       }
 
@@ -292,6 +367,7 @@ export async function _rollbackDataVersion({
         const binding = CHANGELOG_ENTITY_BINDINGS[current.entityType]
         if (!binding) throw new Error(`Unsupported entity type ${current.entityType}`)
         await lockEntityRow({ tx, binding, entityId: current.entityId })
+        await lockChangeLogChain(tx, current.entityType, current.entityId)
 
         const target = await tx.query.changeLogs.findFirst({
           where: and(
@@ -305,7 +381,7 @@ export async function _rollbackDataVersion({
         const effectiveTarget = target ?? fallbackTarget
 
         const description = `Rollback release v${currentDataVersion} -> v${targetDataVersion} (state of v${restoreSourceDataVersion})`
-        const targetSnapshot = normalizeSnapshot((effectiveTarget ?? current).fullSnapshot)
+        let targetSnapshot = normalizeSnapshot((effectiveTarget ?? current).fullSnapshot)
         const currentSnapshot = normalizeSnapshot(current.fullSnapshot)
         const restoredVersion = normalizePublishedRollbackVersion(effectiveTarget?.version)
         const createdInCurrentVersion = wasCreatedInCurrentDataVersion({
@@ -315,12 +391,29 @@ export async function _rollbackDataVersion({
         })
         const shouldSoftDelete = shouldSoftDeleteCreated && createdInCurrentVersion
         if (shouldSoftDelete) {
-          targetSnapshot.deletedAt = new Date().toISOString()
+          targetSnapshot = applySoftDeleteRollbackSideEffects({
+            entityType: current.entityType,
+            entityId: current.entityId,
+            snapshot: targetSnapshot,
+          })
         }
+        const nextVersion = current.version + 1
+
+        const applied = await applyRollbackSnapshot({
+          tx,
+          binding,
+          entityId: current.entityId,
+          snapshot: targetSnapshot,
+          newVersion: nextVersion,
+        })
+
+        if (!applied) throw new Error(`Failed to stage rollback snapshot for ${current.entityId}`)
+
         const rollbackChangeLog: SaveChangeLogData = {
           entityId: current.entityId,
           entityType: current.entityType,
           action: "rollback",
+          version: nextVersion,
           changes: [
             {
               action: "rollback",
@@ -335,7 +428,8 @@ export async function _rollbackDataVersion({
           previousSnapshot: currentSnapshot,
             description,
             changeReason: changeReason || description,
-            parentVersion: restoredVersion !== null ? getRollbackParentVersion(restoredVersion) : null,
+            parentVersion: getRollbackParentVersion(current.version),
+            mergedFromVersion: restoredVersion,
             dataVersion: targetDataVersion,
             isActive: true,
           userId,
@@ -354,16 +448,6 @@ export async function _rollbackDataVersion({
         if (!saved.success || !saved.data) {
           throw new Error(saved.errors?.join(", ") || `Failed to rollback ${current.entityId}`)
         }
-
-        const applied = await applyRollbackSnapshot({
-          tx,
-          binding,
-          entityId: current.entityId,
-          snapshot: targetSnapshot,
-          newVersion: getRollbackAppliedEntityVersion(saved.data.version),
-        })
-
-        if (!applied) throw new Error(`Failed to apply snapshot for ${current.entityId}`)
       }
 
       if (editor) {

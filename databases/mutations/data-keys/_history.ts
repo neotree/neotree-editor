@@ -3,6 +3,8 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveDataKeysHistory({
   previous,
@@ -25,7 +27,8 @@ export async function _saveDataKeysHistory({
       const dataKeyId = c?.data?.uuid
       if (!dataKeyId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create data key" : "Update data key"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -35,7 +38,7 @@ export async function _saveDataKeysHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
         version: versionValue,
@@ -44,8 +47,6 @@ export async function _saveDataKeysHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -62,10 +63,10 @@ export async function _saveDataKeysHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
+        const sanitizedSnapshot = removeHexCharacters(c.data || {})
         const previousSnapshot = isCreate
           ? {}
-          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.uuid === dataKeyId) || {}))
+          : removeHexCharacters(previous.find((prevC) => prevC.uuid === dataKeyId) || {})
 
         changeLogsData.push({
           entityId: dataKeyId,

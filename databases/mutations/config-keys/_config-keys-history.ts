@@ -3,6 +3,8 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveConfigKeysHistory({
   previous,
@@ -24,14 +26,15 @@ export async function _saveConfigKeysHistory({
     for (const c of drafts) {
       const configKeyId = c?.data?.configKeyId
       if (!configKeyId) continue
+      const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
+      const isCreate = !prev
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof configKeysHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: versionValue,
         configKeyId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -41,8 +44,6 @@ export async function _saveConfigKeysHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -70,8 +71,10 @@ export async function _saveConfigKeysHistory({
 
       if (userId) {
         const { ...rest } = c.data || {}
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
-        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.configKeyId === configKeyId) || {}))
+        const sanitizedSnapshot = removeHexCharacters(rest)
+        const previousSnapshot = isCreate
+          ? {}
+          : removeHexCharacters(previous.find((prevC) => prevC.configKeyId === configKeyId) || {})
 
         changeLogsData.push({
           entityId: configKeyId,

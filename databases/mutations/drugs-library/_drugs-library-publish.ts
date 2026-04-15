@@ -8,6 +8,8 @@ import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion 
 import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history"
 import { v4 } from "uuid"
 import { removeHexCharacters } from "@/databases/utils"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
 
 export async function _publishDrugsLibraryItems(opts?: {
   broadcastAction?: boolean
@@ -15,13 +17,19 @@ export async function _publishDrugsLibraryItems(opts?: {
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const results: { success: boolean; errors?: string[] } = { success: false }
-  const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
+    return {
+      success: false,
+      errors: ["Drugs library publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const client = opts?.client ?? db
+    const client = opts.client
     let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.drugsLibraryItemId),
@@ -38,11 +46,12 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await client
+      const deletedRows = await client
         .update(drugsLibrary)
         .set({
           deletedAt,
           key: sql`CONCAT(${drugsLibrary.key}, '_', ${drugsLibrary.itemId})`, // make the unique key available for use
+          version: sql`${drugsLibrary.version} + 1`,
         })
         .where(
           inArray(
@@ -50,9 +59,13 @@ export async function _publishDrugsLibraryItems(opts?: {
             deleted.map((c) => c.drugsLibraryItemId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.itemId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: c.drugsLibraryItem!.version,
+        version:
+          deletedById.get(c.drugsLibraryItemId!)?.version ??
+          getPublishedEntityVersion({ currentVersion: c.drugsLibraryItem!.version, isCreate: false }),
         itemId: c.drugsLibraryItemId!,
         changes: {
           action: "delete_drugs_library_item",
@@ -70,20 +83,25 @@ export async function _publishDrugsLibraryItems(opts?: {
           const history = historyPayload[index]
           if (!entry?.drugsLibraryItemId) continue
 
-          const snapshot = removeHexCharacters({
-            ...(entry.drugsLibraryItem ?? {}),
-            deletedAt,
-            key: `${entry.drugsLibraryItem?.key ?? ""}_${entry.drugsLibraryItemId}`,
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.drugsLibraryItem ?? {},
+            deletedFields: {
+              deletedAt,
+              key: `${entry.drugsLibraryItem?.key ?? ""}_${entry.drugsLibraryItemId}`,
+            },
+            sanitize: removeHexCharacters,
           })
 
           changeLogs.push({
             entityId: entry.drugsLibraryItemId,
             entityType: "drugs_library",
             action: "delete",
-            version: history.version || 1,
+            version: history.version,
             dataVersion: opts.dataVersion,
             changes: history.changes,
-            fullSnapshot: snapshot,
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: opts.publisherUserId,
             drugsLibraryItemId: entry.drugsLibraryItemId,
@@ -114,6 +132,7 @@ export async function _publishDrugsLibraryItems(opts?: {
 
     if (updates.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
+      const persistedUpdates: typeof drugsLibraryDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.itemId).length) {
         dataBefore = await client.query.drugsLibrary.findMany({
           where: inArray(
@@ -125,19 +144,22 @@ export async function _publishDrugsLibraryItems(opts?: {
 
       for (const { itemId: _itemId, data: c } of updates) {
         const itemId = _itemId!
+        const sourceDraft = updates.find((draft) => draft.itemId === itemId)
 
         const { itemId: __itemId, id, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${drugsLibrary.version} + 1`,
         }
 
-        await client.update(drugsLibrary).set(updates).where(eq(drugsLibrary.itemId, itemId)).returning()
+        const [persisted] = await client.update(drugsLibrary).set(nextData).where(eq(drugsLibrary.itemId, itemId)).returning()
+        if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
       const updateChangeLogs = await _saveDrugsLibraryItemsHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -150,6 +172,7 @@ export async function _publishDrugsLibraryItems(opts?: {
 
     if (inserts.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
+      const persistedInserts: typeof drugsLibraryDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.itemId).length) {
         dataBefore = await client.query.drugsLibrary.findMany({
           where: inArray(
@@ -161,18 +184,24 @@ export async function _publishDrugsLibraryItems(opts?: {
 
       for (const { id, data } of inserts) {
         const itemId = data.itemId || v4()
-        const { id: _id, ...payload } = { ...data, itemId };
+        const { id: _id, ...payload } = {
+          ...data,
+          itemId,
+          version: getPublishedEntityVersion({ currentVersion: data.version, isCreate: true }),
+        };
 
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.itemId = itemId
           return d
         })
 
-        await client.insert(drugsLibrary).values(payload)
+        const [persisted] = await client.insert(drugsLibrary).values(payload).returning()
+        const sourceDraft = inserts.find((draft) => draft.id === id)
+        if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
 
       const insertChangeLogs = await _saveDrugsLibraryItemsHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -187,15 +216,6 @@ export async function _publishDrugsLibraryItems(opts?: {
       .delete(drugsLibraryDrafts)
       .where(!opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId))
 
-    const published = [...updates.map((c) => c.itemId!), ...deleted.map((c) => c.drugsLibraryItemId!)]
-
-    if (published.length) {
-      await client
-        .update(drugsLibrary)
-        .set({ version: sql`${drugsLibrary.version} + 1` })
-        .where(inArray(drugsLibrary.itemId, published))
-    }
-
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, client })
       if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save drugs library changelogs")
@@ -206,7 +226,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     results.success = false
     results.errors = [e.message]
     logger.error("_publishDrugsLibraryItems ERROR", e.message)
-  } finally {
-    return results
   }
+
+  return results
 }

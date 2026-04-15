@@ -3,8 +3,10 @@ import assert from "node:assert/strict"
 import {
   DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY,
   RELEASE_ROLLBACK_MAX_RECENT_DEPTH,
+  applySoftDeleteRollbackSideEffects,
   coerceRollbackSnapshotValues,
   computeRollbackSnapshotHash,
+  getPublishedEntityVersion,
   getRollbackSourceVersion,
   getReleaseRollbackDepth,
   getNextRollbackDataVersion,
@@ -15,11 +17,44 @@ import {
   normalizePublishedRollbackVersion,
   wasCreatedInCurrentDataVersion,
 } from "../lib/changelog-rollback"
+import { buildDeleteChangeSnapshots, getRollbackButtonTargetVersion } from "../lib/changelog-publish"
 
 assert.equal(
-  getRollbackParentVersion(4),
+  getPublishedEntityVersion({ currentVersion: 4, isCreate: false }),
+  5,
+  "publishing an update or delete should advance the entity version exactly once",
+)
+
+assert.equal(
+  getPublishedEntityVersion({ currentVersion: 1, isCreate: true }),
+  2,
+  "publishing a newly created entity should advance to the persisted post-publish version",
+)
+
+assert.equal(
+  getRollbackParentVersion(5),
+  5,
+  "rollback chain should point to the immediately previous changelog version so history remains chronological",
+)
+
+assert.equal(
+  getRollbackButtonTargetVersion({
+    action: "update",
+    parentVersion: 4,
+    mergedFromVersion: 2,
+  }),
   4,
-  "rollback chain should point to the restored version so the next rollback walks backward",
+  "non-rollback changelog entries should keep using parentVersion as the rollback target",
+)
+
+assert.equal(
+  getRollbackButtonTargetVersion({
+    action: "rollback",
+    parentVersion: 5,
+    mergedFromVersion: 3,
+  }),
+  3,
+  "rollback changelog entries should target the restored version when rolling back again",
 )
 
 assert.equal(
@@ -56,6 +91,53 @@ assert.equal(
   computeRollbackSnapshotHash({ foo: "bar" }),
   computeRollbackSnapshotHash({ foo: "bar" }),
   "snapshot hash should be deterministic for identical payloads",
+)
+
+const deleteSnapshots = buildDeleteChangeSnapshots({
+  previousEntity: {
+    diagnosisId: "diag-1",
+    key: "pneumonia",
+    deletedAt: null,
+  },
+  deletedFields: {
+    deletedAt: "2026-04-12T08:00:00.000Z",
+  },
+})
+
+assert.deepEqual(
+  deleteSnapshots.previousSnapshot,
+  {
+    diagnosisId: "diag-1",
+    key: "pneumonia",
+    deletedAt: null,
+  },
+  "delete snapshot builder should preserve the pre-delete entity state for rollback baselines",
+)
+
+assert.deepEqual(
+  deleteSnapshots.fullSnapshot,
+  {
+    diagnosisId: "diag-1",
+    key: "pneumonia",
+    deletedAt: "2026-04-12T08:00:00.000Z",
+  },
+  "delete snapshot builder should record the post-delete state as the active changelog snapshot",
+)
+
+const softDeletedDataKeySnapshot = applySoftDeleteRollbackSideEffects({
+  entityType: "data_key",
+  entityId: "uuid-1",
+  snapshot: {
+    uuid: "uuid-1",
+    uniqueKey: "patient_age",
+    deletedAt: null,
+  },
+})
+
+assert.equal(
+  softDeletedDataKeySnapshot.uniqueKey,
+  "patient_age_uuid-1",
+  "soft-delete rollback side effects should preserve data-key unique-key release semantics",
 )
 
 const coercedPayload = coerceRollbackSnapshotValues(

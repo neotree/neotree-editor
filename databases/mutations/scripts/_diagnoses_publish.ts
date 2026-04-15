@@ -8,6 +8,8 @@ import { diagnoses, diagnosesDrafts, diagnosesHistory, pendingDeletion } from "@
 import { _saveDiagnosesHistory } from "./_diagnoses_history"
 import { v4 } from "uuid"
 import { removeHexCharacters } from "@/databases/utils"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
 
 export async function _publishDiagnoses(opts?: {
   scriptsIds?: string[]
@@ -17,15 +19,21 @@ export async function _publishDiagnoses(opts?: {
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const { scriptsIds, diagnosesIds } = { ...opts }
 
   const results: { success: boolean; errors?: string[] } = { success: false }
-  const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
+    return {
+      success: false,
+      errors: ["Diagnosis publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const client = opts?.client ?? db
+    const client = opts.client
     let updates: (typeof diagnosesDrafts.$inferSelect)[] = []
     let inserts: (typeof diagnosesDrafts.$inferSelect)[] = []
 
@@ -58,6 +66,7 @@ export async function _publishDiagnoses(opts?: {
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof diagnoses.$inferSelect)[] = []
+      const persistedUpdates: typeof diagnosesDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.diagnosisId).length) {
         dataBefore = await client.query.diagnoses.findMany({
           where: inArray(
@@ -69,19 +78,22 @@ export async function _publishDiagnoses(opts?: {
 
       for (const { diagnosisId: _diagnosisId, data: c } of updates) {
         const diagnosisId = _diagnosisId!
+        const sourceDraft = updates.find((draft) => draft.diagnosisId === diagnosisId)
 
         const { diagnosisId: __diagnosisId, id, oldDiagnosisId, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${diagnoses.version} + 1`,
         }
 
-        await client.update(diagnoses).set(updates).where(eq(diagnoses.diagnosisId, diagnosisId)).returning()
+        const [persisted] = await client.update(diagnoses).set(nextData).where(eq(diagnoses.diagnosisId, diagnosisId)).returning()
+        if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
       const updateChangeLogs = await _saveDiagnosesHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -95,6 +107,7 @@ export async function _publishDiagnoses(opts?: {
     if (inserts.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof diagnoses.$inferSelect)[] = []
+      const persistedInserts: typeof diagnosesDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.diagnosisId).length) {
         dataBefore = await client.query.diagnoses.findMany({
           where: inArray(
@@ -107,18 +120,25 @@ export async function _publishDiagnoses(opts?: {
       for (const { id, scriptId: _scriptId, scriptDraftId, data } of inserts) {
         const diagnosisId = data.diagnosisId || v4()
         const scriptId = (data.scriptId || _scriptId || scriptDraftId)!
-        const payload = { ...data, diagnosisId, scriptId }
+        const payload = {
+          ...data,
+          diagnosisId,
+          scriptId,
+          version: getPublishedEntityVersion({ currentVersion: data.version, isCreate: true }),
+        }
 
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.diagnosisId = diagnosisId
           return d
         })
 
-        await client.insert(diagnoses).values(payload)
+        const [persisted] = await client.insert(diagnoses).values(payload).returning()
+        const sourceDraft = inserts.find((draft) => draft.id === id)
+        if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
 
       const insertChangeLogs = await _saveDiagnosesHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
         client,
@@ -152,18 +172,22 @@ export async function _publishDiagnoses(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await client
+      const deletedRows = await client
         .update(diagnoses)
-        .set({ deletedAt })
+        .set({ deletedAt, version: sql`${diagnoses.version} + 1` })
         .where(
           inArray(
             diagnoses.diagnosisId,
             deleted.map((c) => c.diagnosisId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.diagnosisId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: c.diagnosis!.version,
+        version:
+          deletedById.get(c.diagnosisId!)?.version ??
+          getPublishedEntityVersion({ currentVersion: c.diagnosis!.version, isCreate: false }),
         diagnosisId: c.diagnosisId!,
         scriptId: c.diagnosis!.scriptId,
         changes: {
@@ -182,19 +206,22 @@ export async function _publishDiagnoses(opts?: {
           const history = historyPayload[index]
           if (!entry?.diagnosisId) continue
 
-          const snapshot = removeHexCharacters({
-            ...(entry.diagnosis ?? {}),
-            deletedAt,
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.diagnosis ?? {},
+            deletedFields: { deletedAt },
+            sanitize: removeHexCharacters,
           })
 
           changeLogs.push({
             entityId: entry.diagnosisId,
             entityType: "diagnosis",
             action: "delete",
-            version: history.version || 1,
+            version: history.version,
             dataVersion: opts.dataVersion,
             changes: history.changes,
-            fullSnapshot: snapshot,
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: opts.publisherUserId,
             scriptId: entry.diagnosis?.scriptId || null,
@@ -209,19 +236,6 @@ export async function _publishDiagnoses(opts?: {
       await client.delete(pendingDeletion).where(inArray(pendingDeletion.id, deleted.map((entry) => entry.id)))
     }
 
-    const published = [
-      // ...inserts.map(c => c.diagnosisId! || c.diagnosisDraftId),
-      ...updates.map((c) => c.diagnosisId!),
-      ...deleted.map((c) => c.diagnosisId!),
-    ]
-
-    if (published.length) {
-      await client
-        .update(diagnoses)
-        .set({ version: sql`${diagnoses.version} + 1` })
-        .where(inArray(diagnoses.diagnosisId, published))
-    }
-
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, client })
       if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save diagnosis changelogs")
@@ -232,7 +246,7 @@ export async function _publishDiagnoses(opts?: {
     results.success = false
     results.errors = [e.message]
     logger.error("_publishDiagnoses ERROR", e)
-  } finally {
-    return results
   }
+
+  return results
 }

@@ -17,7 +17,8 @@
         "tsx": "tsx $1",
         "test:changelog-sanitize": "tsx tests/changelog-sanitize.test.ts",
         "test:changelog-rollback": "tsx tests/changelog-rollback.test.ts",
-        "test:changelog-feature": "tsx tests/changelog-feature.integration.test.ts"
+        "test:changelog-feature": "tsx tests/changelog-feature.integration.test.ts",
+        "test:changelog-publish-contract": "tsx tests/changelog-publish-contract.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",

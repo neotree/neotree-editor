@@ -16,6 +16,8 @@ import {
 } from "@/databases/pg/schema"
 import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
 
 export async function _publishScripts({
   userId,
@@ -27,12 +29,19 @@ export async function _publishScripts({
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!client || !Number.isFinite(dataVersion)) {
+    return {
+      success: false,
+      errors: ["Script publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const executor = client ?? db
+    const executor = client
     const drafts = await executor.query.scriptsDrafts.findMany({
       where: !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
     })
@@ -54,6 +63,7 @@ export async function _publishScripts({
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof scripts.$inferSelect)[] = []
+      const persistedUpdates: typeof scriptsDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.scriptId).length) {
         dataBefore = await executor.query.scripts.findMany({
           where: inArray(
@@ -65,20 +75,28 @@ export async function _publishScripts({
 
       for (const { scriptId: _scriptId, data: c } of updates) {
         const scriptId = _scriptId!
+        const sourceDraft = updates.find((draft) => draft.scriptId === scriptId)
 
         const { scriptId: __scriptId, id, oldScriptId, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${scripts.version} + 1`,
         }
-        await executor.update(scripts).set(updates).where(eq(scripts.scriptId, scriptId))
+        const [persisted] = await executor.update(scripts).set(nextData).where(eq(scripts.scriptId, scriptId)).returning()
+        if (persisted && sourceDraft) {
+          persistedUpdates.push({
+            ...sourceDraft,
+            data: persisted as typeof scriptsDrafts.$inferSelect["data"],
+          })
+        }
 
         processedScripts.push({ scriptId })
       }
 
       const updateChangeLogs = await _saveScriptsHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: publisherUserId,
         client: executor,
@@ -91,6 +109,7 @@ export async function _publishScripts({
 
     if (inserts.length) {
       let dataBefore: (typeof scripts.$inferSelect)[] = []
+      const persistedInserts: typeof scriptsDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.scriptId).length) {
         dataBefore = await executor.query.scripts.findMany({
           where: inArray(
@@ -103,9 +122,19 @@ export async function _publishScripts({
       const insertData = inserts.map((s) => ({
         ...s.data,
         scriptId: s.data.scriptId,
+        version: getPublishedEntityVersion({ currentVersion: s.data.version, isCreate: true }),
       }))
 
-      await executor.insert(scripts).values(insertData)
+      const insertedRows = await executor.insert(scripts).values(insertData).returning()
+      for (const insertedRow of insertedRows) {
+        const sourceDraft = inserts.find((draft) => draft.data.scriptId === insertedRow.scriptId)
+        if (sourceDraft) {
+          persistedInserts.push({
+            ...sourceDraft,
+            data: insertedRow as typeof scriptsDrafts.$inferSelect["data"],
+          })
+        }
+      }
 
       for (const insertedScript of inserts) {
         const scriptId = insertedScript.data.scriptId!
@@ -148,7 +177,7 @@ export async function _publishScripts({
           )
       }
       const insertChangeLogs = await _saveScriptsHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: publisherUserId,
         client: executor,
@@ -177,18 +206,20 @@ export async function _publishScripts({
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await executor
+      const deletedRows = await executor
         .update(scripts)
-        .set({ deletedAt })
+        .set({ deletedAt, version: sql`${scripts.version} + 1` })
         .where(
           inArray(
             scripts.scriptId,
             deleted.map((c) => c.scriptId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.scriptId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: c.script!.version,
+        version: deletedById.get(c.scriptId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.script!.version, isCreate: false }),
         scriptId: c.scriptId!,
         changes: {
           action: "delete_script",
@@ -206,21 +237,22 @@ export async function _publishScripts({
           const history = historyPayload[index]
           if (!entry?.scriptId) continue
 
-          const snapshot = removeHexCharacters({
-            ...(entry.script ?? {}),
-            deletedAt,
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.script ?? {},
+            deletedFields: { deletedAt },
+            sanitize: removeHexCharacters,
           })
 
           changeLogs.push({
             entityId: entry.scriptId,
             entityType: "script",
             action: "delete",
-            version: history.version || 1,
+            version: history.version,
             dataVersion,
             changes: history.changes,
-            fullSnapshot: snapshot,
-            previousSnapshot: snapshot,
-            baselineSnapshot: snapshot,
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: publisherUserId,
             scriptId: entry.scriptId,
@@ -239,19 +271,6 @@ export async function _publishScripts({
         ),
       )
 
-    const published = [
-      // ...inserts.map(c => c.scriptId! || c.scriptDraftId),
-      ...updates.map((c) => c.scriptId!),
-      ...deleted.map((c) => c.scriptId!),
-    ]
-
-    if (published.length) {
-      await executor
-        .update(scripts)
-        .set({ version: sql`${scripts.version} + 1` })
-        .where(inArray(scripts.scriptId, published))
-    }
-
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, client: executor })
       if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save script changelogs")
@@ -262,7 +281,7 @@ export async function _publishScripts({
     results.success = false
     results.errors = [e.message]
     logger.error("_publishScripts ERROR", e.message)
-  } finally {
-    return results
   }
+
+  return results
 }

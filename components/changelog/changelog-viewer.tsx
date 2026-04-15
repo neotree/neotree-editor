@@ -210,12 +210,17 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
                               Data v{dataVersion}
                             </div>
                           )}
-                          {change.parentVersion && (
+                          {change.action === "rollback" && change.mergedFromVersion ? (
+                            <div className="flex items-center gap-1">
+                              <GitBranch className="h-3 w-3" />
+                              Restored: v{change.mergedFromVersion}
+                            </div>
+                          ) : change.parentVersion ? (
                             <div className="flex items-center gap-1">
                               <GitBranch className="h-3 w-3" />
                               Parent: v{change.parentVersion}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>

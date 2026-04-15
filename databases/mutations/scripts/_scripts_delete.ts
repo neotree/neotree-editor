@@ -46,9 +46,12 @@ export async function _deleteScripts(
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the scripts, please confirm this action!');
 
         // delete drafts
-        await executor.delete(scriptsDrafts).where(or(
-            inArray(scriptsDrafts.scriptId, scriptsIds),
-            inArray(scriptsDrafts.scriptDraftId, scriptsIds)
+        await executor.delete(scriptsDrafts).where(and(
+            or(
+                inArray(scriptsDrafts.scriptId, scriptsIds),
+                inArray(scriptsDrafts.scriptDraftId, scriptsIds)
+            ),
+            !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
@@ -71,7 +74,10 @@ export async function _deleteScripts(
         }));
 
         if (scriptsToDelete.length) {
-            await executor.insert(pendingDeletion).values(scriptsToDelete.map(s => ({ scriptId: s.scriptId, })));
+            await executor.insert(pendingDeletion).values(scriptsToDelete.map(s => ({
+                scriptId: s.scriptId,
+                createdByUserId: userId,
+            })));
             await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });
             await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });
             await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });

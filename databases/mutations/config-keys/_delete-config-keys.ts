@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { configKeys, configKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { and } from 'drizzle-orm';
 
 export type DeleteConfigKeysData = {
     configKeysIds: string[];
@@ -37,7 +38,10 @@ export async function _deleteConfigKeys(
 
         if (configKeysIds.length) {
             // delete drafts
-            await db.delete(configKeysDrafts).where(inArray(configKeysDrafts.configKeyDraftId, configKeysIds));
+            await db.delete(configKeysDrafts).where(and(
+                inArray(configKeysDrafts.configKeyDraftId, configKeysIds),
+                !userId ? undefined : eq(configKeysDrafts.createdByUserId, userId),
+            ));
 
             // insert config keys into pendingDeletion, we'll delete them when data is published
             const configKeysArr = await db

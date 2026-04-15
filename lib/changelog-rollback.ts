@@ -34,12 +34,41 @@ export function isReleaseRollbackWithinRecentWindow(params: {
   return depth >= 1 && depth <= maxDepth
 }
 
-export function getRollbackParentVersion(targetVersion: number): number {
-  return targetVersion
+export function getRollbackParentVersion(previousChangeLogVersion: number): number {
+  return previousChangeLogVersion
 }
 
 export function getRollbackAppliedEntityVersion(rollbackChangeLogVersion: number): number {
   return rollbackChangeLogVersion
+}
+
+export function getPublishedEntityVersion(params: {
+  currentVersion?: number | null
+  isCreate?: boolean
+}): number {
+  const currentVersion = Number.isFinite(params.currentVersion) ? Number(params.currentVersion) : 1
+  return currentVersion + 1
+}
+
+export function applySoftDeleteRollbackSideEffects(params: {
+  entityType: string
+  entityId: string
+  snapshot: Record<string, any>
+}) {
+  const snapshot: Record<string, any> = { ...params.snapshot, deletedAt: new Date().toISOString() }
+
+  if (params.entityType === "drugs_library") {
+    const baseKey = typeof snapshot.key === "string" ? snapshot.key : ""
+    snapshot.key = [baseKey, params.entityId].filter(Boolean).join("_")
+  }
+
+  if (params.entityType === "data_key") {
+    const baseUniqueKey = typeof snapshot.uniqueKey === "string" ? snapshot.uniqueKey : ""
+    const baseUuid = typeof snapshot.uuid === "string" ? snapshot.uuid : params.entityId
+    snapshot.uniqueKey = [baseUniqueKey, baseUuid].filter(Boolean).join("_")
+  }
+
+  return snapshot
 }
 
 export function getNextRollbackDataVersion(params: {
