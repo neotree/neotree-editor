@@ -5,6 +5,7 @@ import logger from "@/lib/logger"
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 
 export async function _saveScreensHistory({
   previous,
@@ -26,15 +27,16 @@ export async function _saveScreensHistory({
     for (const c of drafts) {
       const screenId = c?.data?.screenId
       if (!screenId) continue
+      const prev = previous.find((prevC) => prevC.screenId === screenId)
+      const isCreate = !prev
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof screensHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: versionValue,
         screenId,
         scriptId: c?.data?.scriptId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -44,8 +46,6 @@ export async function _saveScreensHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.screenId === screenId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 

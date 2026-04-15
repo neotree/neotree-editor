@@ -5,6 +5,7 @@ import logger from "@/lib/logger"
 import { problemsDrafts, problems, problemsHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 
 export async function _saveProblemsHistory({
   previous,
@@ -27,7 +28,8 @@ export async function _saveProblemsHistory({
       const problemId = c?.data?.problemId
       if (!problemId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.problemId === problemId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create problem" : "Update problem"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -37,7 +39,7 @@ export async function _saveProblemsHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof problemsHistory.$inferInsert = {
         version: versionValue,
@@ -47,8 +49,6 @@ export async function _saveProblemsHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.problemId === problemId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {

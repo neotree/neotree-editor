@@ -12,6 +12,7 @@ import { getChangeLog } from "@/app/actions/change-logs"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { formatChangeValue, getDataVersion, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
+import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
 import { cn } from "@/lib/utils"
 import {
   buildFieldChangeInsights,
@@ -88,7 +89,12 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const highlightEntries = buildHighlightEntries(fieldInsights)
   const groupedSummaries = groupFieldChangeInsights(fieldInsights)
   const hasAnyDiffs = fieldInsights.some((entry) => entry.stats.total > 0)
-  const canRollback = change.isActive && (change.parentVersion ?? null) !== null
+  const rollbackTargetVersion = getRollbackButtonTargetVersion({
+    action: change.action,
+    parentVersion: change.parentVersion,
+    mergedFromVersion: change.mergedFromVersion,
+  })
+  const canRollback = change.isActive && (rollbackTargetVersion ?? null) !== null
 
   return (
     <>
@@ -136,7 +142,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                 <RollbackButton
                   entityId={change.entityId}
                   entityType={change.entityType}
-                  targetVersion={change.parentVersion}
+                  targetVersion={rollbackTargetVersion}
                   currentVersion={change.version}
                   dataVersion={dataVersion ?? null}
                   disabled={!change.isActive}

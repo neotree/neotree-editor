@@ -3,6 +3,8 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { hospitalsDrafts, hospitals, hospitalsHistory } from "@/databases/pg/schema"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveHospitalsHistory({
   previous,
@@ -24,14 +26,15 @@ export async function _saveHospitalsHistory({
     for (const c of drafts) {
       const hospitalId = c?.data?.hospitalId
       if (!hospitalId) continue
+      const prev = previous.find((prevC) => prevC.hospitalId === hospitalId)
+      const isCreate = !prev
+      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
 
       const changeHistoryData: typeof hospitalsHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: versionValue,
         hospitalId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -41,8 +44,6 @@ export async function _saveHospitalsHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.hospitalId === hospitalId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -70,10 +71,10 @@ export async function _saveHospitalsHistory({
 
       if (userId) {
         const { ...rest } = c.data || {}
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
+        const sanitizedSnapshot = removeHexCharacters(rest)
         const previousSnapshot = isCreate
           ? {}
-          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.hospitalId === hospitalId) || {}))
+          : removeHexCharacters(previous.find((prevC) => prevC.hospitalId === hospitalId) || {})
 
         changeLogsData.push({
           entityId: hospitalId,
