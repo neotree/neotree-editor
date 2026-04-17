@@ -144,7 +144,7 @@ export const dataKeyTypes: {
     {
         value: 'problem',
         label: 'problem',
-        hasChildren: false,
+        hasChildren: true,
     },
     {
         value: 'diagnosis',
@@ -159,6 +159,16 @@ export const dataKeyTypes: {
     {
         value: 'diagnosis_symptom_risk',
         label: 'diagnosis_symptom_risk',
+        hasChildren: false,
+    },
+    {
+        value: 'problem_symptom_sign',
+        label: 'problem_symptom_sign',
+        hasChildren: false,
+    },
+    {
+        value: 'problem_symptom_risk',
+        label: 'problem_symptom_risk',
         hasChildren: false,
     },
     {
