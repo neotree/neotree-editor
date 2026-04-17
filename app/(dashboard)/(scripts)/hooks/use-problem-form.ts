@@ -66,6 +66,7 @@ export function useProblemForm({
             expression: formData?.expression || '',
             expressionMeaning: formData?.expressionMeaning || '',
             severityOrder: formData?.severityOrder || null,
+            symptoms: formData?.symptoms || [],
             text1: formData?.text1 || '',
             text2: formData?.text2 || '',
             text3: formData?.text3 || '',
