@@ -15,6 +15,7 @@ import { PreferencesForm } from "@/components/preferences-form";
 import { SelectDataKey } from "@/components/select-data-key";
 import { useProblemForm, UseProblemFormParams } from "../../hooks/use-problem-form";
 import { ImageField } from "../image-field";
+import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
 
 type Props = UseProblemFormParams;
@@ -209,6 +210,15 @@ export function ProblemForm(props: Props) {
                 >
                     Save Draft
                 </Button>
+            </div>
+
+            <Separator className="my-20" />
+            
+            <div>
+                <Symptoms 
+                    disabled={disabled}
+                    form={form}
+                />
             </div>
         </>
     );
