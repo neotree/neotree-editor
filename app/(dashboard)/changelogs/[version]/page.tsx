@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { getChangeLogs } from "@/app/actions/change-logs"
 import { DataVersionChangesTable } from "../components/data-version-changes-table"
 import { DataVersionScriptGroups } from "../components/data-version-script-groups"
+import { ChangelogWorkflowRail } from "../components/workflow-rail"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { buildDataVersionGroupedView } from "@/lib/changelog-data-version-groups"
 
@@ -90,7 +91,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
   if (!changes.length) {
     return (
       <>
-        <Title>{`Data Version v${numericVersion}`}</Title>
+        <Title>{`Published Version v${numericVersion}`}</Title>
         <Content>
           <Link href="/changelogs" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -112,11 +113,8 @@ export default async function DataVersionPage({ params }: { params: Params }) {
     return new Date(change.dateOfChange).getTime() > new Date(latest.dateOfChange).getTime() ? change : latest
   }, changes[0])
 
-  const releasePublishEntry = changes.find(
-    (change) => change.action === "publish" && change.entityType === "release",
-  )
-  const publishEntry =
-    releasePublishEntry ?? changes.find((change) => change.action === "publish") ?? latestChange
+  const releasePublishEntry = changes.find((change) => change.action === "publish" && change.entityType === "release")
+  const publishEntry = releasePublishEntry ?? changes.find((change) => change.action === "publish") ?? latestChange
   const publishedAt = format(new Date(publishEntry.dateOfChange), "PPpp")
   const publishedBy = publishEntry.userName || latestChange.userName || "Unknown user"
   const publishedEmail = publishEntry.userEmail || latestChange.userEmail || ""
@@ -135,12 +133,15 @@ export default async function DataVersionPage({ params }: { params: Params }) {
 
   const entitySummary = formatEntitySummary(entityCounts)
   const groupedView = buildDataVersionGroupedView(visibleChanges)
+  const topEntitySummary = entitySummary === "-" ? "no item changes" : entitySummary.toLowerCase()
 
   return (
     <>
-      <Title>{`Data Version v${numericVersion}`}</Title>
+      <Title>{`Published Version v${numericVersion}`}</Title>
 
       <Content className="space-y-6">
+        <ChangelogWorkflowRail current="version" />
+
         <Link href="/changelogs" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to releases
@@ -164,6 +165,15 @@ export default async function DataVersionPage({ params }: { params: Params }) {
               </div>
             </div>
 
+            <div className="rounded-lg border border-l-4 border-l-primary bg-primary/[0.03] p-4">
+              <div className="font-medium">Summary</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Published version v{numericVersion} changed {visibleChanges.length} {visibleChanges.length === 1 ? "item" : "items"} across{" "}
+                {topEntitySummary}. Use the grouped sections below to review changes by script first, then open individual details only when
+                needed.
+              </p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg border p-4">
                 <div className="text-sm text-muted-foreground">Total Changes</div>
@@ -174,7 +184,7 @@ export default async function DataVersionPage({ params }: { params: Params }) {
                 <div className="text-2xl font-semibold mt-1">{uniqueEntities.size}</div>
               </div>
               <div className="rounded-lg border p-4">
-                <div className="text-sm text-muted-foreground">Fields Updated</div>
+                <div className="text-sm text-muted-foreground">Changed Details</div>
                 <div className="text-2xl font-semibold mt-1">{totalFieldChanges}</div>
               </div>
             </div>
@@ -201,9 +211,9 @@ export default async function DataVersionPage({ params }: { params: Params }) {
               <summary className="cursor-pointer list-none px-4 py-3">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div className="text-sm font-semibold">Raw Timeline</div>
+                    <div className="text-sm font-semibold">Full Audit Log</div>
                     <div className="text-xs text-muted-foreground">
-                      Full chronological changelog entries for audit-level inspection.
+                      Technical chronological entries for audit-level inspection. Most users can review the grouped sections above instead.
                     </div>
                   </div>
                   <Badge variant="outline" className="w-fit bg-muted text-muted-foreground">

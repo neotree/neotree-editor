@@ -20,12 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Pagination,
   PaginationContent,
@@ -45,10 +40,7 @@ import {
   useChangelogsTable,
 } from "../hooks/use-changelogs-table"
 import { resolveEntityTitle } from "@/lib/changelog-utils"
-import {
-  DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY,
-  RELEASE_ROLLBACK_MAX_RECENT_DEPTH,
-} from "@/lib/changelog-rollback"
+import { DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY, RELEASE_ROLLBACK_MAX_RECENT_DEPTH } from "@/lib/changelog-rollback"
 import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
@@ -111,14 +103,7 @@ function renderActionBadges(entry: DataVersionSummary) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map(([action, count]) => (
-        <Badge
-          key={action}
-          variant="outline"
-          className={cn(
-            "capitalize",
-            actionBadgeClasses[action] ?? defaultActionBadgeClass,
-          )}
-        >
+        <Badge key={action} variant="outline" className={cn("capitalize", actionBadgeClasses[action] ?? defaultActionBadgeClass)}>
           {count} {actionLabels[action] || action}
         </Badge>
       ))}
@@ -168,8 +153,7 @@ export function ChangelogsTable(props: Props) {
   const [rollbacking, setRollbacking] = useState<number | null>(null)
   const [pendingRollbackEntry, setPendingRollbackEntry] = useState<DataVersionSummary | null>(null)
   const [showEntityDetails, setShowEntityDetails] = useState(false)
-  const [softDeleteCreated, setSoftDeleteCreated] =
-    useState(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
+  const [softDeleteCreated, setSoftDeleteCreated] = useState(DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete")
   const [allowDeepRollback, setAllowDeepRollback] = useState(false)
   const [targetRollbackVersion, setTargetRollbackVersion] = useState<number | null>(null)
 
@@ -256,11 +240,7 @@ export function ChangelogsTable(props: Props) {
     router.push(buildDetailsHref(version))
   }
 
-  const handleRollbackDataVersion = async (
-    dataVersion: number,
-    restoreToVersion: number,
-    deepRollbackOverride: boolean,
-  ) => {
+  const handleRollbackDataVersion = async (dataVersion: number, restoreToVersion: number, deepRollbackOverride: boolean) => {
     if (viewOnly) return
     if (dataVersion < 2) return
     if (!Number.isFinite(restoreToVersion) || restoreToVersion < 1 || restoreToVersion >= dataVersion) {
@@ -384,7 +364,7 @@ export function ChangelogsTable(props: Props) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search published releases by version, publisher, or entity id..."
+              placeholder="Search published versions by version number, publisher, or item id..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               className="pl-10"
@@ -396,7 +376,7 @@ export function ChangelogsTable(props: Props) {
 
         <div className="px-4">
           <div className="text-sm text-muted-foreground mb-4">
-            {totalDataVersions} data version{totalDataVersions === 1 ? "" : "s"} found
+            {totalDataVersions} published version{totalDataVersions === 1 ? "" : "s"} found
           </div>
 
           {dataVersions.length === 0 ? (
@@ -405,7 +385,7 @@ export function ChangelogsTable(props: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">Data Version</TableHead>
+                  <TableHead className="w-[150px]">Published Version</TableHead>
                   <TableHead className="w-[160px]">Change Summary</TableHead>
                   <TableHead>Entities Affected</TableHead>
                   <TableHead>Notes</TableHead>
@@ -485,9 +465,7 @@ export function ChangelogsTable(props: Props) {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{entry.publishedByName || "Unknown user"}</span>
-                          {entry.publishedByEmail && (
-                            <span className="text-xs text-muted-foreground">{entry.publishedByEmail}</span>
-                          )}
+                          {entry.publishedByEmail && <span className="text-xs text-muted-foreground">{entry.publishedByEmail}</span>}
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{publishedAt}</TableCell>
@@ -500,10 +478,7 @@ export function ChangelogsTable(props: Props) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-                            <DropdownMenuItem
-                              onClick={() => handleNavigate(entry.dataVersion)}
-                              className="cursor-pointer"
-                            >
+                            <DropdownMenuItem onClick={() => handleNavigate(entry.dataVersion)} className="cursor-pointer">
                               View details
                             </DropdownMenuItem>
                             {isSuperUser && !viewOnly && entry.isLatestVersion && entry.dataVersion > 1 && (
@@ -516,9 +491,7 @@ export function ChangelogsTable(props: Props) {
                                 }}
                                 className="cursor-pointer text-orange-600 focus:text-orange-700"
                               >
-                                {rollbacking === entry.dataVersion
-                                  ? "Rolling back..."
-                                  : `Rollback to v${entry.dataVersion - 1}`}
+                                {rollbacking === entry.dataVersion ? "Rolling back..." : `Rollback to v${entry.dataVersion - 1}`}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -548,18 +521,15 @@ export function ChangelogsTable(props: Props) {
                 <PaginationItem>
                   <PaginationNext
                     onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
-                    className={cn(
-                      "cursor-pointer",
-                      currentPage === pagination.totalPages && "pointer-events-none opacity-50"
-                    )}
+                    className={cn("cursor-pointer", currentPage === pagination.totalPages && "pointer-events-none opacity-50")}
                   />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
 
             <div className="text-sm text-muted-foreground text-center">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-              {Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total} releases
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, pagination.total)} of{" "}
+              {pagination.total} releases
             </div>
           </div>
         )}
@@ -585,12 +555,10 @@ export function ChangelogsTable(props: Props) {
                 {pendingRollbackEntry && (
                   <>
                     <p>
-                      You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state
-                      of an earlier release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
+                      You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state of an earlier
+                      release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
                     </p>
-                    {rollbacking !== null && (
-                      <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>
-                    )}
+                    {rollbacking !== null && <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>}
                     <div>
                       <p className="font-medium text-foreground mb-1">Entities affected:</p>
                       {renderEntityImpactList(pendingRollbackEntry)}
@@ -609,10 +577,7 @@ export function ChangelogsTable(props: Props) {
                           {detailsLoadingByVersion[pendingRollbackEntry.dataVersion] ? (
                             <p className="text-sm text-muted-foreground">Loading entity details...</p>
                           ) : (
-                            renderEntityDetails(
-                              pendingRollbackEntry,
-                              detailsByVersion[pendingRollbackEntry.dataVersion],
-                            )
+                            renderEntityDetails(pendingRollbackEntry, detailsByVersion[pendingRollbackEntry.dataVersion])
                           )}
                         </div>
                       )}
@@ -665,7 +630,8 @@ export function ChangelogsTable(props: Props) {
                         <span>Deep restore override for older releases</span>
                       </label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Superuser-only. Enable this only when you intentionally need to restore further back than the recent rollback window.
+                        Superuser-only. Enable this only when you intentionally need to restore further back than the recent rollback
+                        window.
                       </p>
                     </div>
                     <div className="pt-1">
@@ -680,14 +646,13 @@ export function ChangelogsTable(props: Props) {
                         <span>Soft delete items created in this release</span>
                       </label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Recommended. Newly created entities with no prior snapshot will be marked deleted so the rollback matches the previous published release.
+                        Recommended. Newly created entities with no prior snapshot will be marked deleted so the rollback matches the
+                        previous published release.
                       </p>
                     </div>
                   </>
                 )}
-                <p className="font-semibold text-foreground">
-                  Do not proceed unless you are absolutely sure what you are doing.
-                </p>
+                <p className="font-semibold text-foreground">Do not proceed unless you are absolutely sure what you are doing.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -705,11 +670,7 @@ export function ChangelogsTable(props: Props) {
               }
               onClick={() => {
                 if (pendingRollbackEntry !== null && targetRollbackVersion) {
-                  handleRollbackDataVersion(
-                    pendingRollbackEntry.dataVersion,
-                    targetRollbackVersion,
-                    allowDeepRollback,
-                  )
+                  handleRollbackDataVersion(pendingRollbackEntry.dataVersion, targetRollbackVersion, allowDeepRollback)
                 }
               }}
             >

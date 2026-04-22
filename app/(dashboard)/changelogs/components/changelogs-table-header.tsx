@@ -53,7 +53,7 @@ export function ChangelogsTableHeader({
     <>
       <div className="p-4 flex flex-col gap-y-4">
         <div className="flex flex-wrap items-center">
-          <div className="text-2xl font-semibold">Published Releases</div>
+          <div className="text-2xl font-semibold">Published Versions</div>
           <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4">
             <div>
               <Select value={sort} onValueChange={setSort}>
@@ -110,13 +110,8 @@ export function ChangelogsTableHeader({
 
             <div className="flex items-center">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isActiveOnly}
-                  onChange={(e) => setIsActiveOnly(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm whitespace-nowrap">Active only</span>
+                <input type="checkbox" checked={isActiveOnly} onChange={(e) => setIsActiveOnly(e.target.checked)} className="rounded" />
+                <span className="text-sm whitespace-nowrap">Current items only</span>
               </label>
             </div>
 
@@ -128,7 +123,7 @@ export function ChangelogsTableHeader({
                   onChange={(e) => setApplyFiltersToCounts(e.target.checked)}
                   className="rounded"
                 />
-                <span className="text-sm whitespace-nowrap">Filter counts</span>
+                <span className="text-sm whitespace-nowrap">Apply filters to totals</span>
               </label>
             </div>
 

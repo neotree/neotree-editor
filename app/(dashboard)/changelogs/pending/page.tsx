@@ -6,6 +6,7 @@ import { Title } from "@/components/title"
 import { Card, CardContent } from "@/components/ui/card"
 import { getPendingDraftQueue } from "@/app/actions/ops"
 import { DraftReviewWorkspace } from "../components/draft-review-workspace"
+import { ChangelogWorkflowRail } from "../components/workflow-rail"
 
 export const dynamic = "force-dynamic"
 
@@ -36,9 +37,11 @@ export default async function PendingChangesPage({
 
   return (
     <>
-      <Title>Draft Queue</Title>
+      <Title>Pending Draft Changes</Title>
 
       <Content className="space-y-6">
+        <ChangelogWorkflowRail current="drafts" />
+
         <Link href="/changelogs" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to published releases

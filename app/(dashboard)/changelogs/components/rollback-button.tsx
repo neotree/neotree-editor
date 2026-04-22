@@ -8,6 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/loader"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 type Props = {
   entityId: string
@@ -22,6 +32,7 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
   const { alert } = useAlertModal()
   const { viewOnly } = useAppContext()
   const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const handleRollback = useCallback(async () => {
     if (viewOnly) return
@@ -36,15 +47,7 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
       return
     }
 
-    const expectedNextDataVersion = (dataVersion ?? 0) + 1
     const rollingBackCreation = targetVersion === 0
-    const confirmed = window.confirm(
-      rollingBackCreation
-        ? `Rollback this newly created entity from v${currentVersion} to its pre-creation state? This will create a new changelog entry and publish data version v${expectedNextDataVersion}.`
-        : `Restore this entity from v${currentVersion} back to v${targetVersion}? This will create a new changelog entry and publish data version v${expectedNextDataVersion}.`,
-    )
-    if (!confirmed) return
-
     try {
       setLoading(true)
       const response = await axios.post("/api/changelogs/rollback", {
@@ -69,6 +72,7 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
         buttonLabel: "Refresh",
         onClose: () => window.location.reload(),
       })
+      setOpen(false)
     } catch (e: any) {
       alert({
         title: "Rollback failed",
@@ -84,16 +88,35 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
   return (
     <div className="relative">
       {loading && <Loader overlay />}
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={handleRollback}
-        disabled={viewOnly || disabled || loading}
-        className="inline-flex items-center gap-2"
-      >
-        <RotateCcw className="h-4 w-4" />
-        Rollback to previous
-      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" disabled={viewOnly || disabled || loading} className="inline-flex items-center gap-2">
+            <RotateCcw className="h-4 w-4" />
+            Rollback to previous
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm rollback</DialogTitle>
+            <DialogDescription>
+              Rollback does not edit old history. It creates a new published version that restores this item to an earlier state.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-900 dark:text-orange-200">
+            {targetVersion === 0
+              ? `This will roll this newly created item back to its pre-creation state and publish data version v${(dataVersion ?? 0) + 1}.`
+              : `This will restore this item from entity version v${currentVersion} to v${targetVersion} and publish data version v${(dataVersion ?? 0) + 1}.`}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleRollback} disabled={loading}>
+              Confirm rollback
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

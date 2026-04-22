@@ -1,9 +1,13 @@
+"use client"
+
 import Link from "next/link"
+import { useMemo, useState } from "react"
 import { format } from "date-fns"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import type { DataVersionGroupedChange, DataVersionGroupedView, DataVersionScriptGroup } from "@/lib/changelog-data-version-groups"
 
 type Props = {
@@ -39,9 +43,67 @@ export function DataVersionScriptGroups({ groupedView, dataVersion }: Props) {
     return null
   }
 
+  const [query, setQuery] = useState("")
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredView = useMemo(() => {
+    if (!normalizedQuery) return groupedView
+
+    const changeMatches = (change: DataVersionGroupedChange) =>
+      [
+        change.entityTitle,
+        change.entityId,
+        change.entityType,
+        change.action,
+        change.changeReason,
+        change.description,
+        ...change.highlightedFields,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery))
+
+    return {
+      scriptGroups: groupedView.scriptGroups
+        .map((group) => {
+          const changes = group.changes.filter(changeMatches)
+          return {
+            ...group,
+            changes,
+            totalChanges: changes.length,
+            entitiesAffected: new Set(changes.map((change) => `${change.entityType}:${change.entityId}`)).size,
+            fieldsChanged: changes.reduce((acc, change) => acc + change.fieldsChanged, 0),
+            scriptChanges: changes.filter((change) => change.entityType === "script").length,
+            screenChanges: changes.filter((change) => change.entityType === "screen").length,
+            diagnosisChanges: changes.filter((change) => change.entityType === "diagnosis").length,
+            problemChanges: changes.filter((change) => change.entityType === "problem").length,
+            latestChangeAt: changes.reduce(
+              (latest, change) => (new Date(change.dateOfChange).getTime() > new Date(latest).getTime() ? change.dateOfChange : latest),
+              group.latestChangeAt,
+            ),
+          }
+        })
+        .filter(
+          (group) =>
+            group.scriptTitle.toLowerCase().includes(normalizedQuery) ||
+            group.scriptId.toLowerCase().includes(normalizedQuery) ||
+            group.changes.length > 0,
+        ),
+      standaloneChanges: groupedView.standaloneChanges.filter(changeMatches),
+    }
+  }, [groupedView, normalizedQuery])
+
   return (
     <div className="space-y-4">
-      {groupedView.scriptGroups.length > 0 && (
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search within this published version by script, item, field, or action..."
+          className="pl-10"
+        />
+      </div>
+
+      {filteredView.scriptGroups.length > 0 && (
         <section className="space-y-3">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Affected Scripts</h2>
@@ -50,14 +112,14 @@ export function DataVersionScriptGroups({ groupedView, dataVersion }: Props) {
             </p>
           </div>
           <div className="space-y-3">
-            {groupedView.scriptGroups.map((group) => (
+            {filteredView.scriptGroups.map((group) => (
               <ScriptGroupCard key={group.scriptId} group={group} dataVersion={dataVersion} />
             ))}
           </div>
         </section>
       )}
 
-      {groupedView.standaloneChanges.length > 0 && (
+      {filteredView.standaloneChanges.length > 0 && (
         <section className="space-y-3">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Standalone Changes</h2>
@@ -67,12 +129,18 @@ export function DataVersionScriptGroups({ groupedView, dataVersion }: Props) {
           </div>
           <div className="rounded-lg border border-border/70 bg-background/70">
             <div className="divide-y divide-border/60">
-              {groupedView.standaloneChanges.map((change) => (
+              {filteredView.standaloneChanges.map((change) => (
                 <ChangeRow key={change.changeLogId} change={change} dataVersion={dataVersion} compact />
               ))}
             </div>
           </div>
         </section>
+      )}
+
+      {!filteredView.scriptGroups.length && !filteredView.standaloneChanges.length && (
+        <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+          No changes in this published version match your search.
+        </div>
       )}
     </div>
   )
