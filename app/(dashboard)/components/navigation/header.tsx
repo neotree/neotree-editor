@@ -1,7 +1,8 @@
 "use client"
-
 import { useState } from "react"
 import { useMount } from "react-use"
+import { useRouter } from "next/navigation"
+import { FileStack } from "lucide-react"
 
 import { Logo } from "@/components/logo"
 import { Content } from "@/components/content"
@@ -12,9 +13,7 @@ import { HeaderDesktopMenu } from "./header-desktop-menu"
 import { MobileMenu } from "./mobile-menu"
 import { User } from "./user"
 import { TopBar } from "./top-bar"
-import { PendingChangesIndicator } from "@/components/changelog/pending-changes-indicator"
-import { usePendingChanges } from "@/hooks/use-pending-changes"
-import { GlobalChangeLogPanel } from "@/components/changelog/changelog-panel"
+import { Button } from "@/components/ui/button"
 
 type Props = {
   user: IAppContext["authenticatedUser"]
@@ -30,28 +29,18 @@ export function Header({
   showThemeToggle,
 }: Props) {
   const [mounted, setMounted] = useState(false)
-  const [isChangeLogOpen, setIsChangeLogOpen] = useState(false)
+  const router = useRouter()
 
-  const { sys, info } = useAppContext()
-  
-  // Get all pending changes globally (no entityId specified)
-  const { allChangesByEntity, hasChanges } = usePendingChanges({
-    autoTrack: false,
-  })
+  const { sys, info, drafts, pendingDeletion } = useAppContext()
 
   const usePlainBg = sys.data.use_plain_background === "yes"
+  const totalQueueEntries = (drafts?.total || 0) + (pendingDeletion || 0)
 
   useMount(() => {
     setMounted(true)
   })
 
   if (!mounted) return null
-
-  // Calculate total changes across all entities
-  const totalChanges = Object.values(allChangesByEntity || {}).reduce(
-    (sum, entry) => sum + entry.changes.length,
-    0,
-  )
 
   return (
     <>
@@ -121,12 +110,18 @@ export function Header({
 
           <HeaderDesktopMenu />
 
-          {hasChanges && totalChanges > 0 && (
+          {totalQueueEntries > 0 && (
             <div className="my-auto">
-              <PendingChangesIndicator 
-                showDetails={false}
-                onClick={() => setIsChangeLogOpen(true)}
-              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="gap-1"
+                onClick={() => router.push("/changelogs/pending")}
+              >
+                <FileStack className="h-3 w-3" />
+                {totalQueueEntries} draft queue {totalQueueEntries === 1 ? "entry" : "entries"}
+              </Button>
             </div>
           )}
 
@@ -139,13 +134,6 @@ export function Header({
           </div>
         </Content>
       </div>
-
-      {/* Global ChangeLog Panel - shows all pending changes */}
-      <GlobalChangeLogPanel
-        isOpen={isChangeLogOpen}
-        onClose={() => setIsChangeLogOpen(false)}
-        allChangesByEntity={allChangesByEntity}
-      />
     </>
   )
 }

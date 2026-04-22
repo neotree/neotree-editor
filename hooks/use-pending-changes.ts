@@ -21,20 +21,20 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
   // Live query for pending changes
   const pendingChanges = useLiveQuery(async () => {
     if (entityId) {
-      return await pendingChangesAPI.getEntityChanges(entityId, entityType)
+      return await pendingChangesAPI.getEntityChanges(entityId, entityType, userId)
     }
-    return await pendingChangesAPI.getRecentChanges(100)
-  }, [entityId, entityType])
+    return await pendingChangesAPI.getRecentChanges(100, userId)
+  }, [entityId, entityType, userId])
 
   // Live query for change count
   const changeCount = useLiveQuery(async () => {
-    return await pendingChangesAPI.getChangeCount(entityId)
-  }, [entityId])
+    return await pendingChangesAPI.getChangeCount(entityId, userId)
+  }, [entityId, userId])
 
   // Live query for all changes grouped by entity
   const allChangesByEntity = useLiveQuery<PendingChangesByEntity>(async () => {
-    return await pendingChangesAPI.getAllChangesByEntity()
-  }, [])
+    return await pendingChangesAPI.getAllChangesByEntity(userId)
+  }, [userId])
 
   // Start tracking session
   useEffect(() => {
@@ -42,9 +42,6 @@ export function usePendingChanges(options: UsePendingChangesOptions = {}) {
     let cancelled = false
 
     if (autoTrack && entityId && entityType) {
-      // Clear any lingering legacy sessions to keep Dexie tidy
-      pendingChangesAPI.clearAllSessions().catch(() => {})
-
       pendingChangesAPI.startSession(entityId, entityType, entityTitle, userId).then((id) => {
         if (cancelled) return
         activeSessionId = id || null

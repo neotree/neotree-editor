@@ -116,7 +116,7 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
                 <div className="flex flex-col gap-1">
                   <span className="font-medium">{entityTitle}</span>
                   <span className="text-xs text-muted-foreground">
-                    {entityLabel} • {change.entityId}
+                    {entityLabel} | {change.entityId}
                   </span>
                 </div>
               </TableCell>

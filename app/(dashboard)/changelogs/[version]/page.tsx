@@ -58,13 +58,13 @@ function parseDataVersionParam(param: string): number | null {
 
 function formatEntitySummary(entityCounts: Map<string, number>) {
   const items = Array.from(entityCounts.entries()).sort(([, countA], [, countB]) => countB - countA)
-  if (!items.length) return "—"
+  if (!items.length) return "-"
   return items
     .map(([entityType, count]) => {
       const label = entityTypeLabels[entityType] || entityType
       return `${count} ${label}${count === 1 ? "" : "s"}`
     })
-    .join(" • ")
+    .join(" | ")
 }
 
 export default async function DataVersionPage({ params }: { params: Params }) {

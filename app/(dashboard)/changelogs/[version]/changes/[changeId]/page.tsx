@@ -154,7 +154,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                 <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed By</div>
                 <div className="mt-1 text-sm font-medium">
                   {change.userName || "Unknown user"}
-                  {change.userEmail ? ` • ${change.userEmail}` : ""}
+                  {change.userEmail ? ` | ${change.userEmail}` : ""}
                 </div>
               </div>
               <div>

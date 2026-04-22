@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm"
+import { eq, getTableColumns, sql } from "drizzle-orm"
 
 import db from "@/databases/pg/drizzle"
 import {
@@ -201,6 +201,117 @@ function pickColumns(snapshot: any, table: any) {
   }, {})
 }
 
+function getWritableRollbackColumns(binding: VersionedEntityBinding) {
+  const columns = getTableColumns(binding.table) as Record<string, any>
+  const managedKeys = new Set(
+    [binding.pkKey, binding.versionKey, binding.publishDateKey, "id", "updatedAt"].filter(Boolean) as string[],
+  )
+
+  return Object.entries(columns)
+    .filter(([, column]) => column && typeof column === "object" && "name" in column)
+    .filter(([key]) => !managedKeys.has(key))
+}
+
+function cloneRollbackDefaultValue(value: any) {
+  if (value === null || value === undefined) return value
+  if (value instanceof Date) return new Date(value)
+  if (typeof value !== "object") return value
+  return structuredClone(value)
+}
+
+function isRollbackLiteralDefaultValue(value: any) {
+  if (value === null || value === undefined) return value !== undefined
+  if (value instanceof Date) return true
+  if (Array.isArray(value)) return true
+
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+      return true
+    case "object": {
+      const prototype = Object.getPrototypeOf(value)
+      return prototype === Object.prototype || prototype === null
+    }
+    default:
+      return false
+  }
+}
+
+function getRollbackColumnDefaultValue(column: any) {
+  const rawDefault =
+    typeof column.defaultFn === "function" ? column.defaultFn() : column.hasDefault ? column.default : undefined
+
+  if (!isRollbackLiteralDefaultValue(rawDefault)) return undefined
+
+  const defaultValue = cloneRollbackDefaultValue(rawDefault)
+  if (column.dataType === "json" && typeof defaultValue === "string") {
+    try {
+      return JSON.parse(defaultValue)
+    } catch {
+      return defaultValue
+    }
+  }
+
+  return defaultValue
+}
+
+export function buildRollbackSnapshotPayload({
+  binding,
+  entityId,
+  snapshot,
+  newVersion,
+  now = new Date(),
+}: {
+  binding: VersionedEntityBinding
+  entityId: string
+  snapshot: any
+  newVersion: number
+  now?: Date
+}) {
+  const normalizedSnapshot = snapshot ?? {}
+  const basePayload = pickColumns(normalizedSnapshot, binding.table)
+  const missingRequiredKeys: string[] = []
+
+  for (const [key, column] of getWritableRollbackColumns(binding)) {
+    if (Object.prototype.hasOwnProperty.call(basePayload, key)) continue
+
+    const defaultValue = getRollbackColumnDefaultValue(column)
+    if (defaultValue !== undefined) {
+      basePayload[key] = defaultValue
+      continue
+    }
+
+    if ((column as any).notNull) {
+      missingRequiredKeys.push(key)
+      continue
+    }
+
+    basePayload[key] = null
+  }
+
+  if (missingRequiredKeys.length) {
+    throw new Error(`Rollback snapshot is missing required fields: ${missingRequiredKeys.join(", ")}`)
+  }
+
+  const coercedPayload = coerceRollbackSnapshotValues(basePayload, {
+    numericKeys: binding.numericKeys,
+    timestampKeys: binding.timestampKeys,
+    forceNullKeys: binding.forceNullKeys,
+  })
+
+  coercedPayload[binding.pkKey] = entityId
+  if (binding.versionKey) coercedPayload[binding.versionKey] = newVersion
+  if (binding.publishDateKey) coercedPayload[binding.publishDateKey] = now
+  if ("updatedAt" in binding.table) coercedPayload.updatedAt = now
+  if ("createdAt" in binding.table && (coercedPayload.createdAt === null || coercedPayload.createdAt === undefined)) {
+    coercedPayload.createdAt = now
+  }
+
+  return coercedPayload
+}
+
 export async function applyRollbackSnapshot({
   tx,
   binding,
@@ -215,19 +326,13 @@ export async function applyRollbackSnapshot({
   newVersion: number
 }) {
   const now = new Date()
-  const basePayload = coerceRollbackSnapshotValues(pickColumns(snapshot ?? {}, binding.table), {
-    numericKeys: binding.numericKeys,
-    timestampKeys: binding.timestampKeys,
-    forceNullKeys: binding.forceNullKeys,
+  const basePayload = buildRollbackSnapshotPayload({
+    binding,
+    entityId,
+    snapshot,
+    newVersion,
+    now,
   })
-
-  basePayload[binding.pkKey] = entityId
-  if (binding.versionKey) basePayload[binding.versionKey] = newVersion
-  if (binding.publishDateKey) basePayload[binding.publishDateKey] = now
-  if ("updatedAt" in binding.table) basePayload.updatedAt = now
-  if ("createdAt" in binding.table && (basePayload.createdAt === null || basePayload.createdAt === undefined)) {
-    basePayload.createdAt = now
-  }
 
   const [updated] = await tx.update(binding.table).set(basePayload).where(eq(binding.pk, entityId)).returning()
   if (updated) return updated

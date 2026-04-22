@@ -9,6 +9,7 @@ import {
   applySoftDeleteRollbackSideEffects,
   getNextRollbackDataVersion,
   getRollbackParentVersion,
+  getRollbackTargetVersion,
   isChangeAlreadyAlignedToRollbackTarget,
   normalizePublishedRollbackVersion,
 } from "@/lib/changelog-rollback"
@@ -163,7 +164,11 @@ export async function _rollbackChangeLog({
 
       if (!current) throw new Error("No active version found for entity after locking")
 
-      const explicitPreviousVersion = Number.isFinite(current.parentVersion) ? current.parentVersion! : undefined
+      const explicitPreviousVersion = getRollbackTargetVersion({
+        action: current.action,
+        parentVersion: current.parentVersion,
+        mergedFromVersion: current.mergedFromVersion,
+      })
 
       const target = await findTargetForRollback({
         entityId,

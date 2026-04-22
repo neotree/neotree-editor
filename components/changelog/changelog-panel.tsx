@@ -5,11 +5,9 @@ import { X, History, Clock, FileText, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 // Using built-in date formatting instead of date-fns
 import { cn } from "@/lib/utils"
-import { usePendingChanges } from "@/hooks/use-pending-changes"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { PendingChange } from "@/lib/indexed-db"
 
@@ -36,9 +34,9 @@ const MAX_LIST_ITEMS = 3
 const MAX_OBJECT_FIELDS = 4
 
 function formatPrimitive(value: unknown): string {
-  if (value === null || value === undefined) return "—"
+  if (value === null || value === undefined) return "-"
   if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "—"
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "-"
   if (typeof value === "string") {
     const trimmed = value.trim()
     return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed
@@ -84,7 +82,7 @@ function summarizeObject(value: Record<string, unknown>): string {
   const entries = preferredKeys
     .filter((key) => key in value)
     .map((key) => `${key}: ${formatPrimitive(value[key])}`)
-    .filter((entry) => !entry.endsWith(": —"))
+    .filter((entry) => !entry.endsWith(": -"))
 
   if (entries.length) {
     const preview = entries.slice(0, MAX_OBJECT_FIELDS)
@@ -162,8 +160,8 @@ export function GlobalChangeLogPanel({
         {entities.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <FileText className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">No pending changes</p>
-            <p className="text-sm">All changes have been saved</p>
+            <p className="text-lg font-medium">No local pending changes</p>
+            <p className="text-sm">This browser does not currently hold unpublished local edits.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -198,7 +196,7 @@ export function GlobalChangeLogPanel({
                           <div className="flex-1">
                             <div className="font-medium text-sm">{entityName}</div>
                             <div className="text-xs text-muted-foreground">
-                              {entityType} • {changes.length}{" "}
+                              {entityType} | {changes.length}{" "}
                               {changes.length === 1 ? "change" : "changes"}
                             </div>
                           </div>

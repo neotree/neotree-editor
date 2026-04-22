@@ -1,3 +1,5 @@
+import { getRollbackTargetVersion } from "@/lib/changelog-rollback"
+
 export function buildDeleteChangeSnapshots<T>(params: {
   previousEntity?: T | null
   deletedFields?: Record<string, any>
@@ -24,9 +26,5 @@ export function getRollbackButtonTargetVersion(params: {
   parentVersion?: number | null
   mergedFromVersion?: number | null
 }) {
-  if (params.action === "rollback") {
-    return params.mergedFromVersion ?? params.parentVersion ?? null
-  }
-
-  return params.parentVersion ?? null
+  return getRollbackTargetVersion(params)
 }

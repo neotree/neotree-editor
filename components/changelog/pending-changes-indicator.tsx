@@ -14,6 +14,7 @@ interface PendingChangesIndicatorProps {
   entityId?: string
   entityType?: string
   entityTitle?: string
+  userId?: string
   className?: string
   showDetails?: boolean
   onClick?: () => void
@@ -23,6 +24,7 @@ export function PendingChangesIndicator({
   entityId,
   entityType,
   entityTitle,
+  userId,
   className,
   showDetails = true,
   onClick,
@@ -31,6 +33,7 @@ export function PendingChangesIndicator({
     entityId,
     entityType,
     entityTitle,
+    userId,
     autoTrack: false,
   })
 
@@ -45,14 +48,13 @@ export function PendingChangesIndicator({
         variant="secondary" 
         className={cn("gap-1 cursor-pointer hover:bg-secondary/80 transition-colors", className)}
         onClick={(e) => {
-          "PENDING INDICATOR CLICK"
           e.preventDefault()
           e.stopPropagation()
           onClick?.()
         }}
       >
         <Clock className="h-3 w-3" />
-        {changeCount} unsaved {changeCount === 1 ? "change" : "changes"}
+        {changeCount} local pending {changeCount === 1 ? "change" : "changes"}
       </Badge>
     )
   }
@@ -71,9 +73,9 @@ export function PendingChangesIndicator({
       <PopoverContent className="w-96" align="end">
         <div className="space-y-4">
           <div>
-            <h4 className="font-medium text-sm">Pending Changes</h4>
+            <h4 className="font-medium text-sm">Local Pending Changes</h4>
             <p className="text-xs text-muted-foreground mt-1">
-              These changes will be saved when you click Save or Publish
+              These changes exist only in this browser until you save or publish them.
             </p>
           </div>
 
@@ -127,7 +129,7 @@ export function PendingChangesIndicator({
                   onClick()
                 }}
               >
-                View Full History
+                Review Local Pending Changes
               </Button>
             </>
           )}
