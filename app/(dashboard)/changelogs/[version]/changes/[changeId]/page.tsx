@@ -24,6 +24,7 @@ import {
   type HighlightEntry,
 } from "./diff-insights"
 import { RollbackButton } from "../../../components/rollback-button"
+import { ChangelogWorkflowRail } from "../../../components/workflow-rail"
 
 type Params = {
   version: string
@@ -63,6 +64,17 @@ const lifecycleBadgeClasses: Record<ChangeLifecycleState, string> = {
   superseded: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
 }
 
+function getEntityEditorHref(change: ChangeLogType) {
+  if (change.entityType === "script") return `/script/${change.entityId}`
+  if (change.entityType === "screen" && change.scriptId) return `/script/${change.scriptId}/screen/${change.entityId}`
+  if (change.entityType === "diagnosis" && change.scriptId) return `/script/${change.scriptId}/diagnosis/${change.entityId}`
+  if (change.entityType === "problem" && change.scriptId) return `/script/${change.scriptId}/problem/${change.entityId}`
+  if (change.entityType === "config_key") return "/configuration"
+  if (change.entityType === "drugs_library") return `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(change.entityId)}`
+  if (change.entityType === "data_key") return `/data-keys/edit/${encodeURIComponent(change.entityId)}`
+  return null
+}
+
 export default async function ChangeDetailsPage({ params }: { params: Params }) {
   const numericVersion = parseDataVersionParam(params.version)
   if (numericVersion === null) {
@@ -95,11 +107,14 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
     mergedFromVersion: change.mergedFromVersion,
   })
   const canRollback = change.isActive && (rollbackTargetVersion ?? null) !== null
+  const editorHref = getEntityEditorHref(change)
 
   return (
     <>
       <Title>Change Details</Title>
       <Content className="space-y-6">
+        <ChangelogWorkflowRail current="change" />
+
         <Link
           href={`/changelogs/v${numericVersion}`}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -111,6 +126,18 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
         <Card>
           <CardHeader className="space-y-2">
             <CardTitle className="text-2xl">{entityTitle}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {entityTitle} was{" "}
+              {change.action === "update"
+                ? "updated"
+                : change.action === "create"
+                  ? "created"
+                  : change.action === "delete"
+                    ? "deleted"
+                    : change.action}
+              . {normalizedChanges.length} {normalizedChanges.length === 1 ? "detail" : "details"} changed in published version v
+              {dataVersion}.
+            </p>
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <Badge variant="outline" className="bg-muted text-muted-foreground">
                 {entityLabel}
@@ -132,8 +159,22 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {canRollback && (
-              <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {editorHref && (
+                <Link
+                  href={editorHref}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                >
+                  Open this item
+                </Link>
+              )}
+              <Link
+                href={`/changelogs/v${numericVersion}`}
+                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              >
+                Back to published version
+              </Link>
+              {canRollback && (
                 <RollbackButton
                   entityId={change.entityId}
                   entityType={change.entityType}
@@ -142,8 +183,8 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                   dataVersion={dataVersion ?? null}
                   disabled={!change.isActive}
                 />
-              </div>
-            )}
+              )}
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed By</div>
@@ -157,7 +198,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                 <div className="mt-1 text-sm font-medium">{changedOn}</div>
               </div>
               <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Entity ID</div>
+                <div className="text-xs uppercase text-muted-foreground tracking-wide">Technical ID</div>
                 <div className="mt-1 text-sm font-medium break-all">{change.entityId}</div>
               </div>
               {change.parentVersion !== null && (
@@ -190,7 +231,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
 
             <div className="space-y-6">
               <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Summary of Changes</div>
+                <div className="text-xs uppercase text-muted-foreground tracking-wide">What Changed</div>
                 <ChangeSummaryCard highlightEntries={highlightEntries} groupedSummaries={groupedSummaries} hasChanges={hasAnyDiffs} />
               </div>
 
@@ -293,7 +334,7 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
           <div className="text-xs font-medium text-muted-foreground">No structured differences</div>
         </div>
         <div className="px-4 py-4 text-sm text-muted-foreground">
-          Raw values are shown below for reference.
+          Technical values are shown below for reference.
           <RawValueComparison previous={insight.previousValue} next={insight.newValue} />
         </div>
       </div>
@@ -323,11 +364,11 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
         <div className="rounded-lg border border-dashed border-border/70">
           <details>
             <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
-              View raw JSON values
+              View technical JSON values
             </summary>
             <div className="grid gap-3 border-t border-border/60 p-3 md:grid-cols-2">
-              <ValueBlock label="Previous" tone="danger" value={insight.previousValue} />
-              <ValueBlock label="New" tone="success" value={insight.newValue} />
+              <ValueBlock label="Before this change" tone="danger" value={insight.previousValue} />
+              <ValueBlock label="After this change" tone="success" value={insight.newValue} />
             </div>
           </details>
         </div>
@@ -360,8 +401,8 @@ function DiffOperationRow({ operation }: { operation: FieldChangeInsight["operat
         <div className="mt-1 text-xs text-muted-foreground">Moved to position {operation.targetIndex + 1}</div>
       )}
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {operation.kind !== "added" && <ValueBlock label="Previous" tone="danger" value={operation.previousValue} />}
-        {operation.kind !== "removed" && <ValueBlock label="New" tone="success" value={operation.newValue} />}
+        {operation.kind !== "added" && <ValueBlock label="Before this change" tone="danger" value={operation.previousValue} />}
+        {operation.kind !== "removed" && <ValueBlock label="After this change" tone="success" value={operation.newValue} />}
       </div>
       {operation.textDiff && (
         <pre className="mt-3 max-h-64 overflow-auto rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-200">
@@ -375,8 +416,8 @@ function DiffOperationRow({ operation }: { operation: FieldChangeInsight["operat
 function RawValueComparison({ previous, next }: { previous: unknown; next: unknown }) {
   return (
     <div className="mt-3 grid gap-3 md:grid-cols-2">
-      <ValueBlock label="Previous" tone="danger" value={previous} />
-      <ValueBlock label="New" tone="success" value={next} />
+      <ValueBlock label="Before this change" tone="danger" value={previous} />
+      <ValueBlock label="After this change" tone="success" value={next} />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { ChangelogManagement } from "./components"
 import { getDataVersionSummaries } from "@/app/actions/change-logs"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import { getPendingDraftQueue } from "@/app/actions/ops"
+import { ChangelogWorkflowRail } from "./components/workflow-rail"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +24,8 @@ export default async function ChangelogsPage({ searchParams }: { searchParams?: 
     <>
       <Title>Changelog Management</Title>
 
-      <Content>
+      <Content className="space-y-6">
+        <ChangelogWorkflowRail current="releases" />
         <ChangelogManagement
           initialSummaries={summaries.data}
           initialTotal={summaries.total}

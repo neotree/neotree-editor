@@ -35,7 +35,11 @@ export function PublishDrafts({ variant }: Props) {
   const [loading, setLoading] = useState(false)
   const [scope, setScope] = useState<"0" | "1">("0")
 
-  const { publishData: _publishData, discardDrafts: _discardDrafts } = useAppContext()
+  const { publishData: _publishData, discardDrafts: _discardDrafts, drafts, myDrafts, pendingDeletion, myPendingDeletion } = useAppContext()
+
+  const selectedDrafts = scope === "0" ? myDrafts : drafts
+  const selectedDeletes = scope === "0" ? myPendingDeletion : pendingDeletion
+  const selectedTotal = (selectedDrafts?.total || 0) + (selectedDeletes || 0)
 
   const publishData = useCallback(async () => {
     try {
@@ -128,11 +132,15 @@ export function PublishDrafts({ variant }: Props) {
           {loading && <Loader overlay />}
 
           <DialogHeader>
-            <DialogTitle>{ucFirst(variant)} data</DialogTitle>
-            <DialogDescription></DialogDescription>
+            <DialogTitle>{variant === "publish" ? "Publish reviewed draft changes" : "Discard draft changes"}</DialogTitle>
+            <DialogDescription>
+              {variant === "publish"
+                ? "Review this summary before publishing. Publishing creates a new published version and makes these saved draft changes live."
+                : "Discarding removes saved draft changes from the review queue. This cannot be undone from this screen."}
+            </DialogDescription>
           </DialogHeader>
 
-          <div>
+          <div className="space-y-4">
             <RadioGroup
               defaultValue={scopeOptions[0].value}
               onValueChange={(value) => setScope(value as typeof scope)}
@@ -147,6 +155,30 @@ export function PublishDrafts({ variant }: Props) {
                 </div>
               ))}
             </RadioGroup>
+
+            <div className="rounded-lg border border-l-4 border-l-primary bg-primary/[0.03] p-4 text-sm">
+              <div className="font-medium">
+                {scope === "0" ? "Selected scope: my saved draft changes" : "Selected scope: all team saved draft changes"}
+              </div>
+              <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
+                <span>{selectedDrafts?.scripts || 0} script drafts</span>
+                <span>{selectedDrafts?.screens || 0} screen drafts</span>
+                <span>{selectedDrafts?.diagnoses || 0} diagnosis drafts</span>
+                <span>{selectedDrafts?.problems || 0} problem drafts</span>
+                <span>{selectedDrafts?.dataKeys || 0} data key drafts</span>
+                <span>{selectedDrafts?.drugsLibraryItems || 0} drug/fluid/feed drafts</span>
+                <span>{selectedDrafts?.configKeys || 0} configuration drafts</span>
+                <span>{selectedDrafts?.hospitals || 0} hospital drafts</span>
+                <span className="font-medium text-foreground">{selectedDeletes || 0} queued deletes</span>
+                <span className="font-medium text-foreground">{selectedTotal} total pending changes</span>
+              </div>
+            </div>
+
+            {variant === "publish" && selectedDeletes > 0 && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-800 dark:text-red-200">
+                This publish includes queued deletes. Continue only if those deletes were reviewed and are intentional.
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -156,6 +188,7 @@ export function PublishDrafts({ variant }: Props) {
 
             <Button
               variant={variant === "discard" ? "destructive" : undefined}
+              disabled={!selectedTotal || loading}
               onClick={variant === "discard" ? discardDrafts : publishData}
             >
               {ucFirst(variant)} data

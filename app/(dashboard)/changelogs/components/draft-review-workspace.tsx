@@ -68,6 +68,23 @@ const summaryCardClasses = {
   risks: "border-l-amber-500 bg-amber-500/[0.03]",
 }
 
+const friendlyFieldLabels: Record<string, string> = {
+  key: "Key",
+  keyId: "Key ID",
+  label: "Display label",
+  name: "Name",
+  title: "Title",
+  printTitle: "Printed title",
+  sectionTitle: "Section title",
+  previewTitle: "Preview title",
+  positiveLabel: "Positive answer label",
+  negativeLabel: "Negative answer label",
+  refId: "Reference ID",
+  refIdLabel: "Reference label",
+  drug: "Drug, fluid, or feed name",
+  position: "Display order",
+}
+
 type Props = {
   entries: PendingDraftQueueEntry[]
   summary: PendingDraftQueueSummary
@@ -147,6 +164,10 @@ function summarizeGroup(entries: PendingDraftQueueEntry[]) {
 
 function isScriptScopedGroup(groupId: string) {
   return groupId.startsWith("parent:") || groupId.startsWith("script:")
+}
+
+function getFriendlyFieldLabel(field: string) {
+  return friendlyFieldLabels[field] || field.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ")
 }
 
 export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
@@ -239,23 +260,57 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
     <div className="space-y-6">
       <Card>
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Draft Queue</CardTitle>
+          <CardTitle className="text-2xl">Pending Draft Changes</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {summary.scopeLabel}. This queue is built from server draft tables and pending deletions.
+            {summary.scopeLabel}. Only saved draft changes appear here. If you are editing a form, save it first so it is protected in this
+            queue.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-lg border border-l-4 border-l-primary bg-primary/[0.03] p-4">
+            <div className="font-medium">What will happen when this is published?</div>
+            <div className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-4">
+              <span>
+                {summary.totalCreates} new {summary.totalCreates === 1 ? "item" : "items"} will be created
+              </span>
+              <span>
+                {summary.totalUpdates} existing {summary.totalUpdates === 1 ? "item" : "items"} will be updated
+              </span>
+              <span>
+                {summary.totalDeletes} {summary.totalDeletes === 1 ? "item" : "items"} will be deleted
+              </span>
+              <span>
+                {summary.conflictEntries + summary.staleEntries}{" "}
+                {summary.conflictEntries + summary.staleEntries === 1 ? "warning" : "warnings"} need attention
+              </span>
+            </div>
+          </div>
+
+          {!!(summary.conflictEntries + summary.staleEntries || summary.totalDeletes) && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
+              <div className="font-semibold">Review needed before publishing</div>
+              <div className="mt-1">
+                {summary.totalDeletes ? `${summary.totalDeletes} queued delete ${summary.totalDeletes === 1 ? "change" : "changes"}. ` : ""}
+                {summary.staleEntries ? `${summary.staleEntries} stale ${summary.staleEntries === 1 ? "draft" : "drafts"}. ` : ""}
+                {summary.conflictEntries
+                  ? `${summary.conflictEntries} conflict ${summary.conflictEntries === 1 ? "warning" : "warnings"}.`
+                  : ""}{" "}
+                Open each warning or delete and confirm it is intentional.
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.entries)}>
-              <div className="text-sm text-muted-foreground">Queue Entries</div>
+              <div className="text-sm text-muted-foreground">Pending Changes</div>
               <div className="mt-1 text-2xl font-semibold">{summary.totalEntries}</div>
             </div>
             <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.drafts)}>
-              <div className="text-sm text-muted-foreground">Draft Rows</div>
+              <div className="text-sm text-muted-foreground">Saved Draft Changes</div>
               <div className="mt-1 text-2xl font-semibold">{summary.totalDrafts}</div>
             </div>
             <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.deletes)}>
-              <div className="text-sm text-muted-foreground">Deletes Queued</div>
+              <div className="text-sm text-muted-foreground">Queued Deletes</div>
               <div className="mt-1 text-2xl font-semibold">{summary.totalDeletes}</div>
             </div>
             <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.creates)}>
@@ -267,7 +322,7 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
               <div className="mt-1 text-2xl font-semibold">{summary.totalUpdates}</div>
             </div>
             <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.risks)}>
-              <div className="text-sm text-muted-foreground">Risks</div>
+              <div className="text-sm text-muted-foreground">Warnings</div>
               <div className="mt-1 text-2xl font-semibold">{summary.conflictEntries + summary.staleEntries}</div>
             </div>
           </div>
@@ -282,7 +337,7 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
             {!!summary.staleEntries && (
               <>
                 <span>|</span>
-                <span>{summary.staleEntries} stale drafts</span>
+                <span>{summary.staleEntries} older drafts need review</span>
               </>
             )}
             {!!summary.conflictEntries && (
@@ -564,7 +619,12 @@ function DraftGroupCard({ group }: { group: DraftEntryGroup }) {
               ))}
               {!!summary.warnings && (
                 <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                  {summary.warnings} warnings
+                  Needs review
+                </Badge>
+              )}
+              {!summary.warnings && !summary.deletes && (
+                <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                  Ready to publish
                 </Badge>
               )}
             </div>
@@ -612,7 +672,7 @@ function DraftEntryRow({ entry }: { entry: PendingDraftQueueEntry }) {
           <div className="flex flex-wrap gap-2">
             {entry.changedFields.slice(0, 6).map((field) => (
               <Badge key={field} variant="outline" className="bg-background text-xs">
-                {field}
+                {getFriendlyFieldLabel(field)}
               </Badge>
             ))}
             {entry.changedFields.length > 6 && (
@@ -627,7 +687,7 @@ function DraftEntryRow({ entry }: { entry: PendingDraftQueueEntry }) {
             )}
             {entry.isStale && (
               <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                Stale
+                Older draft - review before publishing
               </Badge>
             )}
             {entry.conflictLabels.map((label) => (
@@ -688,14 +748,19 @@ function DraftDiffDialog({ entry }: { entry: PendingDraftQueueEntry }) {
         <div className="space-y-3">
           {entry.diffPreview.map((preview) => (
             <div key={preview.field} className="rounded-lg border p-3">
-              <div className="font-medium">{preview.field}</div>
+              <div className="font-medium">
+                {getFriendlyFieldLabel(preview.field)}
+                {getFriendlyFieldLabel(preview.field) !== preview.field && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">{preview.field}</span>
+                )}
+              </div>
               <div className="mt-2 grid gap-3 md:grid-cols-2">
                 <div className="rounded-md bg-red-500/[0.04] p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Before</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Before this change</div>
                   <div className="mt-1 text-sm">{preview.before}</div>
                 </div>
                 <div className="rounded-md bg-emerald-500/[0.05] p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">After</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">After this change</div>
                   <div className="mt-1 text-sm">{preview.after}</div>
                 </div>
               </div>

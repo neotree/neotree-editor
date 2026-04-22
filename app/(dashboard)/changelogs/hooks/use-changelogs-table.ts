@@ -27,8 +27,8 @@ type Pagination = {
 const sortOptions = [
   { value: "publishedAt.desc", label: "Published (Newest)" },
   { value: "publishedAt.asc", label: "Published (Oldest)" },
-  { value: "dataVersion.desc", label: "Data Version (High to Low)" },
-  { value: "dataVersion.asc", label: "Data Version (Low to High)" },
+  { value: "dataVersion.desc", label: "Published Version (High to Low)" },
+  { value: "dataVersion.asc", label: "Published Version (Low to High)" },
   { value: "changeCount.desc", label: "Changes (High to Low)" },
   { value: "changeCount.asc", label: "Changes (Low to High)" },
 ]
