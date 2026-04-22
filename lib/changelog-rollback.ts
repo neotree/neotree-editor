@@ -38,6 +38,16 @@ export function getRollbackParentVersion(previousChangeLogVersion: number): numb
   return previousChangeLogVersion
 }
 
+export function getRollbackTargetVersion(params: {
+  action?: string | null
+  parentVersion?: number | null
+  mergedFromVersion?: number | null
+}) {
+  if (Number.isFinite(params.parentVersion)) return Number(params.parentVersion)
+  if (Number.isFinite(params.mergedFromVersion)) return Number(params.mergedFromVersion)
+  return null
+}
+
 export function getRollbackAppliedEntityVersion(rollbackChangeLogVersion: number): number {
   return rollbackChangeLogVersion
 }
@@ -135,8 +145,35 @@ export function partitionReleaseRollbackCandidates<T extends RollbackCandidate>(
   }
 }
 
+function normalizeSnapshotValueForHash(snapshot: any): any {
+  if (snapshot instanceof Date) return snapshot.toISOString()
+
+  if (Array.isArray(snapshot)) {
+    return snapshot.map((value) => {
+      if (value === undefined || typeof value === "function" || typeof value === "symbol") return null
+      return normalizeSnapshotValueForHash(value)
+    })
+  }
+
+  if (snapshot && typeof snapshot === "object") {
+    return Object.keys(snapshot)
+      .sort()
+      .reduce<Record<string, any>>((acc, key) => {
+        const value = snapshot[key]
+        if (value === undefined || typeof value === "function" || typeof value === "symbol") return acc
+        acc[key] = normalizeSnapshotValueForHash(value)
+        return acc
+      }, {})
+  }
+
+  if (typeof snapshot === "number" && !Number.isFinite(snapshot)) return null
+  if (typeof snapshot === "bigint") return snapshot.toString()
+  return snapshot
+}
+
 export function computeRollbackSnapshotHash(snapshot: any) {
-  return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
+  const normalizedSnapshot = normalizeSnapshotValueForHash(snapshot ?? {})
+  return createHash("sha256").update(JSON.stringify(normalizedSnapshot)).digest("hex")
 }
 
 export function coerceRollbackSnapshotValues(

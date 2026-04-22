@@ -1,5 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm"
-import { createHash } from "crypto"
+import { and, desc, eq } from "drizzle-orm"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
@@ -21,6 +20,7 @@ import {
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 import { sql } from "drizzle-orm"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback"
 
 export type SaveChangeLogData = {
   entityId: string
@@ -163,10 +163,6 @@ async function lockChangeLogChain(client: DbOrTransaction, entityType: string, e
   const key1 = hashToInt32(entityType)
   const key2 = hashToInt32(entityId)
   await client.execute(sql`select pg_advisory_xact_lock(${key1}, ${key2})`)
-}
-
-function computeSnapshotHash(snapshot: any) {
-  return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
 }
 
 async function resolveUserId(data: SaveChangeLogData) {
@@ -324,7 +320,7 @@ async function ensureBaselineChangeLog({
   }
 
   const baselineVersion = Math.max(0, computedVersion - 1)
-  const snapshotHash = computeSnapshotHash(snapshotForBaseline)
+  const snapshotHash = computeRollbackSnapshotHash(snapshotForBaseline)
 
   const baseline: typeof changeLogs.$inferInsert = {
     changeLogId: uuid.v4(),
@@ -459,11 +455,12 @@ export async function _saveChangeLog({
         }
       }
 
-      const snapshotHash = resolvedData.snapshotHash || computeSnapshotHash(resolvedData.fullSnapshot)
+      const snapshotHash = resolvedData.snapshotHash || computeRollbackSnapshotHash(resolvedData.fullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
 
       const previousSnapshot = resolvedData.previousSnapshot ?? resolvedData.baselineSnapshot ?? {}
 
+      const changeTimestamp = new Date()
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
         entityId: resolvedData.entityId,
@@ -492,28 +489,27 @@ export async function _saveChangeLog({
         drugsLibraryItemId: resolvedData.drugsLibraryItemId,
         dataKeyId: resolvedData.dataKeyId,
         aliasId: resolvedData.aliasId,
-        dateOfChange: new Date(),
+        dateOfChange: changeTimestamp,
       }
 
-      const [inserted] = await tx.insert(changeLogs).values(changeLogData).returning()
-
-      if (inserted && inserted.entityId && Number.isFinite(inserted.version)) {
+      if (changeLogData.isActive) {
         await tx
           .update(changeLogs)
           .set({
             isActive: false,
-            supersededBy: inserted.version,
-            supersededAt: inserted.dateOfChange ?? new Date(),
+            supersededBy: computedVersion,
+            supersededAt: changeTimestamp,
           })
           .where(
             and(
-              eq(changeLogs.entityId, inserted.entityId),
-              eq(changeLogs.entityType, inserted.entityType),
-              lt(changeLogs.version, inserted.version),
+              eq(changeLogs.entityId, resolvedData.entityId),
+              eq(changeLogs.entityType, resolvedData.entityType),
               eq(changeLogs.isActive, true),
             ),
           )
       }
+
+      const [inserted] = await tx.insert(changeLogs).values(changeLogData).returning()
 
       return inserted
     }

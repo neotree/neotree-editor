@@ -10,6 +10,7 @@ export type UseChangelogsTableParams = {
   initialSummaries?: Awaited<ReturnType<typeof getDataVersionSummaries>>["data"]
   initialTotal?: number
   initialLatestDataVersion?: number | null
+  initialSearchValue?: string
 }
 
 export type ChangeLogType = Awaited<ReturnType<typeof getChangeLogs>>["data"][0]
@@ -45,6 +46,7 @@ export function useChangelogsTable({
   initialSummaries = [],
   initialTotal = 0,
   initialLatestDataVersion = null,
+  initialSearchValue = "",
 }: UseChangelogsTableParams) {
   const [dataVersions, setDataVersions] = useState<DataVersionSummary[]>(initialSummaries)
   const [totalDataVersions, setTotalDataVersions] = useState<number>(initialTotal)
@@ -53,7 +55,7 @@ export function useChangelogsTable({
   const [detailsLoadingByVersion, setDetailsLoadingByVersion] = useState<Record<number, boolean>>({})
   const [loading, setLoading] = useState(false)
 
-  const [searchValue, setSearchValue] = useState("")
+  const [searchValue, setSearchValue] = useState(initialSearchValue)
   const [entityType, setEntityType] = useState("all")
   const [action, setAction] = useState("all")
   const [isActiveOnly, setIsActiveOnly] = useState(false)

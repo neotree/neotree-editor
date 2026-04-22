@@ -53,7 +53,7 @@ import axios from "axios"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
 
-type Props = UseChangelogsTableParams & { isSuperUser: boolean }
+type Props = UseChangelogsTableParams & { isSuperUser: boolean; currentUserId?: string | null }
 
 const entityTypeLabels: Record<string, string> = {
   script: "Script",
@@ -90,14 +90,14 @@ const defaultActionBadgeClass = "border-muted bg-muted text-muted-foreground"
 function formatEntitySummary(entry: DataVersionSummary) {
   const items = Object.entries(entry.entityCounts).sort(([, countA], [, countB]) => countB - countA)
 
-  if (!items.length) return "—"
+  if (!items.length) return "-"
 
   return items
     .map(([entityType, count]) => {
       const label = entityTypeLabels[entityType] || entityType
       return `${count} ${label}${count === 1 ? "" : "s"}`
     })
-    .join(" • ")
+    .join(" | ")
 }
 
 function renderActionBadges(entry: DataVersionSummary) {
@@ -384,7 +384,7 @@ export function ChangelogsTable(props: Props) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search releases, publishers or entity ids..."
+              placeholder="Search published releases by version, publisher, or entity id..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               className="pl-10"

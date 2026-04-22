@@ -21,8 +21,1178 @@ import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/e
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
 import db from "@/databases/pg/drizzle"
-import { editorInfo } from "@/databases/pg/schema"
+import {
+  configKeysDrafts,
+  dataKeysDrafts,
+  diagnosesDrafts,
+  drugsLibraryDrafts,
+  editorInfo,
+  hospitalsDrafts,
+  pendingDeletion,
+  problemsDrafts,
+  screensDrafts,
+  scriptsDrafts,
+} from "@/databases/pg/schema"
 import { eq, sql } from "drizzle-orm"
+
+export type PendingDraftQueueScope = "all" | "mine"
+export type PendingDraftQueueTab = "all" | "creates" | "updates" | "deletes" | "mine"
+export type PendingDraftQueueSort = "recent" | "oldest" | "creator" | "entity" | "title" | "action"
+export type PendingDraftQueueGroupBy = "parent" | "creator" | "entity"
+export type PendingDraftQueueEntityType =
+  | "script"
+  | "screen"
+  | "diagnosis"
+  | "problem"
+  | "config_key"
+  | "hospital"
+  | "drugs_library"
+  | "data_key"
+  | "alias"
+export type PendingDraftQueueAction = "create" | "update" | "delete"
+
+export type PendingDraftQueueDiffPreview = {
+  field: string
+  before: string
+  after: string
+}
+
+export type PendingDraftQueueEntry = {
+  id: string
+  entityType: PendingDraftQueueEntityType
+  action: PendingDraftQueueAction
+  title: string
+  description: string
+  entityId: string
+  draftId?: string | null
+  publishedEntityId?: string | null
+  parentEntityId?: string | null
+  parentTitle?: string | null
+  href?: string | null
+  searchHref?: string | null
+  createdAt: string
+  createdByUserId?: string | null
+  createdByName: string
+  createdByEmail?: string | null
+  isUnpublished: boolean
+  source: "draft" | "pending_deletion"
+  statusLabel: string
+  changedFields: string[]
+  changedFieldCount: number
+  diffPreview: PendingDraftQueueDiffPreview[]
+  reviewGroupId: string
+  reviewGroupLabel: string
+  conflictLabels: string[]
+  infoLabels: string[]
+  isStale: boolean
+  ageInDays: number
+  parentHref?: string | null
+}
+
+export type PendingDraftQueueSummary = {
+  totalEntries: number
+  totalDrafts: number
+  totalDeletes: number
+  totalCreates: number
+  totalUpdates: number
+  uniqueEntities: number
+  entityCounts: Record<string, number>
+  scope: PendingDraftQueueScope
+  scopeLabel: string
+  staleEntries: number
+  conflictEntries: number
+}
+
+export type PendingDraftQueueFilters = {
+  scope: PendingDraftQueueScope
+  tab: PendingDraftQueueTab
+  query: string
+  entityType: "all" | PendingDraftQueueEntityType
+  creator: string
+  sort: PendingDraftQueueSort
+  groupBy: PendingDraftQueueGroupBy
+  page: number
+  pageSize: number
+}
+
+export type PendingDraftQueueMeta = {
+  filters: PendingDraftQueueFilters
+  pagination: {
+    page: number
+    pageSize: number
+    totalEntries: number
+    totalPages: number
+    returnedEntries: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
+  }
+  tabCounts: Record<PendingDraftQueueTab, number>
+  creators: Array<{ value: string; label: string; count: number }>
+  entityTypes: Array<{ value: PendingDraftQueueEntityType; label: string; count: number }>
+}
+
+function toIsoString(value: Date | string | null | undefined) {
+  if (!value) return new Date(0).toISOString()
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
+}
+
+const PENDING_DRAFT_STALE_DAYS = 14
+const PENDING_DRAFT_PAGE_SIZE = 20
+const DIFF_FIELD_LIMIT = 8
+const PREVIEW_ITEM_LIMIT = 6
+const entityTypeLabels: Record<PendingDraftQueueEntityType, string> = {
+  script: "Script",
+  screen: "Screen",
+  diagnosis: "Diagnosis",
+  problem: "Problem",
+  config_key: "Config Key",
+  hospital: "Hospital",
+  drugs_library: "Drugs Library",
+  data_key: "Data Key",
+  alias: "Alias",
+}
+const actionLabelByTab: Record<Exclude<PendingDraftQueueTab, "all" | "mine">, PendingDraftQueueAction> = {
+  creates: "create",
+  updates: "update",
+  deletes: "delete",
+}
+const ignoredDiffKeys = new Set([
+  "id",
+  "version",
+  "publishDate",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+  "oldScreenId",
+  "oldScriptId",
+  "oldDiagnosisId",
+  "oldProblemId",
+  "scriptId",
+  "screenId",
+  "diagnosisId",
+  "problemId",
+  "configKeyId",
+  "hospitalId",
+  "itemId",
+  "dataKeyId",
+  "uuid",
+])
+
+function getCreatedByLabel(createdBy?: { displayName?: string | null; email?: string | null } | null) {
+  return createdBy?.displayName || createdBy?.email || "Unknown user"
+}
+
+function buildChangelogSearchHref(entityId?: string | null) {
+  return entityId ? `/changelogs?q=${encodeURIComponent(entityId)}` : null
+}
+
+function summarizeDraftAction(hasPublishedEntity: boolean, noun: string) {
+  return hasPublishedEntity ? `Draft update to published ${noun}` : `New ${noun} draft`
+}
+
+function toPlainRecord(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+}
+
+function previewValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Empty"
+  if (typeof value === "string") return value.length > 120 ? `${value.slice(0, 117)}...` : value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  const json = JSON.stringify(value)
+  return json.length > 120 ? `${json.slice(0, 117)}...` : json
+}
+
+function valuesEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function buildDiffPreview({
+  action,
+  draftData,
+  publishedData,
+}: {
+  action: PendingDraftQueueAction
+  draftData?: unknown
+  publishedData?: unknown
+}) {
+  if (action === "delete") {
+    return { changedFields: [], diffPreview: [] as PendingDraftQueueDiffPreview[] }
+  }
+
+  const draft = toPlainRecord(draftData)
+  const published = toPlainRecord(publishedData)
+  const keys = Array.from(new Set([...Object.keys(draft), ...Object.keys(published)]))
+    .filter((key) => !ignoredDiffKeys.has(key))
+    .sort((a, b) => a.localeCompare(b))
+
+  const changedFields: string[] = []
+  const diffPreview: PendingDraftQueueDiffPreview[] = []
+
+  for (const key of keys) {
+    const before = published[key]
+    const after = draft[key]
+
+    if (action === "create") {
+      const isMeaningful = after !== null && after !== undefined && after !== "" && JSON.stringify(after) !== "[]"
+      if (!isMeaningful) continue
+      changedFields.push(key)
+      if (diffPreview.length < PREVIEW_ITEM_LIMIT) {
+        diffPreview.push({ field: key, before: "New", after: previewValue(after) })
+      }
+      continue
+    }
+
+    if (valuesEqual(before, after)) continue
+    changedFields.push(key)
+    if (diffPreview.length < PREVIEW_ITEM_LIMIT) {
+      diffPreview.push({ field: key, before: previewValue(before), after: previewValue(after) })
+    }
+  }
+
+  return {
+    changedFields: changedFields.slice(0, DIFF_FIELD_LIMIT),
+    diffPreview,
+  }
+}
+
+function normalizePendingDraftQueueFilters(
+  params: {
+    scope?: PendingDraftQueueScope
+    tab?: PendingDraftQueueTab
+    query?: string
+    entityType?: "all" | PendingDraftQueueEntityType
+    creator?: string
+    sort?: PendingDraftQueueSort
+    groupBy?: PendingDraftQueueGroupBy
+    page?: number
+    pageSize?: number
+  } | undefined,
+  canViewAll: boolean,
+) {
+  const requestedScope = params?.scope === "all" && canViewAll ? "all" : "mine"
+  const tab: PendingDraftQueueTab =
+    params?.tab && ["all", "creates", "updates", "deletes", "mine"].includes(params.tab) ? params.tab : "all"
+
+  return {
+    scope: tab === "mine" ? "mine" : requestedScope,
+    tab,
+    query: typeof params?.query === "string" ? params.query.trim() : "",
+    entityType:
+      params?.entityType && ["all", ...Object.keys(entityTypeLabels)].includes(params.entityType)
+        ? (params.entityType as "all" | PendingDraftQueueEntityType)
+        : "all",
+    creator: typeof params?.creator === "string" ? params.creator : "all",
+    sort:
+      params?.sort && ["recent", "oldest", "creator", "entity", "title", "action"].includes(params.sort)
+        ? params.sort
+        : "recent",
+    groupBy:
+      params?.groupBy && ["parent", "creator", "entity"].includes(params.groupBy) ? params.groupBy : "parent",
+    page: Math.max(1, Number(params?.page) || 1),
+    pageSize: Math.min(100, Math.max(10, Number(params?.pageSize) || PENDING_DRAFT_PAGE_SIZE)),
+  } satisfies PendingDraftQueueFilters
+}
+
+export async function getPendingDraftQueue(params?: {
+  scope?: PendingDraftQueueScope
+  tab?: PendingDraftQueueTab
+  query?: string
+  entityType?: "all" | PendingDraftQueueEntityType
+  creator?: string
+  sort?: PendingDraftQueueSort
+  groupBy?: PendingDraftQueueGroupBy
+  page?: number
+  pageSize?: number
+}): Promise<{
+  success: boolean
+  data: PendingDraftQueueEntry[]
+  summary: PendingDraftQueueSummary
+  meta: PendingDraftQueueMeta
+  errors?: string[]
+}> {
+  try {
+    const session = await isAllowed()
+    const currentUserId = session.user?.userId || null
+    const canViewAll = ["admin", "super_user"].includes(session.user?.role || "")
+    const filters = normalizePendingDraftQueueFilters(params, canViewAll)
+    const createdByFilter = filters.scope === "mine" && currentUserId ? currentUserId : null
+
+    const whereByUser = <TColumn,>(column: TColumn) =>
+      createdByFilter ? eq(column as any, createdByFilter) : undefined
+
+    const [
+      scriptDraftRows,
+      screenDraftRows,
+      diagnosisDraftRows,
+      problemDraftRows,
+      configKeyDraftRows,
+      hospitalDraftRows,
+      drugsLibraryDraftRows,
+      dataKeyDraftRows,
+      pendingDeletionRows,
+    ] = await Promise.all([
+      db.query.scriptsDrafts.findMany({
+        where: whereByUser(scriptsDrafts.createdByUserId),
+        with: { createdBy: true, script: true },
+      }),
+      db.query.screensDrafts.findMany({
+        where: whereByUser(screensDrafts.createdByUserId),
+        with: { createdBy: true, screen: true, script: true, scriptDraft: true },
+      }),
+      db.query.diagnosesDrafts.findMany({
+        where: whereByUser(diagnosesDrafts.createdByUserId),
+        with: { createdBy: true, diagnosis: true, script: true, scriptDraft: true },
+      }),
+      db.query.problemsDrafts.findMany({
+        where: whereByUser(problemsDrafts.createdByUserId),
+        with: { createdBy: true, problem: true, script: true, scriptDraft: true },
+      }),
+      db.query.configKeysDrafts.findMany({
+        where: whereByUser(configKeysDrafts.createdByUserId),
+        with: { createdBy: true, configKey: true },
+      }),
+      db.query.hospitalsDrafts.findMany({
+        where: whereByUser(hospitalsDrafts.createdByUserId),
+        with: { createdBy: true, hospital: true },
+      }),
+      db.query.drugsLibraryDrafts.findMany({
+        where: whereByUser(drugsLibraryDrafts.createdByUserId),
+        with: { createdBy: true, item: true },
+      }),
+      db.query.dataKeysDrafts.findMany({
+        where: whereByUser(dataKeysDrafts.createdByUserId),
+      }),
+      db.query.pendingDeletion.findMany({
+        where: whereByUser(pendingDeletion.createdByUserId),
+        with: {
+          createdBy: true,
+          script: true,
+          screen: true,
+          screenScript: true,
+          diagnosis: true,
+          diagnosisScript: true,
+          problem: true,
+          problemScript: true,
+          configKey: true,
+          hospital: true,
+          drugsLibraryItem: true,
+          dataKey: true,
+          alias: true,
+        },
+      }),
+    ])
+
+    const entries: PendingDraftQueueEntry[] = [
+      ...scriptDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.scriptId || draft.scriptDraftId
+        const diff = buildDiffPreview({
+          action: draft.scriptId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.script,
+        })
+        return {
+          id: `draft:script:${draft.scriptDraftId}`,
+          entityType: "script",
+          action: draft.scriptId ? "update" : "create",
+          title: draft.data.title || draft.data.printTitle || "Untitled Script",
+          description: summarizeDraftAction(!!draft.scriptId, "script"),
+          entityId,
+          draftId: draft.scriptDraftId,
+          publishedEntityId: draft.scriptId,
+          href: entityId ? `/script/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.scriptId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.scriptId,
+          source: "draft",
+          statusLabel: draft.scriptId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: `script:${entityId}`,
+          reviewGroupLabel: draft.data.title || draft.data.printTitle || "Script",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...screenDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.screenId || draft.screenDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.screenId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.screen,
+        })
+        return {
+          id: `draft:screen:${draft.screenDraftId}`,
+          entityType: "screen",
+          action: draft.screenId ? "update" : "create",
+          title: draft.data.title || draft.data.sectionTitle || draft.data.previewTitle || "Untitled Screen",
+          description: summarizeDraftAction(!!draft.screenId, "screen"),
+          entityId,
+          draftId: draft.screenDraftId,
+          publishedEntityId: draft.screenId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/screen/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.screenId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.screenId,
+          source: "draft",
+          statusLabel: draft.screenId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `screen:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Screen Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...diagnosisDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.diagnosisId || draft.diagnosisDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.diagnosisId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.diagnosis,
+        })
+        return {
+          id: `draft:diagnosis:${draft.diagnosisDraftId}`,
+          entityType: "diagnosis",
+          action: draft.diagnosisId ? "update" : "create",
+          title: draft.data.name || draft.data.key || "Untitled Diagnosis",
+          description: summarizeDraftAction(!!draft.diagnosisId, "diagnosis"),
+          entityId,
+          draftId: draft.diagnosisDraftId,
+          publishedEntityId: draft.diagnosisId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/diagnosis/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.diagnosisId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.diagnosisId,
+          source: "draft",
+          statusLabel: draft.diagnosisId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `diagnosis:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Diagnosis Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...problemDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.problemId || draft.problemDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.problemId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.problem,
+        })
+        return {
+          id: `draft:problem:${draft.problemDraftId}`,
+          entityType: "problem",
+          action: draft.problemId ? "update" : "create",
+          title: draft.data.name || draft.data.key || "Untitled Problem",
+          description: summarizeDraftAction(!!draft.problemId, "problem"),
+          entityId,
+          draftId: draft.problemDraftId,
+          publishedEntityId: draft.problemId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/problem/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.problemId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.problemId,
+          source: "draft",
+          statusLabel: draft.problemId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `problem:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Problem Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...configKeyDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.configKeyId || draft.configKeyDraftId
+        const diff = buildDiffPreview({
+          action: draft.configKeyId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.configKey,
+        })
+        return {
+          id: `draft:config_key:${draft.configKeyDraftId}`,
+          entityType: "config_key",
+          action: draft.configKeyId ? "update" : "create",
+          title: draft.data.label || draft.data.key || "Untitled Config Key",
+          description: summarizeDraftAction(!!draft.configKeyId, "configuration key"),
+          entityId,
+          draftId: draft.configKeyDraftId,
+          publishedEntityId: draft.configKeyId,
+          href: "/configuration",
+          searchHref: buildChangelogSearchHref(draft.configKeyId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.configKeyId,
+          source: "draft",
+          statusLabel: draft.configKeyId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:config_key",
+          reviewGroupLabel: "Configuration Keys",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...hospitalDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.hospitalId || draft.hospitalDraftId
+        const diff = buildDiffPreview({
+          action: draft.hospitalId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.hospital,
+        })
+        return {
+          id: `draft:hospital:${draft.hospitalDraftId}`,
+          entityType: "hospital",
+          action: draft.hospitalId ? "update" : "create",
+          title: draft.data.name || "Untitled Hospital",
+          description: summarizeDraftAction(!!draft.hospitalId, "hospital"),
+          entityId,
+          draftId: draft.hospitalDraftId,
+          publishedEntityId: draft.hospitalId,
+          href: `/hospitals?hospitalId=${encodeURIComponent(entityId)}`,
+          searchHref: buildChangelogSearchHref(draft.hospitalId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.hospitalId,
+          source: "draft",
+          statusLabel: draft.hospitalId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:hospital",
+          reviewGroupLabel: "Hospitals",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...drugsLibraryDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.itemId || draft.itemDraftId
+        const diff = buildDiffPreview({
+          action: draft.itemId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.item,
+        })
+        return {
+          id: `draft:drugs_library:${draft.itemDraftId}`,
+          entityType: "drugs_library",
+          action: draft.itemId ? "update" : "create",
+          title: draft.data.drug || draft.data.key || "Untitled Drug",
+          description: summarizeDraftAction(!!draft.itemId, "drugs library item"),
+          entityId,
+          draftId: draft.itemDraftId,
+          publishedEntityId: draft.itemId,
+          href: `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(entityId)}`,
+          searchHref: buildChangelogSearchHref(draft.itemId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.itemId,
+          source: "draft",
+          statusLabel: draft.itemId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:drugs_library",
+          reviewGroupLabel: "Drugs, Fluids, and Feeds",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...dataKeyDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.dataKeyId || draft.uuid
+        const hrefId = draft.data?.uuid || draft.uuid
+        const diff = buildDiffPreview({
+          action: draft.dataKeyId ? "update" : "create",
+          draftData: draft.data,
+        })
+        return {
+          id: `draft:data_key:${draft.uuid}`,
+          entityType: "data_key",
+          action: draft.dataKeyId ? "update" : "create",
+          title: draft.data.label || draft.data.name || "Untitled Data Key",
+          description: summarizeDraftAction(!!draft.dataKeyId, "data key"),
+          entityId,
+          draftId: draft.uuid,
+          publishedEntityId: draft.dataKeyId,
+          href: `/data-keys/edit/${encodeURIComponent(hrefId)}`,
+          searchHref: buildChangelogSearchHref(draft.dataKeyId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: "Unknown user",
+          createdByEmail: null,
+          isUnpublished: !draft.dataKeyId,
+          source: "draft",
+          statusLabel: draft.dataKeyId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:data_key",
+          reviewGroupLabel: "Data Keys",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...pendingDeletionRows
+        .filter((row) =>
+          [
+            row.scriptId,
+            row.screenId,
+            row.diagnosisId,
+            row.problemId,
+            row.configKeyId,
+            row.hospitalId,
+            row.drugsLibraryItemId,
+            row.dataKeyId,
+            row.aliasId,
+          ].some(Boolean),
+        )
+        .map((row): PendingDraftQueueEntry => {
+          if (row.scriptId) {
+            return {
+              id: `delete:script:${row.scriptId}:${row.id}`,
+              entityType: "script" as const,
+              action: "delete" as const,
+              title: row.script?.title || row.script?.printTitle || "Untitled Script",
+              description: "Queued for deletion at next publish",
+              entityId: row.scriptId,
+              publishedEntityId: row.scriptId,
+              href: `/script/${row.scriptId}`,
+              searchHref: buildChangelogSearchHref(row.scriptId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: `script:${row.scriptId}`,
+              reviewGroupLabel: row.script?.title || row.script?.printTitle || "Script",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.screenId) {
+            return {
+              id: `delete:screen:${row.screenId}:${row.id}`,
+              entityType: "screen" as const,
+              action: "delete" as const,
+              title: row.screen?.title || row.screen?.sectionTitle || "Untitled Screen",
+              description: "Queued for deletion at next publish",
+              entityId: row.screenId,
+              publishedEntityId: row.screenId,
+              parentEntityId: row.screenScriptId,
+              parentTitle: row.screenScript?.title || row.screenScript?.printTitle || null,
+              href: row.screenScriptId ? `/script/${row.screenScriptId}/screen/${row.screenId}` : null,
+              searchHref: buildChangelogSearchHref(row.screenId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.screenScriptId ? `parent:${row.screenScriptId}` : `screen:${row.screenId}`,
+              reviewGroupLabel: row.screenScript?.title || row.screenScript?.printTitle || "Ungrouped Screen Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.screenScriptId ? `/script/${row.screenScriptId}` : null,
+            }
+          }
+
+          if (row.diagnosisId) {
+            return {
+              id: `delete:diagnosis:${row.diagnosisId}:${row.id}`,
+              entityType: "diagnosis" as const,
+              action: "delete" as const,
+              title: row.diagnosis?.name || row.diagnosis?.key || "Untitled Diagnosis",
+              description: "Queued for deletion at next publish",
+              entityId: row.diagnosisId,
+              publishedEntityId: row.diagnosisId,
+              parentEntityId: row.diagnosisScriptId,
+              parentTitle: row.diagnosisScript?.title || row.diagnosisScript?.printTitle || null,
+              href: row.diagnosisScriptId ? `/script/${row.diagnosisScriptId}/diagnosis/${row.diagnosisId}` : null,
+              searchHref: buildChangelogSearchHref(row.diagnosisId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.diagnosisScriptId ? `parent:${row.diagnosisScriptId}` : `diagnosis:${row.diagnosisId}`,
+              reviewGroupLabel: row.diagnosisScript?.title || row.diagnosisScript?.printTitle || "Ungrouped Diagnosis Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.diagnosisScriptId ? `/script/${row.diagnosisScriptId}` : null,
+            }
+          }
+
+          if (row.problemId) {
+            return {
+              id: `delete:problem:${row.problemId}:${row.id}`,
+              entityType: "problem" as const,
+              action: "delete" as const,
+              title: row.problem?.name || row.problem?.key || "Untitled Problem",
+              description: "Queued for deletion at next publish",
+              entityId: row.problemId,
+              publishedEntityId: row.problemId,
+              parentEntityId: row.problemScriptId,
+              parentTitle: row.problemScript?.title || row.problemScript?.printTitle || null,
+              href: row.problemScriptId ? `/script/${row.problemScriptId}/problem/${row.problemId}` : null,
+              searchHref: buildChangelogSearchHref(row.problemId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.problemScriptId ? `parent:${row.problemScriptId}` : `problem:${row.problemId}`,
+              reviewGroupLabel: row.problemScript?.title || row.problemScript?.printTitle || "Ungrouped Problem Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.problemScriptId ? `/script/${row.problemScriptId}` : null,
+            }
+          }
+
+          if (row.configKeyId) {
+            return {
+              id: `delete:config_key:${row.configKeyId}:${row.id}`,
+              entityType: "config_key" as const,
+              action: "delete" as const,
+              title: row.configKey?.label || row.configKey?.key || "Untitled Config Key",
+              description: "Queued for deletion at next publish",
+              entityId: row.configKeyId,
+              publishedEntityId: row.configKeyId,
+              href: "/configuration",
+              searchHref: buildChangelogSearchHref(row.configKeyId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:config_key",
+              reviewGroupLabel: "Configuration Keys",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.hospitalId) {
+            return {
+              id: `delete:hospital:${row.hospitalId}:${row.id}`,
+              entityType: "hospital" as const,
+              action: "delete" as const,
+              title: row.hospital?.name || "Untitled Hospital",
+              description: "Queued for deletion at next publish",
+              entityId: row.hospitalId,
+              publishedEntityId: row.hospitalId,
+              href: `/hospitals?hospitalId=${encodeURIComponent(row.hospitalId)}`,
+              searchHref: buildChangelogSearchHref(row.hospitalId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:hospital",
+              reviewGroupLabel: "Hospitals",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.drugsLibraryItemId) {
+            return {
+              id: `delete:drugs_library:${row.drugsLibraryItemId}:${row.id}`,
+              entityType: "drugs_library" as const,
+              action: "delete" as const,
+              title: row.drugsLibraryItem?.drug || row.drugsLibraryItem?.key || "Untitled Drug",
+              description: "Queued for deletion at next publish",
+              entityId: row.drugsLibraryItemId,
+              publishedEntityId: row.drugsLibraryItemId,
+              href: `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(row.drugsLibraryItemId)}`,
+              searchHref: buildChangelogSearchHref(row.drugsLibraryItemId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:drugs_library",
+              reviewGroupLabel: "Drugs, Fluids, and Feeds",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.dataKeyId) {
+            return {
+              id: `delete:data_key:${row.dataKeyId}:${row.id}`,
+              entityType: "data_key" as const,
+              action: "delete" as const,
+              title: row.dataKey?.label || row.dataKey?.name || "Untitled Data Key",
+              description: "Queued for deletion at next publish",
+              entityId: row.dataKeyId,
+              publishedEntityId: row.dataKeyId,
+              href: `/data-keys/edit/${encodeURIComponent(row.dataKeyId)}`,
+              searchHref: buildChangelogSearchHref(row.dataKeyId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:data_key",
+              reviewGroupLabel: "Data Keys",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          return {
+            id: `delete:alias:${row.aliasId}:${row.id}`,
+            entityType: "alias" as const,
+            action: "delete" as const,
+            title: row.alias?.alias || row.alias?.name || "Alias",
+            description: "Queued for deletion at next publish",
+            entityId: row.aliasId || `alias-${row.id}`,
+            publishedEntityId: row.aliasId,
+            href: null,
+            searchHref: buildChangelogSearchHref(row.aliasId),
+            createdAt: toIsoString(row.createdAt),
+            createdByUserId: row.createdByUserId,
+            createdByName: getCreatedByLabel(row.createdBy),
+            createdByEmail: row.createdBy?.email || null,
+            isUnpublished: false,
+            source: "pending_deletion" as const,
+            statusLabel: "Delete queued",
+            changedFields: [],
+            changedFieldCount: 0,
+            diffPreview: [],
+            reviewGroupId: "entity:alias",
+            reviewGroupLabel: "Aliases",
+            conflictLabels: [],
+            infoLabels: [],
+            isStale: false,
+            ageInDays: 0,
+            parentHref: null,
+          }
+        }),
+    ]
+
+    const entityActionMap = new Map<string, Set<PendingDraftQueueAction>>()
+    const parentDraftMap = new Set(
+      entries.filter((entry) => entry.entityType === "script" && entry.source === "draft").map((entry) => entry.entityId),
+    )
+    const parentDeleteMap = new Set(
+      entries
+        .filter((entry) => entry.entityType === "script" && entry.action === "delete")
+        .map((entry) => entry.publishedEntityId || entry.entityId),
+    )
+
+    for (const entry of entries) {
+      const key = `${entry.entityType}:${entry.publishedEntityId || entry.entityId}`
+      const actions = entityActionMap.get(key) || new Set<PendingDraftQueueAction>()
+      actions.add(entry.action)
+      entityActionMap.set(key, actions)
+    }
+
+    const enrichedEntries = entries.map((entry) => {
+      const ageInDays = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      const conflictLabels = [...entry.conflictLabels]
+      const infoLabels = [...entry.infoLabels]
+      const actionSet = entityActionMap.get(`${entry.entityType}:${entry.publishedEntityId || entry.entityId}`)
+
+      if (actionSet?.has("delete") && (actionSet.has("update") || actionSet.has("create")) && entry.entityType !== "alias") {
+        conflictLabels.push("Has both a draft and a delete queued")
+      }
+
+      if (entry.parentEntityId && parentDraftMap.has(entry.parentEntityId)) {
+        infoLabels.push("Parent script also has a draft")
+      }
+
+      if (entry.parentEntityId && parentDeleteMap.has(entry.parentEntityId)) {
+        conflictLabels.push("Parent script is queued for deletion")
+      }
+
+      if (ageInDays >= PENDING_DRAFT_STALE_DAYS) {
+        infoLabels.push(`Stale for ${ageInDays} days`)
+      }
+
+      return {
+        ...entry,
+        ageInDays,
+        isStale: ageInDays >= PENDING_DRAFT_STALE_DAYS,
+        conflictLabels,
+        infoLabels,
+      }
+    })
+
+    const creatorCounts = enrichedEntries.reduce<Record<string, { label: string; count: number }>>((acc, entry) => {
+      const key = entry.createdByUserId || entry.createdByName
+      if (!acc[key]) acc[key] = { label: entry.createdByName, count: 0 }
+      acc[key].count += 1
+      return acc
+    }, {})
+
+    const entityCounts = enrichedEntries.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.entityType] = (acc[entry.entityType] || 0) + 1
+      return acc
+    }, {})
+    const creatorOptions = Object.entries(creatorCounts)
+      .map(([value, data]) => ({ value, label: data.label, count: data.count }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    const entityOptions = Object.entries(entityCounts)
+      .map(([value, count]) => ({ value: value as PendingDraftQueueEntityType, label: entityTypeLabels[value as PendingDraftQueueEntityType], count }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+
+    let filteredEntries = enrichedEntries.filter((entry) => {
+      if (filters.tab !== "all" && filters.tab !== "mine" && entry.action !== actionLabelByTab[filters.tab]) return false
+      if (filters.entityType !== "all" && entry.entityType !== filters.entityType) return false
+      if (filters.creator !== "all" && (entry.createdByUserId || entry.createdByName) !== filters.creator) return false
+      if (!filters.query) return true
+
+      const query = filters.query.toLowerCase()
+      return [
+        entry.title,
+        entry.description,
+        entry.entityId,
+        entry.parentTitle,
+        entry.createdByName,
+        entry.reviewGroupLabel,
+        entityTypeLabels[entry.entityType],
+        ...entry.changedFields,
+        ...entry.conflictLabels,
+      ]
+        .filter(Boolean)
+        .some((value) => `${value}`.toLowerCase().includes(query))
+    })
+
+    filteredEntries = filteredEntries.sort((left, right) => {
+      if (filters.sort === "oldest") return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      if (filters.sort === "creator") return left.createdByName.localeCompare(right.createdByName) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "entity") return entityTypeLabels[left.entityType].localeCompare(entityTypeLabels[right.entityType]) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "title") return left.title.localeCompare(right.title) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "action") return left.action.localeCompare(right.action) || right.createdAt.localeCompare(left.createdAt)
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    })
+
+    const totalEntries = filteredEntries.length
+    const totalPages = Math.max(1, Math.ceil(totalEntries / filters.pageSize))
+    const page = Math.min(filters.page, totalPages)
+    const startIndex = (page - 1) * filters.pageSize
+    const pagedEntries = filteredEntries.slice(startIndex, startIndex + filters.pageSize)
+
+    const uniqueEntities = new Set(enrichedEntries.map((entry) => `${entry.entityType}:${entry.entityId}`)).size
+    const totalDeletes = enrichedEntries.filter((entry) => entry.action === "delete").length
+    const totalCreates = enrichedEntries.filter((entry) => entry.action === "create").length
+    const totalUpdates = enrichedEntries.filter((entry) => entry.action === "update").length
+    const staleEntries = enrichedEntries.filter((entry) => entry.isStale).length
+    const conflictEntries = enrichedEntries.filter((entry) => entry.conflictLabels.length > 0).length
+    const tabCounts = {
+      all: enrichedEntries.length,
+      creates: totalCreates,
+      updates: totalUpdates,
+      deletes: totalDeletes,
+      mine: filters.scope === "mine" ? enrichedEntries.length : 0,
+    } satisfies Record<PendingDraftQueueTab, number>
+
+    return {
+      success: true,
+      data: pagedEntries,
+      summary: {
+        totalEntries: totalEntries,
+        totalDrafts: enrichedEntries.filter((entry) => entry.source === "draft").length,
+        totalDeletes,
+        totalCreates,
+        totalUpdates,
+        uniqueEntities,
+        entityCounts,
+        scope: filters.scope,
+        scopeLabel: filters.scope === "all" ? "Team publish queue" : "Your draft queue",
+        staleEntries,
+        conflictEntries,
+      },
+      meta: {
+        filters: { ...filters, page },
+        pagination: {
+          page,
+          pageSize: filters.pageSize,
+          totalEntries,
+          totalPages,
+          returnedEntries: pagedEntries.length,
+          hasPreviousPage: page > 1,
+          hasNextPage: page < totalPages,
+        },
+        tabCounts,
+        creators: creatorOptions,
+        entityTypes: entityOptions,
+      },
+    }
+  } catch (e: any) {
+    logger.error("getPendingDraftQueue ERROR", e.message)
+    return {
+      success: false,
+      data: [],
+      summary: {
+        totalEntries: 0,
+        totalDrafts: 0,
+        totalDeletes: 0,
+        totalCreates: 0,
+        totalUpdates: 0,
+        uniqueEntities: 0,
+        entityCounts: {},
+        scope: "mine",
+        scopeLabel: "Draft queue",
+        staleEntries: 0,
+        conflictEntries: 0,
+      },
+      meta: {
+        filters: {
+          scope: "mine",
+          tab: "all",
+          query: "",
+          entityType: "all",
+          creator: "all",
+          sort: "recent",
+          groupBy: "parent",
+          page: 1,
+          pageSize: PENDING_DRAFT_PAGE_SIZE,
+        },
+        pagination: {
+          page: 1,
+          pageSize: PENDING_DRAFT_PAGE_SIZE,
+          totalEntries: 0,
+          totalPages: 1,
+          returnedEntries: 0,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+        tabCounts: {
+          all: 0,
+          creates: 0,
+          updates: 0,
+          deletes: 0,
+          mine: 0,
+        },
+        creators: [],
+        entityTypes: [],
+      },
+      errors: [e.message],
+    }
+  }
+}
 
 export async function getEditorDetails(): Promise<{
   errors?: string[]

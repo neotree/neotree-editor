@@ -1381,6 +1381,9 @@ export const changeLogs = pgTable(
   },
   (table) => ({
     uniqueVersionPerEntity: uniqueIndex("unique_version_per_entity").on(table.entityType, table.entityId, table.version),
+    singleActiveVersionPerEntity: uniqueIndex("change_logs_single_active_version_idx")
+      .on(table.entityType, table.entityId)
+      .where(sql`${table.isActive} = true`),
     activeVersionIndex: index("active_version_index").on(table.entityId, table.isActive),
     entityIndex: index("change_logs_entity_index").on(table.entityType, table.entityId),
     versionChainIndex: index("version_chain_index").on(table.entityId, table.parentVersion),

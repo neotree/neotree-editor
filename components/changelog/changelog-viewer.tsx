@@ -189,7 +189,7 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
                             </Badge>
                           )}
                           {change.entityName && (
-                            <span className="text-sm text-muted-foreground">• {change.entityName}</span>
+                            <span className="text-sm text-muted-foreground">| {change.entityName}</span>
                           )}
                         </div>
 
