@@ -5,6 +5,7 @@ import { revalidatePath as _revalidatePath } from "next/cache"
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
+import { getAuthenticatedUser } from "./get-authenticated-user"
 import { _clearPendingDeletion, _processPendingDeletion } from "@/databases/mutations/ops"
 import * as opsQueries from "@/databases/queries/ops"
 import * as scriptsQueries from "@/databases/queries/scripts"
@@ -293,6 +294,30 @@ function normalizePendingDraftQueueFilters(
   } satisfies PendingDraftQueueFilters
 }
 
+function shouldIncludeDraftRows({
+  filters,
+  entityType,
+}: {
+  filters: PendingDraftQueueFilters
+  entityType: PendingDraftQueueEntityType
+}) {
+  if (filters.tab === "deletes") return false
+  if (filters.entityType !== "all") return filters.entityType === entityType
+  return entityType !== "alias"
+}
+
+function shouldIncludePendingDeletionRows({
+  filters,
+  entityType,
+}: {
+  filters: PendingDraftQueueFilters
+  entityType: PendingDraftQueueEntityType
+}) {
+  if (filters.tab === "creates" || filters.tab === "updates") return false
+  if (filters.entityType !== "all") return filters.entityType === entityType
+  return true
+}
+
 export async function getPendingDraftQueue(params?: {
   scope?: PendingDraftQueueScope
   tab?: PendingDraftQueueTab
@@ -316,6 +341,24 @@ export async function getPendingDraftQueue(params?: {
     const canViewAll = ["admin", "super_user"].includes(session.user?.role || "")
     const filters = normalizePendingDraftQueueFilters(params, canViewAll)
     const createdByFilter = filters.scope === "mine" && currentUserId ? currentUserId : null
+    const includeScripts = shouldIncludeDraftRows({ filters, entityType: "script" })
+    const includeScreens = shouldIncludeDraftRows({ filters, entityType: "screen" })
+    const includeDiagnoses = shouldIncludeDraftRows({ filters, entityType: "diagnosis" })
+    const includeProblems = shouldIncludeDraftRows({ filters, entityType: "problem" })
+    const includeConfigKeys = shouldIncludeDraftRows({ filters, entityType: "config_key" })
+    const includeHospitals = shouldIncludeDraftRows({ filters, entityType: "hospital" })
+    const includeDrugsLibrary = shouldIncludeDraftRows({ filters, entityType: "drugs_library" })
+    const includeDataKeys = shouldIncludeDraftRows({ filters, entityType: "data_key" })
+    const includePendingDeletes =
+      shouldIncludePendingDeletionRows({ filters, entityType: "script" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "screen" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "diagnosis" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "problem" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "config_key" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "hospital" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "drugs_library" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "alias" })
 
     const whereByUser = <TColumn,>(column: TColumn) =>
       createdByFilter ? eq(column as any, createdByFilter) : undefined
@@ -331,55 +374,74 @@ export async function getPendingDraftQueue(params?: {
       dataKeyDraftRows,
       pendingDeletionRows,
     ] = await Promise.all([
-      db.query.scriptsDrafts.findMany({
-        where: whereByUser(scriptsDrafts.createdByUserId),
-        with: { createdBy: true, script: true },
-      }),
-      db.query.screensDrafts.findMany({
-        where: whereByUser(screensDrafts.createdByUserId),
-        with: { createdBy: true, screen: true, script: true, scriptDraft: true },
-      }),
-      db.query.diagnosesDrafts.findMany({
-        where: whereByUser(diagnosesDrafts.createdByUserId),
-        with: { createdBy: true, diagnosis: true, script: true, scriptDraft: true },
-      }),
-      db.query.problemsDrafts.findMany({
-        where: whereByUser(problemsDrafts.createdByUserId),
-        with: { createdBy: true, problem: true, script: true, scriptDraft: true },
-      }),
-      db.query.configKeysDrafts.findMany({
-        where: whereByUser(configKeysDrafts.createdByUserId),
-        with: { createdBy: true, configKey: true },
-      }),
-      db.query.hospitalsDrafts.findMany({
-        where: whereByUser(hospitalsDrafts.createdByUserId),
-        with: { createdBy: true, hospital: true },
-      }),
-      db.query.drugsLibraryDrafts.findMany({
-        where: whereByUser(drugsLibraryDrafts.createdByUserId),
-        with: { createdBy: true, item: true },
-      }),
-      db.query.dataKeysDrafts.findMany({
-        where: whereByUser(dataKeysDrafts.createdByUserId),
-      }),
-      db.query.pendingDeletion.findMany({
-        where: whereByUser(pendingDeletion.createdByUserId),
-        with: {
-          createdBy: true,
-          script: true,
-          screen: true,
-          screenScript: true,
-          diagnosis: true,
-          diagnosisScript: true,
-          problem: true,
-          problemScript: true,
-          configKey: true,
-          hospital: true,
-          drugsLibraryItem: true,
-          dataKey: true,
-          alias: true,
-        },
-      }),
+      includeScripts
+        ? db.query.scriptsDrafts.findMany({
+            where: whereByUser(scriptsDrafts.createdByUserId),
+            with: { createdBy: true, script: true },
+          })
+        : Promise.resolve([]),
+      includeScreens
+        ? db.query.screensDrafts.findMany({
+            where: whereByUser(screensDrafts.createdByUserId),
+            with: { createdBy: true, screen: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeDiagnoses
+        ? db.query.diagnosesDrafts.findMany({
+            where: whereByUser(diagnosesDrafts.createdByUserId),
+            with: { createdBy: true, diagnosis: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeProblems
+        ? db.query.problemsDrafts.findMany({
+            where: whereByUser(problemsDrafts.createdByUserId),
+            with: { createdBy: true, problem: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeConfigKeys
+        ? db.query.configKeysDrafts.findMany({
+            where: whereByUser(configKeysDrafts.createdByUserId),
+            with: { createdBy: true, configKey: true },
+          })
+        : Promise.resolve([]),
+      includeHospitals
+        ? db.query.hospitalsDrafts.findMany({
+            where: whereByUser(hospitalsDrafts.createdByUserId),
+            with: { createdBy: true, hospital: true },
+          })
+        : Promise.resolve([]),
+      includeDrugsLibrary
+        ? db.query.drugsLibraryDrafts.findMany({
+            where: whereByUser(drugsLibraryDrafts.createdByUserId),
+            with: { createdBy: true, item: true },
+          })
+        : Promise.resolve([]),
+      includeDataKeys
+        ? db.query.dataKeysDrafts.findMany({
+            where: whereByUser(dataKeysDrafts.createdByUserId),
+            with: { createdBy: true, dataKey: true },
+          })
+        : Promise.resolve([]),
+      includePendingDeletes
+        ? db.query.pendingDeletion.findMany({
+            where: whereByUser(pendingDeletion.createdByUserId),
+            with: {
+              createdBy: true,
+              script: true,
+              screen: true,
+              screenScript: true,
+              diagnosis: true,
+              diagnosisScript: true,
+              problem: true,
+              problemScript: true,
+              configKey: true,
+              hospital: true,
+              drugsLibraryItem: true,
+              dataKey: true,
+              alias: true,
+            },
+          })
+        : Promise.resolve([]),
     ])
 
     const entries: PendingDraftQueueEntry[] = [
@@ -660,6 +722,7 @@ export async function getPendingDraftQueue(params?: {
         const diff = buildDiffPreview({
           action: draft.dataKeyId ? "update" : "create",
           draftData: draft.data,
+          publishedData: draft.dataKey,
         })
         return {
           id: `draft:data_key:${draft.uuid}`,
@@ -674,8 +737,8 @@ export async function getPendingDraftQueue(params?: {
           searchHref: buildChangelogSearchHref(draft.dataKeyId),
           createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
           createdByUserId: draft.createdByUserId,
-          createdByName: "Unknown user",
-          createdByEmail: null,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
           isUnpublished: !draft.dataKeyId,
           source: "draft",
           statusLabel: draft.dataKeyId ? "Draft update" : "New draft",
@@ -693,17 +756,17 @@ export async function getPendingDraftQueue(params?: {
       }),
       ...pendingDeletionRows
         .filter((row) =>
-          [
-            row.scriptId,
-            row.screenId,
-            row.diagnosisId,
-            row.problemId,
-            row.configKeyId,
-            row.hospitalId,
-            row.drugsLibraryItemId,
-            row.dataKeyId,
-            row.aliasId,
-          ].some(Boolean),
+          (
+            (shouldIncludePendingDeletionRows({ filters, entityType: "script" }) && row.scriptId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "screen" }) && row.screenId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "diagnosis" }) && row.diagnosisId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "problem" }) && row.problemId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "config_key" }) && row.configKeyId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "hospital" }) && row.hospitalId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "drugs_library" }) && row.drugsLibraryItemId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) && row.dataKeyId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "alias" }) && row.aliasId)
+          ),
         )
         .map((row): PendingDraftQueueEntry => {
           if (row.scriptId) {
@@ -1105,7 +1168,9 @@ export async function getPendingDraftQueue(params?: {
       creates: totalCreates,
       updates: totalUpdates,
       deletes: totalDeletes,
-      mine: filters.scope === "mine" ? enrichedEntries.length : 0,
+      mine: currentUserId
+        ? enrichedEntries.filter((entry) => entry.createdByUserId === currentUserId).length
+        : 0,
     } satisfies Record<PendingDraftQueueTab, number>
 
     return {
@@ -1198,20 +1263,33 @@ export async function getEditorDetails(): Promise<{
   errors?: string[]
   shouldPublishData: boolean
   pendingDeletion: number
+  myPendingDeletion: number
   drafts: typeof opsQueries.defaultCountDraftsData
+  myDrafts: typeof opsQueries.defaultCountDraftsData
+  myDraftQueueCount: number
   info: GetEditorInfoResults["data"]
 }> {
   const errors: string[] = []
   let shouldPublishData = false
   try {
+    const authenticatedUser = await getAuthenticatedUser()
     const editorInfo = await _getEditorInfo()
     editorInfo.errors?.forEach((e) => errors.push(e))
 
     const pendingDeletion = await opsQueries._countPendingDeletion()
     pendingDeletion.errors?.forEach((e) => errors.push(e))
+    const currentUserId = authenticatedUser?.userId || null
 
     const { errors: draftsErrors, ...drafts } = await opsQueries._countDrafts()
     draftsErrors?.forEach((e) => errors.push(e))
+    const { errors: myDraftsErrors, ...myDrafts } = currentUserId
+      ? await opsQueries._countDrafts(currentUserId)
+      : { ...opsQueries.defaultCountDraftsData, errors: undefined }
+    myDraftsErrors?.forEach((e) => errors.push(e))
+    const myPendingDeletion = currentUserId
+      ? await opsQueries._countPendingDeletion(currentUserId)
+      : { total: 0, errors: undefined }
+    myPendingDeletion.errors?.forEach((e) => errors.push(e))
 
     const mode = "development"
 
@@ -1219,7 +1297,10 @@ export async function getEditorDetails(): Promise<{
 
     return {
       pendingDeletion: pendingDeletion.total,
+      myPendingDeletion: myPendingDeletion.total,
       drafts,
+      myDrafts,
+      myDraftQueueCount: myDrafts.total + myPendingDeletion.total,
       errors: errors.length ? errors : undefined,
       shouldPublishData,
       info: editorInfo.data,
@@ -1229,7 +1310,10 @@ export async function getEditorDetails(): Promise<{
     return {
       errors: [e.message, ...errors],
       pendingDeletion: 0,
+      myPendingDeletion: 0,
       drafts: opsQueries.defaultCountDraftsData,
+      myDrafts: opsQueries.defaultCountDraftsData,
+      myDraftQueueCount: 0,
       shouldPublishData,
       info: null,
     }

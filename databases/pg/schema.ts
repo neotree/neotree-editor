@@ -42,6 +42,10 @@ export const bytea = customType<{ data: Buffer; notNull: false; default: false }
 })
 
 export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
+  dataKey: one(dataKeys, {
+    fields: [dataKeysDrafts.dataKeyId],
+    references: [dataKeys.uuid],
+  }),
   createdBy: one(users, {
     fields: [dataKeysDrafts.createdByUserId],
     references: [users.userId],

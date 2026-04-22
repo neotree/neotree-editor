@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import axios from "axios"
@@ -14,9 +14,6 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
 import { resetDrugsLibraryState } from "@/hooks/use-drugs-library"
 import { useIsLocked } from "@/hooks/use-is-locked"
-import { usePendingChanges } from "@/hooks/use-pending-changes"
-import { createChangeTracker } from "@/lib/change-tracker"
-import { pendingChangesAPI } from "@/lib/indexed-db"
 
 export type UseScriptFormParams = {
   formData?: ScriptFormDataType
@@ -27,48 +24,18 @@ export function useScriptForm(params: UseScriptFormParams) {
   const { formData } = params
 
   const { alert } = useAlertModal()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const { saveScripts } = useScriptsContext()
 
   const isNewScript = !formData?.scriptId
 
-  const { trackChange, clearChanges } = usePendingChanges({
-    entityId: formData?.scriptId,
-    entityType: "script",
-    entityTitle: formData?.title || formData?.printTitle || "Untitled Script",
-    userId: authenticatedUser?.userId,
-    autoTrack: false,
-  })
-
-  const changeTrackerRef = useRef(
-    formData?.scriptId
-      ? createChangeTracker({
-          entityId: formData.scriptId,
-          entityType: "script",
-          userId: authenticatedUser?.userId,
-          userName: authenticatedUser?.displayName,
-          entityTitle: formData?.title || formData?.printTitle || "Untitled Script",
-          resolveEntityTitle: (data) => data?.title || data?.printTitle,
-        })
-      : null,
-  )
-
-  const originalSnapshotRef = useRef<ScriptFormDataType | null>(null)
-
   useEffect(() => {
     return () => {
       resetDrugsLibraryState()
     }
   }, [])
-
-  useEffect(() => {
-    if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
-      originalSnapshotRef.current = formData
-      changeTrackerRef.current.setSnapshot(formData)
-    }
-  }, [formData])
 
   const getDefaultFormValues = useCallback(() => {
     return {
@@ -137,13 +104,6 @@ export function useScriptForm(params: UseScriptFormParams) {
       scriptId,
     }
 
-    if (isNewScript) {
-      // For new scripts, we'll track the creation after we get the scriptId from the server
-    } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-     
-      await changeTrackerRef.current.trackChanges(data, "Draft saved")
-    }
-
     // const res = await saveScripts({ data: [data], broadcastAction: true, });
 
     // TODO: Replace this with server action
@@ -157,25 +117,6 @@ export function useScriptForm(params: UseScriptFormParams) {
         variant: "error",
       })
     } else {
-      if (isNewScript && scriptId) {
-        const newScriptId = scriptId
-
-        // Track the creation of the new script
-        await pendingChangesAPI.addChange({
-          entityType: "script",
-          entityId: newScriptId,
-          entityTitle: payload.title || payload.printTitle || "Untitled Script",
-          action: "create",
-          fieldPath: "script",
-          fieldName: "New Script",
-          oldValue: null,
-          newValue: payload.title || payload.printTitle || "Untitled Script",
-          userId: authenticatedUser?.userId,
-          userName: authenticatedUser?.displayName,
-          fullSnapshot: payload,
-        })
-      }
-
       router.refresh()
       alert({
         title: "Success",

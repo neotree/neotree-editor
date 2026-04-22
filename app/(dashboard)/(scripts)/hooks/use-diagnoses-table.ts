@@ -15,8 +15,6 @@ import {
   filterScriptsSearchResults,
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseDiagnosesTableParams = {
   disabled?: boolean
@@ -54,7 +52,7 @@ export function useDiagnosesTable({
   }, [diagnosesParam])
 
   const router = useRouter()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -88,20 +86,6 @@ export function useDiagnosesTable({
               onClose: () => setDiagnoses(_diagnoses),
             })
           } else {
-            await Promise.all(
-              diagnosesToDelete.map(async (diagnosis) => {
-                if (!diagnosis?.diagnosisId) return
-                await recordPendingDeletionChange({
-                  entityId: diagnosis.diagnosisId,
-                  entityType: "diagnosis",
-                  entityTitle: diagnosis.name || diagnosis.key || "Untitled Diagnosis",
-                  snapshot: diagnosis,
-                  userId: authenticatedUser?.userId,
-                  userName: authenticatedUser?.displayName,
-                  description: `Marked "${diagnosis.name || diagnosis.key || "Untitled Diagnosis"}" for deletion`,
-                })
-              }),
-            )
             setSelected([])
             router.refresh()
             alert({
@@ -121,7 +105,7 @@ export function useDiagnosesTable({
         },
       )
     },
-    [deleteDiagnoses, confirm, alert, router, diagnoses, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [deleteDiagnoses, confirm, alert, router, diagnoses],
   )
 
   const onSort = useCallback(
@@ -139,24 +123,6 @@ export function useDiagnosesTable({
 
       setDiagnoses((prev) => ({ ...prev, data: sorted }))
 
-      for (const change of payload) {
-        const originalDiagnosis = diagnoses.data.find((d) => d.diagnosisId === change.diagnosisId)
-        if (originalDiagnosis) {
-          await pendingChangesAPI.addChange({
-            entityType: "diagnosis",
-            entityId: change.diagnosisId,
-            entityTitle: originalDiagnosis.name || originalDiagnosis.key || "Untitled Diagnosis",
-            action: "update",
-            fieldPath: "position",
-            fieldName: "position",
-            oldValue: originalDiagnosis.position,
-            newValue: change.position,
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-          })
-        }
-      }
-
       // await saveDiagnoses({ data: payload, broadcastAction: true, });
 
       // TODO: Replace this with server action
@@ -166,7 +132,7 @@ export function useDiagnosesTable({
 
       router.refresh()
     },
-    [saveDiagnoses, loadDiagnoses, diagnoses, router, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [saveDiagnoses, loadDiagnoses, diagnoses, router],
   )
 
   const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly])

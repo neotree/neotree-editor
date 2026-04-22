@@ -4,11 +4,7 @@ import { ChevronRight } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type {
-  DataVersionGroupedChange,
-  DataVersionGroupedView,
-  DataVersionScriptGroup,
-} from "@/lib/changelog-data-version-groups"
+import type { DataVersionGroupedChange, DataVersionGroupedView, DataVersionScriptGroup } from "@/lib/changelog-data-version-groups"
 
 type Props = {
   groupedView: DataVersionGroupedView
@@ -96,7 +92,7 @@ function ScriptGroupCard({ group, dataVersion }: { group: DataVersionScriptGroup
   }
 
   return (
-    <details className="rounded-xl border border-border/70 bg-background/80 shadow-sm">
+    <details className="rounded-lg border border-border/70 bg-background/80">
       <summary className="cursor-pointer list-none px-4 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -136,9 +132,7 @@ function ScriptGroupCard({ group, dataVersion }: { group: DataVersionScriptGroup
               )}
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Latest change {format(new Date(group.latestChangeAt), "PPpp")}
-          </div>
+          <div className="text-sm text-muted-foreground">Latest change {format(new Date(group.latestChangeAt), "PPpp")}</div>
         </div>
       </summary>
       <div className="border-t border-border/60 px-4 py-4">
@@ -174,15 +168,7 @@ function ScriptGroupCard({ group, dataVersion }: { group: DataVersionScriptGroup
   )
 }
 
-function ChangeRow({
-  change,
-  dataVersion,
-  compact = false,
-}: {
-  change: DataVersionGroupedChange
-  dataVersion: number
-  compact?: boolean
-}) {
+function ChangeRow({ change, dataVersion, compact = false }: { change: DataVersionGroupedChange; dataVersion: number; compact?: boolean }) {
   const entityLabel = entityTypeLabels[change.entityType] || change.entityType
   const actionLabel = actionLabels[change.action] || change.action
 
@@ -203,18 +189,10 @@ function ChangeRow({
         </div>
         <div className="text-xs text-muted-foreground">{change.entityId}</div>
         {change.highlightedFields.length > 0 && (
-          <div className="text-xs text-muted-foreground">
-            Key fields: {change.highlightedFields.join(", ")}
-          </div>
+          <div className="text-xs text-muted-foreground">Key fields: {change.highlightedFields.join(", ")}</div>
         )}
-        {!compact && change.changeReason && (
-          <div className="text-xs text-muted-foreground">
-            Reason: {change.changeReason}
-          </div>
-        )}
-        {!compact && change.description && (
-          <div className="text-xs text-muted-foreground line-clamp-2">{change.description}</div>
-        )}
+        {!compact && change.changeReason && <div className="text-xs text-muted-foreground">Reason: {change.changeReason}</div>}
+        {!compact && change.description && <div className="text-xs text-muted-foreground line-clamp-2">{change.description}</div>}
       </div>
       <div className="flex items-center gap-3 md:flex-col md:items-end">
         <div className="text-xs text-muted-foreground">{format(new Date(change.dateOfChange), "PPpp")}</div>

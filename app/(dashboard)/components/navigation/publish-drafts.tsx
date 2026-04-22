@@ -20,7 +20,6 @@ import {
 import ucFirst from "@/lib/ucFirst"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { pendingChangesAPI } from "@/lib/indexed-db"
 
 type Props = {
   variant: "publish" | "discard"
@@ -57,8 +56,6 @@ export function PublishDrafts({ variant }: Props) {
           message: res.errors.map((e) => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(""),
         })
       } else {
-        await pendingChangesAPI.clearAllChanges()
-
         alert({
           variant: "success",
           title: "Success",
@@ -96,8 +93,6 @@ export function PublishDrafts({ variant }: Props) {
           message: res.errors.map((e) => `<div class="mb-1 text-sm text-danger">${e}</div>`).join(""),
         })
       } else {
-        await pendingChangesAPI.clearAllChanges()
-
         alert({
           variant: "success",
           title: "Success",
