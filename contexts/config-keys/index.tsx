@@ -8,8 +8,6 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import * as serverActions from '@/app/actions/config-keys';
 import { useAppContext } from "../app";
-import { recordPendingDeletionChange } from "@/lib/change-tracker";
-import { pendingChangesAPI } from "@/lib/indexed-db";
 
 export interface IConfigKeysContext extends  
 ConfigKeysContextProviderProps,
@@ -135,18 +133,6 @@ function useConfigKeysContentHook({
                     onClose: () => setConfigKeys(_configKeys),
                 });
             } else {
-                await Promise.all(keysToDelete.map(async key => {
-                    if (!key?.configKeyId) return;
-                    await recordPendingDeletionChange({
-                        entityId: key.configKeyId,
-                        entityType: "configKey",
-                        entityTitle: getConfigKeyTitle(key),
-                        snapshot: key,
-                        userId: authenticatedUser?.userId,
-                        userName: authenticatedUser?.displayName,
-                        description: `Marked "${getConfigKeyTitle(key)}" for deletion`,
-                    });
-                }));
                 onFormOpenChange(false);
                 setSelected([]);
                 router.refresh();
@@ -195,50 +181,6 @@ function useConfigKeysContentHook({
         setConfigKeys(prev => ({ ...prev, data: sorted, }));
 
         try {
-            await Promise.all(sorted.map(async (item) => {
-                if (!item?.configKeyId) return;
-
-                const existingChanges = await pendingChangesAPI.getEntityChanges(item.configKeyId, "configKey");
-                const existingPositionChange = existingChanges.find(change => change.fieldPath === "position");
-                const previousPosition = existingPositionChange?.oldValue ?? previousPositions.get(item.configKeyId);
-
-                if (previousPosition === undefined) return;
-
-                if (item.position === previousPosition) {
-                    if (existingPositionChange?.id) {
-                        await pendingChangesAPI.deleteChange(existingPositionChange.id);
-                    }
-                    return;
-                }
-
-                const entityTitle = getConfigKeyTitle(item);
-                const description = `Position changed from ${previousPosition} to ${item.position}`;
-                const fullSnapshot = { ...item, position: item.position };
-
-                if (existingPositionChange?.id) {
-                    await pendingChangesAPI.updateChange(existingPositionChange.id, {
-                        newValue: item.position,
-                        description,
-                        fullSnapshot,
-                    });
-                } else {
-                    await pendingChangesAPI.addChange({
-                        entityId: item.configKeyId,
-                        entityType: "configKey",
-                        entityTitle,
-                        action: "update",
-                        fieldPath: "position",
-                        fieldName: "Position",
-                        oldValue: previousPosition,
-                        newValue: item.position,
-                        userId: authenticatedUser?.userId,
-                        userName: authenticatedUser?.displayName,
-                        description,
-                        fullSnapshot,
-                    });
-                }
-            }));
-
             if (payload.length) {
                 await saveConfigKeys({ 
                     data: payload.map(({ configKeyId, position }) => ({ configKeyId, position, })), 
@@ -246,28 +188,9 @@ function useConfigKeysContentHook({
                 });
             }
         } catch (e) {
-            // Roll back UI and pending changes if the save fails
             setConfigKeys(previousState);
-
-            await Promise.all(sorted.map(async (item) => {
-                if (!item?.configKeyId) return;
-                const existingChanges = await pendingChangesAPI.getEntityChanges(item.configKeyId, "configKey");
-                const existingPositionChange = existingChanges.find(change => change.fieldPath === "position");
-                const baseline = existingPositionChange?.oldValue ?? previousPositions.get(item.configKeyId);
-
-                if (existingPositionChange?.id) {
-                    if (baseline === undefined || baseline === item.position) {
-                        await pendingChangesAPI.deleteChange(existingPositionChange.id);
-                    } else {
-                        await pendingChangesAPI.updateChange(existingPositionChange.id, {
-                            newValue: baseline,
-                            description: `Position rolled back to ${baseline}`,
-                        });
-                    }
-                }
-            }));
         }
-    }, [saveConfigKeys, configKeys, authenticatedUser?.userId, authenticatedUser?.displayName, viewOnly]);
+    }, [saveConfigKeys, configKeys, viewOnly]);
 
     const activeItem = useMemo(() => !activeItemId ? null : configKeys.data.filter(t => t.configKeyId === activeItemId)[0], [activeItemId, configKeys]);
     const disabled = useMemo(() => viewOnly, [viewOnly]);

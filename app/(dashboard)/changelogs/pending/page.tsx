@@ -44,19 +44,15 @@ export default async function PendingChangesPage({
           Back to published releases
         </Link>
 
-        <Card>
-          <CardContent className="p-6">
-            {pendingDraftQueue.errors?.length ? (
+        {pendingDraftQueue.errors?.length ? (
+          <Card>
+            <CardContent className="p-4">
               <div className="text-sm text-danger">{pendingDraftQueue.errors.join(", ")}</div>
-            ) : (
-              <DraftReviewWorkspace
-                entries={pendingDraftQueue.data}
-                summary={pendingDraftQueue.summary}
-                meta={pendingDraftQueue.meta}
-              />
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <DraftReviewWorkspace entries={pendingDraftQueue.data} summary={pendingDraftQueue.summary} meta={pendingDraftQueue.meta} />
+        )}
       </Content>
     </>
   )

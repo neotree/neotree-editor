@@ -13,9 +13,6 @@ import { useAppContext } from "@/contexts/app"
 import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
-import { createChangeTracker } from "@/lib/change-tracker"
-import type { ChangeTracker } from "@/lib/change-tracker"
-import { pendingChangesAPI } from "@/lib/indexed-db"
 
 export type UseScreenFormParams = {
   scriptId: string
@@ -31,7 +28,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
   const { saveScreens } = useScriptsContext()
   const { alert } = useAlertModal()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
 
   const scriptPageHref = useMemo(() => `/script/${scriptId}?section=screens`, [scriptId])
   const isNewScreen = !formData?.screenId
@@ -39,21 +36,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()),
     [],
   )
-
-  const changeTrackerRef = useRef<ChangeTracker | null>(
-    formData?.screenId
-      ? createChangeTracker({
-          entityId: formData.screenId,
-          entityType: "screen",
-          userId: authenticatedUser?.userId,
-          userName: authenticatedUser?.displayName,
-          entityTitle: formData?.title || formData?.sectionTitle || formData?.label || "Screen",
-          resolveEntityTitle: (data) => data?.title || data?.sectionTitle || data?.label || data?.previewTitle,
-        })
-      : null,
-  )
-
-  const originalSnapshotRef = useRef<ScreenFormDataType | null>(null)
 
   const getDefaultValues = useCallback(() => {
     return {
@@ -133,14 +115,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
   })
 
   useEffect(() => {
-    if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
-
-      originalSnapshotRef.current = formData
-      changeTrackerRef.current.setSnapshot(formData)
-    }
-  }, [formData])
-
-  useEffect(() => {
     if (mounted.current) {
       // form.reset(getDefaultValues())
     } else {
@@ -171,13 +145,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
       if (!payloadData.scriptId) throw new Error("Screen is missing script reference!")
 
-      if (isNewScreen) {
-        
-      } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-        
-        await changeTrackerRef.current.trackChanges(payloadData, "Screen draft saved")
-      }
-
       // const res = await saveScreens({ data: [payloadData], broadcastAction: true, });
 
       // TODO: Replace this with server action
@@ -185,23 +152,6 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       const res = response.data as Awaited<ReturnType<typeof saveScreens>>
 
       if (res.errors?.length) throw new Error(res.errors.join(", "))
-
-      if (isNewScreen) {
-       
-        await pendingChangesAPI.addChange({
-          entityType: "screen",
-          entityId: screenId,
-          entityTitle: payloadData.title || payloadData.sectionTitle || payloadData.label || "Untitled Screen",
-          action: "create",
-          fieldPath: "screen",
-          fieldName: "New Screen",
-          oldValue: null,
-          newValue: payloadData.title || payloadData.sectionTitle || payloadData.label || "Untitled Screen",
-          userId: authenticatedUser?.userId,
-          userName: authenticatedUser?.displayName,
-          fullSnapshot: payloadData,
-        })
-      }
 
       router.refresh()
       alert({
@@ -248,6 +198,5 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     scriptLockedByUserId,
     save,
     getDefaultValues,
-    changeTracker: changeTrackerRef.current,
   }
 }

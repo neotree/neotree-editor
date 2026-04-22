@@ -31,10 +31,10 @@ export function Header({
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-  const { sys, info, drafts, pendingDeletion } = useAppContext()
+  const { sys, info, myDraftQueueCount } = useAppContext()
 
   const usePlainBg = sys.data.use_plain_background === "yes"
-  const totalQueueEntries = (drafts?.total || 0) + (pendingDeletion || 0)
+  const totalQueueEntries = myDraftQueueCount || 0
 
   useMount(() => {
     setMounted(true)
@@ -120,7 +120,7 @@ export function Header({
                 onClick={() => router.push("/changelogs/pending")}
               >
                 <FileStack className="h-3 w-3" />
-                {totalQueueEntries} draft queue {totalQueueEntries === 1 ? "entry" : "entries"}
+                {totalQueueEntries} my draft {totalQueueEntries === 1 ? "entry" : "entries"}
               </Button>
             </div>
           )}

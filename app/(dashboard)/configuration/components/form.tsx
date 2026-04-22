@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { v4 } from "uuid";
@@ -20,9 +20,6 @@ import {
     SheetFooter,
 } from "@/components/ui/sheet";
 import { useIsLocked } from "@/hooks/use-is-locked";
-import { createChangeTracker } from "@/lib/change-tracker";
-import { pendingChangesAPI } from "@/lib/indexed-db";
-import { useAppContext } from "@/contexts/app";
 
 type Props = {
     formData?: FormDataType;
@@ -36,7 +33,6 @@ function FormComponent({ formData }: Props) {
     });
 
     const { disabled: _disabled, onSave, } = useConfigKeysContext();
-    const { authenticatedUser } = useAppContext();
 
     const disabled = _disabled || isLocked;
 
@@ -53,19 +49,6 @@ function FormComponent({ formData }: Props) {
         } satisfies FormDataType,
     });
 
-    const changeTrackerRef = useRef<ReturnType<typeof createChangeTracker> | null>(null);
-    const originalSnapshotRef = useRef<FormDataType | null>(null);
-
-    const sanitizeConfigKey = (data?: FormDataType | null) => {
-        if (!data) return null;
-        return {
-            configKeyId: data.configKeyId,
-            key: data.key,
-            label: data.label,
-            summary: data.summary,
-        } as FormDataType;
-    };
-
     useEffect(() => {
         reset({
             key: formData?.key || '',
@@ -73,33 +56,7 @@ function FormComponent({ formData }: Props) {
             configKeyId: formData?.configKeyId || v4(),
             summary: formData?.summary || '',
         });
-
-        if (!formData?.configKeyId) {
-            changeTrackerRef.current = null;
-            originalSnapshotRef.current = null;
-            return;
-        }
-
-        if (changeTrackerRef.current && originalSnapshotRef.current?.configKeyId === formData.configKeyId) {
-            return;
-        }
-
-        const snapshot = sanitizeConfigKey(formData);
-        if (!snapshot) return;
-
-        const tracker = createChangeTracker({
-            entityId: formData.configKeyId,
-            entityType: "configKey",
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-            entityTitle: formData.label || formData.key || "Config key",
-            resolveEntityTitle: (data) => data?.label || data?.key,
-        });
-
-        tracker.setSnapshot(snapshot);
-        changeTrackerRef.current = tracker;
-        originalSnapshotRef.current = snapshot;
-    }, [formData, reset, authenticatedUser?.userId, authenticatedUser?.displayName]);
+    }, [formData, reset]);
 
     const onSubmit = handleSubmit(async data => {
         if (disabled) return;
@@ -111,26 +68,6 @@ function FormComponent({ formData }: Props) {
 
         const success = await onSave([payload]);
         if (!success) return;
-
-        const snapshot = sanitizeConfigKey(payload);
-
-        if (!formData?.configKeyId && snapshot) {
-            await pendingChangesAPI.addChange({
-                entityType: "configKey",
-                entityId: snapshot.configKeyId!,
-                entityTitle: snapshot.label || snapshot.key || "Config key",
-                action: "create",
-                fieldPath: "configKey",
-                fieldName: "New Config Key",
-                oldValue: null,
-                newValue: snapshot,
-                userId: authenticatedUser?.userId,
-                userName: authenticatedUser?.displayName,
-                fullSnapshot: snapshot,
-            });
-        } else if (changeTrackerRef.current && originalSnapshotRef.current && snapshot) {
-            await changeTrackerRef.current.trackChanges(snapshot, "Config key saved");
-        }
     });
 
     return (

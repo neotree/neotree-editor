@@ -70,13 +70,6 @@ export const dataKeysDrafts = pgTable(
     }),
 );
 
-export const dataKeysDraftsRelations = relations(dataKeysDrafts, ({ one }) => ({
-    dataKey: one(dataKeys, {
-        fields: [dataKeysDrafts.dataKeyId],
-        references: [dataKeys.uuid],
-    }),
-}));
-
 // DATA KEYS DRAFTS HISTORY
 export const dataKeysHistory = pgTable(
     'nt_data_keys_history', 

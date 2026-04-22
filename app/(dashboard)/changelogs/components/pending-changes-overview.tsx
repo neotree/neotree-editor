@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { ArrowRight, FileStack } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 import type { PendingDraftQueueEntry, PendingDraftQueueSummary } from "@/app/actions/ops"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,14 +15,11 @@ export function PendingChangesOverview({
   latestEntry?: PendingDraftQueueEntry
 }) {
   return (
-    <Card className="border-blue-500/20 bg-blue-500/5">
+    <Card>
       <CardContent className="space-y-4 p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FileStack className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">{summary.scopeLabel}</h2>
-            </div>
+            <h2 className="text-lg font-semibold">{summary.scopeLabel}</h2>
             <p className="max-w-3xl text-sm text-muted-foreground">
               This summary comes from server draft tables and pending deletions, so it reflects the actual publish queue.
             </p>
@@ -36,19 +33,19 @@ export function PendingChangesOverview({
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border bg-background/80 p-4">
+          <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Queue Entries</div>
             <div className="mt-1 text-2xl font-semibold">{summary.totalEntries}</div>
           </div>
-          <div className="rounded-lg border bg-background/80 p-4">
+          <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Draft Rows</div>
             <div className="mt-1 text-2xl font-semibold">{summary.totalDrafts}</div>
           </div>
-          <div className="rounded-lg border bg-background/80 p-4">
+          <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Deletes Queued</div>
             <div className="mt-1 text-2xl font-semibold">{summary.totalDeletes}</div>
           </div>
-          <div className="rounded-lg border bg-background/80 p-4">
+          <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Unique Entities</div>
             <div className="mt-1 text-2xl font-semibold">{summary.uniqueEntities}</div>
           </div>
@@ -56,13 +53,13 @@ export function PendingChangesOverview({
 
         {latestEntry ? (
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="bg-background/80 text-muted-foreground">
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
               Latest: {latestEntry.title}
             </Badge>
-            <Badge variant="outline" className="bg-background/80 text-muted-foreground">
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
               {latestEntry.statusLabel}
             </Badge>
-            <Badge variant="outline" className="bg-background/80 text-muted-foreground">
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
               {formatDistanceToNow(new Date(latestEntry.createdAt), { addSuffix: true })}
             </Badge>
           </div>

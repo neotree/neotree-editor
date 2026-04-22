@@ -142,22 +142,6 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const disabled = useMemo(() => !!disabledProp, [disabledProp])
 
   const onSave = handleSubmit(async (data) => {
-    if (form.changeTracker) {
-      const currentFields = form.getValues("fields")
-      const updatedFields =
-        !isEmpty(fieldIndex) && field
-          ? currentFields.map((f, i) => ({
-              ...f,
-              ...(i === fieldIndex ? data : null),
-            }))
-          : [...currentFields, data]
-
-      await form.changeTracker.trackChanges(
-        { ...form.getValues(), fields: updatedFields },
-        `Field "${data.label}" ${field ? "updated" : "added"}`,
-      )
-    }
-
     if (!isEmpty(fieldIndex) && field) {
       form.setValue(
         "fields",

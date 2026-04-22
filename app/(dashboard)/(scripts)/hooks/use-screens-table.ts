@@ -15,8 +15,6 @@ import {
   filterScriptsSearchResults,
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseScreensTableParams = {
   disabled?: boolean
@@ -54,7 +52,7 @@ export function useScreensTable({
   }, [screensParam])
 
   const router = useRouter()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -88,20 +86,6 @@ export function useScreensTable({
               onClose: () => setScreens(_screens),
             })
           } else {
-            await Promise.all(
-              screensToDelete.map(async (screen) => {
-                if (!screen?.screenId) return
-                await recordPendingDeletionChange({
-                  entityId: screen.screenId,
-                  entityType: "screen",
-                  entityTitle: screen.title || screen.sectionTitle || screen.label || "Untitled Screen",
-                  snapshot: screen,
-                  userId: authenticatedUser?.userId,
-                  userName: authenticatedUser?.displayName,
-                  description: `Marked "${screen.title || screen.sectionTitle || screen.label || "Untitled Screen"}" for deletion`,
-                })
-              }),
-            )
             setSelected([])
             router.refresh()
             alert({
@@ -121,7 +105,7 @@ export function useScreensTable({
         },
       )
     },
-    [deleteScreens, confirm, alert, router, screens, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [deleteScreens, confirm, alert, router, screens],
   )
 
   const onSort = useCallback(
@@ -139,25 +123,6 @@ export function useScreensTable({
 
       setScreens((prev) => ({ ...prev, data: sorted }))
 
-      for (const change of payload) {
-        const screen = screens.data.find((s) => s.screenId === change.screenId)
-        if (screen) {
-          await pendingChangesAPI.addChange({
-            entityId: change.screenId,
-            entityType: "screen",
-            entityTitle: screen.title || screen.sectionTitle || screen.label || "Untitled Screen",
-            action: "update",
-            fieldPath: "position",
-            fieldName: "position",
-            oldValue: screen.position,
-            newValue: change.position,
-            description: `Position changed from ${screen.position} to ${change.position}`,
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-          })
-        }
-      }
-
       // await saveScreens({ data: payload, broadcastAction: true })
 
       // TODO: Replace this with server action
@@ -167,7 +132,7 @@ export function useScreensTable({
 
       router.refresh()
     },
-    [saveScreens, loadScreens, screens, router, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [saveScreens, loadScreens, screens, router],
   )
 
   const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly])

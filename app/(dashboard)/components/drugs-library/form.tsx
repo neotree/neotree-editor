@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import queryString from "query-string";
 import { v4 as uuidv4 } from "uuid";
@@ -33,8 +33,6 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import ucFirst from "@/lib/ucFirst";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { useAppContext } from "@/contexts/app";
-import { createChangeTracker } from "@/lib/change-tracker";
-import { pendingChangesAPI } from "@/lib/indexed-db";
 import { ErrorCard } from "@/components/error-card";
 
 type ItemType = DrugsLibraryState['drugs'][0];
@@ -142,13 +140,9 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const [form, setForm] = useState(getDefaultForm(item, newItemType));
 
     const { keys, loading } = useDrugsLibrary();
-    const { authenticatedUser } = useAppContext();
+    useAppContext();
 
     const { confirm } = useConfirmModal();
-
-    const changeTrackerRef = useRef<ReturnType<typeof createChangeTracker> | null>(null);
-    const originalSnapshotRef = useRef<ReturnType<typeof sanitizeDrugsItem>>(null);
-    const lastTrackedIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         setOpen(!!itemId || !!newItemType);
@@ -157,38 +151,6 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     useEffect(() => {
         setForm(getDefaultForm(item, newItemType));
     }, [item, newItemType]);
-
-    useEffect(() => {
-        if (!item?.itemId) {
-            changeTrackerRef.current = null;
-            originalSnapshotRef.current = null;
-            lastTrackedIdRef.current = null;
-            return;
-        }
-
-        if (lastTrackedIdRef.current === item.itemId && changeTrackerRef.current) {
-            return;
-        }
-
-        const tracker = createChangeTracker({
-            entityId: item.itemId,
-            entityType: "drugsLibraryItem",
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-            entityTitle: resolveItemTitle(item) || "Drugs Library Item",
-            resolveEntityTitle: (data) => resolveItemTitle(data) || undefined,
-        });
-
-        const snapshot = sanitizeDrugsItem(item);
-
-        if (snapshot) {
-            tracker.setSnapshot(snapshot);
-            originalSnapshotRef.current = snapshot;
-        }
-
-        changeTrackerRef.current = tracker;
-        lastTrackedIdRef.current = item.itemId;
-    }, [item, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const onSave = useCallback(async () => {
         const payload: ItemType = {
@@ -206,50 +168,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             type: form.type as ItemType["type"],
         };
 
-        const trackablePayload = sanitizeDrugsItem(payload);
-        const entityId = payload.itemId;
-
         const persist = async () => {
-            try {
-                if (!item && trackablePayload && entityId) {
-                    const existingChanges = await pendingChangesAPI.getEntityChanges(entityId, "drugsLibraryItem");
-                    const existingCreate = existingChanges.find((change) => change.action === "create");
-
-                    const entityTitle = resolveItemTitle(payload) || "Drugs Library Item"
-                    const fieldName = resolveItemTitle(payload) || "New Library Item"
-
-                    if (existingCreate?.id) {
-                        await pendingChangesAPI.updateChange(existingCreate.id, {
-                            fieldName,
-                            newValue: trackablePayload,
-                            timestamp: Date.now(),
-                            userId: authenticatedUser?.userId,
-                            userName: authenticatedUser?.displayName,
-                            entityTitle,
-                            fullSnapshot: trackablePayload,
-                        });
-                    } else {
-                        await pendingChangesAPI.addChange({
-                            entityType: "drugsLibraryItem",
-                            entityId,
-                            entityTitle,
-                            action: "create",
-                            fieldPath: "drugsLibraryItem",
-                            fieldName,
-                            oldValue: null,
-                            newValue: trackablePayload,
-                            userId: authenticatedUser?.userId,
-                            userName: authenticatedUser?.displayName,
-                            fullSnapshot: trackablePayload,
-                        });
-                    }
-                } else if (changeTrackerRef.current && originalSnapshotRef.current && trackablePayload) {
-                    await changeTrackerRef.current.trackChanges(trackablePayload, "Drugs library item saved");
-                }
-            } catch (error) {
-                console.error("Failed to track drugs library changes", error);
-            }
-
             await onChange(payload);
             setOpen(false);
         };
@@ -270,7 +189,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                 negativeLabel: 'No, do not save',
             });
         }
-    }, [form, item, onChange, confirm, authenticatedUser?.userId, authenticatedUser?.displayName]);
+    }, [form, item, onChange, confirm]);
     const onClose = useCallback(() => {
         setOpen(false);
         setForm(getDefaultForm(undefined, newItemType))
