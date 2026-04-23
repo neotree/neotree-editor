@@ -139,8 +139,6 @@ function toIsoString(value: Date | string | null | undefined) {
 
 const PENDING_DRAFT_STALE_DAYS = 14
 const PENDING_DRAFT_PAGE_SIZE = 20
-const DIFF_FIELD_LIMIT = 8
-const PREVIEW_ITEM_LIMIT = 6
 const entityTypeLabels: Record<PendingDraftQueueEntityType, string> = {
   script: "Script",
   screen: "Screen",
@@ -197,10 +195,9 @@ function toPlainRecord(value: unknown) {
 
 function previewValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "Empty"
-  if (typeof value === "string") return value.length > 120 ? `${value.slice(0, 117)}...` : value
+  if (typeof value === "string") return value
   if (typeof value === "number" || typeof value === "boolean") return String(value)
-  const json = JSON.stringify(value)
-  return json.length > 120 ? `${json.slice(0, 117)}...` : json
+  return JSON.stringify(value, null, 2)
 }
 
 function valuesEqual(left: unknown, right: unknown) {
@@ -237,37 +234,35 @@ function buildDiffPreview({
       const isMeaningful = after !== null && after !== undefined && after !== "" && JSON.stringify(after) !== "[]"
       if (!isMeaningful) continue
       changedFields.push(key)
-      if (diffPreview.length < PREVIEW_ITEM_LIMIT) {
-        diffPreview.push({ field: key, before: "New", after: previewValue(after) })
-      }
+      diffPreview.push({ field: key, before: "New", after: previewValue(after) })
       continue
     }
 
     if (valuesEqual(before, after)) continue
     changedFields.push(key)
-    if (diffPreview.length < PREVIEW_ITEM_LIMIT) {
-      diffPreview.push({ field: key, before: previewValue(before), after: previewValue(after) })
-    }
+    diffPreview.push({ field: key, before: previewValue(before), after: previewValue(after) })
   }
 
   return {
-    changedFields: changedFields.slice(0, DIFF_FIELD_LIMIT),
+    changedFields,
     diffPreview,
   }
 }
 
 function normalizePendingDraftQueueFilters(
-  params: {
-    scope?: PendingDraftQueueScope
-    tab?: PendingDraftQueueTab
-    query?: string
-    entityType?: "all" | PendingDraftQueueEntityType
-    creator?: string
-    sort?: PendingDraftQueueSort
-    groupBy?: PendingDraftQueueGroupBy
-    page?: number
-    pageSize?: number
-  } | undefined,
+  params:
+    | {
+        scope?: PendingDraftQueueScope
+        tab?: PendingDraftQueueTab
+        query?: string
+        entityType?: "all" | PendingDraftQueueEntityType
+        creator?: string
+        sort?: PendingDraftQueueSort
+        groupBy?: PendingDraftQueueGroupBy
+        page?: number
+        pageSize?: number
+      }
+    | undefined,
   canViewAll: boolean,
 ) {
   const requestedScope = params?.scope === "all" && canViewAll ? "all" : "mine"
@@ -283,24 +278,14 @@ function normalizePendingDraftQueueFilters(
         ? (params.entityType as "all" | PendingDraftQueueEntityType)
         : "all",
     creator: typeof params?.creator === "string" ? params.creator : "all",
-    sort:
-      params?.sort && ["recent", "oldest", "creator", "entity", "title", "action"].includes(params.sort)
-        ? params.sort
-        : "recent",
-    groupBy:
-      params?.groupBy && ["parent", "creator", "entity"].includes(params.groupBy) ? params.groupBy : "parent",
+    sort: params?.sort && ["recent", "oldest", "creator", "entity", "title", "action"].includes(params.sort) ? params.sort : "recent",
+    groupBy: params?.groupBy && ["parent", "creator", "entity"].includes(params.groupBy) ? params.groupBy : "parent",
     page: Math.max(1, Number(params?.page) || 1),
     pageSize: Math.min(100, Math.max(10, Number(params?.pageSize) || PENDING_DRAFT_PAGE_SIZE)),
   } satisfies PendingDraftQueueFilters
 }
 
-function shouldIncludeDraftRows({
-  filters,
-  entityType,
-}: {
-  filters: PendingDraftQueueFilters
-  entityType: PendingDraftQueueEntityType
-}) {
+function shouldIncludeDraftRows({ filters, entityType }: { filters: PendingDraftQueueFilters; entityType: PendingDraftQueueEntityType }) {
   if (filters.tab === "deletes") return false
   if (filters.entityType !== "all") return filters.entityType === entityType
   return entityType !== "alias"
@@ -319,6 +304,7 @@ function shouldIncludePendingDeletionRows({
 }
 
 export async function getPendingDraftQueue(params?: {
+  entryId?: string
   scope?: PendingDraftQueueScope
   tab?: PendingDraftQueueTab
   query?: string
@@ -360,8 +346,7 @@ export async function getPendingDraftQueue(params?: {
       shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) ||
       shouldIncludePendingDeletionRows({ filters, entityType: "alias" })
 
-    const whereByUser = <TColumn,>(column: TColumn) =>
-      createdByFilter ? eq(column as any, createdByFilter) : undefined
+    const whereByUser = <TColumn>(column: TColumn) => (createdByFilter ? eq(column as any, createdByFilter) : undefined)
 
     const [
       scriptDraftRows,
@@ -755,8 +740,8 @@ export async function getPendingDraftQueue(params?: {
         }
       }),
       ...pendingDeletionRows
-        .filter((row) =>
-          (
+        .filter(
+          (row) =>
             (shouldIncludePendingDeletionRows({ filters, entityType: "script" }) && row.scriptId) ||
             (shouldIncludePendingDeletionRows({ filters, entityType: "screen" }) && row.screenId) ||
             (shouldIncludePendingDeletionRows({ filters, entityType: "diagnosis" }) && row.diagnosisId) ||
@@ -765,8 +750,7 @@ export async function getPendingDraftQueue(params?: {
             (shouldIncludePendingDeletionRows({ filters, entityType: "hospital" }) && row.hospitalId) ||
             (shouldIncludePendingDeletionRows({ filters, entityType: "drugs_library" }) && row.drugsLibraryItemId) ||
             (shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) && row.dataKeyId) ||
-            (shouldIncludePendingDeletionRows({ filters, entityType: "alias" }) && row.aliasId)
-          ),
+            (shouldIncludePendingDeletionRows({ filters, entityType: "alias" }) && row.aliasId),
         )
         .map((row): PendingDraftQueueEntry => {
           if (row.scriptId) {
@@ -1102,14 +1086,16 @@ export async function getPendingDraftQueue(params?: {
       }
     })
 
-    const creatorCounts = enrichedEntries.reduce<Record<string, { label: string; count: number }>>((acc, entry) => {
+    const scopedEntries = params?.entryId ? enrichedEntries.filter((entry) => entry.id === params.entryId) : enrichedEntries
+
+    const creatorCounts = scopedEntries.reduce<Record<string, { label: string; count: number }>>((acc, entry) => {
       const key = entry.createdByUserId || entry.createdByName
       if (!acc[key]) acc[key] = { label: entry.createdByName, count: 0 }
       acc[key].count += 1
       return acc
     }, {})
 
-    const entityCounts = enrichedEntries.reduce<Record<string, number>>((acc, entry) => {
+    const entityCounts = scopedEntries.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.entityType] = (acc[entry.entityType] || 0) + 1
       return acc
     }, {})
@@ -1117,10 +1103,14 @@ export async function getPendingDraftQueue(params?: {
       .map(([value, data]) => ({ value, label: data.label, count: data.count }))
       .sort((a, b) => a.label.localeCompare(b.label))
     const entityOptions = Object.entries(entityCounts)
-      .map(([value, count]) => ({ value: value as PendingDraftQueueEntityType, label: entityTypeLabels[value as PendingDraftQueueEntityType], count }))
+      .map(([value, count]) => ({
+        value: value as PendingDraftQueueEntityType,
+        label: entityTypeLabels[value as PendingDraftQueueEntityType],
+        count,
+      }))
       .sort((a, b) => a.label.localeCompare(b.label))
 
-    let filteredEntries = enrichedEntries.filter((entry) => {
+    let filteredEntries = scopedEntries.filter((entry) => {
       if (filters.tab !== "all" && filters.tab !== "mine" && entry.action !== actionLabelByTab[filters.tab]) return false
       if (filters.entityType !== "all" && entry.entityType !== filters.entityType) return false
       if (filters.creator !== "all" && (entry.createdByUserId || entry.createdByName) !== filters.creator) return false
@@ -1144,8 +1134,13 @@ export async function getPendingDraftQueue(params?: {
 
     filteredEntries = filteredEntries.sort((left, right) => {
       if (filters.sort === "oldest") return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
-      if (filters.sort === "creator") return left.createdByName.localeCompare(right.createdByName) || right.createdAt.localeCompare(left.createdAt)
-      if (filters.sort === "entity") return entityTypeLabels[left.entityType].localeCompare(entityTypeLabels[right.entityType]) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "creator")
+        return left.createdByName.localeCompare(right.createdByName) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "entity")
+        return (
+          entityTypeLabels[left.entityType].localeCompare(entityTypeLabels[right.entityType]) ||
+          right.createdAt.localeCompare(left.createdAt)
+        )
       if (filters.sort === "title") return left.title.localeCompare(right.title) || right.createdAt.localeCompare(left.createdAt)
       if (filters.sort === "action") return left.action.localeCompare(right.action) || right.createdAt.localeCompare(left.createdAt)
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
@@ -1157,20 +1152,18 @@ export async function getPendingDraftQueue(params?: {
     const startIndex = (page - 1) * filters.pageSize
     const pagedEntries = filteredEntries.slice(startIndex, startIndex + filters.pageSize)
 
-    const uniqueEntities = new Set(enrichedEntries.map((entry) => `${entry.entityType}:${entry.entityId}`)).size
-    const totalDeletes = enrichedEntries.filter((entry) => entry.action === "delete").length
-    const totalCreates = enrichedEntries.filter((entry) => entry.action === "create").length
-    const totalUpdates = enrichedEntries.filter((entry) => entry.action === "update").length
-    const staleEntries = enrichedEntries.filter((entry) => entry.isStale).length
-    const conflictEntries = enrichedEntries.filter((entry) => entry.conflictLabels.length > 0).length
+    const uniqueEntities = new Set(scopedEntries.map((entry) => `${entry.entityType}:${entry.entityId}`)).size
+    const totalDeletes = scopedEntries.filter((entry) => entry.action === "delete").length
+    const totalCreates = scopedEntries.filter((entry) => entry.action === "create").length
+    const totalUpdates = scopedEntries.filter((entry) => entry.action === "update").length
+    const staleEntries = scopedEntries.filter((entry) => entry.isStale).length
+    const conflictEntries = scopedEntries.filter((entry) => entry.conflictLabels.length > 0).length
     const tabCounts = {
-      all: enrichedEntries.length,
+      all: scopedEntries.length,
       creates: totalCreates,
       updates: totalUpdates,
       deletes: totalDeletes,
-      mine: currentUserId
-        ? enrichedEntries.filter((entry) => entry.createdByUserId === currentUserId).length
-        : 0,
+      mine: currentUserId ? scopedEntries.filter((entry) => entry.createdByUserId === currentUserId).length : 0,
     } satisfies Record<PendingDraftQueueTab, number>
 
     return {
@@ -1178,7 +1171,7 @@ export async function getPendingDraftQueue(params?: {
       data: pagedEntries,
       summary: {
         totalEntries: totalEntries,
-        totalDrafts: enrichedEntries.filter((entry) => entry.source === "draft").length,
+        totalDrafts: scopedEntries.filter((entry) => entry.source === "draft").length,
         totalDeletes,
         totalCreates,
         totalUpdates,
@@ -1286,9 +1279,7 @@ export async function getEditorDetails(): Promise<{
       ? await opsQueries._countDrafts(currentUserId)
       : { ...opsQueries.defaultCountDraftsData, errors: undefined }
     myDraftsErrors?.forEach((e) => errors.push(e))
-    const myPendingDeletion = currentUserId
-      ? await opsQueries._countPendingDeletion(currentUserId)
-      : { total: 0, errors: undefined }
+    const myPendingDeletion = currentUserId ? await opsQueries._countPendingDeletion(currentUserId) : { total: 0, errors: undefined }
     myPendingDeletion.errors?.forEach((e) => errors.push(e))
 
     const mode = "development"
@@ -1320,10 +1311,8 @@ export async function getEditorDetails(): Promise<{
   }
 }
 
-export const revalidatePath = async (
-  path: Parameters<typeof _revalidatePath>[0],
-  type?: Parameters<typeof _revalidatePath>[1],
-) => _revalidatePath(path, type)
+export const revalidatePath = async (path: Parameters<typeof _revalidatePath>[0], type?: Parameters<typeof _revalidatePath>[1]) =>
+  _revalidatePath(path, type)
 
 export const countAllDrafts = async () => {
   try {
@@ -1359,11 +1348,7 @@ export const countAllDrafts = async () => {
   }
 }
 
-export async function publishData({
-  scope,
-}: {
-  scope: number
-}) {
+export async function publishData({ scope }: { scope: number }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
     const session = await isAllowed([
@@ -1467,10 +1452,7 @@ export async function publishData({
       })
       if (processPendingDeletion.errors?.length) throw new Error(processPendingDeletion.errors.join(", "))
 
-      await tx
-        .update(editorInfo)
-        .set({ dataVersion: nextDataVersion, lastPublishDate: new Date() })
-        .where(eq(editorInfo.id, editor.id))
+      await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
 
       if (publisherUserId) {
         const releaseLog = await _saveChangeLog({
@@ -1497,11 +1479,7 @@ export async function publishData({
   }
 }
 
-export async function discardDrafts({
-  scope,
-}: {
-  scope: number
-}) {
+export async function discardDrafts({ scope }: { scope: number }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
     const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_diagnoses", "delete_screens"])

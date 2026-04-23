@@ -290,6 +290,90 @@ async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: stri
   return rows?.[0]?.version as number | undefined
 }
 
+async function getLatestChangeLog(
+  client: DbOrTransaction,
+  entityId: string,
+  entityType: SaveChangeLogData["entityType"],
+) {
+  const rows = await client
+    .select()
+    .from(changeLogs)
+    .where(and(eq(changeLogs.entityId, entityId), eq(changeLogs.entityType, entityType)))
+    .orderBy(desc(changeLogs.version))
+    .limit(1)
+
+  return rows?.[0]
+}
+
+async function reconcileChangeLogGap(params: {
+  client: DbOrTransaction
+  data: SaveChangeLogData
+  entityVersion: number
+  latestChangeLog: typeof changeLogs.$inferSelect
+}) {
+  const { client, data, entityVersion, latestChangeLog } = params
+  const latestVersion = Number(latestChangeLog.version)
+  const recoveredVersion = entityVersion - 1
+  const missingVersionCount = recoveredVersion - latestVersion
+
+  if (missingVersionCount < 1) {
+    return { repaired: false as const, latestVersion }
+  }
+
+  if (data.previousSnapshot === undefined) {
+    return { repaired: false as const, latestVersion }
+  }
+
+  const recoveredFullSnapshot = data.previousSnapshot
+  const recoveredPreviousSnapshot = latestChangeLog.fullSnapshot ?? latestChangeLog.previousSnapshot ?? {}
+  const recoveredTimestamp = new Date()
+
+  const recoveredChangeLog: typeof changeLogs.$inferInsert = {
+    changeLogId: uuid.v4(),
+    entityId: data.entityId,
+    entityType: data.entityType,
+    action: "update",
+    version: recoveredVersion,
+    dataVersion: data.dataVersion ?? latestChangeLog.dataVersion ?? null,
+    changes: [],
+    fullSnapshot: recoveredFullSnapshot,
+    previousSnapshot: recoveredPreviousSnapshot,
+    snapshotHash: computeRollbackSnapshotHash(recoveredFullSnapshot),
+    description: missingVersionCount === 1 ? "Recovered missing changelog snapshot" : "History repaired",
+    changeReason:
+      missingVersionCount === 1
+        ? "Auto-reconciled a single missing changelog version during save"
+        : `Auto-rebaselined changelog history during save after ${missingVersionCount} missing versions`,
+    parentVersion: latestVersion,
+    mergedFromVersion: null,
+    isActive: false,
+    userId: data.userId,
+    scriptId: data.scriptId,
+    screenId: data.screenId,
+    diagnosisId: data.diagnosisId,
+    problemId: data.problemId,
+    configKeyId: data.configKeyId,
+    hospitalId: data.hospitalId,
+    drugsLibraryItemId: data.drugsLibraryItemId,
+    dataKeyId: data.dataKeyId,
+    aliasId: data.aliasId,
+    dateOfChange: recoveredTimestamp,
+  }
+
+  await client.insert(changeLogs).values(recoveredChangeLog)
+
+  logger.log("saveChangeLog auto-reconciled missing version", {
+    entityType: data.entityType,
+    entityId: data.entityId,
+    recoveredVersion,
+    currentEntityVersion: entityVersion,
+    previousLatestVersion: latestVersion,
+    missingVersionCount,
+  })
+
+  return { repaired: true as const, latestVersion: recoveredVersion }
+}
+
 async function ensureBaselineChangeLog({
   client,
   data,
@@ -410,22 +494,48 @@ export async function _saveChangeLog({
         const entityType = resolvedData.entityType as VersionedEntityType
         const entityVersion = await getEntityVersion(tx, { ...resolvedData, entityType })
         const config = ENTITY_VERSION_CONFIG[entityType]
-        const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
+        const latestChangeLog = await getLatestChangeLog(tx, resolvedData.entityId, resolvedData.entityType)
+        let latestVersion = latestChangeLog?.version
         latestChangeLogVersion = latestVersion
 
         if (Number.isFinite(latestVersion)) {
           const expectedNextVersion = Number(latestVersion) + 1
           if (entityVersion !== expectedNextVersion) {
-            logger.error("saveChangeLog entity/changelog drift", {
-              entityType: resolvedData.entityType,
-              entityId: resolvedData.entityId,
-              entityVersion,
-              latestChangeLogVersion: latestVersion,
-              expectedNextVersion,
-            })
-            throw new Error(
-              `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
-            )
+            if (latestChangeLog) {
+              const reconciliation = await reconcileChangeLogGap({
+                client: tx,
+                data: resolvedData,
+                entityVersion,
+                latestChangeLog,
+              })
+
+              if (reconciliation.repaired) {
+                latestVersion = reconciliation.latestVersion
+                latestChangeLogVersion = reconciliation.latestVersion
+              } else {
+                logger.error("saveChangeLog entity/changelog drift", {
+                  entityType: resolvedData.entityType,
+                  entityId: resolvedData.entityId,
+                  entityVersion,
+                  latestChangeLogVersion: latestVersion,
+                  expectedNextVersion,
+                })
+                throw new Error(
+                  `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
+                )
+              }
+            } else {
+              logger.error("saveChangeLog entity/changelog drift", {
+                entityType: resolvedData.entityType,
+                entityId: resolvedData.entityId,
+                entityVersion,
+                latestChangeLogVersion: latestVersion,
+                expectedNextVersion,
+              })
+              throw new Error(
+                `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
+              )
+            }
           }
           computedVersion = entityVersion
         } else {

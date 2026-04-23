@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { getChangeLog } from "@/app/actions/change-logs"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
-import { formatChangeValue, getDataVersion, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import { formatChangeValue, getDataVersion, isHistoryRepairChange, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import { buildHumanDiffRows, formatTechnicalDiffValue, type HumanDiffRow } from "@/lib/changelog-human-diff"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
 import { cn } from "@/lib/utils"
@@ -96,6 +97,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const changedOn = format(new Date(change.dateOfChange), "PPpp")
   const dataVersion = getDataVersion(change) ?? numericVersion
   const normalizedChanges = normalizeChanges(change)
+  const isHistoryRepair = isHistoryRepairChange(change)
   const lifecycle = getChangeLifecycleStatus(change)
   const fieldInsights = buildFieldChangeInsights(normalizedChanges, { entityType: change.entityType })
   const highlightEntries = buildHighlightEntries(fieldInsights)
@@ -127,16 +129,17 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
           <CardHeader className="space-y-2">
             <CardTitle className="text-2xl">{entityTitle}</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {entityTitle} was{" "}
-              {change.action === "update"
-                ? "updated"
-                : change.action === "create"
-                  ? "created"
-                  : change.action === "delete"
-                    ? "deleted"
-                    : change.action}
-              . {normalizedChanges.length} {normalizedChanges.length === 1 ? "detail" : "details"} changed in published version v
-              {dataVersion}.
+              {isHistoryRepair
+                ? `${entityTitle} had its changelog history repaired before published version v${dataVersion} was written.`
+                : `${entityTitle} was ${
+                    change.action === "update"
+                      ? "updated"
+                      : change.action === "create"
+                        ? "created"
+                        : change.action === "delete"
+                          ? "deleted"
+                          : change.action
+                  }. ${normalizedChanges.length} ${normalizedChanges.length === 1 ? "detail" : "details"} changed in published version v${dataVersion}.`}
             </p>
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <Badge variant="outline" className="bg-muted text-muted-foreground">
@@ -238,7 +241,11 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
               <div>
                 <div className="text-xs uppercase text-muted-foreground tracking-wide">Detailed Changes ({normalizedChanges.length})</div>
                 {normalizedChanges.length === 0 ? (
-                  <div className="mt-3 text-sm text-muted-foreground italic">No field-level changes recorded for this entry.</div>
+                  <div className="mt-3 text-sm text-muted-foreground italic">
+                    {isHistoryRepair
+                      ? "This entry records a background history repair. No exact field-by-field diff was recoverable."
+                      : "No field-level changes recorded for this entry."}
+                  </div>
                 ) : (
                   <div className="mt-4 space-y-4">
                     {fieldInsights.map((insight, index) => (
@@ -322,8 +329,13 @@ function ChangeSummaryCard({
 function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsight; defaultOpen?: boolean }) {
   const hasOperations = insight.operations.length > 0
   const groupLabel = CHANGE_GROUP_METADATA[insight.groupKey].label
+  const readableRows = buildHumanDiffRows({
+    field: insight.field,
+    before: insight.previousValue,
+    after: insight.newValue,
+  })
 
-  if (!hasOperations) {
+  if (!hasOperations && !readableRows.length) {
     return (
       <div className="rounded-lg border border-dashed border-border/70 bg-muted/30">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
@@ -358,9 +370,13 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
         </div>
       </summary>
       <div className="border-t border-border/60 p-4 space-y-4">
-        {insight.operations.map((operation) => (
-          <DiffOperationRow key={operation.id} operation={operation} />
-        ))}
+        {readableRows.length ? (
+          readableRows.map((row) => <HumanDiffRowCard key={row.id} row={row} />)
+        ) : (
+          <div className="rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+            No readable field-level differences were detected. Use technical details below for audit review.
+          </div>
+        )}
         <div className="rounded-lg border border-dashed border-border/70">
           <details>
             <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
@@ -377,38 +393,33 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
   )
 }
 
-function DiffOperationRow({ operation }: { operation: FieldChangeInsight["operations"][number] }) {
-  const toneClass = {
-    added: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
-    removed: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30",
-    updated: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
-    moved: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
-  }[operation.kind]
-
+function HumanDiffRowCard({ row }: { row: HumanDiffRow }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase">
-        <div className="font-semibold">{operation.path}</div>
-        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide", toneClass)}>
-          {operation.kind === "added" && "Added"}
-          {operation.kind === "removed" && "Removed"}
-          {operation.kind === "updated" && "Modified"}
-          {operation.kind === "moved" && "Reordered"}
-        </span>
+    <div className="rounded-lg border border-border/60 bg-muted/20">
+      <div className="border-b border-border/60 px-4 py-3">
+        <div className="font-medium">{row.itemLabel || row.fieldLabel}</div>
+        {row.itemLabel && <div className="mt-1 text-sm text-muted-foreground">{row.fieldLabel}</div>}
+        {row.detailLabel && <div className="mt-2 text-sm font-medium">{row.detailLabel}</div>}
       </div>
-      {operation.label && <div className="mt-1 text-sm font-medium text-foreground">{operation.label}</div>}
-      {operation.kind === "moved" && typeof operation.targetIndex === "number" && (
-        <div className="mt-1 text-xs text-muted-foreground">Moved to position {operation.targetIndex + 1}</div>
-      )}
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {operation.kind !== "added" && <ValueBlock label="Before this change" tone="danger" value={operation.previousValue} />}
-        {operation.kind !== "removed" && <ValueBlock label="After this change" tone="success" value={operation.newValue} />}
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        <div className="rounded-lg border border-rose-500/15 bg-rose-500/[0.04] p-3">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Before this change</div>
+          <div className="mt-2 whitespace-pre-wrap break-words text-sm">{row.before}</div>
+        </div>
+        <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/[0.05] p-3">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">After this change</div>
+          <div className="mt-2 whitespace-pre-wrap break-words text-sm">{row.after}</div>
+        </div>
       </div>
-      {operation.textDiff && (
-        <pre className="mt-3 max-h-64 overflow-auto rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-200">
-          {operation.textDiff}
-        </pre>
-      )}
+      <details className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+        <summary className="cursor-pointer font-medium">Show technical details</summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap">
+            {formatTechnicalDiffValue(row.rawBefore)}
+          </pre>
+          <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap">{formatTechnicalDiffValue(row.rawAfter)}</pre>
+        </div>
+      </details>
     </div>
   )
 }
