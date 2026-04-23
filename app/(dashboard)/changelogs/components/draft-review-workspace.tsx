@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
-import { AlertTriangle, ArrowRight, Download, ExternalLink, Eye, Filter, Search, Users } from "lucide-react"
+import { AlertTriangle, ArrowRight, Download, ExternalLink, Eye, Filter, MoreVertical, Search, Users } from "lucide-react"
 
 import type {
   PendingDraftQueueEntry,
@@ -16,7 +16,7 @@ import type {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -168,6 +168,10 @@ function isScriptScopedGroup(groupId: string) {
 
 function getFriendlyFieldLabel(field: string) {
   return friendlyFieldLabels[field] || field.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ")
+}
+
+function getDraftDiffHref(entry: PendingDraftQueueEntry) {
+  return `/changelogs/pending/${encodeURIComponent(entry.id)}`
 }
 
 export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
@@ -701,25 +705,7 @@ function DraftEntryRow({ entry }: { entry: PendingDraftQueueEntry }) {
         <div className="flex flex-col gap-2 lg:items-end">
           <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}</div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            {entry.diffPreview.length > 0 && <DraftDiffDialog entry={entry} />}
-            {entry.href && (
-              <Button asChild variant="outline" size="sm">
-                <Link href={entry.href}>Open</Link>
-              </Button>
-            )}
-            {entry.parentHref && (
-              <Button asChild variant="ghost" size="sm">
-                <Link href={entry.parentHref}>Parent</Link>
-              </Button>
-            )}
-            {entry.searchHref && (
-              <Button asChild variant="ghost" size="sm">
-                <Link href={entry.searchHref}>
-                  History
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            )}
+            <DraftEntryActions entry={entry} />
           </div>
         </div>
       </div>
@@ -727,47 +713,47 @@ function DraftEntryRow({ entry }: { entry: PendingDraftQueueEntry }) {
   )
 }
 
-function DraftDiffDialog({ entry }: { entry: PendingDraftQueueEntry }) {
+function DraftEntryActions({ entry }: { entry: PendingDraftQueueEntry }) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Eye className="mr-2 h-4 w-4" />
-          Diff
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon" className="h-9 w-9">
+          <MoreVertical className="h-4 w-4" />
+          <span className="sr-only">Open draft actions</span>
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{entry.title}</DialogTitle>
-          <DialogDescription>
-            {entry.changedFieldCount
-              ? `${entry.changedFieldCount} changed ${entry.changedFieldCount === 1 ? "field" : "fields"} in this draft.`
-              : "Preview of the draft payload."}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          {entry.diffPreview.map((preview) => (
-            <div key={preview.field} className="rounded-lg border p-3">
-              <div className="font-medium">
-                {getFriendlyFieldLabel(preview.field)}
-                {getFriendlyFieldLabel(preview.field) !== preview.field && (
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">{preview.field}</span>
-                )}
-              </div>
-              <div className="mt-2 grid gap-3 md:grid-cols-2">
-                <div className="rounded-md bg-red-500/[0.04] p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Before this change</div>
-                  <div className="mt-1 text-sm">{preview.before}</div>
-                </div>
-                <div className="rounded-md bg-emerald-500/[0.05] p-3">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">After this change</div>
-                  <div className="mt-1 text-sm">{preview.after}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild disabled={!entry.diffPreview.length && entry.action !== "delete"}>
+          <Link href={getDraftDiffHref(entry)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Review diff
+          </Link>
+        </DropdownMenuItem>
+        {entry.href && (
+          <DropdownMenuItem asChild>
+            <Link href={entry.href}>
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Open editor
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {entry.parentHref && (
+          <DropdownMenuItem asChild>
+            <Link href={entry.parentHref}>
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Open parent
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {entry.searchHref && (
+          <DropdownMenuItem asChild>
+            <Link href={entry.searchHref}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View history
+            </Link>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

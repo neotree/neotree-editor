@@ -2,6 +2,7 @@
 
 import * as mutations from "@/databases/mutations/changelogs"
 import * as queries from "@/databases/queries/changelogs"
+import { isUnauthenticatedError } from "@/lib/auth-errors"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
 import { isAuthenticated } from "./is-authenticated"
@@ -14,13 +15,19 @@ async function ensureSuperUser() {
   return session
 }
 
+function logUnexpectedActionError(label: string, error: any) {
+  if (!isUnauthenticatedError(error)) {
+    logger.error(label, error?.message || error)
+  }
+}
+
 // QUERIES
 export const getChangeLogs: typeof queries._getChangeLogs = async (...args) => {
   try {
     await isAllowed()
     return await queries._getChangeLogs(...args)
   } catch (e: any) {
-    logger.error("getChangeLogs ERROR", e.message)
+    logUnexpectedActionError("getChangeLogs ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -30,7 +37,7 @@ export const getChangeLog: typeof queries._getChangeLog = async (...args) => {
     await isAllowed()
     return await queries._getChangeLog(...args)
   } catch (e: any) {
-    logger.error("getChangeLog ERROR", e.message)
+    logUnexpectedActionError("getChangeLog ERROR", e)
     return { errors: [e.message] }
   }
 }
@@ -40,7 +47,7 @@ export const getEntityHistory: typeof queries._getEntityHistory = async (...args
     await isAllowed()
     return await queries._getEntityHistory(...args)
   } catch (e: any) {
-    logger.error("getEntityHistory ERROR", e.message)
+    logUnexpectedActionError("getEntityHistory ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -50,7 +57,7 @@ export const getActiveVersion: typeof queries._getActiveVersion = async (...args
     await isAllowed()
     return await queries._getActiveVersion(...args)
   } catch (e: any) {
-    logger.error("getActiveVersion ERROR", e.message)
+    logUnexpectedActionError("getActiveVersion ERROR", e)
     return { errors: [e.message] }
   }
 }
@@ -60,7 +67,7 @@ export const getVersionChain: typeof queries._getVersionChain = async (...args) 
     await isAllowed()
     return await queries._getVersionChain(...args)
   } catch (e: any) {
-    logger.error("getVersionChain ERROR", e.message)
+    logUnexpectedActionError("getVersionChain ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -70,7 +77,7 @@ export const getChangeLogStats: typeof queries._getChangeLogStats = async (...ar
     await isAllowed()
     return await queries._getChangeLogStats(...args)
   } catch (e: any) {
-    logger.error("getChangeLogStats ERROR", e.message)
+    logUnexpectedActionError("getChangeLogStats ERROR", e)
     return {
       errors: [e.message],
       data: { totalChanges: 0, byAction: {}, byUser: {}, byEntityType: {} },
@@ -83,7 +90,7 @@ export const countChangeLogs: typeof queries._countChangeLogs = async (...args) 
     await isAllowed()
     return await queries._countChangeLogs(...args)
   } catch (e: any) {
-    logger.error("countChangeLogs ERROR", e.message)
+    logUnexpectedActionError("countChangeLogs ERROR", e)
     return { errors: [e.message], count: 0 }
   }
 }
@@ -93,7 +100,7 @@ export const countChangeLogsByEntity: typeof queries._countChangeLogsByEntity = 
     await isAllowed()
     return await queries._countChangeLogsByEntity(...args)
   } catch (e: any) {
-    logger.error("countChangeLogsByEntity ERROR", e.message)
+    logUnexpectedActionError("countChangeLogsByEntity ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -103,7 +110,7 @@ export const countChangeLogsByAction: typeof queries._countChangeLogsByAction = 
     await isAllowed()
     return await queries._countChangeLogsByAction(...args)
   } catch (e: any) {
-    logger.error("countChangeLogsByAction ERROR", e.message)
+    logUnexpectedActionError("countChangeLogsByAction ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -113,7 +120,7 @@ export const countChangeLogsByUser: typeof queries._countChangeLogsByUser = asyn
     await isAllowed()
     return await queries._countChangeLogsByUser(...args)
   } catch (e: any) {
-    logger.error("countChangeLogsByUser ERROR", e.message)
+    logUnexpectedActionError("countChangeLogsByUser ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -123,7 +130,7 @@ export const countEntityVersions: typeof queries._countEntityVersions = async (.
     await isAllowed()
     return await queries._countEntityVersions(...args)
   } catch (e: any) {
-    logger.error("countEntityVersions ERROR", e.message)
+    logUnexpectedActionError("countEntityVersions ERROR", e)
     return { errors: [e.message], totalVersions: 0, activeVersions: 0 }
   }
 }
@@ -133,7 +140,7 @@ export const getDataVersionSummaries: typeof queries._getDataVersionSummaries = 
     await isAllowed()
     return await queries._getDataVersionSummaries(...args)
   } catch (e: any) {
-    logger.error("getDataVersionSummaries ERROR", e.message)
+    logUnexpectedActionError("getDataVersionSummaries ERROR", e)
     return { errors: [e.message], data: [], total: 0 }
   }
 }
@@ -143,7 +150,7 @@ export const searchChangeLogs: typeof queries.SearchChangeLogs._searchChangeLogs
     await isAllowed()
     return await queries.SearchChangeLogs._searchChangeLogs(...args)
   } catch (e: any) {
-    logger.error("searchChangeLogs ERROR", e.message)
+    logUnexpectedActionError("searchChangeLogs ERROR", e)
     return { errors: [e.message], data: [], total: 0 }
   }
 }
@@ -153,7 +160,7 @@ export const searchChangesByField: typeof queries.SearchChangeLogs._searchChange
     await isAllowed()
     return await queries.SearchChangeLogs._searchChangesByField(...args)
   } catch (e: any) {
-    logger.error("searchChangesByField ERROR", e.message)
+    logUnexpectedActionError("searchChangesByField ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -163,7 +170,7 @@ export const searchChangeLogsByUser: typeof queries.SearchChangeLogs._searchChan
     await isAllowed()
     return await queries.SearchChangeLogs._searchChangeLogsByUser(...args)
   } catch (e: any) {
-    logger.error("searchChangeLogsByUser ERROR", e.message)
+    logUnexpectedActionError("searchChangeLogsByUser ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -175,7 +182,7 @@ export const searchChangeLogsByDateRange: typeof queries.SearchChangeLogs._searc
     await isAllowed()
     return await queries.SearchChangeLogs._searchChangeLogsByDateRange(...args)
   } catch (e: any) {
-    logger.error("searchChangeLogsByDateRange ERROR", e.message)
+    logUnexpectedActionError("searchChangeLogsByDateRange ERROR", e)
     return { errors: [e.message], data: [] }
   }
 }
@@ -185,10 +192,24 @@ export const findRelatedChanges: typeof queries.SearchChangeLogs._findRelatedCha
     await isAllowed()
     return await queries.SearchChangeLogs._findRelatedChanges(...args)
   } catch (e: any) {
-    logger.error("findRelatedChanges ERROR", e.message)
+    logUnexpectedActionError("findRelatedChanges ERROR", e)
     return {
       errors: [e.message],
       data: { current: {} as any, children: [], mergedVersions: [], supersededVersions: [] },
+    }
+  }
+}
+
+export const getChangeLogIntegrityReport: typeof queries._getChangeLogIntegrityReport = async (...args) => {
+  try {
+    await ensureSuperUser()
+    return await queries._getChangeLogIntegrityReport(...args)
+  } catch (e: any) {
+    logUnexpectedActionError("getChangeLogIntegrityReport ERROR", e)
+    return {
+      errors: [e.message],
+      data: [],
+      summary: { healthy: 0, autoHealable: 0, rebaselineRequired: 0, missingChain: 0, changeLogAhead: 0, total: 0 },
     }
   }
 }
@@ -205,7 +226,7 @@ export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => 
       },
     })
   } catch (e: any) {
-    logger.error("saveChangeLog ERROR", e.message)
+    logUnexpectedActionError("saveChangeLog ERROR", e)
     return { errors: [e.message], success: false }
   }
 }
@@ -221,7 +242,7 @@ export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) =
       })),
     })
   } catch (e: any) {
-    logger.error("saveChangeLogs ERROR", e.message)
+    logUnexpectedActionError("saveChangeLogs ERROR", e)
     return { errors: [e.message], success: false, saved: 0 }
   }
 }
@@ -231,7 +252,7 @@ export const updateChangeLog: typeof mutations._updateChangeLog = async (params)
     await isAllowed()
     return await mutations._updateChangeLog(params)
   } catch (e: any) {
-    logger.error("updateChangeLog ERROR", e.message)
+    logUnexpectedActionError("updateChangeLog ERROR", e)
     return { errors: [e.message], success: false }
   }
 }
@@ -241,7 +262,7 @@ export const markVersionAsSuperseded: typeof mutations._markVersionAsSuperseded 
     await isAllowed()
     return await mutations._markVersionAsSuperseded(params)
   } catch (e: any) {
-    logger.error("markVersionAsSuperseded ERROR", e.message)
+    logUnexpectedActionError("markVersionAsSuperseded ERROR", e)
     return { errors: [e.message], success: false }
   }
 }
@@ -254,7 +275,7 @@ export const rollbackChangeLog: typeof mutations._rollbackChangeLog = async (par
       userId: session.user?.userId!,
     })
   } catch (e: any) {
-    logger.error("rollbackChangeLog ERROR", e.message)
+    logUnexpectedActionError("rollbackChangeLog ERROR", e)
     return { errors: [e.message], success: false }
   }
 }
@@ -267,7 +288,7 @@ export const rollbackDataVersion: typeof mutations._rollbackDataVersion = async 
       userId: session.user?.userId!,
     })
   } catch (e: any) {
-    logger.error("rollbackDataVersion ERROR", e.message)
+    logUnexpectedActionError("rollbackDataVersion ERROR", e)
     return { errors: [e.message], success: false }
   }
 }

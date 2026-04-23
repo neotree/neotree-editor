@@ -6,6 +6,16 @@ export type NormalizedChange = {
   newValue: unknown
 }
 
+export function isHistoryRepairChange(change: Pick<ChangeLogType, "description" | "changeReason">) {
+  const description = `${change.description || ""} ${change.changeReason || ""}`.toLowerCase()
+  return (
+    description.includes("history repaired") ||
+    description.includes("recovered missing changelog snapshot") ||
+    description.includes("auto-rebaselined changelog history") ||
+    description.includes("auto-reconciled a single missing changelog version")
+  )
+}
+
 export function toNumericVersion(value: unknown): number | null {
   if (value === null || value === undefined) return null
   const parsed = typeof value === "number" ? value : Number(value)
@@ -126,6 +136,14 @@ export function normalizeChanges(change: ChangeLogType): NormalizedChange[] {
         }
       }
     }
+  }
+
+  if (!normalized.length && isHistoryRepairChange(change)) {
+    normalized.push({
+      field: "historyRepair",
+      previousValue: "Changelog history was incomplete before this publish.",
+      newValue: change.changeReason || change.description || "History was repaired from the latest trusted snapshot.",
+    })
   }
 
   return normalized

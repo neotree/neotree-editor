@@ -14,6 +14,7 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
+import { isUnauthenticatedError } from "@/lib/auth-errors";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
@@ -204,7 +205,9 @@ export const getScripts: typeof queries._getScripts = async (...args) => {
         await isAllowed();
         return await queries._getScripts(...args);
     } catch (e: any) {
-        logger.error('getScripts ERROR', e.message);
+        if (!isUnauthenticatedError(e)) {
+            logger.error('getScripts ERROR', e.message);
+        }
         return { errors: [e.message], data: [], };
     }
 };

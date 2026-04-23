@@ -1,4 +1,5 @@
 import { isAllowed } from "./is-allowed";
+import { isUnauthenticatedError } from "@/lib/auth-errors";
 import * as queries from "@/databases/queries/aliases";
 import * as mutations from "@/databases/mutations/aliases";
 import logger from "@/lib/logger";
@@ -9,7 +10,9 @@ export const getAllAliases: typeof queries._getAllAliases = async (...args) => {
         await isAllowed();
         return await queries._getAllAliases(...args);
     } catch (e: any) {
-        logger.error('getAllAliases ERROR', e.message);
+        if (!isUnauthenticatedError(e)) {
+            logger.error('getAllAliases ERROR', e.message);
+        }
         return { errors: [e.message], data:[] , };
     }
 };
@@ -35,7 +38,9 @@ export const seedAliases: typeof mutations._seedAliases = async (...args) => {
         await isAllowed();
         return await mutations._seedAliases(...args);
     } catch (e: any) {
-        logger.error('getAliases ERROR', e.message);
+        if (!isUnauthenticatedError(e)) {
+            logger.error('getAliases ERROR', e.message);
+        }
     
     }
 };

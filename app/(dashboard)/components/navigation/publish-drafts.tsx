@@ -34,6 +34,7 @@ export function PublishDrafts({ variant }: Props) {
   const { alert } = useAlertModal()
   const [loading, setLoading] = useState(false)
   const [scope, setScope] = useState<"0" | "1">("0")
+  const [open, setOpen] = useState(false)
 
   const { publishData: _publishData, discardDrafts: _discardDrafts, drafts, myDrafts, pendingDeletion, myPendingDeletion } = useAppContext()
 
@@ -126,7 +127,13 @@ export function PublishDrafts({ variant }: Props) {
 
   return (
     <>
-      <Dialog>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen)
+          if (nextOpen) setScope("0")
+        }}
+      >
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent>
           {loading && <Loader overlay />}
@@ -141,15 +148,11 @@ export function PublishDrafts({ variant }: Props) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <RadioGroup
-              defaultValue={scopeOptions[0].value}
-              onValueChange={(value) => setScope(value as typeof scope)}
-              className="flex flex-col gap-y-4"
-            >
+            <RadioGroup value={scope} onValueChange={(value) => setScope(value as typeof scope)} className="flex flex-col gap-y-4">
               {scopeOptions.map((t) => (
                 <div key={t.value} className="flex items-center space-x-2">
-                  <RadioGroupItem value={t.value} id={t.value} />
-                  <Label secondary htmlFor={t.value}>
+                  <RadioGroupItem value={t.value} id={`${variant}-draft-scope-${t.value}`} />
+                  <Label secondary htmlFor={`${variant}-draft-scope-${t.value}`}>
                     {ucFirst(variant)} {t.label}
                   </Label>
                 </div>
