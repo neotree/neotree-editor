@@ -318,14 +318,15 @@ export async function applyRollbackSnapshot({
   entityId,
   snapshot,
   newVersion,
+  now = new Date(),
 }: {
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
   binding: VersionedEntityBinding
   entityId: string
   snapshot: any
   newVersion: number
+  now?: Date
 }) {
-  const now = new Date()
   const basePayload = buildRollbackSnapshotPayload({
     binding,
     entityId,
@@ -342,4 +343,48 @@ export async function applyRollbackSnapshot({
 
   const [inserted] = await tx.insert(binding.table).values(insertPayload).returning()
   return inserted
+}
+
+function snapshotDate(value: any) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.valueOf()) ? null : date
+}
+
+export async function ensureActiveChangeApplied({
+  tx,
+  binding,
+  activeChange,
+}: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  binding: VersionedEntityBinding
+  activeChange: typeof changeLogs.$inferSelect
+}) {
+  if (!binding.versionKey) return null
+
+  const columns = getTableColumns(binding.table) as Record<string, any>
+  const versionColumn = columns[binding.versionKey]
+  if (!versionColumn) return null
+
+  const [row] = await tx
+    .select({ version: versionColumn })
+    .from(binding.table)
+    .where(eq(binding.pk, activeChange.entityId))
+    .limit(1)
+
+  if (Number(row?.version) === Number(activeChange.version)) return null
+
+  await assertSnapshotIntegrity(tx, activeChange, activeChange.entityId)
+
+  return await applyRollbackSnapshot({
+    tx,
+    binding,
+    entityId: activeChange.entityId,
+    snapshot: normalizeSnapshot(activeChange.fullSnapshot),
+    newVersion: activeChange.version,
+    now:
+      snapshotDate((activeChange.fullSnapshot as any)?.publishDate) ??
+      snapshotDate((activeChange.fullSnapshot as any)?.updatedAt) ??
+      new Date(),
+  })
 }

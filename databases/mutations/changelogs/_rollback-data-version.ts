@@ -21,6 +21,7 @@ import {
   applyRollbackSnapshot,
   assertSnapshotIntegrity,
   CHANGELOG_ENTITY_BINDINGS,
+  ensureActiveChangeApplied,
   lockEntityRow,
   lockChangeLogChain,
   normalizeSnapshot,
@@ -272,6 +273,11 @@ export async function _rollbackDataVersion({
               targetDataVersion: scriptTargetDataVersion,
             })
           ) {
+            await ensureActiveChangeApplied({
+              tx,
+              binding: childBinding,
+              activeChange: childCurrent,
+            })
             continue
           }
 
@@ -335,7 +341,7 @@ export async function _rollbackDataVersion({
                 toDataVersion: restoreSourceDataVersion,
               },
             ],
-            fullSnapshot: targetSnapshot,
+            fullSnapshot: applied,
             previousSnapshot: currentSnapshot,
             description,
             changeReason: changeReason || description,
@@ -423,15 +429,15 @@ export async function _rollbackDataVersion({
               fromDataVersion: currentDataVersion,
               toDataVersion: restoreSourceDataVersion,
             },
-            ],
-            fullSnapshot: targetSnapshot,
+          ],
+          fullSnapshot: applied,
           previousSnapshot: currentSnapshot,
-            description,
-            changeReason: changeReason || description,
-            parentVersion: getRollbackParentVersion(current.version),
-            mergedFromVersion: restoredVersion,
-            dataVersion: targetDataVersion,
-            isActive: true,
+          description,
+          changeReason: changeReason || description,
+          parentVersion: getRollbackParentVersion(current.version),
+          mergedFromVersion: restoredVersion,
+          dataVersion: targetDataVersion,
+          isActive: true,
           userId,
           scriptId: current.scriptId,
           screenId: current.screenId,

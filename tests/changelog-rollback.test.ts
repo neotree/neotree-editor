@@ -254,6 +254,16 @@ assert.equal(
   2,
   "rollback should use numeric defaults for non-null fields added after the snapshot was created",
 )
+assert.equal(
+  legacyScreenRollbackPayload.version,
+  6,
+  "rollback changelog snapshots should use the applied live-row version, not the historical target snapshot version",
+)
+assert.equal(
+  legacyScreenRollbackPayload.publishDate instanceof Date,
+  true,
+  "rollback changelog snapshots should include the applied live-row publish timestamp",
+)
 
 const legacyDataKeyRollbackPayload = buildRollbackSnapshotPayload({
   binding: dataKeyBinding,
