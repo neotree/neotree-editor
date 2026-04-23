@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { getChangeLog } from "@/app/actions/change-logs"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { formatChangeValue, getDataVersion, isHistoryRepairChange, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
-import { buildHumanDiffRows, formatTechnicalDiffValue, type HumanDiffRow } from "@/lib/changelog-human-diff"
+import { buildHumanDiffRows, type HumanDiffRow } from "@/lib/changelog-human-diff"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
 import { cn } from "@/lib/utils"
@@ -19,13 +19,11 @@ import {
   buildFieldChangeInsights,
   buildHighlightEntries,
   groupFieldChangeInsights,
-  CHANGE_GROUP_METADATA,
   type ChangeGroupSummary,
   type FieldChangeInsight,
   type HighlightEntry,
 } from "./diff-insights"
 import { RollbackButton } from "../../../components/rollback-button"
-import { ChangelogWorkflowRail } from "../../../components/workflow-rail"
 
 type Params = {
   version: string
@@ -65,6 +63,17 @@ const lifecycleBadgeClasses: Record<ChangeLifecycleState, string> = {
   superseded: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
 }
 
+const systemFieldNames = new Set([
+  "id",
+  "uuid",
+  "version",
+  "dataVersion",
+  "publishDate",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+])
+
 function getEntityEditorHref(change: ChangeLogType) {
   if (change.entityType === "script") return `/script/${change.entityId}`
   if (change.entityType === "screen" && change.scriptId) return `/script/${change.scriptId}/screen/${change.entityId}`
@@ -100,9 +109,12 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const isHistoryRepair = isHistoryRepairChange(change)
   const lifecycle = getChangeLifecycleStatus(change)
   const fieldInsights = buildFieldChangeInsights(normalizedChanges, { entityType: change.entityType })
-  const highlightEntries = buildHighlightEntries(fieldInsights)
-  const groupedSummaries = groupFieldChangeInsights(fieldInsights)
-  const hasAnyDiffs = fieldInsights.some((entry) => entry.stats.total > 0)
+  const userFacingInsights = fieldInsights.filter((entry) => !systemFieldNames.has(entry.field))
+  const systemInsights = fieldInsights.filter((entry) => systemFieldNames.has(entry.field))
+  const visibleInsights = userFacingInsights.length ? userFacingInsights : fieldInsights
+  const highlightEntries = buildHighlightEntries(visibleInsights)
+  const groupedSummaries = groupFieldChangeInsights(visibleInsights).filter((group) => group.stats.total > 0)
+  const hasAnyDiffs = visibleInsights.some((entry) => entry.stats.total > 0)
   const rollbackTargetVersion = getRollbackButtonTargetVersion({
     action: change.action,
     parentVersion: change.parentVersion,
@@ -115,8 +127,6 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
     <>
       <Title>Change Details</Title>
       <Content className="space-y-6">
-        <ChangelogWorkflowRail current="change" />
-
         <Link
           href={`/changelogs/v${numericVersion}`}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -139,7 +149,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                         : change.action === "delete"
                           ? "deleted"
                           : change.action
-                  }. ${normalizedChanges.length} ${normalizedChanges.length === 1 ? "detail" : "details"} changed in published version v${dataVersion}.`}
+                  }. ${visibleInsights.length} ${visibleInsights.length === 1 ? "detail" : "details"} changed in published version v${dataVersion}.`}
             </p>
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <Badge variant="outline" className="bg-muted text-muted-foreground">
@@ -239,8 +249,8 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
               </div>
 
               <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Detailed Changes ({normalizedChanges.length})</div>
-                {normalizedChanges.length === 0 ? (
+                <div className="text-xs uppercase text-muted-foreground tracking-wide">Changes to Review ({visibleInsights.length})</div>
+                {visibleInsights.length === 0 ? (
                   <div className="mt-3 text-sm text-muted-foreground italic">
                     {isHistoryRepair
                       ? "This entry records a background history repair. No exact field-by-field diff was recoverable."
@@ -248,7 +258,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                   </div>
                 ) : (
                   <div className="mt-4 space-y-4">
-                    {fieldInsights.map((insight, index) => (
+                    {visibleInsights.map((insight, index) => (
                       <FieldDiffDetails
                         key={`${change.changeLogId}-${insight.field}-${index}`}
                         insight={insight}
@@ -256,6 +266,23 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                       />
                     ))}
                   </div>
+                )}
+                {systemInsights.length > 0 && userFacingInsights.length > 0 && (
+                  <details className="mt-4 rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-3">
+                    <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
+                      Show system metadata changes
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {systemInsights.map((insight) => (
+                        <RawValueComparison
+                          key={`${change.changeLogId}-${insight.field}-system`}
+                          label={insight.fieldLabel}
+                          previous={insight.previousValue}
+                          next={insight.newValue}
+                        />
+                      ))}
+                    </div>
+                  </details>
                 )}
               </div>
             </div>
@@ -302,23 +329,9 @@ function ChangeSummaryCard({
         )}
       </div>
       <div className="px-4 py-3">
-        <div className="text-xs font-semibold uppercase text-muted-foreground">Breakdown by Category</div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="flex flex-wrap gap-2">
           {groupedSummaries.map((group) => (
-            <div key={group.key} className="rounded-lg border border-dashed border-border/70 bg-background/70 p-3 text-sm">
-              <div className="font-medium">{group.label}</div>
-              <div className="text-xs text-muted-foreground">{group.description}</div>
-              {group.stats.total === 0 ? (
-                <div className="mt-2 text-sm text-muted-foreground">No changes.</div>
-              ) : (
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <StatBadge label="Added" value={group.stats.added} tone="added" />
-                  <StatBadge label="Modified" value={group.stats.updated} tone="updated" />
-                  <StatBadge label="Removed" value={group.stats.removed} tone="removed" />
-                  {group.stats.moved > 0 && <StatBadge label="Moved" value={group.stats.moved} tone="moved" />}
-                </div>
-              )}
-            </div>
+            <StatBadge key={group.key} label={group.label} value={group.stats.total} tone="updated" />
           ))}
         </div>
       </div>
@@ -328,7 +341,6 @@ function ChangeSummaryCard({
 
 function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsight; defaultOpen?: boolean }) {
   const hasOperations = insight.operations.length > 0
-  const groupLabel = CHANGE_GROUP_METADATA[insight.groupKey].label
   const readableRows = buildHumanDiffRows({
     field: insight.field,
     before: insight.previousValue,
@@ -341,7 +353,6 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <div>
             <div className="text-sm font-semibold">{insight.fieldLabel}</div>
-            <div className="text-xs uppercase text-muted-foreground">{groupLabel}</div>
           </div>
           <div className="text-xs font-medium text-muted-foreground">No structured differences</div>
         </div>
@@ -359,7 +370,6 @@ function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsigh
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-sm font-semibold">{insight.fieldLabel}</div>
-            <div className="text-xs uppercase text-muted-foreground">{groupLabel}</div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <StatBadge label="Added" value={insight.stats.added} tone="added" />
@@ -411,24 +421,18 @@ function HumanDiffRowCard({ row }: { row: HumanDiffRow }) {
           <div className="mt-2 whitespace-pre-wrap break-words text-sm">{row.after}</div>
         </div>
       </div>
-      <details className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-        <summary className="cursor-pointer font-medium">Show technical details</summary>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap">
-            {formatTechnicalDiffValue(row.rawBefore)}
-          </pre>
-          <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap">{formatTechnicalDiffValue(row.rawAfter)}</pre>
-        </div>
-      </details>
     </div>
   )
 }
 
-function RawValueComparison({ previous, next }: { previous: unknown; next: unknown }) {
+function RawValueComparison({ label, previous, next }: { label?: string; previous: unknown; next: unknown }) {
   return (
-    <div className="mt-3 grid gap-3 md:grid-cols-2">
-      <ValueBlock label="Before this change" tone="danger" value={previous} />
-      <ValueBlock label="After this change" tone="success" value={next} />
+    <div className="rounded-lg border border-border/60 bg-background/80 p-3">
+      {label && <div className="mb-3 text-sm font-semibold">{label}</div>}
+      <div className="grid gap-3 md:grid-cols-2">
+        <ValueBlock label="Before this change" tone="danger" value={previous} />
+        <ValueBlock label="After this change" tone="success" value={next} />
+      </div>
     </div>
   )
 }

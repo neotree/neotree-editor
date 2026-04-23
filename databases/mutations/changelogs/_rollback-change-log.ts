@@ -17,12 +17,14 @@ import {
   applyRollbackSnapshot,
   assertSnapshotIntegrity,
   CHANGELOG_ENTITY_BINDINGS,
+  ensureActiveChangeApplied,
   lockChangeLogChain,
   lockEntityRow,
   normalizeSnapshot,
 } from "./_rollback-shared"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
 import { buildReleasePublishChangeLog } from "./_release-log"
+import { isUuidLike } from "@/lib/uuid"
 
 export type RollbackChangeLogParams = {
   entityId: string
@@ -56,6 +58,9 @@ export async function _rollbackChangeLog({
     }
     if (!entityType) {
       throw new Error("Invalid entityType")
+    }
+    if (!isUuidLike(userId)) {
+      throw new Error("Invalid userId")
     }
 
     const result = await db.transaction(async (tx) => {
@@ -273,7 +278,7 @@ export async function _rollbackChangeLog({
                 toVersion: restoredVersion,
               },
             ],
-            fullSnapshot: targetSnapshot,
+            fullSnapshot: applied,
             previousSnapshot: currentSnapshot,
             description,
             changeReason: changeReason || description,
@@ -379,6 +384,11 @@ export async function _rollbackChangeLog({
               targetDataVersion: target.dataVersion,
             })
           ) {
+            await ensureActiveChangeApplied({
+              tx,
+              binding: childBinding,
+              activeChange: childCurrent,
+            })
             continue
           }
 

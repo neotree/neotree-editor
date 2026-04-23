@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { buildHumanDiffRows, formatTechnicalDiffValue, parseDraftPreviewValue } from "@/lib/changelog-human-diff"
-import { ChangelogWorkflowRail } from "../../components/workflow-rail"
 
 export const dynamic = "force-dynamic"
 
@@ -86,8 +85,6 @@ export default async function PendingDraftDiffPage({ params }: { params: Params 
     <>
       <Title>Draft Diff</Title>
       <Content className="space-y-6">
-        <ChangelogWorkflowRail current="drafts" />
-
         <Link href="/changelogs/pending" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to pending drafts
