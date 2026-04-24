@@ -61,11 +61,22 @@ export async function _saveScreensHistory({
             }
           })
 
+        const syncChangeReason = getDataKeySyncChangeReason(
+          removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {}),
+          removeHexCharacters(c.data || {}),
+        )
+
         changeHistoryData.changes = {
           action: "update_screen",
           description: "Update screen",
           oldValues,
           newValues,
+          metadata: syncChangeReason
+            ? {
+                source: "data_key_reference_sync",
+                mode: syncChangeReason === "Published via data key reference sync" ? "pure" : "mixed",
+              }
+            : undefined,
         }
       }
 

@@ -20,6 +20,17 @@ import {
 } from "../lib/changelog-rollback"
 import { CHANGELOG_ENTITY_BINDINGS, buildRollbackSnapshotPayload } from "../databases/mutations/changelogs/_rollback-shared"
 import { buildDeleteChangeSnapshots, getRollbackButtonTargetVersion } from "../lib/changelog-publish"
+import {
+  buildDataKeyDependentRollbackSnapshot,
+  buildDataKeyReferenceCandidates,
+  buildDataKeyRollbackDependencies,
+  findDataKeyReferencePaths,
+} from "../lib/changelog-dependencies"
+import { buildHumanDiffRows } from "../lib/changelog-human-diff"
+import {
+  getProtectedDependentRollbackMessage,
+  isProtectedDependentRollbackChange,
+} from "../lib/changelog-rollback-guards"
 
 assert.equal(
   getPublishedEntityVersion({ currentVersion: 4, isCreate: false }),
@@ -419,6 +430,177 @@ assert.equal(
   importedScriptLooksNewInRolledBackRelease && DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY === "soft_delete",
   true,
   "an imported script first published in the rolled-back release must be soft-deleted by default during release rollback",
+)
+
+const dataKeyReferenceCandidates = buildDataKeyReferenceCandidates(
+  { uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uniqueKey: "patient_temp" },
+  { uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uniqueKey: "patient_temperature" },
+)
+
+assert.deepEqual(
+  findDataKeyReferencePaths(
+    {
+      keyId: "patient_temperature",
+      fields: [
+        {
+          keyId: "unrelated",
+          items: [{ keyId: "patient_temp", label: "Temperature" }],
+        },
+      ],
+    },
+    dataKeyReferenceCandidates,
+  ).map((match) => match.path),
+  ["keyId", "fields[0].items[0].keyId"],
+  "data-key dependency detection should find direct and nested references without matching unrelated fields",
+)
+
+const dataKeyDependencies = buildDataKeyRollbackDependencies({
+  dataKeyEntityId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  currentSnapshot: { uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uniqueKey: "patient_temperature" },
+  targetSnapshot: { uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uniqueKey: "patient_temp" },
+  activeChanges: [
+    {
+      entityId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      entityType: "data_key",
+      fullSnapshot: { uniqueKey: "patient_temperature" },
+    },
+    {
+      entityId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      entityType: "screen",
+      fullSnapshot: { fields: [{ keyId: "patient_temperature" }] },
+    },
+    {
+      entityId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      entityType: "diagnosis",
+      fullSnapshot: { keyId: "other_key" },
+    },
+  ] as any,
+})
+
+assert.deepEqual(
+  dataKeyDependencies.map((dependency) => `${dependency.entityType}:${dependency.entityId}:${dependency.matchedPath}`),
+  ["screen:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb:fields[0].keyId"],
+  "data-key rollback planning should include dependent entities and exclude the rolled-back data key itself",
+)
+
+assert.deepEqual(
+  buildDataKeyDependentRollbackSnapshot({
+    dataKeyCurrentSnapshot: {
+      uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      uniqueKey: "patient_temperature",
+      name: "patientTemperature",
+      label: "Patient temperature",
+      confidential: true,
+    },
+    dataKeyTargetSnapshot: {
+      uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      uniqueKey: "patient_temp",
+      name: "patientTemp",
+      label: "Patient temp",
+      confidential: false,
+    },
+    currentSnapshot: {
+      title: "Later unrelated title edit",
+      keyId: "patient_temperature",
+      key: "patientTemperature",
+      label: "Patient temperature",
+      fields: [
+        { fieldId: "field-1", keyId: "patient_temperature", key: "patientTemperature", label: "Patient temperature" },
+        { fieldId: "field-2", keyId: "other", key: "other", label: "Other" },
+      ],
+    },
+    targetSnapshot: {
+      title: "Old title",
+      keyId: "patient_temp",
+      key: "patientTemp",
+      label: "Patient temp",
+      fields: [
+        { fieldId: "field-1", keyId: "patient_temp", key: "patientTemp", label: "Patient temp" },
+        { fieldId: "field-2", keyId: "other", key: "oldOther", label: "Old other" },
+      ],
+    },
+  }),
+  {
+    title: "Later unrelated title edit",
+    keyId: "patient_temp",
+    key: "patientTemp",
+    label: "Patient temp",
+    fields: [
+      { fieldId: "field-1", keyId: "patient_temp", key: "patientTemp", label: "Patient temp" },
+      { fieldId: "field-2", keyId: "other", key: "other", label: "Other" },
+    ],
+  },
+  "dependent rollback snapshots should restore only data-key-derived fields while preserving unrelated later edits",
+)
+
+assert.deepEqual(
+  buildHumanDiffRows({
+    field: "metadata",
+    before: { b: 2, a: { d: 4, c: 3 } },
+    after: { a: { c: 3, d: 4 }, b: 2 },
+  }),
+  [],
+  "human diff equality should ignore object key ordering so jsonb round-trips do not show false visual changes",
+)
+
+assert.equal(
+  isProtectedDependentRollbackChange({
+    entityType: "screen",
+    changes: [
+      { field: "fields.0.keyId", previousValue: "old", newValue: "new" },
+      { field: "fields.0.label", previousValue: "Old label", newValue: "New label" },
+    ],
+  }),
+  true,
+  "dependent screen changes that only touch data-key-derived fields should block direct rollback",
+)
+
+assert.equal(
+  isProtectedDependentRollbackChange({
+    entityType: "screen",
+    changeReason: "Published via data key reference sync",
+    changes: {
+      action: "update_screen",
+      description: "Update screen",
+      oldValues: [{ keyId: "old-key" }, { label: "Old label" }],
+      newValues: [{ keyId: "new-key" }, { label: "New label" }],
+    },
+  }),
+  true,
+  "legacy propagated dependent changelogs should still block direct rollback from their sync reason and old/new value payload",
+)
+
+assert.equal(
+  isProtectedDependentRollbackChange({
+    entityType: "diagnosis",
+    changes: {
+      action: "update_diagnosis",
+      description: "Update diagnosis",
+      oldValues: [{ keyId: "old-key" }],
+      newValues: [{ keyId: "new-key" }],
+      metadata: { source: "data_key_reference_sync", mode: "pure" },
+    },
+  }),
+  true,
+  "explicit sync metadata should block direct rollback even without parsing field arrays",
+)
+
+assert.equal(
+  isProtectedDependentRollbackChange({
+    entityType: "screen",
+    changes: [
+      { field: "title", previousValue: "Old title", newValue: "New title" },
+      { field: "fields.0.label", previousValue: "Old label", newValue: "New label" },
+    ],
+  }),
+  false,
+  "mixed dependent changes should not be treated as pure propagated data-key changes",
+)
+
+assert.equal(
+  getProtectedDependentRollbackMessage("screen"),
+  "This screen change came from a Data Key propagation. Roll back the Data Key instead to keep linked entities in sync.",
+  "protected rollback guidance should explain the supported recovery path",
 )
 
 console.log("changelog rollback tests passed")

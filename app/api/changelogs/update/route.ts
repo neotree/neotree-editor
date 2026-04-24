@@ -9,6 +9,9 @@ export async function POST(req: NextRequest) {
     const isAuthorised = await isAuthenticated()
 
     if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] }, { status: 401 })
+    if (isAuthorised.user?.role !== "super_user") {
+      return NextResponse.json({ errors: ["Forbidden"] }, { status: 403 })
+    }
 
     const body = await req.json()
 

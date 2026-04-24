@@ -60,6 +60,16 @@ export async function _saveDiagnosesHistory({
               changePayload.newValues.push({ [key]: newValue })
             }
           })
+        const syncChangeReason = getDataKeySyncChangeReason(
+          removeHexCharacters(previous.find((prevC) => prevC.diagnosisId === diagnosisId) || {}),
+          removeHexCharacters(c.data || {}),
+        )
+        if (syncChangeReason) {
+          ;(changePayload as any).metadata = {
+            source: "data_key_reference_sync",
+            mode: syncChangeReason === "Published via data key reference sync" ? "pure" : "mixed",
+          }
+        }
       }
 
       insertData.push(changeHistoryData)

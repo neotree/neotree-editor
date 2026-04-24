@@ -7,6 +7,7 @@ import { changeLogs, editorInfo } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 import {
   applySoftDeleteRollbackSideEffects,
+  computeRollbackSnapshotHash,
   getNextRollbackDataVersion,
   getRollbackParentVersion,
   getRollbackTargetVersion,
@@ -25,6 +26,8 @@ import {
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
 import { buildReleasePublishChangeLog } from "./_release-log"
 import { isUuidLike } from "@/lib/uuid"
+import { buildDataKeyDependentRollbackSnapshot, buildDataKeyRollbackDependencies } from "@/lib/changelog-dependencies"
+import { getProtectedDependentRollbackMessage, isProtectedDependentRollbackChange } from "@/lib/changelog-rollback-guards"
 
 export type RollbackChangeLogParams = {
   entityId: string
@@ -146,6 +149,29 @@ export async function _rollbackChangeLog({
         return await findPreviousTarget({ entityId, entityType, currentVersion })
       }
 
+      const findTargetAtOrBeforeDataVersion = async ({
+        entityId,
+        entityType,
+        targetDataVersion,
+      }: {
+        entityId: string
+        entityType: (typeof changeLogs.$inferSelect)["entityType"]
+        targetDataVersion?: number | null
+      }) => {
+        if (!Number.isFinite(targetDataVersion)) return null
+
+        return (
+          (await tx.query.changeLogs.findFirst({
+            where: and(
+              eq(changeLogs.entityId, entityId),
+              eq(changeLogs.entityType, entityType),
+              lte(changeLogs.dataVersion, Number(targetDataVersion)),
+            ),
+            orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
+          })) ?? null
+        )
+      }
+
       const rollbackTimestamp = new Date().toISOString()
       const initiallyCurrent = await tx.query.changeLogs.findFirst({
         where: and(eq(changeLogs.entityId, entityId), eq(changeLogs.entityType, entityType), eq(changeLogs.isActive, true)),
@@ -168,6 +194,9 @@ export async function _rollbackChangeLog({
       })
 
       if (!current) throw new Error("No active version found for entity after locking")
+      if (isProtectedDependentRollbackChange(current)) {
+        throw new Error(getProtectedDependentRollbackMessage(current.entityType))
+      }
 
       const explicitPreviousVersion = getRollbackTargetVersion({
         action: current.action,
@@ -214,18 +243,20 @@ export async function _rollbackChangeLog({
         targetChange,
         binding,
         overrideDescription,
+        targetSnapshotOverride,
         allowSoftDeleteIfCreated = false,
       }: {
         currentChange: typeof changeLogs.$inferSelect
         targetChange: typeof changeLogs.$inferSelect | null
         binding: (typeof CHANGELOG_ENTITY_BINDINGS)[keyof typeof CHANGELOG_ENTITY_BINDINGS]
         overrideDescription?: string
+        targetSnapshotOverride?: any
         allowSoftDeleteIfCreated?: boolean
       }) => {
         const meaningfulTarget = targetChange && normalizePublishedRollbackVersion(targetChange.version) !== null ? targetChange : null
         const restoredVersion = normalizePublishedRollbackVersion(meaningfulTarget?.version)
-        const shouldSoftDeleteCreated = allowSoftDeleteIfCreated && !meaningfulTarget
-        const effectiveSnapshotSource = meaningfulTarget?.fullSnapshot ?? currentChange.fullSnapshot
+        const shouldSoftDeleteCreated = allowSoftDeleteIfCreated && !meaningfulTarget && !targetSnapshotOverride
+        const effectiveSnapshotSource = targetSnapshotOverride ?? meaningfulTarget?.fullSnapshot ?? currentChange.fullSnapshot
         if (!effectiveSnapshotSource) {
           throw new Error(`Previous snapshot missing for ${currentChange.entityType} ${currentChange.entityId}`)
         }
@@ -314,6 +345,11 @@ export async function _rollbackChangeLog({
         binding,
         allowSoftDeleteIfCreated: true,
       })
+      const rolledBackDependencies: {
+        entityId: string
+        entityType: (typeof changeLogs.$inferSelect)["entityType"]
+        targetVersion: number | null
+      }[] = []
 
       if (current.entityType === "script") {
         const childTypes: (typeof changeLogs.$inferSelect)["entityType"][] = ["screen", "diagnosis", "problem"]
@@ -411,6 +447,99 @@ export async function _rollbackChangeLog({
         }
       }
 
+      if (current.entityType === "data_key") {
+        const activeDependencyCandidates = await tx.query.changeLogs.findMany({
+          where: eq(changeLogs.isActive, true),
+          orderBy: (changeLogs, { asc }) => [asc(changeLogs.entityType), asc(changeLogs.entityId)],
+        })
+        const dependencies = buildDataKeyRollbackDependencies({
+          dataKeyEntityId: current.entityId,
+          currentSnapshot: current.fullSnapshot,
+          targetSnapshot: target.fullSnapshot,
+          activeChanges: activeDependencyCandidates,
+        })
+
+        if (dependencies.length && !Number.isFinite(target.dataVersion)) {
+          throw new Error("Data key rollback has dependent entities but the target version has no dataVersion")
+        }
+
+        for (const dependency of dependencies) {
+          const dependencyBinding = CHANGELOG_ENTITY_BINDINGS[dependency.entityType]
+          if (!dependencyBinding) {
+            throw new Error(`Unsupported dependent entity type ${dependency.entityType}`)
+          }
+
+          await lockEntityRow({ tx, binding: dependencyBinding, entityId: dependency.entityId })
+          await lockChangeLogChain(tx, dependency.entityType, dependency.entityId)
+
+          const dependencyCurrent = await tx.query.changeLogs.findFirst({
+            where: and(
+              eq(changeLogs.entityId, dependency.entityId),
+              eq(changeLogs.entityType, dependency.entityType),
+              eq(changeLogs.isActive, true),
+            ),
+            orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
+          })
+
+          if (!dependencyCurrent) {
+            throw new Error(`No active changelog history found for dependent entity ${dependency.entityId}`)
+          }
+
+          if (
+            isChangeAlreadyAlignedToRollbackTarget({
+              currentDataVersion: dependencyCurrent.dataVersion,
+              targetDataVersion: target.dataVersion,
+            })
+          ) {
+            await ensureActiveChangeApplied({
+              tx,
+              binding: dependencyBinding,
+              activeChange: dependencyCurrent,
+            })
+            continue
+          }
+
+          const dependencyTarget = await findTargetAtOrBeforeDataVersion({
+            entityId: dependencyCurrent.entityId,
+            entityType: dependencyCurrent.entityType,
+            targetDataVersion: target.dataVersion,
+          })
+          const dependencyTargetVersion = normalizePublishedRollbackVersion(dependencyTarget?.version)
+          const dependencyRollbackSnapshot =
+            dependencyTargetVersion === null
+              ? null
+              : buildDataKeyDependentRollbackSnapshot({
+                  currentSnapshot: dependencyCurrent.fullSnapshot,
+                  targetSnapshot: dependencyTarget!.fullSnapshot,
+                  dataKeyCurrentSnapshot: current.fullSnapshot,
+                  dataKeyTargetSnapshot: target.fullSnapshot,
+                })
+          if (
+            dependencyRollbackSnapshot &&
+            computeRollbackSnapshotHash(dependencyRollbackSnapshot) === computeRollbackSnapshotHash(dependencyCurrent.fullSnapshot)
+          ) {
+            continue
+          }
+
+          const savedDependency = await rollbackEntity({
+            currentChange: dependencyCurrent,
+            targetChange: dependencyTarget,
+            binding: dependencyBinding,
+            targetSnapshotOverride: dependencyRollbackSnapshot,
+            allowSoftDeleteIfCreated: true,
+            overrideDescription: dependencyTargetVersion !== null
+              ? `Restore data-key-linked fields from ${dependencyCurrent.entityType} version ${dependencyTarget!.version}`
+              : `Restore data-key-linked fields after data key version ${target.version}`,
+          })
+
+          rolledBackDependencies.push({
+            entityId: savedDependency.entityId,
+            entityType: savedDependency.entityType,
+            targetVersion: dependencyTargetVersion,
+          })
+        }
+      }
+
       if (editor) {
         await tx
           .update(editorInfo)
@@ -433,6 +562,8 @@ export async function _rollbackChangeLog({
               rollbackTargetVersion: target.version,
               fromDataVersion: current.dataVersion,
               toDataVersion: nextDataVersion,
+              dependentRollbackCount: rolledBackDependencies.length,
+              dependentRollbacks: rolledBackDependencies,
             },
           ],
         }),
