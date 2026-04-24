@@ -217,7 +217,7 @@ export const getChangeLogIntegrityReport: typeof queries._getChangeLogIntegrityR
 // MUTATIONS
 export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => {
   try {
-    const session = await isAllowed()
+    const session = await ensureSuperUser()
     return await mutations._saveChangeLog({
       ...params,
       data: {
@@ -233,7 +233,7 @@ export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => 
 
 export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) => {
   try {
-    const session = await isAllowed()
+    const session = await ensureSuperUser()
     return await mutations._saveChangeLogs({
       ...params,
       data: params.data.map((d) => ({
@@ -249,7 +249,7 @@ export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) =
 
 export const updateChangeLog: typeof mutations._updateChangeLog = async (params) => {
   try {
-    await isAllowed()
+    await ensureSuperUser()
     return await mutations._updateChangeLog(params)
   } catch (e: any) {
     logUnexpectedActionError("updateChangeLog ERROR", e)
@@ -259,7 +259,7 @@ export const updateChangeLog: typeof mutations._updateChangeLog = async (params)
 
 export const markVersionAsSuperseded: typeof mutations._markVersionAsSuperseded = async (params) => {
   try {
-    await isAllowed()
+    await ensureSuperUser()
     return await mutations._markVersionAsSuperseded(params)
   } catch (e: any) {
     logUnexpectedActionError("markVersionAsSuperseded ERROR", e)

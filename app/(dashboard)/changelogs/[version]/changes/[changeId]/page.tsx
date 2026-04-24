@@ -9,11 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { getChangeLog } from "@/app/actions/change-logs"
+import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
 import { formatChangeValue, getDataVersion, isHistoryRepairChange, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
 import { buildHumanDiffRows, type HumanDiffRow } from "@/lib/changelog-human-diff"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
+import { getProtectedDependentRollbackMessage, isProtectedDependentRollbackChange } from "@/lib/changelog-rollback-guards"
 import { cn } from "@/lib/utils"
 import {
   buildFieldChangeInsights,
@@ -92,6 +94,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   }
 
   const { data, errors } = await getChangeLog({ changeLogId: params.changeId })
+  const currentUser = await getAuthenticatedUser()
   if (errors?.length) {
     throw new Error(errors.join(", "))
   }
@@ -120,7 +123,12 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
     parentVersion: change.parentVersion,
     mergedFromVersion: change.mergedFromVersion,
   })
-  const canRollback = change.isActive && (rollbackTargetVersion ?? null) !== null
+  const isProtectedDependentRollback = isProtectedDependentRollbackChange(change)
+  const canRollback =
+    currentUser?.role === "super_user" &&
+    change.isActive &&
+    (rollbackTargetVersion ?? null) !== null &&
+    !isProtectedDependentRollback
   const editorHref = getEntityEditorHref(change)
 
   return (
@@ -198,6 +206,11 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                 />
               )}
             </div>
+            {isProtectedDependentRollback && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+                {getProtectedDependentRollbackMessage(change.entityType)}
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed By</div>
