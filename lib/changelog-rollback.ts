@@ -205,6 +205,10 @@ export function coerceRollbackSnapshotValues(
   for (const key of options.numericKeys ?? []) {
     if (!(key in nextPayload)) continue
     const value = nextPayload[key]
+    if (value === null || value === undefined || value === "") {
+      nextPayload[key] = null
+      continue
+    }
     const num = typeof value === "number" ? value : Number(value)
     nextPayload[key] = Number.isFinite(num) ? num : null
   }
