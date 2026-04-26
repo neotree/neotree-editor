@@ -28,6 +28,7 @@ import { buildReleasePublishChangeLog } from "./_release-log"
 import { isUuidLike } from "@/lib/uuid"
 import { buildDataKeyDependentRollbackSnapshot, buildDataKeyRollbackDependencies } from "@/lib/changelog-dependencies"
 import { getProtectedDependentRollbackMessage, isProtectedDependentRollbackChange } from "@/lib/changelog-rollback-guards"
+import { assertRollbackAllowedWithDrafts } from "./_rollback-draft-guard"
 
 export type RollbackChangeLogParams = {
   entityId: string
@@ -67,6 +68,8 @@ export async function _rollbackChangeLog({
     }
 
     const result = await db.transaction(async (tx) => {
+      await assertRollbackAllowedWithDrafts(tx, userId)
+
       const findTargetByVersion = async ({
         entityId,
         entityType,

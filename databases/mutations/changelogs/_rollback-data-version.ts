@@ -27,6 +27,7 @@ import {
   normalizeSnapshot,
   type VersionedEntityBinding,
 } from "./_rollback-shared"
+import { assertRollbackAllowedWithDrafts } from "./_rollback-draft-guard"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
 import { buildReleasePublishChangeLog } from "./_release-log"
 
@@ -92,6 +93,8 @@ export async function _rollbackDataVersion({
         sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
       )
       const editor = lockedEditorInfo?.[0]
+
+      await assertRollbackAllowedWithDrafts(tx, userId)
 
       const currentDataVersion = requestedDataVersion ?? editor?.dataVersion
       if (!currentDataVersion || currentDataVersion < 2) {

@@ -1,6 +1,7 @@
 import { eq, getTableColumns, sql } from "drizzle-orm"
 
 import db from "@/databases/pg/drizzle"
+import logger from "@/lib/logger"
 import {
   aliases,
   changeLogs,
@@ -16,6 +17,7 @@ import {
 import {
   coerceRollbackSnapshotValues,
   computeRollbackSnapshotHash,
+  shouldAutoRepairLegacySnapshotHash,
 } from "@/lib/changelog-rollback"
 
 export type VersionedEntityBinding = {
@@ -168,9 +170,24 @@ export async function assertSnapshotIntegrity(
 ) {
   const storedHash = await ensureSnapshotHash(tx, change)
   const computedHash = computeRollbackSnapshotHash(change.fullSnapshot)
-  if (storedHash !== computedHash) {
-    throw new Error(`Snapshot hash mismatch for ${label} v${change.version}`)
+  if (storedHash === computedHash) return
+
+  if (shouldAutoRepairLegacySnapshotHash(change) && (change as any).id) {
+    await tx.update(changeLogs).set({ snapshotHash: computedHash }).where(eq(changeLogs.id, (change as any).id))
+    logger.log("rollback auto-repaired legacy snapshot hash", {
+      changeLogId: (change as any).id,
+      entityType: change.entityType,
+      entityId: change.entityId,
+      version: change.version,
+      dataVersion: change.dataVersion,
+      label,
+      storedHash,
+      computedHash,
+    })
+    return
   }
+
+  throw new Error(`Snapshot hash mismatch for ${label} v${change.version}`)
 }
 
 export async function lockEntityRow({
@@ -257,6 +274,17 @@ function getRollbackColumnDefaultValue(column: any) {
   return defaultValue
 }
 
+function getRollbackManagedFieldFallback(params: {
+  binding: VersionedEntityBinding
+  key: string
+  now: Date
+}) {
+  if (params.key === "createdAt") return params.now
+  if (params.key === "updatedAt") return params.now
+  if (params.binding.publishDateKey && params.key === params.binding.publishDateKey) return params.now
+  return undefined
+}
+
 export function buildRollbackSnapshotPayload({
   binding,
   entityId,
@@ -276,6 +304,12 @@ export function buildRollbackSnapshotPayload({
 
   for (const [key, column] of getWritableRollbackColumns(binding)) {
     if (Object.prototype.hasOwnProperty.call(basePayload, key)) continue
+
+    const managedFallback = getRollbackManagedFieldFallback({ binding, key, now })
+    if (managedFallback !== undefined) {
+      basePayload[key] = managedFallback
+      continue
+    }
 
     const defaultValue = getRollbackColumnDefaultValue(column)
     if (defaultValue !== undefined) {

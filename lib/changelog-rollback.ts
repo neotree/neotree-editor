@@ -3,6 +3,7 @@ import { createHash } from "crypto"
 export const DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY = "soft_delete" as const
 export const RELEASE_ROLLBACK_MAX_RECENT_DEPTH = 5 as const
 export const SCRIPT_CHILD_ENTITY_TYPES = ["screen", "diagnosis", "problem"] as const
+export const SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT = new Date("2026-04-24T00:00:00.000Z")
 
 type RollbackCandidate = {
   entityId: string
@@ -174,6 +175,22 @@ function normalizeSnapshotValueForHash(snapshot: any): any {
 export function computeRollbackSnapshotHash(snapshot: any) {
   const normalizedSnapshot = normalizeSnapshotValueForHash(snapshot ?? {})
   return createHash("sha256").update(JSON.stringify(normalizedSnapshot)).digest("hex")
+}
+
+export function shouldAutoRepairLegacySnapshotHash(change: {
+  dateOfChange?: Date | string | null
+  snapshotHash?: string | null
+}) {
+  if (!change.snapshotHash) return true
+
+  if (!change.dateOfChange) return true
+
+  const changedAt =
+    change.dateOfChange instanceof Date ? change.dateOfChange : new Date(change.dateOfChange)
+
+  if (Number.isNaN(changedAt.valueOf())) return true
+
+  return changedAt < SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT
 }
 
 export function coerceRollbackSnapshotValues(
