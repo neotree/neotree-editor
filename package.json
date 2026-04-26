@@ -14,11 +14,7 @@
         "prestart:production": "yarn",
         "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
         "start:production": "NODE_ENV=production pm2 start pm2.production.json",
-        "tsx": "tsx $1",
-        "test:changelog-sanitize": "tsx tests/changelog-sanitize.test.ts",
-        "test:changelog-rollback": "tsx tests/changelog-rollback.test.ts",
-        "test:changelog-feature": "tsx tests/changelog-feature.integration.test.ts",
-        "test:changelog-publish-contract": "tsx tests/changelog-publish-contract.test.ts"
+        "tsx": "tsx $1"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
