@@ -992,6 +992,7 @@ export const problems = pgTable(
     keyId: text("key_id").notNull().default(""),
     severityOrder: integer("severity_order"),
     expressionMeaning: text("expression_meaning").notNull().default(""),
+    symptoms: jsonb("symptoms").default("[]").$type<DiagnosisSymptom[]>().notNull(),
     text1: text("text1").notNull().default(""),
     text2: text("text2").notNull().default(""),
     text3: text("text3").notNull().default(""),
