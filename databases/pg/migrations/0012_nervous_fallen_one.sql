@@ -1,1 +1,0 @@
-ALTER TABLE "nt_data_keys" ALTER COLUMN "unique_key" SET DATA TYPE text;
