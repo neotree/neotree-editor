@@ -27,6 +27,7 @@ import type {
   ScriptItem,
   FluidField,
 } from "@/types"
+import type { IntegrityBaseline, IntegrityPolicy } from "@/lib/integrity-policy"
 import { defaultPreferences } from "@/constants"
 import { dataKeys, dataKeysDrafts } from "./_data-keys"
 
@@ -377,6 +378,25 @@ export const editorInfo = pgTable("nt_editor_info", {
   dataVersion: integer("data_version").notNull().default(1),
   lastPublishDate: timestamp("last_publish_date"),
   lastDataKeysSyncDate: timestamp("last_data_keys_sync_date"),
+  integrityPolicy: jsonb("integrity_policy").$type<IntegrityPolicy>().default({
+    enforcementMode: "block_new_issues_only",
+    scanScope: "affected_scripts_only",
+    triggerSources: {
+      scriptEdits: true,
+      dataKeyLibraryEdits: false,
+      deletions: true,
+    },
+    useBaseline: true,
+  }).notNull(),
+  integrityBaseline: jsonb("integrity_baseline").$type<IntegrityBaseline>().default({
+    capturedAt: null,
+    capturedByUserId: null,
+    totalBlockingIssues: 0,
+    totalScripts: 0,
+    fingerprintVersion: 1,
+    ruleSetVersion: "2026-04-26",
+    fingerprints: [],
+  }).notNull(),
 })
 
 // DEVICES

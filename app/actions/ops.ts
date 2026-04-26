@@ -21,7 +21,17 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-import { buildDataKeyIntegrityContext, buildDataKeyIntegrityPublishDetails, buildDataKeyIntegrityPublishErrors, repairDataKeyIntegrityReferences, scanDataKeyIntegrity } from "@/lib/data-key-integrity"
+import {
+  buildDataKeyIntegrityContext,
+  buildDataKeyIntegrityPublishDetails,
+  buildDataKeyIntegrityPublishErrors,
+  buildDataKeyIntegrityReportFromEntries,
+  getBlockingIntegrityEntries,
+  getDataKeyIntegrityEntryFingerprint,
+  repairDataKeyIntegrityReferences,
+  scanDataKeyIntegrity,
+} from "@/lib/data-key-integrity"
+import { getIntegrityBaselineLookup, getIntegrityPolicyState, hasIntegrityBaseline, isIntegrityBaselineCompatible } from "@/lib/integrity-policy"
 import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -35,7 +45,13 @@ function assertCanPublishDrafts(user?: { role?: string | null } | null) {
   if (!allowed) throw new Error("Forbidden: only admin or super_user can publish drafts")
 }
 
-async function getScopedIntegrityData(userId?: string | null): Promise<{
+async function getScopedIntegrityData({
+  userId,
+  policy,
+}: {
+  userId?: string | null
+  policy: ReturnType<typeof getIntegrityPolicyState>["policy"]
+}): Promise<{
   dataKeysRes: Awaited<ReturnType<typeof dataKeysQueries._getDataKeys>>
   screensRes: Awaited<ReturnType<typeof scriptsQueries._getScreens>>
   diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
@@ -69,8 +85,22 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
   const hasExistingDataKeyLibraryChanges =
     userDataKeyDrafts.some((draft) => !!draft.dataKeyId) ||
     userPendingDeletion.some((entry) => !!entry.dataKeyId)
+  const deletedDataKeyIds = new Set(
+    userPendingDeletion
+      .map((entry) => entry.dataKeyId)
+      .filter((id): id is string => !!id)
+  )
 
-  const shouldRunIntegrityChecks = hasScriptFamilyChanges || hasExistingDataKeyLibraryChanges
+  const shouldRunIntegrityChecks =
+    policy.enforcementMode !== "off" &&
+    (
+      (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) ||
+      (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
+      (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
+    )
+  const shouldIncludeDataKeyImpact =
+    (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
+    (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
 
   if (!shouldRunIntegrityChecks) {
     return {
@@ -81,28 +111,26 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
       shouldRunIntegrityChecks,
     }
   }
-
-  const deletedDataKeyIds = new Set(
-    userPendingDeletion
-      .map((entry) => entry.dataKeyId)
-      .filter((id): id is string => !!id)
-  )
-  const deletedDataKeys = !deletedDataKeyIds.size
+  const deletedDataKeys = !shouldIncludeDataKeyImpact || !deletedDataKeyIds.size
     ? []
     : await db.query.dataKeys.findMany({
         where: inArray(dataKeys.uuid, Array.from(deletedDataKeyIds)),
       })
-  const dataKeysForImpact = [
-    ...userDataKeyDrafts
-      .filter((draft) => !!draft.dataKeyId)
-      .map((draft) => ({
-        ...draft.data,
-        uuid: draft.dataKeyId || draft.data.uuid,
-        uniqueKey: draft.data.uniqueKey,
-      })),
-    ...deletedDataKeys,
-  ].filter((item) => !!item.uniqueKey) as dataKeysQueries.DataKey[]
-  const dataKeyImpact = !dataKeysForImpact.length
+  const dataKeysForImpact = !shouldIncludeDataKeyImpact
+    ? []
+    : [
+        ...(policy.triggerSources.dataKeyLibraryEdits
+          ? userDataKeyDrafts
+              .filter((draft) => !!draft.dataKeyId)
+              .map((draft) => ({
+                ...draft.data,
+                uuid: draft.dataKeyId || draft.data.uuid,
+                uniqueKey: draft.data.uniqueKey,
+              }))
+          : []),
+        ...deletedDataKeys,
+      ].filter((item) => !!item.uniqueKey) as dataKeysQueries.DataKey[]
+  const dataKeyImpact = !shouldIncludeDataKeyImpact || !dataKeysForImpact.length
     ? null
     : await dataKeysMutations._updateDataKeysRefs({
         dataKeys: dataKeysForImpact,
@@ -131,7 +159,7 @@ async function getScopedIntegrityData(userId?: string | null): Promise<{
     ...dataKeyImpactScriptIds,
   ]))
 
-  const shouldLimitToAffectedScripts = !!userId
+  const shouldLimitToAffectedScripts = policy.scanScope === "affected_scripts_only" && !!userId
   const hasAffectedScripts = !!affectedScriptIds?.length
   if (shouldLimitToAffectedScripts && !hasAffectedScripts) {
     return {
@@ -390,6 +418,7 @@ export async function publishData({
 
     const editorInfoResult = await _getEditorInfo()
     const currentDataVersion = editorInfoResult.data?.dataVersion || 1
+    const integrityPolicyState = getIntegrityPolicyState(editorInfoResult.data)
 
     // The next version will be currentDataVersion + 1
     const nextDataVersion = currentDataVersion + 1
@@ -400,7 +429,10 @@ export async function publishData({
       diagnosesRes,
       problemsRes,
       shouldRunIntegrityChecks,
-    } = await getScopedIntegrityData(userId)
+    } = await getScopedIntegrityData({
+      userId,
+      policy: integrityPolicyState.policy,
+    })
 
     const integrityErrors = [
       ...(dataKeysRes.errors || []),
@@ -447,10 +479,88 @@ export async function publishData({
         problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
         onlyIssues: true,
         context: integrityContext || undefined,
+        policy: integrityPolicyState.policy,
       })
-      const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(integrityReport)
-      const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(integrityReport)
-      if (publishIntegrityErrors.length) {
+      const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries, integrityPolicyState.policy)
+      const blockingBaselineLookup = getIntegrityBaselineLookup(integrityPolicyState.baseline)
+      const hasCapturedBaseline = hasIntegrityBaseline(integrityPolicyState.baseline)
+      const hasCompatibleBaseline = isIntegrityBaselineCompatible(integrityPolicyState.baseline)
+      const policyModeMessage = `Integrity enforcement mode: ${integrityPolicyState.policy.enforcementMode.replaceAll("_", " ")}.`
+
+      let enforcedBlockingEntries = blockingEntries
+      let policyWarnings: string[] = []
+
+      if (integrityPolicyState.policy.enforcementMode === "warn_only") {
+        enforcedBlockingEntries = []
+        if (blockingEntries.length) {
+          policyWarnings.push(
+            `Integrity policy is set to warn only. ${blockingEntries.length} blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected but did not block publish.`
+          )
+        }
+      } else if (integrityPolicyState.policy.enforcementMode === "block_new_issues_only") {
+        if (!hasCapturedBaseline) {
+          enforcedBlockingEntries = []
+          policyWarnings.push(
+            "Integrity policy is set to block new issues only, but no baseline has been captured yet. Validation is running in warn-only mode until a baseline is captured."
+          )
+          if (blockingEntries.length) {
+            policyWarnings.push(
+              `${blockingEntries.length} existing blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected and allowed because there is no captured baseline yet.`
+            )
+          }
+        } else if (!hasCompatibleBaseline) {
+          enforcedBlockingEntries = []
+          policyWarnings.push(
+            "Integrity policy is set to block new issues only, but the captured baseline is outdated for the current rule set. Validation is running in warn-only mode until a new baseline is captured."
+          )
+          if (blockingEntries.length) {
+            policyWarnings.push(
+              `${blockingEntries.length} blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected and allowed because the captured baseline is not compatible with the current rule set.`
+            )
+          }
+        } else {
+          enforcedBlockingEntries = blockingEntries.filter(
+            (entry) => !blockingBaselineLookup.has(getDataKeyIntegrityEntryFingerprint(entry))
+          )
+          if (blockingEntries.length && !enforcedBlockingEntries.length) {
+            policyWarnings.push(
+              "Existing baseline integrity issues were detected in scope, but no newly introduced blocking issues were found."
+            )
+          }
+        }
+      }
+
+      if (policyWarnings.length) {
+        results.warnings = [...(results.warnings || []), policyModeMessage, ...policyWarnings]
+      }
+
+      if (enforcedBlockingEntries.length) {
+        const enforcedReport = buildDataKeyIntegrityReportFromEntries(
+          enforcedBlockingEntries,
+          integrityPolicyState.policy
+        )
+        const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(
+          enforcedReport,
+          integrityPolicyState.policy
+        )
+        const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(
+          enforcedReport,
+          integrityPolicyState.policy
+        )
+
+        if (
+          integrityPolicyState.policy.enforcementMode === "block_new_issues_only" &&
+          publishIntegrityDetails
+        ) {
+          publishIntegrityDetails.summary = [
+            policyModeMessage,
+            "Blocking policy: block new issues only. Existing baseline issues are not blocking this publish.",
+            ...publishIntegrityDetails.summary,
+          ]
+        } else if (publishIntegrityDetails) {
+          publishIntegrityDetails.summary = [policyModeMessage, ...publishIntegrityDetails.summary]
+        }
+
         results.success = false
         results.errors = publishIntegrityErrors
         results.blockingDetails = publishIntegrityDetails

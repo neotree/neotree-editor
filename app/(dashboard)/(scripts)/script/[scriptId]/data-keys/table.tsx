@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
 import { isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
 
 const statusStyles = {
@@ -129,7 +130,7 @@ function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
 
 export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
-    integrity?: DataKeyIntegrityReport | null;
+    integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null }) | null;
 }) {
     const router = useRouter();
     const { viewOnly } = useAppContext();
@@ -147,6 +148,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
     const [bulkReviewItems, setBulkReviewItems] = useState<Array<Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number]>>([]);
     const [loadingBulkPreview, setLoadingBulkPreview] = useState(false);
+    const [showReviewedBulkItemsOnly, setShowReviewedBulkItemsOnly] = useState(false);
+    const bulkReviewScrollRef = useRef<HTMLDivElement | null>(null);
+    const pendingBulkScrollTopRef = useRef<number | null>(null);
     const [repairEntryParam, setRepairEntryParam] = useQueryState("dataKeyRepair", {
         defaultValue: "",
         clearOnDefault: true,
@@ -182,8 +186,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return true;
     });
     const filteredEntries = entries.filter((entry) => {
-        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
-        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
+        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry, integrity?.policy || undefined)) return false;
+        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry, integrity?.policy || undefined)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
@@ -219,6 +223,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         if (isRepairing || loadingBulkPreview) return;
         setBulkResolveStatus(null);
         setBulkReviewItems([]);
+        setShowReviewedBulkItemsOnly(false);
         void setBulkStatusParam("");
     };
 
@@ -515,6 +520,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     const bulkReviewableItems = bulkReviewItems.filter((item) => item.changed);
     const reviewedBulkItemsCount = bulkReviewableItems.filter((item) => item.reviewed).length;
+    const allBulkReviewableItemsReviewed = !!bulkReviewableItems.length && reviewedBulkItemsCount === bulkReviewableItems.length;
+    const someBulkReviewableItemsReviewed = reviewedBulkItemsCount > 0 && reviewedBulkItemsCount < bulkReviewableItems.length;
+    const visibleBulkReviewItems = showReviewedBulkItemsOnly
+        ? bulkReviewableItems.filter((item) => item.reviewed)
+        : bulkReviewableItems;
 
     useEffect(() => {
         if (viewOnly) return;
@@ -549,9 +559,24 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         setReviewAcknowledged(false);
         setBulkResolveStatus(null);
         setBulkReviewItems([]);
+        setShowReviewedBulkItemsOnly(false);
         void setRepairEntryParam("");
         void setBulkStatusParam("");
     }, [setBulkStatusParam, setRepairEntryParam, viewOnly]);
+
+    useEffect(() => {
+        if (loadingBulkPreview) return;
+        if (pendingBulkScrollTopRef.current === null) return;
+
+        const scrollTop = pendingBulkScrollTopRef.current;
+        pendingBulkScrollTopRef.current = null;
+
+        requestAnimationFrame(() => {
+            if (bulkReviewScrollRef.current) {
+                bulkReviewScrollRef.current.scrollTop = scrollTop;
+            }
+        });
+    }, [bulkReviewItems, loadingBulkPreview]);
 
     return (
         <>
@@ -769,7 +794,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </Button>
                         <Button
                             onClick={() => handleBulkResolve()}
-                            disabled={!bulkResolveStatus || isRepairing || !bulkResolvableEntries[bulkResolveStatus]?.length}
+                            disabled={!bulkResolveStatus || isRepairing || !reviewedBulkItemsCount}
                         >
                             {isRepairing ? "Saving Drafts..." : "Save Repair Drafts"}
                         </Button>
@@ -817,7 +842,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </SheetDescription>
                     </SheetHeader>
 
-                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                    <div ref={bulkReviewScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                         {loadingBulkPreview ? (
                             <div className="text-sm text-muted-foreground">Preparing bulk repair review...</div>
                         ) : !bulkReviewableItems.length ? (
@@ -826,22 +851,93 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             </div>
                         ) : (
                             <>
-                                <div className="rounded-md border p-3 text-sm text-muted-foreground">
-                                    {reviewedBulkItemsCount} of {bulkReviewableItems.length} suggested repairs are marked for save. Unreviewed entries will be left unchanged.
+                                <div className="sticky top-0 z-10 -mx-4 border-b bg-background px-4 pb-4">
+                                    <div className="rounded-md border p-3 space-y-3 text-sm">
+                                        <div className="text-muted-foreground">
+                                            {bulkReviewableItems.length} reviewable, {reviewedBulkItemsCount} selected for save. Unreviewed entries will be left unchanged.
+                                        </div>
+
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    id="bulk-review-select-all"
+                                                    checked={
+                                                        allBulkReviewableItemsReviewed
+                                                            ? true
+                                                            : someBulkReviewableItemsReviewed
+                                                                ? "indeterminate"
+                                                                : false
+                                                    }
+                                                    onCheckedChange={(checked) => {
+                                                        const nextReviewed = checked === true;
+                                                        setBulkReviewItems((current) => current.map((candidate) => (
+                                                            candidate.changed
+                                                                ? {
+                                                                    ...candidate,
+                                                                    reviewed: nextReviewed,
+                                                                }
+                                                                : candidate
+                                                        )));
+                                                    }}
+                                                />
+
+                                                <Label htmlFor="bulk-review-select-all" className="leading-5">
+                                                    Mark all {bulkReviewableItems.length} suggested repair{bulkReviewableItems.length === 1 ? "" : "s"} for save
+                                                </Label>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <div className="flex items-start gap-2">
+                                                    <Checkbox
+                                                        id="bulk-review-show-reviewed-only"
+                                                        checked={showReviewedBulkItemsOnly}
+                                                        onCheckedChange={(checked) => setShowReviewedBulkItemsOnly(checked === true)}
+                                                    />
+                                                    <Label htmlFor="bulk-review-show-reviewed-only" className="leading-5">
+                                                        Reviewed items only
+                                                    </Label>
+                                                </div>
+
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={!reviewedBulkItemsCount}
+                                                    onClick={() => {
+                                                        setBulkReviewItems((current) => current.map((candidate) => (
+                                                            candidate.changed
+                                                                ? {
+                                                                    ...candidate,
+                                                                    reviewed: false,
+                                                                }
+                                                                : candidate
+                                                        )));
+                                                    }}
+                                                >
+                                                    Clear all
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {bulkReviewableItems.map((item, index) => {
+                                {!visibleBulkReviewItems.length ? (
+                                    <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                                        No reviewed items are currently selected.
+                                    </div>
+                                ) : visibleBulkReviewItems.map((item, index) => {
+                                    const originalIndex = bulkReviewItems.findIndex((candidate) => candidate === item);
                                     const usageHref = buildUsageHref(item.entry);
 
                                     return (
                                         <div key={`${getEntryKey(item.entry)}::${index}`} className="rounded-md border p-4 space-y-4">
                                             <div className="flex items-start gap-3">
                                                 <Checkbox
-                                                    id={`bulk-review-${index}`}
+                                                    id={`bulk-review-${originalIndex}`}
                                                     checked={item.reviewed === true}
                                                     onCheckedChange={(checked) => {
                                                         setBulkReviewItems((current) => current.map((candidate, candidateIndex) => (
-                                                            candidateIndex !== index
+                                                            candidateIndex !== originalIndex
                                                                 ? candidate
                                                                 : {
                                                                     ...candidate,
@@ -852,7 +948,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                                 />
 
                                                 <div className="flex-1 space-y-3">
-                                                    <Label htmlFor={`bulk-review-${index}`} className="leading-5">
+                                                    <Label htmlFor={`bulk-review-${originalIndex}`} className="leading-5">
                                                         I have reviewed this suggested repair
                                                     </Label>
 
@@ -874,16 +970,17 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                                                 modal
                                                                 value={item.targetDataKey?.name || item.targetDataKey?.label || ""}
                                                                 placeholder="Select data key"
-                                                                type={item.entry.expectedDataType || undefined}
-                                                                disabled={isRepairing || loadingBulkPreview}
-                                                                onChange={async ([dataKey]) => {
-                                                                    const nextItems = bulkReviewItems.map((candidate, candidateIndex) => (
-                                                                        candidateIndex !== index
-                                                                            ? candidate
-                                                                            : {
-                                                                                ...candidate,
-                                                                                reviewed: false,
-                                                                                selectedTargetUniqueKey: dataKey?.uniqueKey || "",
+                                                                 type={item.entry.expectedDataType || undefined}
+                                                                 disabled={isRepairing || loadingBulkPreview}
+                                                                 onChange={async ([dataKey]) => {
+                                                                     pendingBulkScrollTopRef.current = bulkReviewScrollRef.current?.scrollTop ?? null;
+                                                                     const nextItems = bulkReviewItems.map((candidate, candidateIndex) => (
+                                                                         candidateIndex !== originalIndex
+                                                                             ? candidate
+                                                                             : {
+                                                                                 ...candidate,
+                                                                                 reviewed: false,
+                                                                                 selectedTargetUniqueKey: dataKey?.uniqueKey || "",
                                                                             }
                                                                     ));
                                                                     setBulkReviewItems(nextItems);
@@ -1014,7 +1111,13 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                        This view shows all scanned script references. Blocking issues behave consistently with publish across the registry and publish flow. Publishing is blocked by missing, unlinked, or unmanaged datakeys, duplicate parent datakeys in the same script, and script options that no longer exist in the parent datakey pool.
+                        {integrity?.policy?.enforcementMode === "off"
+                            ? "This view shows all scanned script references. Integrity issues are still visible here for review, but publish enforcement is currently turned off in settings."
+                            : integrity?.policy?.enforcementMode === "warn_only"
+                                ? "This view shows all scanned script references. Integrity issues follow the configured rule set, but publish is currently running in warn-only mode."
+                                : integrity?.policy?.enforcementMode === "block_new_issues_only"
+                                    ? "This view shows all scanned script references. Publish only blocks newly introduced blocking issues that are not part of the captured baseline."
+                                    : "This view shows all scanned script references. Publish is blocked by missing, unlinked, or unmanaged datakeys, duplicate parent datakeys in the same script, and script options that no longer exist in the parent datakey pool."}
                     </div>
 
                     {viewOnly && (
@@ -1106,7 +1209,13 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         </div>
 
                         <div className="text-xs text-muted-foreground">
-                            Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope.
+                            {integrity?.policy?.enforcementMode === "warn_only"
+                                ? "Blocking issues match the configured rule set, but publish is currently running in warn-only mode."
+                                : integrity?.policy?.enforcementMode === "off"
+                                    ? "Integrity enforcement is currently turned off in settings. The issue counts below still reflect the configured rule set."
+                                    : integrity?.policy?.enforcementMode === "block_new_issues_only"
+                                        ? "Blocking issues match the configured rule set. In block new issues only mode, existing baseline issues may still be allowed at publish."
+                                    : "Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope."}
                         </div>
 
                         {!viewOnly && hasBulkResolveActions && (
