@@ -13,6 +13,8 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
 import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { _getEditorInfo } from '@/databases/queries/editor-info';
+import { getIntegrityPolicyState } from '@/lib/integrity-policy';
 
 type PreparedIntegrityRepair = {
     entry: DataKeyIntegrityEntry;
@@ -215,12 +217,14 @@ export const getDataKeysIntegrity = async (params?: {
             pendingDeletedDataKeys.map((entry) => entry.dataKeyId).filter((id): id is string => !!id)
         );
         const scopedDataKeys = dataKeysRes.data.filter((item) => !pendingDeletedDataKeyIds.has(item.uuid));
+        const editorInfoRes = await _getEditorInfo();
 
         const errors = [
             ...(dataKeysRes.errors || []),
             ...(screensRes.errors || []),
             ...(diagnosesRes.errors || []),
             ...(problemsRes.errors || []),
+            ...(editorInfoRes.errors || []),
         ];
 
         if (errors.length) {
@@ -236,6 +240,7 @@ export const getDataKeysIntegrity = async (params?: {
             };
         }
 
+        const integrityPolicyState = getIntegrityPolicyState(editorInfoRes.data);
         const integrityContext = buildDataKeyIntegrityContext(scopedDataKeys);
 
         const rawReport = scanDataKeyIntegrity({
@@ -245,6 +250,7 @@ export const getDataKeysIntegrity = async (params?: {
             problems: problemsRes.data,
             onlyIssues: params?.onlyIssues !== false,
             context: integrityContext,
+            policy: integrityPolicyState.policy,
         });
 
         const repairs = repairDataKeyIntegrityReferences({
@@ -279,12 +285,14 @@ export const getDataKeysIntegrity = async (params?: {
             problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
             onlyIssues: true,
             context: integrityContext,
+            policy: integrityPolicyState.policy,
         });
 
         return {
             success: true,
             data: {
                 ...rawReport,
+                policy: integrityPolicyState.policy,
                 summary: {
                     ...rawReport.summary,
                     blocking: publishAlignedReport.summary.blocking,

@@ -1,6 +1,7 @@
 import { buildNormalizedDataKeyMatchKey, normalizeDataKeyCompatibilityType, normalizeDataKeyMatchValue } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
+import { DEFAULT_INTEGRITY_POLICY, getIntegrityEntryFingerprint, type IntegrityPolicy } from "@/lib/integrity-policy";
 import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
@@ -107,6 +108,39 @@ export type DataKeyIntegrityPublishDetails = {
     scripts: DataKeyIntegrityPublishScriptGroup[];
 };
 
+export function summarizeDataKeyIntegrityEntries(
+    entries: DataKeyIntegrityEntry[],
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+): DataKeyIntegrityReport["summary"] {
+    const summary = {
+        total: entries.length,
+        resolved: 0,
+        out_of_sync: 0,
+        missing: 0,
+        legacy_match: 0,
+        conflict: 0,
+        unmanaged: 0,
+        blocking: 0,
+    };
+
+    entries.forEach((entry) => {
+        summary[entry.status] += 1;
+        if (isBlockingEntry(entry, policy)) summary.blocking += 1;
+    });
+
+    return summary;
+}
+
+export function buildDataKeyIntegrityReportFromEntries(
+    entries: DataKeyIntegrityEntry[],
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+): DataKeyIntegrityReport {
+    return {
+        entries,
+        summary: summarizeDataKeyIntegrityEntries(entries, policy),
+    };
+}
+
 function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "problemId" | "location">) {
     return (
         target.kind === candidate.kind &&
@@ -135,7 +169,10 @@ export type DataKeyIntegrityContext = {
     strictSuggestionsByType: Map<string, StrictSuggestionCandidate[]>;
 };
 
-export function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "kind">) {
+export function isBlockingEntry(
+    entry: Pick<DataKeyIntegrityEntry, "status" | "kind">,
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+) {
     return (
         entry.status === "missing" ||
         entry.status === "legacy_match" ||
@@ -144,6 +181,36 @@ export function isBlockingEntry(entry: Pick<DataKeyIntegrityEntry, "status" | "k
         entry.kind === "field_option_collection" ||
         entry.kind === "duplicate_parent_data_key"
     );
+}
+
+export function getBlockingIntegrityEntries(
+    entries: DataKeyIntegrityEntry[],
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+) {
+    return entries.filter((entry) => isBlockingEntry(entry, policy));
+}
+
+export function getDataKeyIntegrityEntryFingerprint(entry: DataKeyIntegrityEntry) {
+    return getIntegrityEntryFingerprint({
+        scriptId: entry.scriptId,
+        kind: entry.kind,
+        screenId: entry.screenId,
+        diagnosisId: entry.diagnosisId,
+        problemId: entry.problemId,
+        fieldId: entry.fieldId,
+        fieldIndex: entry.fieldIndex,
+        screenItemId: entry.screenItemId,
+        screenItemIndex: entry.screenItemIndex,
+        fieldItemId: entry.fieldItemId,
+        fieldItemIndex: entry.fieldItemIndex,
+        symptomId: entry.symptomId,
+        symptomIndex: entry.symptomIndex,
+        expectedDataType: entry.expectedDataType,
+        currentUniqueKey: entry.currentUniqueKey,
+        currentKey: entry.currentKey,
+        matchedUniqueKey: entry.matchedUniqueKey,
+        matchedName: entry.matchedName,
+    });
 }
 
 function buildIntegrityEntryUsageHref(entry: DataKeyIntegrityEntry) {
@@ -507,6 +574,7 @@ export function scanDataKeyIntegrity({
     dataKeys = [],
     onlyIssues = false,
     context,
+    policy,
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
@@ -514,7 +582,9 @@ export function scanDataKeyIntegrity({
     dataKeys?: DataKey[];
     onlyIssues?: boolean;
     context?: DataKeyIntegrityContext;
+    policy?: IntegrityPolicy;
 }): DataKeyIntegrityReport {
+    const resolvedPolicy = policy || DEFAULT_INTEGRITY_POLICY;
     const resolvedContext = context || buildDataKeyIntegrityContext(dataKeys);
     const { byUniqueKey } = resolvedContext;
     const entries: DataKeyIntegrityEntry[] = [];
@@ -773,22 +843,7 @@ export function scanDataKeyIntegrity({
     const duplicateParentEntries = collectDuplicateParentEntries(entries);
     duplicateParentEntries.forEach((entry) => pushEntry(entry));
 
-    const summary = {
-        total: entries.length,
-        resolved: 0,
-        out_of_sync: 0,
-        missing: 0,
-        legacy_match: 0,
-        conflict: 0,
-        unmanaged: 0,
-        blocking: 0,
-    };
-    entries.forEach((entry) => {
-        summary[entry.status] += 1;
-        if (isBlockingEntry(entry)) summary.blocking += 1;
-    });
-
-    return { entries, summary };
+    return buildDataKeyIntegrityReportFromEntries(entries, resolvedPolicy);
 }
 
 function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
@@ -806,8 +861,11 @@ function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
     return entry.status.replace(/_/g, " ");
 }
 
-export function buildDataKeyIntegrityPublishDetails(report: DataKeyIntegrityReport): DataKeyIntegrityPublishDetails | null {
-    const blocking = report.entries.filter((entry) => isBlockingEntry(entry));
+export function buildDataKeyIntegrityPublishDetails(
+    report: DataKeyIntegrityReport,
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+): DataKeyIntegrityPublishDetails | null {
+    const blocking = getBlockingIntegrityEntries(report.entries, policy);
     if (!blocking.length) return null;
 
     const grouped = new Map<string, DataKeyIntegrityEntry[]>();
@@ -860,8 +918,11 @@ export function buildDataKeyIntegrityPublishDetails(report: DataKeyIntegrityRepo
     };
 }
 
-export function buildDataKeyIntegrityPublishErrors(report: DataKeyIntegrityReport) {
-    const details = buildDataKeyIntegrityPublishDetails(report);
+export function buildDataKeyIntegrityPublishErrors(
+    report: DataKeyIntegrityReport,
+    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
+) {
+    const details = buildDataKeyIntegrityPublishDetails(report, policy);
     if (!details) return [];
 
     const errors = [...details.summary];
