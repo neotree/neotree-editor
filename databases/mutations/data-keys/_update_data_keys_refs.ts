@@ -7,6 +7,15 @@ import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensD
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
+import {
+    shouldSyncFieldOwnedOptions,
+    shouldSyncScreenOwnedOptions,
+    syncDiagnosisReference,
+    syncFieldReference,
+    syncKeyOnlyReference,
+    syncScreenEntityReference,
+    syncScreenReference,
+} from './_update_data_keys_refs.helpers';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -169,9 +178,9 @@ export async function _updateDataKeysRefs({
         const trackMatchSource = (source?: MatchSource) => {
             if (source === 'uniqueKey') stats.matchedByUniqueKey++;
         };
-        const getDataKeyOptional = (key?: DataKey) => !!(key?.metadata as Record<string, any> | undefined)?.optional;
 
         const usagesMap = new Map<string, AffectedUsage>();
+        const warningOnlyScreensMap = new Map<string, AffectedEntity>();
         const addUsage = (usage: AffectedUsage) => {
             const dedupeKey = [
                 usage.kind,
@@ -182,6 +191,23 @@ export async function _updateDataKeysRefs({
                 usage.title,
             ].join('|');
             usagesMap.set(dedupeKey, usage);
+        };
+        const addWarningOnlyScreen = (screen: {
+            screenId: string;
+            scriptId: string;
+            scriptTitle?: string | null;
+            title?: string | null;
+            label?: string | null;
+            refId?: string | null;
+        }) => {
+            if (!screen.screenId || !screen.scriptId) return;
+            warningOnlyScreensMap.set(screen.screenId, {
+                id: screen.screenId,
+                scriptId: screen.scriptId,
+                scriptTitle: screen.scriptTitle || undefined,
+                title: screen.title || screen.label || screen.refId || screen.screenId,
+                type: 'screen',
+            });
         };
 
         const keyIdPatterns = changedUniqueKeys
@@ -292,9 +318,7 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        const shouldFallbackToFullScan = !candidateScripts.size && changedUniqueKeys.length > 0;
-
-        const useFullScan = dryRun || shouldFallbackToFullScan;
+        const useFullScan = false;
 
         if (!candidateScripts.size && !useFullScan) {
             return {
@@ -325,6 +349,7 @@ export async function _updateDataKeysRefs({
         const prefetchErrors = [
             ...(screensGetErrors || []),
             ...(diagnosesGetErrors || []),
+            ...(problemsGetErrors || []),
         ];
         if (prefetchErrors.length) {
             return { success: false, errors: prefetchErrors, info: stats };
@@ -339,7 +364,6 @@ export async function _updateDataKeysRefs({
                 uniqueKey: s.refIdDataKey || s.refId,
             });
             trackMatchSource(refMatchSource);
-
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
             });
@@ -358,37 +382,64 @@ export async function _updateDataKeysRefs({
             }
 
             let updated = !!screenDataKey || !!refIdDataKey;
-
-            const items = (s.items || []).map((item, itemIndex) => {
-                const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
-                    uniqueKey: item.keyId,
-                });
-                trackMatchSource(itemMatchSource);
-
-                if (itemDataKey) {
-                    updated = true;
-                    addUsage({
-                        id: item.itemId || `${s.screenId}:item:${itemIndex}`,
-                        kind: 'screen_item',
-                        title: item.label || item.key || item.id || `${itemIndex + 1}`,
-                        location: s.title || s.label || s.refId || s.screenId,
-                        scriptId: s.scriptId,
-                        scriptTitle: s.scriptTitle || undefined,
-                        screenId: s.screenId,
-                        screenItemIndex: itemIndex,
-                    });
-                }
-                return {
-                    ...item,
-                    ...(!itemDataKey ? {} : {
-                        keyId: itemDataKey.uniqueKey,
-                        label: itemDataKey.label,
-                        confidential: !!itemDataKey.confidential,
-                        ...(!(`${item.key || ''}`.length) ? {} : { key: itemDataKey.name, }),
-                        ...(!(`${item.id || ''}`.length) ? {} : { id: itemDataKey.name, }),
-                    }),
-                };
+            const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
+            const shouldSyncScreenOptions = shouldSyncScreenOwnedOptions({
+                screenType: s.type,
+                dataKey: screenDataKey,
+                currentItemsCount: (s.items || []).length,
             });
+
+            const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
+                ? (s.items || [])
+                : (s.items || []).map((item, itemIndex) => {
+                    const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                    });
+                    trackMatchSource(itemMatchSource);
+
+                    if (itemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                            kind: 'screen_item',
+                            title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                            location: s.title || s.label || s.refId || s.screenId,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            screenItemIndex: itemIndex,
+                        });
+                    }
+                    if (shouldSyncScreenOptions) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !screenOptionUniqueKeys.has(keyId)) {
+                            addUsage({
+                                id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                                kind: 'screen_item',
+                                title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                                location: s.title || s.label || s.refId || s.screenId,
+                                scriptId: s.scriptId,
+                                scriptTitle: s.scriptTitle || undefined,
+                                screenId: s.screenId,
+                                screenItemIndex: itemIndex,
+                            });
+                        }
+                    }
+                    const syncedItem = syncScreenReference(item, itemDataKey);
+                    if (syncedItem.changed) {
+                        updated = true;
+                    }
+                    return {
+                        ...item,
+                        ...syncedItem.value,
+                    };
+                });
+            if (shouldSyncScreenOptions && (items || []).some((item) => {
+                const keyId = `${item.keyId || ''}`.trim();
+                return !!keyId && !screenOptionUniqueKeys.has(keyId);
+            })) {
+                addWarningOnlyScreen(s);
+            }
 
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
@@ -421,10 +472,6 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(maxTimeMatchSource);
 
-                if (fieldDataKey || refKeyDataKey || minDateKeyDataKey || maxDateKeyDataKey || minTimeKeyDataKey || maxTimeKeyDataKey) {
-                    updated = true;
-                }
-
                 if (fieldDataKey) {
                     addUsage({
                         id: field.fieldId || `${s.screenId}:field:${fieldIndex}`,
@@ -438,43 +485,37 @@ export async function _updateDataKeysRefs({
                     });
                 }
 
-                return {
-                    ...field,
-                    ...(!fieldDataKey ? {} : {
-                        keyId: fieldDataKey.uniqueKey,
-                        key: fieldDataKey.name,
-                        label: fieldDataKey.label,
-                        confidential: !!fieldDataKey.confidential,
-                        optional: getDataKeyOptional(fieldDataKey),
-                    }),
-                    ...(!refKeyDataKey ? {} : {
-                        refKeyId: refKeyDataKey.uniqueKey,
-                        refKey: refKeyDataKey.name,
-                    }),
-                    ...(!minDateKeyDataKey ? {} : {
-                        minDateKeyId: minDateKeyDataKey.uniqueKey,
-                        minDateKey: minDateKeyDataKey.name,
-                    }),
-                    ...(!maxDateKeyDataKey ? {} : {
-                        maxDateKeyId: maxDateKeyDataKey.uniqueKey,
-                        maxDateKey: maxDateKeyDataKey.name,
-                    }),
-                    ...(!minTimeKeyDataKey ? {} : {
-                        minTimeKeyId: minTimeKeyDataKey.uniqueKey,
-                        minTimeKey: minTimeKeyDataKey.name,
-                    }),
-                    ...(!maxTimeKeyDataKey ? {} : {
-                        maxTimeKeyId: maxTimeKeyDataKey.uniqueKey,
-                        maxTimeKey: maxTimeKeyDataKey.name,
-                    }),
-                    items: (field.items || []).map((item, fieldItemIndex) => {
-                        const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
-                            uniqueKey: item.keyId,
-                        });
-                        trackMatchSource(fieldItemMatchSource);
+                const fieldOptionUniqueKeys = new Set((fieldDataKey?.options || []).filter(Boolean));
+                const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
+                    const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                    });
+                    trackMatchSource(fieldItemMatchSource);
 
-                        if (fieldItemDataKey) {
-                            updated = true;
+                    if (fieldItemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
+                            kind: 'screen_field_item',
+                            title: `${item.label || item.value || (fieldItemIndex + 1)}`,
+                            location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            fieldIndex,
+                            fieldItemIndex,
+                        });
+                    }
+                    if (
+                        shouldSyncFieldOwnedOptions({
+                            fieldType: field.type,
+                            dataKey: fieldDataKey,
+                            currentItemsCount: (field.items || []).length,
+                        })
+                    ) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !fieldOptionUniqueKeys.has(keyId)) {
+                            addWarningOnlyScreen(s);
                             addUsage({
                                 id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
                                 kind: 'screen_field_item',
@@ -487,33 +528,78 @@ export async function _updateDataKeysRefs({
                                 fieldItemIndex,
                             });
                         }
-                        return {
-                            ...item,
-                            ...(!fieldItemDataKey ? {} : {
-                                keyId: fieldItemDataKey.uniqueKey,
-                                value: fieldItemDataKey.name,
-                                label: fieldItemDataKey.label,
-                            }),
-                        };
-                    }),
+                    }
+                    const syncedFieldItem = syncKeyOnlyReference(item, fieldItemDataKey, {
+                        id: "keyId",
+                        name: "value",
+                    });
+                    const fieldItemValue = fieldItemDataKey ? {
+                        ...syncedFieldItem.value,
+                        label: fieldItemDataKey.label,
+                    } : item;
+                    if (JSON.stringify(fieldItemValue) !== JSON.stringify(item)) {
+                        updated = true;
+                    }
+                    return {
+                        ...item,
+                        ...fieldItemValue,
+                    };
+                });
+                const syncedField = syncFieldReference(field, fieldDataKey);
+                const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
+                    id: "refKeyId",
+                    name: "refKey",
+                });
+                const syncedMinDateField = syncKeyOnlyReference(syncedRefField.value, minDateKeyDataKey, {
+                    id: "minDateKeyId",
+                    name: "minDateKey",
+                });
+                const syncedMaxDateField = syncKeyOnlyReference(syncedMinDateField.value, maxDateKeyDataKey, {
+                    id: "maxDateKeyId",
+                    name: "maxDateKey",
+                });
+                const syncedMinTimeField = syncKeyOnlyReference(syncedMaxDateField.value, minTimeKeyDataKey, {
+                    id: "minTimeKeyId",
+                    name: "minTimeKey",
+                });
+                const syncedMaxTimeField = syncKeyOnlyReference(syncedMinTimeField.value, maxTimeKeyDataKey, {
+                    id: "maxTimeKeyId",
+                    name: "maxTimeKey",
+                });
+                if (
+                    syncedField.changed ||
+                    syncedRefField.changed ||
+                    syncedMinDateField.changed ||
+                    syncedMaxDateField.changed ||
+                    syncedMinTimeField.changed ||
+                    syncedMaxTimeField.changed
+                ) {
+                    updated = true;
+                }
+
+                return {
+                    ...syncedMaxTimeField.value,
+                    items: fieldItems,
                 };
             });
 
+            const syncedScreen = syncScreenEntityReference(s, screenDataKey);
+            if (syncedScreen.changed) {
+                updated = true;
+            }
+            const syncedRefScreen = syncKeyOnlyReference(syncedScreen.value, refIdDataKey, {
+                id: "refIdDataKey",
+                name: "refId",
+            });
+            if (syncedRefScreen.changed) {
+                updated = true;
+            }
+
             return {
-                ...s,
+                ...syncedRefScreen.value,
                 updated,
                 items,
                 fields,
-                ...(!screenDataKey ? {} : {
-                    keyId: screenDataKey.uniqueKey,
-                    key: screenDataKey.name,
-                    label: screenDataKey.label,
-                    confidential: !!screenDataKey.confidential,
-                }),
-                ...(!refIdDataKey ? {} : {
-                    refId: refIdDataKey.name,
-                    refIdDataKey: refIdDataKey.uniqueKey,
-                }),
             };
         }).filter(s => !!s.updated).map(({ updated, ...s }) => s);
 
@@ -557,26 +643,27 @@ export async function _updateDataKeysRefs({
                         diagnosisSymptomIndex: symptomIndex,
                     });
                 }
+                const syncedSymptom = syncDiagnosisReference(item, symptomDataKey);
+                if (syncedSymptom.changed) {
+                    updated = true;
+                }
                 return {
                     ...item,
-                    ...(!symptomDataKey ? {} : {
-                        keyId: symptomDataKey.uniqueKey,
-                        key: symptomDataKey.name,
-                        name: symptomDataKey.label,
-                    }),
+                    ...syncedSymptom.value,
                 };
             });
-
-            return {
+            const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
+            }, diagnosisDataKey);
+            if (syncedDiagnosis.changed) {
+                updated = true;
+            }
+
+            return {
+                ...syncedDiagnosis.value,
                 symptoms,
                 updated,
-                ...(!diagnosisDataKey ? {} : {
-                    keyId: diagnosisDataKey.uniqueKey,
-                    key: diagnosisDataKey.name,
-                    name: diagnosisDataKey.label,
-                }),
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
@@ -595,7 +682,7 @@ export async function _updateDataKeysRefs({
                     location: 'Problem',
                     scriptId: d.scriptId,
                     scriptTitle: d.scriptTitle || undefined,
-                    diagnosisId: d.problemId,
+                    problemId: d.problemId,
                 });
             }
 
@@ -617,13 +704,20 @@ export async function _updateDataKeysRefs({
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
         stats.updatedProblems = problemsUpdatedData.length;
 
-        const affectedScreens: AffectedEntity[] = screensUpdatedData.map(s => ({
-            id: s.screenId,
-            scriptId: s.scriptId,
-            scriptTitle: s.scriptTitle || undefined,
-            title: s.title || s.label || s.refId || s.screenId,
-            type: 'screen',
-        }));
+        const affectedScreensMap = new Map<string, AffectedEntity>();
+        screensUpdatedData.forEach((s) => {
+            affectedScreensMap.set(s.screenId, {
+                id: s.screenId,
+                scriptId: s.scriptId,
+                scriptTitle: s.scriptTitle || undefined,
+                title: s.title || s.label || s.refId || s.screenId,
+                type: 'screen',
+            });
+        });
+        warningOnlyScreensMap.forEach((screen) => {
+            affectedScreensMap.set(screen.id, screen);
+        });
+        const affectedScreens: AffectedEntity[] = Array.from(affectedScreensMap.values());
         const affectedDiagnoses: AffectedEntity[] = diagnosesUpdatedData.map(d => ({
             id: d.diagnosisId,
             scriptId: d.scriptId,

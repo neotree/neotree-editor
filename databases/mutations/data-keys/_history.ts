@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
 
@@ -7,14 +8,17 @@ export async function _saveDataKeysHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof dataKeysDrafts.$inferSelect[]
   previous: typeof dataKeys.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof dataKeysHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -32,9 +36,10 @@ export async function _saveDataKeysHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         dataKeyId,
         changes: changePayload,
       }
@@ -67,7 +72,7 @@ export async function _saveDataKeysHistory({
           entityId: dataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -80,7 +85,7 @@ export async function _saveDataKeysHistory({
     }
 
     if (insertData.length) {
-      await db.insert(dataKeysHistory).values(insertData)
+      await executor.insert(dataKeysHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

@@ -18,13 +18,15 @@ import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
 
 type Props = {
-    children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
+    children?: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
     disabled?: boolean;
     symptom?: {
         index: number;
         data: DiagnosisSymptom,
     };
     form: ReturnType<typeof useDiagnosisForm>;
+    open?: boolean;
+    onClose?: () => void;
 };
 
 export function Symptom<P = {}>({
@@ -32,11 +34,19 @@ export function Symptom<P = {}>({
     symptom: symptomProp,
     form,
     disabled: disabledProp,
+    open: controlledOpen,
+    onClose: controlledOnClose,
     ...extraProps
 }: Props & P) {
     const { data: symptom, index: symptomIndex, } = { ...symptomProp, };
 
-    const [open, setOpen] = useState(false);
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = controlledOpen ?? uncontrolledOpen;
+    const setOpen = controlledOnClose
+        ? (nextOpen: boolean) => {
+            if (!nextOpen) controlledOnClose();
+        }
+        : setUncontrolledOpen;
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -86,8 +96,8 @@ export function Symptom<P = {}>({
         <>
             <Modal
                 open={open}
-                title={symptom ? 'Add symptom' : 'Edit symptom'}
-                trigger={typeof children === 'function' ? children({ extraProps }) : children}
+                title={symptom ? 'Edit symptom' : 'Add symptom'}
+                trigger={children ? (typeof children === 'function' ? children({ extraProps }) : children) : undefined}
                 onOpenChange={open => {
                     setOpen(open);
                     resetForm(getDefaultValues());
