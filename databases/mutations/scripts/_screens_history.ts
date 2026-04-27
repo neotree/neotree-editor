@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
@@ -9,28 +10,32 @@ export async function _saveScreensHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof screensDrafts.$inferSelect[]
   previous: typeof screens.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof screensHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const screenId = c?.data?.screenId
       if (!screenId) continue
 
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+
       const changeHistoryData: typeof screensHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: nextVersion,
         screenId,
         scriptId: c?.data?.scriptId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -79,7 +84,7 @@ export async function _saveScreensHistory({
           entityId: screenId,
           entityType: "screen",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -93,7 +98,7 @@ export async function _saveScreensHistory({
     }
 
     if (insertData.length) {
-      await db.insert(screensHistory).values(insertData)
+      await executor.insert(screensHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

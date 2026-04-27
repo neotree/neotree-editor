@@ -4,6 +4,7 @@ import { v4 } from "uuid"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import {
   scripts,
   screensDrafts,
@@ -15,24 +16,24 @@ import {
 } from "@/databases/pg/schema"
 import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
-import { _publishScreens } from "./_screens_publish"
-import { _publishDiagnoses } from "./_diagnoses_publish"
-import { _publishProblems } from "./_problems_publish"
 
 export async function _publishScripts({
   userId,
   publisherUserId,
   dataVersion,
+  client,
 }: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const changeLogs: SaveChangeLogData[] = []
 
   try {
-    const drafts = await db.query.scriptsDrafts.findMany({
+    const executor = client || db
+    const drafts = await executor.query.scriptsDrafts.findMany({
       where: !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
     })
     const inserts = drafts
@@ -44,16 +45,13 @@ export async function _publishScripts({
       }))
     const updates = drafts.filter((c) => c.scriptId)
 
-    const scriptsIdsAndScriptsDraftsIds = [...inserts.map((s) => s.scriptId!), ...updates.map((s) => s.scriptId!)]
-
     const errors: string[] = []
-    const processedScripts: { scriptId: string; errors?: string[] }[] = []
 
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof scripts.$inferSelect)[] = []
       if (updates.filter((c) => c.scriptId).length) {
-        dataBefore = await db.query.scripts.findMany({
+        dataBefore = await executor.query.scripts.findMany({
           where: inArray(
             scripts.scriptId,
             updates.filter((c) => c.scriptId).map((c) => c.scriptId!),
@@ -70,15 +68,15 @@ export async function _publishScripts({
           ...payload,
           publishDate: new Date(),
         }
-        await db.update(scripts).set(updates).where(eq(scripts.scriptId, scriptId))
+        await executor.update(scripts).set(updates).where(eq(scripts.scriptId, scriptId))
 
-        processedScripts.push({ scriptId })
       }
 
       const updateChangeLogs = await _saveScriptsHistory({
         drafts: updates,
         previous: dataBefore,
         userId: publisherUserId,
+        client: executor,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -89,7 +87,7 @@ export async function _publishScripts({
     if (inserts.length) {
       let dataBefore: (typeof scripts.$inferSelect)[] = []
       if (inserts.filter((c) => c.scriptId).length) {
-        dataBefore = await db.query.scripts.findMany({
+        dataBefore = await executor.query.scripts.findMany({
           where: inArray(
             scripts.scriptId,
             inserts.filter((c) => c.scriptId).map((c) => c.scriptId!),
@@ -102,22 +100,20 @@ export async function _publishScripts({
         scriptId: s.scriptDraftId,
       }))
 
-      await db.insert(scripts).values(insertData)
+      await executor.insert(scripts).values(insertData)
 
       for (const { scriptId } of insertData) {
-        processedScripts.push({ scriptId })
-
-        await db
+        await executor
           .update(screensDrafts)
           .set({ scriptId })
           .where(or(eq(screensDrafts.scriptId, scriptId), eq(screensDrafts.scriptDraftId, scriptId)))
 
-        await db
+        await executor
           .update(diagnosesDrafts)
           .set({ scriptId })
           .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
 
-        await db
+        await executor
           .update(problemsDrafts)
           .set({ scriptId })
           .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
@@ -126,6 +122,7 @@ export async function _publishScripts({
         drafts: inserts,
         previous: dataBefore,
         userId: publisherUserId,
+        client: executor,
       })
        changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -133,33 +130,7 @@ export async function _publishScripts({
       })))
     }
 
-    if (processedScripts.length) {
-      const publishScreens = await _publishScreens({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-      })
-      if (publishScreens.errors) throw new Error(publishScreens.errors.join(", "))
-
-      const publishDiagnoses = await _publishDiagnoses({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-      })
-      if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(", "))
-
-      const publishProblems = await _publishProblems({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-      })
-      if (publishProblems.errors) throw new Error(publishProblems.errors.join(", "))
-    }
-
-    let deleted = await db.query.pendingDeletion.findMany({
+    let deleted = await executor.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.scriptId),
         !userId ? undefined : eq(pendingDeletion.createdByUserId, userId),
@@ -170,14 +141,14 @@ export async function _publishScripts({
       },
     })
 
-    await db.delete(scriptsDrafts).where(!userId ? undefined : eq(scriptsDrafts.createdByUserId, userId))
+    await executor.delete(scriptsDrafts).where(!userId ? undefined : eq(scriptsDrafts.createdByUserId, userId))
 
     deleted = deleted.filter((c) => c.script)
 
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await executor
         .update(scripts)
         .set({ deletedAt })
         .where(
@@ -188,17 +159,17 @@ export async function _publishScripts({
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.script!.version,
+        version: (c.script!.version ?? 0) + 1,
         scriptId: c.scriptId!,
         changes: {
-          action: "delete_config_key",
-          description: "Delete config key",
+          action: "delete_script",
+          description: "Delete script",
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
       }))
 
-      await db.insert(scriptsHistory).values(historyPayload)
+      await executor.insert(scriptsHistory).values(historyPayload)
 
       if (publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -215,7 +186,7 @@ export async function _publishScripts({
             entityId: entry.scriptId,
             entityType: "script",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.script?.version ?? 0) + 1),
             dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -230,7 +201,7 @@ export async function _publishScripts({
       }
     }
 
-    await db
+    await executor
       .delete(pendingDeletion)
       .where(
         and(
@@ -246,16 +217,17 @@ export async function _publishScripts({
     ]
 
     if (published.length) {
-      await db
+      await executor
         .update(scripts)
         .set({ version: sql`${scripts.version} + 1` })
         .where(inArray(scripts.scriptId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishScripts changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishScripts changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 
