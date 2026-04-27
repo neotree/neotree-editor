@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
@@ -15,17 +16,18 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, }: {
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
-    
+    client?: DbOrTransaction;
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     let sqlInfo: { [key: string]: Query; } = {};
+    const executor = client || db;
 
     try {
         const existingDiagnosisIds = Array.from(new Set(
@@ -44,32 +46,32 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
             maxDraftDiagnosis,
         ] = await Promise.all([
             existingDiagnosisIds.length
-                ? db.query.diagnosesDrafts.findMany({
+                ? executor.query.diagnosesDrafts.findMany({
                     where: inArray(diagnosesDrafts.diagnosisDraftId, existingDiagnosisIds),
                 })
                 : Promise.resolve([]),
             existingDiagnosisIds.length
-                ? db.query.diagnoses.findMany({
+                ? executor.query.diagnoses.findMany({
                     where: inArray(diagnoses.diagnosisId, existingDiagnosisIds),
                 })
                 : Promise.resolve([]),
             referencedScriptIds.length
-                ? db.query.scripts.findMany({
+                ? executor.query.scripts.findMany({
                     where: inArray(scripts.scriptId, referencedScriptIds),
                     columns: { scriptId: true, },
                 })
                 : Promise.resolve([]),
             referencedScriptIds.length
-                ? db.query.scriptsDrafts.findMany({
+                ? executor.query.scriptsDrafts.findMany({
                     where: inArray(scriptsDrafts.scriptDraftId, referencedScriptIds),
                     columns: { scriptDraftId: true, },
                 })
                 : Promise.resolve([]),
-            db.query.diagnoses.findFirst({
+            executor.query.diagnoses.findFirst({
                 columns: { position: true, },
                 orderBy: desc(diagnoses.position),
             }),
-            db.query.diagnosesDrafts.findFirst({
+            executor.query.diagnosesDrafts.findFirst({
                 columns: { position: true, },
                 orderBy: desc(diagnosesDrafts.position),
             }),
@@ -128,7 +130,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                             const publishedScriptId = publishedScriptIds.has(data.scriptId) ? data.scriptId : undefined;
 
                             if (scriptDraftId || publishedScriptId) {
-                                const q = db.insert(diagnosesDrafts).values({
+                                const q = executor.insert(diagnosesDrafts).values({
                                     data,
                                     scriptId: publishedScriptId,
                                     scriptDraftId,

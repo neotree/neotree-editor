@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
+import { CircleHelp, CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
@@ -21,10 +21,19 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
-import { isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
 
@@ -61,9 +70,48 @@ const statusFilterOptions = [
     { value: "resolved", label: "Resolved" },
     { value: "out_of_sync", label: "Out of sync" },
     { value: "missing", label: "Missing" },
-    { value: "legacy_match", label: "Legacy match" },
+    { value: "legacy_match", label: "Unlinked match" },
     { value: "conflict", label: "Conflict" },
-    { value: "unmanaged", label: "Unmanaged" },
+    { value: "unmanaged", label: "Unmanaged reference" },
+] as const;
+
+const statusHelpItems = [
+    {
+        status: "resolved",
+        label: "Resolved",
+        description: "The reference is linked correctly and matches the current data key library state.",
+        example: "A field points to the correct data key unique key and its current script text still matches the linked data key.",
+    },
+    {
+        status: "out_of_sync",
+        label: "Out of sync",
+        description: "The reference is linked, but part of the script copy or option set no longer matches the linked data key library entry.",
+        example: "A linked option still exists, but its label in the script is stale compared with the current library label.",
+    },
+    {
+        status: "missing",
+        label: "Missing",
+        description: "The script points to a data key that no longer exists in the library.",
+        example: "A deleted parent data key is still referenced by a field in the script.",
+    },
+    {
+        status: "legacy_match",
+        label: "Unlinked match",
+        description: "A matching data key exists in the library, but the script reference is not linked by unique key yet.",
+        example: "The script still uses an old text/key reference, and the matching data key can be resolved safely.",
+    },
+    {
+        status: "conflict",
+        label: "Conflict",
+        description: "The reference is structurally invalid and needs manual attention before publish can proceed.",
+        example: "The same parent data key appears twice in the same script, which would create ambiguous exported data.",
+    },
+    {
+        status: "unmanaged",
+        label: "Unmanaged reference",
+        description: "The script contains a local or legacy-style reference that does not map cleanly to the managed data key library.",
+        example: "A field still uses a free-text or locally-defined data key reference that is not managed by the central library.",
+    },
 ] as const;
 
 function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
@@ -71,13 +119,13 @@ function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["sta
         case "out_of_sync":
             return "Out of sync";
         case "legacy_match":
-            return "Not linked properly";
+            return "Unlinked match";
         case "missing":
             return "Missing from library";
         case "conflict":
             return "Conflict";
         case "unmanaged":
-            return "Not managed by library";
+            return "Unmanaged reference";
         default:
             return "Resolved";
     }
@@ -142,10 +190,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "non_blocking">("all");
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
+    const [tableSearchValue, setTableSearchValue] = useState("");
+    const [searchedRowIndexes, setSearchedRowIndexes] = useState<number[]>([]);
+    const [tablePage, setTablePage] = useState(1);
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
     const [savingResolution, setSavingResolution] = useState(false);
+    const [statusHelpOpen, setStatusHelpOpen] = useState(false);
     const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
     const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
@@ -163,7 +215,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         defaultValue: "",
         clearOnDefault: true,
     });
-    const effectivePolicy = integrity?.policy || undefined;
     const showIntegrityLoader = savingResolution || loadingRepairPreview || loadingBulkPreview;
     const entries = useMemo(() => [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
@@ -191,12 +242,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return true;
     }), [issueScopeFilter]);
     const filteredEntries = useMemo(() => entries.filter((entry) => {
-        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry, effectivePolicy)) return false;
-        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry, effectivePolicy)) return false;
+        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
+        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
-    }), [effectivePolicy, entries, issueScopeFilter, statusFilter, typeFilter]);
+    }), [entries, issueScopeFilter, statusFilter, typeFilter]);
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
     const bulkResolvableEntries = useMemo(() => ({
@@ -214,6 +265,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         const selectedOptionStillAvailable = availableStatusOptions.some((option) => option.value === statusFilter);
         if (!selectedOptionStillAvailable) setStatusFilter("all");
     }, [availableStatusOptions, statusFilter]);
+
+    useEffect(() => {
+        setTablePage(1);
+    }, [issueScopeFilter, statusFilter, typeFilter, tableSearchValue]);
+
+    useEffect(() => {
+        setSearchedRowIndexes(filteredEntries.map((_, index) => index));
+    }, [filteredEntries]);
 
     const closeRepairModal = () => {
         if (isRepairing || loadingRepairPreview || savingResolution) return;
@@ -622,8 +681,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const reviewedBulkItemsCount = useMemo(() => bulkReviewableItems.filter((item) => item.reviewed).length, [bulkReviewableItems]);
     const allBulkReviewableItemsReviewed = !!bulkReviewableItems.length && reviewedBulkItemsCount === bulkReviewableItems.length;
     const someBulkReviewableItemsReviewed = reviewedBulkItemsCount > 0 && reviewedBulkItemsCount < bulkReviewableItems.length;
-    const legacyBulkStatus: "out_of_sync" | "legacy_match" = bulkResolveStatus ?? "out_of_sync";
-    const legacyBulkEntries = bulkResolvableEntries[legacyBulkStatus];
     const visibleBulkReviewItems = useMemo(() => showReviewedBulkItemsOnly
         ? bulkReviewableItems.filter((item) => item.reviewed)
         : bulkReviewableItems, [bulkReviewableItems, showReviewedBulkItemsOnly]);
@@ -644,6 +701,43 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
         "",
     ]), [filteredEntries]);
+    const pageSize = 100;
+    const searchedEntries = useMemo(
+        () => searchedRowIndexes
+            .map((rowIndex) => filteredEntries[rowIndex])
+            .filter((entry): entry is DataKeyIntegrityReport["entries"][number] => !!entry),
+        [filteredEntries, searchedRowIndexes]
+    );
+    const totalPages = Math.max(1, Math.ceil(searchedEntries.length / pageSize));
+    const visibleRowIndexes = useMemo(
+        () => searchedRowIndexes.slice((tablePage - 1) * pageSize, tablePage * pageSize),
+        [searchedRowIndexes, tablePage]
+    );
+    const visibleRowIndexSet = useMemo(() => new Set(visibleRowIndexes), [visibleRowIndexes]);
+    const renderPageNumbers = useMemo(() => {
+        const pages: (number | "ellipsis")[] = [];
+
+        pages.push(1);
+
+        if (totalPages <= 7) {
+            for (let i = 2; i <= totalPages; i++) pages.push(i);
+        } else {
+            if (tablePage > 3) pages.push("ellipsis");
+
+            for (let i = Math.max(2, tablePage - 1); i <= Math.min(totalPages - 1, tablePage + 1); i++) {
+                pages.push(i);
+            }
+
+            if (tablePage < totalPages - 2) pages.push("ellipsis");
+            if (totalPages > 1) pages.push(totalPages);
+        }
+
+        return pages;
+    }, [tablePage, totalPages]);
+
+    useEffect(() => {
+        if (tablePage > totalPages) setTablePage(totalPages);
+    }, [tablePage, totalPages]);
 
     useEffect(() => {
         if (viewOnly) return;
@@ -700,6 +794,34 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     return (
         <>
             {showIntegrityLoader && <Loader overlay />}
+            <Modal
+                open={statusHelpOpen}
+                onOpenChange={setStatusHelpOpen}
+                title="Integrity status help"
+                description="These statuses explain what was detected, why it matters, and what action is usually needed."
+                actions={(
+                    <Button variant="ghost" onClick={() => setStatusHelpOpen(false)}>
+                        Close
+                    </Button>
+                )}
+            >
+                <div className="space-y-3 text-sm">
+                    {statusHelpItems.map((item) => (
+                        <div key={item.status} className="rounded-md border p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className={cn("inline-flex rounded px-2 py-1 text-xs font-medium", statusStyles[item.status])}>
+                                    {item.label}
+                                </span>
+                            </div>
+                            <div className="text-foreground">{item.description}</div>
+                            <div className="text-muted-foreground">
+                                <span className="font-medium text-foreground">Example:</span> {item.example}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Modal>
+
             <Modal
                 open={!!repairModalEntry}
                 onOpenChange={(open) => {
@@ -899,58 +1021,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
                 )}
             </Modal>
-
-            {false && <Modal
-                open={false}
-                onOpenChange={(open) => {
-                    if (!open && !isRepairing) setBulkResolveStatus(null);
-                }}
-                title={bulkResolveStatus ? `Resolve ${legacyBulkStatus.replace(/_/g, " ")}` : "Resolve by status"}
-                description="This saves draft repairs only for the selected status in the current script."
-                actions={(
-                    <>
-                        <Button variant="ghost" onClick={() => setBulkResolveStatus(null)} disabled={isRepairing}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={() => handleBulkResolve()}
-                            disabled={!bulkResolveStatus || isRepairing || !reviewedBulkItemsCount}
-                        >
-                            {isRepairing ? "Saving Drafts..." : "Save Repair Drafts"}
-                        </Button>
-                    </>
-                )}
-            >
-                {!bulkResolveStatus ? null : (
-                    <div className="space-y-4 text-sm">
-                        <div className="rounded-md border p-3 space-y-2">
-                            <div><span className="font-medium">Status:</span> {legacyBulkStatus.replace(/_/g, " ")}</div>
-                            <div><span className="font-medium">Entries:</span> {legacyBulkEntries.length}</div>
-                            <div className="text-muted-foreground">
-                                Only references with this status in the current script will be repaired. Nothing is published automatically.
-                            </div>
-                        </div>
-
-                        <div className="rounded-md border p-3 space-y-2">
-                            <div className="font-medium">Affected references</div>
-                            <div className="space-y-1">
-                                {legacyBulkEntries.slice(0, 8).map((entry: DataKeyIntegrityReport["entries"][number]) => (
-                                    <div key={getEntryKey(entry)}>
-                                        {entry.currentKey || entry.currentLabel || entry.location}
-                                        <span className="text-muted-foreground"> · {kindLabels[entry.kind]} · {entry.location}</span>
-                                    </div>
-                                ))}
-                                {legacyBulkEntries.length > 8 && (
-                                    <div className="text-muted-foreground">
-                                        And {legacyBulkEntries.length - 8} more...�
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>}
-
             <Sheet open={!!bulkResolveStatus} onOpenChange={(open) => { if (!open) closeBulkReviewDrawer(); }}>
                 <SheetContent hideCloseButton side="right" className="p-0 m-0 flex flex-col sm:max-w-3xl w-full">
                     <SheetHeader className="py-4 px-4 border-b border-b-border text-left">
@@ -1228,10 +1298,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 { label: "Resolved", value: summary.resolved },
                                 { label: "Blocking", value: summary.blocking },
                                 { label: "Missing", value: summary.missing },
-                                { label: "Legacy Match", value: summary.legacy_match },
+                                { label: "Unlinked Match", value: summary.legacy_match },
                                 { label: "Conflict", value: summary.conflict },
                                 { label: "Out Of Sync", value: summary.out_of_sync },
-                                { label: "Unmanaged", value: summary.unmanaged },
+                                { label: "Unmanaged Reference", value: summary.unmanaged },
                             ].map((item) => (
                                 <div key={item.label} className="rounded-md border p-3">
                                     <div className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</div>
@@ -1248,7 +1318,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 ? "This view shows all scanned script references. Integrity issues follow the configured rule set, but publish is currently running in warn-only mode."
                                 : integrity?.policy?.enforcementMode === "block_new_issues_only"
                                     ? "This view shows all scanned script references. Publish only blocks newly introduced blocking issues that are not part of the captured baseline."
-                                    : "This view shows all scanned script references. Publish is blocked by missing, unlinked, or unmanaged datakeys, duplicate parent datakeys in the same script, and script options that no longer exist in the parent datakey pool."}
+                                    : "This view shows all scanned script references. Publish is blocked by missing data keys, unlinked matches, unmanaged references, duplicate parent data keys in the same script, and script options that no longer exist in the parent data key pool."}
                     </div>
 
                     {viewOnly && (
@@ -1265,6 +1335,18 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                         ? "Review issues from the row menu. Repair actions are disabled in view mode."
                                         : "Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script."}
                                 </div>
+                            </div>
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setStatusHelpOpen(true)}
+                                    className="gap-2"
+                                >
+                                    <CircleHelp className="h-4 w-4" />
+                                    Status help
+                                </Button>
                             </div>
                         </div>
 
@@ -1371,7 +1453,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                         disabled={isRepairing}
                                         onClick={() => openBulkResolveDrawer("legacy_match")}
                                     >
-                                        Legacy match ({bulkResolvableEntries.legacy_match.length})
+                                        Unlinked match ({bulkResolvableEntries.legacy_match.length})
                                     </Button>
                                 )}
                             </div>
@@ -1379,11 +1461,19 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
 
                     <div className="text-sm text-muted-foreground">
-                        Showing {filteredEntries.length} of {entries.length} references.
+                        {searchedEntries.length} matching reference{searchedEntries.length === 1 ? "" : "s"} ({filteredEntries.length} filtered, {entries.length} total).
                     </div>
 
                     <DataTable
-                        search={{ inputPlaceholder: 'Search data key references' }}
+                        search={{
+                            inputPlaceholder: 'Search data key references',
+                            value: tableSearchValue,
+                            setValue: setTableSearchValue,
+                        }}
+                        onFilteredRowsChange={(rows) => {
+                            setSearchedRowIndexes(rows.map((row) => row.rowIndex));
+                        }}
+                        filter={(rowIndex) => visibleRowIndexSet.has(rowIndex)}
                         getRowOptions={({ rowIndex }) => {
                             const issue = filteredEntries[rowIndex];
                             return {
@@ -1406,7 +1496,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     if (!issue) return null;
                                     return (
                                         <span className={cn("inline-flex rounded px-2 py-1 text-xs font-medium", statusStyles[issue.status])}>
-                                            {issue.status.replace(/_/g, " ")}
+                                            {getDataKeyIntegrityStatusLabel(issue.status)}
                                         </span>
                                     );
                                 },
@@ -1429,6 +1519,50 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         ]}
                         data={tableData}
                     />
+
+                    {totalPages > 1 && (
+                        <div className="flex flex-col gap-3 rounded-md border px-3 py-3">
+                            <Pagination>
+                                <PaginationContent>
+                                    <PaginationItem>
+                                        <PaginationPrevious
+                                            onClick={() => tablePage > 1 && setTablePage((current) => Math.max(1, current - 1))}
+                                            className={cn("cursor-pointer", tablePage <= 1 && "pointer-events-none opacity-50")}
+                                        />
+                                    </PaginationItem>
+
+                                    {renderPageNumbers.map((pageNum, index) => (
+                                        pageNum === "ellipsis" ? (
+                                            <PaginationItem key={`ellipsis-${index}`}>
+                                                <PaginationEllipsis />
+                                            </PaginationItem>
+                                        ) : (
+                                            <PaginationItem key={pageNum}>
+                                                <PaginationLink
+                                                    onClick={() => setTablePage(pageNum)}
+                                                    isActive={pageNum === tablePage}
+                                                    className="cursor-pointer"
+                                                >
+                                                    {pageNum}
+                                                </PaginationLink>
+                                            </PaginationItem>
+                                        )
+                                    ))}
+
+                                    <PaginationItem>
+                                        <PaginationNext
+                                            onClick={() => tablePage < totalPages && setTablePage((current) => Math.min(totalPages, current + 1))}
+                                            className={cn("cursor-pointer", tablePage >= totalPages && "pointer-events-none opacity-50")}
+                                        />
+                                    </PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
+
+                            <div className="text-center text-sm text-muted-foreground">
+                                Showing {(searchedEntries.length ? ((tablePage - 1) * pageSize) + 1 : 0)}-{Math.min(tablePage * pageSize, searchedEntries.length)} of {searchedEntries.length} matching references
+                            </div>
+                        </div>
+                    )}
                 </div>
             </PageContainer>
         </>

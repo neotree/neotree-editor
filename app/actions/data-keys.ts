@@ -12,61 +12,15 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { getIntegrityPolicyState } from '@/lib/integrity-policy';
-
-type PreparedIntegrityRepair = {
-    entry: DataKeyIntegrityEntry;
-    selectedTargetUniqueKey?: string;
-    repairs: ReturnType<typeof repairSingleDataKeyIntegrityReference>;
-    preparedAt: number;
-};
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
     selectedTargetUniqueKey?: string;
     reviewed?: boolean;
 };
-
-const PREPARED_INTEGRITY_REPAIR_CACHE_TTL_MS = 2 * 60 * 1000;
-const PREPARED_INTEGRITY_REPAIR_CACHE_KEY = '__prepared_data_key_integrity_repair_cache__';
-
-function getPreparedIntegrityRepairStore(): Map<string, PreparedIntegrityRepair> {
-    const globalWithCache = globalThis as typeof globalThis & {
-        [PREPARED_INTEGRITY_REPAIR_CACHE_KEY]?: Map<string, PreparedIntegrityRepair>;
-    };
-    if (!globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY]) {
-        globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY] = new Map<string, PreparedIntegrityRepair>();
-    }
-    return globalWithCache[PREPARED_INTEGRITY_REPAIR_CACHE_KEY]!;
-}
-
-function buildPreparedIntegrityRepairCacheId(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
-    return `${userId || 'anonymous'}::${selectedTargetUniqueKey || ''}::${getDataKeyIntegrityEntryFingerprint(entry)}`;
-}
-
-function getPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
-    const store = getPreparedIntegrityRepairStore();
-    const cacheId = buildPreparedIntegrityRepairCacheId(userId, entry, selectedTargetUniqueKey);
-    const cached = store.get(cacheId);
-    if (!cached) return null;
-    if ((Date.now() - cached.preparedAt) > PREPARED_INTEGRITY_REPAIR_CACHE_TTL_MS) {
-        store.delete(cacheId);
-        return null;
-    }
-    return cached;
-}
-
-function setPreparedIntegrityRepair(userId: string | null | undefined, payload: PreparedIntegrityRepair) {
-    const store = getPreparedIntegrityRepairStore();
-    const cacheId = buildPreparedIntegrityRepairCacheId(userId, payload.entry, payload.selectedTargetUniqueKey);
-    store.set(cacheId, payload);
-}
-
-function clearPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
-    getPreparedIntegrityRepairStore().delete(buildPreparedIntegrityRepairCacheId(userId, entry, selectedTargetUniqueKey));
-}
 
 async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
     const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
@@ -585,20 +539,12 @@ export const resolveDataKeyIntegrityEntry = async (params: {
     try {
         const session = await isAllowed();
         await assertCanManageEditorDrafts(session.user);
-        const cached = getPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
-        const prepared = cached
-            ? {
-                success: true as const,
-                errors: [] as string[],
-                repairs: cached.repairs,
-            }
-            : await prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey);
+        const prepared = await prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey);
 
         if (!prepared.success) {
             logger.error('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
                 entry: params.entry,
                 errors: prepared.errors,
-                cacheHit: !!cached,
             });
             return {
                 success: false,
@@ -611,7 +557,6 @@ export const resolveDataKeyIntegrityEntry = async (params: {
         const repairs = prepared.repairs;
 
         if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) {
-            clearPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
             return {
                 success: true,
                 changed: false,
@@ -686,8 +631,6 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 };
             }
         }
-        clearPreparedIntegrityRepair(session.user?.userId, params.entry, params.selectedTargetUniqueKey);
-
         return {
             success: true,
             changed: true,
@@ -907,8 +850,6 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             }
         }
 
-        reviewedItems.forEach((item) => clearPreparedIntegrityRepair(session.user?.userId, item.entry, item.selectedTargetUniqueKey));
-
         return {
             success: true,
             changed: true,
@@ -1091,13 +1032,6 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             || params.entry.suggestedUniqueKeys?.[0]
             || params.entry.currentUniqueKey;
         const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
-        setPreparedIntegrityRepair(session.user?.userId, {
-            entry: params.entry,
-            selectedTargetUniqueKey: params.selectedTargetUniqueKey,
-            repairs,
-            preparedAt: Date.now(),
-        });
-
         return {
             success: true,
             changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length,

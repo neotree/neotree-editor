@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     captureIntegrityPolicyBaseline,
@@ -8,6 +8,7 @@ import {
     saveIntegrityPolicySettings,
 } from "@/app/actions/integrity-policy";
 import { Loader } from "@/components/loader";
+import { Pagination } from "@/components/pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,23 @@ type Props = {
     canManage: boolean;
     initialPolicy: IntegrityPolicy;
     initialBaseline: IntegrityBaseline;
+    baselineCapturedBy?: {
+        displayName: string;
+        email: string;
+    } | null;
+    currentUser?: {
+        displayName: string;
+        email: string;
+    } | null;
+    auditEntries?: Array<{
+        action: string;
+        createdAt: string;
+        actor: {
+            displayName: string;
+            email: string;
+        } | null;
+        metadata?: Record<string, any>;
+    }>;
 };
 
 const enforcementOptions: Array<{ value: IntegrityPolicy["enforcementMode"]; label: string; description: string }> = [
@@ -79,19 +97,47 @@ function arePoliciesEqual(a: IntegrityPolicy, b: IntegrityPolicy) {
     );
 }
 
-export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
+function formatAuditAction(action: string) {
+    switch (action) {
+        case "policy_updated":
+            return "Policy updated";
+        case "baseline_captured":
+            return "Baseline captured";
+        case "baseline_cleared":
+            return "Baseline cleared";
+        default:
+            return action.replaceAll("_", " ");
+    }
+}
+
+export function Content({ canManage, initialPolicy, initialBaseline, baselineCapturedBy, currentUser, auditEntries = [] }: Props) {
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
 
     const [loading, setLoading] = useState(false);
     const [policy, setPolicy] = useState<IntegrityPolicy>(initialPolicy);
+    const [savedPolicy, setSavedPolicy] = useState<IntegrityPolicy>(initialPolicy);
     const [baseline, setBaseline] = useState<IntegrityBaseline>(initialBaseline);
+    const [baselineCapturedByState, setBaselineCapturedByState] = useState(baselineCapturedBy);
+    const [auditEntriesState, setAuditEntriesState] = useState(auditEntries);
+    const [auditPage, setAuditPage] = useState(1);
+    const auditPageSize = 10;
+    const maxAuditEntries = 100;
     const hasCapturedBaseline = baseline.fingerprints.length > 0;
     const hasCompatibleBaseline = isIntegrityBaselineCompatible(baseline);
 
-    const isDirty = useMemo(() => !arePoliciesEqual(policy, initialPolicy), [initialPolicy, policy]);
+    const isDirty = useMemo(() => !arePoliciesEqual(policy, savedPolicy), [policy, savedPolicy]);
     const selectedEnforcementOption = enforcementOptions.find((option) => option.value === policy.enforcementMode);
     const selectedScanScopeOption = scanScopeOptions.find((option) => option.value === policy.scanScope);
+    const totalAuditPages = Math.max(1, Math.ceil(auditEntriesState.length / auditPageSize));
+    const visibleAuditEntries = useMemo(
+        () => auditEntriesState.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize),
+        [auditEntriesState, auditPage]
+    );
+
+    useEffect(() => {
+        if (auditPage > totalAuditPages) setAuditPage(totalAuditPages);
+    }, [auditPage, totalAuditPages]);
 
     const savePolicy = async () => {
         try {
@@ -102,7 +148,15 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
             }
 
             setPolicy(res.data.policy);
+            setSavedPolicy(res.data.policy);
             setBaseline(res.data.baseline);
+            setAuditPage(1);
+            setAuditEntriesState((current) => [{
+                action: "policy_updated",
+                createdAt: new Date().toISOString(),
+                actor: currentUser || null,
+                metadata: {},
+            }, ...current].slice(0, maxAuditEntries));
             alert({
                 title: "Integrity policy updated",
                 message: "Publish integrity settings were saved successfully.",
@@ -129,6 +183,17 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
 
             setPolicy(res.data.policy);
             setBaseline(res.data.baseline);
+            setBaselineCapturedByState(currentUser || baselineCapturedBy || null);
+            setAuditPage(1);
+            setAuditEntriesState((current) => [{
+                action: "baseline_captured",
+                createdAt: new Date().toISOString(),
+                actor: currentUser || null,
+                metadata: {
+                    totalBlockingIssues: res.data.baseline.totalBlockingIssues,
+                    totalScripts: res.data.baseline.totalScripts,
+                },
+            }, ...current].slice(0, maxAuditEntries));
             alert({
                 title: "Baseline captured",
                 message: `Captured ${res.data.baseline.totalBlockingIssues} blocking issue${res.data.baseline.totalBlockingIssues === 1 ? "" : "s"} across ${res.data.baseline.totalScripts} script${res.data.baseline.totalScripts === 1 ? "" : "s"}.`,
@@ -155,6 +220,14 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
 
             setPolicy(res.data.policy);
             setBaseline(res.data.baseline);
+            setBaselineCapturedByState(null);
+            setAuditPage(1);
+            setAuditEntriesState((current) => [{
+                action: "baseline_cleared",
+                createdAt: new Date().toISOString(),
+                actor: currentUser || null,
+                metadata: {},
+            }, ...current].slice(0, maxAuditEntries));
             alert({
                 title: "Baseline cleared",
                 message: "The integrity baseline has been cleared.",
@@ -283,9 +356,9 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
                                     }))}
                                 />
                                 <div>
-                                    <Label htmlFor="integrity-trigger-datakey-edits">Datakey library edits</Label>
+                                    <Label htmlFor="integrity-trigger-datakey-edits">Data key library edits</Label>
                                     <div className="text-sm text-muted-foreground">
-                                        Run integrity checks when existing datakeys are edited in the library.
+                                        Run integrity checks when existing data keys are edited in the library.
                                     </div>
                                 </div>
                             </div>
@@ -361,7 +434,12 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
                             </div>
                             <div className="rounded-md border p-4">
                                 <div className="text-sm text-muted-foreground">Captured by user</div>
-                                <div className="mt-1 font-medium">{baseline.capturedByUserId || "Unknown"}</div>
+                                <div className="mt-1 font-medium">
+                                    {baselineCapturedByState?.displayName || baselineCapturedByState?.email || baseline.capturedByUserId || "Unknown"}
+                                </div>
+                                {!!baselineCapturedByState?.email && (
+                                    <div className="text-xs text-muted-foreground">{baselineCapturedByState.email}</div>
+                                )}
                             </div>
                         </div>
 
@@ -403,6 +481,57 @@ export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
                                 Capture current baseline
                             </Button>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Integrity policy audit</CardTitle>
+                        <CardDescription>
+                            Recent super-admin changes to integrity policy and legacy baseline settings.
+                        </CardDescription>
+                    </CardHeader>
+
+                    <CardContent>
+                        {!auditEntriesState.length ? (
+                            <div className="text-sm text-muted-foreground">No integrity policy audit entries yet.</div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Showing {auditEntriesState.length ? ((auditPage - 1) * auditPageSize) + 1 : 0}-{Math.min(auditPage * auditPageSize, auditEntriesState.length)} of {auditEntriesState.length} audit entries
+                                </div>
+
+                                <div className="space-y-3">
+                                {visibleAuditEntries.map((entry, index) => (
+                                    <div key={`${entry.action}-${entry.createdAt}-${index}`} className="rounded-md border p-3">
+                                        <div className="font-medium">{formatAuditAction(entry.action)}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {formatDate(entry.createdAt)} - {entry.actor?.displayName || entry.actor?.email || "Unknown user"}
+                                        </div>
+                                        {!!entry.actor?.email && (
+                                            <div className="text-xs text-muted-foreground">{entry.actor.email}</div>
+                                        )}
+                                        {!!entry.metadata?.totalBlockingIssues && (
+                                            <div className="mt-2 text-sm text-muted-foreground">
+                                                {entry.metadata.totalBlockingIssues} blocking issue{entry.metadata.totalBlockingIssues === 1 ? "" : "s"} across {entry.metadata.totalScripts || 0} script{entry.metadata.totalScripts === 1 ? "" : "s"}.
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                </div>
+
+                                {totalAuditPages > 1 && (
+                                    <Pagination
+                                        limit={auditPageSize}
+                                        currentPage={auditPage}
+                                        totalPages={totalAuditPages}
+                                        totalRows={auditEntriesState.length}
+                                        collectionName="audit entries"
+                                        onPaginate={setAuditPage}
+                                    />
+                                )}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
