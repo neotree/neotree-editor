@@ -16,9 +16,6 @@ import {
 } from "@/databases/pg/schema"
 import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
-import { _publishScreens } from "./_screens_publish"
-import { _publishDiagnoses } from "./_diagnoses_publish"
-import { _publishProblems } from "./_problems_publish"
 
 export async function _publishScripts({
   userId,
@@ -48,10 +45,7 @@ export async function _publishScripts({
       }))
     const updates = drafts.filter((c) => c.scriptId)
 
-    const scriptsIdsAndScriptsDraftsIds = [...inserts.map((s) => s.scriptId!), ...updates.map((s) => s.scriptId!)]
-
     const errors: string[] = []
-    const processedScripts: { scriptId: string; errors?: string[] }[] = []
 
     if (updates.length) {
       // we'll use data before to compare changes
@@ -76,7 +70,6 @@ export async function _publishScripts({
         }
         await executor.update(scripts).set(updates).where(eq(scripts.scriptId, scriptId))
 
-        processedScripts.push({ scriptId })
       }
 
       const updateChangeLogs = await _saveScriptsHistory({
@@ -110,8 +103,6 @@ export async function _publishScripts({
       await executor.insert(scripts).values(insertData)
 
       for (const { scriptId } of insertData) {
-        processedScripts.push({ scriptId })
-
         await executor
           .update(screensDrafts)
           .set({ scriptId })
@@ -137,35 +128,6 @@ export async function _publishScripts({
         ...log,
         dataVersion: dataVersion
       })))
-    }
-
-    if (processedScripts.length) {
-      const publishScreens = await _publishScreens({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-        client: executor,
-      })
-      if (publishScreens.errors) throw new Error(publishScreens.errors.join(", "))
-
-      const publishDiagnoses = await _publishDiagnoses({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-        client: executor,
-      })
-      if (publishDiagnoses.errors) throw new Error(publishDiagnoses.errors.join(", "))
-
-      const publishProblems = await _publishProblems({
-        userId,
-        publisherUserId,
-        scriptsIds: processedScripts.map((s) => s.scriptId),
-        dataVersion,
-        client: executor,
-      })
-      if (publishProblems.errors) throw new Error(publishProblems.errors.join(", "))
     }
 
     let deleted = await executor.query.pendingDeletion.findMany({
@@ -197,11 +159,11 @@ export async function _publishScripts({
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.script!.version,
+        version: (c.script!.version ?? 0) + 1,
         scriptId: c.scriptId!,
         changes: {
-          action: "delete_config_key",
-          description: "Delete config key",
+          action: "delete_script",
+          description: "Delete script",
           oldValues: [{ deletedAt: null }],
           newValues: [{ deletedAt }],
         },
@@ -224,7 +186,7 @@ export async function _publishScripts({
             entityId: entry.scriptId,
             entityType: "script",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.script?.version ?? 0) + 1),
             dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -264,7 +226,8 @@ export async function _publishScripts({
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishScripts changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishScripts changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

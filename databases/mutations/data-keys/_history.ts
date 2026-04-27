@@ -36,9 +36,10 @@ export async function _saveDataKeysHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         dataKeyId,
         changes: changePayload,
       }
@@ -71,7 +72,7 @@ export async function _saveDataKeysHistory({
           entityId: dataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,

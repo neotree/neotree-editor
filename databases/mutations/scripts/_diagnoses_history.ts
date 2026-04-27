@@ -38,9 +38,10 @@ export async function _saveDiagnosesHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof diagnosesHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         diagnosisId,
         scriptId: c?.data?.scriptId ?? "",
         changes: changePayload,
@@ -75,7 +76,7 @@ export async function _saveDiagnosesHistory({
           entityId: diagnosisId,
           entityType: "diagnosis",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,

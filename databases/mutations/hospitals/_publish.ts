@@ -135,7 +135,7 @@ export async function _publishHospitals(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.hospital!.version,
+        version: (c.hospital!.version ?? 0) + 1,
         hospitalId: c.hospitalId!,
         changes: {
           action: "delete_hospital",
@@ -162,7 +162,7 @@ export async function _publishHospitals(opts?: {
             entityId: entry.hospitalId,
             entityType: "hospital",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.hospital?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
@@ -200,7 +200,8 @@ export async function _publishHospitals(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishHospitals changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishHospitals changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

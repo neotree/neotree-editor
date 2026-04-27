@@ -158,7 +158,7 @@ export async function _publishProblems(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.problem!.version,
+        version: (c.problem!.version ?? 0) + 1,
         problemId: c.problemId!,
         scriptId: c.problem!.scriptId,
         changes: {
@@ -186,7 +186,7 @@ export async function _publishProblems(opts?: {
             entityId: entry.problemId,
             entityType: "problem",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.problem?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -225,7 +225,8 @@ export async function _publishProblems(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishProblems changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishProblems changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 
