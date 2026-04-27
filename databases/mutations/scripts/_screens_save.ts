@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
@@ -135,10 +136,11 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
     }
 }
 
-export async function _saveScreens({ data, broadcastAction, userId, }: {
+export async function _saveScreens({ data, broadcastAction, userId, client, }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
     userId?: string;
+    client?: DbOrTransaction;
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -146,6 +148,7 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
     const warnings: string[] = [];
     const info: SaveScreensResponse['info'] = {};
     const confidentialDataKeyIds = new Set<string>();
+    const executor = client || db;
     
     try {
         const existingScreenIds = Array.from(new Set(
@@ -164,32 +167,32 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
             maxDraftScreen,
         ] = await Promise.all([
             existingScreenIds.length
-                ? db.query.screensDrafts.findMany({
+                ? executor.query.screensDrafts.findMany({
                     where: inArray(screensDrafts.screenDraftId, existingScreenIds),
                 })
                 : Promise.resolve([]),
             existingScreenIds.length
-                ? db.query.screens.findMany({
+                ? executor.query.screens.findMany({
                     where: inArray(screens.screenId, existingScreenIds),
                 })
                 : Promise.resolve([]),
             referencedScriptIds.length
-                ? db.query.scripts.findMany({
+                ? executor.query.scripts.findMany({
                     where: inArray(scripts.scriptId, referencedScriptIds),
                     columns: { scriptId: true, },
                 })
                 : Promise.resolve([]),
             referencedScriptIds.length
-                ? db.query.scriptsDrafts.findMany({
+                ? executor.query.scriptsDrafts.findMany({
                     where: inArray(scriptsDrafts.scriptDraftId, referencedScriptIds),
                     columns: { scriptDraftId: true, },
                 })
                 : Promise.resolve([]),
-            db.query.screens.findFirst({
+            executor.query.screens.findFirst({
                 columns: { position: true, },
                 orderBy: desc(screens.position),
             }),
-            db.query.screensDrafts.findFirst({
+            executor.query.screensDrafts.findFirst({
                 columns: { position: true, },
                 orderBy: desc(screensDrafts.position),
             }),
@@ -279,7 +282,7 @@ export async function _saveScreens({ data, broadcastAction, userId, }: {
                             const publishedScriptId = publishedScriptIds.has(data.scriptId) ? data.scriptId : undefined;
 
                             if (scriptDraftId || publishedScriptId) {
-                                const q = db.insert(screensDrafts).values({
+                                const q = executor.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
                                     scriptId: publishedScriptId,

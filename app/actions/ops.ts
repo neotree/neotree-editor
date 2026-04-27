@@ -31,7 +31,7 @@ import {
   repairDataKeyIntegrityReferences,
   scanDataKeyIntegrity,
 } from "@/lib/data-key-integrity"
-import { getIntegrityBaselineLookup, getIntegrityPolicyState, hasIntegrityBaseline, isIntegrityBaselineCompatible } from "@/lib/integrity-policy"
+import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
 import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -59,6 +59,7 @@ function mergeIntegrityEntityUpdates<T extends Record<string, any>>(
 async function persistPublishIntegrityRepairs({
   repairs,
   publisherUserId,
+  client,
 }: {
   repairs: {
     screens: Awaited<ReturnType<typeof scriptsQueries._getScreens>>["data"]
@@ -66,6 +67,7 @@ async function persistPublishIntegrityRepairs({
     problems: Awaited<ReturnType<typeof scriptsQueries._getProblems>>["data"]
   }
   publisherUserId?: string | null
+  client?: import("@/databases/pg/db-client").DbOrTransaction
 }) {
   const userId = publisherUserId || undefined
   const [repairedScreens, repairedDiagnoses, repairedProblems] = await Promise.all([
@@ -73,18 +75,21 @@ async function persistPublishIntegrityRepairs({
       ? scriptsMutations._saveScreens({
           data: repairs.screens,
           userId,
+          client,
         })
       : Promise.resolve({ success: true, data: [], warnings: undefined, errors: undefined }),
     repairs.diagnoses.length
       ? scriptsMutations._saveDiagnoses({
           data: repairs.diagnoses,
           userId,
+          client,
         })
       : Promise.resolve({ success: true, data: [], errors: undefined }),
     repairs.problems.length
       ? scriptsMutations._saveProblems({
           data: repairs.problems,
           userId,
+          client,
         })
       : Promise.resolve({ success: true, data: [], errors: undefined }),
   ])
@@ -223,15 +228,26 @@ async function getScopedIntegrityData({
     ...dataKeyImpactScriptIds,
   ]))
 
-  const shouldLimitToAffectedScripts = policy.scanScope === "affected_scripts_only" && !!userId
+  const requestedAffectedScope = policy.scanScope === "affected_scripts_only" && !!userId
   const hasAffectedScripts = !!affectedScriptIds?.length
-  if (shouldLimitToAffectedScripts && !hasAffectedScripts) {
+  let shouldLimitToAffectedScripts = requestedAffectedScope
+  if (requestedAffectedScope && !hasAffectedScripts) {
+    if (shouldIncludeDataKeyImpact) {
+      logger.error("getScopedIntegrityData WARN", JSON.stringify({
+        message: "No affected scripts were detected for datakey-driven integrity scope; widening to full scope conservatively.",
+        hasExistingDataKeyLibraryChanges,
+        deletedDataKeyIds: deletedDataKeyIds.size,
+        dataKeyImpactScripts: dataKeyImpactScriptIds.length,
+      }))
+      shouldLimitToAffectedScripts = false
+    } else {
     return {
       dataKeysRes: { data: [], errors: undefined },
       screensRes: { data: [], errors: undefined },
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: false,
+    }
     }
   }
 
@@ -542,71 +558,29 @@ export async function publishData({
         context: integrityContext || undefined,
         policy: integrityPolicyState.policy,
       })
-      const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries, integrityPolicyState.policy)
-      const blockingBaselineLookup = getIntegrityBaselineLookup(integrityPolicyState.baseline)
-      const hasCapturedBaseline = hasIntegrityBaseline(integrityPolicyState.baseline)
-      const hasCompatibleBaseline = isIntegrityBaselineCompatible(integrityPolicyState.baseline)
-      const policyModeMessage = `Integrity enforcement mode: ${integrityPolicyState.policy.enforcementMode.replaceAll("_", " ")}.`
-
-      let enforcedBlockingEntries = blockingEntries
-      let policyWarnings: string[] = []
-
-      if (integrityPolicyState.policy.enforcementMode === "warn_only") {
-        enforcedBlockingEntries = []
-        if (blockingEntries.length) {
-          policyWarnings.push(
-            `Integrity policy is set to warn only. ${blockingEntries.length} blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected but did not block publish.`
-          )
-        }
-      } else if (integrityPolicyState.policy.enforcementMode === "block_new_issues_only") {
-        if (!hasCapturedBaseline) {
-          enforcedBlockingEntries = []
-          policyWarnings.push(
-            "Integrity policy is set to block new issues only, but no baseline has been captured yet. Validation is running in warn-only mode until a baseline is captured."
-          )
-          if (blockingEntries.length) {
-            policyWarnings.push(
-              `${blockingEntries.length} existing blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected and allowed because there is no captured baseline yet.`
-            )
-          }
-        } else if (!hasCompatibleBaseline) {
-          enforcedBlockingEntries = []
-          policyWarnings.push(
-            "Integrity policy is set to block new issues only, but the captured baseline is outdated for the current rule set. Validation is running in warn-only mode until a new baseline is captured."
-          )
-          if (blockingEntries.length) {
-            policyWarnings.push(
-              `${blockingEntries.length} blocking issue${blockingEntries.length === 1 ? "" : "s"} were detected and allowed because the captured baseline is not compatible with the current rule set.`
-            )
-          }
-        } else {
-          enforcedBlockingEntries = blockingEntries.filter(
-            (entry) => !blockingBaselineLookup.has(getDataKeyIntegrityEntryFingerprint(entry))
-          )
-          if (blockingEntries.length && !enforcedBlockingEntries.length) {
-            policyWarnings.push(
-              "Existing baseline integrity issues were detected in scope, but no newly introduced blocking issues were found."
-            )
-          }
-        }
-      }
+      const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries)
+      const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
+        policy: integrityPolicyState.policy,
+        baseline: integrityPolicyState.baseline,
+        blockingEntries,
+        getFingerprint: getDataKeyIntegrityEntryFingerprint,
+      })
+      const enforcedBlockingEntries = policyEvaluation.enforcedBlockingEntries
+      const policyWarnings = policyEvaluation.warnings
 
       if (policyWarnings.length) {
-        results.warnings = [...(results.warnings || []), policyModeMessage, ...policyWarnings]
+        results.warnings = [...(results.warnings || []), policyEvaluation.policyModeMessage, ...policyWarnings]
       }
 
       if (enforcedBlockingEntries.length) {
         const enforcedReport = buildDataKeyIntegrityReportFromEntries(
           enforcedBlockingEntries,
-          integrityPolicyState.policy
         )
         const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(
-          enforcedReport,
-          integrityPolicyState.policy
+          enforcedReport
         )
         const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(
-          enforcedReport,
-          integrityPolicyState.policy
+          enforcedReport
         )
 
         if (
@@ -614,33 +588,18 @@ export async function publishData({
           publishIntegrityDetails
         ) {
           publishIntegrityDetails.summary = [
-            policyModeMessage,
+            policyEvaluation.policyModeMessage,
             "Blocking policy: block new issues only. Existing baseline issues are not blocking this publish.",
             ...publishIntegrityDetails.summary,
           ]
         } else if (publishIntegrityDetails) {
-          publishIntegrityDetails.summary = [policyModeMessage, ...publishIntegrityDetails.summary]
+          publishIntegrityDetails.summary = [policyEvaluation.policyModeMessage, ...publishIntegrityDetails.summary]
         }
 
         results.success = false
         results.errors = publishIntegrityErrors
         results.blockingDetails = publishIntegrityDetails
         return results
-      }
-    }
-
-    if (repairs.screens.length || repairs.diagnoses.length || repairs.problems.length) {
-      const persistedRepairs = await persistPublishIntegrityRepairs({
-        repairs,
-        publisherUserId,
-      })
-      if (persistedRepairs.errors?.length) {
-        results.success = false
-        results.errors = persistedRepairs.errors
-        return results
-      }
-      if (persistedRepairs.warnings?.length) {
-        results.warnings = [...(results.warnings || []), ...persistedRepairs.warnings]
       }
     }
 
@@ -651,6 +610,18 @@ export async function publishData({
     }
 
     const publishTransactionResult = await db.transaction(async (tx) => {
+      if (repairs.screens.length || repairs.diagnoses.length || repairs.problems.length) {
+        const persistedRepairs = await persistPublishIntegrityRepairs({
+          repairs,
+          publisherUserId,
+          client: tx,
+        })
+        if (persistedRepairs.errors?.length) throw new Error(persistedRepairs.errors.join(", "))
+        if (persistedRepairs.warnings?.length) {
+          results.warnings = [...(results.warnings || []), ...persistedRepairs.warnings]
+        }
+      }
+
       const publishConfigKeys = await configKeysMutations._publishConfigKeys({
         userId,
         publisherUserId,

@@ -5,6 +5,7 @@ import { _saveEditorInfo } from "@/databases/mutations/editor-info";
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getDiagnoses, _getProblems, _getScreens } from "@/databases/queries/scripts";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
+import { adminAuditLogs } from "@/databases/pg/schema";
 import {
   buildDataKeyIntegrityContext,
   getBlockingIntegrityEntries,
@@ -65,7 +66,7 @@ async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: s
     policy,
   });
 
-  const blockingEntries = getBlockingIntegrityEntries(report.entries, policy);
+  const blockingEntries = getBlockingIntegrityEntries(report.entries);
   const scriptIds = new Set(blockingEntries.map((entry) => entry.scriptId).filter(Boolean));
   const baseline: IntegrityBaseline = {
     capturedAt: new Date().toISOString(),
@@ -83,6 +84,31 @@ async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: s
     editorInfo: editorInfoRes.data,
     errors: [],
   };
+}
+
+async function saveIntegrityPolicyAuditLog({
+  tx,
+  actorUserId,
+  action,
+  beforeState,
+  afterState,
+  metadata,
+}: {
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+  actorUserId?: string | null;
+  action: string;
+  beforeState: Record<string, any>;
+  afterState: Record<string, any>;
+  metadata?: Record<string, any>;
+}) {
+  await tx.insert(adminAuditLogs).values({
+    area: "integrity_policy",
+    action,
+    actorUserId: actorUserId || null,
+    beforeState,
+    afterState,
+    metadata: metadata || {},
+  });
 }
 
 export async function saveIntegrityPolicySettings(policyInput: Partial<IntegrityPolicy>) {
@@ -118,6 +144,18 @@ export async function saveIntegrityPolicySettings(policyInput: Partial<Integrity
       if (!saved.success || saved.errors?.length) {
         throw new Error(saved.errors?.join(", ") || "Failed to save integrity policy");
       }
+
+      await saveIntegrityPolicyAuditLog({
+        tx,
+        actorUserId: session.user?.userId,
+        action: "policy_updated",
+        beforeState: {
+          policy: currentState.policy,
+        },
+        afterState: {
+          policy: nextPolicy,
+        },
+      });
 
       return saved;
     }).catch((error: any) => ({
@@ -175,6 +213,22 @@ export async function captureIntegrityPolicyBaseline() {
         throw new Error(saved.errors?.join(", ") || "Failed to save integrity baseline");
       }
 
+      await saveIntegrityPolicyAuditLog({
+        tx,
+        actorUserId: session.user?.userId,
+        action: "baseline_captured",
+        beforeState: {
+          baseline: currentState.baseline,
+        },
+        afterState: {
+          baseline: baselineRes.baseline,
+        },
+        metadata: {
+          totalBlockingIssues: baselineRes.baseline.totalBlockingIssues,
+          totalScripts: baselineRes.baseline.totalScripts,
+        },
+      });
+
       return saved;
     }).catch((error: any) => ({
       success: false,
@@ -225,6 +279,18 @@ export async function clearIntegrityPolicyBaseline() {
       if (!saved.success || saved.errors?.length) {
         throw new Error(saved.errors?.join(", ") || "Failed to clear integrity baseline");
       }
+
+      await saveIntegrityPolicyAuditLog({
+        tx,
+        actorUserId: session.user?.userId,
+        action: "baseline_cleared",
+        beforeState: {
+          baseline: currentState.baseline,
+        },
+        afterState: {
+          baseline: EMPTY_INTEGRITY_BASELINE,
+        },
+      });
 
       return saved;
     }).catch((error: any) => ({

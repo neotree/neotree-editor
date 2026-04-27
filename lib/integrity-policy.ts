@@ -32,6 +32,13 @@ export type IntegrityPolicyState = {
   baseline: IntegrityBaseline;
 };
 
+export type IntegrityPolicyBlockingEvaluationResult<T> = {
+  enforcedBlockingEntries: T[];
+  warnings: string[];
+  policyModeMessage: string;
+  baselineState: "not_applicable" | "none" | "outdated" | "active";
+};
+
 export type IntegrityFingerprintEntry = {
   scriptId: string;
   kind: string;
@@ -155,6 +162,108 @@ export function getIntegrityBaselineLookup(
   }
 
   return new Set(baseline.fingerprints);
+}
+
+export function evaluateIntegrityPolicyBlockingEntries<T>({
+  policy,
+  baseline,
+  blockingEntries,
+  getFingerprint,
+  issueLabel = "blocking issue",
+}: {
+  policy: IntegrityPolicy;
+  baseline?: Partial<IntegrityBaseline> | null;
+  blockingEntries: T[];
+  getFingerprint: (entry: T) => string;
+  issueLabel?: string;
+}): IntegrityPolicyBlockingEvaluationResult<T> {
+  const policyModeMessage = `Integrity enforcement mode: ${policy.enforcementMode.replaceAll("_", " ")}.`;
+  const warnings: string[] = [];
+
+  if (policy.enforcementMode === "off") {
+    return {
+      enforcedBlockingEntries: [],
+      warnings,
+      policyModeMessage,
+      baselineState: "not_applicable",
+    };
+  }
+
+  if (policy.enforcementMode === "warn_only") {
+    if (blockingEntries.length) {
+      warnings.push(
+        `Integrity policy is set to warn only. ${blockingEntries.length} ${issueLabel}${blockingEntries.length === 1 ? "" : "s"} ${blockingEntries.length === 1 ? "was" : "were"} detected but did not block publish.`
+      );
+    }
+
+    return {
+      enforcedBlockingEntries: [],
+      warnings,
+      policyModeMessage,
+      baselineState: "not_applicable",
+    };
+  }
+
+  if (policy.enforcementMode === "block_all_issues") {
+    return {
+      enforcedBlockingEntries: blockingEntries,
+      warnings,
+      policyModeMessage,
+      baselineState: "not_applicable",
+    };
+  }
+
+  if (!hasIntegrityBaseline(baseline)) {
+    if (blockingEntries.length) {
+      warnings.push(
+        "Integrity policy is set to block new issues only, but no baseline has been captured yet. Validation is running in warn-only mode until a baseline is captured."
+      );
+      warnings.push(
+        `${blockingEntries.length} existing ${issueLabel}${blockingEntries.length === 1 ? "" : "s"} ${blockingEntries.length === 1 ? "was" : "were"} detected and allowed because there is no captured baseline yet.`
+      );
+    }
+
+    return {
+      enforcedBlockingEntries: [],
+      warnings,
+      policyModeMessage,
+      baselineState: "none",
+    };
+  }
+
+  if (!isIntegrityBaselineCompatible(baseline)) {
+    if (blockingEntries.length) {
+      warnings.push(
+        "Integrity policy is set to block new issues only, but the captured baseline is outdated for the current rule set. Validation is running in warn-only mode until a new baseline is captured."
+      );
+      warnings.push(
+        `${blockingEntries.length} ${issueLabel}${blockingEntries.length === 1 ? "" : "s"} ${blockingEntries.length === 1 ? "was" : "were"} detected and allowed because the captured baseline is not compatible with the current rule set.`
+      );
+    }
+
+    return {
+      enforcedBlockingEntries: [],
+      warnings,
+      policyModeMessage,
+      baselineState: "outdated",
+    };
+  }
+
+  const baselineLookup = getIntegrityBaselineLookup(baseline);
+  const enforcedBlockingEntries = blockingEntries.filter((entry) => !baselineLookup.has(getFingerprint(entry)));
+
+  if (blockingEntries.length && !enforcedBlockingEntries.length) {
+    warnings.push(
+      "Existing baseline integrity issues were detected in scope, but no newly introduced blocking issues were found."
+    );
+  }
+
+  return {
+    enforcedBlockingEntries,
+    warnings,
+    policyModeMessage,
+    baselineState: "active",
+  };
 }
 
 export function getIntegrityEntryFingerprint(entry: IntegrityFingerprintEntry) {

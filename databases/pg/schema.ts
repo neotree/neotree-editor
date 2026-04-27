@@ -1401,12 +1401,36 @@ export const changeLogs = pgTable(
   },
   (table) => ({
     uniqueVersionPerEntity: uniqueIndex("unique_version_per_entity").on(table.entityType, table.entityId, table.version),
-    activeVersionIndex: index("active_version_index").on(table.entityId, table.isActive),
+    singleActiveVersionIndex: uniqueIndex("change_logs_single_active_version_idx")
+      .on(table.entityType, table.entityId)
+      .where(sql`${table.isActive} = true`),
+    activeVersionIndex: index("active_version_index").on(table.entityType, table.entityId, table.isActive),
     entityIndex: index("change_logs_entity_index").on(table.entityType, table.entityId),
     versionChainIndex: index("version_chain_index").on(table.entityId, table.parentVersion),
     userIndex: index("change_logs_user_index").on(table.userId),
     dateIndex: index("change_logs_date_index").on(table.dateOfChange),
     dataVersionIndex: index("change_logs_data_version_index").on(table.dataVersion),
+  }),
+)
+
+export const adminAuditLogs = pgTable(
+  "nt_admin_audit_logs",
+  {
+    id: serial("id").primaryKey(),
+    auditLogId: uuid("audit_log_id").notNull().unique().defaultRandom(),
+    area: text("area").notNull(),
+    action: text("action").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.userId, { onDelete: "set null" }),
+    beforeState: jsonb("before_state").$type<any>().default({}).notNull(),
+    afterState: jsonb("after_state").$type<any>().default({}).notNull(),
+    metadata: jsonb("metadata").$type<any>().default({}).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    areaIndex: index("admin_audit_logs_area_index").on(table.area),
+    actionIndex: index("admin_audit_logs_action_index").on(table.action),
+    actorUserIndex: index("admin_audit_logs_actor_user_index").on(table.actorUserId),
+    createdAtIndex: index("admin_audit_logs_created_at_index").on(table.createdAt),
   }),
 )
 
@@ -1451,5 +1475,12 @@ export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
   alias: one(aliases, {
     fields: [changeLogs.aliasId],
     references: [aliases.uuid],
+  }),
+}))
+
+export const adminAuditLogsRelations = relations(adminAuditLogs, ({ one }) => ({
+  actor: one(users, {
+    fields: [adminAuditLogs.actorUserId],
+    references: [users.userId],
   }),
 }))

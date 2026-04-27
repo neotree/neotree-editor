@@ -1,4 +1,0 @@
-ALTER TABLE "nt_data_keys" ALTER COLUMN "unique_key" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_policy" jsonb DEFAULT '{"enforcementMode":"block_new_issues_only","scanScope":"affected_scripts_only","triggerSources":{"scriptEdits":true,"dataKeyLibraryEdits":false,"deletions":true},"useBaseline":true}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"capturedAt":null,"capturedByUserId":null,"totalBlockingIssues":0,"totalScripts":0,"fingerprintVersion":1,"ruleSetVersion":"2026-04-26","fingerprints":[]}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "nt_problems" ADD COLUMN "symptoms" jsonb DEFAULT '[]' NOT NULL;

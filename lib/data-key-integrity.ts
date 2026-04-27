@@ -108,9 +108,25 @@ export type DataKeyIntegrityPublishDetails = {
     scripts: DataKeyIntegrityPublishScriptGroup[];
 };
 
+export function getDataKeyIntegrityStatusLabel(status: DataKeyIntegrityStatus) {
+    switch (status) {
+        case "out_of_sync":
+            return "Out of sync";
+        case "legacy_match":
+            return "Unlinked match";
+        case "missing":
+            return "Missing from library";
+        case "conflict":
+            return "Conflict";
+        case "unmanaged":
+            return "Unmanaged reference";
+        default:
+            return "Resolved";
+    }
+}
+
 export function summarizeDataKeyIntegrityEntries(
     entries: DataKeyIntegrityEntry[],
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ): DataKeyIntegrityReport["summary"] {
     const summary = {
         total: entries.length,
@@ -125,7 +141,7 @@ export function summarizeDataKeyIntegrityEntries(
 
     entries.forEach((entry) => {
         summary[entry.status] += 1;
-        if (isBlockingEntry(entry, policy)) summary.blocking += 1;
+        if (isBlockingEntry(entry)) summary.blocking += 1;
     });
 
     return summary;
@@ -133,11 +149,10 @@ export function summarizeDataKeyIntegrityEntries(
 
 export function buildDataKeyIntegrityReportFromEntries(
     entries: DataKeyIntegrityEntry[],
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ): DataKeyIntegrityReport {
     return {
         entries,
-        summary: summarizeDataKeyIntegrityEntries(entries, policy),
+        summary: summarizeDataKeyIntegrityEntries(entries),
     };
 }
 
@@ -171,7 +186,6 @@ export type DataKeyIntegrityContext = {
 
 export function isBlockingEntry(
     entry: Pick<DataKeyIntegrityEntry, "status" | "kind">,
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ) {
     return (
         entry.status === "missing" ||
@@ -185,9 +199,8 @@ export function isBlockingEntry(
 
 export function getBlockingIntegrityEntries(
     entries: DataKeyIntegrityEntry[],
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ) {
-    return entries.filter((entry) => isBlockingEntry(entry, policy));
+    return entries.filter((entry) => isBlockingEntry(entry));
 }
 
 export function getDataKeyIntegrityEntryFingerprint(entry: DataKeyIntegrityEntry) {
@@ -843,7 +856,7 @@ export function scanDataKeyIntegrity({
     const duplicateParentEntries = collectDuplicateParentEntries(entries);
     duplicateParentEntries.forEach((entry) => pushEntry(entry));
 
-    return buildDataKeyIntegrityReportFromEntries(entries, resolvedPolicy);
+    return buildDataKeyIntegrityReportFromEntries(entries);
 }
 
 function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
@@ -851,21 +864,20 @@ function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
 }
 
 function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
-    if (entry.kind === "duplicate_parent_data_key") return "duplicate parent datakey";
+    if (entry.kind === "duplicate_parent_data_key") return "duplicate parent data key";
     if (entry.kind === "screen_option_collection" || entry.kind === "field_option_collection") {
         return "invalid script option";
     }
-    if (entry.status === "missing") return "missing datakey";
-    if (entry.status === "legacy_match") return "unlinked datakey";
-    if (entry.status === "unmanaged") return "unmanaged datakey";
-    return entry.status.replace(/_/g, " ");
+    if (entry.status === "missing") return "missing data key";
+    if (entry.status === "legacy_match") return "unlinked match";
+    if (entry.status === "unmanaged") return "unmanaged reference";
+    return getDataKeyIntegrityStatusLabel(entry.status).toLowerCase();
 }
 
 export function buildDataKeyIntegrityPublishDetails(
     report: DataKeyIntegrityReport,
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ): DataKeyIntegrityPublishDetails | null {
-    const blocking = getBlockingIntegrityEntries(report.entries, policy);
+    const blocking = getBlockingIntegrityEntries(report.entries);
     if (!blocking.length) return null;
 
     const grouped = new Map<string, DataKeyIntegrityEntry[]>();
@@ -920,9 +932,8 @@ export function buildDataKeyIntegrityPublishDetails(
 
 export function buildDataKeyIntegrityPublishErrors(
     report: DataKeyIntegrityReport,
-    policy: IntegrityPolicy = DEFAULT_INTEGRITY_POLICY,
 ) {
-    const details = buildDataKeyIntegrityPublishDetails(report, policy);
+    const details = buildDataKeyIntegrityPublishDetails(report);
     if (!details) return [];
 
     const errors = [...details.summary];

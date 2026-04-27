@@ -18,18 +18,14 @@ const navItems = [
     section: "general",
   },
   {
-    label: "Logs",
-    href: "/settings/logs",
-    section: "logs",
-  },
-  {
     label: "Changelogs",
     title: "Changelog Management",
     href: "/changelogs",
     section: "changelogs",
   },
   {
-    label: "App",
+    label: "Integrity Policy",
+    title: "Data Key Integrity Policy Settings",
     href: "/settings/app",
     section: "app",
   },

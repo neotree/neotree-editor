@@ -221,7 +221,7 @@ export function PublishDrafts({ variant }: Props) {
 
                             <Button asChild variant="outline" size="sm">
                               <Link href={script.registryHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
-                                Open datakey integrity registry
+                                Open data key integrity registry
                                 <ExternalLink className="ml-2 h-4 w-4" />
                               </Link>
                             </Button>
@@ -252,7 +252,7 @@ export function PublishDrafts({ variant }: Props) {
                           </div>
                         ) : (
                           <div className="px-4 py-3 text-sm text-muted-foreground">
-                            Too many issues to show individually here. Open the datakey integrity registry for this script to review and resolve them.
+                            Too many issues to show individually here. Open the data key integrity registry for this script to review and resolve them.
                           </div>
                         )}
                       </div>
