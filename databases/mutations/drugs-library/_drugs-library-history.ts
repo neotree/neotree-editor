@@ -36,9 +36,10 @@ export async function _saveDrugsLibraryItemsHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         itemId,
         changes: changePayload,
       }
@@ -71,7 +72,7 @@ export async function _saveDrugsLibraryItemsHistory({
           entityId: itemId,
           entityType: "drugs_library",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,

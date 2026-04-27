@@ -27,13 +27,14 @@ export async function _saveScriptsHistory({
       const scriptId = c?.data?.scriptId
       if (!scriptId) continue
 
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+
       const changeHistoryData: typeof scriptsHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: nextVersion,
         scriptId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -82,7 +83,7 @@ export async function _saveScriptsHistory({
           entityId: scriptId,
           entityType: "script",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,

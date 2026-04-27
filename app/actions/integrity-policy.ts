@@ -2,7 +2,6 @@
 
 import db from "@/databases/pg/drizzle";
 import { _saveEditorInfo } from "@/databases/mutations/editor-info";
-import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log";
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getDiagnoses, _getProblems, _getScreens } from "@/databases/queries/scripts";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
@@ -15,7 +14,6 @@ import {
 import {
   EMPTY_INTEGRITY_BASELINE,
   INTEGRITY_BASELINE_FINGERPRINT_VERSION,
-  INTEGRITY_POLICY_AUDIT_ENTITY_ID,
   INTEGRITY_BASELINE_RULESET_VERSION,
   getIntegrityPolicyState,
   normalizeIntegrityPolicy,
@@ -112,48 +110,13 @@ export async function saveIntegrityPolicySettings(policyInput: Partial<Integrity
         data: {
           integrityPolicy: nextPolicy,
         },
+        increaseVersion: false,
         broadcastAction: false,
         client: tx,
       });
 
       if (!saved.success || saved.errors?.length) {
         throw new Error(saved.errors?.join(", ") || "Failed to save integrity policy");
-      }
-
-      const audit = await _saveChangeLog({
-        data: {
-          entityId: INTEGRITY_POLICY_AUDIT_ENTITY_ID,
-          entityType: "release",
-          action: "update",
-          userId: session.user?.userId || "",
-          description: "Integrity policy settings updated",
-          changeReason: "Integrity policy settings updated",
-          changes: [
-            {
-              field: "integrityPolicy",
-              previousValue: currentState.policy,
-              newValue: nextPolicy,
-            },
-          ],
-          fullSnapshot: {
-            integrityPolicy: nextPolicy,
-            integrityBaseline: currentState.baseline,
-          },
-          previousSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: currentState.baseline,
-          },
-          baselineSnapshot: {
-            integrityPolicy: nextPolicy,
-            integrityBaseline: currentState.baseline,
-          },
-          isActive: false,
-        },
-        client: tx,
-      });
-
-      if (!audit.success || audit.errors?.length) {
-        throw new Error(audit.errors?.join(", ") || "Failed to save integrity policy audit log");
       }
 
       return saved;
@@ -203,48 +166,13 @@ export async function captureIntegrityPolicyBaseline() {
         data: {
           integrityBaseline: baselineRes.baseline,
         },
+        increaseVersion: false,
         broadcastAction: false,
         client: tx,
       });
 
       if (!saved.success || saved.errors?.length) {
         throw new Error(saved.errors?.join(", ") || "Failed to save integrity baseline");
-      }
-
-      const audit = await _saveChangeLog({
-        data: {
-          entityId: INTEGRITY_POLICY_AUDIT_ENTITY_ID,
-          entityType: "release",
-          action: "update",
-          userId: session.user?.userId || "",
-          description: "Integrity baseline captured",
-          changeReason: "Integrity baseline captured",
-          changes: [
-            {
-              field: "integrityBaseline",
-              previousValue: currentState.baseline,
-              newValue: baselineRes.baseline,
-            },
-          ],
-          fullSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: baselineRes.baseline,
-          },
-          previousSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: currentState.baseline,
-          },
-          baselineSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: baselineRes.baseline,
-          },
-          isActive: false,
-        },
-        client: tx,
-      });
-
-      if (!audit.success || audit.errors?.length) {
-        throw new Error(audit.errors?.join(", ") || "Failed to save integrity baseline audit log");
       }
 
       return saved;
@@ -289,48 +217,13 @@ export async function clearIntegrityPolicyBaseline() {
         data: {
           integrityBaseline: EMPTY_INTEGRITY_BASELINE,
         },
+        increaseVersion: false,
         broadcastAction: false,
         client: tx,
       });
 
       if (!saved.success || saved.errors?.length) {
         throw new Error(saved.errors?.join(", ") || "Failed to clear integrity baseline");
-      }
-
-      const audit = await _saveChangeLog({
-        data: {
-          entityId: INTEGRITY_POLICY_AUDIT_ENTITY_ID,
-          entityType: "release",
-          action: "delete",
-          userId: session.user?.userId || "",
-          description: "Integrity baseline cleared",
-          changeReason: "Integrity baseline cleared",
-          changes: [
-            {
-              field: "integrityBaseline",
-              previousValue: currentState.baseline,
-              newValue: EMPTY_INTEGRITY_BASELINE,
-            },
-          ],
-          fullSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: EMPTY_INTEGRITY_BASELINE,
-          },
-          previousSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: currentState.baseline,
-          },
-          baselineSnapshot: {
-            integrityPolicy: currentState.policy,
-            integrityBaseline: EMPTY_INTEGRITY_BASELINE,
-          },
-          isActive: false,
-        },
-        client: tx,
-      });
-
-      if (!audit.success || audit.errors?.length) {
-        throw new Error(audit.errors?.join(", ") || "Failed to save integrity baseline audit log");
       }
 
       return saved;

@@ -52,7 +52,7 @@ export async function _publishDrugsLibraryItems(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.drugsLibraryItem!.version,
+        version: (c.drugsLibraryItem!.version ?? 0) + 1,
         itemId: c.drugsLibraryItemId!,
         changes: {
           action: "delete_drugs_library_item",
@@ -80,7 +80,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             entityId: entry.drugsLibraryItemId,
             entityType: "drugs_library",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.drugsLibraryItem?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -199,7 +199,8 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishDrugsLibraryItems changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishDrugsLibraryItems changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

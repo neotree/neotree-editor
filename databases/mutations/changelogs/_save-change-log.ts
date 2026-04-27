@@ -525,25 +525,27 @@ export async function _saveChangeLog({
         dateOfChange: new Date(),
       }
 
-      const [inserted] = await tx.insert(changeLogs).values(changeLogData).returning()
+      const insertedAt = changeLogData.dateOfChange ?? new Date()
 
-      if (inserted && inserted.entityId && Number.isFinite(inserted.version)) {
+      if (changeLogData.isActive) {
         await tx
           .update(changeLogs)
           .set({
             isActive: false,
-            supersededBy: inserted.version,
-            supersededAt: inserted.dateOfChange ?? new Date(),
+            supersededBy: computedVersion,
+            supersededAt: insertedAt,
           })
           .where(
             and(
-              eq(changeLogs.entityId, inserted.entityId),
-              eq(changeLogs.entityType, inserted.entityType),
-              lt(changeLogs.version, inserted.version),
+              eq(changeLogs.entityId, resolvedData.entityId),
+              eq(changeLogs.entityType, resolvedData.entityType),
+              lt(changeLogs.version, computedVersion),
               eq(changeLogs.isActive, true),
             ),
           )
       }
+
+      const [inserted] = await tx.insert(changeLogs).values(changeLogData).returning()
 
       return inserted
     }

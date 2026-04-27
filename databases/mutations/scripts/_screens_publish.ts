@@ -160,7 +160,7 @@ export async function _publishScreens(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.screen!.version,
+        version: (c.screen!.version ?? 0) + 1,
         screenId: c.screenId!,
         scriptId: c.screen!.scriptId,
         changes: {
@@ -188,7 +188,7 @@ export async function _publishScreens(opts?: {
             entityId: entry.screenId,
             entityType: "screen",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.screen?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -237,7 +237,8 @@ export async function _publishScreens(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishScreens changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishScreens changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

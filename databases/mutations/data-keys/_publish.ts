@@ -225,7 +225,8 @@ export async function _publishDataKeys(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishDataKeys changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishDataKeys changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

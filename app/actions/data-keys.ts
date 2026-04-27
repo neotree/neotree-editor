@@ -12,7 +12,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { getIntegrityPolicyState } from '@/lib/integrity-policy';
 
@@ -43,7 +43,7 @@ function getPreparedIntegrityRepairStore(): Map<string, PreparedIntegrityRepair>
 }
 
 function buildPreparedIntegrityRepairCacheId(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
-    return `${userId || 'anonymous'}::${selectedTargetUniqueKey || ''}::${JSON.stringify(entry)}`;
+    return `${userId || 'anonymous'}::${selectedTargetUniqueKey || ''}::${getDataKeyIntegrityEntryFingerprint(entry)}`;
 }
 
 function getPreparedIntegrityRepair(userId: string | null | undefined, entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
@@ -777,6 +777,12 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
         let currentScreens = screensRes.data;
         let currentDiagnoses = diagnosesRes.data;
         let currentProblems = problemsRes.data;
+        const currentScreensById = new Map(currentScreens.map((screen) => [screen.screenId, screen] as const));
+        const currentDiagnosesById = new Map(currentDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis] as const));
+        const currentProblemsById = new Map(currentProblems.map((problem) => [problem.problemId, problem] as const));
+        const changedScreenIds = new Set<string>();
+        const changedDiagnosisIds = new Set<string>();
+        const changedProblemIds = new Set<string>();
         let resolvedCount = 0;
         const warnings: string[] = [];
 
@@ -795,19 +801,37 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
 
             resolvedCount++;
             if (repairs.screens.length) {
-                currentScreens = currentScreens.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen);
+                repairs.screens.forEach((screen) => {
+                    currentScreensById.set(screen.screenId, screen);
+                    changedScreenIds.add(screen.screenId);
+                });
+                currentScreens = currentScreens.map((screen) => currentScreensById.get(screen.screenId) || screen);
             }
             if (repairs.diagnoses.length) {
-                currentDiagnoses = currentDiagnoses.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis);
+                repairs.diagnoses.forEach((diagnosis) => {
+                    currentDiagnosesById.set(diagnosis.diagnosisId, diagnosis);
+                    changedDiagnosisIds.add(diagnosis.diagnosisId);
+                });
+                currentDiagnoses = currentDiagnoses.map((diagnosis) => currentDiagnosesById.get(diagnosis.diagnosisId) || diagnosis);
             }
             if (repairs.problems.length) {
-                currentProblems = currentProblems.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem);
+                repairs.problems.forEach((problem) => {
+                    currentProblemsById.set(problem.problemId, problem);
+                    changedProblemIds.add(problem.problemId);
+                });
+                currentProblems = currentProblems.map((problem) => currentProblemsById.get(problem.problemId) || problem);
             }
         }
 
-        const changedScreens = currentScreens.filter((screen, index) => JSON.stringify(screen) !== JSON.stringify(screensRes.data[index]));
-        const changedDiagnoses = currentDiagnoses.filter((diagnosis, index) => JSON.stringify(diagnosis) !== JSON.stringify(diagnosesRes.data[index]));
-        const changedProblems = currentProblems.filter((problem, index) => JSON.stringify(problem) !== JSON.stringify(problemsRes.data[index]));
+        const changedScreens = Array.from(changedScreenIds)
+            .map((screenId) => currentScreensById.get(screenId))
+            .filter((screen): screen is typeof screensRes.data[number] => !!screen);
+        const changedDiagnoses = Array.from(changedDiagnosisIds)
+            .map((diagnosisId) => currentDiagnosesById.get(diagnosisId))
+            .filter((diagnosis): diagnosis is typeof diagnosesRes.data[number] => !!diagnosis);
+        const changedProblems = Array.from(changedProblemIds)
+            .map((problemId) => currentProblemsById.get(problemId))
+            .filter((problem): problem is typeof problemsRes.data[number] => !!problem);
 
         if (!changedScreens.length && !changedDiagnoses.length && !changedProblems.length) {
             return {

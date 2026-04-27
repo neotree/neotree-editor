@@ -135,7 +135,7 @@ export async function _publishConfigKeys(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.configKey!.version,
+        version: (c.configKey!.version ?? 0) + 1,
         configKeyId: c.configKeyId!,
         changes: {
           action: "delete_config_key",
@@ -162,7 +162,7 @@ export async function _publishConfigKeys(opts?: {
             entityId: entry.configKeyId,
             entityType: "config_key",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.configKey?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
@@ -202,7 +202,8 @@ export async function _publishConfigKeys(opts?: {
     if (changeLogs.length) {
       const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishConfigKeys changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishConfigKeys changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

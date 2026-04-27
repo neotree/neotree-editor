@@ -37,6 +37,70 @@ import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDra
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
+function mergeIntegrityEntityUpdates<T extends Record<string, any>>(
+  current: T[],
+  updates: T[],
+  getId: (item: T) => string | undefined,
+) {
+  if (!updates.length) return current
+
+  const updatesMap = new Map(
+    updates
+      .map((item) => [getId(item), item] as const)
+      .filter(([id]) => !!id)
+  )
+
+  return current.map((item) => {
+    const id = getId(item)
+    return (id && updatesMap.get(id)) || item
+  })
+}
+
+async function persistPublishIntegrityRepairs({
+  repairs,
+  publisherUserId,
+}: {
+  repairs: {
+    screens: Awaited<ReturnType<typeof scriptsQueries._getScreens>>["data"]
+    diagnoses: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>["data"]
+    problems: Awaited<ReturnType<typeof scriptsQueries._getProblems>>["data"]
+  }
+  publisherUserId?: string | null
+}) {
+  const userId = publisherUserId || undefined
+  const [repairedScreens, repairedDiagnoses, repairedProblems] = await Promise.all([
+    repairs.screens.length
+      ? scriptsMutations._saveScreens({
+          data: repairs.screens,
+          userId,
+        })
+      : Promise.resolve({ success: true, data: [], warnings: undefined, errors: undefined }),
+    repairs.diagnoses.length
+      ? scriptsMutations._saveDiagnoses({
+          data: repairs.diagnoses,
+          userId,
+        })
+      : Promise.resolve({ success: true, data: [], errors: undefined }),
+    repairs.problems.length
+      ? scriptsMutations._saveProblems({
+          data: repairs.problems,
+          userId,
+        })
+      : Promise.resolve({ success: true, data: [], errors: undefined }),
+  ])
+
+  const errors = [
+    ...(repairedScreens.errors || []),
+    ...(repairedDiagnoses.errors || []),
+    ...(repairedProblems.errors || []),
+  ]
+
+  return {
+    errors: errors.length ? errors : undefined,
+    warnings: repairedScreens.warnings || [],
+  }
+}
+
 function assertCanPublishDrafts(user?: { role?: string | null } | null) {
   const role = `${user?.role || ""}`.trim()
   const allowed = role === "admin" || role === "super_user"
@@ -458,25 +522,22 @@ export async function publishData({
           context: integrityContext || undefined,
         })
 
-    if (shouldRunIntegrityChecks) {
-      const mergeById = <T extends Record<string, any>>(
-        current: T[],
-        updates: T[],
-        getId: (item: T) => string | undefined,
-      ) => {
-        if (!updates.length) return current
-        const updatesMap = new Map(updates.map((item) => [getId(item), item] as const).filter(([id]) => !!id))
-        return current.map((item) => {
-          const id = getId(item)
-          return (id && updatesMap.get(id)) || item
-        })
-      }
+    const repairedScreensForIntegrity = shouldRunIntegrityChecks
+      ? mergeIntegrityEntityUpdates(screensRes.data, repairs.screens, (item) => item.screenId)
+      : screensRes.data
+    const repairedDiagnosesForIntegrity = shouldRunIntegrityChecks
+      ? mergeIntegrityEntityUpdates(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId)
+      : diagnosesRes.data
+    const repairedProblemsForIntegrity = shouldRunIntegrityChecks
+      ? mergeIntegrityEntityUpdates(problemsRes.data, repairs.problems, (item) => item.problemId)
+      : problemsRes.data
 
+    if (shouldRunIntegrityChecks) {
       const integrityReport = scanDataKeyIntegrity({
         dataKeys: dataKeysRes.data,
-        screens: mergeById(screensRes.data, repairs.screens, (item) => item.screenId),
-        diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
-        problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
+        screens: repairedScreensForIntegrity,
+        diagnoses: repairedDiagnosesForIntegrity,
+        problems: repairedProblemsForIntegrity,
         onlyIssues: true,
         context: integrityContext || undefined,
         policy: integrityPolicyState.policy,
@@ -568,42 +629,18 @@ export async function publishData({
       }
     }
 
-    if (repairs.screens.length) {
-      const repairedScreens = await scriptsMutations._saveScreens({
-        data: repairs.screens,
-        userId: publisherUserId || undefined,
+    if (repairs.screens.length || repairs.diagnoses.length || repairs.problems.length) {
+      const persistedRepairs = await persistPublishIntegrityRepairs({
+        repairs,
+        publisherUserId,
       })
-      if (repairedScreens.errors?.length) {
+      if (persistedRepairs.errors?.length) {
         results.success = false
-        results.errors = repairedScreens.errors
+        results.errors = persistedRepairs.errors
         return results
       }
-      if (repairedScreens.warnings?.length) {
-        results.warnings = [...(results.warnings || []), ...repairedScreens.warnings]
-      }
-    }
-
-    if (repairs.diagnoses.length) {
-      const repairedDiagnoses = await scriptsMutations._saveDiagnoses({
-        data: repairs.diagnoses,
-        userId: publisherUserId || undefined,
-      })
-      if (repairedDiagnoses.errors?.length) {
-        results.success = false
-        results.errors = repairedDiagnoses.errors
-        return results
-      }
-    }
-
-    if (repairs.problems.length) {
-      const repairedProblems = await scriptsMutations._saveProblems({
-        data: repairs.problems,
-        userId: publisherUserId || undefined,
-      })
-      if (repairedProblems.errors?.length) {
-        results.success = false
-        results.errors = repairedProblems.errors
-        return results
+      if (persistedRepairs.warnings?.length) {
+        results.warnings = [...(results.warnings || []), ...persistedRepairs.warnings]
       }
     }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { previewDataKeyIntegrityEntriesBulk, previewDataKeyIntegrityEntryRepair, resolveDataKeyIntegrityEntriesBulk, resolveDataKeyIntegrityEntry } from "@/app/actions/data-keys";
 import { dataKeyTypes } from "@/constants";
+import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
@@ -132,6 +133,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
     integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null }) | null;
 }) {
+    type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
     const { viewOnly } = useAppContext();
     const { alert } = useAlertModal();
@@ -143,14 +145,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
+    const [savingResolution, setSavingResolution] = useState(false);
     const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
     const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
-    const [bulkReviewItems, setBulkReviewItems] = useState<Array<Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number]>>([]);
+    const [bulkReviewItems, setBulkReviewItems] = useState<BulkPreviewItem[]>([]);
     const [loadingBulkPreview, setLoadingBulkPreview] = useState(false);
     const [showReviewedBulkItemsOnly, setShowReviewedBulkItemsOnly] = useState(false);
     const bulkReviewScrollRef = useRef<HTMLDivElement | null>(null);
     const pendingBulkScrollTopRef = useRef<number | null>(null);
+    const bulkPreviewRequestIdRef = useRef(0);
     const [repairEntryParam, setRepairEntryParam] = useQueryState("dataKeyRepair", {
         defaultValue: "",
         clearOnDefault: true,
@@ -159,8 +163,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         defaultValue: "",
         clearOnDefault: true,
     });
-
-    const entries = [...(integrity?.entries || [])].sort((a, b) => {
+    const effectivePolicy = integrity?.policy || undefined;
+    const showIntegrityLoader = savingResolution || loadingRepairPreview || loadingBulkPreview;
+    const entries = useMemo(() => [...(integrity?.entries || [])].sort((a, b) => {
         const keyA = `${a.currentKey || a.matchedName || ""}`.trim().toLowerCase();
         const keyB = `${b.currentKey || b.matchedName || ""}`.trim().toLowerCase();
         if (keyA !== keyB) return keyA.localeCompare(keyB);
@@ -170,12 +175,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         if (labelA !== labelB) return labelA.localeCompare(labelB);
 
         return `${a.location || ""}`.trim().toLowerCase().localeCompare(`${b.location || ""}`.trim().toLowerCase());
-    });
+    }), [integrity?.entries]);
     const summary = integrity?.summary;
-    const availableTypes = dataKeyTypes.filter((type) =>
+    const availableTypes = useMemo(() => dataKeyTypes.filter((type) =>
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
-    );
-    const availableStatusOptions = statusFilterOptions.filter((option) => {
+    ), [entries]);
+    const availableStatusOptions = useMemo(() => statusFilterOptions.filter((option) => {
         if (option.value === "all") return true;
         if (issueScopeFilter === "blocking") {
             return option.value !== "resolved";
@@ -184,24 +189,24 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             return !["missing", "legacy_match", "unmanaged"].includes(option.value);
         }
         return true;
-    });
-    const filteredEntries = entries.filter((entry) => {
-        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry, integrity?.policy || undefined)) return false;
-        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry, integrity?.policy || undefined)) return false;
+    }), [issueScopeFilter]);
+    const filteredEntries = useMemo(() => entries.filter((entry) => {
+        if (issueScopeFilter === "blocking" && !isBlockingEntry(entry, effectivePolicy)) return false;
+        if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry, effectivePolicy)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
-    });
+    }), [effectivePolicy, entries, issueScopeFilter, statusFilter, typeFilter]);
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
-    const bulkResolvableEntries = {
+    const bulkResolvableEntries = useMemo(() => ({
         out_of_sync: entries.filter((entry) => (
             entry.status === "out_of_sync" &&
             entry.kind !== "screen_option_collection" &&
             entry.kind !== "field_option_collection"
         )),
         legacy_match: entries.filter((entry) => entry.status === "legacy_match"),
-    };
+    }), [entries]);
     const hasBulkResolveActions = !!bulkResolvableEntries.out_of_sync.length || !!bulkResolvableEntries.legacy_match.length;
     const hasActiveFilters = issueScopeFilter !== "all" || statusFilter !== "all" || typeFilter !== "all";
 
@@ -211,7 +216,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     }, [availableStatusOptions, statusFilter]);
 
     const closeRepairModal = () => {
-        if (isRepairing || loadingRepairPreview) return;
+        if (isRepairing || loadingRepairPreview || savingResolution) return;
         setRepairModalEntry(null);
         setRepairPreview(null);
         setSelectedTargetUniqueKey("");
@@ -220,10 +225,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     };
 
     const closeBulkReviewDrawer = () => {
-        if (isRepairing || loadingBulkPreview) return;
+        if (isRepairing || savingResolution) return;
+        bulkPreviewRequestIdRef.current += 1;
         setBulkResolveStatus(null);
         setBulkReviewItems([]);
         setShowReviewedBulkItemsOnly(false);
+        setLoadingBulkPreview(false);
         void setBulkStatusParam("");
     };
 
@@ -259,26 +266,103 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     const loadBulkRepairPreview = async ({
         items,
-        status,
+        requestId,
     }: {
         items: Array<{
             entry: DataKeyIntegrityReport["entries"][number];
             selectedTargetUniqueKey?: string;
             reviewed?: boolean;
         }>;
-        status: "out_of_sync" | "legacy_match";
+        requestId: number;
     }) => {
         setLoadingBulkPreview(true);
-        const res = await previewDataKeyIntegrityEntriesBulk({ items });
-        if (!res.success) {
+        try {
+            const chunkSize = 25;
+            const previews: BulkPreviewItem[] = [];
+
+            for (let index = 0; index < items.length; index += chunkSize) {
+                const chunk = items.slice(index, index + chunkSize);
+                const res = await previewDataKeyIntegrityEntriesBulk({ items: chunk });
+
+                if (bulkPreviewRequestIdRef.current !== requestId) {
+                    return {
+                        success: false as const,
+                        cancelled: true as const,
+                        previews: [],
+                        errors: [],
+                    };
+                }
+
+                if (!res.success) {
+                    setLoadingBulkPreview(false);
+                    return {
+                        ...res,
+                        cancelled: false as const,
+                    };
+                }
+
+                previews.push(...res.previews);
+                setBulkReviewItems([...previews]);
+            }
+
             setLoadingBulkPreview(false);
-            return res;
+            return {
+                success: true as const,
+                cancelled: false as const,
+                previews,
+                errors: [],
+            };
+        } catch (e: any) {
+            if (bulkPreviewRequestIdRef.current === requestId) {
+                setLoadingBulkPreview(false);
+            }
+            return {
+                success: false as const,
+                cancelled: bulkPreviewRequestIdRef.current !== requestId,
+                previews: [],
+                errors: [e?.message || "Failed to prepare bulk review"],
+            };
+        }
+    };
+
+    const loadSingleBulkRepairPreview = async ({
+        item,
+    }: {
+        item: {
+            entry: DataKeyIntegrityReport["entries"][number];
+            selectedTargetUniqueKey?: string;
+            reviewed?: boolean;
+        };
+    }): Promise<
+        | { success: true; preview: BulkPreviewItem; errors: string[] }
+        | { success: false; preview: null; errors: string[] }
+    > => {
+        const res = await previewDataKeyIntegrityEntryRepair({
+            entry: item.entry,
+            selectedTargetUniqueKey: item.selectedTargetUniqueKey || undefined,
+        });
+        if (!res.success || !res.preview) {
+            return {
+                success: false,
+                preview: null,
+                errors: res.errors || [],
+            };
         }
 
-        setBulkResolveStatus(status);
-        setBulkReviewItems(res.previews);
-        setLoadingBulkPreview(false);
-        return res;
+        return {
+            success: true as const,
+            preview: {
+                entry: item.entry,
+                selectedTargetUniqueKey: item.selectedTargetUniqueKey || res.preview.targetDataKey?.uniqueKey || "",
+                targetDataKey: res.preview.targetDataKey,
+                screens: res.preview.screens,
+                diagnoses: res.preview.diagnoses,
+                problems: res.preview.problems,
+                changed: res.changed,
+                reviewed: item.reviewed === true,
+            },
+            errors: [],
+        };
     };
 
     const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
@@ -309,38 +393,42 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         if (!scriptId || viewOnly || isRepairing) return;
         startRepairTransition(async () => {
             setResolvingKey(getEntryKey(entry));
-            const res = await resolveDataKeyIntegrityEntry({
-                entry,
-                selectedTargetUniqueKey: selectedTargetUniqueKey || undefined,
-            });
-
-            if (!res.success) {
-                alert({
-                    title: "Resolve failed",
-                    message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
-                    variant: "error",
-                    buttonLabel: "Close",
+            setSavingResolution(true);
+            try {
+                const res = await resolveDataKeyIntegrityEntry({
+                    entry,
+                    selectedTargetUniqueKey: selectedTargetUniqueKey || undefined,
                 });
-                setResolvingKey(null);
-                return;
-            }
 
-            if (!res.changed) {
-                toast.message("No safe change was applied for this reference");
-            } else {
-                toast.success(`Repair draft saved for ${entry.currentKey || entry.currentLabel || entry.location}`);
-                if (res.warnings?.length) {
-                    toast.message(res.warnings.join(" "));
+                if (!res.success) {
+                    alert({
+                        title: "Resolve failed",
+                        message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
+                        variant: "error",
+                        buttonLabel: "Close",
+                    });
+                    return;
                 }
-            }
 
-            setResolvingKey(null);
-            setRepairModalEntry(null);
-            setRepairPreview(null);
-            setSelectedTargetUniqueKey("");
-            setReviewAcknowledged(false);
-            await setRepairEntryParam("");
-            router.refresh();
+                if (!res.changed) {
+                    toast.message("No safe change was applied for this reference");
+                } else {
+                    toast.success(`Repair draft saved for ${entry.currentKey || entry.currentLabel || entry.location}`);
+                    if (res.warnings?.length) {
+                        toast.message(res.warnings.join(" "));
+                    }
+                }
+
+                setRepairModalEntry(null);
+                setRepairPreview(null);
+                setSelectedTargetUniqueKey("");
+                setReviewAcknowledged(false);
+                await setRepairEntryParam("");
+                router.refresh();
+            } finally {
+                setResolvingKey(null);
+                setSavingResolution(false);
+            }
         });
     };
 
@@ -350,9 +438,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         if (!entriesToResolve.length) return;
         await setRepairEntryParam("");
         await setBulkStatusParam(status);
+        const requestId = bulkPreviewRequestIdRef.current + 1;
+        bulkPreviewRequestIdRef.current = requestId;
+        setBulkResolveStatus(status);
+        setBulkReviewItems([]);
+        setShowReviewedBulkItemsOnly(false);
 
         const res = await loadBulkRepairPreview({
-            status,
+            requestId,
             items: entriesToResolve.map((entry) => ({
                 entry,
                 selectedTargetUniqueKey: entry.matchedUniqueKey || entry.currentUniqueKey || "",
@@ -360,7 +453,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             })),
         });
 
-        if (!res.success) {
+        if (!res.success && !res.cancelled) {
+            setBulkResolveStatus(null);
+            setBulkReviewItems([]);
+            setLoadingBulkPreview(false);
             await setBulkStatusParam("");
             alert({
                 title: "Bulk preview failed",
@@ -378,37 +474,41 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
         startRepairTransition(async () => {
             setResolvingKey(`bulk:${bulkResolveStatus}`);
-            const res = await resolveDataKeyIntegrityEntriesBulk({
-                items: reviewedItems.map((item) => ({
-                    entry: item.entry,
-                    selectedTargetUniqueKey: item.selectedTargetUniqueKey || undefined,
-                    reviewed: item.reviewed,
-                })),
-            });
-
-            if (!res.success) {
-                alert({
-                    title: "Bulk resolve failed",
-                    message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
-                    variant: "error",
-                    buttonLabel: "Close",
+            setSavingResolution(true);
+            try {
+                const res = await resolveDataKeyIntegrityEntriesBulk({
+                    items: reviewedItems.map((item) => ({
+                        entry: item.entry,
+                        selectedTargetUniqueKey: item.selectedTargetUniqueKey || undefined,
+                        reviewed: item.reviewed,
+                    })),
                 });
-                setResolvingKey(null);
-                return;
-            }
 
-            if (!res.changed) {
-                toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
-            } else {
-                toast.success(`Saved ${res.resolvedCount} ${bulkResolveStatus.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
-                if (res.warnings?.length) {
-                    toast.message(res.warnings.join(" "));
+                if (!res.success) {
+                    alert({
+                        title: "Bulk resolve failed",
+                        message: (res.errors?.length ? res.errors.join("<br />") : "Failed to repair data key references"),
+                        variant: "error",
+                        buttonLabel: "Close",
+                    });
+                    return;
                 }
-            }
 
-            setResolvingKey(null);
-            closeBulkReviewDrawer();
-            router.refresh();
+                if (!res.changed) {
+                    toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
+                } else {
+                    toast.success(`Saved ${res.resolvedCount} ${bulkResolveStatus.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
+                    if (res.warnings?.length) {
+                        toast.message(res.warnings.join(" "));
+                    }
+                }
+
+                closeBulkReviewDrawer();
+                router.refresh();
+            } finally {
+                setResolvingKey(null);
+                setSavingResolution(false);
+            }
         });
     };
 
@@ -518,13 +618,32 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         );
     };
 
-    const bulkReviewableItems = bulkReviewItems.filter((item) => item.changed);
-    const reviewedBulkItemsCount = bulkReviewableItems.filter((item) => item.reviewed).length;
+    const bulkReviewableItems = useMemo(() => bulkReviewItems.filter((item) => item.changed), [bulkReviewItems]);
+    const reviewedBulkItemsCount = useMemo(() => bulkReviewableItems.filter((item) => item.reviewed).length, [bulkReviewableItems]);
     const allBulkReviewableItemsReviewed = !!bulkReviewableItems.length && reviewedBulkItemsCount === bulkReviewableItems.length;
     const someBulkReviewableItemsReviewed = reviewedBulkItemsCount > 0 && reviewedBulkItemsCount < bulkReviewableItems.length;
-    const visibleBulkReviewItems = showReviewedBulkItemsOnly
+    const legacyBulkStatus: "out_of_sync" | "legacy_match" = bulkResolveStatus ?? "out_of_sync";
+    const legacyBulkEntries = bulkResolvableEntries[legacyBulkStatus];
+    const visibleBulkReviewItems = useMemo(() => showReviewedBulkItemsOnly
         ? bulkReviewableItems.filter((item) => item.reviewed)
-        : bulkReviewableItems;
+        : bulkReviewableItems, [bulkReviewableItems, showReviewedBulkItemsOnly]);
+    const tableData = useMemo(() => filteredEntries.map((issue) => [
+        issue.status.replace(/_/g, " "),
+        issue.currentKey || issue.matchedName || "",
+        issue.currentLabel || issue.matchedLabel || "",
+        issue.expectedDataType,
+        kindLabels[issue.kind],
+        issue.location,
+        issue.reason,
+        issue.status === "out_of_sync" && issue.kind !== "screen_option_collection" && issue.kind !== "field_option_collection"
+            ? "Resolve available"
+            : issue.status === "legacy_match"
+                ? "Resolve available"
+                : issue.status === "unmanaged"
+                    ? "Legacy/local reference"
+                    : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
+        "",
+    ]), [filteredEntries]);
 
     useEffect(() => {
         if (viewOnly) return;
@@ -580,6 +699,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
 
     return (
         <>
+            {showIntegrityLoader && <Loader overlay />}
             <Modal
                 open={!!repairModalEntry}
                 onOpenChange={(open) => {
@@ -589,12 +709,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 description="Repairs are saved as drafts only. Nothing is published automatically."
                 actions={(
                     <>
-                        <Button variant="ghost" onClick={closeRepairModal} disabled={isRepairing || loadingRepairPreview}>
+                        <Button variant="ghost" onClick={closeRepairModal} disabled={isRepairing || loadingRepairPreview || savingResolution}>
                             Cancel
                         </Button>
                         <Button
                             onClick={() => repairModalEntry && handleResolveEntry(repairModalEntry)}
-                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || !reviewAcknowledged || (!repairPreview?.screens.length && !repairPreview?.diagnoses.length && !repairPreview?.problems.length)}
+                            disabled={!repairModalEntry || isRepairing || loadingRepairPreview || savingResolution || !reviewAcknowledged || (!repairPreview?.screens.length && !repairPreview?.diagnoses.length && !repairPreview?.problems.length)}
                         >
                             {isRepairing ? "Saving Draft..." : "Save Repair Draft"}
                         </Button>
@@ -780,12 +900,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 )}
             </Modal>
 
-            <Modal
+            {false && <Modal
                 open={false}
                 onOpenChange={(open) => {
                     if (!open && !isRepairing) setBulkResolveStatus(null);
                 }}
-                title={bulkResolveStatus ? `Resolve ${bulkResolveStatus.replace(/_/g, " ")}` : "Resolve by status"}
+                title={bulkResolveStatus ? `Resolve ${legacyBulkStatus.replace(/_/g, " ")}` : "Resolve by status"}
                 description="This saves draft repairs only for the selected status in the current script."
                 actions={(
                     <>
@@ -804,8 +924,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 {!bulkResolveStatus ? null : (
                     <div className="space-y-4 text-sm">
                         <div className="rounded-md border p-3 space-y-2">
-                            <div><span className="font-medium">Status:</span> {bulkResolveStatus.replace(/_/g, " ")}</div>
-                            <div><span className="font-medium">Entries:</span> {bulkResolvableEntries[bulkResolveStatus].length}</div>
+                            <div><span className="font-medium">Status:</span> {legacyBulkStatus.replace(/_/g, " ")}</div>
+                            <div><span className="font-medium">Entries:</span> {legacyBulkEntries.length}</div>
                             <div className="text-muted-foreground">
                                 Only references with this status in the current script will be repaired. Nothing is published automatically.
                             </div>
@@ -814,22 +934,22 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         <div className="rounded-md border p-3 space-y-2">
                             <div className="font-medium">Affected references</div>
                             <div className="space-y-1">
-                                {bulkResolvableEntries[bulkResolveStatus].slice(0, 8).map((entry) => (
+                                {legacyBulkEntries.slice(0, 8).map((entry: DataKeyIntegrityReport["entries"][number]) => (
                                     <div key={getEntryKey(entry)}>
                                         {entry.currentKey || entry.currentLabel || entry.location}
                                         <span className="text-muted-foreground"> · {kindLabels[entry.kind]} · {entry.location}</span>
                                     </div>
                                 ))}
-                                {bulkResolvableEntries[bulkResolveStatus].length > 8 && (
+                                {legacyBulkEntries.length > 8 && (
                                     <div className="text-muted-foreground">
-                                        And {bulkResolvableEntries[bulkResolveStatus].length - 8} more…
+                                        And {legacyBulkEntries.length - 8} more...�
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
                 )}
-            </Modal>
+            </Modal>}
 
             <Sheet open={!!bulkResolveStatus} onOpenChange={(open) => { if (!open) closeBulkReviewDrawer(); }}>
                 <SheetContent hideCloseButton side="right" className="p-0 m-0 flex flex-col sm:max-w-3xl w-full">
@@ -843,7 +963,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </SheetHeader>
 
                     <div ref={bulkReviewScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                        {loadingBulkPreview ? (
+                        {loadingBulkPreview && !bulkReviewItems.length ? (
                             <div className="text-sm text-muted-foreground">Preparing bulk repair review...</div>
                         ) : !bulkReviewableItems.length ? (
                             <div className="rounded-md border p-3 text-sm text-muted-foreground">
@@ -853,6 +973,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             <>
                                 <div className="sticky top-0 z-10 -mx-4 border-b bg-background px-4 pb-4">
                                     <div className="rounded-md border p-3 space-y-3 text-sm">
+                                        {loadingBulkPreview && (
+                                            <div className="text-muted-foreground">
+                                                Loading more repair previews...
+                                            </div>
+                                        )}
                                         <div className="text-muted-foreground">
                                             {bulkReviewableItems.length} reviewable, {reviewedBulkItemsCount} selected for save. Unreviewed entries will be left unchanged.
                                         </div>
@@ -974,32 +1099,38 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                                                  disabled={isRepairing || loadingBulkPreview}
                                                                  onChange={async ([dataKey]) => {
                                                                      pendingBulkScrollTopRef.current = bulkReviewScrollRef.current?.scrollTop ?? null;
-                                                                     const nextItems = bulkReviewItems.map((candidate, candidateIndex) => (
-                                                                         candidateIndex !== originalIndex
-                                                                             ? candidate
-                                                                             : {
-                                                                                 ...candidate,
-                                                                                 reviewed: false,
-                                                                                 selectedTargetUniqueKey: dataKey?.uniqueKey || "",
-                                                                            }
-                                                                    ));
-                                                                    setBulkReviewItems(nextItems);
-                                                                    const previewRes = await loadBulkRepairPreview({
-                                                                        status: bulkResolveStatus!,
-                                                                        items: nextItems.map((candidate) => ({
-                                                                            entry: candidate.entry,
-                                                                            reviewed: candidate.reviewed,
-                                                                            selectedTargetUniqueKey: candidate.selectedTargetUniqueKey || undefined,
-                                                                        })),
+                                                                    const nextSelectedTargetUniqueKey = dataKey?.uniqueKey || "";
+                                                                    const previousItem = item;
+                                                                    const nextItem = {
+                                                                        ...item,
+                                                                        reviewed: false,
+                                                                        selectedTargetUniqueKey: nextSelectedTargetUniqueKey,
+                                                                    };
+                                                                    setBulkReviewItems((current) => {
+                                                                        const next = current.slice();
+                                                                        next[originalIndex] = nextItem;
+                                                                        return next;
                                                                     });
-                                                                    if (!previewRes.success) {
+                                                                    const previewRes = await loadSingleBulkRepairPreview({ item: nextItem });
+                                                                    if (!previewRes.success || !previewRes.preview) {
+                                                                        setBulkReviewItems((current) => {
+                                                                            const next = current.slice();
+                                                                            next[originalIndex] = previousItem;
+                                                                            return next;
+                                                                        });
                                                                         alert({
                                                                             title: "Bulk preview failed",
                                                                             message: (previewRes.errors?.length ? previewRes.errors.join("<br />") : "Failed to preview bulk repair"),
                                                                             variant: "error",
                                                                             buttonLabel: "Close",
                                                                         });
+                                                                        return;
                                                                     }
+                                                                    setBulkReviewItems((current) => {
+                                                                        const next = current.slice();
+                                                                        next[originalIndex] = previewRes.preview;
+                                                                        return next;
+                                                                    });
                                                                 }}
                                                             />
                                                             <div className="text-sm text-emerald-900">
@@ -1072,12 +1203,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
 
                     <SheetFooter className="px-4 py-4 border-t border-t-border">
-                        <Button variant="ghost" onClick={closeBulkReviewDrawer} disabled={isRepairing || loadingBulkPreview}>
+                        <Button variant="ghost" onClick={closeBulkReviewDrawer} disabled={isRepairing || loadingBulkPreview || savingResolution}>
                             Cancel
                         </Button>
                         <Button
                             onClick={() => handleBulkResolve()}
-                            disabled={!bulkResolveStatus || isRepairing || loadingBulkPreview || reviewedBulkItemsCount === 0}
+                            disabled={!bulkResolveStatus || isRepairing || loadingBulkPreview || savingResolution || reviewedBulkItemsCount === 0}
                         >
                             {isRepairing ? "Saving Drafts..." : `Save ${reviewedBulkItemsCount || ""} Reviewed Repair Draft${reviewedBulkItemsCount === 1 ? "" : "s"}`}
                         </Button>
@@ -1296,26 +1427,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 },
                             },
                         ]}
-                        data={filteredEntries.map((issue) => [
-                            issue.status.replace(/_/g, " "),
-                            issue.currentKey || issue.matchedName || "",
-                            issue.currentLabel || issue.matchedLabel || "",
-                            issue.expectedDataType,
-                            kindLabels[issue.kind],
-                            issue.location,
-                            issue.reason,
-                            issue.status === "out_of_sync" && issue.kind !== "screen_option_collection" && issue.kind !== "field_option_collection"
-                                ? "Resolve available"
-                                : issue.status === "legacy_match"
-                                    ? "Resolve available"
-                                    : issue.status === "unmanaged"
-                                        ? "Legacy/local reference"
-                                        : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
-                            "",
-                        ])}
+                        data={tableData}
                     />
                 </div>
             </PageContainer>
         </>
     );
 }
+

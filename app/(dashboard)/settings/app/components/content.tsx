@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import {
     captureIntegrityPolicyBaseline,
@@ -17,13 +16,11 @@ import { Switch } from "@/components/ui/switch";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isIntegrityBaselineCompatible, type IntegrityBaseline, type IntegrityPolicy } from "@/lib/integrity-policy";
-import type { getChangeLogs } from "@/app/actions/change-logs";
 
 type Props = {
     canManage: boolean;
     initialPolicy: IntegrityPolicy;
     initialBaseline: IntegrityBaseline;
-    recentAuditEntries: Awaited<ReturnType<typeof getChangeLogs>>["data"];
 };
 
 const enforcementOptions: Array<{ value: IntegrityPolicy["enforcementMode"]; label: string; description: string }> = [
@@ -71,17 +68,18 @@ function formatDate(value?: string | null) {
     }
 }
 
-function formatAuditDate(value?: string | Date | null) {
-    if (!value) return "Unknown date";
-    try {
-        return new Date(value).toLocaleString();
-    } catch {
-        return `${value}`;
-    }
+function arePoliciesEqual(a: IntegrityPolicy, b: IntegrityPolicy) {
+    return (
+        a.enforcementMode === b.enforcementMode &&
+        a.scanScope === b.scanScope &&
+        a.useBaseline === b.useBaseline &&
+        a.triggerSources.scriptEdits === b.triggerSources.scriptEdits &&
+        a.triggerSources.dataKeyLibraryEdits === b.triggerSources.dataKeyLibraryEdits &&
+        a.triggerSources.deletions === b.triggerSources.deletions
+    );
 }
 
-export function Content({ canManage, initialPolicy, initialBaseline, recentAuditEntries }: Props) {
-    const router = useRouter();
+export function Content({ canManage, initialPolicy, initialBaseline }: Props) {
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
 
@@ -91,31 +89,9 @@ export function Content({ canManage, initialPolicy, initialBaseline, recentAudit
     const hasCapturedBaseline = baseline.fingerprints.length > 0;
     const hasCompatibleBaseline = isIntegrityBaselineCompatible(baseline);
 
-    const isDirty = useMemo(
-        () => JSON.stringify(policy) !== JSON.stringify(initialPolicy),
-        [initialPolicy, policy]
-    );
+    const isDirty = useMemo(() => !arePoliciesEqual(policy, initialPolicy), [initialPolicy, policy]);
     const selectedEnforcementOption = enforcementOptions.find((option) => option.value === policy.enforcementMode);
     const selectedScanScopeOption = scanScopeOptions.find((option) => option.value === policy.scanScope);
-
-    useEffect(() => {
-        if (!canManage) return;
-
-        const refresh = () => router.refresh();
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") {
-                refresh();
-            }
-        };
-
-        window.addEventListener("focus", refresh);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener("focus", refresh);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [canManage, router]);
 
     const savePolicy = async () => {
         try {
@@ -127,7 +103,6 @@ export function Content({ canManage, initialPolicy, initialBaseline, recentAudit
 
             setPolicy(res.data.policy);
             setBaseline(res.data.baseline);
-            router.refresh();
             alert({
                 title: "Integrity policy updated",
                 message: "Publish integrity settings were saved successfully.",
@@ -154,7 +129,6 @@ export function Content({ canManage, initialPolicy, initialBaseline, recentAudit
 
             setPolicy(res.data.policy);
             setBaseline(res.data.baseline);
-            router.refresh();
             alert({
                 title: "Baseline captured",
                 message: `Captured ${res.data.baseline.totalBlockingIssues} blocking issue${res.data.baseline.totalBlockingIssues === 1 ? "" : "s"} across ${res.data.baseline.totalScripts} script${res.data.baseline.totalScripts === 1 ? "" : "s"}.`,
@@ -181,7 +155,6 @@ export function Content({ canManage, initialPolicy, initialBaseline, recentAudit
 
             setPolicy(res.data.policy);
             setBaseline(res.data.baseline);
-            router.refresh();
             alert({
                 title: "Baseline cleared",
                 message: "The integrity baseline has been cleared.",
@@ -430,41 +403,6 @@ export function Content({ canManage, initialPolicy, initialBaseline, recentAudit
                                 Capture current baseline
                             </Button>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Integrity policy audit</CardTitle>
-                        <CardDescription>
-                            Recent super-admin integrity policy and baseline changes.
-                        </CardDescription>
-                    </CardHeader>
-
-                    <CardContent>
-                        {!recentAuditEntries.length ? (
-                            <div className="rounded-md border px-4 py-6 text-sm text-muted-foreground">
-                                No recent integrity policy audit entries were found.
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {recentAuditEntries.map((entry) => (
-                                    <div key={entry.changeLogId} className="rounded-md border p-4">
-                                        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                                            <div className="font-medium">{entry.description || "Integrity policy change"}</div>
-                                            <div className="text-xs uppercase tracking-wide text-muted-foreground">{entry.action}</div>
-                                        </div>
-                                        <div className="mt-2 text-sm text-muted-foreground">
-                                            {formatAuditDate(entry.dateOfChange)}
-                                        </div>
-                                        <div className="mt-1 text-sm text-muted-foreground">
-                                            {entry.userName || "Unknown user"}
-                                            {entry.userEmail ? ` • ${entry.userEmail}` : ""}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
             </div>
