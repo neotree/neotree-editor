@@ -145,11 +145,22 @@ async function getScopedIntegrityData({
     }),
   ])
 
+  const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
+  const effectiveUserScreenDrafts = shouldIgnoreDataKeySyncDrafts
+    ? userScreenDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
+    : userScreenDrafts
+  const effectiveUserDiagnosisDrafts = shouldIgnoreDataKeySyncDrafts
+    ? userDiagnosisDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
+    : userDiagnosisDrafts
+  const effectiveUserProblemDrafts = shouldIgnoreDataKeySyncDrafts
+    ? userProblemDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
+    : userProblemDrafts
+
   const hasScriptFamilyChanges =
     userScriptDrafts.length > 0 ||
-    userScreenDrafts.length > 0 ||
-    userDiagnosisDrafts.length > 0 ||
-    userProblemDrafts.length > 0 ||
+    effectiveUserScreenDrafts.length > 0 ||
+    effectiveUserDiagnosisDrafts.length > 0 ||
+    effectiveUserProblemDrafts.length > 0 ||
     userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
   const hasExistingDataKeyLibraryChanges =
     userDataKeyDrafts.some((draft) => !!draft.dataKeyId) ||
@@ -221,9 +232,9 @@ async function getScopedIntegrityData({
 
   const affectedScriptIds = Array.from(new Set([
     ...userScriptDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...userScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...userDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...userProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...effectiveUserScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...effectiveUserDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...effectiveUserProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
     ...dataKeyImpactScriptIds,
   ]))

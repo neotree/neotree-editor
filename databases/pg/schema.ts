@@ -791,6 +791,7 @@ export const screensDrafts = pgTable("nt_screens_drafts", {
   type: screenTypeEnum("type").notNull(),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof screens.$inferInsert>().notNull(),
+  draftOrigin: text("draft_origin"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -916,6 +917,7 @@ export const diagnosesDrafts = pgTable("nt_diagnoses_drafts", {
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof diagnoses.$inferInsert>().notNull(),
+  draftOrigin: text("draft_origin"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1040,6 +1042,7 @@ export const problemsDrafts = pgTable("nt_problems_drafts", {
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof problems.$inferInsert>().notNull(),
+  draftOrigin: text("draft_origin"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

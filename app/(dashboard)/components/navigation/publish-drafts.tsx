@@ -105,7 +105,7 @@ export function PublishDrafts({ variant }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [scope, _publishData, alert, isCreatingDataKey])
+  }, [scope, alert, isCreatingDataKey])
 
   const discardDrafts = useCallback(async () => {
     try {
@@ -144,7 +144,7 @@ export function PublishDrafts({ variant }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [scope, _discardDrafts, alert])
+  }, [scope, alert])
 
   const trigger =
     variant === "discard" ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CircleHelp, CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -293,7 +293,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         void setBulkStatusParam("");
     };
 
-    const loadRepairPreview = async ({
+    const loadRepairPreview = useCallback(async ({
         entry,
         nextSelectedTargetUniqueKey,
     }: {
@@ -321,9 +321,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         );
         setLoadingRepairPreview(false);
         return res;
-    };
+    }, []);
 
-    const loadBulkRepairPreview = async ({
+    const loadBulkRepairPreview = useCallback(async ({
         items,
         requestId,
     }: {
@@ -382,7 +382,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 errors: [e?.message || "Failed to prepare bulk review"],
             };
         }
-    };
+    }, []);
 
     const loadSingleBulkRepairPreview = async ({
         item,
@@ -424,7 +424,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         };
     };
 
-    const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
+    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || viewOnly || isRepairing || loadingRepairPreview) return;
         await setBulkStatusParam("");
         await setRepairEntryParam(getEntryKey(entry));
@@ -446,7 +446,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             });
             return;
         }
-    };
+    }, [alert, isRepairing, loadRepairPreview, loadingRepairPreview, scriptId, setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
     const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || viewOnly || isRepairing) return;
@@ -491,7 +491,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         });
     };
 
-    const openBulkResolveDrawer = async (status: "out_of_sync" | "legacy_match") => {
+    const openBulkResolveDrawer = useCallback(async (status: "out_of_sync" | "legacy_match") => {
         if (!scriptId || viewOnly || isRepairing || loadingBulkPreview) return;
         const entriesToResolve = bulkResolvableEntries[status];
         if (!entriesToResolve.length) return;
@@ -524,7 +524,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 buttonLabel: "Close",
             });
         }
-    };
+    }, [alert, bulkResolvableEntries, isRepairing, loadBulkRepairPreview, loadingBulkPreview, scriptId, setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
     const handleBulkResolve = () => {
         if (!scriptId || viewOnly || isRepairing || !bulkResolveStatus) return;
