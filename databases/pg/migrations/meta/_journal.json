@@ -89,15 +89,8 @@
     {
       "idx": 12,
       "version": "7",
-      "when": 1777274349016,
-      "tag": "0012_slimy_jackpot",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1777281669560,
-      "tag": "0013_breezy_red_wolf",
+      "when": 1777281893732,
+      "tag": "0012_wealthy_sister_grimm",
       "breakpoints": true
     }
   ]
