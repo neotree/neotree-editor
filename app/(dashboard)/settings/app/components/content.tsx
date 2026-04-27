@@ -414,7 +414,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                     <CardHeader>
                         <CardTitle>Legacy baseline</CardTitle>
                         <CardDescription>
-                            Capture the current set of blocking integrity issues so "block new issues only" can allow existing legacy debt without allowing new regressions.
+                            Capture the current set of blocking integrity issues so &quot;block new issues only&quot; can allow existing legacy debt without allowing new regressions.
                         </CardDescription>
                     </CardHeader>
 
@@ -445,13 +445,13 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
 
                         {policy.enforcementMode === "block_new_issues_only" && !hasCapturedBaseline && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                No baseline has been captured yet. In this state, "block new issues only" will behave as warn-only until a baseline is captured.
+                                No baseline has been captured yet. In this state, &quot;block new issues only&quot; will behave as warn-only until a baseline is captured.
                             </div>
                         )}
 
                         {policy.enforcementMode === "block_new_issues_only" && hasCapturedBaseline && !hasCompatibleBaseline && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                The captured baseline is outdated for the current integrity rule set. "Block new issues only" will behave as warn-only until a new baseline is captured.
+                                The captured baseline is outdated for the current integrity rule set. &quot;Block new issues only&quot; will behave as warn-only until a new baseline is captured.
                             </div>
                         )}
 

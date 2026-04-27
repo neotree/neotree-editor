@@ -20,6 +20,8 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
+export type DraftOrigin = "editor" | "data_key_sync";
+
 function summarizeSelectionRuleWarnings(contextLabel: string, warnings: string[]) {
     if (!warnings.length) return [];
 
@@ -136,11 +138,12 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
     }
 }
 
-export async function _saveScreens({ data, broadcastAction, userId, client, }: {
+export async function _saveScreens({ data, broadcastAction, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
     userId?: string;
     client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -248,11 +251,15 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
                             warnings.push(...mergedNormalization.warnings.map((warning) => `Screen "${screenLabel}" merged draft: ${warning}`));
                         }
                         
-                        const q = db
+                        const persistedDraftOrigin = draft.draftOrigin === "editor"
+                            ? "editor"
+                            : requestedDraftOrigin;
+                        const q = executor
                             .update(screensDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(screensDrafts.screenDraftId, screenId));
 
                         info.query = q.toSQL();
@@ -287,11 +294,12 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
                                     type: data.type,
                                     scriptId: publishedScriptId,
                                     scriptDraftId,
-                                    screenDraftId: screenId,
-                                    position: data.position,
-                                    screenId: published?.screenId,
-                                    createdByUserId: userId,
-                                });
+                                screenDraftId: screenId,
+                                position: data.position,
+                                screenId: published?.screenId,
+                                createdByUserId: userId,
+                                draftOrigin: requestedDraftOrigin,
+                            });
 
                                 info.query = q.toSQL();
 

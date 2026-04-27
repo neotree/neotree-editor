@@ -8,6 +8,7 @@ import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 import { removeHexCharacters } from '../../utils'
+import type { DraftOrigin } from './_screens_save';
 
 export type SaveDiagnosesData = Partial<DiagnosisType>;
 
@@ -16,12 +17,13 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client }: {
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
     client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -100,11 +102,15 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const persistedDraftOrigin = draft.draftOrigin === "editor"
+                            ? "editor"
+                            : requestedDraftOrigin;
+                        const q = executor
                             .update(diagnosesDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(diagnosesDrafts.diagnosisDraftId, diagnosisId));
 
                         sqlInfo[`${diagnosisId} - updateDiagnosisDraft`] = q.toSQL();
@@ -138,6 +144,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
                                     createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
                                 });
 
                                 sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();

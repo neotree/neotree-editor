@@ -8,6 +8,7 @@ import { problems, problemsDrafts, scripts, scriptsDrafts } from '@/databases/pg
 import socket from '@/lib/socket';
 import { ProblemType } from '../../queries/scripts/_problems_get';
 import { removeHexCharacters } from '../../utils'
+import type { DraftOrigin } from './_screens_save';
 
 export type SaveProblemsData = Partial<ProblemType>;
 
@@ -16,12 +17,13 @@ export type SaveProblemsResponse = {
     errors?: string[]; 
 };
 
-export async function _saveProblems({ data, broadcastAction, syncSilently, userId, client }: {
+export async function _saveProblems({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveProblemsData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
     client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveProblemsResponse = { success: false, };
     data = removeHexCharacters(data)
@@ -60,11 +62,15 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                             ...item,
                         } as typeof draft.data;
                         
+                        const persistedDraftOrigin = draft.draftOrigin === "editor"
+                            ? "editor"
+                            : requestedDraftOrigin;
                         const q = executor
                             .update(problemsDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(problemsDrafts.problemDraftId, problemId));
 
                         sqlInfo[`${problemId} - updateProblemDraft`] = q.toSQL();
@@ -114,6 +120,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                                     position: data.position,
                                     problemId: published?.problemId,
                                     createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
                                 });
 
                                 sqlInfo[`${problemId} - createProblemDraft`] = q.toSQL();
