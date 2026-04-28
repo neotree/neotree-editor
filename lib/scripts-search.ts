@@ -137,6 +137,27 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.text1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text1',
+                fieldValue: s.text1,
+            });
+        }
+
+        if (`${s.text2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text2',
+                fieldValue: s.text2,
+            });
+        }
+
+        if (`${s.text3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text3',
+                fieldValue: s.text3,
+            });
+        }
+
         if (`${s.key || ''}`.match(searchRegex)) {
             matches.push({
                 field: 'key',
@@ -381,6 +402,27 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.text1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text1',
+                fieldValue: s.text1,
+            });
+        }
+
+        if (`${s.text2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text2',
+                fieldValue: s.text2,
+            });
+        }
+
+        if (`${s.text3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text3',
+                fieldValue: s.text3,
+            });
+        }
+
         if (`${s.key || ''}`.match(searchRegex)) {
             matches.push({
                 field: 'key',
@@ -530,6 +572,30 @@ export const scriptsSearchResultsFilters = [
         value: 'manual_entry',
         label: 'Manual entry only',
     },
+    {
+        value: 'text1',
+        label: 'Text 1',
+    },
+    {
+        value: 'text2',
+        label: 'Text 2',
+    },
+    {
+        value: 'text3',
+        label: 'Text 3',
+    },
+    {
+        value: 'title1',
+        label: 'Title 1',
+    },
+    {
+        value: 'title2',
+        label: 'Title 2',
+    },
+    {
+        value: 'title3',
+        label: 'Title 3',
+    },
 ] as const;
 
 export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResultsFilters>['value'];
@@ -556,6 +622,12 @@ const matchedFieldFilterMap: Record<string, string> = {
     item_manual_entry: 'manual_entry',
     field_item_manual_label: 'manual_entry',
     item_manual_label: 'manual_entry',
+    text1: 'text1',
+    text2: 'text2',
+    text3: 'text3',
+    title1: 'title1',
+    title2: 'title2',
+    title3: 'title3',
 };
 
 export function filterScriptsSearchResults({ searchValue, filter, results, }: {
@@ -564,7 +636,7 @@ export function filterScriptsSearchResults({ searchValue, filter, results, }: {
     results: ScriptsSearchResultsItem[];
 }) {
     if (filter === 'all') return results;
-    
+
     const filterFn = (m: ScriptsSearchResultsItem['matches'][0]) => {
         if (matchedFieldFilterMap[m.field] !== filter) return false;
         // if (!`${m.fieldValue || ''}`.toLowerCase().includes(`${searchValue || ''}`.toLowerCase())) return false;
