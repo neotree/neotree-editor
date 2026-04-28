@@ -19,7 +19,8 @@
         "test:integrity-policy": "tsx tests/integrity-policy.test.ts",
         "test:data-key-integrity": "tsx tests/data-key-integrity.test.ts",
         "test:integrity-draft-origin": "tsx tests/integrity-draft-origin.test.ts",
-        "test:integrity-scan-scope": "tsx tests/integrity-scan-scope.test.ts"
+        "test:integrity-scan-scope": "tsx tests/integrity-scan-scope.test.ts",
+        "test:integrity-baseline": "tsx tests/integrity-baseline.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
