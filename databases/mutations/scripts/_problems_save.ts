@@ -62,9 +62,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                             ...item,
                         } as typeof draft.data;
                         
-                        const persistedDraftOrigin = draft.draftOrigin === "editor"
-                            ? "editor"
-                            : requestedDraftOrigin;
+                        const persistedDraftOrigin = requestedDraftOrigin;
                         const q = executor
                             .update(problemsDrafts)
                             .set({

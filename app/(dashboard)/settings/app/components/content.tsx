@@ -360,6 +360,12 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                     <div className="text-sm text-muted-foreground">
                                         Run integrity checks when existing data keys are edited in the library.
                                     </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Turning this off disables integrity enforcement from data key library edits, but data key changes still propagate to linked usages.
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        If someone later edits an affected script directly, that script counts as a normal script edit and will still be scanned when Script edits is enabled.
+                                    </div>
                                 </div>
                             </div>
 

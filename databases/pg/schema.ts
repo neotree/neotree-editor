@@ -114,6 +114,10 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "release",
 ])
 
+
+// DRAFT ORIGIN ENUM
+export const draftOriginEnum = pgEnum("draft_origin", ["data_key_sync", "editor", "import", "other"])
+
 // MAILER SETTINGS
 export const mailerSettings = pgTable("nt_mailer_settings", {
   id: serial("id").primaryKey(),
@@ -791,7 +795,7 @@ export const screensDrafts = pgTable("nt_screens_drafts", {
   type: screenTypeEnum("type").notNull(),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof screens.$inferInsert>().notNull(),
-  draftOrigin: text("draft_origin"),
+  draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -917,7 +921,7 @@ export const diagnosesDrafts = pgTable("nt_diagnoses_drafts", {
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof diagnoses.$inferInsert>().notNull(),
-  draftOrigin: text("draft_origin"),
+  draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1042,7 +1046,7 @@ export const problemsDrafts = pgTable("nt_problems_drafts", {
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof problems.$inferInsert>().notNull(),
-  draftOrigin: text("draft_origin"),
+  draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

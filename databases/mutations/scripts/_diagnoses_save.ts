@@ -102,9 +102,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                             ...item,
                         } as typeof draft.data;
                         
-                        const persistedDraftOrigin = draft.draftOrigin === "editor"
-                            ? "editor"
-                            : requestedDraftOrigin;
+                        const persistedDraftOrigin = requestedDraftOrigin;
                         const q = executor
                             .update(diagnosesDrafts)
                             .set({

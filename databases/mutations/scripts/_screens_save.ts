@@ -251,9 +251,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                             warnings.push(...mergedNormalization.warnings.map((warning) => `Screen "${screenLabel}" merged draft: ${warning}`));
                         }
                         
-                        const persistedDraftOrigin = draft.draftOrigin === "editor"
-                            ? "editor"
-                            : requestedDraftOrigin;
+                        const persistedDraftOrigin = requestedDraftOrigin;
                         const q = executor
                             .update(screensDrafts)
                             .set({

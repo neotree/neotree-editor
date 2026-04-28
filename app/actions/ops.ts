@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
-import { eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, ne } from "drizzle-orm"
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
@@ -32,6 +32,7 @@ import {
   scanDataKeyIntegrity,
 } from "@/lib/data-key-integrity"
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
+import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
 import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -54,6 +55,18 @@ function mergeIntegrityEntityUpdates<T extends Record<string, any>>(
     const id = getId(item)
     return (id && updatesMap.get(id)) || item
   })
+}
+
+function buildPreviewEntityMap<T extends Record<string, any>>(
+  items: T[] | undefined,
+  getId: (item: T) => string | undefined,
+) : Map<string, Record<string, any>> {
+  return new Map<string, Record<string, any>>(
+    (items || [])
+      .map((item) => [getId(item), item as Record<string, any>] as const)
+      .filter(([id]) => !!id)
+      .map(([id, item]) => [id as string, item] as const)
+  )
 }
 
 async function persistPublishIntegrityRepairs({
@@ -127,12 +140,9 @@ async function getScopedIntegrityData({
   problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
   shouldRunIntegrityChecks: boolean
 }> {
-  const [userDataKeyDrafts, userScriptDrafts, userScreenDrafts, userDiagnosisDrafts, userProblemDrafts, userPendingDeletion] = await Promise.all([
+  const [userDataKeyDrafts, userScriptDrafts, userPendingDeletion] = await Promise.all([
     db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined }),
     db.query.scriptsDrafts.findMany({ where: userId ? eq(scriptsDrafts.createdByUserId, userId) : undefined }),
-    db.query.screensDrafts.findMany({ where: userId ? eq(screensDrafts.createdByUserId, userId) : undefined }),
-    db.query.diagnosesDrafts.findMany({ where: userId ? eq(diagnosesDrafts.createdByUserId, userId) : undefined }),
-    db.query.problemsDrafts.findMany({ where: userId ? eq(problemsDrafts.createdByUserId, userId) : undefined }),
     db.query.pendingDeletion.findMany({
       where: userId ? eq(pendingDeletion.createdByUserId, userId) : undefined,
       columns: {
@@ -145,23 +155,6 @@ async function getScopedIntegrityData({
     }),
   ])
 
-  const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
-  const effectiveUserScreenDrafts = shouldIgnoreDataKeySyncDrafts
-    ? userScreenDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
-    : userScreenDrafts
-  const effectiveUserDiagnosisDrafts = shouldIgnoreDataKeySyncDrafts
-    ? userDiagnosisDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
-    : userDiagnosisDrafts
-  const effectiveUserProblemDrafts = shouldIgnoreDataKeySyncDrafts
-    ? userProblemDrafts.filter((draft) => draft.draftOrigin !== "data_key_sync")
-    : userProblemDrafts
-
-  const hasScriptFamilyChanges =
-    userScriptDrafts.length > 0 ||
-    effectiveUserScreenDrafts.length > 0 ||
-    effectiveUserDiagnosisDrafts.length > 0 ||
-    effectiveUserProblemDrafts.length > 0 ||
-    userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
   const hasExistingDataKeyLibraryChanges =
     userDataKeyDrafts.some((draft) => !!draft.dataKeyId) ||
     userPendingDeletion.some((entry) => !!entry.dataKeyId)
@@ -171,35 +164,51 @@ async function getScopedIntegrityData({
       .filter((id): id is string => !!id)
   )
 
-  const shouldRunIntegrityChecks =
-    policy.enforcementMode !== "off" &&
-    (
-      (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) ||
-      (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
-      (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
-    )
+  const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
+  const shouldClassifyLegacyDataKeySyncDrafts = shouldIgnoreDataKeySyncDrafts && hasExistingDataKeyLibraryChanges
+  const draftOriginPrefilter = shouldIgnoreDataKeySyncDrafts && !shouldClassifyLegacyDataKeySyncDrafts
+
+  const [userScreenDrafts, userDiagnosisDrafts, userProblemDrafts] = await Promise.all([
+    db.query.screensDrafts.findMany({
+      where: userId
+        ? (draftOriginPrefilter
+          ? and(eq(screensDrafts.createdByUserId, userId), ne(screensDrafts.draftOrigin, "data_key_sync"))
+          : eq(screensDrafts.createdByUserId, userId))
+        : (draftOriginPrefilter ? ne(screensDrafts.draftOrigin, "data_key_sync") : undefined),
+    }),
+    db.query.diagnosesDrafts.findMany({
+      where: userId
+        ? (draftOriginPrefilter
+          ? and(eq(diagnosesDrafts.createdByUserId, userId), ne(diagnosesDrafts.draftOrigin, "data_key_sync"))
+          : eq(diagnosesDrafts.createdByUserId, userId))
+        : (draftOriginPrefilter ? ne(diagnosesDrafts.draftOrigin, "data_key_sync") : undefined),
+    }),
+    db.query.problemsDrafts.findMany({
+      where: userId
+        ? (draftOriginPrefilter
+          ? and(eq(problemsDrafts.createdByUserId, userId), ne(problemsDrafts.draftOrigin, "data_key_sync"))
+          : eq(problemsDrafts.createdByUserId, userId))
+        : (draftOriginPrefilter ? ne(problemsDrafts.draftOrigin, "data_key_sync") : undefined),
+    }),
+  ])
+
   const shouldIncludeDataKeyImpact =
     (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
     (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
 
-  if (!shouldRunIntegrityChecks) {
-    return {
-      dataKeysRes: { data: [], errors: undefined },
-      screensRes: { data: [], errors: undefined },
-      diagnosesRes: { data: [], errors: undefined },
-      problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks,
-    }
-  }
-  const deletedDataKeys = !shouldIncludeDataKeyImpact || !deletedDataKeyIds.size
+  const shouldComputeDataKeyImpact =
+    shouldIncludeDataKeyImpact ||
+    shouldClassifyLegacyDataKeySyncDrafts
+
+  const deletedDataKeys = !shouldComputeDataKeyImpact || !deletedDataKeyIds.size
     ? []
     : await db.query.dataKeys.findMany({
         where: inArray(dataKeys.uuid, Array.from(deletedDataKeyIds)),
       })
-  const dataKeysForImpact = !shouldIncludeDataKeyImpact
+  const dataKeysForImpact = !shouldComputeDataKeyImpact
     ? []
     : [
-        ...(policy.triggerSources.dataKeyLibraryEdits
+        ...(hasExistingDataKeyLibraryChanges
           ? userDataKeyDrafts
               .filter((draft) => !!draft.dataKeyId)
               .map((draft) => ({
@@ -210,7 +219,7 @@ async function getScopedIntegrityData({
           : []),
         ...deletedDataKeys,
       ].filter((item) => !!item.uniqueKey) as dataKeysQueries.DataKey[]
-  const dataKeyImpact = !shouldIncludeDataKeyImpact || !dataKeysForImpact.length
+  const dataKeyImpact = !shouldComputeDataKeyImpact || !dataKeysForImpact.length
     ? null
     : await dataKeysMutations._updateDataKeysRefs({
         dataKeys: dataKeysForImpact,
@@ -226,24 +235,101 @@ async function getScopedIntegrityData({
       screensRes: { data: [], errors: undefined },
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks,
+      shouldRunIntegrityChecks: true,
     }
   }
 
-  const affectedScriptIds = Array.from(new Set([
-    ...userScriptDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
-    ...dataKeyImpactScriptIds,
-  ]))
+  const screenPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.screens, (item) => item.screenId)
+  const diagnosisPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.diagnoses, (item) => item.diagnosisId)
+  const problemPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.problems, (item) => item.problemId)
+  const affectedScreenIds = new Set((dataKeyImpact?.affected?.screens || []).map((item) => item.id).filter(Boolean))
+  const affectedDiagnosisIds = new Set((dataKeyImpact?.affected?.diagnoses || []).map((item) => item.id).filter(Boolean))
+  const affectedProblemIds = new Set((dataKeyImpact?.affected?.problems || []).map((item) => item.id).filter(Boolean))
+
+  const [publishedLegacyScreensRes, publishedLegacyDiagnosesRes, publishedLegacyProblemsRes] =
+    shouldClassifyLegacyDataKeySyncDrafts && dataKeyImpactScriptIds.length
+      ? await Promise.all([
+          scriptsQueries._getScreens({
+            returnDraftsIfExist: false,
+            scriptsIds: dataKeyImpactScriptIds,
+          }),
+          scriptsQueries._getDiagnoses({
+            returnDraftsIfExist: false,
+            scriptsIds: dataKeyImpactScriptIds,
+          }),
+          scriptsQueries._getProblems({
+            returnDraftsIfExist: false,
+            scriptsIds: dataKeyImpactScriptIds,
+          }),
+        ])
+      : [
+          { data: [], errors: undefined },
+          { data: [], errors: undefined },
+          { data: [], errors: undefined },
+        ]
+
+  const legacyPublishedErrors = [
+    ...(publishedLegacyScreensRes.errors || []),
+    ...(publishedLegacyDiagnosesRes.errors || []),
+    ...(publishedLegacyProblemsRes.errors || []),
+  ]
+  if (legacyPublishedErrors.length) {
+    return {
+      dataKeysRes: { data: [], errors: legacyPublishedErrors },
+      screensRes: { data: [], errors: undefined },
+      diagnosesRes: { data: [], errors: undefined },
+      problemsRes: { data: [], errors: undefined },
+      shouldRunIntegrityChecks: true,
+    }
+  }
+
+  const publishedScreenMap = buildPreviewEntityMap(publishedLegacyScreensRes.data, (item) => item.screenId)
+  const publishedDiagnosisMap = buildPreviewEntityMap(publishedLegacyDiagnosesRes.data, (item) => item.diagnosisId)
+  const publishedProblemMap = buildPreviewEntityMap(publishedLegacyProblemsRes.data, (item) => item.problemId)
+
+  const {
+    effectiveUserScreenDrafts,
+    effectiveUserDiagnosisDrafts,
+    effectiveUserProblemDrafts,
+    shouldRunIntegrityChecks,
+    shouldIncludeDataKeyImpact: evaluatedShouldIncludeDataKeyImpact,
+    affectedScriptIds,
+  } = evaluateIntegrityScanScope({
+    policy,
+    userScriptDrafts,
+    userScreenDrafts,
+    userDiagnosisDrafts,
+    userProblemDrafts,
+    userPendingDeletion,
+    hasExistingDataKeyLibraryChanges,
+    deletedDataKeyIdsSize: deletedDataKeyIds.size,
+    screenPreviewMap,
+    diagnosisPreviewMap,
+    problemPreviewMap,
+    publishedScreenMap,
+    publishedDiagnosisMap,
+    publishedProblemMap,
+    affectedScreenIds,
+    affectedDiagnosisIds,
+    affectedProblemIds,
+    dataKeyImpactScriptIds,
+  })
+
+  if (!shouldRunIntegrityChecks) {
+    return {
+      dataKeysRes: { data: [], errors: undefined },
+      screensRes: { data: [], errors: undefined },
+      diagnosesRes: { data: [], errors: undefined },
+      problemsRes: { data: [], errors: undefined },
+      shouldRunIntegrityChecks,
+    }
+  }
 
   const requestedAffectedScope = policy.scanScope === "affected_scripts_only" && !!userId
   const hasAffectedScripts = !!affectedScriptIds?.length
   let shouldLimitToAffectedScripts = requestedAffectedScope
   if (requestedAffectedScope && !hasAffectedScripts) {
-    if (shouldIncludeDataKeyImpact) {
+    if (evaluatedShouldIncludeDataKeyImpact) {
       logger.error("getScopedIntegrityData WARN", JSON.stringify({
         message: "No affected scripts were detected for datakey-driven integrity scope; widening to full scope conservatively.",
         hasExistingDataKeyLibraryChanges,
@@ -264,23 +350,23 @@ async function getScopedIntegrityData({
 
   const affectedScriptsSet = new Set(affectedScriptIds || [])
   const scopedUserScreenDrafts = shouldLimitToAffectedScripts
-    ? userScreenDrafts.filter((draft) => {
+    ? effectiveUserScreenDrafts.filter((draft) => {
         const scriptId = draft.scriptId || draft.scriptDraftId
         return !!scriptId && affectedScriptsSet.has(scriptId)
       })
-    : userScreenDrafts
+    : effectiveUserScreenDrafts
   const scopedUserDiagnosisDrafts = shouldLimitToAffectedScripts
-    ? userDiagnosisDrafts.filter((draft) => {
+    ? effectiveUserDiagnosisDrafts.filter((draft) => {
         const scriptId = draft.scriptId || draft.scriptDraftId
         return !!scriptId && affectedScriptsSet.has(scriptId)
       })
-    : userDiagnosisDrafts
+    : effectiveUserDiagnosisDrafts
   const scopedUserProblemDrafts = shouldLimitToAffectedScripts
-    ? userProblemDrafts.filter((draft) => {
+    ? effectiveUserProblemDrafts.filter((draft) => {
         const scriptId = draft.scriptId || draft.scriptDraftId
         return !!scriptId && affectedScriptsSet.has(scriptId)
       })
-    : userProblemDrafts
+    : effectiveUserProblemDrafts
 
   const [publishedDataKeysRes, publishedScreensRes, publishedDiagnosesRes, publishedProblemsRes] = await Promise.all([
     dataKeysQueries._getDataKeys({ returnDraftsIfExist: false }),
@@ -338,8 +424,9 @@ async function getScopedIntegrityData({
       isDeleted: false,
       draftCreatedByUserId: draft.createdByUserId,
     }
-    screensMap.set(draft.screenId || draft.screenDraftId, data as typeof publishedScreensRes.data[number])
-    screensMap.set(draft.screenDraftId, data as typeof publishedScreensRes.data[number])
+    const primaryId = draft.screenId || draft.screenDraftId
+    if (primaryId) screensMap.set(primaryId, data as typeof publishedScreensRes.data[number])
+    if (draft.screenDraftId) screensMap.set(draft.screenDraftId, data as typeof publishedScreensRes.data[number])
   })
 
   const diagnosesMap = new Map<string, typeof publishedDiagnosesRes.data[number]>()
@@ -353,8 +440,9 @@ async function getScopedIntegrityData({
       isDeleted: false,
       draftCreatedByUserId: draft.createdByUserId,
     }
-    diagnosesMap.set(draft.diagnosisId || draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
-    diagnosesMap.set(draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
+    const primaryId = draft.diagnosisId || draft.diagnosisDraftId
+    if (primaryId) diagnosesMap.set(primaryId, data as typeof publishedDiagnosesRes.data[number])
+    if (draft.diagnosisDraftId) diagnosesMap.set(draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
   })
 
   const problemsMap = new Map<string, typeof publishedProblemsRes.data[number]>()
@@ -368,8 +456,9 @@ async function getScopedIntegrityData({
       isDeleted: false,
       draftCreatedByUserId: draft.createdByUserId,
     }
-    problemsMap.set(draft.problemId || draft.problemDraftId, data as typeof publishedProblemsRes.data[number])
-    problemsMap.set(draft.problemDraftId, data as typeof publishedProblemsRes.data[number])
+    const primaryId = draft.problemId || draft.problemDraftId
+    if (primaryId) problemsMap.set(primaryId, data as typeof publishedProblemsRes.data[number])
+    if (draft.problemDraftId) problemsMap.set(draft.problemDraftId, data as typeof publishedProblemsRes.data[number])
   })
 
   return {
