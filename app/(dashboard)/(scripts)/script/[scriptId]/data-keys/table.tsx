@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CircleHelp, CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/data-table";
+import { SearchInput } from "@/components/search-input";
 import { Modal } from "@/components/modal";
 import { SelectDataKey } from "@/components/select-data-key";
 import { Button } from "@/components/ui/button";
@@ -191,7 +192,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [tableSearchValue, setTableSearchValue] = useState("");
-    const [searchedRowIndexes, setSearchedRowIndexes] = useState<number[]>([]);
     const [tablePage, setTablePage] = useState(1);
     const [repairModalEntry, setRepairModalEntry] = useState<DataKeyIntegrityReport["entries"][number] | null>(null);
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
@@ -270,10 +270,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         setTablePage(1);
     }, [issueScopeFilter, statusFilter, typeFilter, tableSearchValue]);
 
-    useEffect(() => {
-        setSearchedRowIndexes(filteredEntries.map((_, index) => index));
-    }, [filteredEntries]);
-
     const closeRepairModal = () => {
         if (isRepairing || loadingRepairPreview || savingResolution) return;
         setRepairModalEntry(null);
@@ -293,7 +289,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         void setBulkStatusParam("");
     };
 
-    const loadRepairPreview = async ({
+    const loadRepairPreview = useCallback(async ({
         entry,
         nextSelectedTargetUniqueKey,
     }: {
@@ -321,9 +317,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         );
         setLoadingRepairPreview(false);
         return res;
-    };
+    }, []);
 
-    const loadBulkRepairPreview = async ({
+    const loadBulkRepairPreview = useCallback(async ({
         items,
         requestId,
     }: {
@@ -382,7 +378,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 errors: [e?.message || "Failed to prepare bulk review"],
             };
         }
-    };
+    }, []);
 
     const loadSingleBulkRepairPreview = async ({
         item,
@@ -424,7 +420,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         };
     };
 
-    const openRepairModal = async (entry: DataKeyIntegrityReport["entries"][number]) => {
+    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || viewOnly || isRepairing || loadingRepairPreview) return;
         await setBulkStatusParam("");
         await setRepairEntryParam(getEntryKey(entry));
@@ -446,7 +442,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
             });
             return;
         }
-    };
+    }, [alert, isRepairing, loadRepairPreview, loadingRepairPreview, scriptId, setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
     const handleResolveEntry = (entry: DataKeyIntegrityReport["entries"][number]) => {
         if (!scriptId || viewOnly || isRepairing) return;
@@ -491,7 +487,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         });
     };
 
-    const openBulkResolveDrawer = async (status: "out_of_sync" | "legacy_match") => {
+    const openBulkResolveDrawer = useCallback(async (status: "out_of_sync" | "legacy_match") => {
         if (!scriptId || viewOnly || isRepairing || loadingBulkPreview) return;
         const entriesToResolve = bulkResolvableEntries[status];
         if (!entriesToResolve.length) return;
@@ -524,7 +520,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 buttonLabel: "Close",
             });
         }
-    };
+    }, [alert, bulkResolvableEntries, isRepairing, loadBulkRepairPreview, loadingBulkPreview, scriptId, setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
     const handleBulkResolve = () => {
         if (!scriptId || viewOnly || isRepairing || !bulkResolveStatus) return;
@@ -684,7 +680,39 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const visibleBulkReviewItems = useMemo(() => showReviewedBulkItemsOnly
         ? bulkReviewableItems.filter((item) => item.reviewed)
         : bulkReviewableItems, [bulkReviewableItems, showReviewedBulkItemsOnly]);
-    const tableData = useMemo(() => filteredEntries.map((issue) => [
+    const pageSize = 100;
+    const searchedEntries = useMemo(() => {
+        const query = tableSearchValue.trim().toLowerCase();
+        if (!query) return filteredEntries;
+
+        return filteredEntries.filter((issue) => {
+            const rowValues = [
+                issue.status.replace(/_/g, " "),
+                issue.currentKey || issue.matchedName || "",
+                issue.currentLabel || issue.matchedLabel || "",
+                issue.expectedDataType || "",
+                kindLabels[issue.kind],
+                issue.location || "",
+                issue.reason || "",
+                issue.status === "out_of_sync" && issue.kind !== "screen_option_collection" && issue.kind !== "field_option_collection"
+                    ? "Resolve available"
+                    : issue.status === "legacy_match"
+                        ? "Resolve available"
+                        : issue.status === "unmanaged"
+                            ? "Legacy/local reference"
+                            : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
+            ];
+
+            return JSON.stringify(rowValues).toLowerCase().includes(query);
+        });
+    }, [filteredEntries, tableSearchValue]);
+
+    const pagedEntries = useMemo(() => {
+        const start = (tablePage - 1) * pageSize;
+        return searchedEntries.slice(start, start + pageSize);
+    }, [searchedEntries, tablePage]);
+
+    const tableData = useMemo(() => pagedEntries.map((issue) => [
         issue.status.replace(/_/g, " "),
         issue.currentKey || issue.matchedName || "",
         issue.currentLabel || issue.matchedLabel || "",
@@ -700,20 +728,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     ? "Legacy/local reference"
                     : issue.matchedName || (issue.status === "missing" ? "Create new data key" : ""),
         "",
-    ]), [filteredEntries]);
-    const pageSize = 100;
-    const searchedEntries = useMemo(
-        () => searchedRowIndexes
-            .map((rowIndex) => filteredEntries[rowIndex])
-            .filter((entry): entry is DataKeyIntegrityReport["entries"][number] => !!entry),
-        [filteredEntries, searchedRowIndexes]
-    );
+    ]), [pagedEntries]);
     const totalPages = Math.max(1, Math.ceil(searchedEntries.length / pageSize));
-    const visibleRowIndexes = useMemo(
-        () => searchedRowIndexes.slice((tablePage - 1) * pageSize, tablePage * pageSize),
-        [searchedRowIndexes, tablePage]
-    );
-    const visibleRowIndexSet = useMemo(() => new Set(visibleRowIndexes), [visibleRowIndexes]);
     const renderPageNumbers = useMemo(() => {
         const pages: (number | "ellipsis")[] = [];
 
@@ -1460,22 +1476,22 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         )}
                     </div>
 
-                    <div className="text-sm text-muted-foreground">
-                        {searchedEntries.length} matching reference{searchedEntries.length === 1 ? "" : "s"} ({filteredEntries.length} filtered, {entries.length} total).
+                    <div className="flex flex-col gap-y-3">
+                        <div className="md:max-w-xl">
+                            <SearchInput
+                                placeholder="Search data key references"
+                                onSearch={setTableSearchValue}
+                            />
+                        </div>
+
+                        <div className="text-sm text-muted-foreground">
+                            {searchedEntries.length} matching reference{searchedEntries.length === 1 ? "" : "s"} ({filteredEntries.length} filtered, {entries.length} total).
+                        </div>
                     </div>
 
                     <DataTable
-                        search={{
-                            inputPlaceholder: 'Search data key references',
-                            value: tableSearchValue,
-                            setValue: setTableSearchValue,
-                        }}
-                        onFilteredRowsChange={(rows) => {
-                            setSearchedRowIndexes(rows.map((row) => row.rowIndex));
-                        }}
-                        filter={(rowIndex) => visibleRowIndexSet.has(rowIndex)}
                         getRowOptions={({ rowIndex }) => {
-                            const issue = filteredEntries[rowIndex];
+                            const issue = pagedEntries[rowIndex];
                             return {
                                 className: cn(
                                     issue?.status === "resolved" && "bg-emerald-50 hover:bg-emerald-100",
@@ -1492,7 +1508,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             {
                                 name: "Status",
                                 cellRenderer({ rowIndex }) {
-                                    const issue = filteredEntries[rowIndex];
+                                    const issue = pagedEntries[rowIndex];
                                     if (!issue) return null;
                                     return (
                                         <span className={cn("inline-flex rounded px-2 py-1 text-xs font-medium", statusStyles[issue.status])}>
@@ -1511,7 +1527,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             {
                                 name: "",
                                 cellRenderer({ rowIndex }) {
-                                    const issue = filteredEntries[rowIndex];
+                                    const issue = pagedEntries[rowIndex];
                                     if (!issue) return null;
                                     return <div className="flex items-center justify-end">{renderActions(issue)}</div>;
                                 },

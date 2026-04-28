@@ -1,5 +1,5 @@
 {
-  "id": "d8bd6334-b9fd-48fb-b869-14b91ab6b772",
+  "id": "de9548b5-bc97-43fb-b0a2-52287e31d7ed",
   "prevId": "b2e4d52f-77d7-4ce6-ae8a-09d9e8ff190b",
   "version": "7",
   "dialect": "postgresql",
@@ -1444,6 +1444,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -3462,6 +3470,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -4265,6 +4281,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -5728,6 +5752,16 @@
         "alias",
         "hospital",
         "release"
+      ]
+    },
+    "public.draft_origin": {
+      "name": "draft_origin",
+      "schema": "public",
+      "values": [
+        "data_key_sync",
+        "editor",
+        "import",
+        "other"
       ]
     },
     "public.drug_type": {

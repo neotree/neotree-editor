@@ -1,28 +1,32 @@
 'use server';
 
+import { and, eq, isNull } from "drizzle-orm";
+
 import db from "@/databases/pg/drizzle";
 import { _saveEditorInfo } from "@/databases/mutations/editor-info";
-import { _getDataKeys } from "@/databases/queries/data-keys";
-import { _getDiagnoses, _getProblems, _getScreens } from "@/databases/queries/scripts";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
-import { adminAuditLogs } from "@/databases/pg/schema";
 import {
-  buildDataKeyIntegrityContext,
-  getBlockingIntegrityEntries,
-  getDataKeyIntegrityEntryFingerprint,
-  scanDataKeyIntegrity,
-} from "@/lib/data-key-integrity";
+  adminAuditLogs,
+  dataKeys,
+  diagnoses,
+  hospitals,
+  pendingDeletion,
+  problems,
+  screens,
+  scripts,
+} from "@/databases/pg/schema";
+import { buildIntegrityBaselineFromSnapshotData } from "@/lib/integrity-baseline";
 import {
   EMPTY_INTEGRITY_BASELINE,
-  INTEGRITY_BASELINE_FINGERPRINT_VERSION,
-  INTEGRITY_BASELINE_RULESET_VERSION,
   getIntegrityPolicyState,
+  IntegrityBaseline,
   normalizeIntegrityPolicy,
-  type IntegrityBaseline,
   type IntegrityPolicy,
 } from "@/lib/integrity-policy";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+import type { DataKey } from "@/databases/queries/data-keys";
+import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 
 function assertCanManageIntegrityPolicy(user?: { role?: string | null } | null) {
   if (user?.role !== "super_user") {
@@ -31,57 +35,97 @@ function assertCanManageIntegrityPolicy(user?: { role?: string | null } | null) 
 }
 
 async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: string | null) {
-  const [editorInfoRes, dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
-    _getEditorInfo(),
-    _getDataKeys({ returnDraftsIfExist: false }),
-    _getScreens({ returnDraftsIfExist: false }),
-    _getDiagnoses({ returnDraftsIfExist: false }),
-    _getProblems({ returnDraftsIfExist: false }),
+  const [publishedDataKeysRows, publishedScreensRows, publishedDiagnosesRows, publishedProblemsRows] = await Promise.all([
+    db
+      .select({
+        dataKey: dataKeys,
+      })
+      .from(dataKeys)
+      .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
+      .where(and(
+        isNull(dataKeys.deletedAt),
+        isNull(pendingDeletion.id),
+      )),
+    db
+      .select({
+        screen: screens,
+        scriptTitle: scripts.title,
+        hospitalName: hospitals.name,
+      })
+      .from(screens)
+      .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+      .leftJoin(scripts, eq(scripts.scriptId, screens.scriptId))
+      .leftJoin(hospitals, eq(hospitals.hospitalId, scripts.hospitalId))
+      .where(and(
+        isNull(screens.deletedAt),
+        isNull(pendingDeletion.id),
+      )),
+    db
+      .select({
+        diagnosis: diagnoses,
+        scriptTitle: scripts.title,
+      })
+      .from(diagnoses)
+      .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+      .leftJoin(scripts, eq(scripts.scriptId, diagnoses.scriptId))
+      .where(and(
+        isNull(diagnoses.deletedAt),
+        isNull(pendingDeletion.id),
+      )),
+    db
+      .select({
+        problem: problems,
+        scriptTitle: scripts.title,
+      })
+      .from(problems)
+      .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+      .leftJoin(scripts, eq(scripts.scriptId, problems.scriptId))
+      .where(and(
+        isNull(problems.deletedAt),
+        isNull(pendingDeletion.id),
+      )),
   ]);
 
-  const errors = [
-    ...(editorInfoRes.errors || []),
-    ...(dataKeysRes.errors || []),
-    ...(screensRes.errors || []),
-    ...(diagnosesRes.errors || []),
-    ...(problemsRes.errors || []),
-  ];
+  const publishedDataKeys = publishedDataKeysRows.map((row) => ({
+    ...row.dataKey,
+    isDraft: false,
+    isDeleted: false,
+  })) as DataKey[];
 
-  if (errors.length) {
-    return {
-      success: false as const,
-      baseline: null,
-      errors,
-    };
-  }
+  const publishedScreens = publishedScreensRows.map((row) => ({
+    ...row.screen,
+    scriptTitle: row.scriptTitle || "",
+    hospitalName: row.hospitalName || "",
+    isDraft: false,
+    isDeleted: false,
+  })) as ScreenType[];
 
-  const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
-  const report = scanDataKeyIntegrity({
-    dataKeys: dataKeysRes.data,
-    screens: screensRes.data,
-    diagnoses: diagnosesRes.data,
-    problems: problemsRes.data,
-    onlyIssues: true,
-    context: integrityContext,
+  const publishedDiagnoses = publishedDiagnosesRows.map((row) => ({
+    ...row.diagnosis,
+    scriptTitle: row.scriptTitle || "",
+    isDraft: false,
+    isDeleted: false,
+  })) as DiagnosisType[];
+
+  const publishedProblems = publishedProblemsRows.map((row) => ({
+    ...row.problem,
+    scriptTitle: row.scriptTitle || "",
+    isDraft: false,
+    isDeleted: false,
+  })) as ProblemType[];
+
+  const baseline: IntegrityBaseline = buildIntegrityBaselineFromSnapshotData({
     policy,
+    userId,
+    dataKeys: publishedDataKeys,
+    screens: publishedScreens,
+    diagnoses: publishedDiagnoses,
+    problems: publishedProblems,
   });
-
-  const blockingEntries = getBlockingIntegrityEntries(report.entries);
-  const scriptIds = new Set(blockingEntries.map((entry) => entry.scriptId).filter(Boolean));
-  const baseline: IntegrityBaseline = {
-    capturedAt: new Date().toISOString(),
-    capturedByUserId: userId || null,
-    totalBlockingIssues: blockingEntries.length,
-    totalScripts: scriptIds.size,
-    fingerprintVersion: INTEGRITY_BASELINE_FINGERPRINT_VERSION,
-    ruleSetVersion: INTEGRITY_BASELINE_RULESET_VERSION,
-    fingerprints: Array.from(new Set(blockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)))).sort(),
-  };
 
   return {
     success: true as const,
     baseline,
-    editorInfo: editorInfoRes.data,
     errors: [],
   };
 }
