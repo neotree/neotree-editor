@@ -72,6 +72,11 @@ export type UpdateDataKeysRefsResponse = {
     errors?: string[];
     success: boolean;
     info?: UpdateStats;
+    preview?: {
+        screens: Awaited<ReturnType<typeof _getScreens>>["data"];
+        diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
+        problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+    };
     affected?: {
         scripts: { scriptId: string; scriptTitle?: string; }[];
         screens: AffectedEntity[];
@@ -109,6 +114,21 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
 
 function escapeLikePattern(value: string) {
     return value.replace(/[\\%_]/g, '\\$&');
+}
+
+function buildJsonKeyIdPatterns(uniqueKeys: string[], jsonKeys: string[]) {
+    return uniqueKeys
+        .filter(Boolean)
+        .slice(0, 120)
+        .flatMap((uniqueKey) => {
+            const escapedUniqueKey = escapeLikePattern(uniqueKey);
+            return jsonKeys.flatMap((jsonKey) => ([
+                `%\"${jsonKey}\":\"${escapedUniqueKey}\"%`,
+                `%\"${jsonKey}\": \"${escapedUniqueKey}\"%`,
+                `%\"${jsonKey}\"%\"${escapedUniqueKey}\"%`,
+                `%${escapeLikePattern(jsonKey)}%${escapedUniqueKey}%`,
+            ]));
+        });
 }
 
 async function mapWithConcurrency<T>(
@@ -210,17 +230,16 @@ export async function _updateDataKeysRefs({
             });
         };
 
-        const keyIdPatterns = changedUniqueKeys
-            .filter(Boolean)
-            .slice(0, 120)
-            .flatMap(keyId => {
-                const id = escapeLikePattern(keyId);
-                return [
-                    `%\"keyId\":\"${id}\"%`,
-                    `%\"keyId\": \"${id}\"%`,
-                    `%\"keyId\"%\"${id}\"%`,
-                ];
-            });
+        const screenJsonReferenceKeys = [
+            'keyId',
+            'refKeyId',
+            'minDateKeyId',
+            'maxDateKeyId',
+            'minTimeKeyId',
+            'maxTimeKeyId',
+            'refIdDataKey',
+        ];
+        const keyIdPatterns = buildJsonKeyIdPatterns(changedUniqueKeys, screenJsonReferenceKeys);
         const likePatterns = Array.from(new Set([
             ...keyIdPatterns,
         ])).slice(0, 240);
@@ -754,6 +773,11 @@ export async function _updateDataKeysRefs({
             return {
                 success: true,
                 info: stats,
+                preview: {
+                    screens: screensUpdatedData,
+                    diagnoses: diagnosesUpdatedData,
+                    problems: problemsUpdatedData,
+                },
                 affected,
             };
         }
