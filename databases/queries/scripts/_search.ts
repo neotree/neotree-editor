@@ -70,6 +70,12 @@ export async function _searchScripts({
             !screensDrafts.length ? undefined : notInArray(schema.screens.screenId, screensDrafts.map(d => d.screenDraftId)),
             or(
                 sql`lower(${schema.screens.condition}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text3}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title3}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.sectionTitle}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.previewTitle}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.previewPrintTitle}::text) like ${`%${searchTerm}%`}`,
@@ -102,6 +108,9 @@ export async function _searchScripts({
             !diagnosesDrafts.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesDrafts.map(d => d.diagnosisDraftId)),
             or(
                 sql`lower(${schema.diagnoses.name}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text3}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.expression}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.symptoms}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.key}::text) like ${`%${searchTerm}%`}`,
