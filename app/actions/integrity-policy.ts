@@ -175,10 +175,51 @@ export async function saveIntegrityPolicySettings(policyInput: Partial<Integrity
       },
     });
 
+    const enablingEnforcementFromOff =
+      currentState.policy.enforcementMode === "off" &&
+      nextPolicy.enforcementMode !== "off";
+    let nextBaseline = currentState.baseline;
+    let autoCapturedBaseline = false;
+
+    if (enablingEnforcementFromOff) {
+      const baselineRes = await buildCurrentIntegrityBaseline(nextPolicy, session.user?.userId);
+      if (!baselineRes.success || !baselineRes.baseline) {
+        return {
+          success: false,
+          data: null,
+          errors: baselineRes.errors?.length ? baselineRes.errors : ["Failed to auto-capture integrity baseline"],
+        };
+      }
+
+      nextBaseline = baselineRes.baseline;
+      autoCapturedBaseline = true;
+    }
+
     const txResult = await db.transaction(async (tx) => {
+      if (autoCapturedBaseline) {
+        await saveIntegrityPolicyAuditLog({
+          tx,
+          actorUserId: session.user?.userId,
+          action: "baseline_captured",
+          beforeState: {
+            baseline: currentState.baseline,
+          },
+          afterState: {
+            baseline: nextBaseline,
+          },
+          metadata: {
+            totalBlockingIssues: nextBaseline.totalBlockingIssues,
+            totalScripts: nextBaseline.totalScripts,
+            automatic: true,
+            reason: "auto_enablement_capture",
+          },
+        });
+      }
+
       const saved = await _saveEditorInfo({
         data: {
           integrityPolicy: nextPolicy,
+          ...(autoCapturedBaseline ? { integrityBaseline: nextBaseline } : {}),
         },
         increaseVersion: false,
         broadcastAction: false,
@@ -199,6 +240,12 @@ export async function saveIntegrityPolicySettings(policyInput: Partial<Integrity
         afterState: {
           policy: nextPolicy,
         },
+        metadata: autoCapturedBaseline
+          ? {
+              automaticBaselineCapture: true,
+              reason: "auto_enablement_capture",
+            }
+          : {},
       });
 
       return saved;
@@ -216,7 +263,8 @@ export async function saveIntegrityPolicySettings(policyInput: Partial<Integrity
       success: true,
       data: {
         policy: nextPolicy,
-        baseline: currentState.baseline,
+        baseline: nextBaseline,
+        autoCapturedBaseline,
       },
       errors: [],
     };

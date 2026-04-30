@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS "nt_integrity_import_snapshots" (
 DROP INDEX IF EXISTS "active_version_index";--> statement-breakpoint
 ALTER TABLE "nt_data_keys" ALTER COLUMN "unique_key" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "nt_diagnoses_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
-ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_policy" jsonb DEFAULT '{"enforcementMode":"block_new_issues_only","scanScope":"affected_scripts_only","triggerSources":{"scriptEdits":true,"dataKeyLibraryEdits":false,"deletions":true,"imports":true},"useBaseline":true}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"capturedAt":null,"capturedByUserId":null,"totalBlockingIssues":0,"totalScripts":0,"fingerprintVersion":1,"ruleSetVersion":"2026-04-26","fingerprints":[]}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_policy" jsonb DEFAULT '{"enforcementMode":"off","scanScope":"affected_scripts_only","triggerSources":{"scriptEdits":false,"dataKeyLibraryEdits":false,"deletions":false,"imports":false},"useBaseline":true}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"capturedAt":null,"capturedByUserId":null,"totalBlockingIssues":0,"totalScripts":0,"fingerprintVersion":1,"ruleSetVersion":"2026-04-26","fingerprints":[],"acceptedImportFingerprints":[],"acceptedImportFingerprintRefs":{}}'::jsonb NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_problems" ADD COLUMN "symptoms" jsonb DEFAULT '[]' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_problems_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_screens_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint

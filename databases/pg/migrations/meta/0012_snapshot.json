@@ -1,5 +1,5 @@
 {
-  "id": "f6005b39-b898-4561-ad4a-fed4fd18af6d",
+  "id": "5077f2ab-16d2-4afb-ba2d-de0c6b791afd",
   "prevId": "b2e4d52f-77d7-4ce6-ae8a-09d9e8ff190b",
   "version": "7",
   "dialect": "postgresql",
@@ -2112,14 +2112,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{\"enforcementMode\":\"block_new_issues_only\",\"scanScope\":\"affected_scripts_only\",\"triggerSources\":{\"scriptEdits\":true,\"dataKeyLibraryEdits\":false,\"deletions\":true,\"imports\":true},\"useBaseline\":true}'::jsonb"
+          "default": "'{\"enforcementMode\":\"off\",\"scanScope\":\"affected_scripts_only\",\"triggerSources\":{\"scriptEdits\":false,\"dataKeyLibraryEdits\":false,\"deletions\":false,\"imports\":false},\"useBaseline\":true}'::jsonb"
         },
         "integrity_baseline": {
           "name": "integrity_baseline",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":1,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[]}'::jsonb"
+          "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":1,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[],\"acceptedImportFingerprints\":[],\"acceptedImportFingerprintRefs\":{}}'::jsonb"
         }
       },
       "indexes": {},
