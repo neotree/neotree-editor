@@ -13,6 +13,7 @@ export type IntegrityPolicy = {
     scriptEdits: boolean;
     dataKeyLibraryEdits: boolean;
     deletions: boolean;
+    imports: boolean;
   };
   useBaseline: boolean;
 };
@@ -67,6 +68,7 @@ export const DEFAULT_INTEGRITY_POLICY: IntegrityPolicy = {
     scriptEdits: true,
     dataKeyLibraryEdits: false,
     deletions: true,
+    imports: true,
   },
   useBaseline: true,
 };
@@ -108,6 +110,7 @@ export function normalizeIntegrityPolicy(
         value?.triggerSources?.dataKeyLibraryEdits ??
         DEFAULT_INTEGRITY_POLICY.triggerSources.dataKeyLibraryEdits,
       deletions: value?.triggerSources?.deletions ?? DEFAULT_INTEGRITY_POLICY.triggerSources.deletions,
+      imports: value?.triggerSources?.imports ?? DEFAULT_INTEGRITY_POLICY.triggerSources.imports,
     },
     useBaseline:
       enforcementMode === "block_new_issues_only"
@@ -162,6 +165,58 @@ export function getIntegrityBaselineLookup(
   }
 
   return new Set(baseline.fingerprints);
+}
+
+function extractScriptIdsFromFingerprints(fingerprints: string[]) {
+  return new Set(
+    fingerprints
+      .map((fingerprint) => `${fingerprint || ""}`.split("::")[0]?.trim())
+      .filter((scriptId): scriptId is string => !!scriptId),
+  );
+}
+
+export function mergeFingerprintsIntoIntegrityBaseline(
+  baselineValue: Partial<IntegrityBaseline> | null | undefined,
+  fingerprints: string[],
+) {
+  const baseline = isIntegrityBaselineCompatible(baselineValue)
+    ? normalizeIntegrityBaseline(baselineValue)
+    : { ...EMPTY_INTEGRITY_BASELINE };
+
+  const mergedFingerprints = Array.from(new Set([
+    ...baseline.fingerprints,
+    ...fingerprints.filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && !!fingerprint),
+  ])).sort();
+  const scriptIds = extractScriptIdsFromFingerprints(mergedFingerprints);
+
+  return {
+    ...baseline,
+    totalBlockingIssues: mergedFingerprints.length,
+    totalScripts: scriptIds.size,
+    fingerprints: mergedFingerprints,
+  };
+}
+
+export function removeFingerprintsFromIntegrityBaseline(
+  baselineValue: Partial<IntegrityBaseline> | null | undefined,
+  fingerprintsToRemove: string[],
+) {
+  const baseline = isIntegrityBaselineCompatible(baselineValue)
+    ? normalizeIntegrityBaseline(baselineValue)
+    : { ...EMPTY_INTEGRITY_BASELINE };
+
+  const removalSet = new Set(
+    fingerprintsToRemove.filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && !!fingerprint),
+  );
+  const remainingFingerprints = baseline.fingerprints.filter((fingerprint) => !removalSet.has(fingerprint));
+  const scriptIds = extractScriptIdsFromFingerprints(remainingFingerprints);
+
+  return {
+    ...baseline,
+    totalBlockingIssues: remainingFingerprints.length,
+    totalScripts: scriptIds.size,
+    fingerprints: remainingFingerprints,
+  };
 }
 
 export function evaluateIntegrityPolicyBlockingEntries<T>({

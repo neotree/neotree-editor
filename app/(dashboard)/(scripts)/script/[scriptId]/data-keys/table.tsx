@@ -37,6 +37,7 @@ import { PageContainer } from "../../../components/page-container";
 import { getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
+import { pendingChangesAPI } from "@/lib/indexed-db";
 
 const statusStyles = {
     resolved: "bg-emerald-100 text-emerald-800",
@@ -178,13 +179,97 @@ function buildUsageHref(entry: DataKeyIntegrityReport["entries"][number]) {
     return `/script/${entry.scriptId}`;
 }
 
+type IntegrityImpactSummary = {
+    delta: {
+        total: number;
+        resolved: number;
+        out_of_sync: number;
+        missing: number;
+        legacy_match: number;
+        conflict: number;
+        unmanaged: number;
+        blocking: number;
+    };
+    touched: {
+        screens: number;
+        diagnoses: number;
+        problems: number;
+    };
+};
+
+type ResolveOutcomeModalState = {
+    title: string;
+    summary: IntegrityImpactSummary | null;
+    warnings: string[];
+};
+
+function formatImpactDelta(value: number) {
+    if (value === 0) return "0";
+    return value > 0 ? `+${value}` : `${value}`;
+}
+
+function buildImpactSummaryMessage(summary?: IntegrityImpactSummary | null) {
+    if (!summary) return "";
+
+    const parts = [
+        `Resolved ${formatImpactDelta(summary.delta.resolved)}`,
+        `Unlinked match ${formatImpactDelta(summary.delta.legacy_match)}`,
+        `Out of sync ${formatImpactDelta(summary.delta.out_of_sync)}`,
+    ];
+
+    if (summary.delta.blocking !== 0) {
+        parts.push(`Blocking ${formatImpactDelta(summary.delta.blocking)}`);
+    }
+
+    if (summary.delta.total !== 0) {
+        parts.push(`Total ${formatImpactDelta(summary.delta.total)}`);
+    }
+
+    const touchedParts = [
+        summary.touched.screens ? `${summary.touched.screens} screen${summary.touched.screens === 1 ? "" : "s"}` : "",
+        summary.touched.diagnoses ? `${summary.touched.diagnoses} diagnosis${summary.touched.diagnoses === 1 ? "" : "es"}` : "",
+        summary.touched.problems ? `${summary.touched.problems} problem${summary.touched.problems === 1 ? "" : "s"}` : "",
+    ].filter(Boolean);
+
+    return `${parts.join(" · ")}${touchedParts.length ? ` · rescanned ${touchedParts.join(", ")}` : ""}`;
+}
+
+function getImpactSummaryRows(summary?: IntegrityImpactSummary | null) {
+    if (!summary) return [];
+
+    return [
+        { label: "Resolved", value: formatImpactDelta(summary.delta.resolved) },
+        { label: "Unlinked match", value: formatImpactDelta(summary.delta.legacy_match) },
+        { label: "Out of sync", value: formatImpactDelta(summary.delta.out_of_sync) },
+        { label: "Blocking", value: formatImpactDelta(summary.delta.blocking) },
+        { label: "Total", value: formatImpactDelta(summary.delta.total) },
+    ];
+}
+
+function buildTouchedEntitiesLabel(summary?: IntegrityImpactSummary | null) {
+    if (!summary) return "";
+
+    return [
+        summary.touched.screens ? `${summary.touched.screens} screen${summary.touched.screens === 1 ? "" : "s"}` : "",
+        summary.touched.diagnoses ? `${summary.touched.diagnoses} diagnosis${summary.touched.diagnoses === 1 ? "" : "es"}` : "",
+        summary.touched.problems ? `${summary.touched.problems} problem${summary.touched.problems === 1 ? "" : "s"}` : "",
+    ].filter(Boolean).join(", ");
+}
+
+function buildImpactSummaryInlineText(summary?: IntegrityImpactSummary | null) {
+    if (!summary) return "";
+
+    const base = buildImpactSummaryMessage(summary);
+    return base.replaceAll("Â·", "|");
+}
+
 export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
     integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null }) | null;
 }) {
     type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
-    const { viewOnly } = useAppContext();
+    const { viewOnly, authenticatedUser } = useAppContext();
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
@@ -198,6 +283,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
     const [savingResolution, setSavingResolution] = useState(false);
     const [statusHelpOpen, setStatusHelpOpen] = useState(false);
+    const [resolveOutcomeModal, setResolveOutcomeModal] = useState<ResolveOutcomeModalState | null>(null);
     const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
     const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
     const [bulkResolveStatus, setBulkResolveStatus] = useState<null | "out_of_sync" | "legacy_match">(null);
@@ -468,10 +554,21 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 if (!res.changed) {
                     toast.message("No safe change was applied for this reference");
                 } else {
+                    await trackIntegrityDraftChange({
+                        fieldPath: "dataKeyIntegrity",
+                        fieldName: "Data key integrity",
+                        newValue: {
+                            resolvedEntryKey: getEntryKey(entry),
+                            selectedTargetUniqueKey: selectedTargetUniqueKey || null,
+                        },
+                        description: `Resolved data key integrity reference for ${entry.currentKey || entry.currentLabel || entry.location}`,
+                    });
                     toast.success(`Repair draft saved for ${entry.currentKey || entry.currentLabel || entry.location}`);
-                    if (res.warnings?.length) {
-                        toast.message(res.warnings.join(" "));
-                    }
+                    setResolveOutcomeModal({
+                        title: "Registry Updated",
+                        summary: res.impactSummary,
+                        warnings: res.warnings || [],
+                    });
                 }
 
                 setRepairModalEntry(null);
@@ -522,6 +619,31 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         }
     }, [alert, bulkResolvableEntries, isRepairing, loadBulkRepairPreview, loadingBulkPreview, scriptId, setBulkStatusParam, setRepairEntryParam, viewOnly]);
 
+    const trackIntegrityDraftChange = useCallback(async (change: {
+        fieldPath: string;
+        fieldName: string;
+        newValue: unknown;
+        description: string;
+    }) => {
+        try {
+            await pendingChangesAPI.addChange({
+                entityId: scriptId,
+                entityType: "script",
+                entityTitle: title || "Untitled Script",
+                action: "update",
+                fieldPath: change.fieldPath,
+                fieldName: change.fieldName,
+                oldValue: null,
+                newValue: change.newValue,
+                userId: authenticatedUser?.userId,
+                userName: authenticatedUser?.displayName,
+                description: change.description,
+            });
+        } catch {
+            // Local pending-change tracking should never make a successful resolve look like it failed.
+        }
+    }, [authenticatedUser?.displayName, authenticatedUser?.userId, scriptId, title]);
+
     const handleBulkResolve = () => {
         if (!scriptId || viewOnly || isRepairing || !bulkResolveStatus) return;
         const reviewedItems = bulkReviewItems.filter((item) => item.reviewed);
@@ -552,10 +674,21 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 if (!res.changed) {
                     toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
                 } else {
+                    await trackIntegrityDraftChange({
+                        fieldPath: "dataKeyIntegrity.bulk",
+                        fieldName: "Data key integrity bulk resolve",
+                        newValue: {
+                            status: bulkResolveStatus,
+                            resolvedCount: res.resolvedCount,
+                        },
+                        description: `Resolved ${res.resolvedCount} ${bulkResolveStatus.replace(/_/g, " ")} data key integrity reference${res.resolvedCount === 1 ? "" : "s"}`,
+                    });
                     toast.success(`Saved ${res.resolvedCount} ${bulkResolveStatus.replace(/_/g, " ")} repair draft${res.resolvedCount === 1 ? "" : "s"}`);
-                    if (res.warnings?.length) {
-                        toast.message(res.warnings.join(" "));
-                    }
+                    setResolveOutcomeModal({
+                        title: "Registry Updated",
+                        summary: res.impactSummary,
+                        warnings: res.warnings || [],
+                    });
                 }
 
                 closeBulkReviewDrawer();
@@ -838,6 +971,60 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                 </div>
             </Modal>
 
+            <Modal
+                open={!!resolveOutcomeModal}
+                onOpenChange={(open) => {
+                    if (!open) setResolveOutcomeModal(null);
+                }}
+                title={resolveOutcomeModal?.title || "Registry Updated"}
+                description="The script integrity summary was recalculated after saving this draft repair."
+                actions={(
+                    <Button onClick={() => setResolveOutcomeModal(null)}>
+                        Close
+                    </Button>
+                )}
+            >
+                {!resolveOutcomeModal ? null : (
+                    <div className="space-y-4 text-sm">
+                        <div className="rounded-md border p-3 space-y-2">
+                            <div className="font-medium">Why the counts changed</div>
+                            <div className="text-muted-foreground">
+                                A single repair can relink a parent reference and reclassify other references in the same script when the registry is rescanned.
+                            </div>
+                            {!!buildImpactSummaryInlineText(resolveOutcomeModal.summary) && (
+                                <div className="text-muted-foreground">
+                                    Summary: {buildImpactSummaryInlineText(resolveOutcomeModal.summary)}
+                                </div>
+                            )}
+                            {!!buildTouchedEntitiesLabel(resolveOutcomeModal.summary) && (
+                                <div className="text-muted-foreground">
+                                    Persisted changes were rescanned across {buildTouchedEntitiesLabel(resolveOutcomeModal.summary)}.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                            {getImpactSummaryRows(resolveOutcomeModal.summary).map((row) => (
+                                <div key={row.label} className="rounded-md border p-3">
+                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">{row.label}</div>
+                                    <div className="text-2xl font-semibold">{row.value}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {!!resolveOutcomeModal.warnings.length && (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
+                                <div className="font-medium text-amber-950">Additional notes</div>
+                                <ul className="list-disc pl-5 space-y-1 text-amber-900">
+                                    {resolveOutcomeModal.warnings.map((warning, index) => (
+                                        <li key={`${warning}-${index}`}>{warning}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
             <Modal
                 open={!!repairModalEntry}
                 onOpenChange={(open) => {

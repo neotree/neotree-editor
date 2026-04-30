@@ -33,6 +33,7 @@ import {
 } from "@/lib/data-key-integrity"
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
 import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
+import { getAcceptedImportFingerprintLookup } from "./integrity-imports"
 import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -166,29 +167,35 @@ async function getScopedIntegrityData({
 
   const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
   const shouldClassifyLegacyDataKeySyncDrafts = shouldIgnoreDataKeySyncDrafts && hasExistingDataKeyLibraryChanges
-  const draftOriginPrefilter = shouldIgnoreDataKeySyncDrafts && !shouldClassifyLegacyDataKeySyncDrafts
+  const shouldIgnoreImportDrafts = !policy.triggerSources.imports
+  const filteredOrigins = [
+    ...(shouldIgnoreImportDrafts ? ["import"] : []),
+    ...(shouldIgnoreDataKeySyncDrafts && !shouldClassifyLegacyDataKeySyncDrafts ? ["data_key_sync"] : []),
+  ]
+
+  const buildDraftWhereClause = <T extends {
+    createdByUserId: any
+    draftOrigin: any
+  }>(table: T) => {
+    const clauses = [
+      ...(userId ? [eq(table.createdByUserId, userId)] : []),
+      ...filteredOrigins.map((origin) => ne(table.draftOrigin, origin as "import" | "data_key_sync")),
+    ]
+
+    if (!clauses.length) return undefined
+    if (clauses.length === 1) return clauses[0]
+    return and(...clauses)
+  }
 
   const [userScreenDrafts, userDiagnosisDrafts, userProblemDrafts] = await Promise.all([
     db.query.screensDrafts.findMany({
-      where: userId
-        ? (draftOriginPrefilter
-          ? and(eq(screensDrafts.createdByUserId, userId), ne(screensDrafts.draftOrigin, "data_key_sync"))
-          : eq(screensDrafts.createdByUserId, userId))
-        : (draftOriginPrefilter ? ne(screensDrafts.draftOrigin, "data_key_sync") : undefined),
+      where: buildDraftWhereClause(screensDrafts),
     }),
     db.query.diagnosesDrafts.findMany({
-      where: userId
-        ? (draftOriginPrefilter
-          ? and(eq(diagnosesDrafts.createdByUserId, userId), ne(diagnosesDrafts.draftOrigin, "data_key_sync"))
-          : eq(diagnosesDrafts.createdByUserId, userId))
-        : (draftOriginPrefilter ? ne(diagnosesDrafts.draftOrigin, "data_key_sync") : undefined),
+      where: buildDraftWhereClause(diagnosesDrafts),
     }),
     db.query.problemsDrafts.findMany({
-      where: userId
-        ? (draftOriginPrefilter
-          ? and(eq(problemsDrafts.createdByUserId, userId), ne(problemsDrafts.draftOrigin, "data_key_sync"))
-          : eq(problemsDrafts.createdByUserId, userId))
-        : (draftOriginPrefilter ? ne(problemsDrafts.draftOrigin, "data_key_sync") : undefined),
+      where: buildDraftWhereClause(problemsDrafts),
     }),
   ])
 
@@ -291,6 +298,8 @@ async function getScopedIntegrityData({
     effectiveUserScreenDrafts,
     effectiveUserDiagnosisDrafts,
     effectiveUserProblemDrafts,
+    effectiveUserScriptDrafts,
+    hasImportChanges,
     shouldRunIntegrityChecks,
     shouldIncludeDataKeyImpact: evaluatedShouldIncludeDataKeyImpact,
     affectedScriptIds,
@@ -325,7 +334,11 @@ async function getScopedIntegrityData({
     }
   }
 
-  const requestedAffectedScope = policy.scanScope === "affected_scripts_only" && !!userId
+  const forceAffectedScopeForImports = !!userId && policy.triggerSources.imports && hasImportChanges
+  const requestedAffectedScope = !!userId && (
+    policy.scanScope === "affected_scripts_only" ||
+    forceAffectedScopeForImports
+  )
   const hasAffectedScripts = !!affectedScriptIds?.length
   let shouldLimitToAffectedScripts = requestedAffectedScope
   if (requestedAffectedScope && !hasAffectedScripts) {
@@ -659,9 +672,24 @@ export async function publishData({
         policy: integrityPolicyState.policy,
       })
       const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries)
+      const acceptedImportFingerprints =
+        integrityPolicyState.policy.enforcementMode === "block_new_issues_only" && integrityPolicyState.policy.triggerSources.imports
+          ? await getAcceptedImportFingerprintLookup(
+              Array.from(new Set(blockingEntries.map((entry) => entry.scriptId).filter((id): id is string => !!id))),
+            )
+          : new Set<string>()
+      const effectiveBaseline = acceptedImportFingerprints.size
+        ? {
+            ...integrityPolicyState.baseline,
+            fingerprints: Array.from(new Set([
+              ...integrityPolicyState.baseline.fingerprints,
+              ...Array.from(acceptedImportFingerprints),
+            ])),
+          }
+        : integrityPolicyState.baseline
       const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
         policy: integrityPolicyState.policy,
-        baseline: integrityPolicyState.baseline,
+        baseline: effectiveBaseline,
         blockingEntries,
         getFingerprint: getDataKeyIntegrityEntryFingerprint,
       })
