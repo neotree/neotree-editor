@@ -5,6 +5,7 @@ type ScriptDraftLike = {
   scriptId?: string | null
   scriptDraftId?: string | null
   draftOrigin?: IntegrityDraftOrigin
+  updatedAt?: Date | null
   data?: Record<string, any>
 }
 
@@ -18,6 +19,7 @@ type EntityDraftLike = ScriptDraftLike & {
   diagnosisDraftId?: string | null
   problemId?: string | null
   problemDraftId?: string | null
+  updatedAt?: Date | null
 }
 
 type PendingDeletionLike = {
@@ -127,6 +129,58 @@ export function evaluateIntegrityScanScope({
       userProblemDrafts.some((draft) => draft.draftOrigin === "import")
     )
 
+  const importManagedOrigins = new Set<IntegrityDraftOrigin>(["import", "data_key_sync"])
+  const importAllowanceCandidatesByScript = {} as Record<string, {
+    hasImportDraft: boolean
+    hasDataKeySyncDraft: boolean
+    hasManualDraft: boolean
+    hasPendingDeletion: boolean
+    latestImportManagedUpdatedAt: string | null
+  }>
+
+  const ensureImportAllowanceCandidate = (scriptId: string) => {
+    if (!importAllowanceCandidatesByScript[scriptId]) {
+      importAllowanceCandidatesByScript[scriptId] = {
+        hasImportDraft: false,
+        hasDataKeySyncDraft: false,
+        hasManualDraft: false,
+        hasPendingDeletion: false,
+        latestImportManagedUpdatedAt: null,
+      }
+    }
+    return importAllowanceCandidatesByScript[scriptId]
+  }
+
+  const markDraftImportAllowance = (scriptId: string | null | undefined, draftOrigin: IntegrityDraftOrigin | undefined, updatedAt?: Date | null) => {
+    if (!scriptId) return
+    const candidate = ensureImportAllowanceCandidate(scriptId)
+    if (draftOrigin === "import") candidate.hasImportDraft = true
+    if (draftOrigin === "data_key_sync") candidate.hasDataKeySyncDraft = true
+
+    if (!draftOrigin || !importManagedOrigins.has(draftOrigin)) {
+      candidate.hasManualDraft = true
+      return
+    }
+
+    const updatedAtIso = updatedAt ? new Date(updatedAt).toISOString() : null
+    if (updatedAtIso && (!candidate.latestImportManagedUpdatedAt || updatedAtIso > candidate.latestImportManagedUpdatedAt)) {
+      candidate.latestImportManagedUpdatedAt = updatedAtIso
+    }
+  }
+
+  userScriptDrafts.forEach((draft) => markDraftImportAllowance(draft.scriptId || draft.scriptDraftId, draft.draftOrigin, draft.updatedAt))
+  userScreenDrafts.forEach((draft) => markDraftImportAllowance(draft.scriptId || draft.scriptDraftId, draft.draftOrigin, draft.updatedAt))
+  userDiagnosisDrafts.forEach((draft) => markDraftImportAllowance(draft.scriptId || draft.scriptDraftId, draft.draftOrigin, draft.updatedAt))
+  userProblemDrafts.forEach((draft) => markDraftImportAllowance(draft.scriptId || draft.scriptDraftId, draft.draftOrigin, draft.updatedAt))
+
+  userPendingDeletion.forEach((entry) => {
+    [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]
+      .filter((id): id is string => !!id)
+      .forEach((scriptId) => {
+        ensureImportAllowanceCandidate(scriptId).hasPendingDeletion = true
+      })
+  })
+
   const hasScriptFamilyChanges =
     effectiveUserScriptDrafts.length > 0 ||
     filteredUserScreenDrafts.length > 0 ||
@@ -161,6 +215,7 @@ export function evaluateIntegrityScanScope({
     effectiveUserDiagnosisDrafts: filteredUserDiagnosisDrafts,
     effectiveUserProblemDrafts: filteredUserProblemDrafts,
     hasImportChanges,
+    importAllowanceCandidatesByScript,
     hasScriptFamilyChanges,
     shouldRunIntegrityChecks,
     affectedScriptIds,

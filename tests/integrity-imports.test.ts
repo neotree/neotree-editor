@@ -8,8 +8,8 @@ import {
 } from "../lib/integrity-import-acceptance";
 import {
   EMPTY_INTEGRITY_BASELINE,
-  mergeFingerprintsIntoIntegrityBaseline,
-  removeFingerprintsFromIntegrityBaseline,
+  mergeAcceptedImportFingerprintsIntoIntegrityBaseline,
+  removeAcceptedImportFingerprintsFromIntegrityBaseline,
 } from "../lib/integrity-policy";
 import type { DataKeyIntegrityPublishDetails } from "../lib/data-key-integrity";
 
@@ -121,14 +121,21 @@ assert.deepEqual(
 );
 assert.equal((nextMetadata as Record<string, any>).untouched, true, "revoke metadata normalization should preserve unrelated metadata");
 
-const mergedBaseline = mergeFingerprintsIntoIntegrityBaseline(EMPTY_INTEGRITY_BASELINE, fingerprints);
-assert.equal(mergedBaseline.totalBlockingIssues, 3, "accepted import fingerprints should be merged into the effective baseline");
-assert.equal(mergedBaseline.totalScripts, 2, "baseline script counts should be recomputed from merged import fingerprints");
+const mergedBaseline = mergeAcceptedImportFingerprintsIntoIntegrityBaseline(EMPTY_INTEGRITY_BASELINE, fingerprints);
+assert.equal(mergedBaseline.totalBlockingIssues, 0, "accepted import fingerprints should not overwrite captured baseline counts");
+assert.equal(mergedBaseline.totalScripts, 0, "accepted import fingerprints should not rewrite captured baseline script counts");
+assert.deepEqual(mergedBaseline.acceptedImportFingerprints, fingerprints, "accepted import fingerprints should be stored separately from captured baseline fingerprints");
 
-const reducedBaseline = removeFingerprintsFromIntegrityBaseline(mergedBaseline, [
+const reducedBaseline = removeAcceptedImportFingerprintsFromIntegrityBaseline(mergedBaseline, [
   "script-b::field_option_collection::screen-3::loc-c",
 ]);
-assert.equal(reducedBaseline.totalBlockingIssues, 2, "revoking accepted import fingerprints should remove them from the baseline");
-assert.equal(reducedBaseline.totalScripts, 2, "removing one fingerprint should keep remaining script coverage correct");
+assert.deepEqual(
+  reducedBaseline.acceptedImportFingerprints,
+  [
+    "script-a::field::screen-1::loc-a",
+    "script-b::field::screen-2::loc-b",
+  ],
+  "revoking accepted import fingerprints should remove only the accepted import allowance, not the captured baseline",
+);
 
 console.log("integrity imports tests passed");

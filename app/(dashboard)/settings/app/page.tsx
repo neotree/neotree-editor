@@ -16,7 +16,10 @@ export default async function DataKeyIntegrityPolicySettingsPage() {
         _getEditorInfo(),
     ]);
 
-    if (user?.role !== "super_user") {
+    const canManagePolicy = user?.role === "super_user";
+    const canManageImports = user?.role === "super_user" || user?.role === "admin";
+
+    if (!canManageImports) {
         redirect("/");
     }
 
@@ -88,7 +91,8 @@ export default async function DataKeyIntegrityPolicySettingsPage() {
             <Title>Data Key Integrity Policy</Title>
 
             <Content
-                canManage
+                canManagePolicy={canManagePolicy}
+                canManageImports={canManageImports}
                 initialPolicy={integrityPolicyState.policy}
                 initialBaseline={integrityPolicyState.baseline}
                 baselineCapturedBy={baselineCapturedByUser ? {
