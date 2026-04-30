@@ -64,13 +64,13 @@ export type IntegrityFingerprintEntry = {
 };
 
 export const DEFAULT_INTEGRITY_POLICY: IntegrityPolicy = {
-  enforcementMode: "block_new_issues_only",
+  enforcementMode: "off",
   scanScope: "affected_scripts_only",
   triggerSources: {
-    scriptEdits: true,
+    scriptEdits: false,
     dataKeyLibraryEdits: false,
-    deletions: true,
-    imports: true,
+    deletions: false,
+    imports: false,
   },
   useBaseline: true,
 };
@@ -190,6 +190,7 @@ function extractScriptIdsFromFingerprints(fingerprints: string[]) {
       .filter((scriptId): scriptId is string => !!scriptId),
   );
 }
+
 
 export function mergeAcceptedImportFingerprintsIntoIntegrityBaseline(
   baselineValue: Partial<IntegrityBaseline> | null | undefined,

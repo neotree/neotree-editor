@@ -23,7 +23,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
-import { isIntegrityBaselineCompatible, type IntegrityBaseline, type IntegrityPolicy } from "@/lib/integrity-policy";
+import {
+    isIntegrityBaselineCompatible,
+    type IntegrityBaseline,
+    type IntegrityPolicy,
+} from "@/lib/integrity-policy";
 
 type Props = {
     canManagePolicy: boolean;
@@ -170,6 +174,7 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
     const hasActiveTriggers = enabledTriggerCount > 0;
     const scanConfigurationInactive = enforcementDisabled || !hasActiveTriggers;
     const baselineModeActive = policy.enforcementMode === "block_new_issues_only";
+    const enablingEnforcementFromOff = savedPolicy.enforcementMode === "off" && policy.enforcementMode !== "off";
 
     const isDirty = useMemo(() => !arePoliciesEqual(policy, savedPolicy), [policy, savedPolicy]);
     const selectedEnforcementOption = enforcementOptions.find((option) => option.value === policy.enforcementMode);
@@ -208,16 +213,35 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
             setPolicy(res.data.policy);
             setSavedPolicy(res.data.policy);
             setBaseline(res.data.baseline);
+            if (res.data.autoCapturedBaseline) {
+                setBaselineCapturedByState(currentUser || baselineCapturedBy || null);
+            }
             setAuditPage(1);
-            setAuditEntriesState((current) => [{
-                action: "policy_updated",
-                createdAt: new Date().toISOString(),
-                actor: currentUser || null,
-                metadata: {},
-            }, ...current].slice(0, maxAuditEntries));
+            setAuditEntriesState((current) => [
+                ...(res.data.autoCapturedBaseline ? [{
+                    action: "baseline_captured",
+                    createdAt: new Date().toISOString(),
+                    actor: currentUser || null,
+                    metadata: {
+                        totalBlockingIssues: res.data.baseline.totalBlockingIssues,
+                        totalScripts: res.data.baseline.totalScripts,
+                        automatic: true,
+                        reason: "auto_enablement_capture",
+                    },
+                }] : []),
+                {
+                    action: "policy_updated",
+                    createdAt: new Date().toISOString(),
+                    actor: currentUser || null,
+                    metadata: {},
+                },
+                ...current,
+            ].slice(0, maxAuditEntries));
             alert({
                 title: "Integrity policy updated",
-                message: "Publish integrity settings were saved successfully.",
+                message: res.data.autoCapturedBaseline
+                    ? "Publish integrity settings were saved successfully, and a fresh baseline was captured automatically."
+                    : "Publish integrity settings were saved successfully.",
                 variant: "success",
             });
         } catch (e: any) {
@@ -390,6 +414,15 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                         {!enforcementDisabled && !hasActiveTriggers && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                                 All trigger sources are off. This policy will not run any integrity scans until at least one trigger source is enabled.
+                            </div>
+                        )}
+
+                        {enablingEnforcementFromOff && (
+                            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                                <div className="font-medium">Fresh baseline will be captured automatically</div>
+                                <div className="mt-1">
+                                    Saving this policy will automatically capture a new published baseline first, then re-enable integrity scanning with that baseline in place.
+                                </div>
                             </div>
                         )}
 
@@ -573,7 +606,9 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                                 disabled={!canManagePolicy || loading || !isDirty}
                                 onClick={() => confirm(savePolicy, {
                                     title: "Save integrity policy",
-                                    message: "These settings will affect publish validation for all users.",
+                                    message: enablingEnforcementFromOff
+                                        ? "These settings will affect publish validation for all users. A fresh published baseline will be captured automatically before integrity scanning is turned back on."
+                                        : "These settings will affect publish validation for all users.",
                                     danger: true,
                                     positiveLabel: "Save policy",
                                 })}
@@ -833,12 +868,21 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                                 <div className="space-y-3">
                                 {visibleAuditEntries.map((entry, index) => (
                                     <div key={`${entry.action}-${entry.createdAt}-${index}`} className="rounded-md border p-3">
-                                        <div className="font-medium">{formatAuditAction(entry.action)}</div>
+                                        <div className="font-medium">
+                                            {entry.action === "baseline_captured" && entry.metadata?.automatic
+                                                ? "Baseline captured automatically"
+                                                : formatAuditAction(entry.action)}
+                                        </div>
                                         <div className="text-sm text-muted-foreground">
                                             {formatDate(entry.createdAt)} - {entry.actor?.displayName || entry.actor?.email || "Unknown user"}
                                         </div>
                                         {!!entry.actor?.email && (
                                             <div className="text-xs text-muted-foreground">{entry.actor.email}</div>
+                                        )}
+                                        {entry.action === "policy_updated" && entry.metadata?.automaticBaselineCapture && (
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                                A fresh published baseline was captured automatically before enforcement was turned back on.
+                                            </div>
                                         )}
                                         {!!entry.metadata?.totalBlockingIssues && (
                                             <div className="mt-2 text-sm text-muted-foreground">

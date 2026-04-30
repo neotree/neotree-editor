@@ -383,13 +383,13 @@ export const editorInfo = pgTable("nt_editor_info", {
   lastPublishDate: timestamp("last_publish_date"),
   lastDataKeysSyncDate: timestamp("last_data_keys_sync_date"),
   integrityPolicy: jsonb("integrity_policy").$type<IntegrityPolicy>().default({
-    enforcementMode: "block_new_issues_only",
+    enforcementMode: "off",
     scanScope: "affected_scripts_only",
     triggerSources: {
-      scriptEdits: true,
+      scriptEdits: false,
       dataKeyLibraryEdits: false,
-      deletions: true,
-      imports: true,
+      deletions: false,
+      imports: false,
     },
     useBaseline: true,
   }).notNull(),
@@ -401,6 +401,8 @@ export const editorInfo = pgTable("nt_editor_info", {
     fingerprintVersion: 1,
     ruleSetVersion: "2026-04-26",
     fingerprints: [],
+    acceptedImportFingerprints: [],
+    acceptedImportFingerprintRefs: {},
   }).notNull(),
 })
 
