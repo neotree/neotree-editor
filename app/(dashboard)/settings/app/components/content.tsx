@@ -595,7 +595,7 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                                 </div>
                                 {!baselineModeActive && (
                                     <div className="mt-2 text-xs text-muted-foreground">
-                                        You can still capture or clear the baseline now for future use, but it will not affect publish behavior until "Block new issues only" is selected.
+                                        You can still capture or clear the baseline now for future use, but it will not affect publish behavior until &quot;Block new issues only&quot; is selected.
                                     </div>
                                 )}
                             </div>
@@ -909,31 +909,32 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                 </Card>
             </div>
 
-            <Modal
-                open={!!selectedImportSnapshot}
-                onOpenChange={(open) => {
-                    if (!open) setSelectedImportSnapshotId(null);
-                }}
-                title={selectedImportSnapshot?.sourceLabel || "Import snapshot details"}
-                description={selectedImportSnapshot ? `${selectedImportSnapshot.status.replaceAll("_", " ")} import integrity snapshot` : undefined}
-                actions={(
-                    <>
-                        <div className="text-xs text-muted-foreground">
-                            Import debt is tracked separately from the global legacy baseline.
-                        </div>
-                        <div className="flex-1" />
-                        <Button
-                            variant="ghost"
-                            disabled={loading}
-                            onClick={() => setSelectedImportSnapshotId(null)}
-                        >
-                            Close
-                        </Button>
-                    </>
-                )}
-                contentProps={{ className: "sm:max-w-4xl" }}
-            >
-                {!selectedImportSnapshot ? null : (() => {
+            {!selectedImportSnapshot ? null : (
+                <Modal
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setSelectedImportSnapshotId(null);
+                    }}
+                    title={selectedImportSnapshot.sourceLabel || "Import snapshot details"}
+                    description={`${selectedImportSnapshot.status.replaceAll("_", " ")} import integrity snapshot`}
+                    actions={(
+                        <>
+                            <div className="text-xs text-muted-foreground">
+                                Import debt is tracked separately from the global legacy baseline.
+                            </div>
+                            <div className="flex-1" />
+                            <Button
+                                variant="ghost"
+                                disabled={loading}
+                                onClick={() => setSelectedImportSnapshotId(null)}
+                            >
+                                Close
+                            </Button>
+                        </>
+                    )}
+                    contentProps={{ className: "sm:max-w-4xl" }}
+                >
+                    {(() => {
                     const reviewDetails = selectedImportSnapshot.metadata?.reviewDetails as {
                         totalIssues?: number;
                         totalScripts?: number;
@@ -959,8 +960,8 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                         ? selectedImportSnapshot.metadata.acceptedScriptIds.filter((value: unknown): value is string => typeof value === "string" && !!value)
                         : [];
 
-                    return (
-                        <div className="space-y-4">
+                        return (
+                            <div className="space-y-4">
                             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                                 <div className="rounded-md border p-4">
                                     <div className="text-sm text-muted-foreground">Created</div>
@@ -1048,10 +1049,11 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                                     })}
                                 </div>
                             </ScrollArea>
-                        </div>
-                    );
-                })()}
-            </Modal>
+                            </div>
+                        );
+                    })()}
+                </Modal>
+            )}
         </>
     );
 }
