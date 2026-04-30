@@ -158,6 +158,27 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.title1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title1',
+                fieldValue: s.title1,
+            });
+        }
+
+        if (`${s.title2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title2',
+                fieldValue: s.title2,
+            });
+        }
+
+        if (`${s.title3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title3',
+                fieldValue: s.title3,
+            });
+        }
+
         if (`${s.key || ''}`.match(searchRegex)) {
             matches.push({
                 field: 'key',
