@@ -26,7 +26,8 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isIntegrityBaselineCompatible, type IntegrityBaseline, type IntegrityPolicy } from "@/lib/integrity-policy";
 
 type Props = {
-    canManage: boolean;
+    canManagePolicy: boolean;
+    canManageImports: boolean;
     initialPolicy: IntegrityPolicy;
     initialBaseline: IntegrityBaseline;
     baselineCapturedBy?: {
@@ -139,7 +140,7 @@ function formatAuditAction(action: string) {
     }
 }
 
-export function Content({ canManage, initialPolicy, initialBaseline, baselineCapturedBy, currentUser, auditEntries = [], importSnapshots = [] }: Props) {
+export function Content({ canManagePolicy, canManageImports, initialPolicy, initialBaseline, baselineCapturedBy, currentUser, auditEntries = [], importSnapshots = [] }: Props) {
     const router = useRouter();
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
@@ -367,9 +368,9 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                     </CardHeader>
 
                     <CardContent className="space-y-6">
-                        {!canManage && (
+                        {!canManagePolicy && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                You can view the current integrity policy, but only super admins can change it.
+                                You can view the current integrity policy, but only super admins can change policy settings and baseline snapshots.
                             </div>
                         )}
 
@@ -397,7 +398,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Label>Enforcement mode</Label>
                                 <Select
                                     value={policy.enforcementMode}
-                                    disabled={!canManage || loading}
+                                    disabled={!canManagePolicy || loading}
                                     onValueChange={(value) => setPolicy((current) => ({
                                         ...current,
                                         enforcementMode: value as IntegrityPolicy["enforcementMode"],
@@ -423,7 +424,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Label>Scan scope</Label>
                                 <Select
                                     value={policy.scanScope}
-                                    disabled={!canManage || loading || scanConfigurationInactive}
+                                    disabled={!canManagePolicy || loading || scanConfigurationInactive}
                                     onValueChange={(value) => setPolicy((current) => ({
                                         ...current,
                                         scanScope: value as IntegrityPolicy["scanScope"],
@@ -460,7 +461,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-script-edits"
                                     checked={policy.triggerSources.scriptEdits}
-                                    disabled={!canManage || loading || enforcementDisabled}
+                                    disabled={!canManagePolicy || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -481,7 +482,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-datakey-edits"
                                     checked={policy.triggerSources.dataKeyLibraryEdits}
-                                    disabled={!canManage || loading || enforcementDisabled}
+                                    disabled={!canManagePolicy || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -508,7 +509,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-deletions"
                                     checked={policy.triggerSources.deletions}
-                                    disabled={!canManage || loading || enforcementDisabled}
+                                    disabled={!canManagePolicy || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -529,7 +530,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-imports"
                                     checked={policy.triggerSources.imports}
-                                    disabled={!canManage || loading || enforcementDisabled}
+                                    disabled={!canManagePolicy || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -569,7 +570,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
 
                         <div className="flex justify-end">
                             <Button
-                                disabled={!canManage || loading || !isDirty}
+                                disabled={!canManagePolicy || loading || !isDirty}
                                 onClick={() => confirm(savePolicy, {
                                     title: "Save integrity policy",
                                     message: "These settings will affect publish validation for all users.",
@@ -631,7 +632,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                         <div className="flex flex-wrap justify-end gap-3">
                             <Button
                                 variant="outline"
-                                disabled={!canManage || loading || !hasCapturedBaseline}
+                                disabled={!canManagePolicy || loading || !hasCapturedBaseline}
                                 onClick={() => confirm(clearBaseline, {
                                     title: "Clear integrity baseline",
                                     message: "This will remove the captured legacy baseline. Future publishes in \"block new issues only\" mode will fall back to warn-only until a new baseline is captured.",
@@ -643,7 +644,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                             </Button>
 
                             <Button
-                                disabled={!canManage || loading}
+                                disabled={!canManagePolicy || loading}
                                 onClick={() => confirm(captureBaseline, {
                                     title: "Capture integrity baseline",
                                     message: "This will capture the current global set of blocking integrity issues and treat them as known legacy debt for \"block new issues only\" mode.",
@@ -717,7 +718,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                                         </Button>
                                                         {snapshot.status === "pending_review" && (
                                                             <Button
-                                                                disabled={!canManage || loading}
+                                                                disabled={!canManageImports || loading}
                                                                 onClick={() => confirm(() => acceptImportSnapshot(snapshot.snapshotId), {
                                                                     title: "Accept imported issues",
                                                                     message: "This will allow the imported issues in this snapshot without merging them into the global baseline.",
@@ -731,7 +732,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                                         {snapshot.status === "accepted" && (
                                                             <Button
                                                                 variant="outline"
-                                                                disabled={!canManage || loading}
+                                                                disabled={!canManageImports || loading}
                                                                 onClick={() => confirm(() => revokeImportSnapshot(snapshot.snapshotId), {
                                                                     title: "Revoke accepted import issues",
                                                                     message: "This will remove the accepted import snapshot from publish allowances.",
@@ -774,7 +775,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                                                             </Button>
                                                                             {snapshot.status === "pending_review" && !scriptAccepted && (
                                                                                 <Button
-                                                                                    disabled={!canManage || loading}
+                                                                                    disabled={!canManageImports || loading}
                                                                                     onClick={() => confirm(() => acceptImportSnapshot(snapshot.snapshotId, [script.scriptId]), {
                                                                                         title: "Accept imported script issues",
                                                                                         message: "This will allow the imported issues for this script only, without accepting the entire import snapshot.",

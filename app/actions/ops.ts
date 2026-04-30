@@ -33,7 +33,7 @@ import {
 } from "@/lib/data-key-integrity"
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
 import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
-import { getAcceptedImportFingerprintLookup } from "./integrity-imports"
+import { getAcceptedImportFingerprintLookup, getAcceptedImportScriptAllowanceLookup } from "./integrity-imports"
 import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
@@ -140,6 +140,14 @@ async function getScopedIntegrityData({
   diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
   problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
   shouldRunIntegrityChecks: boolean
+  hasImportChanges: boolean
+  importAllowanceCandidatesByScript: Record<string, {
+    hasImportDraft: boolean
+    hasDataKeySyncDraft: boolean
+    hasManualDraft: boolean
+    hasPendingDeletion: boolean
+    latestImportManagedUpdatedAt: string | null
+  }>
 }> {
   const [userDataKeyDrafts, userScriptDrafts, userPendingDeletion] = await Promise.all([
     db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined }),
@@ -243,6 +251,8 @@ async function getScopedIntegrityData({
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: true,
+      hasImportChanges: false,
+      importAllowanceCandidatesByScript: {},
     }
   }
 
@@ -287,6 +297,8 @@ async function getScopedIntegrityData({
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: true,
+      hasImportChanges: false,
+      importAllowanceCandidatesByScript: {},
     }
   }
 
@@ -300,6 +312,7 @@ async function getScopedIntegrityData({
     effectiveUserProblemDrafts,
     effectiveUserScriptDrafts,
     hasImportChanges,
+    importAllowanceCandidatesByScript,
     shouldRunIntegrityChecks,
     shouldIncludeDataKeyImpact: evaluatedShouldIncludeDataKeyImpact,
     affectedScriptIds,
@@ -331,6 +344,8 @@ async function getScopedIntegrityData({
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks,
+      hasImportChanges,
+      importAllowanceCandidatesByScript,
     }
   }
 
@@ -357,6 +372,8 @@ async function getScopedIntegrityData({
       diagnosesRes: { data: [], errors: undefined },
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: false,
+      hasImportChanges,
+      importAllowanceCandidatesByScript,
     }
     }
   }
@@ -493,6 +510,8 @@ async function getScopedIntegrityData({
       errors: publishedProblemsRes.errors,
     },
     shouldRunIntegrityChecks,
+    hasImportChanges,
+    importAllowanceCandidatesByScript,
   }
 }
 
@@ -622,6 +641,8 @@ export async function publishData({
       diagnosesRes,
       problemsRes,
       shouldRunIntegrityChecks,
+      hasImportChanges,
+      importAllowanceCandidatesByScript,
     } = await getScopedIntegrityData({
       userId,
       policy: integrityPolicyState.policy,
@@ -672,12 +693,31 @@ export async function publishData({
         policy: integrityPolicyState.policy,
       })
       const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries)
+      const blockingScriptIds = Array.from(new Set(blockingEntries.map((entry) => entry.scriptId).filter((id): id is string => !!id)))
       const acceptedImportFingerprints =
         integrityPolicyState.policy.enforcementMode === "block_new_issues_only" && integrityPolicyState.policy.triggerSources.imports
           ? await getAcceptedImportFingerprintLookup(
-              Array.from(new Set(blockingEntries.map((entry) => entry.scriptId).filter((id): id is string => !!id))),
+              blockingScriptIds,
             )
           : new Set<string>()
+      const acceptedImportScriptIds =
+        integrityPolicyState.policy.enforcementMode === "block_new_issues_only" &&
+        integrityPolicyState.policy.triggerSources.imports &&
+        hasImportChanges
+          ? await getAcceptedImportScriptAllowanceLookup(blockingScriptIds)
+          : new Map<string, string>()
+      const acceptedImportScriptAllowance = new Set(
+        Array.from(acceptedImportScriptIds.entries())
+          .filter(([scriptId, acceptedAt]) => {
+            const candidate = importAllowanceCandidatesByScript[scriptId]
+            if (!candidate) return false
+            if (candidate.hasManualDraft || candidate.hasPendingDeletion) return false
+            if (!candidate.hasImportDraft && !candidate.hasDataKeySyncDraft) return false
+            if (!candidate.latestImportManagedUpdatedAt) return false
+            return candidate.latestImportManagedUpdatedAt <= acceptedAt
+          })
+          .map(([scriptId]) => scriptId),
+      )
       const effectiveBaseline = acceptedImportFingerprints.size
         ? {
             ...integrityPolicyState.baseline,
@@ -693,11 +733,21 @@ export async function publishData({
         blockingEntries,
         getFingerprint: getDataKeyIntegrityEntryFingerprint,
       })
-      const enforcedBlockingEntries = policyEvaluation.enforcedBlockingEntries
+      const importAllowanceFilteredEntries = acceptedImportScriptAllowance.size
+        ? policyEvaluation.enforcedBlockingEntries.filter((entry) => !acceptedImportScriptAllowance.has(entry.scriptId))
+        : policyEvaluation.enforcedBlockingEntries
+      const acceptedImportScriptAllowanceCount =
+        policyEvaluation.enforcedBlockingEntries.length - importAllowanceFilteredEntries.length
+      const enforcedBlockingEntries = importAllowanceFilteredEntries
       const policyWarnings = policyEvaluation.warnings
 
       if (policyWarnings.length) {
         results.warnings = [...(results.warnings || []), policyEvaluation.policyModeMessage, ...policyWarnings]
+      } else if (acceptedImportScriptAllowanceCount > 0) {
+        results.warnings = [
+          ...(results.warnings || []),
+          `Accepted import review allowance suppressed ${acceptedImportScriptAllowanceCount} blocking issue${acceptedImportScriptAllowanceCount === 1 ? "" : "s"} in imported scripts for this publish.`,
+        ]
       }
 
       if (enforcedBlockingEntries.length) {

@@ -60,16 +60,16 @@ export async function _deleteScripts(
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
             ));
 
-        scriptsToDelete = scriptsToDelete.map(s => ({
-            ...s,
-            createdByUserId: userId,
-        }));
-
         if (scriptsToDelete.length) {
-            await db.insert(pendingDeletion).values(scriptsToDelete.map(s => ({ scriptId: s.scriptId, })));
-            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
-            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
-            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), });
+            await db.insert(pendingDeletion).values(
+                scriptsToDelete.map(s => ({
+                    scriptId: s.scriptId,
+                    createdByUserId: userId,
+                }))
+            );
+            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
+            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
+            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
         }
 
         response.success = true;

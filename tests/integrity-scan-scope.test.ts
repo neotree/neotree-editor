@@ -23,6 +23,7 @@ const importedScreenDraft = {
   screenId: "screen-4",
   scriptId: "script-4",
   draftOrigin: "import" as const,
+  updatedAt: new Date("2026-04-30T10:00:00.000Z"),
   data: { screenId: "screen-4", title: "Imported" },
 }
 
@@ -139,6 +140,43 @@ const importsIncluded = evaluateIntegrityScanScope({
 
 assert.equal(importsIncluded.shouldRunIntegrityChecks, true, "import drafts should trigger scans when imports are enabled")
 assert.deepEqual(importsIncluded.affectedScriptIds, ["script-4"], "import drafts should participate in affected script scope when enabled")
+assert.deepEqual(
+  importsIncluded.importAllowanceCandidatesByScript,
+  {
+    "script-4": {
+      hasImportDraft: true,
+      hasDataKeySyncDraft: false,
+      hasManualDraft: false,
+      hasPendingDeletion: false,
+      latestImportManagedUpdatedAt: "2026-04-30T10:00:00.000Z",
+    },
+  },
+  "pure import-managed scripts should expose import allowance candidate details"
+)
+
+const mixedImportAndManual = evaluateIntegrityScanScope({
+  policy: policyImportsOn,
+  userScriptDrafts: [],
+  userScreenDrafts: [
+    importedScreenDraft,
+    { ...manualScreenDraft, scriptId: "script-4", screenId: "screen-5", updatedAt: new Date("2026-04-30T10:05:00.000Z") },
+  ],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  mixedImportAndManual.importAllowanceCandidatesByScript["script-4"]?.hasManualDraft,
+  true,
+  "scripts with mixed import and manual changes should be marked as manually changed for publish allowance filtering"
+)
 
 const propagatedIncluded = evaluateIntegrityScanScope({
   policy: policyDataKeysOn,

@@ -26,6 +26,8 @@ export type IntegrityBaseline = {
   fingerprintVersion: number;
   ruleSetVersion: string;
   fingerprints: string[];
+  acceptedImportFingerprints: string[];
+  acceptedImportFingerprintRefs: Record<string, number>;
 };
 
 export type IntegrityPolicyState = {
@@ -84,6 +86,8 @@ export const EMPTY_INTEGRITY_BASELINE: IntegrityBaseline = {
   fingerprintVersion: INTEGRITY_BASELINE_FINGERPRINT_VERSION,
   ruleSetVersion: INTEGRITY_BASELINE_RULESET_VERSION,
   fingerprints: [],
+  acceptedImportFingerprints: [],
+  acceptedImportFingerprintRefs: {},
 };
 
 export function normalizeIntegrityPolicy(
@@ -122,6 +126,17 @@ export function normalizeIntegrityPolicy(
 export function normalizeIntegrityBaseline(
   value?: Partial<IntegrityBaseline> | null,
 ): IntegrityBaseline {
+  const acceptedImportFingerprintRefs = value?.acceptedImportFingerprintRefs && typeof value.acceptedImportFingerprintRefs === "object"
+    ? Object.fromEntries(
+        Object.entries(value.acceptedImportFingerprintRefs)
+          .filter(([fingerprint, count]) => typeof fingerprint === "string" && !!fingerprint && typeof count === "number" && count > 0)
+          .map(([fingerprint, count]) => [fingerprint, Math.floor(count as number)]),
+      )
+    : {};
+  const acceptedImportFingerprints = Array.isArray(value?.acceptedImportFingerprints)
+    ? value!.acceptedImportFingerprints.filter((item): item is string => typeof item === "string" && !!item)
+    : Object.keys(acceptedImportFingerprintRefs);
+
   return {
     capturedAt: value?.capturedAt || null,
     capturedByUserId: value?.capturedByUserId || null,
@@ -139,6 +154,8 @@ export function normalizeIntegrityBaseline(
     fingerprints: Array.isArray(value?.fingerprints)
       ? value!.fingerprints.filter((item): item is string => typeof item === "string" && !!item)
       : [],
+    acceptedImportFingerprints: Array.from(new Set(acceptedImportFingerprints)).sort(),
+    acceptedImportFingerprintRefs,
   };
 }
 
@@ -160,11 +177,10 @@ export function getIntegrityBaselineLookup(
   value?: Partial<IntegrityBaseline> | null,
 ) {
   const baseline = normalizeIntegrityBaseline(value);
-  if (!isIntegrityBaselineCompatible(baseline)) {
-    return new Set<string>();
-  }
-
-  return new Set(baseline.fingerprints);
+  return new Set<string>([
+    ...(isIntegrityBaselineCompatible(baseline) ? baseline.fingerprints : []),
+    ...baseline.acceptedImportFingerprints,
+  ]);
 }
 
 function extractScriptIdsFromFingerprints(fingerprints: string[]) {
@@ -175,47 +191,42 @@ function extractScriptIdsFromFingerprints(fingerprints: string[]) {
   );
 }
 
-export function mergeFingerprintsIntoIntegrityBaseline(
+export function mergeAcceptedImportFingerprintsIntoIntegrityBaseline(
   baselineValue: Partial<IntegrityBaseline> | null | undefined,
   fingerprints: string[],
 ) {
-  const baseline = isIntegrityBaselineCompatible(baselineValue)
-    ? normalizeIntegrityBaseline(baselineValue)
-    : { ...EMPTY_INTEGRITY_BASELINE };
-
-  const mergedFingerprints = Array.from(new Set([
-    ...baseline.fingerprints,
-    ...fingerprints.filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && !!fingerprint),
-  ])).sort();
-  const scriptIds = extractScriptIdsFromFingerprints(mergedFingerprints);
+  const baseline = normalizeIntegrityBaseline(baselineValue);
+  const nextRefs = { ...baseline.acceptedImportFingerprintRefs };
+  for (const fingerprint of fingerprints) {
+    if (typeof fingerprint !== "string" || !fingerprint) continue;
+    nextRefs[fingerprint] = (nextRefs[fingerprint] || 0) + 1;
+  }
+  const acceptedImportFingerprints = Object.keys(nextRefs).sort();
 
   return {
     ...baseline,
-    totalBlockingIssues: mergedFingerprints.length,
-    totalScripts: scriptIds.size,
-    fingerprints: mergedFingerprints,
+    acceptedImportFingerprints,
+    acceptedImportFingerprintRefs: nextRefs,
   };
 }
 
-export function removeFingerprintsFromIntegrityBaseline(
+export function removeAcceptedImportFingerprintsFromIntegrityBaseline(
   baselineValue: Partial<IntegrityBaseline> | null | undefined,
   fingerprintsToRemove: string[],
 ) {
-  const baseline = isIntegrityBaselineCompatible(baselineValue)
-    ? normalizeIntegrityBaseline(baselineValue)
-    : { ...EMPTY_INTEGRITY_BASELINE };
-
-  const removalSet = new Set(
-    fingerprintsToRemove.filter((fingerprint): fingerprint is string => typeof fingerprint === "string" && !!fingerprint),
-  );
-  const remainingFingerprints = baseline.fingerprints.filter((fingerprint) => !removalSet.has(fingerprint));
-  const scriptIds = extractScriptIdsFromFingerprints(remainingFingerprints);
+  const baseline = normalizeIntegrityBaseline(baselineValue);
+  const nextRefs = { ...baseline.acceptedImportFingerprintRefs };
+  for (const fingerprint of fingerprintsToRemove) {
+    if (typeof fingerprint !== "string" || !fingerprint || !nextRefs[fingerprint]) continue;
+    nextRefs[fingerprint] -= 1;
+    if (nextRefs[fingerprint] <= 0) delete nextRefs[fingerprint];
+  }
+  const acceptedImportFingerprints = Object.keys(nextRefs).sort();
 
   return {
     ...baseline,
-    totalBlockingIssues: remainingFingerprints.length,
-    totalScripts: scriptIds.size,
-    fingerprints: remainingFingerprints,
+    acceptedImportFingerprints,
+    acceptedImportFingerprintRefs: nextRefs,
   };
 }
 

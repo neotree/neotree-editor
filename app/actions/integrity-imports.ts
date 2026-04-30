@@ -7,8 +7,8 @@ import { integrityImportSnapshots, adminAuditLogs } from "@/databases/pg/schema"
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 import {
-  mergeFingerprintsIntoIntegrityBaseline,
-  removeFingerprintsFromIntegrityBaseline,
+  mergeAcceptedImportFingerprintsIntoIntegrityBaseline,
+  removeAcceptedImportFingerprintsFromIntegrityBaseline,
   type IntegrityPolicy,
 } from "@/lib/integrity-policy";
 import { buildIntegrityImportSnapshot, buildIntegrityImportReviewDetails } from "@/lib/integrity-imports";
@@ -155,7 +155,7 @@ export async function acceptIntegrityImportSnapshot(
 
     await db.transaction(async (tx) => {
       const currentEditorInfo = await tx.query.editorInfo.findFirst();
-      const nextBaseline = mergeFingerprintsIntoIntegrityBaseline(
+      const nextBaseline = mergeAcceptedImportFingerprintsIntoIntegrityBaseline(
         currentEditorInfo?.integrityBaseline as Record<string, any> | null | undefined,
         selectedFingerprints,
       );
@@ -290,7 +290,7 @@ export async function revokeIntegrityImportSnapshot(snapshotId: string) {
       }
 
       const currentEditorInfo = await tx.query.editorInfo.findFirst();
-      const nextBaseline = removeFingerprintsFromIntegrityBaseline(
+      const nextBaseline = removeAcceptedImportFingerprintsFromIntegrityBaseline(
         currentEditorInfo?.integrityBaseline as Record<string, any> | null | undefined,
         revokedFingerprints,
       );
@@ -364,4 +364,37 @@ export async function getAcceptedImportFingerprintLookup(scriptIds?: string[]) {
         : []
     )),
   );
+}
+
+export async function getAcceptedImportScriptAllowanceLookup(scriptIds?: string[]) {
+  const rows = await db.query.integrityImportSnapshots.findMany({
+    where: eq(integrityImportSnapshots.status, "accepted"),
+  });
+
+  const scopedRows = scriptIds?.length
+    ? rows.filter((row) => {
+        const importedScriptIds = Array.isArray(row.importedScriptIds) ? row.importedScriptIds : [];
+        return importedScriptIds.some((scriptId) => scriptIds.includes(scriptId));
+      })
+    : rows;
+
+  const lookup = new Map<string, string>();
+
+  scopedRows.forEach((row) => {
+    const acceptedAtIso = row.acceptedAt ? new Date(row.acceptedAt).toISOString() : null;
+    if (!acceptedAtIso) return;
+
+    const importedScriptIds = Array.isArray(row.importedScriptIds)
+      ? row.importedScriptIds.filter((value): value is string => typeof value === "string" && !!value)
+      : [];
+
+    importedScriptIds.forEach((scriptId) => {
+      const currentAcceptedAt = lookup.get(scriptId);
+      if (!currentAcceptedAt || acceptedAtIso > currentAcceptedAt) {
+        lookup.set(scriptId, acceptedAtIso);
+      }
+    });
+  });
+
+  return lookup;
 }
