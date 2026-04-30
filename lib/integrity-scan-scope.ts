@@ -4,6 +4,8 @@ import { isLegacyAutoSyncDraft, type IntegrityDraftOrigin } from "./integrity-dr
 type ScriptDraftLike = {
   scriptId?: string | null
   scriptDraftId?: string | null
+  draftOrigin?: IntegrityDraftOrigin
+  data?: Record<string, any>
 }
 
 type EntityDraftLike = ScriptDraftLike & {
@@ -71,6 +73,11 @@ export function evaluateIntegrityScanScope({
 
   const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
   const shouldClassifyLegacyDataKeySyncDrafts = shouldIgnoreDataKeySyncDrafts && hasExistingDataKeyLibraryChanges
+  const shouldIgnoreImportDrafts = !policy.triggerSources.imports
+
+  const effectiveUserScriptDrafts = shouldIgnoreImportDrafts
+    ? userScriptDrafts.filter((draft) => draft.draftOrigin !== "import")
+    : userScriptDrafts
 
   const effectiveUserScreenDrafts = shouldIgnoreDataKeySyncDrafts
     ? userScreenDrafts.filter((draft) => !isLegacyAutoSyncDraft(
@@ -102,27 +109,45 @@ export function evaluateIntegrityScanScope({
         },
       ))
     : userProblemDrafts
+  const filteredUserScreenDrafts = shouldIgnoreImportDrafts
+    ? effectiveUserScreenDrafts.filter((draft) => draft.draftOrigin !== "import")
+    : effectiveUserScreenDrafts
+  const filteredUserDiagnosisDrafts = shouldIgnoreImportDrafts
+    ? effectiveUserDiagnosisDrafts.filter((draft) => draft.draftOrigin !== "import")
+    : effectiveUserDiagnosisDrafts
+  const filteredUserProblemDrafts = shouldIgnoreImportDrafts
+    ? effectiveUserProblemDrafts.filter((draft) => draft.draftOrigin !== "import")
+    : effectiveUserProblemDrafts
+
+  const hasImportChanges =
+    !shouldIgnoreImportDrafts && (
+      userScriptDrafts.some((draft) => draft.draftOrigin === "import") ||
+      userScreenDrafts.some((draft) => draft.draftOrigin === "import") ||
+      userDiagnosisDrafts.some((draft) => draft.draftOrigin === "import") ||
+      userProblemDrafts.some((draft) => draft.draftOrigin === "import")
+    )
 
   const hasScriptFamilyChanges =
-    userScriptDrafts.length > 0 ||
-    effectiveUserScreenDrafts.length > 0 ||
-    effectiveUserDiagnosisDrafts.length > 0 ||
-    effectiveUserProblemDrafts.length > 0 ||
+    effectiveUserScriptDrafts.length > 0 ||
+    filteredUserScreenDrafts.length > 0 ||
+    filteredUserDiagnosisDrafts.length > 0 ||
+    filteredUserProblemDrafts.length > 0 ||
     userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
 
   const shouldRunIntegrityChecks =
     policy.enforcementMode !== "off" &&
     (
       (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) ||
+      (policy.triggerSources.imports && hasImportChanges) ||
       (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
       (policy.triggerSources.deletions && deletedDataKeyIdsSize > 0)
     )
 
   const affectedScriptIds = Array.from(new Set([
-    ...userScriptDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...effectiveUserProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...effectiveUserScriptDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...filteredUserScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...filteredUserDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
+    ...filteredUserProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
     ...(shouldIncludeDataKeyImpact ? dataKeyImpactScriptIds : []),
   ]))
@@ -131,9 +156,11 @@ export function evaluateIntegrityScanScope({
     shouldIncludeDataKeyImpact,
     shouldIgnoreDataKeySyncDrafts,
     shouldClassifyLegacyDataKeySyncDrafts,
-    effectiveUserScreenDrafts,
-    effectiveUserDiagnosisDrafts,
-    effectiveUserProblemDrafts,
+    effectiveUserScriptDrafts,
+    effectiveUserScreenDrafts: filteredUserScreenDrafts,
+    effectiveUserDiagnosisDrafts: filteredUserDiagnosisDrafts,
+    effectiveUserProblemDrafts: filteredUserProblemDrafts,
+    hasImportChanges,
     hasScriptFamilyChanges,
     shouldRunIntegrityChecks,
     affectedScriptIds,

@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSites } from "@/hooks/use-sites";
 import { ErrorCard } from "@/components/error-card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
     siteId: '',
@@ -55,6 +56,7 @@ export function ScriptsImportModal({
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
+    const [importReview, setImportReview] = useState<NonNullable<Awaited<ReturnType<typeof copyScripts>>['integrityImportReview']> | null>(null);
     const { sites, loading: sitesLoading, } = useSites({
         onLoadSitesError: () => onOpenChange(false),
     });
@@ -103,14 +105,28 @@ export function ScriptsImportModal({
             });
             const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
 
+            if (!res.success) throw new Error(res.errors?.join(', ') || 'Failed to import script');
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
             router.refresh();
 
+            const review = res.integrityImportReview;
+            if (review?.totalBlockingIssues) {
+                resetForm(getDefaultFormFields(overWriteScriptWithId));
+                onOpenChange(false);
+                onImportSuccess?.();
+                setImportReview(review);
+                return;
+            }
+
+            const successMessage = res.warnings?.length
+                ? `Script imported successfully. ${res.warnings.join(' ')}`
+                : 'Script imported successfully!';
+
             alert({
                 variant: 'success',
                 title: 'Success',
-                message: 'Script imported successfully!',
+                message: successMessage,
                 onClose: () => {
                     onImportSuccess?.();
                     resetForm(getDefaultFormFields(overWriteScriptWithId));
@@ -127,6 +143,88 @@ export function ScriptsImportModal({
             setLoading(false);
         }
     });
+
+    const acceptImportedIssues = async () => {
+        try {
+            if (!importReview?.snapshotId) throw new Error('Missing import review snapshot');
+
+            setLoading(true);
+
+            const response = await axios.post('/api/integrity-imports/accept', {
+                snapshotId: importReview.snapshotId,
+            });
+
+            const res = response.data as { success: boolean; errors?: string[] };
+            if (!res.success || res.errors?.length) {
+                throw new Error(res.errors?.join(', ') || 'Failed to accept imported issues');
+            }
+
+            alert({
+                variant: 'success',
+                title: 'Imported issues accepted',
+                message: 'Known issues from this import were accepted separately from the global legacy baseline.',
+                onClose: () => setImportReview(null),
+            });
+        } catch (e: any) {
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to accept imported issues: ' + e.message,
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const acceptImportedIssuesForScript = async (scriptId: string) => {
+        try {
+            if (!importReview?.snapshotId) throw new Error('Missing import review snapshot');
+
+            setLoading(true);
+
+            const response = await axios.post('/api/integrity-imports/accept', {
+                snapshotId: importReview.snapshotId,
+                scriptIds: [scriptId],
+            });
+
+            const res = response.data as { success: boolean; errors?: string[] };
+            if (!res.success || res.errors?.length) {
+                throw new Error(res.errors?.join(', ') || 'Failed to accept imported script issues');
+            }
+
+            setImportReview((current) => {
+                if (!current) return current;
+                const remainingScripts = (current.details?.scripts || []).filter((script) => script.scriptId !== scriptId);
+                const nextTotalIssues = remainingScripts.reduce((sum, script) => sum + script.totalIssues, 0);
+                if (!remainingScripts.length) return null;
+                return {
+                    ...current,
+                    totalBlockingIssues: nextTotalIssues,
+                    totalScripts: remainingScripts.length,
+                    details: current.details ? {
+                        ...current.details,
+                        totalIssues: nextTotalIssues,
+                        totalScripts: remainingScripts.length,
+                        scripts: remainingScripts,
+                    } : current.details,
+                };
+            });
+
+            alert({
+                variant: 'success',
+                title: 'Imported script issues accepted',
+                message: 'Selected imported script issues were accepted separately from the global legacy baseline.',
+            });
+        } catch (e: any) {
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to accept imported script issues: ' + e.message,
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <>
@@ -239,6 +337,111 @@ export function ScriptsImportModal({
                         <Label secondary htmlFor="confirmed">Confirm that you want to overwrite this script</Label>
                     </div>
                 </div>
+            </Modal>
+
+            <Modal
+                open={!!importReview}
+                onOpenChange={() => setImportReview(null)}
+                title="Import integrity review"
+                actions={(
+                    <>
+                        <div className="text-xs text-muted-foreground">
+                            Imported issues are tracked separately from the global baseline.
+                        </div>
+
+                        <div className="flex-1" />
+
+                        <Button
+                            variant="ghost"
+                            disabled={disabled}
+                            onClick={() => setImportReview(null)}
+                        >
+                            Fix before publish
+                        </Button>
+
+                        <Button
+                            disabled={disabled || !importReview?.snapshotId}
+                            onClick={acceptImportedIssues}
+                        >
+                            Accept all imported issues
+                        </Button>
+                    </>
+                )}
+            >
+                {!importReview ? null : (
+                    <div className="flex flex-col gap-y-4">
+                        <ErrorCard>
+                            <div className="p-2 text-sm">
+                                This import introduced <b>{importReview.totalBlockingIssues}</b> blocking integrity issue{importReview.totalBlockingIssues === 1 ? '' : 's'} across <b>{importReview.totalScripts}</b> script{importReview.totalScripts === 1 ? '' : 's'}.
+                            </div>
+                        </ErrorCard>
+
+                        {!!importReview.details?.summary?.length && (
+                            <div className="space-y-2">
+                                {importReview.details.summary.map((summary, index) => (
+                                    <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                        {summary}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <ScrollArea className="h-[360px] rounded-md border p-3">
+                            <div className="space-y-4">
+                                {(importReview.details?.scripts || []).map((script) => (
+                                    <div key={script.scriptId} className="rounded-md border p-3">
+                                        <div className="font-medium">{script.scriptTitle}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {script.totalIssues} blocking issue{script.totalIssues === 1 ? '' : 's'}
+                                        </div>
+
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a href={script.scriptHref}>Open script</a>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a href={script.registryHref}>Open integrity registry</a>
+                                            </Button>
+                                            <Button
+                                                disabled={disabled || !importReview?.snapshotId}
+                                                onClick={() => acceptImportedIssuesForScript(script.scriptId)}
+                                            >
+                                                Accept this script only
+                                            </Button>
+                                        </div>
+
+                                        <div className="mt-3 space-y-3">
+                                            {script.issues.map((issue, index) => (
+                                                <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                                                    <div className="text-xs font-medium uppercase tracking-wide text-amber-800">
+                                                        {issue.ruleLabel}
+                                                    </div>
+                                                    <div className="mt-1 font-medium text-amber-950">{issue.displayName}</div>
+                                                    <div className="mt-1 text-sm text-amber-900">{issue.reason}</div>
+                                                    <div className="mt-1 text-xs text-amber-800">Location: {issue.location}</div>
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        <Button size="sm" variant="outline" asChild>
+                                                            <a href={issue.usageHref}>Open usage</a>
+                                                        </Button>
+                                                        <Button size="sm" variant="outline" asChild>
+                                                            <a href={issue.registryHref}>Open registry</a>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                )}
             </Modal>
         </>
     );

@@ -1,14 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
     captureIntegrityPolicyBaseline,
     clearIntegrityPolicyBaseline,
     saveIntegrityPolicySettings,
 } from "@/app/actions/integrity-policy";
+import {
+    acceptIntegrityImportSnapshot,
+    revokeIntegrityImportSnapshot,
+} from "@/app/actions/integrity-imports";
 import { Loader } from "@/components/loader";
+import { Modal } from "@/components/modal";
 import { Pagination } from "@/components/pagination";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -38,6 +45,27 @@ type Props = {
             email: string;
         } | null;
         metadata?: Record<string, any>;
+    }>;
+    importSnapshots?: Array<{
+        snapshotId: string;
+        status: string;
+        sourceType: string;
+        sourceLabel: string | null;
+        totalBlockingIssues: number;
+        totalScripts: number;
+        importedScriptIds: string[];
+        importedDataKeyIds: string[];
+        createdAt: string;
+        acceptedAt: string | null;
+        createdBy: {
+            displayName: string;
+            email: string;
+        } | null;
+        acceptedBy: {
+            displayName: string;
+            email: string;
+        } | null;
+        metadata: Record<string, any>;
     }>;
 };
 
@@ -93,7 +121,8 @@ function arePoliciesEqual(a: IntegrityPolicy, b: IntegrityPolicy) {
         a.useBaseline === b.useBaseline &&
         a.triggerSources.scriptEdits === b.triggerSources.scriptEdits &&
         a.triggerSources.dataKeyLibraryEdits === b.triggerSources.dataKeyLibraryEdits &&
-        a.triggerSources.deletions === b.triggerSources.deletions
+        a.triggerSources.deletions === b.triggerSources.deletions &&
+        a.triggerSources.imports === b.triggerSources.imports
     );
 }
 
@@ -110,7 +139,8 @@ function formatAuditAction(action: string) {
     }
 }
 
-export function Content({ canManage, initialPolicy, initialBaseline, baselineCapturedBy, currentUser, auditEntries = [] }: Props) {
+export function Content({ canManage, initialPolicy, initialBaseline, baselineCapturedBy, currentUser, auditEntries = [], importSnapshots = [] }: Props) {
+    const router = useRouter();
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
 
@@ -120,11 +150,25 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
     const [baseline, setBaseline] = useState<IntegrityBaseline>(initialBaseline);
     const [baselineCapturedByState, setBaselineCapturedByState] = useState(baselineCapturedBy);
     const [auditEntriesState, setAuditEntriesState] = useState(auditEntries);
+    const [importSnapshotsState, setImportSnapshotsState] = useState(importSnapshots);
+    const [selectedImportSnapshotId, setSelectedImportSnapshotId] = useState<string | null>(null);
     const [auditPage, setAuditPage] = useState(1);
+    const [importReviewPage, setImportReviewPage] = useState(1);
     const auditPageSize = 10;
+    const importReviewPageSize = 10;
     const maxAuditEntries = 100;
     const hasCapturedBaseline = baseline.fingerprints.length > 0;
     const hasCompatibleBaseline = isIntegrityBaselineCompatible(baseline);
+    const enabledTriggerCount = [
+        policy.triggerSources.scriptEdits,
+        policy.triggerSources.dataKeyLibraryEdits,
+        policy.triggerSources.deletions,
+        policy.triggerSources.imports,
+    ].filter(Boolean).length;
+    const enforcementDisabled = policy.enforcementMode === "off";
+    const hasActiveTriggers = enabledTriggerCount > 0;
+    const scanConfigurationInactive = enforcementDisabled || !hasActiveTriggers;
+    const baselineModeActive = policy.enforcementMode === "block_new_issues_only";
 
     const isDirty = useMemo(() => !arePoliciesEqual(policy, savedPolicy), [policy, savedPolicy]);
     const selectedEnforcementOption = enforcementOptions.find((option) => option.value === policy.enforcementMode);
@@ -134,10 +178,23 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
         () => auditEntriesState.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize),
         [auditEntriesState, auditPage]
     );
+    const totalImportReviewPages = Math.max(1, Math.ceil(importSnapshotsState.length / importReviewPageSize));
+    const visibleImportSnapshots = useMemo(
+        () => importSnapshotsState.slice((importReviewPage - 1) * importReviewPageSize, importReviewPage * importReviewPageSize),
+        [importSnapshotsState, importReviewPage]
+    );
+    const selectedImportSnapshot = useMemo(
+        () => importSnapshotsState.find((snapshot) => snapshot.snapshotId === selectedImportSnapshotId) || null,
+        [importSnapshotsState, selectedImportSnapshotId]
+    );
 
     useEffect(() => {
         if (auditPage > totalAuditPages) setAuditPage(totalAuditPages);
     }, [auditPage, totalAuditPages]);
+
+    useEffect(() => {
+        if (importReviewPage > totalImportReviewPages) setImportReviewPage(totalImportReviewPages);
+    }, [importReviewPage, totalImportReviewPages]);
 
     const savePolicy = async () => {
         try {
@@ -244,6 +301,58 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
         }
     };
 
+    const acceptImportSnapshot = async (snapshotId: string, scriptIds?: string[]) => {
+        try {
+            setLoading(true);
+            const res = await acceptIntegrityImportSnapshot(scriptIds?.length ? { snapshotId, scriptIds } : snapshotId);
+            if (!res.success) {
+                throw new Error(res.errors?.join(", ") || "Failed to accept import issues");
+            }
+
+            alert({
+                title: scriptIds?.length ? "Imported script issues accepted" : "Imported issues accepted",
+                message: scriptIds?.length
+                    ? "Selected imported script issues were accepted separately from the global baseline."
+                    : "Imported issues were accepted separately from the global baseline.",
+                variant: "success",
+                onClose: () => router.refresh(),
+            });
+        } catch (e: any) {
+            alert({
+                title: "Failed to accept imported issues",
+                message: e.message,
+                variant: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const revokeImportSnapshot = async (snapshotId: string) => {
+        try {
+            setLoading(true);
+            const res = await revokeIntegrityImportSnapshot(snapshotId);
+            if (!res.success) {
+                throw new Error(res.errors?.join(", ") || "Failed to revoke accepted import issues");
+            }
+
+            alert({
+                title: "Accepted import issues revoked",
+                message: "The accepted import snapshot has been revoked. These issues will be evaluated normally again.",
+                variant: "success",
+                onClose: () => router.refresh(),
+            });
+        } catch (e: any) {
+            alert({
+                title: "Failed to revoke accepted import issues",
+                message: e.message,
+                variant: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             {loading && <Loader overlay />}
@@ -261,6 +370,25 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                         {!canManage && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                                 You can view the current integrity policy, but only super admins can change it.
+                            </div>
+                        )}
+
+                        <div className="rounded-md border p-4">
+                            <div className="font-medium">Effective behavior</div>
+                            <div className="mt-2 text-sm text-muted-foreground">
+                                {enforcementDisabled
+                                    ? "Integrity enforcement is currently off. Trigger sources and scan scope are saved, but they do not apply until enforcement is enabled again."
+                                    : !hasActiveTriggers
+                                        ? "No trigger sources are enabled. In this state, integrity enforcement is configured but will never run."
+                                        : baselineModeActive
+                                            ? `Integrity enforcement is active in block new issues only mode. ${enabledTriggerCount} trigger source${enabledTriggerCount === 1 ? "" : "s"} ${enabledTriggerCount === 1 ? "is" : "are"} enabled and the captured baseline will be used when compatible.`
+                                            : `Integrity enforcement is active in ${policy.enforcementMode.replaceAll("_", " ")} mode with ${enabledTriggerCount} trigger source${enabledTriggerCount === 1 ? "" : "s"} enabled.`}
+                            </div>
+                        </div>
+
+                        {!enforcementDisabled && !hasActiveTriggers && (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                All trigger sources are off. This policy will not run any integrity scans until at least one trigger source is enabled.
                             </div>
                         )}
 
@@ -295,7 +423,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Label>Scan scope</Label>
                                 <Select
                                     value={policy.scanScope}
-                                    disabled={!canManage || loading}
+                                    disabled={!canManage || loading || scanConfigurationInactive}
                                     onValueChange={(value) => setPolicy((current) => ({
                                         ...current,
                                         scanScope: value as IntegrityPolicy["scanScope"],
@@ -315,6 +443,13 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <div className="text-sm text-muted-foreground">
                                     {selectedScanScopeOption?.description}
                                 </div>
+                                {scanConfigurationInactive && (
+                                    <div className="text-xs text-muted-foreground">
+                                        {enforcementDisabled
+                                            ? "Scan scope is inactive while enforcement mode is Off."
+                                            : "Scan scope is inactive until at least one trigger source is enabled."}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -325,7 +460,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-script-edits"
                                     checked={policy.triggerSources.scriptEdits}
-                                    disabled={!canManage || loading}
+                                    disabled={!canManage || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -346,7 +481,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-datakey-edits"
                                     checked={policy.triggerSources.dataKeyLibraryEdits}
-                                    disabled={!canManage || loading}
+                                    disabled={!canManage || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -373,7 +508,7 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 <Switch
                                     id="integrity-trigger-deletions"
                                     checked={policy.triggerSources.deletions}
-                                    disabled={!canManage || loading}
+                                    disabled={!canManage || loading || enforcementDisabled}
                                     onCheckedChange={(checked) => setPolicy((current) => ({
                                         ...current,
                                         triggerSources: {
@@ -390,13 +525,45 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                                 </div>
                             </div>
 
+                            <div className="flex items-start gap-3 rounded-md border p-3">
+                                <Switch
+                                    id="integrity-trigger-imports"
+                                    checked={policy.triggerSources.imports}
+                                    disabled={!canManage || loading || enforcementDisabled}
+                                    onCheckedChange={(checked) => setPolicy((current) => ({
+                                        ...current,
+                                        triggerSources: {
+                                            ...current.triggerSources,
+                                            imports: checked,
+                                        },
+                                    }))}
+                                />
+                                <div>
+                                    <Label htmlFor="integrity-trigger-imports">Imports</Label>
+                                    <div className="text-sm text-muted-foreground">
+                                        Run integrity checks for imported scripts and imported downstream changes before they can be published.
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Imported legacy debt is tracked separately from the global baseline. Accepted import snapshots allow known imported issues without silently merging them into the platform baseline.
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Import reviews are always enforced against the affected imported script set, so unrelated scripts do not block an accepted import publish.
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="rounded-md border p-3">
                                 <div className="font-medium">Baseline behaviour</div>
                                 <div className="mt-1 text-sm text-muted-foreground">
-                                    {policy.enforcementMode === "block_new_issues_only"
+                                    {baselineModeActive
                                         ? 'This mode always uses the captured baseline. Existing baseline issues are allowed, and only newly introduced blocking issues will stop publish.'
                                         : 'The captured baseline is only applied in "block new issues only" mode.'}
                                 </div>
+                                {!baselineModeActive && (
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        You can still capture or clear the baseline now for future use, but it will not affect publish behavior until "Block new issues only" is selected.
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -492,6 +659,161 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
 
                 <Card>
                     <CardHeader>
+                        <CardTitle>Import integrity reviews</CardTitle>
+                        <CardDescription>
+                            Review, accept, and revoke imported integrity debt separately from the global legacy baseline.
+                        </CardDescription>
+                    </CardHeader>
+
+                    <CardContent>
+                        {!importSnapshotsState.length ? (
+                            <div className="text-sm text-muted-foreground">No import integrity snapshots yet.</div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Showing {importSnapshotsState.length ? ((importReviewPage - 1) * importReviewPageSize) + 1 : 0}-{Math.min(importReviewPage * importReviewPageSize, importSnapshotsState.length)} of {importSnapshotsState.length} import snapshot entries
+                                </div>
+
+                                <div className="space-y-3">
+                                    {visibleImportSnapshots.map((snapshot) => {
+                                        const reviewDetails = snapshot.metadata?.reviewDetails as {
+                                            scripts?: Array<{
+                                                scriptId: string;
+                                                scriptTitle: string;
+                                                totalIssues: number;
+                                                registryHref: string;
+                                                scriptHref: string;
+                                            }>;
+                                        } | undefined;
+                                        const acceptedScriptIds = Array.isArray(snapshot.metadata?.acceptedScriptIds)
+                                            ? snapshot.metadata.acceptedScriptIds.filter((value: unknown): value is string => typeof value === "string" && !!value)
+                                            : [];
+
+                                        return (
+                                            <div key={snapshot.snapshotId} className="rounded-md border p-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-medium">{snapshot.sourceLabel || "Imported content"}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {snapshot.status.replaceAll("_", " ")} | {snapshot.totalBlockingIssues} blocking issue{snapshot.totalBlockingIssues === 1 ? "" : "s"} across {snapshot.totalScripts} script{snapshot.totalScripts === 1 ? "" : "s"}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            Created {formatDate(snapshot.createdAt)} by {snapshot.createdBy?.displayName || snapshot.createdBy?.email || "Unknown user"}
+                                                        </div>
+                                                        {!!snapshot.acceptedAt && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Accepted {formatDate(snapshot.acceptedAt)} by {snapshot.acceptedBy?.displayName || snapshot.acceptedBy?.email || "Unknown user"}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            disabled={loading}
+                                                            onClick={() => setSelectedImportSnapshotId(snapshot.snapshotId)}
+                                                        >
+                                                            View details
+                                                        </Button>
+                                                        {snapshot.status === "pending_review" && (
+                                                            <Button
+                                                                disabled={!canManage || loading}
+                                                                onClick={() => confirm(() => acceptImportSnapshot(snapshot.snapshotId), {
+                                                                    title: "Accept imported issues",
+                                                                    message: "This will allow the imported issues in this snapshot without merging them into the global baseline.",
+                                                                    danger: true,
+                                                                    positiveLabel: "Accept imported issues",
+                                                                })}
+                                                            >
+                                                                Accept all
+                                                            </Button>
+                                                        )}
+                                                        {snapshot.status === "accepted" && (
+                                                            <Button
+                                                                variant="outline"
+                                                                disabled={!canManage || loading}
+                                                                onClick={() => confirm(() => revokeImportSnapshot(snapshot.snapshotId), {
+                                                                    title: "Revoke accepted import issues",
+                                                                    message: "This will remove the accepted import snapshot from publish allowances.",
+                                                                    danger: true,
+                                                                    positiveLabel: "Revoke acceptance",
+                                                                })}
+                                                            >
+                                                                Revoke
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {!!acceptedScriptIds.length && snapshot.status === "pending_review" && (
+                                                    <div className="mt-3 text-xs text-muted-foreground">
+                                                        Already accepted scripts: {acceptedScriptIds.length}
+                                                    </div>
+                                                )}
+
+                                                {!!reviewDetails?.scripts?.length && (
+                                                    <div className="mt-4 space-y-3">
+                                                        {reviewDetails.scripts.map((script) => {
+                                                            const scriptAccepted = acceptedScriptIds.includes(script.scriptId);
+                                                            return (
+                                                                <div key={`${snapshot.snapshotId}-${script.scriptId}`} className="rounded-md border p-3">
+                                                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                                                        <div>
+                                                                            <div className="font-medium">{script.scriptTitle}</div>
+                                                                            <div className="text-sm text-muted-foreground">
+                                                                                {script.totalIssues} blocking issue{script.totalIssues === 1 ? "" : "s"}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            <Button variant="outline" asChild>
+                                                                                <a href={script.scriptHref}>Open script</a>
+                                                                            </Button>
+                                                                            <Button variant="outline" asChild>
+                                                                                <a href={script.registryHref}>Open registry</a>
+                                                                            </Button>
+                                                                            {snapshot.status === "pending_review" && !scriptAccepted && (
+                                                                                <Button
+                                                                                    disabled={!canManage || loading}
+                                                                                    onClick={() => confirm(() => acceptImportSnapshot(snapshot.snapshotId, [script.scriptId]), {
+                                                                                        title: "Accept imported script issues",
+                                                                                        message: "This will allow the imported issues for this script only, without accepting the entire import snapshot.",
+                                                                                        danger: true,
+                                                                                        positiveLabel: "Accept this script",
+                                                                                    })}
+                                                                                >
+                                                                                    Accept this script
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {totalImportReviewPages > 1 && (
+                                    <Pagination
+                                        limit={importReviewPageSize}
+                                        currentPage={importReviewPage}
+                                        totalPages={totalImportReviewPages}
+                                        totalRows={importSnapshotsState.length}
+                                        collectionName="import snapshots"
+                                        onPaginate={setImportReviewPage}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
                         <CardTitle>Integrity policy audit</CardTitle>
                         <CardDescription>
                             Recent super-admin changes to integrity policy and legacy baseline settings.
@@ -541,6 +863,150 @@ export function Content({ canManage, initialPolicy, initialBaseline, baselineCap
                     </CardContent>
                 </Card>
             </div>
+
+            <Modal
+                open={!!selectedImportSnapshot}
+                onOpenChange={(open) => {
+                    if (!open) setSelectedImportSnapshotId(null);
+                }}
+                title={selectedImportSnapshot?.sourceLabel || "Import snapshot details"}
+                description={selectedImportSnapshot ? `${selectedImportSnapshot.status.replaceAll("_", " ")} import integrity snapshot` : undefined}
+                actions={(
+                    <>
+                        <div className="text-xs text-muted-foreground">
+                            Import debt is tracked separately from the global legacy baseline.
+                        </div>
+                        <div className="flex-1" />
+                        <Button
+                            variant="ghost"
+                            disabled={loading}
+                            onClick={() => setSelectedImportSnapshotId(null)}
+                        >
+                            Close
+                        </Button>
+                    </>
+                )}
+                contentProps={{ className: "sm:max-w-4xl" }}
+            >
+                {!selectedImportSnapshot ? null : (() => {
+                    const reviewDetails = selectedImportSnapshot.metadata?.reviewDetails as {
+                        totalIssues?: number;
+                        totalScripts?: number;
+                        summary?: string[];
+                        scripts?: Array<{
+                            scriptId: string;
+                            scriptTitle: string;
+                            totalIssues: number;
+                            registryHref: string;
+                            scriptHref: string;
+                            issues: Array<{
+                                ruleLabel: string;
+                                displayName: string;
+                                reason: string;
+                                location: string;
+                                usageHref: string;
+                                registryHref: string;
+                                scriptHref: string;
+                            }>;
+                        }>;
+                    } | undefined;
+                    const acceptedScriptIds = Array.isArray(selectedImportSnapshot.metadata?.acceptedScriptIds)
+                        ? selectedImportSnapshot.metadata.acceptedScriptIds.filter((value: unknown): value is string => typeof value === "string" && !!value)
+                        : [];
+
+                    return (
+                        <div className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="rounded-md border p-4">
+                                    <div className="text-sm text-muted-foreground">Created</div>
+                                    <div className="mt-1 font-medium">{formatDate(selectedImportSnapshot.createdAt)}</div>
+                                </div>
+                                <div className="rounded-md border p-4">
+                                    <div className="text-sm text-muted-foreground">Status</div>
+                                    <div className="mt-1 font-medium capitalize">{selectedImportSnapshot.status.replaceAll("_", " ")}</div>
+                                </div>
+                                <div className="rounded-md border p-4">
+                                    <div className="text-sm text-muted-foreground">Blocking issues</div>
+                                    <div className="mt-1 font-medium">{selectedImportSnapshot.totalBlockingIssues}</div>
+                                </div>
+                                <div className="rounded-md border p-4">
+                                    <div className="text-sm text-muted-foreground">Scripts in snapshot</div>
+                                    <div className="mt-1 font-medium">{selectedImportSnapshot.totalScripts}</div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                                <div>Imported scripts: {selectedImportSnapshot.importedScriptIds.length}</div>
+                                <div>Imported data keys: {selectedImportSnapshot.importedDataKeyIds.length}</div>
+                                <div>Accepted scripts: {acceptedScriptIds.length}</div>
+                                {!!selectedImportSnapshot.acceptedAt && (
+                                    <div>Accepted at: {formatDate(selectedImportSnapshot.acceptedAt)}</div>
+                                )}
+                            </div>
+
+                            {!!reviewDetails?.summary?.length && (
+                                <div className="space-y-2">
+                                    {reviewDetails.summary.map((summary, index) => (
+                                        <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                            {summary}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <ScrollArea className="h-[420px] rounded-md border p-3">
+                                <div className="space-y-4 pr-2">
+                                    {(reviewDetails?.scripts || []).map((script) => {
+                                        const scriptAccepted = acceptedScriptIds.includes(script.scriptId);
+                                        return (
+                                            <div key={`${selectedImportSnapshot.snapshotId}-${script.scriptId}`} className="rounded-md border p-3">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-medium">{script.scriptTitle}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {script.totalIssues} blocking issue{script.totalIssues === 1 ? "" : "s"} {scriptAccepted ? "(accepted)" : ""}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Button variant="outline" asChild>
+                                                            <a href={script.scriptHref}>Open script</a>
+                                                        </Button>
+                                                        <Button variant="outline" asChild>
+                                                            <a href={script.registryHref}>Open registry</a>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 space-y-3">
+                                                    {script.issues.map((issue, index) => (
+                                                        <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                                                            <div className="text-xs font-medium uppercase tracking-wide text-amber-800">
+                                                                {issue.ruleLabel}
+                                                            </div>
+                                                            <div className="mt-1 font-medium text-amber-950">{issue.displayName}</div>
+                                                            <div className="mt-1 text-sm text-amber-900">{issue.reason}</div>
+                                                            <div className="mt-1 text-xs text-amber-800">Location: {issue.location}</div>
+                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                <Button size="sm" variant="outline" asChild>
+                                                                    <a href={issue.usageHref}>Open usage</a>
+                                                                </Button>
+                                                                <Button size="sm" variant="outline" asChild>
+                                                                    <a href={issue.registryHref}>Open registry</a>
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    );
+                })()}
+            </Modal>
         </>
     );
 }
