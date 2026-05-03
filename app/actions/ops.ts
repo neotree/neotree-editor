@@ -34,7 +34,18 @@ import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from 
 import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
 import { getAcceptedImportFingerprintLookup, getAcceptedImportScriptAllowanceLookup } from "./integrity-imports"
 import db from "@/databases/pg/drizzle"
-import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
+import {
+  configKeysDrafts,
+  dataKeys,
+  dataKeysDrafts,
+  diagnosesDrafts,
+  drugsLibraryDrafts,
+  hospitalsDrafts,
+  pendingDeletion,
+  problemsDrafts,
+  screensDrafts,
+  scriptsDrafts,
+} from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -71,6 +82,7 @@ async function getScopedIntegrityData({
   problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
   shouldRunIntegrityChecks: boolean
   hasImportChanges: boolean
+  triggerSummary: string[]
   importAllowanceCandidatesByScript: Record<string, {
     hasImportDraft: boolean
     hasDataKeySyncDraft: boolean
@@ -94,9 +106,13 @@ async function getScopedIntegrityData({
     }),
   ])
 
+  const libraryOriginDataKeyDrafts = userDataKeyDrafts.filter((draft) => !!draft.dataKeyId && draft.draftOrigin !== "import")
+  const importOriginDataKeyDrafts = userDataKeyDrafts.filter((draft) => !!draft.dataKeyId && draft.draftOrigin === "import")
+
   const hasExistingDataKeyLibraryChanges =
-    userDataKeyDrafts.some((draft) => !!draft.dataKeyId) ||
+    libraryOriginDataKeyDrafts.length > 0 ||
     userPendingDeletion.some((entry) => !!entry.dataKeyId)
+  const hasImportOriginDataKeyChanges = importOriginDataKeyDrafts.length > 0
   const deletedDataKeyIds = new Set(
     userPendingDeletion
       .map((entry) => entry.dataKeyId)
@@ -139,6 +155,7 @@ async function getScopedIntegrityData({
 
   const shouldIncludeDataKeyImpact =
     (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
+    (policy.triggerSources.imports && hasImportOriginDataKeyChanges) ||
     (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
 
   const shouldComputeDataKeyImpact =
@@ -153,9 +170,15 @@ async function getScopedIntegrityData({
   const dataKeysForImpact = !shouldComputeDataKeyImpact
     ? []
     : [
-        ...(hasExistingDataKeyLibraryChanges
+        ...(((policy.triggerSources.dataKeyLibraryEdits && libraryOriginDataKeyDrafts.length) ||
+            (policy.triggerSources.imports && importOriginDataKeyDrafts.length) ||
+            shouldClassifyLegacyDataKeySyncDrafts)
           ? userDataKeyDrafts
-              .filter((draft) => !!draft.dataKeyId)
+              .filter((draft) => {
+                if (!draft.dataKeyId) return false
+                if (draft.draftOrigin === "import") return policy.triggerSources.imports
+                return policy.triggerSources.dataKeyLibraryEdits || shouldClassifyLegacyDataKeySyncDrafts
+              })
               .map((draft) => ({
                 ...draft.data,
                 uuid: draft.dataKeyId || draft.data.uuid,
@@ -182,6 +205,7 @@ async function getScopedIntegrityData({
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: true,
       hasImportChanges: false,
+      triggerSummary: [],
       importAllowanceCandidatesByScript: {},
     }
   }
@@ -228,6 +252,7 @@ async function getScopedIntegrityData({
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: true,
       hasImportChanges: false,
+      triggerSummary: [],
       importAllowanceCandidatesByScript: {},
     }
   }
@@ -242,6 +267,7 @@ async function getScopedIntegrityData({
     effectiveUserProblemDrafts,
     effectiveUserScriptDrafts,
     hasImportChanges,
+    hasScriptFamilyChanges,
     importAllowanceCandidatesByScript,
     shouldRunIntegrityChecks,
     shouldIncludeDataKeyImpact: evaluatedShouldIncludeDataKeyImpact,
@@ -254,6 +280,7 @@ async function getScopedIntegrityData({
     userProblemDrafts,
     userPendingDeletion,
     hasExistingDataKeyLibraryChanges,
+    hasImportOriginDataKeyChanges,
     deletedDataKeyIdsSize: deletedDataKeyIds.size,
     screenPreviewMap,
     diagnosisPreviewMap,
@@ -275,6 +302,7 @@ async function getScopedIntegrityData({
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks,
       hasImportChanges,
+      triggerSummary: [],
       importAllowanceCandidatesByScript,
     }
   }
@@ -303,6 +331,7 @@ async function getScopedIntegrityData({
       problemsRes: { data: [], errors: undefined },
       shouldRunIntegrityChecks: false,
       hasImportChanges,
+      triggerSummary: [],
       importAllowanceCandidatesByScript,
     }
     }
@@ -356,12 +385,98 @@ async function getScopedIntegrityData({
       : scriptsQueries._getProblems({ returnDraftsIfExist: false }),
   ])
 
+  const effectiveUserDataKeyDrafts = userDataKeyDrafts.filter((draft) => {
+    if (draft.draftOrigin === "import" && !policy.triggerSources.imports) return false
+    return true
+  })
+  const publishedDataKeysById = new Map(
+    publishedDataKeysRes.data
+      .filter((item) => !!item.uuid)
+      .map((item) => [item.uuid, item] as const),
+  )
+  const formatDraftDataKeyLabel = (draft: typeof userDataKeyDrafts[number]) => {
+    const published = draft.dataKeyId ? publishedDataKeysById.get(draft.dataKeyId) : undefined
+
+    return (
+      draft.data?.name ||
+      draft.data?.label ||
+      published?.name ||
+      published?.label ||
+      draft.uniqueKey ||
+      draft.uuid
+    )
+  }
+  const triggerSummary: string[] = []
+  const effectiveLibraryOriginDataKeyDrafts = effectiveUserDataKeyDrafts.filter(
+    (draft) => !!draft.dataKeyId && draft.draftOrigin !== "import",
+  )
+
+  if (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) {
+    const examples = effectiveLibraryOriginDataKeyDrafts
+      .slice(0, 3)
+      .map((draft) => `"${formatDraftDataKeyLabel(draft)}"`)
+    const dataKeyDraftCount = effectiveLibraryOriginDataKeyDrafts.length
+    const dataKeyDeletionCount = deletedDataKeyIds.size
+    const fragments = [
+      dataKeyDraftCount ? `${dataKeyDraftCount} data key draft${dataKeyDraftCount === 1 ? "" : "s"}` : null,
+      dataKeyDeletionCount ? `${dataKeyDeletionCount} deleted data key${dataKeyDeletionCount === 1 ? "" : "s"}` : null,
+    ].filter(Boolean)
+
+    if (fragments.length) {
+      triggerSummary.push(
+        `Integrity scan triggered by data key library edits: ${fragments.join(" and ")} in your workspace${examples.length ? `, including ${examples.join(", ")}` : ""}.`,
+      )
+    }
+  }
+
+  if (!policy.triggerSources.imports && importOriginDataKeyDrafts.length) {
+    triggerSummary.push(
+      `${importOriginDataKeyDrafts.length} import-origin data key draft${importOriginDataKeyDrafts.length === 1 ? "" : "s"} are present but ignored because Imports is off.`,
+    )
+  }
+
+  if (policy.triggerSources.imports && (hasImportChanges || hasImportOriginDataKeyChanges)) {
+    const importedScriptDraftCount =
+      userScriptDrafts.filter((draft) => draft.draftOrigin === "import").length +
+      userScreenDrafts.filter((draft) => draft.draftOrigin === "import").length +
+      userDiagnosisDrafts.filter((draft) => draft.draftOrigin === "import").length +
+      userProblemDrafts.filter((draft) => draft.draftOrigin === "import").length
+    const importedDataKeyDraftCount = importOriginDataKeyDrafts.length
+    const fragments = [
+      importedScriptDraftCount ? `${importedScriptDraftCount} imported script draft${importedScriptDraftCount === 1 ? "" : "s"}` : null,
+      importedDataKeyDraftCount ? `${importedDataKeyDraftCount} imported data key draft${importedDataKeyDraftCount === 1 ? "" : "s"}` : null,
+    ].filter(Boolean)
+
+    if (fragments.length) {
+      triggerSummary.push(`Integrity scan triggered by imports: ${fragments.join(" and ")} in your workspace.`)
+    }
+  }
+
+  if (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) {
+    const scriptFamilyDraftCount =
+      effectiveUserScriptDrafts.length +
+      effectiveUserScreenDrafts.length +
+      effectiveUserDiagnosisDrafts.length +
+      effectiveUserProblemDrafts.length
+    const scriptDeletionCount = userPendingDeletion.filter((entry) => (
+      !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId
+    )).length
+    const fragments = [
+      scriptFamilyDraftCount ? `${scriptFamilyDraftCount} script-related draft${scriptFamilyDraftCount === 1 ? "" : "s"}` : null,
+      scriptDeletionCount ? `${scriptDeletionCount} pending script deletion${scriptDeletionCount === 1 ? "" : "s"}` : null,
+    ].filter(Boolean)
+
+    if (fragments.length) {
+      triggerSummary.push(`Integrity scan triggered by script edits: ${fragments.join(" and ")} in your workspace.`)
+    }
+  }
+
   const dataKeysMap = new Map<string, typeof publishedDataKeysRes.data[number]>()
   publishedDataKeysRes.data.forEach((item) => {
     dataKeysMap.set(item.uuid, item)
     dataKeysMap.set(item.uniqueKey, item)
   })
-  userDataKeyDrafts.forEach((draft) => {
+  effectiveUserDataKeyDrafts.forEach((draft) => {
     const data = {
       ...draft.data,
       isDraft: true,
@@ -441,6 +556,7 @@ async function getScopedIntegrityData({
     },
     shouldRunIntegrityChecks,
     hasImportChanges,
+    triggerSummary,
     importAllowanceCandidatesByScript,
   }
 }
@@ -573,6 +689,7 @@ export async function publishData({
       problemsRes,
       shouldRunIntegrityChecks,
       hasImportChanges,
+      triggerSummary,
       importAllowanceCandidatesByScript,
     } = integrityChecksEnabled
       ? await getScopedIntegrityData({
@@ -586,6 +703,7 @@ export async function publishData({
           problemsRes: { data: [], errors: undefined },
           shouldRunIntegrityChecks: false,
           hasImportChanges: false,
+          triggerSummary: [],
           importAllowanceCandidatesByScript: {},
         }
 
@@ -689,11 +807,12 @@ export async function publishData({
         ) {
           publishIntegrityDetails.summary = [
             policyEvaluation.policyModeMessage,
+            ...triggerSummary,
             "Blocking policy: block new issues only. Existing baseline issues are not blocking this publish.",
             ...publishIntegrityDetails.summary,
           ]
         } else if (publishIntegrityDetails) {
-          publishIntegrityDetails.summary = [policyEvaluation.policyModeMessage, ...publishIntegrityDetails.summary]
+          publishIntegrityDetails.summary = [policyEvaluation.policyModeMessage, ...triggerSummary, ...publishIntegrityDetails.summary]
         }
 
         results.success = false
@@ -874,6 +993,48 @@ export async function discardDrafts({
     await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
     await scriptsMutations._deleteAllProblemsDrafts({ userId })
     await _clearPendingDeletion({ userId })
+
+    const [
+      remainingConfigKeyDrafts,
+      remainingHospitalDrafts,
+      remainingDrugsDrafts,
+      remainingDataKeyDrafts,
+      remainingScriptDrafts,
+      remainingScreenDrafts,
+      remainingDiagnosisDrafts,
+      remainingProblemDrafts,
+      remainingPendingDeletion,
+    ] = await Promise.all([
+      db.query.configKeysDrafts.findMany({ where: userId ? eq(configKeysDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
+      db.query.hospitalsDrafts.findMany({ where: userId ? eq(hospitalsDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
+      db.query.drugsLibraryDrafts.findMany({ where: userId ? eq(drugsLibraryDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
+      db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined, columns: { uuid: true } }),
+      db.query.scriptsDrafts.findMany({ where: userId ? eq(scriptsDrafts.createdByUserId, userId) : undefined, columns: { scriptDraftId: true } }),
+      db.query.screensDrafts.findMany({ where: userId ? eq(screensDrafts.createdByUserId, userId) : undefined, columns: { screenDraftId: true } }),
+      db.query.diagnosesDrafts.findMany({ where: userId ? eq(diagnosesDrafts.createdByUserId, userId) : undefined, columns: { diagnosisDraftId: true } }),
+      db.query.problemsDrafts.findMany({ where: userId ? eq(problemsDrafts.createdByUserId, userId) : undefined, columns: { problemDraftId: true } }),
+      db.query.pendingDeletion.findMany({ where: userId ? eq(pendingDeletion.createdByUserId, userId) : undefined, columns: { id: true } }),
+    ])
+
+    const leftovers = [
+      remainingConfigKeyDrafts.length ? `${remainingConfigKeyDrafts.length} config key draft${remainingConfigKeyDrafts.length === 1 ? "" : "s"}` : null,
+      remainingHospitalDrafts.length ? `${remainingHospitalDrafts.length} hospital draft${remainingHospitalDrafts.length === 1 ? "" : "s"}` : null,
+      remainingDrugsDrafts.length ? `${remainingDrugsDrafts.length} drug/fluid/feed draft${remainingDrugsDrafts.length === 1 ? "" : "s"}` : null,
+      remainingDataKeyDrafts.length ? `${remainingDataKeyDrafts.length} data key draft${remainingDataKeyDrafts.length === 1 ? "" : "s"}` : null,
+      remainingScriptDrafts.length ? `${remainingScriptDrafts.length} script draft${remainingScriptDrafts.length === 1 ? "" : "s"}` : null,
+      remainingScreenDrafts.length ? `${remainingScreenDrafts.length} screen draft${remainingScreenDrafts.length === 1 ? "" : "s"}` : null,
+      remainingDiagnosisDrafts.length ? `${remainingDiagnosisDrafts.length} diagnosis draft${remainingDiagnosisDrafts.length === 1 ? "" : "s"}` : null,
+      remainingProblemDrafts.length ? `${remainingProblemDrafts.length} problem draft${remainingProblemDrafts.length === 1 ? "" : "s"}` : null,
+      remainingPendingDeletion.length ? `${remainingPendingDeletion.length} pending deletion${remainingPendingDeletion.length === 1 ? "" : "s"}` : null,
+    ].filter(Boolean)
+
+    if (leftovers.length) {
+      results.success = false
+      results.errors = [
+        `Discard completed, but draft state still remains in the workspace: ${leftovers.join(", ")}.`,
+      ]
+      return results
+    }
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {

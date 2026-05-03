@@ -38,6 +38,7 @@ export function evaluateIntegrityScanScope({
   userProblemDrafts,
   userPendingDeletion,
   hasExistingDataKeyLibraryChanges,
+  hasImportOriginDataKeyChanges,
   deletedDataKeyIdsSize,
   screenPreviewMap,
   diagnosisPreviewMap,
@@ -57,6 +58,7 @@ export function evaluateIntegrityScanScope({
   userProblemDrafts: EntityDraftLike[]
   userPendingDeletion: PendingDeletionLike[]
   hasExistingDataKeyLibraryChanges: boolean
+  hasImportOriginDataKeyChanges: boolean
   deletedDataKeyIdsSize: number
   screenPreviewMap: Map<string, Record<string, any>>
   diagnosisPreviewMap: Map<string, Record<string, any>>
@@ -71,6 +73,7 @@ export function evaluateIntegrityScanScope({
 }) {
   const shouldIncludeDataKeyImpact =
     (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
+    (policy.triggerSources.imports && hasImportOriginDataKeyChanges) ||
     (policy.triggerSources.deletions && deletedDataKeyIdsSize > 0)
 
   const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
@@ -192,7 +195,7 @@ export function evaluateIntegrityScanScope({
     policy.enforcementMode !== "off" &&
     (
       (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) ||
-      (policy.triggerSources.imports && hasImportChanges) ||
+      (policy.triggerSources.imports && (hasImportChanges || hasImportOriginDataKeyChanges)) ||
       (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
       (policy.triggerSources.deletions && deletedDataKeyIdsSize > 0)
     )

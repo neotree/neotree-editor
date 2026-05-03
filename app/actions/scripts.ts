@@ -925,7 +925,12 @@ export async function copyScripts(params?: {
         }
 
         if (dataKeysToSave.length) {
-            const res = await _saveDataKeys({ data: dataKeysToSave, userId: session.user?.userId, });
+            const res = await _saveDataKeys({
+                data: dataKeysToSave,
+                userId: session.user?.userId,
+                draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
+            });
             if (res.success) {
                 response.info.dataKeys = dataKeysToSave.length;
                 importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])

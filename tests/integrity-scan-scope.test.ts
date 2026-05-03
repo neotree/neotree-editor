@@ -29,6 +29,7 @@ const importedScreenDraft = {
 
 const policyDataKeysOff = {
   ...DEFAULT_INTEGRITY_POLICY,
+  enforcementMode: "block_new_issues_only" as const,
   triggerSources: {
     ...DEFAULT_INTEGRITY_POLICY.triggerSources,
     scriptEdits: true,
@@ -45,6 +46,7 @@ const propagatedIgnored = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -63,6 +65,7 @@ const manualStillCounts = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -75,6 +78,7 @@ assert.deepEqual(manualStillCounts.affectedScriptIds, ["script-2"], "only real s
 
 const policyDataKeysOn = {
   ...DEFAULT_INTEGRITY_POLICY,
+  enforcementMode: "block_new_issues_only" as const,
   triggerSources: {
     ...DEFAULT_INTEGRITY_POLICY.triggerSources,
     scriptEdits: true,
@@ -85,6 +89,7 @@ const policyDataKeysOn = {
 
 const policyImportsOff = {
   ...DEFAULT_INTEGRITY_POLICY,
+  enforcementMode: "block_new_issues_only" as const,
   triggerSources: {
     ...DEFAULT_INTEGRITY_POLICY.triggerSources,
     scriptEdits: true,
@@ -102,6 +107,7 @@ const importsIgnored = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -114,6 +120,7 @@ assert.equal(importsIgnored.effectiveUserScreenDrafts.length, 0, "import drafts 
 
 const policyImportsOn = {
   ...DEFAULT_INTEGRITY_POLICY,
+  enforcementMode: "block_new_issues_only" as const,
   triggerSources: {
     ...DEFAULT_INTEGRITY_POLICY.triggerSources,
     scriptEdits: true,
@@ -131,6 +138,7 @@ const importsIncluded = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -165,6 +173,7 @@ const mixedImportAndManual = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -186,6 +195,7 @@ const propagatedIncluded = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: true,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -215,6 +225,7 @@ const legacyClassified = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: true,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: legacyPreviewMap,
   diagnosisPreviewMap: emptyPreview,
@@ -232,6 +243,7 @@ const warningOnlyLegacyClassified = evaluateIntegrityScanScope({
   userProblemDrafts: [],
   userPendingDeletion: [],
   hasExistingDataKeyLibraryChanges: true,
+  hasImportOriginDataKeyChanges: false,
   deletedDataKeyIdsSize: 0,
   screenPreviewMap: emptyPreview,
   diagnosisPreviewMap: emptyPreview,
@@ -245,6 +257,55 @@ assert.equal(
   warningOnlyLegacyClassified.effectiveUserScreenDrafts.length,
   0,
   "legacy propagated drafts should be filtered when the current data key change affects the entity without producing a preview diff"
+)
+
+const importOriginDataKeyOnlyWithImportsOff = evaluateIntegrityScanScope({
+  policy: policyDataKeysOn,
+  userScriptDrafts: [],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: true,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: ["script-9"],
+})
+
+assert.equal(
+  importOriginDataKeyOnlyWithImportsOff.shouldRunIntegrityChecks,
+  false,
+  "manual data-key trigger settings alone should not scan pure import-driven data-key fallout",
+)
+
+const importOriginDataKeyOnlyWithImportsOn = evaluateIntegrityScanScope({
+  policy: policyImportsOn,
+  userScriptDrafts: [],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: true,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: ["script-9"],
+})
+
+assert.equal(
+  importOriginDataKeyOnlyWithImportsOn.shouldRunIntegrityChecks,
+  true,
+  "import-origin data-key fallout should scan when imports are enabled",
+)
+assert.deepEqual(
+  importOriginDataKeyOnlyWithImportsOn.affectedScriptIds,
+  ["script-9"],
+  "import-origin data-key impact should participate in affected-script scope under imports",
 )
 
 console.log("integrity scan scope tests passed")

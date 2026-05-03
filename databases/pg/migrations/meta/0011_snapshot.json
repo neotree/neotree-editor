@@ -1,5 +1,5 @@
 {
-  "id": "3de2384c-8992-4fc3-9449-e4b83288dba3",
+  "id": "d91e27bd-b3f9-4eee-9210-5f5c58775ca6",
   "prevId": "6472c5cc-6be3-4c40-9610-4b6165541056",
   "version": "7",
   "dialect": "postgresql",
@@ -2119,7 +2119,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":1,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[],\"acceptedImportFingerprints\":[],\"acceptedImportFingerprintRefs\":{}}'::jsonb"
+          "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":2,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[],\"acceptedImportFingerprints\":[],\"acceptedImportFingerprintRefs\":{}}'::jsonb"
         }
       },
       "indexes": {},
@@ -5725,6 +5725,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
