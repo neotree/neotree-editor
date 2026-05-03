@@ -53,13 +53,21 @@ const fingerprintA = getDataKeyIntegrityEntryFingerprint({
   ...legacyMatch,
   currentLabel: "Field A renamed",
   location: "Changed location text",
+  matchedName: "field_a_renamed",
+  matchedUniqueKey: "dk-renamed",
 })
 const fingerprintB = getDataKeyIntegrityEntryFingerprint({
   ...legacyMatch,
   currentLabel: "Another label",
   location: "Another location",
+  matchedName: "field_a_latest",
+  matchedUniqueKey: "dk-latest",
 })
 
-assert.equal(fingerprintA, fingerprintB, "fingerprint should stay stable across presentation-only changes")
+assert.equal(
+  fingerprintA,
+  fingerprintB,
+  "fingerprint should stay stable across presentation-only and library-suggestion changes",
+)
 
 console.log("data key integrity tests passed")

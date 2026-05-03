@@ -44,6 +44,7 @@ export type IntegrityPolicyBlockingEvaluationResult<T> = {
 
 export type IntegrityFingerprintEntry = {
   scriptId: string;
+  status?: string;
   kind: string;
   screenId?: string;
   diagnosisId?: string;
@@ -75,7 +76,7 @@ export const DEFAULT_INTEGRITY_POLICY: IntegrityPolicy = {
   useBaseline: true,
 };
 
-export const INTEGRITY_BASELINE_FINGERPRINT_VERSION = 1;
+export const INTEGRITY_BASELINE_FINGERPRINT_VERSION = 2;
 export const INTEGRITY_BASELINE_RULESET_VERSION = "2026-04-26";
 
 export const EMPTY_INTEGRITY_BASELINE: IntegrityBaseline = {
@@ -336,6 +337,7 @@ export function evaluateIntegrityPolicyBlockingEntries<T>({
 export function getIntegrityEntryFingerprint(entry: IntegrityFingerprintEntry) {
   return [
     `${entry.scriptId || ""}`.trim(),
+    `${entry.status || ""}`.trim(),
     `${entry.kind || ""}`.trim(),
     `${entry.screenId || ""}`.trim(),
     `${entry.diagnosisId || ""}`.trim(),

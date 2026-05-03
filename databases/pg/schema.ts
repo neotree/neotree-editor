@@ -398,7 +398,7 @@ export const editorInfo = pgTable("nt_editor_info", {
     capturedByUserId: null,
     totalBlockingIssues: 0,
     totalScripts: 0,
-    fingerprintVersion: 1,
+    fingerprintVersion: 2,
     ruleSetVersion: "2026-04-26",
     fingerprints: [],
     acceptedImportFingerprints: [],
