@@ -1,7 +1,8 @@
 import assert from "assert";
 
 import { buildIntegrityBaselineFromSnapshotData } from "../lib/integrity-baseline";
-import { DEFAULT_INTEGRITY_POLICY } from "../lib/integrity-policy";
+import { buildIntegrityImportReviewDetails, buildIntegrityImportSnapshot } from "../lib/integrity-imports";
+import { getIntegrityEntryFingerprint, DEFAULT_INTEGRITY_POLICY } from "../lib/integrity-policy";
 
 const policy = {
   ...DEFAULT_INTEGRITY_POLICY,
@@ -84,6 +85,32 @@ const screens: any[] = [
   },
 ];
 
+const rawLegacyFieldFingerprint = getIntegrityEntryFingerprint({
+  scriptId,
+  kind: "field",
+  screenId,
+  fieldId,
+  fieldIndex: 0,
+  expectedDataType: "multi_select",
+  currentUniqueKey: "",
+  currentKey: "MEDSDIS",
+  matchedUniqueKey: parentMedId,
+  matchedName: "MEDSDIS",
+});
+
+const repairedOptionCollectionFingerprint = getIntegrityEntryFingerprint({
+  scriptId,
+  kind: "field_option_collection",
+  screenId,
+  fieldId,
+  fieldIndex: 0,
+  expectedDataType: "multi_select",
+  currentUniqueKey: parentMedId,
+  currentKey: "MEDSDIS",
+  matchedUniqueKey: parentMedId,
+  matchedName: "MEDSDIS",
+});
+
 const baseline = buildIntegrityBaselineFromSnapshotData({
   policy,
   userId: "user-1",
@@ -93,30 +120,46 @@ const baseline = buildIntegrityBaselineFromSnapshotData({
   problems: [],
 });
 
-const repairedOptionCollectionFingerprint = [
-  scriptId,
-  "field_option_collection",
-  screenId,
-  "",
-  "",
-  fieldId,
-  "0",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "multi_select",
-  parentMedId,
-  "MEDSDIS",
-  parentMedId,
-  "MEDSDIS",
-].join("::");
+assert.ok(
+  baseline.fingerprints.includes(rawLegacyFieldFingerprint),
+  "baseline should capture the raw published legacy-match fingerprint that publish now enforces against",
+);
+assert.ok(
+  !baseline.fingerprints.includes(repairedOptionCollectionFingerprint),
+  "baseline should not capture a repaired option-collection fingerprint that is no longer used by publish",
+);
+
+const importSnapshot = buildIntegrityImportSnapshot({
+  policy,
+  dataKeys,
+  screens,
+  diagnoses: [],
+  problems: [],
+});
 
 assert.ok(
-  baseline.fingerprints.includes(repairedOptionCollectionFingerprint),
-  "baseline should include the repaired published option collection fingerprint for legacy MEDSDIS fields",
+  importSnapshot.fingerprints.includes(rawLegacyFieldFingerprint),
+  "import snapshots should capture raw-state fingerprints so accepted import debt matches publish enforcement",
+);
+assert.ok(
+  !importSnapshot.fingerprints.includes(repairedOptionCollectionFingerprint),
+  "import snapshots should not capture repaired-state fingerprints that publish no longer uses",
+);
+
+const importReviewDetails = buildIntegrityImportReviewDetails({
+  policy,
+  dataKeys,
+  screens,
+  diagnoses: [],
+  problems: [],
+});
+
+assert.ok(importReviewDetails, "import review details should still be generated");
+assert.ok(
+  importReviewDetails?.scripts.some((script) =>
+    script.issues.some((issue) => issue.displayName === "Discharge Medications (Dose/ Duration)" && issue.ruleLabel === "unlinked match"),
+  ),
+  "import review details should describe the raw-state issue users will actually hit at publish time",
 );
 
 console.log("integrity baseline tests passed");
