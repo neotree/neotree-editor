@@ -365,14 +365,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         void setRepairEntryParam("");
     };
 
-    const closeBulkReviewDrawer = () => {
+    const closeBulkReviewDrawer = async () => {
         if (isRepairing || savingResolution) return;
         bulkPreviewRequestIdRef.current += 1;
         setBulkResolveStatus(null);
         setBulkReviewItems([]);
         setShowReviewedBulkItemsOnly(false);
         setLoadingBulkPreview(false);
-        void setBulkStatusParam("");
+        await setBulkStatusParam("");
     };
 
     const loadRepairPreview = useCallback(async ({
@@ -691,7 +691,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     });
                 }
 
-                closeBulkReviewDrawer();
+                await closeBulkReviewDrawer();
                 router.refresh();
             } finally {
                 setResolvingKey(null);
@@ -1060,6 +1060,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                             <div className="text-muted-foreground">
                                 This repair will update the current script draft so this reference points to the data key shown below.
                             </div>
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+                                This saves the affected screen, diagnosis, or problem draft as a whole entity, not just this one row. After save, the registry rescans the script, so sibling issues in the same entity may also be reclassified.
+                            </div>
 
                             <div className="grid gap-3 md:grid-cols-2">
                                 <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-2">
@@ -1147,7 +1150,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                         <div className="rounded-md border p-3 space-y-3">
                             <div className="font-medium">Review affected usage</div>
                             <div className="text-muted-foreground">
-                                Open the affected script location before saving if you want to verify the exact reference being repaired.
+                                Open the affected script location before saving if you want to verify the exact reference being repaired and any sibling references that may be rescanned with it.
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Affected entities in this draft save: {repairPreview.screens.length + repairPreview.diagnoses.length + repairPreview.problems.length}
                             </div>
 
                             {!!repairPreview.screens.length && (
@@ -1218,13 +1224,13 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 onCheckedChange={(checked) => setReviewAcknowledged(checked === true)}
                             />
                             <Label htmlFor="confirm-integrity-repair-review" className="leading-5">
-                                I have reviewed the target data key details and I want to save this singular repair draft against this specific data key.
+                                I have reviewed the target data key details and understand this save updates the affected draft entity and may reclassify sibling integrity issues when the script is rescanned.
                             </Label>
                         </div>
                     </div>
                 )}
             </Modal>
-            <Sheet open={!!bulkResolveStatus} onOpenChange={(open) => { if (!open) closeBulkReviewDrawer(); }}>
+            <Sheet open={!!bulkResolveStatus} onOpenChange={(open) => { if (!open) void closeBulkReviewDrawer(); }}>
                 <SheetContent hideCloseButton side="right" className="p-0 m-0 flex flex-col sm:max-w-3xl w-full">
                     <SheetHeader className="py-4 px-4 border-b border-b-border text-left">
                         <SheetTitle>
@@ -1476,7 +1482,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                     </div>
 
                     <SheetFooter className="px-4 py-4 border-t border-t-border">
-                        <Button variant="ghost" onClick={closeBulkReviewDrawer} disabled={isRepairing || loadingBulkPreview || savingResolution}>
+                        <Button variant="ghost" onClick={() => void closeBulkReviewDrawer()} disabled={isRepairing || loadingBulkPreview || savingResolution}>
                             Cancel
                         </Button>
                         <Button

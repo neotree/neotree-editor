@@ -2,7 +2,6 @@ import {
   buildDataKeyIntegrityContext,
   getBlockingIntegrityEntries,
   getDataKeyIntegrityEntryFingerprint,
-  repairDataKeyIntegrityReferences,
   scanDataKeyIntegrity,
   type DataKeyIntegrityPublishDetails,
   buildDataKeyIntegrityPublishDetails,
@@ -37,23 +36,11 @@ export function buildIntegrityImportSnapshot({
   problems: ProblemType[];
 }): IntegrityImportSnapshotShape {
   const context = buildDataKeyIntegrityContext(dataKeys);
-  const repairs = repairDataKeyIntegrityReferences({
+  const report = scanDataKeyIntegrity({
     dataKeys,
     screens,
     diagnoses,
     problems,
-    context,
-  });
-
-  const repairedScreens = screens.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen);
-  const repairedDiagnoses = diagnoses.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis);
-  const repairedProblems = problems.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem);
-
-  const report = scanDataKeyIntegrity({
-    dataKeys,
-    screens: repairedScreens,
-    diagnoses: repairedDiagnoses,
-    problems: repairedProblems,
     onlyIssues: true,
     context,
     policy,
@@ -85,23 +72,11 @@ export function buildIntegrityImportReviewDetails({
   problems: ProblemType[];
 }): DataKeyIntegrityPublishDetails | null {
   const context = buildDataKeyIntegrityContext(dataKeys);
-  const repairs = repairDataKeyIntegrityReferences({
+  const report = scanDataKeyIntegrity({
     dataKeys,
     screens,
     diagnoses,
     problems,
-    context,
-  });
-
-  const repairedScreens = screens.map((screen) => repairs.screens.find((item) => item.screenId === screen.screenId) || screen);
-  const repairedDiagnoses = diagnoses.map((diagnosis) => repairs.diagnoses.find((item) => item.diagnosisId === diagnosis.diagnosisId) || diagnosis);
-  const repairedProblems = problems.map((problem) => repairs.problems.find((item) => item.problemId === problem.problemId) || problem);
-
-  const report = scanDataKeyIntegrity({
-    dataKeys,
-    screens: repairedScreens,
-    diagnoses: repairedDiagnoses,
-    problems: repairedProblems,
     onlyIssues: true,
     context,
     policy,

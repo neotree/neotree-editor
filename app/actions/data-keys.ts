@@ -12,7 +12,7 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
@@ -45,23 +45,6 @@ type IntegrityImpactSummary = {
     };
 };
 
-function mergeById<T extends Record<string, any>>(
-    current: T[],
-    updates: T[],
-    getId: (item: T) => string | undefined,
-) {
-    if (!updates.length) return current;
-    const updatesMap = new Map(
-        updates
-            .map((item) => [getId(item), item] as const)
-            .filter(([id]) => !!id)
-    );
-    return current.map((item) => {
-        const id = getId(item);
-        return (id && updatesMap.get(id)) || item;
-    });
-}
-
 function buildRegistryIntegrityReport({
     dataKeys,
     screens,
@@ -86,27 +69,8 @@ function buildRegistryIntegrityReport({
         context: integrityContext,
     });
 
-    const repairs = repairDataKeyIntegrityReferences({
-        dataKeys,
-        screens,
-        diagnoses,
-        problems,
-        context: integrityContext,
-    });
-
-    const publishAlignedReport = scanDataKeyIntegrity({
-        dataKeys,
-        screens: mergeById(screens, repairs.screens, (item) => item.screenId),
-        diagnoses: mergeById(diagnoses, repairs.diagnoses, (item) => item.diagnosisId),
-        problems: mergeById(problems, repairs.problems, (item) => item.problemId),
-        onlyIssues: true,
-        context: integrityContext,
-    });
-
     return {
         rawReport,
-        publishAlignedReport,
-        repairs,
         integrityContext,
     };
 }
@@ -345,7 +309,6 @@ export const getDataKeysIntegrity = async (params?: {
         const integrityPolicyState = getIntegrityPolicyState(editorInfoRes.data);
         const {
             rawReport,
-            publishAlignedReport,
         } = buildRegistryIntegrityReport({
             dataKeys: scopedDataKeys,
             screens: screensRes.data,
@@ -359,10 +322,7 @@ export const getDataKeysIntegrity = async (params?: {
             data: {
                 ...rawReport,
                 policy: integrityPolicyState.policy,
-                summary: {
-                    ...rawReport.summary,
-                    blocking: publishAlignedReport.summary.blocking,
-                },
+                summary: rawReport.summary,
             },
         };
     } catch (e: any) {
@@ -696,6 +656,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedScreens.errors?.length) {
                         warnings.push(...(repairedScreens.warnings || []));
@@ -710,6 +671,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedDiagnoses.errors?.length) {
                         throw new Error(repairedDiagnoses.errors.join(', '));
@@ -722,6 +684,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedProblems.errors?.length) {
                         throw new Error(repairedProblems.errors.join(', '));
@@ -960,6 +923,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedScreens.errors?.length) {
                         warnings.push(...(repairedScreens.warnings || []));
@@ -974,6 +938,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedDiagnoses.errors?.length) {
                         throw new Error(repairedDiagnoses.errors.join(', '));
@@ -986,6 +951,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                         userId: session.user?.userId,
                         broadcastAction: false,
                         client: tx,
+                        draftOrigin: "other",
                     });
                     if (repairedProblems.errors?.length) {
                         throw new Error(repairedProblems.errors.join(', '));

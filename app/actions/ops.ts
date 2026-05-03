@@ -28,7 +28,6 @@ import {
   buildDataKeyIntegrityReportFromEntries,
   getBlockingIntegrityEntries,
   getDataKeyIntegrityEntryFingerprint,
-  repairDataKeyIntegrityReferences,
   scanDataKeyIntegrity,
 } from "@/lib/data-key-integrity"
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
@@ -38,25 +37,6 @@ import db from "@/databases/pg/drizzle"
 import { dataKeys, dataKeysDrafts, diagnosesDrafts, pendingDeletion, problemsDrafts, screensDrafts, scriptsDrafts } from "@/databases/pg/schema"
 
 const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
-
-function mergeIntegrityEntityUpdates<T extends Record<string, any>>(
-  current: T[],
-  updates: T[],
-  getId: (item: T) => string | undefined,
-) {
-  if (!updates.length) return current
-
-  const updatesMap = new Map(
-    updates
-      .map((item) => [getId(item), item] as const)
-      .filter(([id]) => !!id)
-  )
-
-  return current.map((item) => {
-    const id = getId(item)
-    return (id && updatesMap.get(id)) || item
-  })
-}
 
 function buildPreviewEntityMap<T extends Record<string, any>>(
   items: T[] | undefined,
@@ -68,56 +48,6 @@ function buildPreviewEntityMap<T extends Record<string, any>>(
       .filter(([id]) => !!id)
       .map(([id, item]) => [id as string, item] as const)
   )
-}
-
-async function persistPublishIntegrityRepairs({
-  repairs,
-  publisherUserId,
-  client,
-}: {
-  repairs: {
-    screens: Awaited<ReturnType<typeof scriptsQueries._getScreens>>["data"]
-    diagnoses: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>["data"]
-    problems: Awaited<ReturnType<typeof scriptsQueries._getProblems>>["data"]
-  }
-  publisherUserId?: string | null
-  client?: import("@/databases/pg/db-client").DbOrTransaction
-}) {
-  const userId = publisherUserId || undefined
-  const [repairedScreens, repairedDiagnoses, repairedProblems] = await Promise.all([
-    repairs.screens.length
-      ? scriptsMutations._saveScreens({
-          data: repairs.screens,
-          userId,
-          client,
-        })
-      : Promise.resolve({ success: true, data: [], warnings: undefined, errors: undefined }),
-    repairs.diagnoses.length
-      ? scriptsMutations._saveDiagnoses({
-          data: repairs.diagnoses,
-          userId,
-          client,
-        })
-      : Promise.resolve({ success: true, data: [], errors: undefined }),
-    repairs.problems.length
-      ? scriptsMutations._saveProblems({
-          data: repairs.problems,
-          userId,
-          client,
-        })
-      : Promise.resolve({ success: true, data: [], errors: undefined }),
-  ])
-
-  const errors = [
-    ...(repairedScreens.errors || []),
-    ...(repairedDiagnoses.errors || []),
-    ...(repairedProblems.errors || []),
-  ]
-
-  return {
-    errors: errors.length ? errors : undefined,
-    warnings: repairedScreens.warnings || [],
-  }
 }
 
 function assertCanPublishDrafts(user?: { role?: string | null } | null) {
@@ -673,32 +603,13 @@ export async function publishData({
     }
 
     const integrityContext = shouldRunIntegrityChecks ? buildDataKeyIntegrityContext(dataKeysRes.data) : null
-    const repairs = !shouldRunIntegrityChecks
-      ? { screens: [], diagnoses: [], problems: [] }
-      : repairDataKeyIntegrityReferences({
-          dataKeys: dataKeysRes.data,
-          screens: screensRes.data,
-          diagnoses: diagnosesRes.data,
-          problems: problemsRes.data,
-          context: integrityContext || undefined,
-        })
-
-    const repairedScreensForIntegrity = shouldRunIntegrityChecks
-      ? mergeIntegrityEntityUpdates(screensRes.data, repairs.screens, (item) => item.screenId)
-      : screensRes.data
-    const repairedDiagnosesForIntegrity = shouldRunIntegrityChecks
-      ? mergeIntegrityEntityUpdates(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId)
-      : diagnosesRes.data
-    const repairedProblemsForIntegrity = shouldRunIntegrityChecks
-      ? mergeIntegrityEntityUpdates(problemsRes.data, repairs.problems, (item) => item.problemId)
-      : problemsRes.data
 
     if (shouldRunIntegrityChecks) {
       const integrityReport = scanDataKeyIntegrity({
         dataKeys: dataKeysRes.data,
-        screens: repairedScreensForIntegrity,
-        diagnoses: repairedDiagnosesForIntegrity,
-        problems: repairedProblemsForIntegrity,
+        screens: screensRes.data,
+        diagnoses: diagnosesRes.data,
+        problems: problemsRes.data,
         onlyIssues: true,
         context: integrityContext || undefined,
         policy: integrityPolicyState.policy,
@@ -799,18 +710,6 @@ export async function publishData({
     }
 
     const publishTransactionResult = await db.transaction(async (tx) => {
-      if (repairs.screens.length || repairs.diagnoses.length || repairs.problems.length) {
-        const persistedRepairs = await persistPublishIntegrityRepairs({
-          repairs,
-          publisherUserId,
-          client: tx,
-        })
-        if (persistedRepairs.errors?.length) throw new Error(persistedRepairs.errors.join(", "))
-        if (persistedRepairs.warnings?.length) {
-          results.warnings = [...(results.warnings || []), ...persistedRepairs.warnings]
-        }
-      }
-
       const publishConfigKeys = await configKeysMutations._publishConfigKeys({
         userId,
         publisherUserId,
