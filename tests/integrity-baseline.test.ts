@@ -87,28 +87,22 @@ const screens: any[] = [
 
 const rawLegacyFieldFingerprint = getIntegrityEntryFingerprint({
   scriptId,
+  status: "legacy_match",
   kind: "field",
   screenId,
   fieldId,
   fieldIndex: 0,
   expectedDataType: "multi_select",
-  currentUniqueKey: "",
-  currentKey: "MEDSDIS",
-  matchedUniqueKey: parentMedId,
-  matchedName: "MEDSDIS",
 });
 
 const repairedOptionCollectionFingerprint = getIntegrityEntryFingerprint({
   scriptId,
+  status: "conflict",
   kind: "field_option_collection",
   screenId,
   fieldId,
   fieldIndex: 0,
   expectedDataType: "multi_select",
-  currentUniqueKey: parentMedId,
-  currentKey: "MEDSDIS",
-  matchedUniqueKey: parentMedId,
-  matchedName: "MEDSDIS",
 });
 
 const baseline = buildIntegrityBaselineFromSnapshotData({
