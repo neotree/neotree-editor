@@ -11,6 +11,7 @@ export type DeleteDiagnosesData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 };
 
 export type DeleteDiagnosesResponse = { 
@@ -36,6 +37,7 @@ export async function _deleteDiagnoses(
         confirmDeleteAll,
         broadcastAction, 
         userId,
+        draftOrigin = "editor",
     }: DeleteDiagnosesData,
 ) {
     const response: DeleteDiagnosesResponse = { success: false, };
@@ -73,6 +75,7 @@ export async function _deleteDiagnoses(
 
         const pendingDeletionInsertData = diagnosesArr.map(s => ({
             ...s,
+            draftOrigin,
             createdByUserId: userId,
         }));
         

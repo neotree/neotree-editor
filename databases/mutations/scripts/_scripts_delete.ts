@@ -13,6 +13,7 @@ export type DeleteScriptsData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 };
 
 export type DeleteScriptsResponse = { 
@@ -32,7 +33,7 @@ export async function _deleteAllScriptsDrafts(opts?: {
 }
 
 export async function _deleteScripts(
-    { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, }: DeleteScriptsData,
+    { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, draftOrigin = "editor", }: DeleteScriptsData,
 ) {
     const response: DeleteScriptsResponse = { success: false, };
 
@@ -64,12 +65,13 @@ export async function _deleteScripts(
             await db.insert(pendingDeletion).values(
                 scriptsToDelete.map(s => ({
                     scriptId: s.scriptId,
+                    draftOrigin,
                     createdByUserId: userId,
                 }))
             );
-            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
-            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
-            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId });
+            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
+            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
+            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
         }
 
         response.success = true;

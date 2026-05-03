@@ -1,5 +1,5 @@
 {
-  "id": "d91e27bd-b3f9-4eee-9210-5f5c58775ca6",
+  "id": "5773fc16-bbd4-4a43-9772-70991777024b",
   "prevId": "6472c5cc-6be3-4c40-9610-4b6165541056",
   "version": "7",
   "dialect": "postgresql",
@@ -3143,6 +3143,14 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",

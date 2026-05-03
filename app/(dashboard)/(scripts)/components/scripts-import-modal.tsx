@@ -63,6 +63,7 @@ export function ScriptsImportModal({
 
     const isLoading = sitesLoading || loading;
     const disabled = isLoading;
+    const isOverwriteImport = !!overWriteScriptWithId;
 
     const {
         formState: { errors },
@@ -114,7 +115,6 @@ export function ScriptsImportModal({
             if (review?.totalBlockingIssues) {
                 resetForm(getDefaultFormFields(overWriteScriptWithId));
                 onOpenChange(false);
-                onImportSuccess?.();
                 setImportReview(review);
                 return;
             }
@@ -163,7 +163,10 @@ export function ScriptsImportModal({
                 variant: 'success',
                 title: 'Imported issues accepted',
                 message: 'Known issues from this import were accepted separately from the global legacy baseline.',
-                onClose: () => setImportReview(null),
+                onClose: () => {
+                    onImportSuccess?.();
+                    setImportReview(null);
+                },
             });
         } catch (e: any) {
             alert({
@@ -214,6 +217,7 @@ export function ScriptsImportModal({
                 variant: 'success',
                 title: 'Imported script issues accepted',
                 message: 'Selected imported script issues were accepted separately from the global legacy baseline.',
+                onClose: () => onImportSuccess?.(),
             });
         } catch (e: any) {
             alert({
@@ -236,7 +240,7 @@ export function ScriptsImportModal({
                     onOpenChange(false);
                     resetForm(getDefaultFormFields(overWriteScriptWithId));
                 }}
-                title="Import script"
+                title={isOverwriteImport ? "Import and overwrite script" : "Import script"}
                 actions={(
                     <>
                         <span className="text-xs text-danger">* Required</span>
@@ -268,6 +272,14 @@ export function ScriptsImportModal({
                             New data keys, drugs, feeds & fluids <b>will be appended</b> to the library
                         </div>
                     </ErrorCard>
+
+                    {isOverwriteImport && (
+                        <ErrorCard>
+                            <div className="p-2 text-sm">
+                                This import will <b>update this script with the imported version</b>. The import will still follow the <b>Imports</b> integrity policy.
+                            </div>
+                        </ErrorCard>
+                    )}
 
                     <div>
                         <Label htmlFor="siteId">Site *</Label>
@@ -334,7 +346,7 @@ export function ScriptsImportModal({
                             checked={confirmed}
                             onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
                         />
-                        <Label secondary htmlFor="confirmed">Confirm that you want to overwrite this script</Label>
+                        <Label secondary htmlFor="confirmed">Confirm that you want to overwrite the current script with the imported script</Label>
                     </div>
                 </div>
             </Modal>
