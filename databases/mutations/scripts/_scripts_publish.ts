@@ -36,6 +36,7 @@ export async function _publishScripts({
     const drafts = await executor.query.scriptsDrafts.findMany({
       where: !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
     })
+    const scriptDraftToPublishedId = new Map<string, string>()
     const inserts = drafts
       .filter((c) => !c.scriptId)
       .map((s) => ({
@@ -61,6 +62,7 @@ export async function _publishScripts({
 
       for (const { scriptId: _scriptId, data: c } of updates) {
         const scriptId = _scriptId!
+        scriptDraftToPublishedId.set(scriptId, scriptId)
 
         const { scriptId: __scriptId, id, oldScriptId, createdAt, updatedAt, deletedAt, ...payload } = c
 
@@ -103,19 +105,23 @@ export async function _publishScripts({
       await executor.insert(scripts).values(insertData)
 
       for (const { scriptId } of insertData) {
+        scriptDraftToPublishedId.set(scriptId, scriptId)
         await executor
           .update(screensDrafts)
-          .set({ scriptId })
+          // Detach child drafts from the parent script draft before it is deleted
+          // later in this publish flow, otherwise the FK cascade removes them
+          // before their own publish steps run.
+          .set({ scriptId, scriptDraftId: null })
           .where(or(eq(screensDrafts.scriptId, scriptId), eq(screensDrafts.scriptDraftId, scriptId)))
 
         await executor
           .update(diagnosesDrafts)
-          .set({ scriptId })
+          .set({ scriptId, scriptDraftId: null })
           .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
 
         await executor
           .update(problemsDrafts)
-          .set({ scriptId })
+          .set({ scriptId, scriptDraftId: null })
           .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
       }
       const insertChangeLogs = await _saveScriptsHistory({
@@ -128,6 +134,25 @@ export async function _publishScripts({
         ...log,
         dataVersion: dataVersion
       })))
+    }
+
+    if (scriptDraftToPublishedId.size) {
+      for (const [scriptDraftId, publishedScriptId] of Array.from(scriptDraftToPublishedId.entries())) {
+        await executor
+          .update(screensDrafts)
+          .set({ scriptId: publishedScriptId, scriptDraftId: null })
+          .where(eq(screensDrafts.scriptDraftId, scriptDraftId))
+
+        await executor
+          .update(diagnosesDrafts)
+          .set({ scriptId: publishedScriptId, scriptDraftId: null })
+          .where(eq(diagnosesDrafts.scriptDraftId, scriptDraftId))
+
+        await executor
+          .update(problemsDrafts)
+          .set({ scriptId: publishedScriptId, scriptDraftId: null })
+          .where(eq(problemsDrafts.scriptDraftId, scriptDraftId))
+      }
     }
 
     let deleted = await executor.query.pendingDeletion.findMany({

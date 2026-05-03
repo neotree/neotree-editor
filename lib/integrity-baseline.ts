@@ -84,5 +84,7 @@ export function buildIntegrityBaselineFromSnapshotData({
     fingerprints: Array.from(
       new Set(blockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry))),
     ).sort(),
+    acceptedImportFingerprints: [],
+    acceptedImportFingerprintRefs: {},
   };
 }

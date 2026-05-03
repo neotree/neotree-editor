@@ -81,9 +81,17 @@ export function PublishDrafts({ variant }: Props) {
       const res = response.data as Awaited<ReturnType<typeof _publishData>>
 
       if (res.errors) {
-        setPublishBlockingErrors(res.errors)
-        setPublishBlockingDetails(res.blockingDetails || null)
-        setPublishBlockingModalOpen(!isCreatingDataKey)
+        if (res.blockingDetails) {
+          setPublishBlockingErrors(res.errors)
+          setPublishBlockingDetails(res.blockingDetails)
+          setPublishBlockingModalOpen(!isCreatingDataKey)
+        } else {
+          alert({
+            variant: "error",
+            title: "Failed to publish changes",
+            message: res.errors.map((error) => `<div class="mb-1 text-sm text-danger">${error}</div>`).join(""),
+          })
+        }
       } else {
         await pendingChangesAPI.clearAllChanges()
 
