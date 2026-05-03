@@ -11,6 +11,8 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 
+export type DataKeyDraftOrigin = "data_key_sync" | "editor" | "import" | "other";
+
 // DATA KEYS
 export const dataKeys = pgTable(
     'nt_data_keys',
@@ -58,6 +60,7 @@ export const dataKeysDrafts = pgTable(
         uniqueKey: uuid('unique_key').notNull(),
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),
         data: jsonb('data').$type<typeof dataKeys.$inferInsert>().notNull(),
+        draftOrigin: text('draft_origin').$type<DataKeyDraftOrigin>().notNull().default('editor'),
         createdByUserId: uuid('created_by_user_id'),
 
         createdAt: timestamp('created_at').defaultNow().notNull(),

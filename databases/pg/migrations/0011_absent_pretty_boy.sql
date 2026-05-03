@@ -106,7 +106,7 @@ ALTER TABLE "nt_data_keys" ALTER COLUMN "unique_key" SET DATA TYPE text;--> stat
 ALTER TABLE "nt_change_logs" ADD COLUMN "problem_id" uuid;--> statement-breakpoint
 ALTER TABLE "nt_diagnoses_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_policy" jsonb DEFAULT '{"enforcementMode":"off","scanScope":"affected_scripts_only","triggerSources":{"scriptEdits":false,"dataKeyLibraryEdits":false,"deletions":false,"imports":false},"useBaseline":true}'::jsonb NOT NULL;--> statement-breakpoint
-ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"capturedAt":null,"capturedByUserId":null,"totalBlockingIssues":0,"totalScripts":0,"fingerprintVersion":1,"ruleSetVersion":"2026-04-26","fingerprints":[],"acceptedImportFingerprints":[],"acceptedImportFingerprintRefs":{}}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"capturedAt":null,"capturedByUserId":null,"totalBlockingIssues":0,"totalScripts":0,"fingerprintVersion":2,"ruleSetVersion":"2026-04-26","fingerprints":[],"acceptedImportFingerprints":[],"acceptedImportFingerprintRefs":{}}'::jsonb NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_id" uuid;--> statement-breakpoint
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_script_id" uuid;--> statement-breakpoint
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_draft_id" uuid;--> statement-breakpoint
@@ -114,6 +114,7 @@ ALTER TABLE "nt_screens" ADD COLUMN "hcw_problems_instructions" text DEFAULT '' 
 ALTER TABLE "nt_screens" ADD COLUMN "suggested_problems_instructions" text DEFAULT '' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_screens_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_scripts_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
+ALTER TABLE "nt_data_keys_drafts" ADD COLUMN "draft_origin" text DEFAULT 'editor' NOT NULL;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "nt_admin_audit_logs" ADD CONSTRAINT "nt_admin_audit_logs_actor_user_id_nt_users_user_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."nt_users"("user_id") ON DELETE set null ON UPDATE no action;
 EXCEPTION
