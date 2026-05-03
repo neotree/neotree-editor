@@ -562,8 +562,9 @@ export async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, }: {
+export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
     scriptsIds: string[];
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -571,13 +572,13 @@ export async function deleteScriptsItems({ scriptsIds, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, });
+        const delScreens = await deleteScreens({ scriptsIds, draftOrigin });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, });
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, });
+        const delProblems = await deleteProblems({ scriptsIds, draftOrigin });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -630,7 +631,10 @@ export async function saveScriptsWithItems({ data, }: {
             }
 
             if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({ scriptsIds: [overWriteScript.data.scriptId], });
+                const res = await deleteScriptsItems({
+                    scriptsIds: [overWriteScript.data.scriptId],
+                    draftOrigin,
+                });
                 res.errors?.forEach(e => errors.push(e));
                 if (errors.length) continue;
             }

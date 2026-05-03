@@ -110,6 +110,7 @@ ALTER TABLE "nt_editor_info" ADD COLUMN "integrity_baseline" jsonb DEFAULT '{"ca
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_id" uuid;--> statement-breakpoint
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_script_id" uuid;--> statement-breakpoint
 ALTER TABLE "nt_pending_deletion" ADD COLUMN "problem_draft_id" uuid;--> statement-breakpoint
+ALTER TABLE "nt_pending_deletion" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_screens" ADD COLUMN "hcw_problems_instructions" text DEFAULT '' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_screens" ADD COLUMN "suggested_problems_instructions" text DEFAULT '' NOT NULL;--> statement-breakpoint
 ALTER TABLE "nt_screens_drafts" ADD COLUMN "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;--> statement-breakpoint

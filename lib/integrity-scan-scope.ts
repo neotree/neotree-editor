@@ -28,6 +28,7 @@ type PendingDeletionLike = {
   diagnosisScriptId?: string | null
   problemScriptId?: string | null
   dataKeyId?: string | null
+  draftOrigin?: IntegrityDraftOrigin
 }
 
 export function evaluateIntegrityScanScope({
@@ -180,16 +181,45 @@ export function evaluateIntegrityScanScope({
     [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]
       .filter((id): id is string => !!id)
       .forEach((scriptId) => {
-        ensureImportAllowanceCandidate(scriptId).hasPendingDeletion = true
+        const candidate = ensureImportAllowanceCandidate(scriptId)
+        candidate.hasPendingDeletion = true
+        if (!entry.draftOrigin || !importManagedOrigins.has(entry.draftOrigin)) {
+          candidate.hasManualDraft = true
+          return
+        }
+
+        if (entry.draftOrigin === "import") candidate.hasImportDraft = true
+        if (entry.draftOrigin === "data_key_sync") candidate.hasDataKeySyncDraft = true
       })
   })
 
+  const isImportGovernedScript = (scriptId: string | null | undefined) => {
+    if (!scriptId) return false
+    const candidate = importAllowanceCandidatesByScript[scriptId]
+    if (!candidate) return false
+    if (candidate.hasManualDraft) return false
+    return candidate.hasImportDraft || candidate.hasDataKeySyncDraft
+  }
+
+  const nonImportScriptDrafts = effectiveUserScriptDrafts.filter((draft) => draft.draftOrigin !== "import")
+  const nonImportScreenDrafts = filteredUserScreenDrafts.filter((draft) => draft.draftOrigin !== "import")
+  const nonImportDiagnosisDrafts = filteredUserDiagnosisDrafts.filter((draft) => draft.draftOrigin !== "import")
+  const nonImportProblemDrafts = filteredUserProblemDrafts.filter((draft) => draft.draftOrigin !== "import")
+  const hasNonImportPendingScriptChanges = userPendingDeletion.some((entry) => (
+    entry.draftOrigin === "import"
+      ? false
+      :
+    [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]
+      .filter((id): id is string => !!id)
+      .some((scriptId) => !isImportGovernedScript(scriptId))
+  ))
+
   const hasScriptFamilyChanges =
-    effectiveUserScriptDrafts.length > 0 ||
-    filteredUserScreenDrafts.length > 0 ||
-    filteredUserDiagnosisDrafts.length > 0 ||
-    filteredUserProblemDrafts.length > 0 ||
-    userPendingDeletion.some((entry) => !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
+    nonImportScriptDrafts.length > 0 ||
+    nonImportScreenDrafts.length > 0 ||
+    nonImportDiagnosisDrafts.length > 0 ||
+    nonImportProblemDrafts.length > 0 ||
+    hasNonImportPendingScriptChanges
 
   const shouldRunIntegrityChecks =
     policy.enforcementMode !== "off" &&
@@ -205,7 +235,10 @@ export function evaluateIntegrityScanScope({
     ...filteredUserScreenDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...filteredUserDiagnosisDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
     ...filteredUserProblemDrafts.map((draft) => draft.scriptId || draft.scriptDraftId).filter((id): id is string => !!id),
-    ...userPendingDeletion.flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]).filter((id): id is string => !!id),
+    ...userPendingDeletion
+      .filter((entry) => !shouldIgnoreImportDrafts || entry.draftOrigin !== "import")
+      .flatMap((entry) => [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId])
+      .filter((id): id is string => !!id),
     ...(shouldIncludeDataKeyImpact ? dataKeyImpactScriptIds : []),
   ]))
 
@@ -217,6 +250,10 @@ export function evaluateIntegrityScanScope({
     effectiveUserScreenDrafts: filteredUserScreenDrafts,
     effectiveUserDiagnosisDrafts: filteredUserDiagnosisDrafts,
     effectiveUserProblemDrafts: filteredUserProblemDrafts,
+    nonImportScriptDrafts,
+    nonImportScreenDrafts,
+    nonImportDiagnosisDrafts,
+    nonImportProblemDrafts,
     hasImportChanges,
     importAllowanceCandidatesByScript,
     hasScriptFamilyChanges,

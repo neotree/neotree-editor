@@ -102,6 +102,7 @@ async function getScopedIntegrityData({
         diagnosisScriptId: true,
         problemScriptId: true,
         dataKeyId: true,
+        draftOrigin: true,
       },
     }),
   ])
@@ -266,6 +267,10 @@ async function getScopedIntegrityData({
     effectiveUserDiagnosisDrafts,
     effectiveUserProblemDrafts,
     effectiveUserScriptDrafts,
+    nonImportScriptDrafts,
+    nonImportScreenDrafts,
+    nonImportDiagnosisDrafts,
+    nonImportProblemDrafts,
     hasImportChanges,
     hasScriptFamilyChanges,
     importAllowanceCandidatesByScript,
@@ -441,9 +446,14 @@ async function getScopedIntegrityData({
       userScreenDrafts.filter((draft) => draft.draftOrigin === "import").length +
       userDiagnosisDrafts.filter((draft) => draft.draftOrigin === "import").length +
       userProblemDrafts.filter((draft) => draft.draftOrigin === "import").length
+    const importedPendingScriptDeletionCount = userPendingDeletion.filter((entry) => (
+      entry.draftOrigin === "import" &&
+      (!!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
+    )).length
     const importedDataKeyDraftCount = importOriginDataKeyDrafts.length
     const fragments = [
       importedScriptDraftCount ? `${importedScriptDraftCount} imported script draft${importedScriptDraftCount === 1 ? "" : "s"}` : null,
+      importedPendingScriptDeletionCount ? `${importedPendingScriptDeletionCount} imported pending script deletion${importedPendingScriptDeletionCount === 1 ? "" : "s"}` : null,
       importedDataKeyDraftCount ? `${importedDataKeyDraftCount} imported data key draft${importedDataKeyDraftCount === 1 ? "" : "s"}` : null,
     ].filter(Boolean)
 
@@ -453,13 +463,25 @@ async function getScopedIntegrityData({
   }
 
   if (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) {
+    const isImportGovernedScript = (scriptId: string | null | undefined) => {
+      if (!scriptId) return false
+      const candidate = importAllowanceCandidatesByScript[scriptId]
+      if (!candidate) return false
+      if (candidate.hasManualDraft) return false
+      return candidate.hasImportDraft || candidate.hasDataKeySyncDraft
+    }
     const scriptFamilyDraftCount =
-      effectiveUserScriptDrafts.length +
-      effectiveUserScreenDrafts.length +
-      effectiveUserDiagnosisDrafts.length +
-      effectiveUserProblemDrafts.length
+      nonImportScriptDrafts.length +
+      nonImportScreenDrafts.length +
+      nonImportDiagnosisDrafts.length +
+      nonImportProblemDrafts.length
     const scriptDeletionCount = userPendingDeletion.filter((entry) => (
-      !!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId
+      entry.draftOrigin === "import"
+        ? false
+        :
+      [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]
+        .filter((id): id is string => !!id)
+        .some((scriptId) => !isImportGovernedScript(scriptId))
     )).length
     const fragments = [
       scriptFamilyDraftCount ? `${scriptFamilyDraftCount} script-related draft${scriptFamilyDraftCount === 1 ? "" : "s"}` : null,

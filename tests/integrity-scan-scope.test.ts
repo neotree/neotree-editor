@@ -162,6 +162,66 @@ assert.deepEqual(
   "pure import-managed scripts should expose import allowance candidate details"
 )
 
+const importPendingDeletionOnly = evaluateIntegrityScanScope({
+  policy: policyImportsOn,
+  userScriptDrafts: [],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [{
+    screenScriptId: "script-4",
+    draftOrigin: "import" as const,
+  }],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  importPendingDeletionOnly.hasScriptFamilyChanges,
+  false,
+  "pure import-origin pending deletions must not count as normal script edits",
+)
+assert.deepEqual(
+  importPendingDeletionOnly.affectedScriptIds,
+  ["script-4"],
+  "import-origin pending deletions should still participate in import affected-script scope",
+)
+
+const importPendingDeletionIgnoredWhenImportsOff = evaluateIntegrityScanScope({
+  policy: policyImportsOff,
+  userScriptDrafts: [],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [{
+    screenScriptId: "script-4",
+    draftOrigin: "import" as const,
+  }],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  importPendingDeletionIgnoredWhenImportsOff.shouldRunIntegrityChecks,
+  false,
+  "pure import-origin pending deletions should be ignored when imports are disabled",
+)
+assert.deepEqual(
+  importPendingDeletionIgnoredWhenImportsOff.affectedScriptIds,
+  [],
+  "import-origin pending deletions should be excluded from affected-script scope when imports are disabled",
+)
+
 const mixedImportAndManual = evaluateIntegrityScanScope({
   policy: policyImportsOn,
   userScriptDrafts: [],
