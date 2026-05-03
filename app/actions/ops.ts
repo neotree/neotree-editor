@@ -635,6 +635,7 @@ export async function publishData({
     // The next version will be currentDataVersion + 1
     const nextDataVersion = currentDataVersion + 1
 
+    const integrityChecksEnabled = integrityPolicyState.policy.enforcementMode !== "off"
     const {
       dataKeysRes,
       screensRes,
@@ -643,10 +644,20 @@ export async function publishData({
       shouldRunIntegrityChecks,
       hasImportChanges,
       importAllowanceCandidatesByScript,
-    } = await getScopedIntegrityData({
-      userId,
-      policy: integrityPolicyState.policy,
-    })
+    } = integrityChecksEnabled
+      ? await getScopedIntegrityData({
+          userId,
+          policy: integrityPolicyState.policy,
+        })
+      : {
+          dataKeysRes: { data: [], errors: undefined },
+          screensRes: { data: [], errors: undefined },
+          diagnosesRes: { data: [], errors: undefined },
+          problemsRes: { data: [], errors: undefined },
+          shouldRunIntegrityChecks: false,
+          hasImportChanges: false,
+          importAllowanceCandidatesByScript: {},
+        }
 
     const integrityErrors = [
       ...(dataKeysRes.errors || []),
