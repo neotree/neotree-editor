@@ -447,6 +447,11 @@ export function ScriptsImportModal({
                                                     </div>
                                                 </div>
                                             ))}
+                                            {!!script.hiddenIssuesCount && (
+                                                <div className="rounded-md border border-dashed border-amber-300 px-3 py-2 text-sm text-amber-900">
+                                                    {script.hiddenIssuesCount} more blocking issue{script.hiddenIssuesCount === 1 ? "" : "s"} in this script are not shown here. Open the integrity registry to review the full list.
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
