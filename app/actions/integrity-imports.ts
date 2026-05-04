@@ -11,7 +11,7 @@ import {
   removeAcceptedImportFingerprintsFromIntegrityBaseline,
   type IntegrityPolicy,
 } from "@/lib/integrity-policy";
-import { buildIntegrityImportSnapshot, buildIntegrityImportReviewDetails } from "@/lib/integrity-imports";
+import { buildIntegrityImportAnalysis } from "@/lib/integrity-imports";
 import { prepareImportSnapshotAcceptance, removeAcceptedScriptIds } from "@/lib/integrity-import-acceptance";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
@@ -53,14 +53,7 @@ export async function createIntegrityImportSnapshot({
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
 }) {
-  const snapshot = buildIntegrityImportSnapshot({
-    policy,
-    dataKeys,
-    screens,
-    diagnoses,
-    problems,
-  });
-  const reviewDetails = buildIntegrityImportReviewDetails({
+  const { snapshot, reviewDetails } = buildIntegrityImportAnalysis({
     policy,
     dataKeys,
     screens,
