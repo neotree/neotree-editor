@@ -22,7 +22,24 @@ export type IntegrityImportSnapshotShape = {
   fingerprints: string[];
 };
 
-export function buildIntegrityImportSnapshot({
+const MAX_IMPORT_REVIEW_ISSUES_PER_SCRIPT = 5;
+
+function compactIntegrityImportReviewDetails(
+  reviewDetails: DataKeyIntegrityPublishDetails | null,
+): DataKeyIntegrityPublishDetails | null {
+  if (!reviewDetails) return reviewDetails;
+
+  return {
+    ...reviewDetails,
+    scripts: reviewDetails.scripts.map((script) => ({
+      ...script,
+      issues: script.issues.slice(0, MAX_IMPORT_REVIEW_ISSUES_PER_SCRIPT),
+      hiddenIssuesCount: Math.max(0, script.totalIssues - MAX_IMPORT_REVIEW_ISSUES_PER_SCRIPT),
+    })),
+  };
+}
+
+export function buildIntegrityImportAnalysis({
   policy,
   dataKeys,
   screens,
@@ -34,7 +51,10 @@ export function buildIntegrityImportSnapshot({
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
-}): IntegrityImportSnapshotShape {
+}): {
+  snapshot: IntegrityImportSnapshotShape;
+  reviewDetails: DataKeyIntegrityPublishDetails | null;
+} {
   const context = buildDataKeyIntegrityContext(dataKeys);
   const report = scanDataKeyIntegrity({
     dataKeys,
@@ -50,12 +70,37 @@ export function buildIntegrityImportSnapshot({
   const scriptIds = new Set(blockingEntries.map((entry) => entry.scriptId).filter(Boolean));
 
   return {
-    fingerprintVersion: INTEGRITY_BASELINE_FINGERPRINT_VERSION,
-    ruleSetVersion: INTEGRITY_BASELINE_RULESET_VERSION,
-    totalBlockingIssues: blockingEntries.length,
-    totalScripts: scriptIds.size,
-    fingerprints: Array.from(new Set(blockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)))).sort(),
+    snapshot: {
+      fingerprintVersion: INTEGRITY_BASELINE_FINGERPRINT_VERSION,
+      ruleSetVersion: INTEGRITY_BASELINE_RULESET_VERSION,
+      totalBlockingIssues: blockingEntries.length,
+      totalScripts: scriptIds.size,
+      fingerprints: Array.from(new Set(blockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)))).sort(),
+    },
+    reviewDetails: compactIntegrityImportReviewDetails(buildDataKeyIntegrityPublishDetails(report)),
   };
+}
+
+export function buildIntegrityImportSnapshot({
+  policy,
+  dataKeys,
+  screens,
+  diagnoses,
+  problems,
+}: {
+  policy: IntegrityPolicy;
+  dataKeys: DataKey[];
+  screens: ScreenType[];
+  diagnoses: DiagnosisType[];
+  problems: ProblemType[];
+}): IntegrityImportSnapshotShape {
+  return buildIntegrityImportAnalysis({
+    policy,
+    dataKeys,
+    screens,
+    diagnoses,
+    problems,
+  }).snapshot;
 }
 
 export function buildIntegrityImportReviewDetails({
@@ -71,16 +116,11 @@ export function buildIntegrityImportReviewDetails({
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
 }): DataKeyIntegrityPublishDetails | null {
-  const context = buildDataKeyIntegrityContext(dataKeys);
-  const report = scanDataKeyIntegrity({
+  return buildIntegrityImportAnalysis({
+    policy,
     dataKeys,
     screens,
     diagnoses,
     problems,
-    onlyIssues: true,
-    context,
-    policy,
-  });
-
-  return buildDataKeyIntegrityPublishDetails(report);
+  }).reviewDetails;
 }
