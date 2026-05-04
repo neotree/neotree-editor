@@ -97,6 +97,7 @@ export type DataKeyIntegrityPublishScriptGroup = {
     scriptTitle: string;
     totalIssues: number;
     issues: DataKeyIntegrityPublishIssue[];
+    hiddenIssuesCount?: number;
     registryHref: string;
     scriptHref: string;
 };
