@@ -61,6 +61,25 @@ assert.equal(blockNewOnly.baselineState, "active", "compatible baseline should b
 assert.equal(blockNewOnly.enforcedBlockingEntries.length, 1, "only newly introduced issues should be enforced")
 assert.equal(blockNewOnly.enforcedBlockingEntries[0].scriptId, "script-2", "baseline issue should be filtered out")
 
+const outdatedBaseline = normalizeIntegrityBaseline({
+  ...compatibleBaseline,
+  fingerprintVersion: 1,
+})
+
+const outdatedEvaluation = evaluateIntegrityPolicyBlockingEntries({
+  policy: { ...DEFAULT_INTEGRITY_POLICY, enforcementMode: "block_new_issues_only" },
+  baseline: outdatedBaseline,
+  blockingEntries: [baseEntry, nextEntry],
+  getFingerprint: getIntegrityEntryFingerprint,
+})
+
+assert.equal(outdatedEvaluation.baselineState, "outdated", "older fingerprint versions should be treated as outdated")
+assert.equal(
+  outdatedEvaluation.enforcedBlockingEntries.length,
+  0,
+  "outdated baselines should degrade to warn-only until recaptured",
+)
+
 const normalized = normalizeIntegrityPolicy({
   enforcementMode: "block_new_issues_only",
   useBaseline: false,
