@@ -16,7 +16,6 @@ import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
-import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
@@ -762,6 +761,11 @@ export async function copyScripts(params?: {
 }> {
     const { data: localDataKeys, } = await _getDataKeys();
     const info = { ...saveScriptsWithItemsInfo };
+    const startedAt = Date.now();
+    const timings: Record<string, number> = {};
+    const markTiming = (step: string, stepStartedAt: number) => {
+        timings[step] = Date.now() - stepStartedAt;
+    };
 
     const {
         scriptsIds = [],
@@ -790,6 +794,7 @@ export async function copyScripts(params?: {
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
         if (fromRemoteSiteId) {
+            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
             const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
@@ -803,6 +808,7 @@ export async function copyScripts(params?: {
             if (resData.errors) return { success: false, errors: resData.errors, info, };
 
             scripts = resData;
+            markTiming('remote_fetch', remoteFetchStartedAt);
 
 
             scripts.data.forEach(({ screens, diagnoses, problems, dataKeys, drugsLibrary }, i) => {
@@ -854,6 +860,7 @@ export async function copyScripts(params?: {
             });
 
             let index = -1;
+            const parseImportedStartedAt = Date.now();
             for (const s of scripts.data) {
                 index++;
                 const { dataKeys, screens, diagnoses, problems, drugsLibrary, } = await parseImportedDataKeys({
@@ -876,6 +883,7 @@ export async function copyScripts(params?: {
                     return overwriteDataKeys || k.isNew;
                 });
             }
+            markTiming('parse_imported_data_keys', parseImportedStartedAt);
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
@@ -891,6 +899,7 @@ export async function copyScripts(params?: {
 
         if (scripts.data.length) {
             if (toRemoteSiteId) {
+                const remoteSaveStartedAt = Date.now();
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
 
                 const res = await axiosClient.post('/api/scripts/with-items?', {
@@ -902,7 +911,9 @@ export async function copyScripts(params?: {
                 });
 
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
+                markTiming('remote_save', remoteSaveStartedAt);
             } else {
+                const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
                     data: scripts.data.map(s => ({
                         ...s,
@@ -912,6 +923,7 @@ export async function copyScripts(params?: {
                         hospitalName: undefined!,
                     })),
                 });
+                markTiming('save_scripts_with_items', saveScriptsStartedAt);
             }
         }
 
@@ -920,15 +932,17 @@ export async function copyScripts(params?: {
         }
 
         if (dffItemsToSave.length) {
-            const { data: dffItems, } = await _getDrugsLibraryItems();
+            const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
+            markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
         if (dataKeysToSave.length) {
+            const saveDataKeysStartedAt = Date.now();
             const res = await _saveDataKeys({
                 data: dataKeysToSave,
                 userId: session.user?.userId,
@@ -941,6 +955,7 @@ export async function copyScripts(params?: {
                     .map((script: { scriptId?: string | null }) => script.scriptId)
                     .filter((value): value is string => !!value);
             }
+            markTiming('save_data_keys', saveDataKeysStartedAt);
         }
 
         if (
@@ -950,36 +965,45 @@ export async function copyScripts(params?: {
             !response.errors?.length &&
             response.savedScriptIds?.length
         ) {
-            const integrityReviewScriptIds = Array.from(new Set([
-                ...(response.savedScriptIds || []),
-                ...importedDataKeyAffectedScriptIds,
-            ]));
-
-            const [editorInfoRes, importedScriptsRes, currentDataKeysRes] = await Promise.all([
-                _getEditorInfo(),
-                getScriptsWithItems({
-                    scriptsIds: integrityReviewScriptIds,
-                    returnDraftsIfExist: true,
-                }),
-                _getDataKeys(),
-            ]);
-
-            const importErrors = [
-                ...(editorInfoRes.errors || []),
-                ...(importedScriptsRes.errors || []),
-                ...(currentDataKeysRes.errors || []),
-            ];
-
-            if (importErrors.length) {
+            const policyStartedAt = Date.now();
+            const editorInfoRes = await _getEditorInfo();
+            markTiming('load_integrity_policy', policyStartedAt);
+            if (editorInfoRes.errors?.length) {
                 response.warnings = [
                     ...(response.warnings || []),
-                    ...importErrors.map((error) => `Imported successfully, but integrity review could not be prepared: ${error}`),
+                    ...editorInfoRes.errors.map((error) => `Imported successfully, but integrity review could not be prepared: ${error}`),
                 ];
                 return response;
             }
-
             const integrityPolicy = getIntegrityPolicyState(editorInfoRes.data).policy;
             if (integrityPolicy.triggerSources.imports && integrityPolicy.enforcementMode !== "off") {
+                const importReviewStartedAt = Date.now();
+                const integrityReviewScriptIds = Array.from(new Set([
+                    ...(response.savedScriptIds || []),
+                    ...importedDataKeyAffectedScriptIds,
+                ]));
+
+                const [importedScriptsRes, currentDataKeysRes] = await Promise.all([
+                    getScriptsWithItems({
+                        scriptsIds: integrityReviewScriptIds,
+                        returnDraftsIfExist: true,
+                    }),
+                    _getDataKeys(),
+                ]);
+
+                const importErrors = [
+                    ...(importedScriptsRes.errors || []),
+                    ...(currentDataKeysRes.errors || []),
+                ];
+
+                if (importErrors.length) {
+                    response.warnings = [
+                        ...(response.warnings || []),
+                        ...importErrors.map((error) => `Imported successfully, but integrity review could not be prepared: ${error}`),
+                    ];
+                    return response;
+                }
+
                 const importedScripts = importedScriptsRes.data;
                 const directlyImportedScripts = importedScripts.filter((script) => response.savedScriptIds?.includes(script.scriptId));
                 const importedDataKeyIds = currentDataKeysRes.data
@@ -1015,10 +1039,23 @@ export async function copyScripts(params?: {
                     requiresAcceptance: !!importSnapshot.snapshotId,
                     details: importSnapshot.reviewDetails,
                 };
+                markTiming('build_integrity_import_review', importReviewStartedAt);
             }
         }
 
         if (broadcastAction && !response?.errors?.length) socket.emit('data_changed', 'copy_scripts');
+
+        logger.log('copyScripts TIMINGS', JSON.stringify({
+            fromRemoteSiteId: !!fromRemoteSiteId,
+            toRemoteSiteId: !!toRemoteSiteId,
+            overwriteDataKeys: !!overwriteDataKeys,
+            overwriteDrugsLibraryItems: !!overwriteDrugsLibraryItems,
+            overWriteScriptWithId: !!overWriteScriptWithId,
+            scriptsRequested: scriptsIds.length,
+            savedScriptIds: response.savedScriptIds?.length || 0,
+            totalMs: Date.now() - startedAt,
+            timings,
+        }));
 
         return response;
     } catch (e: any) {
