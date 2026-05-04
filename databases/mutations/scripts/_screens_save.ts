@@ -20,7 +20,7 @@ export type SaveScreensResponse = {
     info?: { query?: Query; };
 };
 
-export type DraftOrigin = "editor" | "data_key_sync";
+export type DraftOrigin = "editor" | "data_key_sync" | "import" | "other";
 
 function summarizeSelectionRuleWarnings(contextLabel: string, warnings: string[]) {
     if (!warnings.length) return [];

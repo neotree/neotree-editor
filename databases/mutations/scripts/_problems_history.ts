@@ -4,7 +4,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { problemsDrafts, problems, problemsHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveProblemsHistory({
   previous,
@@ -70,7 +70,11 @@ export async function _saveProblemsHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: problemId,

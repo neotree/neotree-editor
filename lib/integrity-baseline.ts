@@ -2,7 +2,6 @@ import {
   buildDataKeyIntegrityContext,
   getBlockingIntegrityEntries,
   getDataKeyIntegrityEntryFingerprint,
-  repairDataKeyIntegrityReferences,
   scanDataKeyIntegrity,
 } from "@/lib/data-key-integrity";
 import {
@@ -13,25 +12,6 @@ import {
 } from "@/lib/integrity-policy";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
-
-function mergeIntegrityEntityUpdates<T extends Record<string, any>>(
-  current: T[],
-  updates: T[],
-  getId: (item: T) => string | undefined,
-) {
-  if (!updates.length) return current;
-
-  const updatesMap = new Map(
-    updates
-      .map((item) => [getId(item), item] as const)
-      .filter(([id]) => !!id),
-  );
-
-  return current.map((item) => {
-    const id = getId(item);
-    return (id && updatesMap.get(id)) || item;
-  });
-}
 
 export function buildIntegrityBaselineFromSnapshotData({
   policy,
@@ -49,23 +29,11 @@ export function buildIntegrityBaselineFromSnapshotData({
   problems: ProblemType[];
 }): IntegrityBaseline {
   const integrityContext = buildDataKeyIntegrityContext(dataKeys);
-  const repairs = repairDataKeyIntegrityReferences({
+  const report = scanDataKeyIntegrity({
     dataKeys,
     screens,
     diagnoses,
     problems,
-    context: integrityContext,
-  });
-
-  const repairedScreens = mergeIntegrityEntityUpdates(screens, repairs.screens, (item) => item.screenId);
-  const repairedDiagnoses = mergeIntegrityEntityUpdates(diagnoses, repairs.diagnoses, (item) => item.diagnosisId);
-  const repairedProblems = mergeIntegrityEntityUpdates(problems, repairs.problems, (item) => item.problemId);
-
-  const report = scanDataKeyIntegrity({
-    dataKeys,
-    screens: repairedScreens,
-    diagnoses: repairedDiagnoses,
-    problems: repairedProblems,
     onlyIssues: true,
     context: integrityContext,
     policy,
@@ -84,5 +52,7 @@ export function buildIntegrityBaselineFromSnapshotData({
     fingerprints: Array.from(
       new Set(blockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry))),
     ).sort(),
+    acceptedImportFingerprints: [],
+    acceptedImportFingerprintRefs: {},
   };
 }
