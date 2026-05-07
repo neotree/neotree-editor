@@ -21,6 +21,8 @@ export function useField(field?: ScriptField) {
             dataType: field?.dataType || '',
             defaultValue: field?.defaultValue || '',
             format: field?.format || '',
+            minLength: field?.minLength || '',
+            maxLength: field?.maxLength || '',
             minValue: field?.minValue || '',
             maxValue: field?.maxValue || '',
             minDate: field?.minDate || '',
