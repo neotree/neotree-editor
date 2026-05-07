@@ -142,19 +142,72 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const disabled = useMemo(() => !!disabledProp, [disabledProp])
 
   const onSave = handleSubmit(async (data) => {
+    const normalizeCharacterLimit = (value?: string) => {
+      const trimmed = `${value || ""}`.trim()
+      if (!trimmed) return { value: "", valid: true }
+
+      const parsed = Number(trimmed)
+      const isValid = Number.isInteger(parsed) && parsed > 0
+
+      return {
+        value: isValid ? `${parsed}` : trimmed,
+        valid: isValid,
+      }
+    }
+
+    const normalizedMinLength = normalizeCharacterLimit(data.minLength)
+    const normalizedMaxLength = normalizeCharacterLimit(data.maxLength)
+
+    if (!normalizedMinLength.valid) {
+      alert({
+        title: "Invalid minimum characters",
+        message: "Minimum characters must be a whole number greater than 0.",
+        variant: "error",
+      })
+      return
+    }
+
+    if (!normalizedMaxLength.valid) {
+      alert({
+        title: "Invalid maximum characters",
+        message: "Maximum characters must be a whole number greater than 0.",
+        variant: "error",
+      })
+      return
+    }
+
+    if (
+      normalizedMinLength.value &&
+      normalizedMaxLength.value &&
+      Number(normalizedMinLength.value) > Number(normalizedMaxLength.value)
+    ) {
+      alert({
+        title: "Invalid character range",
+        message: "Minimum characters cannot be greater than maximum characters.",
+        variant: "error",
+      })
+      return
+    }
+
+    const normalizedData = {
+      ...data,
+      minLength: normalizedMinLength.value,
+      maxLength: normalizedMaxLength.value,
+    }
+
     if (form.changeTracker) {
       const currentFields = form.getValues("fields")
       const updatedFields =
         !isEmpty(fieldIndex) && field
           ? currentFields.map((f, i) => ({
               ...f,
-              ...(i === fieldIndex ? data : null),
+              ...(i === fieldIndex ? normalizedData : null),
             }))
-          : [...currentFields, data]
+          : [...currentFields, normalizedData]
 
       await form.changeTracker.trackChanges(
         { ...form.getValues(), fields: updatedFields },
-        `Field "${data.label}" ${field ? "updated" : "added"}`,
+        `Field "${normalizedData.label}" ${field ? "updated" : "added"}`,
       )
     }
 
@@ -163,11 +216,11 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
         "fields",
         form.getValues("fields").map((f, i) => ({
           ...f,
-          ...(i === fieldIndex ? data : null),
+          ...(i === fieldIndex ? normalizedData : null),
         })),
       )
     } else {
-      form.setValue("fields", [...form.getValues("fields"), data], { shouldDirty: true })
+      form.setValue("fields", [...form.getValues("fields"), normalizedData], { shouldDirty: true })
     }
     onClose()
   })
@@ -340,6 +393,40 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                     Displayed next to the value on summaries and printouts.
                   </span>
                 </div>
+              )}
+
+              {isTextField && (
+                <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                  <div className="sm:flex-1">
+                    <Label htmlFor="minLength">Min characters (optional)</Label>
+                    <Input
+                      {...register("minLength", { disabled })}
+                      name="minLength"
+                      type="number"
+                      min={1}
+                      step={1}
+                      noRing={false}
+                    />
+                  </div>
+
+                  <div className="sm:flex-1">
+                    <Label htmlFor="maxLength">Max characters (optional)</Label>
+                    <Input
+                      {...register("maxLength", { disabled })}
+                      name="maxLength"
+                      type="number"
+                      min={1}
+                      step={1}
+                      noRing={false}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isTextField && (
+                <span className="text-xs text-muted-foreground">
+                  Leave empty for no limit. Mobile will enforce these only while clinicians type into standard text fields.
+                </span>
               )}
 
               <div>
