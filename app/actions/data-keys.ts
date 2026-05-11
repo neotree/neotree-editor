@@ -12,15 +12,119 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, repairDataKeyIntegrityReferences, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { getIntegrityPolicyState } from '@/lib/integrity-policy';
+import socket from '@/lib/socket';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
     selectedTargetUniqueKey?: string;
     reviewed?: boolean;
 };
+
+type IntegritySummarySnapshot = {
+    total: number;
+    resolved: number;
+    out_of_sync: number;
+    missing: number;
+    legacy_match: number;
+    conflict: number;
+    unmanaged: number;
+    blocking: number;
+};
+
+type IntegrityImpactSummary = {
+    before: IntegritySummarySnapshot;
+    after: IntegritySummarySnapshot;
+    delta: IntegritySummarySnapshot;
+    touched: {
+        screens: number;
+        diagnoses: number;
+        problems: number;
+    };
+};
+
+function buildRegistryIntegrityReport({
+    dataKeys,
+    screens,
+    diagnoses,
+    problems,
+    onlyIssues,
+}: {
+    dataKeys: Awaited<ReturnType<typeof _getDataKeys>>["data"];
+    screens: Awaited<ReturnType<typeof _getScreens>>["data"];
+    diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
+    problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+    onlyIssues: boolean;
+}) {
+    const integrityContext = buildDataKeyIntegrityContext(dataKeys);
+
+    const rawReport = scanDataKeyIntegrity({
+        dataKeys,
+        screens,
+        diagnoses,
+        problems,
+        onlyIssues,
+        context: integrityContext,
+    });
+
+    return {
+        rawReport,
+        integrityContext,
+    };
+}
+
+function buildImpactSummary({
+    before,
+    after,
+    touched,
+}: {
+    before: IntegritySummarySnapshot;
+    after: IntegritySummarySnapshot;
+    touched: IntegrityImpactSummary["touched"];
+}): IntegrityImpactSummary {
+    return {
+        before,
+        after,
+        delta: {
+            total: after.total - before.total,
+            resolved: after.resolved - before.resolved,
+            out_of_sync: after.out_of_sync - before.out_of_sync,
+            missing: after.missing - before.missing,
+            legacy_match: after.legacy_match - before.legacy_match,
+            conflict: after.conflict - before.conflict,
+            unmanaged: after.unmanaged - before.unmanaged,
+            blocking: after.blocking - before.blocking,
+        },
+        touched,
+    };
+}
+
+async function loadIntegrityScriptState(scriptId: string) {
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        _getDataKeys({ returnDraftsIfExist: true }),
+        _getScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+        _getDiagnoses({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+        _getProblems({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+    ]);
+
+    const errors = [
+        ...(dataKeysRes.errors || []),
+        ...(screensRes.errors || []),
+        ...(diagnosesRes.errors || []),
+        ...(problemsRes.errors || []),
+    ];
+
+    return {
+        success: errors.length === 0,
+        errors,
+        dataKeys: dataKeysRes.data,
+        screens: screensRes.data,
+        diagnoses: diagnosesRes.data,
+        problems: problemsRes.data,
+    };
+}
 
 async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
     const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
@@ -41,6 +145,10 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
         return {
             success: false as const,
             errors,
+            dataKeys: [] as Awaited<ReturnType<typeof _getDataKeys>>["data"],
+            screens: [] as Awaited<ReturnType<typeof _getScreens>>["data"],
+            diagnoses: [] as Awaited<ReturnType<typeof _getDiagnoses>>["data"],
+            problems: [] as Awaited<ReturnType<typeof _getProblems>>["data"],
             repairs: null,
         };
     }
@@ -48,6 +156,10 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
     return {
         success: true as const,
         errors: [] as string[],
+        dataKeys: dataKeysRes.data,
+        screens: screensRes.data,
+        diagnoses: diagnosesRes.data,
+        problems: problemsRes.data,
         repairs: (() => {
             const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
             return repairSingleDataKeyIntegrityReference({
@@ -195,51 +307,14 @@ export const getDataKeysIntegrity = async (params?: {
         }
 
         const integrityPolicyState = getIntegrityPolicyState(editorInfoRes.data);
-        const integrityContext = buildDataKeyIntegrityContext(scopedDataKeys);
-
-        const rawReport = scanDataKeyIntegrity({
+        const {
+            rawReport,
+        } = buildRegistryIntegrityReport({
             dataKeys: scopedDataKeys,
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
             onlyIssues: params?.onlyIssues !== false,
-            context: integrityContext,
-            policy: integrityPolicyState.policy,
-        });
-
-        const repairs = repairDataKeyIntegrityReferences({
-            dataKeys: scopedDataKeys,
-            screens: screensRes.data,
-            diagnoses: diagnosesRes.data,
-            problems: problemsRes.data,
-            context: integrityContext,
-        });
-
-        const mergeById = <T extends Record<string, any>>(
-            current: T[],
-            updates: T[],
-            getId: (item: T) => string | undefined,
-        ) => {
-            if (!updates.length) return current;
-            const updatesMap = new Map(
-                updates
-                    .map((item) => [getId(item), item] as const)
-                    .filter(([id]) => !!id)
-            );
-            return current.map((item) => {
-                const id = getId(item);
-                return (id && updatesMap.get(id)) || item;
-            });
-        };
-
-        const publishAlignedReport = scanDataKeyIntegrity({
-            dataKeys: scopedDataKeys,
-            screens: mergeById(screensRes.data, repairs.screens, (item) => item.screenId),
-            diagnoses: mergeById(diagnosesRes.data, repairs.diagnoses, (item) => item.diagnosisId),
-            problems: mergeById(problemsRes.data, repairs.problems, (item) => item.problemId),
-            onlyIssues: true,
-            context: integrityContext,
-            policy: integrityPolicyState.policy,
         });
 
         return {
@@ -247,10 +322,7 @@ export const getDataKeysIntegrity = async (params?: {
             data: {
                 ...rawReport,
                 policy: integrityPolicyState.policy,
-                summary: {
-                    ...rawReport.summary,
-                    blocking: publishAlignedReport.summary.blocking,
-                },
+                summary: rawReport.summary,
             },
         };
     } catch (e: any) {
@@ -550,91 +622,136 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 success: false,
                 changed: false,
                 reportAfter: null,
+                impactSummary: null,
                 errors: prepared.errors,
                 warnings: [],
             };
         }
         const repairs = prepared.repairs;
+        const beforeReport = buildRegistryIntegrityReport({
+            dataKeys: prepared.dataKeys,
+            screens: prepared.screens,
+            diagnoses: prepared.diagnoses,
+            problems: prepared.problems,
+            onlyIssues: false,
+        }).rawReport;
 
         if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) {
             return {
                 success: true,
                 changed: false,
                 reportAfter: null,
+                impactSummary: null,
                 errors: [],
                 warnings: [],
             };
         }
 
         const warnings: string[] = [];
+        try {
+            await db.transaction(async (tx) => {
+                if (repairs.screens.length) {
+                    const repairedScreens = await _saveScreens({
+                        data: repairs.screens,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScreens.errors?.length) {
+                        warnings.push(...(repairedScreens.warnings || []));
+                        throw new Error(repairedScreens.errors.join(', '));
+                    }
+                    warnings.push(...(repairedScreens.warnings || []));
+                }
 
-        if (repairs.screens.length) {
-            const repairedScreens = await _saveScreens({
-                data: repairs.screens,
-                userId: session.user?.userId,
+                if (repairs.diagnoses.length) {
+                    const repairedDiagnoses = await _saveDiagnoses({
+                        data: repairs.diagnoses,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedDiagnoses.errors?.length) {
+                        throw new Error(repairedDiagnoses.errors.join(', '));
+                    }
+                }
+
+                if (repairs.problems.length) {
+                    const repairedProblems = await _saveProblems({
+                        data: repairs.problems,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedProblems.errors?.length) {
+                        throw new Error(repairedProblems.errors.join(', '));
+                    }
+                }
             });
-            if (repairedScreens.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntry SAVE_SCREENS_ERRORS', {
-                    entry: params.entry,
-                    screensCount: repairs.screens.length,
-                    errors: repairedScreens.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    reportAfter: null,
-                    errors: repairedScreens.errors,
-                    warnings: repairedScreens.warnings || [],
-                };
-            }
-            warnings.push(...(repairedScreens.warnings || []));
+        } catch (e: any) {
+            logger.error('resolveDataKeyIntegrityEntry SAVE_TRANSACTION_ERROR', {
+                entry: params.entry,
+                screensCount: repairs.screens.length,
+                diagnosesCount: repairs.diagnoses.length,
+                problemsCount: repairs.problems.length,
+                error: e.message,
+            });
+            return {
+                success: false,
+                changed: false,
+                reportAfter: null,
+                impactSummary: null,
+                errors: [e.message],
+                warnings,
+            };
         }
 
-        if (repairs.diagnoses.length) {
-            const repairedDiagnoses = await _saveDiagnoses({
-                data: repairs.diagnoses,
-                userId: session.user?.userId,
+        const persistedState = await loadIntegrityScriptState(params.entry.scriptId);
+        if (!persistedState.success) {
+            logger.error('resolveDataKeyIntegrityEntry REFETCH_ERRORS', {
+                entry: params.entry,
+                errors: persistedState.errors,
             });
-            if (repairedDiagnoses.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntry SAVE_DIAGNOSES_ERRORS', {
-                    entry: params.entry,
-                    diagnosesCount: repairs.diagnoses.length,
-                    errors: repairedDiagnoses.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    reportAfter: null,
-                    errors: repairedDiagnoses.errors,
-                    warnings,
-                };
-            }
+            socket.emit('data_changed', 'resolve_data_key_integrity_entry');
+            return {
+                success: true,
+                changed: true,
+                reportAfter: null,
+                impactSummary: null,
+                errors: [],
+                warnings: [
+                    ...warnings,
+                    ...(persistedState.errors?.length ? [`Draft saved, but summary refresh failed: ${persistedState.errors.join(', ')}`] : []),
+                ],
+            };
         }
 
-        if (repairs.problems.length) {
-            const repairedProblems = await _saveProblems({
-                data: repairs.problems,
-                userId: session.user?.userId,
-            });
-            if (repairedProblems.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntry SAVE_PROBLEMS_ERRORS', {
-                    entry: params.entry,
-                    problemsCount: repairs.problems.length,
-                    errors: repairedProblems.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    reportAfter: null,
-                    errors: repairedProblems.errors,
-                    warnings,
-                };
-            }
-        }
+        const afterReport = buildRegistryIntegrityReport({
+            dataKeys: persistedState.dataKeys,
+            screens: persistedState.screens,
+            diagnoses: persistedState.diagnoses,
+            problems: persistedState.problems,
+            onlyIssues: false,
+        }).rawReport;
+
+        socket.emit('data_changed', 'resolve_data_key_integrity_entry');
+
         return {
             success: true,
             changed: true,
             reportAfter: null,
+            impactSummary: buildImpactSummary({
+                before: beforeReport.summary,
+                after: afterReport.summary,
+                touched: {
+                    screens: repairs.screens.length,
+                    diagnoses: repairs.diagnoses.length,
+                    problems: repairs.problems.length,
+                },
+            }),
             errors: [],
             warnings,
         };
@@ -648,6 +765,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             success: false,
             changed: false,
             reportAfter: null,
+            impactSummary: null,
             errors: [e.message],
             warnings: [],
         };
@@ -673,6 +791,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 success: true,
                 changed: false,
                 resolvedCount: 0,
+                impactSummary: null,
                 errors: [],
                 warnings: [],
             };
@@ -684,6 +803,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 success: false,
                 changed: false,
                 resolvedCount: 0,
+                impactSummary: null,
                 errors: ['Bulk resolve currently supports one script at a time'],
                 warnings: [],
             };
@@ -712,6 +832,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 success: false,
                 changed: false,
                 resolvedCount: 0,
+                impactSummary: null,
                 errors: fetchErrors,
                 warnings: [],
             };
@@ -728,6 +849,13 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
         const changedProblemIds = new Set<string>();
         let resolvedCount = 0;
         const warnings: string[] = [];
+        const beforeReport = buildRegistryIntegrityReport({
+            dataKeys: dataKeysRes.data,
+            screens: currentScreens,
+            diagnoses: currentDiagnoses,
+            problems: currentProblems,
+            onlyIssues: false,
+        }).rawReport;
 
         for (const item of reviewedItems) {
             const entry = item.entry;
@@ -781,79 +909,118 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 success: true,
                 changed: false,
                 resolvedCount: 0,
+                impactSummary: null,
                 errors: [],
                 warnings: [],
             };
         }
 
-        if (changedScreens.length) {
-            const repairedScreens = await _saveScreens({
-                data: changedScreens,
-                userId: session.user?.userId,
+        try {
+            await db.transaction(async (tx) => {
+                if (changedScreens.length) {
+                    const repairedScreens = await _saveScreens({
+                        data: changedScreens,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScreens.errors?.length) {
+                        warnings.push(...(repairedScreens.warnings || []));
+                        throw new Error(repairedScreens.errors.join(', '));
+                    }
+                    warnings.push(...(repairedScreens.warnings || []));
+                }
+
+                if (changedDiagnoses.length) {
+                    const repairedDiagnoses = await _saveDiagnoses({
+                        data: changedDiagnoses,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedDiagnoses.errors?.length) {
+                        throw new Error(repairedDiagnoses.errors.join(', '));
+                    }
+                }
+
+                if (changedProblems.length) {
+                    const repairedProblems = await _saveProblems({
+                        data: changedProblems,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedProblems.errors?.length) {
+                        throw new Error(repairedProblems.errors.join(', '));
+                    }
+                }
             });
-            if (repairedScreens.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_SCREENS_ERRORS', {
-                    entriesCount: entries.length,
-                    screensCount: changedScreens.length,
-                    errors: repairedScreens.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    resolvedCount: 0,
-                    errors: repairedScreens.errors,
-                    warnings: repairedScreens.warnings || [],
-                };
-            }
-            warnings.push(...(repairedScreens.warnings || []));
+        } catch (e: any) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_TRANSACTION_ERROR', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                screensCount: changedScreens.length,
+                diagnosesCount: changedDiagnoses.length,
+                problemsCount: changedProblems.length,
+                error: e.message,
+            });
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: [e.message],
+                warnings,
+            };
         }
 
-        if (changedDiagnoses.length) {
-            const repairedDiagnoses = await _saveDiagnoses({
-                data: changedDiagnoses,
-                userId: session.user?.userId,
+        const persistedState = await loadIntegrityScriptState(scriptIds[0]);
+        if (!persistedState.success) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk REFETCH_ERRORS', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                errors: persistedState.errors,
             });
-            if (repairedDiagnoses.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_DIAGNOSES_ERRORS', {
-                    entriesCount: entries.length,
-                    diagnosesCount: changedDiagnoses.length,
-                    errors: repairedDiagnoses.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    resolvedCount: 0,
-                    errors: repairedDiagnoses.errors,
-                    warnings,
-                };
-            }
+            socket.emit('data_changed', 'resolve_data_key_integrity_entries_bulk');
+            return {
+                success: true,
+                changed: true,
+                resolvedCount,
+                impactSummary: null,
+                errors: [],
+                warnings: [
+                    ...warnings,
+                    ...(persistedState.errors?.length ? [`Drafts saved, but summary refresh failed: ${persistedState.errors.join(', ')}`] : []),
+                ],
+            };
         }
 
-        if (changedProblems.length) {
-            const repairedProblems = await _saveProblems({
-                data: changedProblems,
-                userId: session.user?.userId,
-            });
-            if (repairedProblems.errors?.length) {
-                logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_PROBLEMS_ERRORS', {
-                    entriesCount: entries.length,
-                    problemsCount: changedProblems.length,
-                    errors: repairedProblems.errors,
-                });
-                return {
-                    success: false,
-                    changed: false,
-                    resolvedCount: 0,
-                    errors: repairedProblems.errors,
-                    warnings,
-                };
-            }
-        }
+        const afterReport = buildRegistryIntegrityReport({
+            dataKeys: persistedState.dataKeys,
+            screens: persistedState.screens,
+            diagnoses: persistedState.diagnoses,
+            problems: persistedState.problems,
+            onlyIssues: false,
+        }).rawReport;
+
+        socket.emit('data_changed', 'resolve_data_key_integrity_entries_bulk');
 
         return {
             success: true,
             changed: true,
             resolvedCount,
+            impactSummary: buildImpactSummary({
+                before: beforeReport.summary,
+                after: afterReport.summary,
+                touched: {
+                    screens: changedScreens.length,
+                    diagnoses: changedDiagnoses.length,
+                    problems: changedProblems.length,
+                },
+            }),
             errors: [],
             warnings,
         };
@@ -867,6 +1034,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             success: false,
             changed: false,
             resolvedCount: 0,
+            impactSummary: null,
             errors: [e.message],
             warnings: [],
         };

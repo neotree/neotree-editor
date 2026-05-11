@@ -97,6 +97,7 @@ export type DataKeyIntegrityPublishScriptGroup = {
     scriptTitle: string;
     totalIssues: number;
     issues: DataKeyIntegrityPublishIssue[];
+    hiddenIssuesCount?: number;
     registryHref: string;
     scriptHref: string;
 };
@@ -206,6 +207,7 @@ export function getBlockingIntegrityEntries(
 export function getDataKeyIntegrityEntryFingerprint(entry: DataKeyIntegrityEntry) {
     return getIntegrityEntryFingerprint({
         scriptId: entry.scriptId,
+        status: entry.status,
         kind: entry.kind,
         screenId: entry.screenId,
         diagnosisId: entry.diagnosisId,
@@ -219,10 +221,6 @@ export function getDataKeyIntegrityEntryFingerprint(entry: DataKeyIntegrityEntry
         symptomId: entry.symptomId,
         symptomIndex: entry.symptomIndex,
         expectedDataType: entry.expectedDataType,
-        currentUniqueKey: entry.currentUniqueKey,
-        currentKey: entry.currentKey,
-        matchedUniqueKey: entry.matchedUniqueKey,
-        matchedName: entry.matchedName,
     });
 }
 

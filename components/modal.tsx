@@ -44,10 +44,13 @@ export function Modal({
 }: ModalProps) {
     const { close, isOpen, set } = useModalState();
     const open = id ? (isOpen(id) || props.open) : props.open;
+    const contentClassName = contentProps?.className;
+    const bodyClassName = bodyProps?.className;
+    const footerClassName = footerProps?.className;
 
     useEffect(() => {
         if (id) set({ [id]: false, });
-    }, [id]);
+    }, [id, set]);
 
     return (
         <>
@@ -62,12 +65,12 @@ export function Modal({
                 {trigger}
 
                 <DialogContent 
+                    {...contentProps}
                     hideCloseButton
                     className={cn(
                         '!flex min-h-0 max-h-[90dvh] flex-col overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',
-                        contentProps?.className,
+                        contentClassName,
                     )}
-                    {...contentProps}
                 >
                     <DialogHeader 
                         className={cn(
@@ -89,22 +92,22 @@ export function Modal({
                     </DialogHeader>
 
                     <div
+                        {...bodyProps}
                         className={cn(
                             "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-2",
-                            bodyProps?.className,
+                            bodyClassName,
                         )}
-                        {...bodyProps}
                     >
                         {children}
                     </div>
                     
                     <DialogFooter 
+                        {...footerProps}
                         className={cn(
                             'shrink-0 border-t border-t-border px-4 py-2 items-center w-full',
                             actions ? '' : 'hidden',
-                            footerProps?.className
+                            footerClassName
                         )}
-                        {...footerProps}
                     >
                         {actions}
                     </DialogFooter>

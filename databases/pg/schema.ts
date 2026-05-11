@@ -383,12 +383,13 @@ export const editorInfo = pgTable("nt_editor_info", {
   lastPublishDate: timestamp("last_publish_date"),
   lastDataKeysSyncDate: timestamp("last_data_keys_sync_date"),
   integrityPolicy: jsonb("integrity_policy").$type<IntegrityPolicy>().default({
-    enforcementMode: "block_new_issues_only",
+    enforcementMode: "off",
     scanScope: "affected_scripts_only",
     triggerSources: {
-      scriptEdits: true,
+      scriptEdits: false,
       dataKeyLibraryEdits: false,
-      deletions: true,
+      deletions: false,
+      imports: false,
     },
     useBaseline: true,
   }).notNull(),
@@ -397,9 +398,11 @@ export const editorInfo = pgTable("nt_editor_info", {
     capturedByUserId: null,
     totalBlockingIssues: 0,
     totalScripts: 0,
-    fingerprintVersion: 1,
+    fingerprintVersion: 2,
     ruleSetVersion: "2026-04-26",
     fingerprints: [],
+    acceptedImportFingerprints: [],
+    acceptedImportFingerprintRefs: {},
   }).notNull(),
 })
 
@@ -630,6 +633,7 @@ export const scriptsDrafts = pgTable("nt_scripts_drafts", {
       typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[] } & { reviewConfigurations: ScreenReviewField[] }
     >()
     .notNull(),
+  draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1241,6 +1245,7 @@ export const pendingDeletion = pgTable("nt_pending_deletion", {
   dataKeyId: uuid("data_key_id").references(() => dataKeys.uuid, { onDelete: "cascade" }),
   dataKeyDraftId: uuid("data_key_draft_id").references(() => dataKeys.uuid, { onDelete: "cascade" }),
   aliasId: uuid("alias_id").references(() => aliases.uuid, { onDelete: "cascade" }),
+  draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 })
@@ -1441,6 +1446,42 @@ export const adminAuditLogs = pgTable(
   }),
 )
 
+export const integrityImportSnapshotStatusEnum = pgEnum("integrity_import_snapshot_status", [
+  "pending_review",
+  "accepted",
+  "rejected",
+])
+
+export const integrityImportSnapshots = pgTable(
+  "nt_integrity_import_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    snapshotId: uuid("snapshot_id").notNull().unique().defaultRandom(),
+    status: integrityImportSnapshotStatusEnum("status").notNull().default("pending_review"),
+    sourceType: text("source_type").notNull(),
+    sourceLabel: text("source_label"),
+    importedScriptIds: jsonb("imported_script_ids").$type<string[]>().default([]).notNull(),
+    importedDataKeyIds: jsonb("imported_data_key_ids").$type<string[]>().default([]).notNull(),
+    fingerprintVersion: integer("fingerprint_version").notNull(),
+    ruleSetVersion: text("rule_set_version").notNull(),
+    totalBlockingIssues: integer("total_blocking_issues").notNull().default(0),
+    totalScripts: integer("total_scripts").notNull().default(0),
+    fingerprints: jsonb("fingerprints").$type<string[]>().default([]).notNull(),
+    metadata: jsonb("metadata").$type<any>().default({}).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    acceptedByUserId: uuid("accepted_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    acceptedAt: timestamp("accepted_at"),
+  },
+  (table) => ({
+    statusIndex: index("integrity_import_snapshots_status_index").on(table.status),
+    sourceTypeIndex: index("integrity_import_snapshots_source_type_index").on(table.sourceType),
+    createdByIndex: index("integrity_import_snapshots_created_by_index").on(table.createdByUserId),
+    acceptedByIndex: index("integrity_import_snapshots_accepted_by_index").on(table.acceptedByUserId),
+    createdAtIndex: index("integrity_import_snapshots_created_at_index").on(table.createdAt),
+  }),
+)
+
 export const changeLogsRelations = relations(changeLogs, ({ one }) => ({
   user: one(users, {
     fields: [changeLogs.userId],
@@ -1489,5 +1530,18 @@ export const adminAuditLogsRelations = relations(adminAuditLogs, ({ one }) => ({
   actor: one(users, {
     fields: [adminAuditLogs.actorUserId],
     references: [users.userId],
+  }),
+}))
+
+export const integrityImportSnapshotsRelations = relations(integrityImportSnapshots, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [integrityImportSnapshots.createdByUserId],
+    references: [users.userId],
+    relationName: "integrityImportSnapshotCreatedBy",
+  }),
+  acceptedBy: one(users, {
+    fields: [integrityImportSnapshots.acceptedByUserId],
+    references: [users.userId],
+    relationName: "integrityImportSnapshotAcceptedBy",
   }),
 }))

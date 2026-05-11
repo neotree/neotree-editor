@@ -7,6 +7,7 @@ import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
 
@@ -16,6 +17,8 @@ export type SaveDataKeysParams = {
     userId?: string;
     updateRefs?: boolean;
     allowConfidentialDowngrade?: boolean;
+    draftOrigin?: DataKeyDraftOrigin;
+    propagatedDraftOrigin?: Extract<DataKeyDraftOrigin, "data_key_sync" | "import">;
 };
 
 export type SaveDataKeysResponse = { 
@@ -37,11 +40,54 @@ async function createNewUniqueKey(uniqueKey?: string) {
     return uniqueKey;
 }
 
+async function enforceDraftOriginForTouchedDataKeys({
+    uniqueKeys,
+    userId,
+    draftOrigin,
+}: {
+    uniqueKeys: string[];
+    userId?: string;
+    draftOrigin: DataKeyDraftOrigin;
+}) {
+    if (!uniqueKeys.length) return;
+
+    const touchedPublishedDataKeys = await _getDataKeys({ uniqueKeys });
+    if (touchedPublishedDataKeys.errors?.length) {
+        throw new Error(touchedPublishedDataKeys.errors.join(', '));
+    }
+
+    const touchedPublishedIds = touchedPublishedDataKeys.data
+        .map((item) => item.uuid)
+        .filter((value): value is string => !!value);
+
+    const drafts = await db.query.dataKeysDrafts.findMany({
+        where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined,
+    });
+
+    const touchedUniqueKeys = new Set(uniqueKeys.filter(Boolean));
+    const touchedDataKeyIds = new Set(touchedPublishedIds);
+    const touchedDraftIds = drafts
+        .filter((draft) => (
+            touchedUniqueKeys.has(`${draft.uniqueKey || ''}`) ||
+            (draft.dataKeyId ? touchedDataKeyIds.has(draft.dataKeyId) : false)
+        ))
+        .map((draft) => draft.uuid);
+
+    for (const draftId of touchedDraftIds) {
+        await db
+            .update(dataKeysDrafts)
+            .set({ draftOrigin })
+            .where(eq(dataKeysDrafts.uuid, draftId));
+    }
+}
+
 export async function _saveDataKeys({ 
     data: dataParam, 
     broadcastAction, 
     updateRefs = true,
     userId,
+    draftOrigin = "editor",
+    propagatedDraftOrigin,
 }: SaveDataKeysParams) {
     const response: SaveDataKeysResponse = { success: false, };
 
@@ -133,6 +179,7 @@ export async function _saveDataKeys({
                                 data,
                                 name: data.name,
                                 uniqueKey: data.uniqueKey,
+                                draftOrigin,
                             }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
@@ -155,6 +202,7 @@ export async function _saveDataKeys({
                             dataKeyId: published?.uuid,
                             name: data.name,
                             uniqueKey,
+                            draftOrigin,
                             createdByUserId: userId,
                         });
 
@@ -169,9 +217,22 @@ export async function _saveDataKeys({
         if (errors.length) {
             response.errors = errors;
         } else {
+            if (draftOrigin === "import") {
+                await enforceDraftOriginForTouchedDataKeys({
+                    uniqueKeys,
+                    userId,
+                    draftOrigin,
+                });
+            }
+
             if (updateRefs && uniqueKeys.length) {
                 const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
-                const updateRefsRes = await _updateDataKeysRefs({ dataKeys, broadcastAction, userId, });
+                const updateRefsRes = await _updateDataKeysRefs({
+                    dataKeys,
+                    broadcastAction,
+                    userId,
+                    draftOrigin: propagatedDraftOrigin || (draftOrigin === "import" ? "import" : "data_key_sync"),
+                });
                 if (updateRefsRes.errors?.length || !updateRefsRes.success) {
                     response.success = false;
                     response.errors = updateRefsRes.errors?.length ? updateRefsRes.errors : ['Failed to update related scripts references'];
