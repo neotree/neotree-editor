@@ -22,6 +22,7 @@ export type UpdateDataKeysRefsParams = {
     dataKeys: DataKey[];
     dryRun?: boolean;
     userId?: string;
+    draftOrigin?: "data_key_sync" | "import";
 };
 
 type MatchSource = 'uniqueKey';
@@ -155,6 +156,7 @@ export async function _updateDataKeysRefs({
     dryRun = false,
     broadcastAction,
     userId,
+    draftOrigin = "data_key_sync",
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
         const stats: UpdateStats = {
@@ -786,11 +788,11 @@ export async function _updateDataKeysRefs({
 
         const saveDiagnosesTask = async () => {
             for (const chunk of chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin: 'data_key_sync' });
+                const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (diagnosis) => {
-                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, draftOrigin: 'data_key_sync' });
+                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, draftOrigin });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[diagnosis:${diagnosis.diagnosisId}] ${e}`));
                         } else {
@@ -805,11 +807,11 @@ export async function _updateDataKeysRefs({
 
         const saveProblemsTask = async () => {
             for (const chunk of chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveProblems({ data: chunk, userId, draftOrigin: 'data_key_sync' });
+                const res = await _saveProblems({ data: chunk, userId, draftOrigin });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (problem) => {
-                        const singleRes = await _saveProblems({ data: [problem], userId, draftOrigin: 'data_key_sync' });
+                        const singleRes = await _saveProblems({ data: [problem], userId, draftOrigin });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[problem:${problem.problemId}] ${e}`));
                         } else {
@@ -824,11 +826,11 @@ export async function _updateDataKeysRefs({
 
         const saveScreensTask = async () => {
             for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveScreens({ data: chunk, userId, draftOrigin: 'data_key_sync' });
+                const res = await _saveScreens({ data: chunk, userId, draftOrigin });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (screen) => {
-                        const singleRes = await _saveScreens({ data: [screen], userId, draftOrigin: 'data_key_sync' });
+                        const singleRes = await _saveScreens({ data: [screen], userId, draftOrigin });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[screen:${screen.screenId}] ${e}`));
                         } else {

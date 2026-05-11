@@ -4,7 +4,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveScreensHistory({
   previous,
@@ -78,7 +78,11 @@ export async function _saveScreensHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: screenId,

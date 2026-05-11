@@ -13,6 +13,7 @@ export type IntegrityPolicy = {
     scriptEdits: boolean;
     dataKeyLibraryEdits: boolean;
     deletions: boolean;
+    imports: boolean;
   };
   useBaseline: boolean;
 };
@@ -25,6 +26,8 @@ export type IntegrityBaseline = {
   fingerprintVersion: number;
   ruleSetVersion: string;
   fingerprints: string[];
+  acceptedImportFingerprints: string[];
+  acceptedImportFingerprintRefs: Record<string, number>;
 };
 
 export type IntegrityPolicyState = {
@@ -41,6 +44,7 @@ export type IntegrityPolicyBlockingEvaluationResult<T> = {
 
 export type IntegrityFingerprintEntry = {
   scriptId: string;
+  status?: string;
   kind: string;
   screenId?: string;
   diagnosisId?: string;
@@ -61,17 +65,18 @@ export type IntegrityFingerprintEntry = {
 };
 
 export const DEFAULT_INTEGRITY_POLICY: IntegrityPolicy = {
-  enforcementMode: "block_new_issues_only",
+  enforcementMode: "off",
   scanScope: "affected_scripts_only",
   triggerSources: {
-    scriptEdits: true,
+    scriptEdits: false,
     dataKeyLibraryEdits: false,
-    deletions: true,
+    deletions: false,
+    imports: false,
   },
   useBaseline: true,
 };
 
-export const INTEGRITY_BASELINE_FINGERPRINT_VERSION = 1;
+export const INTEGRITY_BASELINE_FINGERPRINT_VERSION = 2;
 export const INTEGRITY_BASELINE_RULESET_VERSION = "2026-04-26";
 
 export const EMPTY_INTEGRITY_BASELINE: IntegrityBaseline = {
@@ -82,6 +87,8 @@ export const EMPTY_INTEGRITY_BASELINE: IntegrityBaseline = {
   fingerprintVersion: INTEGRITY_BASELINE_FINGERPRINT_VERSION,
   ruleSetVersion: INTEGRITY_BASELINE_RULESET_VERSION,
   fingerprints: [],
+  acceptedImportFingerprints: [],
+  acceptedImportFingerprintRefs: {},
 };
 
 export function normalizeIntegrityPolicy(
@@ -108,6 +115,7 @@ export function normalizeIntegrityPolicy(
         value?.triggerSources?.dataKeyLibraryEdits ??
         DEFAULT_INTEGRITY_POLICY.triggerSources.dataKeyLibraryEdits,
       deletions: value?.triggerSources?.deletions ?? DEFAULT_INTEGRITY_POLICY.triggerSources.deletions,
+      imports: value?.triggerSources?.imports ?? DEFAULT_INTEGRITY_POLICY.triggerSources.imports,
     },
     useBaseline:
       enforcementMode === "block_new_issues_only"
@@ -119,6 +127,17 @@ export function normalizeIntegrityPolicy(
 export function normalizeIntegrityBaseline(
   value?: Partial<IntegrityBaseline> | null,
 ): IntegrityBaseline {
+  const acceptedImportFingerprintRefs = value?.acceptedImportFingerprintRefs && typeof value.acceptedImportFingerprintRefs === "object"
+    ? Object.fromEntries(
+        Object.entries(value.acceptedImportFingerprintRefs)
+          .filter(([fingerprint, count]) => typeof fingerprint === "string" && !!fingerprint && typeof count === "number" && count > 0)
+          .map(([fingerprint, count]) => [fingerprint, Math.floor(count as number)]),
+      )
+    : {};
+  const acceptedImportFingerprints = Array.isArray(value?.acceptedImportFingerprints)
+    ? value!.acceptedImportFingerprints.filter((item): item is string => typeof item === "string" && !!item)
+    : Object.keys(acceptedImportFingerprintRefs);
+
   return {
     capturedAt: value?.capturedAt || null,
     capturedByUserId: value?.capturedByUserId || null,
@@ -136,6 +155,8 @@ export function normalizeIntegrityBaseline(
     fingerprints: Array.isArray(value?.fingerprints)
       ? value!.fingerprints.filter((item): item is string => typeof item === "string" && !!item)
       : [],
+    acceptedImportFingerprints: Array.from(new Set(acceptedImportFingerprints)).sort(),
+    acceptedImportFingerprintRefs,
   };
 }
 
@@ -157,11 +178,58 @@ export function getIntegrityBaselineLookup(
   value?: Partial<IntegrityBaseline> | null,
 ) {
   const baseline = normalizeIntegrityBaseline(value);
-  if (!isIntegrityBaselineCompatible(baseline)) {
-    return new Set<string>();
-  }
+  return new Set<string>([
+    ...(isIntegrityBaselineCompatible(baseline) ? baseline.fingerprints : []),
+    ...baseline.acceptedImportFingerprints,
+  ]);
+}
 
-  return new Set(baseline.fingerprints);
+function extractScriptIdsFromFingerprints(fingerprints: string[]) {
+  return new Set(
+    fingerprints
+      .map((fingerprint) => `${fingerprint || ""}`.split("::")[0]?.trim())
+      .filter((scriptId): scriptId is string => !!scriptId),
+  );
+}
+
+
+export function mergeAcceptedImportFingerprintsIntoIntegrityBaseline(
+  baselineValue: Partial<IntegrityBaseline> | null | undefined,
+  fingerprints: string[],
+) {
+  const baseline = normalizeIntegrityBaseline(baselineValue);
+  const nextRefs = { ...baseline.acceptedImportFingerprintRefs };
+  for (const fingerprint of fingerprints) {
+    if (typeof fingerprint !== "string" || !fingerprint) continue;
+    nextRefs[fingerprint] = (nextRefs[fingerprint] || 0) + 1;
+  }
+  const acceptedImportFingerprints = Object.keys(nextRefs).sort();
+
+  return {
+    ...baseline,
+    acceptedImportFingerprints,
+    acceptedImportFingerprintRefs: nextRefs,
+  };
+}
+
+export function removeAcceptedImportFingerprintsFromIntegrityBaseline(
+  baselineValue: Partial<IntegrityBaseline> | null | undefined,
+  fingerprintsToRemove: string[],
+) {
+  const baseline = normalizeIntegrityBaseline(baselineValue);
+  const nextRefs = { ...baseline.acceptedImportFingerprintRefs };
+  for (const fingerprint of fingerprintsToRemove) {
+    if (typeof fingerprint !== "string" || !fingerprint || !nextRefs[fingerprint]) continue;
+    nextRefs[fingerprint] -= 1;
+    if (nextRefs[fingerprint] <= 0) delete nextRefs[fingerprint];
+  }
+  const acceptedImportFingerprints = Object.keys(nextRefs).sort();
+
+  return {
+    ...baseline,
+    acceptedImportFingerprints,
+    acceptedImportFingerprintRefs: nextRefs,
+  };
 }
 
 export function evaluateIntegrityPolicyBlockingEntries<T>({
@@ -269,6 +337,7 @@ export function evaluateIntegrityPolicyBlockingEntries<T>({
 export function getIntegrityEntryFingerprint(entry: IntegrityFingerprintEntry) {
   return [
     `${entry.scriptId || ""}`.trim(),
+    `${entry.status || ""}`.trim(),
     `${entry.kind || ""}`.trim(),
     `${entry.screenId || ""}`.trim(),
     `${entry.diagnosisId || ""}`.trim(),
