@@ -39,6 +39,7 @@ import type { useScreenForm } from "../../hooks/use-screen-form"
 import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 
 type Props = {
   open: boolean
@@ -344,7 +345,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             <>
               <Title>Flow control</Title>
               <div>
-                <Label htmlFor="condition">Conditional expression</Label>
+                <Label htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
                 <Textarea {...register("condition", { disabled })} name="condition" noRing={false} rows={5} />
                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
               </div>
@@ -549,7 +550,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
               {(isPeriodField || isNumberField) && (
                 <>
                   <div>
-                    <Label htmlFor="calculation">Reference expression</Label>
+                    <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
                     <Input {...register("calculation", { disabled })} name="calculation" noRing={false} />
                     <span className="text-xs text-muted-foreground">
                       Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or
