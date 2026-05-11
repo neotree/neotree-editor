@@ -1,22 +1,26 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { diagnosesDrafts, diagnoses, diagnosesHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveDiagnosesHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof diagnosesDrafts.$inferSelect[]
   previous: typeof diagnoses.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof diagnosesHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -34,9 +38,10 @@ export async function _saveDiagnosesHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof diagnosesHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         diagnosisId,
         scriptId: c?.data?.scriptId ?? "",
         changes: changePayload,
@@ -65,13 +70,17 @@ export async function _saveDiagnosesHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.diagnosisId === diagnosisId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: diagnosisId,
           entityType: "diagnosis",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -86,7 +95,7 @@ export async function _saveDiagnosesHistory({
     }
 
     if (insertData.length) {
-      await db.insert(diagnosesHistory).values(insertData)
+      await executor.insert(diagnosesHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

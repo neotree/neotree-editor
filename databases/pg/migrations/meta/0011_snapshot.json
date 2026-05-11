@@ -1,9 +1,161 @@
 {
-  "id": "b2e4d52f-77d7-4ce6-ae8a-09d9e8ff190b",
+  "id": "5773fc16-bbd4-4a43-9772-70991777024b",
   "prevId": "6472c5cc-6be3-4c40-9610-4b6165541056",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.nt_admin_audit_logs": {
+      "name": "nt_admin_audit_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "audit_log_id": {
+          "name": "audit_log_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "area": {
+          "name": "area",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "before_state": {
+          "name": "before_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "after_state": {
+          "name": "after_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "admin_audit_logs_area_index": {
+          "name": "admin_audit_logs_area_index",
+          "columns": [
+            {
+              "expression": "area",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_audit_logs_action_index": {
+          "name": "admin_audit_logs_action_index",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_audit_logs_actor_user_index": {
+          "name": "admin_audit_logs_actor_user_index",
+          "columns": [
+            {
+              "expression": "actor_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "admin_audit_logs_created_at_index": {
+          "name": "admin_audit_logs_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nt_admin_audit_logs_actor_user_id_nt_users_user_id_fk": {
+          "name": "nt_admin_audit_logs_actor_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_admin_audit_logs",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_admin_audit_logs_audit_log_id_unique": {
+          "name": "nt_admin_audit_logs_audit_log_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "audit_log_id"
+          ]
+        }
+      }
+    },
     "public.nt_api_keys": {
       "name": "nt_api_keys",
       "schema": "",
@@ -361,9 +513,37 @@
           "method": "btree",
           "with": {}
         },
+        "change_logs_single_active_version_idx": {
+          "name": "change_logs_single_active_version_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"nt_change_logs\".\"is_active\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "active_version_index": {
           "name": "active_version_index",
           "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "entity_id",
               "isExpression": false,
@@ -1265,6 +1445,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -1918,6 +2106,20 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
+        },
+        "integrity_policy": {
+          "name": "integrity_policy",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"enforcementMode\":\"off\",\"scanScope\":\"affected_scripts_only\",\"triggerSources\":{\"scriptEdits\":false,\"dataKeyLibraryEdits\":false,\"deletions\":false,\"imports\":false},\"useBaseline\":true}'::jsonb"
+        },
+        "integrity_baseline": {
+          "name": "integrity_baseline",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":2,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[],\"acceptedImportFingerprints\":[],\"acceptedImportFingerprintRefs\":{}}'::jsonb"
         }
       },
       "indexes": {},
@@ -2393,6 +2595,239 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+    "public.nt_integrity_import_snapshots": {
+      "name": "nt_integrity_import_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "status": {
+          "name": "status",
+          "type": "integrity_import_snapshot_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending_review'"
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_label": {
+          "name": "source_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imported_script_ids": {
+          "name": "imported_script_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "imported_data_key_ids": {
+          "name": "imported_data_key_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "fingerprint_version": {
+          "name": "fingerprint_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_set_version": {
+          "name": "rule_set_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_blocking_issues": {
+          "name": "total_blocking_issues",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_scripts": {
+          "name": "total_scripts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "fingerprints": {
+          "name": "fingerprints",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accepted_by_user_id": {
+          "name": "accepted_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "integrity_import_snapshots_status_index": {
+          "name": "integrity_import_snapshots_status_index",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "integrity_import_snapshots_source_type_index": {
+          "name": "integrity_import_snapshots_source_type_index",
+          "columns": [
+            {
+              "expression": "source_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "integrity_import_snapshots_created_by_index": {
+          "name": "integrity_import_snapshots_created_by_index",
+          "columns": [
+            {
+              "expression": "created_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "integrity_import_snapshots_accepted_by_index": {
+          "name": "integrity_import_snapshots_accepted_by_index",
+          "columns": [
+            {
+              "expression": "accepted_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "integrity_import_snapshots_created_at_index": {
+          "name": "integrity_import_snapshots_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nt_integrity_import_snapshots_created_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_integrity_import_snapshots_created_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_integrity_import_snapshots",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "nt_integrity_import_snapshots_accepted_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_integrity_import_snapshots_accepted_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_integrity_import_snapshots",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "accepted_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_integrity_import_snapshots_snapshot_id_unique": {
+          "name": "nt_integrity_import_snapshots_snapshot_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "snapshot_id"
+          ]
+        }
+      }
+    },
     "public.nt_languages": {
       "name": "nt_languages",
       "schema": "",
@@ -2708,6 +3143,14 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -3097,6 +3540,13 @@
           "notNull": true,
           "default": "''"
         },
+        "symptoms": {
+          "name": "symptoms",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
         "text1": {
           "name": "text1",
           "type": "text",
@@ -3260,6 +3710,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -4065,6 +4523,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -4482,6 +4948,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "draft_origin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -5053,7 +5527,7 @@
         },
         "unique_key": {
           "name": "unique_key",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "md5(random()::text || clock_timestamp()::text)::uuid"
@@ -5259,6 +5733,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "draft_origin": {
+          "name": "draft_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editor'"
         },
         "created_by_user_id": {
           "name": "created_by_user_id",
@@ -5529,6 +6010,16 @@
         "release"
       ]
     },
+    "public.draft_origin": {
+      "name": "draft_origin",
+      "schema": "public",
+      "values": [
+        "data_key_sync",
+        "editor",
+        "import",
+        "other"
+      ]
+    },
     "public.drug_type": {
       "name": "drug_type",
       "schema": "public",
@@ -5544,6 +6035,15 @@
       "values": [
         "default",
         "condition"
+      ]
+    },
+    "public.integrity_import_snapshot_status": {
+      "name": "integrity_import_snapshot_status",
+      "schema": "public",
+      "values": [
+        "pending_review",
+        "accepted",
+        "rejected"
       ]
     },
     "public.list_style": {
