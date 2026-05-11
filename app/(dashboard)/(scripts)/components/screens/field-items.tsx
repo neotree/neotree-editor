@@ -20,6 +20,7 @@ import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
 import { isNumericQueryValue } from "@/lib/query-state"
 import { SelectDataKey } from "@/components/select-data-key"
 import { SelectModal } from "@/components/select-modal"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -204,12 +205,15 @@ function Form({
   onChange: (item: Item) => void
 }) {
   const { extractDataKeys } = useDataKeysCtx()
+  const { alert } = useAlertModal()
 
   const {
     control,
     register,
     handleSubmit,
     setValue,
+    watch,
+    formState: { errors },
   } = useForm<Item>({
     defaultValues: {
       ...item,
@@ -225,6 +229,7 @@ function Form({
       keyId: item?.keyId,
     },
   })
+  const enterValueManually = watch("enterValueManually")
 
   const forbidOptions = useMemo(() => {
     const currentItemId = item?.itemId
@@ -238,6 +243,16 @@ function Form({
 
   const onSave = handleSubmit(async (data) => {
     const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
+
+    if (data.enterValueManually && !manualLabel) {
+      alert({
+        title: "Manual value label required",
+        message: "Add a label for the manual entry textbox before saving this option.",
+        variant: "error",
+      })
+      return
+    }
+
     const payload = {
       ...data,
       enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
@@ -360,6 +375,28 @@ function Form({
                 )
               }}
             />
+
+            {enterValueManually && (
+              <div className="px-4">
+                <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
+                <Input
+                  {...register("enterValueManuallyLabel", {
+                    validate: (value) => {
+                      if (!enterValueManually) return true
+                      return !!`${value || ""}`.trim() || "Manual value label is required."
+                    },
+                  })}
+                  error={!!errors.enterValueManuallyLabel}
+                  placeholder="e.g. Specify medication"
+                />
+                <span className="text-xs text-muted-foreground">
+                  This label is shown on the app textbox when manual entry is enabled.
+                </span>
+                {!!errors.enterValueManuallyLabel && (
+                  <span className="text-xs text-destructive">{`${errors.enterValueManuallyLabel.message || ""}`}</span>
+                )}
+              </div>
+            )}
 
           </div>
 

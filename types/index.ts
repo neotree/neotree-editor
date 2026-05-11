@@ -75,6 +75,8 @@ export type ScriptField = {
     dataType: string;
     defaultValue: string;
     format: string;
+    minLength?: string;
+    maxLength?: string;
     minValue: string;
     maxValue: string;
     minDate: string;

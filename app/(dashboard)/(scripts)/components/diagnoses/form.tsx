@@ -17,6 +17,7 @@ import { useDiagnosisForm, UseDiagnosisFormParams } from "../../hooks/use-diagno
 import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = UseDiagnosisFormParams;
 
@@ -130,7 +131,7 @@ export function DiagnosisForm(props: Props) {
                 </div>
 
                 <div>
-                    <Label htmlFor="expression">Diagnosis expression (e.g. $Temp &gt; 37 or $Gestation &lt; 20)</Label>
+                    <Label htmlFor="expression">Diagnosis expression (e.g. $Temp &gt; 37 or $Gestation &lt; 20) <ConditionalExpressionModal /></Label>
                     <Input 
                         {...register('expression', { disabled, })}
                         name="expression"
@@ -139,7 +140,9 @@ export function DiagnosisForm(props: Props) {
                 </div>
 
                 <div>
-                    <Label htmlFor="expressionMeaning">Diagnosis expression (e.g. Temperature greater than 37 or Gestation period less than 20 weeks)</Label>
+                    <Label htmlFor="expressionMeaning">
+                        Diagnosis expression (e.g. Temperature greater than 37 or Gestation period less than 20 weeks) <ConditionalExpressionModal />
+                    </Label>
                     <Input 
                         {...register('expressionMeaning', { disabled, })}
                         name="expressionMeaning"
