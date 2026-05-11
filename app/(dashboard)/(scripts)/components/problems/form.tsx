@@ -17,6 +17,7 @@ import { useProblemForm, UseProblemFormParams } from "../../hooks/use-problem-fo
 import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = UseProblemFormParams;
 
@@ -130,7 +131,7 @@ export function ProblemForm(props: Props) {
                 </div>
 
                 <div>
-                    <Label htmlFor="expression">Problem expression (e.g. $Temp &gt; 37 or $Gestation &lt; 20)</Label>
+                    <Label htmlFor="expression">Problem expression (e.g. $Temp &gt; 37 or $Gestation &lt; 20) <ConditionalExpressionModal /></Label>
                     <Input 
                         {...register('expression', { disabled, })}
                         name="expression"
