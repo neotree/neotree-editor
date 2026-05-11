@@ -32,6 +32,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { FieldItems } from "./screens/field-items";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = {
     disabled?: boolean;
@@ -354,7 +355,7 @@ export function Field({
                     </div>
 
                     <div>
-                        <Label htmlFor="condition">Condition</Label>
+                        <Label htmlFor="condition">Condition <ConditionalExpressionModal /></Label>
                         <Textarea
                             {...register('condition', { required: false, })}
                             name="condition"

@@ -16,6 +16,7 @@ import { SymptomTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { SelectDataKey } from "@/components/select-data-key";
 import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = {
     children?: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -189,7 +190,7 @@ export function Symptom<P = {}>({
                     </div>
 
                     <div>
-                        <Label htmlFor="expression">Sign/Risk expression </Label>
+                        <Label htmlFor="expression">Sign/Risk expression <ConditionalExpressionModal /></Label>
                         <Input
                             {...register('expression', { disabled, })}
                             name="expression"
