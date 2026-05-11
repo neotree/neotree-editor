@@ -128,6 +128,7 @@ export function Item<P = {}>({
     register,
     handleSubmit,
     setValue,
+    formState: { errors },
   } = useForm({
     defaultValues: getDefaultValues(),
   })
@@ -160,6 +161,16 @@ export function Item<P = {}>({
 
   const onSave = handleSubmit(async (data) => {
     const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
+
+    if (data.enterValueManually && !manualLabel) {
+      alert({
+        title: "Manual value label required",
+        message: "Add a label for the manual entry textbox before saving this item.",
+        variant: "error",
+      })
+      return
+    }
+
     data = {
       ...data,
       enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
@@ -535,6 +546,32 @@ export function Item<P = {}>({
                             Enter value manually if selected
                           </Label>
                         </div>
+
+                        {enterValueManually && (
+                          <div>
+                            <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
+                            <Input
+                              {...register("enterValueManuallyLabel", {
+                                disabled,
+                                validate: (value) => {
+                                  if (!enterValueManually) return true
+                                  return !!`${value || ""}`.trim() || "Manual value label is required."
+                                },
+                              })}
+                              name="enterValueManuallyLabel"
+                              error={!disabled && !!errors.enterValueManuallyLabel}
+                              placeholder="e.g. Specify medication"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              This label is shown on the app textbox when manual entry is enabled.
+                            </span>
+                            {!!errors.enterValueManuallyLabel && (
+                              <span className="text-xs text-destructive">
+                                {`${errors.enterValueManuallyLabel.message || ""}`}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                       </>
                     )}
