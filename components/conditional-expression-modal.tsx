@@ -47,41 +47,41 @@ export function ConditionalExpressionModal() {
                             "
                         >
                             <code>
-                                <p><b>$Sex</b> = "M"</p>
+                                <p><b>$Sex</b> = &apos;M&apos;</p>
                                 <p><b>$Gestation</b> = 39</p>
-                                <p><b>$Diagnoses</b> = ["Sepsis", "Jaundice", "Premature"]</p>
+                                <p><b>$Diagnoses</b> = [&apos;Sepsis&apos;, &apos;Jaundice&apos;, &apos;Premature&apos;]</p>
                             </code>
 
                             <br />
 
                             <code>
-                                <p><b>$Sex</b> = "F" or <b>$Gestation</b> &gt; 39 <i>{'-false'}</i></p>
+                                <p><b>$Sex</b> = &apos;F&apos; or <b>$Gestation</b> &gt; 39 <i>{'-false'}</i></p>
                             </code>
                             <code>
-                                <p><b>$Sex</b> = "F" or <b>$Gestation</b> &gt;= 39 <i>{'-true'}</i></p>
+                                <p><b>$Sex</b> = &apos;F&apos; or <b>$Gestation</b> &gt;= 39 <i>{'-true'}</i></p>
                             </code>
                             <code>
-                                <p><b>$Sex</b> = "F" or <b>$Gestation</b> &gt;= 39 <i>{'-true'}</i></p>
+                                <p><b>$Sex</b> = &apos;F&apos; or <b>$Gestation</b> &gt;= 39 <i>{'-true'}</i></p>
                             </code>
 
                             <h6>Multi selection</h6>
                             
                             <code>
-                                <p><b>$Diagnoses</b> = "LBW" <i>{'-false'}</i></p>
-                                <div>For multiple values, we check if "LBW" (right side of the expression) is <b>included</b> in the selection</div>
+                                <p><b>$Diagnoses</b> = &apos;LBW&apos; <i>{'-false'}</i></p>
+                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>included</b> in the selection</div>
 
-                                <p><b>$Diagnoses</b> != "LBW" <i>{'-true'}</i></p>
-                                <div>For multiple values, we check if "LBW" (right side of the expression) is <b>NOT included</b> in the selection</div>
-
-                                <br />
-
-                                <p>[<b>$Diagnoses</b> includes ("LBW")] <i>{'-false'}</i></p>
-                                <p>[<b>$Diagnoses</b> includes ("LBW","Sepsis")] <i>{'-true'}</i></p>
+                                <p><b>$Diagnoses</b> != &apos;LBW&apos; <i>{'-true'}</i></p>
+                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>NOT included</b> in the selection</div>
 
                                 <br />
 
-                                <p>[<b>$Diagnoses</b> excludes ("LBW")] <i>{'-true'}</i></p>
-                                <p>[<b>$Diagnoses</b> excludes ("LBW","Sepsis")] <i>{'-false'}</i></p>
+                                <p>[<b>$Diagnoses</b> includes (&apos;LBW&apos;)] <i>{'-false'}</i></p>
+                                <p>[<b>$Diagnoses</b> includes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-true'}</i></p>
+
+                                <br />
+
+                                <p>[<b>$Diagnoses</b> excludes (&apos;LBW&apos;)] <i>{'-true'}</i></p>
+                                <p>[<b>$Diagnoses</b> excludes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-false'}</i></p>
                             </code>
 
                             <h6>Stacked expressions</h6>
@@ -91,36 +91,36 @@ export function ConditionalExpressionModal() {
                                 <br />
 
                                 <p>
-                                    <b>$Sex</b> = "F" or <b>$Gestation</b> &gt; 39
+                                    <b>$Sex</b> = &apos;F&apos; or <b>$Gestation</b> &gt; 39
                                     <br />
-                                    [<b>$Diagnoses</b> includes ("LBW")]
+                                    [<b>$Diagnoses</b> includes (&apos;LBW&apos;)]
                                 </p>
                                 <p><i>{'-false'}</i></p>
 
                                 <br /><br />
 
                                 <p>
-                                    <b>$Sex</b> = "M" or <b>$Gestation</b> &gt; 39
+                                    <b>$Sex</b> = &apos;M&apos; or <b>$Gestation</b> &gt; 39
                                     <br />
-                                    [<b>$Diagnoses</b> includes ("LBW")]
+                                    [<b>$Diagnoses</b> includes (&apos;LBW&apos;)]
                                 </p>
                                 <p><i>{'-false'}</i></p>
 
                                 <br /><br />
 
                                 <p>
-                                    <b>$Sex</b> = "M" or <b>$Gestation</b> &gt; 39
+                                    <b>$Sex</b> = &apos;M&apos; or <b>$Gestation</b> &gt; 39
                                     <br />
-                                    [<b>$Diagnoses</b> includes ("LBW","Sepsis")]
+                                    [<b>$Diagnoses</b> includes (&apos;LBW&apos;,&apos;Sepsis&apos;)]
                                 </p>
                                 <p><i>{'-true'}</i></p>
 
                                 <br /><br />
 
                                 <p>
-                                    <b>$Sex</b> = "M" or <b>$Gestation</b> &gt;= 39
+                                    <b>$Sex</b> = &apos;M&apos; or <b>$Gestation</b> &gt;= 39
                                     <br />
-                                    [<b>$Diagnoses</b> excludes ("LBW")]
+                                    [<b>$Diagnoses</b> excludes (&apos;LBW&apos;)]
                                 </p>
                                 <p><i>{'-true'}</i></p>
                             </code>
