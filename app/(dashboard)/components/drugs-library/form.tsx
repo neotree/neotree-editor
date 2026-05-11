@@ -36,6 +36,7 @@ import { useAppContext } from "@/contexts/app";
 import { createChangeTracker } from "@/lib/change-tracker";
 import { pendingChangesAPI } from "@/lib/indexed-db";
 import { ErrorCard } from "@/components/error-card";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -422,7 +423,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div>
-                <Label secondary htmlFor="calculator_condition">Calculator condition</Label>
+                <Label secondary htmlFor="calculator_condition">Calculator condition <ConditionalExpressionModal /></Label>
                 <div className="text-xs mb-2">
                     <ErrorCard color="warning">
                         <p>Will be used in the Standalone DFF Calculator only</p>
@@ -440,7 +441,7 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
             </div>
 
             <div>
-                <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''} (Admission)</Label>
+                <Label secondary htmlFor="condition">Condition {validateWithCondition ? '*' : ''} (Admission) <ConditionalExpressionModal /></Label>
                 <div className="text-xs mb-2">
                     <ErrorCard color="warning">
                         <p>Will be used in the Admission DFF Calculator only</p>
