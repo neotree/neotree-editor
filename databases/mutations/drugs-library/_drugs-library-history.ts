@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { drugsLibraryDrafts, drugsLibrary, drugsLibraryHistory } from "@/databases/pg/schema"
 
@@ -7,14 +8,17 @@ export async function _saveDrugsLibraryItemsHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof drugsLibraryDrafts.$inferSelect[]
   previous: typeof drugsLibrary.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof drugsLibraryHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -32,9 +36,10 @@ export async function _saveDrugsLibraryItemsHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         itemId,
         changes: changePayload,
       }
@@ -67,7 +72,7 @@ export async function _saveDrugsLibraryItemsHistory({
           entityId: itemId,
           entityType: "drugs_library",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -80,7 +85,7 @@ export async function _saveDrugsLibraryItemsHistory({
     }
 
     if (insertData.length) {
-      await db.insert(drugsLibraryHistory).values(insertData)
+      await executor.insert(drugsLibraryHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)
