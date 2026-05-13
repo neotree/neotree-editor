@@ -797,11 +797,16 @@ export async function copyScripts(params?: {
             const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
+                returnDraftsIfExist: false,
+            }));
             importedDataKeys = importedDataKeysRes.data;
 
             const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: JSON.stringify(scriptsIds),
+                data: JSON.stringify({
+                    returnDraftsIfExist: false,
+                }),
             }));
             const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
 
