@@ -6,6 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
+import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 
@@ -93,6 +94,7 @@ export async function _saveDataKeys({
 
     try {
         const errors = [];
+        const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
 
         const resolveConfidential = ({
             incoming,
@@ -133,8 +135,7 @@ export async function _saveDataKeys({
         let index = 0;
         for (const { uuid: dataKeyUuid, isNewUuid, createdAt, publishDate, deletedAt, updatedAt, ...item } of data) {
             try {
-                item.name = `${item.name || ''}`.trim();
-                item.label = `${item.label || ''}`.trim();
+                const normalizedItem = normalizeIncomingDataKeyPatch(item);
 
                 index++;
 
@@ -142,14 +143,14 @@ export async function _saveDataKeys({
                     const draft = isNewUuid ? null : await db.query.dataKeysDrafts.findFirst({
                         where: or(
                             eq(dataKeysDrafts.uuid, dataKeyUuid),
-                            !item.uniqueKey ? undefined :  eq(dataKeysDrafts.uniqueKey, item.uniqueKey)
+                            !normalizedItem.uniqueKey ? undefined :  eq(dataKeysDrafts.uniqueKey, normalizedItem.uniqueKey)
                         ),
                     });
 
                     const published = (draft || isNewUuid) ? null : await db.query.dataKeys.findFirst({
                         where: or(
                             eq(dataKeys.uuid, dataKeyUuid),
-                            !item.uniqueKey ? undefined : eq(dataKeys.uniqueKey, item.uniqueKey)
+                            !normalizedItem.uniqueKey ? undefined : eq(dataKeys.uniqueKey, normalizedItem.uniqueKey)
                         ),
                     });
 
@@ -164,10 +165,10 @@ export async function _saveDataKeys({
 
                         const data = {
                             ...draft.data,
-                            ...item,
+                            ...normalizedItem,
                         };
                         const resolvedConfidential = resolveConfidential({
-                            incoming: item,
+                            incoming: normalizedItem,
                             existing: draft.data,
                             fallback: publishedForDraft?.confidential,
                         });
@@ -182,18 +183,26 @@ export async function _saveDataKeys({
                                 draftOrigin,
                             }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
 
+                        if (data.uniqueKey) {
+                            propagationMatchUniqueKeysByDataKey[data.uniqueKey] = Array.from(new Set([
+                                `${draft.uniqueKey || ''}`.trim(),
+                                `${normalizedItem.uniqueKey || ''}`.trim(),
+                                `${data.uniqueKey || ''}`.trim(),
+                            ].filter(Boolean)));
+                        }
+
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
                     } else {
-                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(item.uniqueKey || '');
+                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(normalizedItem.uniqueKey || '');
 
                         const data = {
                             ...published,
-                            ...item,
+                            ...normalizedItem,
                             uniqueKey,
                             uuid: dataKeyUuid,
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
-                        const resolvedConfidential = resolveConfidential({ incoming: item, existing: published });
+                        const resolvedConfidential = resolveConfidential({ incoming: normalizedItem, existing: published });
                         data.confidential = resolvedConfidential;
 
                         await db.insert(dataKeysDrafts).values({
@@ -205,6 +214,14 @@ export async function _saveDataKeys({
                             draftOrigin,
                             createdByUserId: userId,
                         });
+
+                        if (data.uniqueKey) {
+                            propagationMatchUniqueKeysByDataKey[data.uniqueKey] = Array.from(new Set([
+                                `${published?.uniqueKey || ''}`.trim(),
+                                `${normalizedItem.uniqueKey || ''}`.trim(),
+                                `${data.uniqueKey || ''}`.trim(),
+                            ].filter(Boolean)));
+                        }
 
                         uniqueKeys.push(data.uniqueKey);
                     }
@@ -232,6 +249,7 @@ export async function _saveDataKeys({
                     broadcastAction,
                     userId,
                     draftOrigin: propagatedDraftOrigin || (draftOrigin === "import" ? "import" : "data_key_sync"),
+                    matchUniqueKeysByDataKey: propagationMatchUniqueKeysByDataKey,
                 });
                 if (updateRefsRes.errors?.length || !updateRefsRes.success) {
                     response.success = false;
