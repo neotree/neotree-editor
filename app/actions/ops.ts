@@ -157,6 +157,7 @@ export async function publishData({
       userId,
       publisherUserId,
       dataVersion: nextDataVersion,
+      allowConfidentialDowngrade: true,
     })
     const publishScripts = await scriptsMutations._publishScripts({
       userId,
