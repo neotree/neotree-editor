@@ -85,6 +85,13 @@
       "when": 1777827962912,
       "tag": "0011_sweet_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778756772221,
+      "tag": "0012_dark_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

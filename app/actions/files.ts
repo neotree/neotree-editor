@@ -1,6 +1,11 @@
 'use server';
 
 import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { execFileSync } from "child_process";
 
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
 import { _getFileByFileId, _getFiles, _getFullFileByFileId } from "@/databases/queries/files";
@@ -43,6 +48,33 @@ export async function uploadFile(
 
                 if (metadata.width || metadata.height) {
                     filename = `${filename}?w=${metadata.width}&h=${metadata.height}`;
+                }
+
+                const isApk = (formData.get('contentType')?.toString() || file.type) === 'application/vnd.android.package-archive'
+                    || _filename.toLowerCase().endsWith('.apk');
+
+                if (isApk) {
+                    try {
+                        const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
+                        metadata.apkChecksumSha256 = checksumSha256;
+
+                        const tmpFile = path.join(os.tmpdir(), `${fileId}.apk`);
+                        fs.writeFileSync(tmpFile, buffer);
+                        try {
+                            const output = execFileSync('apksigner', ['verify', '--print-certs', tmpFile], { encoding: 'utf-8' });
+                            const match = output.match(/SHA-256 digest:\\s*([A-Fa-f0-9:]+)/);
+                            if (match?.[1]) {
+                                metadata.apkSignatureSha256 = match[1].replace(/:/g, '').toLowerCase();
+                                metadata.apkSignatureVerifiedAt = new Date().toISOString();
+                            }
+                        } catch (e) {
+                            // apksigner may not be available; best-effort only
+                        } finally {
+                            try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+                        }
+                    } catch (e) {
+                        // ignore checksum/signature errors; upload should still succeed
+                    }
                 }
 
                 response = await _saveFile(
