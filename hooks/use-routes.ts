@@ -38,6 +38,12 @@ export function useRoutes() {
       hidden: false,
     },
     {
+      label: "App Updates",
+      href: "/app-updates",
+      id: v4(),
+      hidden: false,
+    },
+    {
       label: "Hospitals",
       href: "/hospitals",
       id: v4(),
