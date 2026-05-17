@@ -1,13 +1,19 @@
 import { eq, } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { files } from "@/databases/pg/schema";
+import { files, filesAliases } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { GetFullFileResponse, GetFileDetailsResponse, FileDetails } from "./types";
 import { getAppUrl } from "@/lib/urls";
 
 export async function _getFullFileByFileId(fileId: string): Promise<GetFullFileResponse> {
     try {
+        const alias = await db.query.filesAliases.findFirst({
+            where: eq(filesAliases.alias, fileId),
+        });
+
+        fileId = alias?.fileId || fileId;
+
         const file = await db.query.files.findFirst({
             where: eq(files.fileId, fileId),
         });
@@ -26,6 +32,12 @@ export async function _getFullFileByFileId(fileId: string): Promise<GetFullFileR
 
 export async function _getFileByFileId(fileId: string): Promise<GetFileDetailsResponse> {
     try {
+        const alias = await db.query.filesAliases.findFirst({
+            where: eq(filesAliases.alias, fileId),
+        });
+
+        fileId = alias?.fileId || fileId;
+        
         const file = await db.query.files.findFirst({
             where: eq(files.fileId, fileId),
             columns: {
