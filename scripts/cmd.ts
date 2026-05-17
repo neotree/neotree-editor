@@ -33,7 +33,7 @@ export async function cmdSitePrompt(opts?: {
         sites.map((s, i) => `[${i + 1}]: ${s.name}`).join('\n') + '\n> '
     );
 
-    let index = Number(selected);
+    let index = Number(selected) - 1;
 
     if (
         isNaN(index) ||
