@@ -5,6 +5,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
+import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
 
 export type SaveAppUpdatePoliciesData = Partial<typeof appUpdatePolicies.$inferInsert>;
 
@@ -30,6 +31,10 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
 
                 const policyId = itemPolicyId || published?.policyId || uuid.v4();
 
+                const normalizedItem = normalizeAppUpdatePolicyPayload(cleanItem);
+                const validationErrors = validateAppUpdatePolicyPayload(normalizedItem);
+                if (validationErrors.length) throw new Error(validationErrors.join(", "));
+
                 const draft = await db.query.appUpdatePoliciesDrafts.findFirst({
                     where: eq(appUpdatePoliciesDrafts.policyDraftId, policyId),
                 });
@@ -37,7 +42,7 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 if (draft) {
                     const merged = {
                         ...draft.data,
-                        ...cleanItem,
+                        ...normalizedItem,
                         policyId,
                     } as typeof appUpdatePolicies.$inferInsert;
 
@@ -48,7 +53,7 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 } else {
                     const merged = {
                         ...(published || {}),
-                        ...cleanItem,
+                        ...normalizedItem,
                         policyId,
                     } as typeof appUpdatePolicies.$inferInsert;
 

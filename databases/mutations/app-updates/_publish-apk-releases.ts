@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { apkReleases, apkReleasesDrafts } from "@/databases/pg/schema";
+import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 export async function _publishApkReleases(opts?: {
     userId?: string | null;
@@ -14,6 +15,7 @@ export async function _publishApkReleases(opts?: {
     const results: { success: boolean; errors?: string[] } = { success: false };
     const errors: string[] = [];
     const changeLogs: SaveChangeLogData[] = [];
+    const publishedDraftIds: string[] = [];
 
     try {
         const executor = opts?.client || db;
@@ -24,7 +26,10 @@ export async function _publishApkReleases(opts?: {
         for (const draft of drafts) {
             try {
                 const apkReleaseId = draft.apkReleaseId || draft.data.apkReleaseId || draft.apkReleaseDraftId;
-                const { countryISO: _countryISO, ...payload } = { ...draft.data, apkReleaseId } as any;
+                const { countryISO: _countryISO, ...rawPayload } = { ...draft.data, apkReleaseId } as any;
+                const payload = normalizeApkReleasePayload(rawPayload);
+                const validationErrors = validateApkReleasePayload(payload);
+                if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 const existing = await executor.query.apkReleases.findFirst({
                     where: eq(apkReleases.apkReleaseId, apkReleaseId),
@@ -65,14 +70,17 @@ export async function _publishApkReleases(opts?: {
                         userId: opts.userId,
                     });
                 }
+                publishedDraftIds.push(draft.apkReleaseDraftId);
             } catch (e: any) {
                 errors.push(e.message);
             }
         }
 
-        await executor
-            .delete(apkReleasesDrafts)
-            .where(opts?.userId ? eq(apkReleasesDrafts.createdByUserId, opts.userId) : undefined);
+        if (publishedDraftIds.length) {
+            await executor
+                .delete(apkReleasesDrafts)
+                .where(inArray(apkReleasesDrafts.apkReleaseDraftId, publishedDraftIds));
+        }
 
         if (changeLogs.length && Number.isFinite(opts?.dataVersion)) {
             const saveResult = await _saveChangeLogs({

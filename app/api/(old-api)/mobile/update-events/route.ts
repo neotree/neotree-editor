@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _saveDeviceUpdateEvents } from "@/databases/mutations/device-update-events";
+import { _getDevice } from "@/databases/queries/devices";
 
 export async function POST(req: NextRequest) {
     try {
@@ -18,10 +19,14 @@ export async function POST(req: NextRequest) {
 
         if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] });
         if (!eventType) return NextResponse.json({ errors: ["Missing eventType"] });
+        const deviceRes = await _getDevice({ deviceId });
+        if (deviceRes.errors?.length) return NextResponse.json({ errors: deviceRes.errors, data: null });
+        if (!deviceRes.data) return NextResponse.json({ errors: ["Device not registered"], data: null });
 
         const res = await _saveDeviceUpdateEvents({
             returnSaved: true,
             data: [{
+                eventId: body?.eventId || undefined,
                 deviceId,
                 eventType,
                 appVersion: body?.appVersion || null,

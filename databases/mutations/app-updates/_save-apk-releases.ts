@@ -5,6 +5,7 @@ import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
+import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 export type SaveApkReleasesData = Partial<typeof apkReleases.$inferInsert> & {
     runtimeVersion: string;
@@ -37,11 +38,17 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                 });
 
                 let fileMeta: any = null;
+                let fileDetails: { size: number; contentType: string; filename: string } | null = null;
                 if (item?.fileId) {
                     const file = await db.query.files.findFirst({
                         where: eq(files.fileId, item.fileId),
-                        columns: { size: true, metadata: true },
+                        columns: { size: true, metadata: true, contentType: true, filename: true },
                     });
+                    fileDetails = file ? {
+                        size: file.size,
+                        contentType: file.contentType,
+                        filename: file.filename,
+                    } : null;
                     fileMeta = file?.metadata || null;
                 }
 
@@ -49,12 +56,18 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     where: eq(apkReleasesDrafts.apkReleaseDraftId, apkReleaseId),
                 });
 
-                const enriched = {
+                const enriched = normalizeApkReleasePayload({
                     ...cleanItem,
-                    fileSize: item.fileSize ?? fileMeta?.size ?? undefined,
+                    fileSize: item.fileSize ?? fileDetails?.size ?? undefined,
                     checksumSha256: item.checksumSha256 ?? fileMeta?.apkChecksumSha256 ?? undefined,
                     signatureSha256: item.signatureSha256 ?? fileMeta?.apkSignatureSha256 ?? undefined,
-                };
+                });
+
+                const validationErrors = validateApkReleasePayload(enriched, {
+                    fileContentType: fileDetails?.contentType,
+                    fileName: fileDetails?.filename,
+                });
+                if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 if (draft) {
                     const merged = {

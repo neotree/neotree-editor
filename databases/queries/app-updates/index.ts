@@ -1,4 +1,4 @@
-import { and, inArray, count, isNull, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, count, isNull, isNotNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts } from "@/databases/pg/schema";
@@ -14,14 +14,18 @@ export type GetAppUpdatePolicyResult = {
     errors?: string[];
 };
 
-export async function _getAppUpdatePolicy(): Promise<GetAppUpdatePolicyResult> {
+export async function _getAppUpdatePolicy(params?: {
+    runtimeVersion?: string;
+}): Promise<GetAppUpdatePolicyResult> {
     try {
+        const runtimeVersion = params?.runtimeVersion?.trim();
         const data = await db.query.appUpdatePolicies.findFirst({
-            where: undefined,
+            where: runtimeVersion ? eq(appUpdatePolicies.runtimeVersion, runtimeVersion) : undefined,
             with: {
                 currentApkRelease: true,
                 rollbackApkRelease: true,
             },
+            orderBy: [desc(appUpdatePolicies.policyVersion), desc(appUpdatePolicies.updatedAt)],
         });
 
         return { data: data || null };
@@ -99,6 +103,7 @@ export async function _getApkReleases(params?: GetApkReleasesParams): Promise<Ge
 
         const data = await db.query.apkReleases.findMany({
             where: !where.length ? undefined : and(...where),
+            orderBy: [desc(apkReleases.versionCode), desc(apkReleases.updatedAt)],
         });
 
         return { data };

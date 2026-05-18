@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _saveDeviceAppStates } from "@/databases/mutations/device-app-states";
+import { _getDevice } from "@/databases/queries/devices";
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
         if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] });
         if (!appVersion) return NextResponse.json({ errors: ["Missing appVersion"] });
         if (!runtimeVersion) return NextResponse.json({ errors: ["Missing runtimeVersion"] });
+        const deviceRes = await _getDevice({ deviceId });
+        if (deviceRes.errors?.length) return NextResponse.json({ errors: deviceRes.errors, data: null });
+        if (!deviceRes.data) return NextResponse.json({ errors: ["Device not registered"], data: null });
 
         const res = await _saveDeviceAppStates({
             returnSaved: true,

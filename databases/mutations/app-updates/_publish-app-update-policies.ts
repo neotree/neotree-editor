@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
-import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
+import { appUpdatePolicies, appUpdatePoliciesDrafts, apkReleases } from "@/databases/pg/schema";
+import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
 
 export async function _publishAppUpdatePolicies(opts?: {
     userId?: string | null;
@@ -14,6 +15,7 @@ export async function _publishAppUpdatePolicies(opts?: {
     const results: { success: boolean; errors?: string[] } = { success: false };
     const errors: string[] = [];
     const changeLogs: SaveChangeLogData[] = [];
+    const publishedDraftIds: string[] = [];
 
     try {
         const executor = opts?.client || db;
@@ -24,7 +26,18 @@ export async function _publishAppUpdatePolicies(opts?: {
         for (const draft of drafts) {
             try {
                 const policyId = draft.policyId || draft.data.policyId || draft.policyDraftId;
-                const { countryISO: _countryISO, ...payload } = { ...draft.data, policyId } as any;
+                const { countryISO: _countryISO, ...rawPayload } = { ...draft.data, policyId } as any;
+                const payload = normalizeAppUpdatePolicyPayload(rawPayload);
+
+                const referencedReleaseIds = [payload.currentApkReleaseId, payload.rollbackApkReleaseId].filter(Boolean);
+                const releaseRows = !referencedReleaseIds.length
+                    ? []
+                    : await executor.query.apkReleases.findMany({
+                        where: inArray(apkReleases.apkReleaseId, referencedReleaseIds as string[]),
+                    });
+                const releasesById = new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
+                const validationErrors = validateAppUpdatePolicyPayload(payload, releasesById);
+                if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 const existing = await executor.query.appUpdatePolicies.findFirst({
                     where: eq(appUpdatePolicies.policyId, policyId),
@@ -69,14 +82,17 @@ export async function _publishAppUpdatePolicies(opts?: {
                         userId: opts.userId,
                     });
                 }
+                publishedDraftIds.push(draft.policyDraftId);
             } catch (e: any) {
                 errors.push(e.message);
             }
         }
 
-        await executor
-            .delete(appUpdatePoliciesDrafts)
-            .where(opts?.userId ? eq(appUpdatePoliciesDrafts.createdByUserId, opts.userId) : undefined);
+        if (publishedDraftIds.length) {
+            await executor
+                .delete(appUpdatePoliciesDrafts)
+                .where(inArray(appUpdatePoliciesDrafts.policyDraftId, publishedDraftIds));
+        }
 
         if (changeLogs.length && Number.isFinite(opts?.dataVersion)) {
             const saveResult = await _saveChangeLogs({

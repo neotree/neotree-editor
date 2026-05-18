@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getAppUpdatePolicy } from "@/databases/queries/app-updates";
+import { _getDevice } from "@/databases/queries/devices";
 import { getAppUrl } from "@/lib/urls";
 
 export async function GET(req: NextRequest) {
@@ -12,7 +13,15 @@ export async function GET(req: NextRequest) {
         const isAuthorised = await isAuthenticated();
         if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] });
 
-        const policyRes = await _getAppUpdatePolicy();
+        const deviceId = req.nextUrl.searchParams.get("deviceId") || "";
+        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"], data: null });
+        const deviceRes = await _getDevice({ deviceId });
+        if (deviceRes.errors?.length) return NextResponse.json({ errors: deviceRes.errors, data: null });
+        if (!deviceRes.data) return NextResponse.json({ errors: ["Device not registered"], data: null });
+
+        const runtimeVersion = req.nextUrl.searchParams.get("runtimeVersion") || undefined;
+        const nativeBuildVersion = Number(req.nextUrl.searchParams.get("nativeBuildVersion") || NaN);
+        const policyRes = await _getAppUpdatePolicy({ runtimeVersion });
         if (policyRes?.errors?.length) return NextResponse.json({ errors: policyRes.errors, data: null });
 
         const policy = policyRes.data;
@@ -41,6 +50,7 @@ export async function GET(req: NextRequest) {
                 releaseNotes: release.releaseNotes,
                 releasedAt: release.releasedAt,
                 downloadUrl,
+                isDowngrade: Number.isFinite(nativeBuildVersion) && release.versionCode < nativeBuildVersion,
             };
         };
 
