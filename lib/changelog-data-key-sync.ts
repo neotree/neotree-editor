@@ -56,6 +56,10 @@ function collectChangedTerminalKeys(previous: unknown, next: unknown, path: stri
   return terminals
 }
 
+export function getIntegrityManualRepairChangeReason() {
+  return "Published via manual integrity repair"
+}
+
 export function getDataKeySyncChangeReason(previous: unknown, next: unknown): string | undefined {
   const changedTerminals = Array.from(collectChangedTerminalKeys(previous, next).values())
   if (!changedTerminals.length) return undefined

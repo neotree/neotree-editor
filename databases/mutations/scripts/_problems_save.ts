@@ -3,10 +3,12 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { problems, problemsDrafts, scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { ProblemType } from '../../queries/scripts/_problems_get';
 import { removeHexCharacters } from '../../utils'
+import type { DraftOrigin } from './_screens_save';
 
 export type SaveProblemsData = Partial<ProblemType>;
 
@@ -15,17 +17,19 @@ export type SaveProblemsResponse = {
     errors?: string[]; 
 };
 
-export async function _saveProblems({ data, broadcastAction, syncSilently, userId, }: {
+export async function _saveProblems({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveProblemsData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
-    
+    client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveProblemsResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     let sqlInfo: { [key: string]: Query; } = {};
+    const executor = client || db;
 
     try {
         let index = 0;
@@ -36,7 +40,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                 const problemId = itemProblemId || uuid.v4();
 
                 if (!errors.length) {
-                    const getProblemDraftQuery = db.query.problemsDrafts.findFirst({
+                    const getProblemDraftQuery = executor.query.problemsDrafts.findFirst({
                         where: eq(problemsDrafts.problemDraftId, problemId),
                     });
 
@@ -44,7 +48,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
 
                     const draft = !itemProblemId ? null : await getProblemDraftQuery.execute();
 
-                    const getPublishedProblemQuery = db.query.problems.findFirst({
+                    const getPublishedProblemQuery = executor.query.problems.findFirst({
                         where: eq(problems.problemId, problemId),
                     });
 
@@ -58,11 +62,13 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const persistedDraftOrigin = requestedDraftOrigin;
+                        const q = executor
                             .update(problemsDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(problemsDrafts.problemDraftId, problemId));
 
                         sqlInfo[`${problemId} - updateProblemDraft`] = q.toSQL();
@@ -71,12 +77,12 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const problem = await db.query.problems.findFirst({
+                            const problem = await executor.query.problems.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(problems.position),
                             });
 
-                            const problemDraft = await db.query.problemsDrafts.findFirst({
+                            const problemDraft = await executor.query.problemsDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(problemsDrafts.position),
                             });
@@ -93,18 +99,18 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                         } as typeof problemsDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
                                 where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
                                 columns: { scriptDraftId: true, },
                             });
 
-                            const publishedScript = await db.query.scripts.findFirst({
+                            const publishedScript = await executor.query.scripts.findFirst({
                                 where: eq(scripts.scriptId, data.scriptId),
                                 columns: { scriptId: true, },
                             });
 
                             if (scriptDraft || publishedScript) {
-                                const q = db.insert(problemsDrafts).values({
+                                const q = executor.insert(problemsDrafts).values({
                                     data,
                                     scriptId: publishedScript?.scriptId,
                                     scriptDraftId: scriptDraft?.scriptDraftId,
@@ -112,6 +118,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                                     position: data.position,
                                     problemId: published?.problemId,
                                     createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
                                 });
 
                                 sqlInfo[`${problemId} - createProblemDraft`] = q.toSQL();

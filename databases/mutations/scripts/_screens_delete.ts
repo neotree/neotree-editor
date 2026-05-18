@@ -11,6 +11,7 @@ export type DeleteScreensData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 };
 
 export type DeleteScreensResponse = { 
@@ -36,6 +37,7 @@ export async function _deleteScreens(
         confirmDeleteAll,
         broadcastAction, 
         userId,
+        draftOrigin = "editor",
     }: DeleteScreensData,
 ) {
     const response: DeleteScreensResponse = { success: false, };
@@ -73,6 +75,7 @@ export async function _deleteScreens(
 
         const pendingDeletionInsertData = screensArr.map(s => ({
             ...s,
+            draftOrigin,
             createdByUserId: userId,
         }));
         

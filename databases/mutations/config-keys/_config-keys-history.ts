@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema"
 
@@ -7,27 +8,31 @@ export async function _saveConfigKeysHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof configKeysDrafts.$inferSelect[]
   previous: typeof configKeys.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof configKeysHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const configKeyId = c?.data?.configKeyId
       if (!configKeyId) continue
 
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+
       const changeHistoryData: typeof configKeysHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: nextVersion,
         configKeyId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -73,7 +78,7 @@ export async function _saveConfigKeysHistory({
           entityId: configKeyId,
           entityType: "config_key",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -85,7 +90,7 @@ export async function _saveConfigKeysHistory({
     }
 
     if (insertData.length) {
-      await db.insert(configKeysHistory).values(insertData)
+      await executor.insert(configKeysHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

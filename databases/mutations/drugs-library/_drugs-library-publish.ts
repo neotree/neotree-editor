@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { drugsLibrary, drugsLibraryDrafts, drugsLibraryHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveDrugsLibraryItemsHistory } from "./_drugs-library-history"
 import { v4 } from "uuid"
@@ -13,13 +14,15 @@ export async function _publishDrugsLibraryItems(opts?: {
   userId?: string | null
   publisherUserId?: string | null
   dataVersion?: number
+  client?: DbOrTransaction
 }) {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   try {
-    let deleted = await db.query.pendingDeletion.findMany({
+    const executor = opts?.client || db
+    let deleted = await executor.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.drugsLibraryItemId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -35,7 +38,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await db
+      await executor
         .update(drugsLibrary)
         .set({
           deletedAt,
@@ -49,7 +52,7 @@ export async function _publishDrugsLibraryItems(opts?: {
         )
 
       const historyPayload = deleted.map((c) => ({
-        version: c.drugsLibraryItem!.version,
+        version: (c.drugsLibraryItem!.version ?? 0) + 1,
         itemId: c.drugsLibraryItemId!,
         changes: {
           action: "delete_drugs_library_item",
@@ -59,7 +62,7 @@ export async function _publishDrugsLibraryItems(opts?: {
         },
       }))
 
-      await db.insert(drugsLibraryHistory).values(historyPayload)
+      await executor.insert(drugsLibraryHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -77,7 +80,7 @@ export async function _publishDrugsLibraryItems(opts?: {
             entityId: entry.drugsLibraryItemId,
             entityType: "drugs_library",
             action: "delete",
-            version: history.version || 1,
+            version: history.version || ((entry.drugsLibraryItem?.version ?? 0) + 1),
             dataVersion: opts.dataVersion,
             changes: history.changes,
             fullSnapshot: snapshot,
@@ -90,7 +93,7 @@ export async function _publishDrugsLibraryItems(opts?: {
       }
     }
 
-    await db
+    await executor
       .delete(pendingDeletion)
       .where(
         and(
@@ -102,7 +105,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     let updates: (typeof drugsLibraryDrafts.$inferSelect)[] = []
     let inserts: (typeof drugsLibraryDrafts.$inferSelect)[] = []
 
-    const res = await db.query.drugsLibraryDrafts.findMany({
+    const res = await executor.query.drugsLibraryDrafts.findMany({
       where: !opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts?.userId),
     })
 
@@ -112,7 +115,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (updates.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
       if (updates.filter((c) => c.itemId).length) {
-        dataBefore = await db.query.drugsLibrary.findMany({
+        dataBefore = await executor.query.drugsLibrary.findMany({
           where: inArray(
             drugsLibrary.itemId,
             updates.filter((c) => c.itemId).map((c) => c.itemId!),
@@ -130,13 +133,14 @@ export async function _publishDrugsLibraryItems(opts?: {
           publishDate: new Date(),
         }
 
-        await db.update(drugsLibrary).set(updates).where(eq(drugsLibrary.itemId, itemId)).returning()
+        await executor.update(drugsLibrary).set(updates).where(eq(drugsLibrary.itemId, itemId)).returning()
       }
 
       const updateChangeLogs = await _saveDrugsLibraryItemsHistory({
         drafts: updates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -147,7 +151,7 @@ export async function _publishDrugsLibraryItems(opts?: {
     if (inserts.length) {
       let dataBefore: (typeof drugsLibrary.$inferSelect)[] = []
       if (inserts.filter((c) => c.itemId).length) {
-        dataBefore = await db.query.drugsLibrary.findMany({
+        dataBefore = await executor.query.drugsLibrary.findMany({
           where: inArray(
             drugsLibrary.itemId,
             inserts.filter((c) => c.itemId).map((c) => c.itemId!),
@@ -164,13 +168,14 @@ export async function _publishDrugsLibraryItems(opts?: {
           return d
         })
 
-        await db.insert(drugsLibrary).values(payload)
+        await executor.insert(drugsLibrary).values(payload)
       }
 
       const insertChangeLogs = await _saveDrugsLibraryItemsHistory({
         drafts: inserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
+        client: executor,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -178,23 +183,24 @@ export async function _publishDrugsLibraryItems(opts?: {
       })))
     }
 
-    await db
+    await executor
       .delete(drugsLibraryDrafts)
       .where(!opts?.userId ? undefined : eq(drugsLibraryDrafts.createdByUserId, opts.userId))
 
     const published = [...updates.map((c) => c.itemId!), ...deleted.map((c) => c.drugsLibraryItemId!)]
 
     if (published.length) {
-      await db
+      await executor
         .update(drugsLibrary)
         .set({ version: sql`${drugsLibrary.version} + 1` })
         .where(inArray(drugsLibrary.itemId, published))
     }
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: true })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
       if (saveResult.errors?.length) {
-        logger.error("_publishDrugsLibraryItems changelog warnings", saveResult.errors.join(", "))
+        logger.error("_publishDrugsLibraryItems changelog error", saveResult.errors.join(", "))
+        throw new Error(saveResult.errors.join(", "))
       }
     }
 

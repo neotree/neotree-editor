@@ -11,6 +11,77 @@ export type SelectionConflict = {
   group?: string
 }
 
+export function normalizeSelectionRuleItems<T extends SelectionRuleItem>(
+  items: T[],
+  createId: () => string,
+): {
+  items: T[]
+  warnings: string[]
+} {
+  const usedIds = new Set<string>()
+  const remappedIds = new Map<string, string>()
+  const warnings: string[] = []
+
+  const normalized = items.map((item, index) => {
+    const originalId = `${item.itemId || ""}`.trim()
+    let itemId = originalId
+
+    if (!itemId || usedIds.has(itemId)) {
+      itemId = createId()
+      warnings.push(
+        !originalId
+          ? `Assigned generated itemId ${itemId} to item at index ${index}`
+          : `Remapped duplicate itemId ${originalId} to ${itemId} at item index ${index}`,
+      )
+    }
+
+    usedIds.add(itemId)
+    if (originalId && originalId !== itemId) {
+      remappedIds.set(originalId, itemId)
+    }
+
+    return {
+      ...item,
+      itemId,
+    }
+  })
+
+  const validIds = new Set(normalized.map((item) => `${item.itemId || ""}`.trim()).filter(Boolean))
+
+  return {
+    items: normalized.map((item, index) => {
+    const currentItemId = `${item.itemId || ""}`.trim()
+    const originalForbidWith = (item.forbidWith || []).map((id) => `${id}`.trim()).filter(Boolean)
+    const forbidWith: string[] = []
+    const seen = new Set<string>()
+
+    originalForbidWith.forEach((id) => {
+      const remappedId = remappedIds.get(id) || id
+      if (remappedId !== id) {
+        warnings.push(`Remapped forbidWith ${id} to ${remappedId} for item ${currentItemId || index}`)
+      }
+      if (remappedId === currentItemId) {
+        warnings.push(`Dropped self-referencing forbidWith ${remappedId} for item ${currentItemId || index}`)
+        return
+      }
+      if (!validIds.has(remappedId)) {
+        warnings.push(`Dropped unknown forbidWith ${remappedId} for item ${currentItemId || index}`)
+        return
+      }
+      if (seen.has(remappedId)) return
+      seen.add(remappedId)
+      forbidWith.push(remappedId)
+    })
+
+    return {
+      ...item,
+      forbidWith,
+    }
+    }),
+    warnings,
+  }
+}
+
 export function validateSelectionRules<T extends SelectionRuleItem>(
   items: T[],
   contextLabel: string,
