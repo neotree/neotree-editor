@@ -17,7 +17,9 @@ export async function _saveDeviceUpdateEvents({ data, returnSaved }: {
     const response: SaveDeviceUpdateEventsResponse = { success: false, inserted: [] };
 
     try {
-        const q = db.insert(deviceUpdateEvents).values(data);
+        const q = db.insert(deviceUpdateEvents).values(data).onConflictDoNothing({
+            target: deviceUpdateEvents.eventId,
+        });
 
         if (returnSaved) {
             const inserted = await q.returning();

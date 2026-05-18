@@ -926,19 +926,19 @@ export async function publishData({
       })
       if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
 
-      const publishAppUpdatePolicies = await appUpdatesMutations._publishAppUpdatePolicies({
-        userId,
-        dataVersion: nextDataVersion,
-        client: tx,
-      })
-      if (publishAppUpdatePolicies.errors?.length) throw new Error(publishAppUpdatePolicies.errors.join(", "))
-
       const publishApkReleases = await appUpdatesMutations._publishApkReleases({
         userId,
         dataVersion: nextDataVersion,
         client: tx,
       })
       if (publishApkReleases.errors?.length) throw new Error(publishApkReleases.errors.join(", "))
+
+      const publishAppUpdatePolicies = await appUpdatesMutations._publishAppUpdatePolicies({
+        userId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishAppUpdatePolicies.errors?.length) throw new Error(publishAppUpdatePolicies.errors.join(", "))
 
       const processPendingDeletion = await _processPendingDeletion({
         userId,
@@ -1039,6 +1039,8 @@ export async function discardDrafts({
     await scriptsMutations._deleteAllScreensDrafts({ userId })
     await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
     await scriptsMutations._deleteAllProblemsDrafts({ userId })
+    await appUpdatesMutations._deleteAllAppUpdatePolicyDrafts({ userId })
+    await appUpdatesMutations._deleteAllApkReleaseDrafts({ userId })
     await _clearPendingDeletion({ userId })
 
     const [

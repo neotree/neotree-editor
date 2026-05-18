@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import type { saveAppUpdatePolicies } from "@/app/actions/app-updates";
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases } from "@/databases/pg/schema";
+import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload, isApkReleaseDeviceAvailable } from "@/lib/app-updates/validation";
 
 const installWindows = ["on_restart", "idle", "immediate"] as const;
 
@@ -163,8 +166,12 @@ export function AppUpdatePolicyForm({
   const releaseOptions = useMemo(() => {
     return releaseRows.map((r) => ({
       value: r.apkReleaseId,
-      label: `${r.versionName || ""} (${r.versionCode || ""})${r.__draft ? " - draft" : ""}`,
+      label: `${r.versionName || ""} (${r.versionCode || ""})${r.__draft ? " - draft" : ""}${isApkReleaseDeviceAvailable(r) ? "" : " - not ready"}`,
     }));
+  }, [releaseRows]);
+
+  const releasesById = useMemo(() => {
+    return new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
   }, [releaseRows]);
 
   const latestRelease = useMemo(() => {
@@ -187,12 +194,15 @@ export function AppUpdatePolicyForm({
       if (editingDisabled) return;
       setLoading(true);
 
-      const payload = {
+      const payload = normalizeAppUpdatePolicyPayload({
         ...policyForm,
         apkGracePeriodHours: policyForm.apkGracePeriodHours ?? null,
         apkForceAfter: policyForm.apkForceAfter ? new Date(policyForm.apkForceAfter) : null,
         policyVersion: Number(policyForm.policyVersion || 1),
-      } as any;
+      } as any);
+
+      const errors = validateAppUpdatePolicyPayload(payload, releasesById);
+      if (errors.length) throw new Error(errors.join(", "));
 
       const res = await saveAppUpdatePolicies({ data: [payload] });
 
@@ -216,7 +226,14 @@ export function AppUpdatePolicyForm({
     } finally {
       setLoading(false);
     }
-  }, [alert, editingDisabled, policyForm, router, saveAppUpdatePolicies]);
+  }, [alert, editingDisabled, policyForm, releasesById, router, saveAppUpdatePolicies]);
+
+  const policyValidationErrors = useMemo(() => {
+    return validateAppUpdatePolicyPayload(normalizeAppUpdatePolicyPayload(policyForm), releasesById);
+  }, [policyForm, releasesById]);
+
+  const currentRelease = policyForm.currentApkReleaseId ? releasesById.get(policyForm.currentApkReleaseId) : null;
+  const rollbackRelease = policyForm.rollbackApkReleaseId ? releasesById.get(policyForm.rollbackApkReleaseId) : null;
 
   return (
     <>
@@ -254,6 +271,53 @@ export function AppUpdatePolicyForm({
               </Button>
             </div>
           </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Current release</div>
+                  <div className="text-sm font-medium">
+                    {currentRelease ? `${currentRelease.versionName} (${currentRelease.versionCode})` : "Not selected"}
+                  </div>
+                </div>
+                {currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                )}
+              </div>
+              <Badge className="mt-3" variant={currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? "default" : "secondary"}>
+                {currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? "Ready" : "Needs review"}
+              </Badge>
+            </div>
+
+            <div className="rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Rollback release</div>
+                  <div className="text-sm font-medium">
+                    {rollbackRelease ? `${rollbackRelease.versionName} (${rollbackRelease.versionCode})` : "Not selected"}
+                  </div>
+                </div>
+                {rollbackRelease && isApkReleaseDeviceAvailable(rollbackRelease) ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+              <Badge className="mt-3" variant={rollbackRelease && isApkReleaseDeviceAvailable(rollbackRelease) ? "default" : "outline"}>
+                {rollbackRelease ? (isApkReleaseDeviceAvailable(rollbackRelease) ? "Ready" : "Needs review") : "Optional"}
+              </Badge>
+            </div>
+          </div>
+
+          {policyValidationErrors.length ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {policyValidationErrors[0]}
+              {policyValidationErrors.length > 1 ? ` and ${policyValidationErrors.length - 1} more` : ""}
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
             <div>

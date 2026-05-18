@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +17,12 @@ import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import type { saveApkReleases } from "@/app/actions/app-updates";
 import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases } from "@/databases/pg/schema";
+import { getApkReleaseReadiness, normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 const apkReleaseStatuses = [
   "uploaded",
@@ -179,13 +182,16 @@ export function ApkReleaseForm({
       if (!apkForm.versionName) throw new Error("Version name is required");
       if (!apkForm.versionCode) throw new Error("Version code is required");
 
-      const payload = {
+      const payload = normalizeApkReleasePayload({
         ...apkForm,
         versionCode: Number(apkForm.versionCode || 0),
         validatedAt: apkForm.validatedAt ? new Date(apkForm.validatedAt) : null,
         approvedAt: apkForm.approvedAt ? new Date(apkForm.approvedAt) : null,
         releasedAt: apkForm.releasedAt ? new Date(apkForm.releasedAt) : null,
-      } as any;
+      } as any);
+
+      const errors = validateApkReleasePayload(payload);
+      if (errors.length) throw new Error(errors.join(", "));
 
       const res = await saveApkReleases({ data: [payload] });
 
@@ -232,6 +238,9 @@ export function ApkReleaseForm({
     setApkForm(defaultApkForm());
   }, []);
 
+  const readiness = useMemo(() => getApkReleaseReadiness(normalizeApkReleasePayload(apkForm)), [apkForm]);
+  const validationErrors = useMemo(() => validateApkReleasePayload(normalizeApkReleasePayload(apkForm)), [apkForm]);
+
   return (
     <>
       {loading && <Loader overlay />}
@@ -264,6 +273,29 @@ export function ApkReleaseForm({
               </Button>
             </div>
           </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {readiness.map((check) => (
+              <div key={check.key} className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex min-w-0 items-center gap-2 text-sm">
+                  {check.passed ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  )}
+                  <span>{check.label}</span>
+                </div>
+                <Badge variant={check.passed ? "default" : "secondary"}>{check.passed ? "Pass" : "Open"}</Badge>
+              </div>
+            ))}
+          </div>
+
+          {validationErrors.length ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {validationErrors[0]}
+              {validationErrors.length > 1 ? ` and ${validationErrors.length - 1} more` : ""}
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
             <div>

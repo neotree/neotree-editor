@@ -121,6 +121,9 @@ export const draftOriginEnum = pgEnum("draft_origin", ["data_key_sync", "editor"
 
 // APP UPDATE ENUMS
 export const apkReleaseStatusEnum = pgEnum("apk_release_status", ["uploaded", "validated", "approved", "available", "deprecated", "revoked", "rolled_back"])
+export const mdmProviderEnum = pgEnum("mdm_provider", ["headwind"])
+export const mdmManagementStateEnum = pgEnum("mdm_management_state", ["managed", "unmanaged", "unknown"])
+export const mdmEnrollmentStatusEnum = pgEnum("mdm_enrollment_status", ["pending", "enrolled", "unenrolled", "failed", "unknown"])
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable("nt_mailer_settings", {
@@ -509,6 +512,78 @@ export const filesChunks = pgTable("nt_files_chunks", {
     .notNull(),
   data: bytea("data").notNull(),
 })
+
+// MDM PROVIDER PROFILES
+export const mdmProviderProfiles = pgTable("nt_mdm_provider_profiles", {
+  id: serial("id").primaryKey(),
+  profileId: uuid("profile_id").notNull().unique().defaultRandom(),
+
+  name: text("name").notNull(),
+  provider: mdmProviderEnum("provider").default("headwind").notNull(),
+  countryISO: text("country_iso").notNull(),
+  hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
+
+  baseUrl: text("base_url").notNull(),
+  apiKey: text("api_key"),
+  defaultKioskPolicy: text("default_kiosk_policy"),
+  settings: jsonb("settings").default({}).notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  providerIndex: index("mdm_provider_profiles_provider_idx").on(table.provider),
+  countryIndex: index("mdm_provider_profiles_country_idx").on(table.countryISO),
+}))
+
+// DEVICE MDM LINKS
+export const deviceMdmLinks = pgTable("nt_device_mdm_links", {
+  id: serial("id").primaryKey(),
+  linkId: uuid("link_id").notNull().unique().defaultRandom(),
+
+  deviceId: text("device_id").notNull().references(() => devices.deviceId, { onDelete: "cascade" }),
+  provider: mdmProviderEnum("provider").default("headwind").notNull(),
+  profileId: uuid("profile_id").references(() => mdmProviderProfiles.profileId, { onDelete: "set null" }),
+
+  mdmDeviceId: text("mdm_device_id"),
+  mdmConfigId: text("mdm_config_id"),
+  enrollmentStatus: mdmEnrollmentStatusEnum("enrollment_status").default("unknown").notNull(),
+  managementState: mdmManagementStateEnum("management_state").default("unknown").notNull(),
+
+  serialNumber: text("serial_number"),
+  androidVersion: text("android_version"),
+  lastMdmSeenAt: timestamp("last_mdm_seen_at"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  payload: jsonb("payload").default({}).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  deviceProviderUnique: uniqueIndex("device_mdm_link_device_provider_unique").on(table.deviceId, table.provider),
+  deviceIndex: index("device_mdm_links_device_idx").on(table.deviceId),
+  mdmDeviceIndex: index("device_mdm_links_mdm_device_idx").on(table.mdmDeviceId),
+  profileIndex: index("device_mdm_links_profile_idx").on(table.profileId),
+}))
+
+export const mdmProviderProfilesRelations = relations(mdmProviderProfiles, ({ one, many }) => ({
+  hospital: one(hospitals, {
+    fields: [mdmProviderProfiles.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
+  deviceLinks: many(deviceMdmLinks),
+}))
+
+export const deviceMdmLinksRelations = relations(deviceMdmLinks, ({ one }) => ({
+  device: one(devices, {
+    fields: [deviceMdmLinks.deviceId],
+    references: [devices.deviceId],
+  }),
+  profile: one(mdmProviderProfiles, {
+    fields: [deviceMdmLinks.profileId],
+    references: [mdmProviderProfiles.profileId],
+  }),
+}))
 
 // APK RELEASES
 export const apkReleases = pgTable("nt_apk_releases", {
