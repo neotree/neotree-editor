@@ -456,6 +456,13 @@ export const filesChunks = pgTable("nt_files_chunks", {
   data: bytea("data").notNull(),
 })
 
+// FILES ALIASES
+export const filesAliases = pgTable("nt_files_aliases", {
+  id: serial("id").primaryKey(),
+  fileId: uuid("file_id").references(() => files.fileId, { onDelete: "cascade" }),
+  alias: text("alias").notNull(),
+});
+
 // CONFIG KEYS
 export const configKeys = pgTable(
   "nt_config_keys",
