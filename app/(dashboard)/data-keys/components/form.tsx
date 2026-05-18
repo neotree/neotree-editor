@@ -175,6 +175,7 @@ function Form({
     }, [dataKey, authenticatedUser?.userId, authenticatedUser?.displayName]);
 
     const dataType = watch('dataType');
+    const uniqueKeyValue = watch('uniqueKey');
     const options = watch('options');
     const nameValue = watch('name');
     const labelValue = watch('label');
@@ -232,6 +233,7 @@ function Form({
         const changed = (
             `${nameValue || ''}` !== `${dataKey.name || ''}` ||
             `${labelValue || ''}` !== `${dataKey.label || ''}` ||
+            `${uniqueKeyValue || ''}` !== `${dataKey.uniqueKey || ''}` ||
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
             !!confidential !== !!dataKey.confidential ||
             optionsSignature !== savedOptionsSignature
@@ -251,6 +253,7 @@ function Form({
         dataKey,
         nameValue,
         labelValue,
+        uniqueKeyValue,
         dataType,
         confidential,
         optionsSignature,
