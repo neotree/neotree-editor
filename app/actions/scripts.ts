@@ -16,7 +16,9 @@ import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
-import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
+import { _getEditorInfo } from "@/databases/queries/editor-info";
+import { getIntegrityPolicyState } from "@/lib/integrity-policy";
+import { createIntegrityImportSnapshot } from "./integrity-imports";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -311,9 +313,11 @@ export async function saveScriptScreens({
     screens,
     scriptId,
     preserveScreensIds,
+    draftOrigin,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
 }): Promise<{
     errors?: string[];
@@ -373,6 +377,7 @@ export async function saveScriptScreens({
                     screenId,
                     version: 1,
                 }],
+                draftOrigin,
             });
 
             res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
@@ -393,9 +398,11 @@ export async function saveScriptDiagnoses({
     diagnoses,
     scriptId,
     preserveDiagnosesIds,
+    draftOrigin,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
 }): Promise<{
     errors?: string[];
@@ -454,6 +461,7 @@ export async function saveScriptDiagnoses({
                     diagnosisId,
                     version: 1,
                 }],
+                draftOrigin,
             });
 
             res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
@@ -474,9 +482,11 @@ export async function saveScriptProblems({
     problems,
     scriptId,
     preserveProblemsIds,
+    draftOrigin,
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
 }): Promise<{
     errors?: string[];
@@ -534,6 +544,7 @@ export async function saveScriptProblems({
                     problemId,
                     version: 1,
                 }],
+                draftOrigin,
             });
 
             res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
@@ -550,8 +561,9 @@ export async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, }: {
+export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
     scriptsIds: string[];
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -559,13 +571,13 @@ export async function deleteScriptsItems({ scriptsIds, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, });
+        const delScreens = await deleteScreens({ scriptsIds, draftOrigin });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, });
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, });
+        const delProblems = await deleteProblems({ scriptsIds, draftOrigin });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -589,18 +601,21 @@ const saveScriptsWithItemsInfo = {
 export async function saveScriptsWithItems({ data, }: {
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
+        draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     })[];
 }): Promise<{
     errors?: string[];
     success: boolean;
     info: typeof saveScriptsWithItemsInfo,
+    savedScriptIds?: string[];
 }> {
     const info = { ...saveScriptsWithItemsInfo };
+    const savedScriptIds: string[] = [];
 
     try {
         const errors: string[] = [];
 
-        for (const { overWriteScriptWithId, ...script } of data) {
+        for (const { overWriteScriptWithId, draftOrigin, ...script } of data) {
             const overWriteScript = !overWriteScriptWithId ? { data: null, } : await getScript({
                 scriptId: overWriteScriptWithId,
                 returnDraftIfExists: true,
@@ -615,7 +630,10 @@ export async function saveScriptsWithItems({ data, }: {
             }
 
             if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({ scriptsIds: [overWriteScript.data.scriptId], });
+                const res = await deleteScriptsItems({
+                    scriptsIds: [overWriteScript.data.scriptId],
+                    draftOrigin,
+                });
                 res.errors?.forEach(e => errors.push(e));
                 if (errors.length) continue;
             }
@@ -682,39 +700,43 @@ export async function saveScriptsWithItems({ data, }: {
                     version: 1,
                     printSections: printSections.map(s => ({
                         ...s,
-                        screensIds: s.screensIds.map(id => oldScreensIdsMap[id]).filter(id => id),
+                        screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
                     })),
                     reviewConfigurations: reviewConfigurations.map(c => ({
                         ...c,
                         screen: oldScreensIdsMap[c.screen],
-                    })).filter(c => c.screen),
+                    })).filter((c): c is typeof c & { screen: string } => !!c.screen),
                 }],
+                draftOrigin,
             });
 
             res.errors?.forEach(e => errors.push(e));
             if (errors.length) continue;
 
-            info.scripts++;
-
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, });
-            // saveScreens.errors?.forEach(e => errors.push(e));
+            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, draftOrigin });
+            saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, });
-            // saveDiagnoses.errors?.forEach(e => errors.push(e));
+            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, draftOrigin });
+            saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, });
-            // saveDiagnoses.errors?.forEach(e => errors.push(e));
+            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, draftOrigin });
+            saveProblems.errors?.forEach(e => errors.push(e));
             info.problems += saveProblems.saved;
+
+            if (errors.length) continue;
+
+            info.scripts++;
+            savedScriptIds.push(scriptId);
         }
 
-        if (errors.length) return { success: false, errors, info, };
+        if (errors.length) return { success: false, errors, info, savedScriptIds, };
 
-        return { success: true, info, };
+        return { success: true, info, savedScriptIds, };
     } catch (e: any) {
         logger.error('saveScriptsWithItems ERROR', e.message);
-        return { success: false, errors: [e.message], info, };
+        return { success: false, errors: [e.message], info, savedScriptIds, };
     }
 }
 
@@ -727,9 +749,23 @@ export async function copyScripts(params?: {
     broadcastAction?: boolean;
     overwriteDataKeys?: boolean;
     overwriteDrugsLibraryItems?: boolean;
-}): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>>> {
+}): Promise<Awaited<ReturnType<typeof saveScriptsWithItems>> & {
+    warnings?: string[];
+    integrityImportReview?: {
+        snapshotId: string | null;
+        totalBlockingIssues: number;
+        totalScripts: number;
+        requiresAcceptance: boolean;
+        details: Awaited<ReturnType<typeof createIntegrityImportSnapshot>>["reviewDetails"];
+    } | null;
+}> {
     const { data: localDataKeys, } = await _getDataKeys();
     const info = { ...saveScriptsWithItemsInfo };
+    const startedAt = Date.now();
+    const timings: Record<string, number> = {};
+    const markTiming = (step: string, stepStartedAt: number) => {
+        timings[step] = Date.now() - stepStartedAt;
+    };
 
     const {
         scriptsIds = [],
@@ -747,6 +783,7 @@ export async function copyScripts(params?: {
 
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
+        let importedDataKeyAffectedScriptIds: string[] = [];
 
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
@@ -757,19 +794,26 @@ export async function copyScripts(params?: {
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
         if (fromRemoteSiteId) {
+            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys');
+            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
+                returnDraftsIfExist: false,
+            }));
             importedDataKeys = importedDataKeysRes.data;
 
             const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
                 scriptsIds: JSON.stringify(scriptsIds),
+                data: JSON.stringify({
+                    returnDraftsIfExist: false,
+                }),
             }));
             const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
 
             if (resData.errors) return { success: false, errors: resData.errors, info, };
 
             scripts = resData;
+            markTiming('remote_fetch', remoteFetchStartedAt);
 
 
             scripts.data.forEach(({ screens, diagnoses, problems, dataKeys, drugsLibrary }, i) => {
@@ -821,6 +865,7 @@ export async function copyScripts(params?: {
             });
 
             let index = -1;
+            const parseImportedStartedAt = Date.now();
             for (const s of scripts.data) {
                 index++;
                 const { dataKeys, screens, diagnoses, problems, drugsLibrary, } = await parseImportedDataKeys({
@@ -843,12 +888,23 @@ export async function copyScripts(params?: {
                     return overwriteDataKeys || k.isNew;
                 });
             }
+            markTiming('parse_imported_data_keys', parseImportedStartedAt);
         }
 
-        let response: Awaited<ReturnType<typeof saveScriptsWithItems>> = { success: true, info, };
+        let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
+            warnings?: string[];
+            integrityImportReview?: {
+                snapshotId: string | null;
+                totalBlockingIssues: number;
+                totalScripts: number;
+                requiresAcceptance: boolean;
+                details: Awaited<ReturnType<typeof createIntegrityImportSnapshot>>["reviewDetails"];
+            } | null;
+        } = { success: true, info, };
 
         if (scripts.data.length) {
             if (toRemoteSiteId) {
+                const remoteSaveStartedAt = Date.now();
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
 
                 const res = await axiosClient.post('/api/scripts/with-items?', {
@@ -860,33 +916,151 @@ export async function copyScripts(params?: {
                 });
 
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
+                markTiming('remote_save', remoteSaveStartedAt);
             } else {
+                const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
+                        draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
                         hospitalId: undefined!,
                         hospitalName: undefined!,
                     })),
                 });
+                markTiming('save_scripts_with_items', saveScriptsStartedAt);
             }
         }
 
+        if (!response.success || response.errors?.length) {
+            return response;
+        }
+
         if (dffItemsToSave.length) {
-            const { data: dffItems, } = await _getDrugsLibraryItems();
+            const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
+            markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
         if (dataKeysToSave.length) {
-            const res = await _saveDataKeys({ data: dataKeysToSave, userId: session.user?.userId, });
-            if (res.success) response.info.dataKeys = dataKeysToSave.length;
+            const saveDataKeysStartedAt = Date.now();
+            const res = await _saveDataKeys({
+                data: dataKeysToSave,
+                userId: session.user?.userId,
+                draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
+            });
+            if (res.success) {
+                response.info.dataKeys = dataKeysToSave.length;
+                importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
+                    .map((script: { scriptId?: string | null }) => script.scriptId)
+                    .filter((value): value is string => !!value);
+            }
+            markTiming('save_data_keys', saveDataKeysStartedAt);
+        }
+
+        if (
+            fromRemoteSiteId &&
+            !toRemoteSiteId &&
+            response.success &&
+            !response.errors?.length &&
+            response.savedScriptIds?.length
+        ) {
+            const policyStartedAt = Date.now();
+            const editorInfoRes = await _getEditorInfo();
+            markTiming('load_integrity_policy', policyStartedAt);
+            if (editorInfoRes.errors?.length) {
+                response.warnings = [
+                    ...(response.warnings || []),
+                    ...editorInfoRes.errors.map((error) => `Imported successfully, but integrity review could not be prepared: ${error}`),
+                ];
+                return response;
+            }
+            const integrityPolicy = getIntegrityPolicyState(editorInfoRes.data).policy;
+            if (integrityPolicy.triggerSources.imports && integrityPolicy.enforcementMode !== "off") {
+                const importReviewStartedAt = Date.now();
+                const integrityReviewScriptIds = Array.from(new Set([
+                    ...(response.savedScriptIds || []),
+                    ...importedDataKeyAffectedScriptIds,
+                ]));
+
+                const [importedScriptsRes, currentDataKeysRes] = await Promise.all([
+                    getScriptsWithItems({
+                        scriptsIds: integrityReviewScriptIds,
+                        returnDraftsIfExist: true,
+                    }),
+                    _getDataKeys(),
+                ]);
+
+                const importErrors = [
+                    ...(importedScriptsRes.errors || []),
+                    ...(currentDataKeysRes.errors || []),
+                ];
+
+                if (importErrors.length) {
+                    response.warnings = [
+                        ...(response.warnings || []),
+                        ...importErrors.map((error) => `Imported successfully, but integrity review could not be prepared: ${error}`),
+                    ];
+                    return response;
+                }
+
+                const importedScripts = importedScriptsRes.data;
+                const directlyImportedScripts = importedScripts.filter((script) => response.savedScriptIds?.includes(script.scriptId));
+                const importedDataKeyIds = currentDataKeysRes.data
+                    .filter((dataKey) => dataKeysToSave.some((savedKey) => savedKey.uniqueKey === dataKey.uniqueKey))
+                    .map((dataKey) => dataKey.uuid)
+                    .filter((value): value is string => !!value);
+
+                const importSnapshot = await createIntegrityImportSnapshot({
+                    actorUserId: session.user?.userId || null,
+                    policy: integrityPolicy,
+                    sourceType: "script_import",
+                    sourceLabel: directlyImportedScripts.length === 1
+                        ? directlyImportedScripts[0]?.title || directlyImportedScripts[0]?.printTitle || "Imported script"
+                        : `${directlyImportedScripts.length || response.savedScriptIds?.length || 0} imported scripts`,
+                    importedScriptIds: integrityReviewScriptIds,
+                    importedDataKeyIds,
+                    metadata: {
+                        fromRemoteSiteId,
+                        overwriteDataKeys: !!overwriteDataKeys,
+                        overwriteDrugsLibraryItems: !!overwriteDrugsLibraryItems,
+                        overWriteScriptWithId: overWriteScriptWithId || null,
+                    },
+                    dataKeys: currentDataKeysRes.data,
+                    screens: importedScripts.flatMap((script) => script.screens || []),
+                    diagnoses: importedScripts.flatMap((script) => script.diagnoses || []),
+                    problems: importedScripts.flatMap((script) => script.problems || []),
+                });
+
+                response.integrityImportReview = {
+                    snapshotId: importSnapshot.snapshotId,
+                    totalBlockingIssues: importSnapshot.snapshot.totalBlockingIssues,
+                    totalScripts: importSnapshot.snapshot.totalScripts,
+                    requiresAcceptance: !!importSnapshot.snapshotId,
+                    details: importSnapshot.reviewDetails,
+                };
+                markTiming('build_integrity_import_review', importReviewStartedAt);
+            }
         }
 
         if (broadcastAction && !response?.errors?.length) socket.emit('data_changed', 'copy_scripts');
+
+        logger.log('copyScripts TIMINGS', JSON.stringify({
+            fromRemoteSiteId: !!fromRemoteSiteId,
+            toRemoteSiteId: !!toRemoteSiteId,
+            overwriteDataKeys: !!overwriteDataKeys,
+            overwriteDrugsLibraryItems: !!overwriteDrugsLibraryItems,
+            overWriteScriptWithId: !!overWriteScriptWithId,
+            scriptsRequested: scriptsIds.length,
+            savedScriptIds: response.savedScriptIds?.length || 0,
+            totalMs: Date.now() - startedAt,
+            timings,
+        }));
 
         return response;
     } catch (e: any) {
