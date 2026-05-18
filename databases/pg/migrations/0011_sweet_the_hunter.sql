@@ -214,3 +214,39 @@ END $$;
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "change_logs_single_active_version_idx" ON "nt_change_logs" USING btree ("entity_type","entity_id") WHERE "nt_change_logs"."is_active" = true;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "active_version_index" ON "nt_change_logs" USING btree ("entity_type","entity_id","is_active");
+
+DO $$ BEGIN
+ ALTER TABLE "nt_scripts_drafts" ADD COLUMN IF NOT EXISTS "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "nt_screens_drafts" ADD COLUMN IF NOT EXISTS "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "nt_diagnoses_drafts" ADD COLUMN IF NOT EXISTS "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "nt_problems_drafts" ADD COLUMN IF NOT EXISTS "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "nt_pending_deletion" ADD COLUMN IF NOT EXISTS "draft_origin" "draft_origin" DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "nt_data_keys_drafts" ADD COLUMN IF NOT EXISTS "draft_origin" text DEFAULT 'editor' NOT NULL;
+EXCEPTION
+ WHEN undefined_table THEN null;
+END $$;

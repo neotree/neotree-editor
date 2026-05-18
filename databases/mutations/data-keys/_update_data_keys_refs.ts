@@ -23,6 +23,7 @@ export type UpdateDataKeysRefsParams = {
     dryRun?: boolean;
     userId?: string;
     draftOrigin?: "data_key_sync" | "import";
+    matchUniqueKeysByDataKey?: Record<string, string[]>;
 };
 
 type MatchSource = 'uniqueKey';
@@ -157,6 +158,7 @@ export async function _updateDataKeysRefs({
     broadcastAction,
     userId,
     draftOrigin = "data_key_sync",
+    matchUniqueKeysByDataKey = {},
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
         const stats: UpdateStats = {
@@ -182,7 +184,13 @@ export async function _updateDataKeysRefs({
             if (key.uniqueKey) byUniqueKey.set(key.uniqueKey, key);
         });
 
-        const changedUniqueKeys = Array.from(byUniqueKey.keys());
+        const changedUniqueKeys = Array.from(new Set(
+            dataKeys.flatMap((key) => {
+                const currentUniqueKey = `${key.uniqueKey || ''}`.trim();
+                const aliases = currentUniqueKey ? (matchUniqueKeysByDataKey[currentUniqueKey] || []) : [];
+                return [currentUniqueKey, ...aliases].filter(Boolean);
+            }),
+        ));
 
         const getUpdatedDataKey = ({
             uniqueKey,
@@ -192,6 +200,12 @@ export async function _updateDataKeysRefs({
             if (uniqueKey) {
                 const keyById = byUniqueKey.get(uniqueKey);
                 if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+
+                for (const [currentUniqueKey, aliases] of Object.entries(matchUniqueKeysByDataKey)) {
+                    if (!aliases.includes(uniqueKey)) continue;
+                    const aliasedDataKey = byUniqueKey.get(currentUniqueKey);
+                    if (aliasedDataKey) return { dataKey: aliasedDataKey, source: 'uniqueKey' };
+                }
             }
 
             return {};

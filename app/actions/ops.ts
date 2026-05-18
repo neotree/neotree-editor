@@ -879,6 +879,7 @@ export async function publishData({
         userId,
         publisherUserId,
         dataVersion: nextDataVersion,
+        allowConfidentialDowngrade: true,
         client: tx,
       })
       if (publishDataKeys.errors?.length) throw new Error(publishDataKeys.errors.join(", "))

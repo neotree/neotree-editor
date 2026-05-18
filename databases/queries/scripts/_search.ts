@@ -35,6 +35,11 @@ export async function _searchScripts({
         // SCRIPTS
         const scriptsDrafts = !returnDraftsIfExist ? [] : await db.query.scriptsDrafts.findMany({
             where: sql`lower(${schema.scriptsDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const scripts = await db.select({
@@ -56,6 +61,13 @@ export async function _searchScripts({
         // SCREENS
         const screensDrafts = !returnDraftsIfExist ? [] : await db.query.screensDrafts.findMany({
             where: sql`lower(${schema.screensDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                screenId: true,
+                screenDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const screens = await db.select({
@@ -102,6 +114,13 @@ export async function _searchScripts({
         // DIAGNOSES
         const diagnosesDrafts = !returnDraftsIfExist ? [] : await db.query.diagnosesDrafts.findMany({
             where: sql`lower(${schema.diagnosesDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                diagnosisId: true,
+                diagnosisDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const diagnoses = await db.select({
@@ -130,6 +149,13 @@ export async function _searchScripts({
         // PROOBLEMS
         const problemsDrafts = !returnDraftsIfExist ? [] : await db.query.problemsDrafts.findMany({
             where: sql`lower(${schema.problemsDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                problemId: true,
+                problemDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const problems = await db.select({
@@ -215,6 +241,11 @@ export async function _searchScripts({
                 inArray(schema.scriptsDrafts.scriptId, scriptsIdsFromItems),
                 inArray(schema.scriptsDrafts.scriptDraftId, scriptsIdsFromItems),
             ),
+            columns: {
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const scriptsFromItems = !scriptsIdsFromItems.length ? [] : await db.select({
