@@ -70,8 +70,8 @@ export function ConditionalExpressionModal() {
                                 <p><b>$Diagnoses</b> = &apos;LBW&apos; <i>{'-false'}</i></p>
                                 <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>included</b> in the selection</div>
 
-                                <p><b>$Diagnoses</b> != &apos;LBW&apos; <i>{'-true'}</i></p>
-                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>NOT included</b> in the selection</div>
+                                {/* <p><b>$Diagnoses</b> != &apos;LBW&apos; <i>{'-true'}</i></p>
+                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>NOT included</b> in the selection</div> */}
 
                                 <br />
 
