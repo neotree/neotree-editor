@@ -6,6 +6,13 @@ import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { GetDataKeysParams, GetDataKeysResults, _getDataKeys } from "@/databases/queries/data-keys";
 import { _deleteDataKeys } from "@/databases/mutations/data-keys";
 
+function parseOptionalBoolean(value: unknown) {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    if (typeof value === "boolean") return value;
+    return undefined;
+}
+
 export async function GET(req: NextRequest) {
 	let res: GetDataKeysResults = { data: [], };
 	try {
@@ -13,7 +20,15 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
+        const parsed = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams & {
+            returnDraftsIfExist?: string | boolean;
+            withDeleted?: string | boolean;
+        };
+        const params: GetDataKeysParams = {
+            ...parsed,
+            returnDraftsIfExist: parseOptionalBoolean(parsed.returnDraftsIfExist),
+            withDeleted: parseOptionalBoolean(parsed.withDeleted),
+        };
 
         res = await _getDataKeys(params);
         res = {

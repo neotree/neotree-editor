@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
 import { removeHexCharacters } from "../../utils"
@@ -9,27 +10,31 @@ export async function _saveScriptsHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof scriptsDrafts.$inferSelect[]
   previous: typeof scripts.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof scriptsHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const scriptId = c?.data?.scriptId
       if (!scriptId) continue
 
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+
       const changeHistoryData: typeof scriptsHistory.$inferInsert = {
-        version: c?.data?.version || 1,
+        version: nextVersion,
         scriptId,
         changes: {},
       }
-
-      const isCreate = (c?.data?.version || 1) === 1
 
       if (isCreate) {
         changeHistoryData.changes = {
@@ -78,7 +83,7 @@ export async function _saveScriptsHistory({
           entityId: scriptId,
           entityType: "script",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -91,7 +96,7 @@ export async function _saveScriptsHistory({
     }
 
     if (insertData.length) {
-      await db.insert(scriptsHistory).values(insertData)
+      await executor.insert(scriptsHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

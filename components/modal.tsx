@@ -26,6 +26,7 @@ export type ModalProps = DialogProps & {
     actions?: React.ReactNode;
     trigger?: React.ReactNode;
     contentProps?: DialogContentProps;
+    bodyProps?: React.HTMLAttributes<HTMLDivElement>;
     footerProps?: DialogFooterProps;
 };
 
@@ -37,20 +38,25 @@ export function Modal({
     actions,
     trigger,
     contentProps,
+    bodyProps,
     footerProps,
     ...props
 }: ModalProps) {
     const { close, isOpen, set } = useModalState();
+    const open = id ? (isOpen(id) || props.open) : props.open;
+    const contentClassName = contentProps?.className;
+    const bodyClassName = bodyProps?.className;
+    const footerClassName = footerProps?.className;
 
     useEffect(() => {
         if (id) set({ [id]: false, });
-    }, [id]);
+    }, [id, set]);
 
     return (
         <>
             <Dialog 
                 {...props}
-                open={(!id ? undefined : isOpen(id)) || props.open}
+                open={open}
                 onOpenChange={open => {
                     if (id) set({ [id]: open, });
                     props?.onOpenChange?.(open);
@@ -59,17 +65,17 @@ export function Modal({
                 {trigger}
 
                 <DialogContent 
+                    {...contentProps}
                     hideCloseButton
                     className={cn(
-                        'flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl',
-                        contentProps?.className,
+                        '!flex min-h-0 max-h-[90dvh] flex-col overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',
+                        contentClassName,
                     )}
-                    {...contentProps}
                 >
                     <DialogHeader 
                         className={cn(
                             !title && !description ? 'hidden' : '',
-                            'border-b border-b-border px-4 py-4',
+                            'shrink-0 border-b border-b-border px-4 py-4',
                         )}
                     >
                         <DialogTitle
@@ -85,17 +91,23 @@ export function Modal({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex-1 flex flex-col overflow-y-auto px-4 py-2">
+                    <div
+                        {...bodyProps}
+                        className={cn(
+                            "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-2",
+                            bodyClassName,
+                        )}
+                    >
                         {children}
                     </div>
                     
                     <DialogFooter 
-                        className={cn(
-                            'border-t border-t-border px-4 py-2 items-center w-full',
-                            actions ? '' : 'hidden',
-                            footerProps?.className
-                        )}
                         {...footerProps}
+                        className={cn(
+                            'shrink-0 border-t border-t-border px-4 py-2 items-center w-full',
+                            actions ? '' : 'hidden',
+                            footerClassName
+                        )}
                     >
                         {actions}
                     </DialogFooter>

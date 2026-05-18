@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { v4 as uuidV4 } from "uuid"
 import { arrayMoveImmutable } from "array-move"
+import { useQueryState } from "nuqs"
 
 import type { ScriptField } from "@/types"
 import { DataTable } from "@/components/data-table"
@@ -16,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
+import { isNumericQueryValue } from "@/lib/query-state"
 import { SelectDataKey } from "@/components/select-data-key"
 import { SelectModal } from "@/components/select-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
@@ -36,10 +38,28 @@ export function FieldItems({
   onChange: (items: Item[]) => void
 }) {
   const { confirm } = useConfirmModal()
-  const [currentItemIndex, setCurrentItemIndex] = useState<number>(-1)
-  const [newItem, setNewItem] = useState(false)
+  const [currentItem, setCurrentItem] = useQueryState("fieldItem", {
+    defaultValue: "",
+    clearOnDefault: true,
+  })
 
-  const showForm = newItem || currentItemIndex >= 0
+  const currentItemIndex =
+    currentItem === "new"
+      ? -1
+      : null
+  const activeItem =
+    currentItem === "new"
+      ? null
+      : items.find((item) => item.itemId === currentItem)
+        || (isNumericQueryValue(currentItem) ? items[Number(currentItem)] || null : null)
+  const resolvedCurrentItemIndex = currentItem === "new"
+    ? -1
+    : (() => {
+        const indexById = items.findIndex((item) => item.itemId === currentItem)
+        if (indexById >= 0) return indexById
+        return isNumericQueryValue(currentItem) ? Number(currentItem) : null
+      })()
+  const showForm = currentItem === "new" || !!activeItem
 
   return (
     <>
@@ -47,19 +67,18 @@ export function FieldItems({
         <Form
           fieldDataKey={dataKey}
           fieldType={fieldType}
-          item={items[currentItemIndex] || null}
+          item={activeItem}
           allItems={items}
           onClose={() => {
-            setCurrentItemIndex(-1)
-            setNewItem(false)
+            setCurrentItem("")
           }}
           onChange={(data) => {
-            if (newItem) {
+            if (currentItem === "new") {
               onChange([...items, data])
-            } else {
+            } else if (resolvedCurrentItemIndex !== null && resolvedCurrentItemIndex >= 0) {
               onChange(
                 items.map((item, i) => {
-                  if (i !== currentItemIndex) return item
+                  if (i !== resolvedCurrentItemIndex) return item
                   return {
                     ...item,
                     ...data,
@@ -91,7 +110,7 @@ export function FieldItems({
           }}
           headerActions={
             disabled ? null : (
-              <Button variant="ghost" onClick={() => setNewItem(true)}>
+              <Button variant="ghost" onClick={() => setCurrentItem("new")}>
                 <PlusIcon className="h-4 w-4 mr-2" /> Add
               </Button>
             )
@@ -140,7 +159,7 @@ export function FieldItems({
                       </DropdownMenuTrigger>
 
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setTimeout(() => setCurrentItemIndex(rowIndex), 0)}>
+                        <DropdownMenuItem onClick={() => setTimeout(() => setCurrentItem(items[rowIndex]?.itemId || `${rowIndex}`), 0)}>
                           <EditIcon className="h-4 w-4 mr-2" /> Edit
                         </DropdownMenuItem>
 
