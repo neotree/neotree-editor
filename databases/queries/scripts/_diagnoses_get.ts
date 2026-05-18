@@ -80,6 +80,14 @@ export async function _getDiagnoses(
                 ),
                 !diagnosesIds?.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds)
             ),
+            columns: {
+                diagnosisId: true,
+                diagnosisDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+                createdByUserId: true,
+            },
         });
 
         // published diagnoses conditions
@@ -180,6 +188,10 @@ export async function _getDiagnosis(
 
         let draft = (returnDraftIfExists && whereDiagnosisDraftId) ? await db.query.diagnosesDrafts.findFirst({
             where: whereDiagnosisDraftId,
+            columns: {
+                data: true,
+                createdByUserId: true,
+            },
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -195,7 +207,10 @@ export async function _getDiagnosis(
             .select({
                 diagnosis: diagnoses,
                 pendingDeletion,
-                draft: diagnosesDrafts,
+                draft: {
+                    data: diagnosesDrafts.data,
+                    createdByUserId: diagnosesDrafts.createdByUserId,
+                },
             })
             .from(diagnoses)
             .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
