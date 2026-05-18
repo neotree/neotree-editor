@@ -513,6 +513,13 @@ export const filesChunks = pgTable("nt_files_chunks", {
   data: bytea("data").notNull(),
 })
 
+// FILES ALIASES
+export const filesAliases = pgTable("nt_files_aliases", {
+  id: serial("id").primaryKey(),
+  fileId: uuid("file_id").references(() => files.fileId, { onDelete: "cascade" }),
+  alias: text("alias").notNull(),
+})
+
 // MDM PROVIDER PROFILES
 export const mdmProviderProfiles = pgTable("nt_mdm_provider_profiles", {
   id: serial("id").primaryKey(),
@@ -670,7 +677,9 @@ export const appUpdatePoliciesRelations = relations(appUpdatePolicies, ({ one })
     fields: [appUpdatePolicies.createdByUserId],
     references: [users.userId],
   }),
-}))// APK RELEASES DRAFTS
+}))
+
+// APK RELEASES DRAFTS
 export const apkReleasesDrafts = pgTable("nt_apk_releases_drafts", {
   id: serial("id").primaryKey(),
   apkReleaseDraftId: uuid("apk_release_draft_id").notNull().unique().defaultRandom(),
@@ -715,8 +724,6 @@ export const appUpdatePoliciesDraftsRelations = relations(appUpdatePoliciesDraft
     references: [users.userId],
   }),
 }))
-
-
 
 // CONFIG KEYS
 export const configKeys = pgTable(
