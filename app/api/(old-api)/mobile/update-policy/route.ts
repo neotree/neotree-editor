@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
-import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getAppUpdatePolicy } from "@/databases/queries/app-updates";
-import { _getDevice } from "@/databases/queries/devices";
 import { getAppUrl } from "@/lib/urls";
+import { authenticateMobileDevice } from "@/lib/mobile-device-auth";
 
 export async function GET(req: NextRequest) {
     try {
         logger.log(`[GET] /api/mobile/update-policy`);
 
-        const isAuthorised = await isAuthenticated();
-        if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] });
-
         const deviceId = req.nextUrl.searchParams.get("deviceId") || "";
-        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"], data: null });
-        const deviceRes = await _getDevice({ deviceId });
-        if (deviceRes.errors?.length) return NextResponse.json({ errors: deviceRes.errors, data: null });
-        if (!deviceRes.data) return NextResponse.json({ errors: ["Device not registered"], data: null });
+        const auth = await authenticateMobileDevice(req, deviceId);
+        if (!auth.ok) return NextResponse.json({ errors: auth.errors, data: null }, { status: auth.status });
 
         const runtimeVersion = req.nextUrl.searchParams.get("runtimeVersion") || undefined;
         const nativeBuildVersion = Number(req.nextUrl.searchParams.get("nativeBuildVersion") || NaN);
@@ -31,7 +25,9 @@ export async function GET(req: NextRequest) {
             if (!release) return null;
 
             const available = !!(release.isAvailable && release.status === "available");
-            const downloadUrl = release.fileId ? getAppUrl(`/api/files/${release.fileId}/download`) : null;
+            const downloadUrl = release.fileId
+                ? getAppUrl(`/api/mobile/apk-releases/${release.apkReleaseId}/download?deviceId=${encodeURIComponent(deviceId)}`)
+                : null;
 
             return {
                 apkReleaseId: release.apkReleaseId,

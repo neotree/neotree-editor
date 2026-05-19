@@ -37,7 +37,9 @@ export async function _saveMdmProviderProfile(data: SaveMdmProviderProfileData) 
   }
 }
 
-export async function _linkDeviceToMdm(data: typeof deviceMdmLinks.$inferInsert) {
+export async function _linkDeviceToMdm(
+  data: typeof deviceMdmLinks.$inferInsert & { linkId?: string },
+) {
   try {
     if (!data.deviceId) return { success: false, errors: ["Device ID is required"] }
     if (!data.mdmDeviceId) return { success: false, errors: ["MDM device ID is required"] }
@@ -50,6 +52,30 @@ export async function _linkDeviceToMdm(data: typeof deviceMdmLinks.$inferInsert)
       payload: data.payload || {},
       lastSyncedAt: data.lastSyncedAt || new Date(),
     } satisfies typeof deviceMdmLinks.$inferInsert
+
+    if (payload.linkId) {
+      const [updated] = await db
+        .update(deviceMdmLinks)
+        .set({
+          deviceId: payload.deviceId,
+          provider: payload.provider,
+          profileId: payload.profileId,
+          mdmDeviceId: payload.mdmDeviceId,
+          mdmConfigId: payload.mdmConfigId,
+          enrollmentStatus: payload.enrollmentStatus,
+          managementState: payload.managementState,
+          serialNumber: payload.serialNumber,
+          androidVersion: payload.androidVersion,
+          lastMdmSeenAt: payload.lastMdmSeenAt,
+          lastSyncedAt: payload.lastSyncedAt,
+          payload: payload.payload,
+        })
+        .where(eq(deviceMdmLinks.linkId, payload.linkId))
+        .returning()
+
+      if (!updated) return { success: false, errors: ["Device MDM link not found"] }
+      return { success: true, data: updated }
+    }
 
     const [inserted] = await db
       .insert(deviceMdmLinks)
@@ -74,6 +100,23 @@ export async function _linkDeviceToMdm(data: typeof deviceMdmLinks.$inferInsert)
     return { success: true, data: inserted }
   } catch (e: any) {
     logger.error("_linkDeviceToMdm ERROR", e.message)
+    return { success: false, errors: [e.message] }
+  }
+}
+
+export async function _unlinkDeviceFromMdm(linkId: string) {
+  try {
+    if (!linkId) return { success: false, errors: ["Device MDM link ID is required"] }
+
+    const [deleted] = await db
+      .delete(deviceMdmLinks)
+      .where(eq(deviceMdmLinks.linkId, linkId))
+      .returning()
+
+    if (!deleted) return { success: false, errors: ["Device MDM link not found"] }
+    return { success: true, data: deleted }
+  } catch (e: any) {
+    logger.error("_unlinkDeviceFromMdm ERROR", e.message)
     return { success: false, errors: [e.message] }
   }
 }

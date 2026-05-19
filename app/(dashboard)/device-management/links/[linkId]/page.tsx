@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: { linkId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
 };
 
-export default async function EditDeviceMdmLinkPage({ params }: Props) {
+export default async function EditDeviceMdmLinkPage({ params, searchParams }: Props) {
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");
@@ -54,7 +55,12 @@ export default async function EditDeviceMdmLinkPage({ params }: Props) {
               </Link>
               <span>Edit device MDM link</span>
             </div>
-            <DeviceMdmLinkForm link={link.data} profiles={profiles.data} />
+            <DeviceMdmLinkForm
+              link={link.data}
+              profiles={profiles.data}
+              error={typeof searchParams?.error === "string" ? searchParams.error : null}
+              returnTo={`/device-management/links/${params.linkId}`}
+            />
           </CardContent>
         </Card>
       </Content>

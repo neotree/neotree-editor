@@ -1,4 +1,4 @@
-import type { MdmDeviceStatus, MdmProvider, MdmProviderConfig } from "./types"
+import type { MdmActionResult, MdmDeviceStatus, MdmProvider, MdmProviderConfig } from "./types"
 
 export class HeadwindMdmProvider implements MdmProvider {
   readonly name = "headwind" as const
@@ -13,6 +13,37 @@ export class HeadwindMdmProvider implements MdmProvider {
     return {
       "Content-Type": "application/json",
       ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
+    }
+  }
+
+  private async postAction(action: string, mdmDeviceId: string, body: Record<string, any>): Promise<MdmActionResult> {
+    const actionPaths = this.config.settings?.actionPaths || {}
+    const template = actionPaths[action]
+
+    if (!template) {
+      return {
+        success: false,
+        provider: this.name,
+        message: `Headwind ${action} endpoint is not configured`,
+        payload: { action, mdmDeviceId },
+      }
+    }
+
+    const path = `${template}`.replace(":mdmDeviceId", encodeURIComponent(mdmDeviceId))
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({ mdmDeviceId, ...body }),
+      cache: "no-store",
+    })
+    const payload = await res.json().catch(() => ({}))
+
+    return {
+      success: res.ok,
+      provider: this.name,
+      providerActionId: payload?.id || payload?.actionId || null,
+      message: res.ok ? payload?.message || null : payload?.message || `Headwind ${action} failed: ${res.status}`,
+      payload,
     }
   }
 
@@ -60,5 +91,21 @@ export class HeadwindMdmProvider implements MdmProvider {
       lastMdmSeenAt: item?.lastUpdate || item?.lastSeen || null,
       payload: item || {},
     }))
+  }
+
+  async lockDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult> {
+    return this.postAction("lockDevice", mdmDeviceId, { reason: reason || null })
+  }
+
+  async wipeDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult> {
+    return this.postAction("wipeDevice", mdmDeviceId, { reason: reason || null })
+  }
+
+  async assignKioskPolicy(mdmDeviceId: string, policyId: string): Promise<MdmActionResult> {
+    return this.postAction("assignKioskPolicy", mdmDeviceId, { policyId })
+  }
+
+  async pushApk(mdmDeviceId: string, apk: { apkReleaseId: string; downloadUrl: string }): Promise<MdmActionResult> {
+    return this.postAction("pushApk", mdmDeviceId, apk)
   }
 }

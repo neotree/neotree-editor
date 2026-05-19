@@ -418,6 +418,8 @@ export const devices = pgTable("nt_devices", {
   id: serial("id").primaryKey(),
   deviceId: text("device_id").notNull().unique(),
   deviceHash: text("device_hash").notNull().unique(),
+  deviceAuthSecret: text("device_auth_secret"),
+  deviceAuthSecretRotatedAt: timestamp("device_auth_secret_rotated_at"),
   details: jsonb("details").default({}),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
