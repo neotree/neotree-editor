@@ -4,7 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, problemsDrafts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { ScriptField, Preferences, PrintSection,ScreenReviewField,Alias} from "@/types";
+import { ScriptField, Preferences, PrintSection, ScreenReviewField, Alias, EligibilityCriteria } from "@/types";
 import { _getScreens } from "./_screens_get";
 
 
@@ -19,6 +19,7 @@ export type ScriptType = typeof scripts.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
     nuidSearchFields: ScriptField[];
+    eligibilityCriteria: EligibilityCriteria | null;
     reviewConfigurations: ScreenReviewField[];
     aliases: Alias[];
     lastAlias:string;

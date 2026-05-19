@@ -35,6 +35,7 @@ import { ScriptPrintSetup } from './print';
 import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
 import { LockStatus } from '@/components/lock-status';
+import { EligibilityCriteriaForm } from "./eligibility-criteria-form";
 
 type Props = {
     formData?: ScriptFormDataType;
@@ -72,6 +73,7 @@ export function ScriptForm(props: Props) {
     const exportable = watch('exportable');
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
+    const eligibilityCriteria = watch('eligibilityCriteria');
     const preferences = watch('preferences');
     const reviewable = watch('reviewable');
 
@@ -221,6 +223,15 @@ export function ScriptForm(props: Props) {
                             onCheckedChange={() => setValue('exportable', !exportable, { shouldDirty: true, })}
                         />
                         <Label secondary htmlFor="exportable">Exportable</Label>
+                    </div>
+
+                    <div className="pt-4">
+                        <EligibilityCriteriaForm
+                            disabled={disabled}
+                            scriptId={props.formData?.scriptId}
+                            value={eligibilityCriteria || null}
+                            onChange={(data) => setValue('eligibilityCriteria', data, { shouldDirty: true, })}
+                        />
                     </div>
 
                     <Title className="mt-5">Neotree ID Search</Title>

@@ -119,6 +119,18 @@ export type ScriptField = {
     }[];
 };
 
+export type EligibilityCriteria = {
+    criteria_type: 'date' | 'datetime' | 'dropdown' | 'yesno';
+    criteria_label: string;
+    auto_fills?: string;
+    criteria_condition: string;
+    items?: NonNullable<ScriptField['items']>;
+    min_date?: string;
+    max_date?: string;
+    min_date_current?: boolean;
+    max_date_current?: boolean;
+};
+
 export type DiagnosisSymptom = {
     expression: string;
     key?: string;
@@ -166,6 +178,7 @@ export type Script = {
     description: string;
     hospitalId: string;
     exportable: boolean;
+    eligibilityCriteria: EligibilityCriteria | null;
     nuidSearchEnabled: boolean;
     publishDate: boolean;
     createdAt: string;
