@@ -67,6 +67,14 @@ export async function _getProblems(
                 ),
                 !problemsIds?.length ? undefined : inArray(problemsDrafts.problemDraftId, problemsIds)
             ),
+            columns: {
+                problemId: true,
+                problemDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+                createdByUserId: true,
+            },
         });
 
         // published problems conditions
@@ -166,6 +174,10 @@ export async function _getProblem(
 
         let draft = (returnDraftIfExists && whereProblemDraftId) ? await db.query.problemsDrafts.findFirst({
             where: whereProblemDraftId,
+            columns: {
+                data: true,
+                createdByUserId: true,
+            },
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -181,7 +193,10 @@ export async function _getProblem(
             .select({
                 problem: problems,
                 pendingDeletion,
-                draft: problemsDrafts,
+                draft: {
+                    data: problemsDrafts.data,
+                    createdByUserId: problemsDrafts.createdByUserId,
+                },
             })
             .from(problems)
             .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))

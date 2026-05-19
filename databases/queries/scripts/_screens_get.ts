@@ -88,6 +88,14 @@ export async function _getScreens(
                 !screensIds?.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
                 !types?.length ? undefined : inArray(screensDrafts.type, types)
             ),
+            columns: {
+                screenId: true,
+                screenDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+                createdByUserId: true,
+            },
         });
 
         // published screens conditions
@@ -184,6 +192,10 @@ export async function _getScreen(
 
         let draft = (returnDraftIfExists && whereScreenDraftId) ? await db.query.screensDrafts.findFirst({
             where: whereScreenDraftId,
+            columns: {
+                data: true,
+                createdByUserId: true,
+            },
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -199,7 +211,10 @@ export async function _getScreen(
             .select({
                 screen: screens,
                 pendingDeletion,
-                draft: screensDrafts,
+                draft: {
+                    data: screensDrafts.data,
+                    createdByUserId: screensDrafts.createdByUserId,
+                },
             })
             .from(screens)
             .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
@@ -359,4 +374,3 @@ export async function _listScreens(
         return { data: [], errors: [e.message], };
     }
 }
-
