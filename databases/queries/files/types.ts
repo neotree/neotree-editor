@@ -44,3 +44,20 @@ export type GetFilesResults = {
     page: number;
     limit?: number;
 };
+
+export type ReferencedFile = {
+    isExternal?: boolean;
+    fileId?: string;
+    alias?: string;
+    url: string;
+    type: string;
+    refType: string;
+    refId: string;
+    refField: string;
+    host: string;
+};
+
+export type GetReferencedFilesResponse = {
+    errors?: string[];
+    data: ReferencedFile[];
+};
