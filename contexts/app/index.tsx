@@ -1,8 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
 import { useMount } from "react-use";
 
 import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
@@ -76,8 +75,6 @@ export function AppContextProvider({
 }
 
 function useAppContextValue(props: AppContextProviderProps) {
-    const router = useRouter();
-
     const { isAdmin, isSuperUser, sys, } = props;
     const { setTheme } = useTheme();
 

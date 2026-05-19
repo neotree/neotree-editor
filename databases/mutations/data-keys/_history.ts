@@ -1,5 +1,6 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
 
@@ -7,19 +8,24 @@ export async function _saveDataKeysHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof dataKeysDrafts.$inferSelect[]
   previous: typeof dataKeys.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
+  const executor = client || db
+  const insertData: typeof dataKeysHistory.$inferInsert[] = []
 
   try {
-    const insertData: typeof dataKeysHistory.$inferInsert[] = []
-
     for (const c of drafts) {
-      const dataKeyId = c?.data?.uuid
-      if (!dataKeyId) continue
+      const resolvedDataKeyId = c.dataKeyId || c?.data?.uuid
+      if (!resolvedDataKeyId) {
+        logger.error("_saveDataKeysHistory ERROR", "Missing data key id for draft history entry")
+        continue
+      }
 
       const isCreate = (c?.data?.version || 1) === 1
       const changeDescription = isCreate ? "Create data key" : "Update data key"
@@ -32,15 +38,16 @@ export async function _saveDataKeysHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-        version: versionValue,
-        dataKeyId,
+        version: nextVersion,
+        dataKeyId: resolvedDataKeyId,
         changes: changePayload,
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
+        const prev = previous.find((prevC) => prevC.uuid === resolvedDataKeyId)
 
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
@@ -58,32 +65,36 @@ export async function _saveDataKeysHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
+        const sanitizedSnapshot = JSON.parse(JSON.stringify({
+          ...(c.data || {}),
+          uuid: resolvedDataKeyId,
+        }))
         const previousSnapshot = isCreate
           ? {}
-          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.uuid === dataKeyId) || {}))
+          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.uuid === resolvedDataKeyId) || {}))
 
         changeLogsData.push({
-          entityId: dataKeyId,
+          entityId: resolvedDataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
           baselineSnapshot: previousSnapshot,
           description: changeDescription,
           userId,
-          dataKeyId,
+          dataKeyId: resolvedDataKeyId,
         })
       }
     }
 
     if (insertData.length) {
-      await db.insert(dataKeysHistory).values(insertData)
+      await executor.insert(dataKeysHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveDataKeysHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

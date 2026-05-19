@@ -11,6 +11,7 @@ export type DeleteProblemsData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 };
 
 export type DeleteProblemsResponse = { 
@@ -36,6 +37,7 @@ export async function _deleteProblems(
         confirmDeleteAll,
         broadcastAction, 
         userId,
+        draftOrigin = "editor",
     }: DeleteProblemsData,
 ) {
     const response: DeleteProblemsResponse = { success: false, };
@@ -73,6 +75,7 @@ export async function _deleteProblems(
 
         const pendingDeletionInsertData = problemsArr.map(s => ({
             ...s,
+            draftOrigin,
             createdByUserId: userId,
         }));
         

@@ -1,22 +1,26 @@
 import type { SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { problemsDrafts, problems, problemsHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveProblemsHistory({
   previous,
   drafts,
   userId,
+  client,
 }: {
   drafts: typeof problemsDrafts.$inferSelect[]
   previous: typeof problems.$inferSelect[]
   userId?: string | null
+  client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
+    const executor = client || db
     const insertData: typeof problemsHistory.$inferInsert[] = []
 
     for (const c of drafts) {
@@ -34,9 +38,10 @@ export async function _saveProblemsHistory({
       }
 
       const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof problemsHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         problemId,
         scriptId: c?.data?.scriptId ?? "",
         changes: changePayload,
@@ -65,13 +70,17 @@ export async function _saveProblemsHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: problemId,
           entityType: "problem",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -86,7 +95,7 @@ export async function _saveProblemsHistory({
     }
 
     if (insertData.length) {
-      await db.insert(problemsHistory).values(insertData)
+      await executor.insert(problemsHistory).values(insertData)
     }
   } catch (e: any) {
     logger.error(e.message)

@@ -21,6 +21,7 @@ export async function _previewDataKeysRefsImpact({
         });
 
         const dataKeysToEvaluate: typeof byUuid.data = [];
+        const matchUniqueKeysByDataKey: Record<string, string[]> = {};
 
         data.forEach(item => {
             const existing = (
@@ -29,11 +30,20 @@ export async function _previewDataKeysRefsImpact({
             );
             if (!existing?.uniqueKey) return;
 
-            dataKeysToEvaluate.push({
+            const nextDataKey = {
                 ...existing,
                 ...item,
                 uniqueKey: existing.uniqueKey,
-            });
+            };
+
+            dataKeysToEvaluate.push(nextDataKey);
+
+            if (existing.uniqueKey) {
+                matchUniqueKeysByDataKey[existing.uniqueKey] = Array.from(new Set([
+                    existing.uniqueKey,
+                    item.uniqueKey || "",
+                ].filter(Boolean)));
+            }
         });
 
         if (!dataKeysToEvaluate.length) {
@@ -69,6 +79,7 @@ export async function _previewDataKeysRefsImpact({
         return await _updateDataKeysRefs({
             dataKeys: dataKeysToEvaluate,
             dryRun: true,
+            matchUniqueKeysByDataKey,
         });
     } catch (e: any) {
         return {

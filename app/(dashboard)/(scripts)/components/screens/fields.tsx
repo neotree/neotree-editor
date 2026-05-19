@@ -14,6 +14,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
 
@@ -130,21 +131,49 @@ export function Fields({
         defaultValue: '',
         clearOnDefault: true,
     });
+    const [, setCurrentFieldItem] = useQueryState('fieldItem', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
+    const openFieldEditor = useCallback((value: string) => {
+        setCurrentFieldItem('');
+        setCurrentField(value);
+    }, [setCurrentField, setCurrentFieldItem]);
+
+    const closeFieldEditor = useCallback(() => {
+        setCurrentFieldItem('');
+        setCurrentField('');
+    }, [setCurrentField, setCurrentFieldItem]);
+
+    const parsedCurrentFieldIndex = currentField === 'new'
+        ? -1
+        : null;
+    const activeField = currentField === 'new'
+        ? undefined
+        : fields.find((field) => field.fieldId === currentField)
+            || (isNumericQueryValue(currentField) ? fields[Number(currentField)] : undefined);
+    const activeFieldIndex = currentField === 'new'
+        ? -1
+        : fields.findIndex((field) => field.fieldId === currentField);
+    const resolvedFieldIndex = activeFieldIndex >= 0
+        ? activeFieldIndex
+        : (isNumericQueryValue(currentField) ? Number(currentField) : parsedCurrentFieldIndex);
 
     return (
         <>
             <button ref={btnRef} />
 
-            {!!currentField && (
+            {!!currentField && (currentField === 'new' || !!activeField) && (
                 <Field
                     open={!!currentField}
-                    onClose={() => setCurrentField('')}
+                    onClose={closeFieldEditor}
                     form={form}
                     scriptId={scriptId}
                     disabled={disabled}
-                    field={!fields[Number(currentField)] ? undefined : {
-                        data: fields[Number(currentField)],
-                        index: Number(currentField),
+                    field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
+                        data: activeField,
+                        index: resolvedFieldIndex,
                     }}
                 />
             )}
@@ -201,7 +230,7 @@ export function Fields({
                         <Button 
                             className="text-primary border-primary" 
                             variant="outline"
-                            onClick={() => setCurrentField('new')}
+                            onClick={() => openFieldEditor('new')}
                         >
                             <Plus className="h-4 w-4 mr-1" />
                             New field
@@ -246,7 +275,7 @@ export function Fields({
                                     <DropdownMenuContent>
                                         <DropdownMenuItem 
                                             onClick={() => {
-                                                setTimeout(() => setCurrentField(`${rowIndex}`), 0);
+                                                setTimeout(() => openFieldEditor(fields[rowIndex]?.fieldId || `${rowIndex}`), 0);
                                             }}
                                         >
                                             <Edit className="w-4 h-4 mr-2" />

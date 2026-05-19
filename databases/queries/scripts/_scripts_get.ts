@@ -100,7 +100,13 @@ export async function _getScripts(
         // unpublished scripts conditions
         const draftsRes = !returnDraftsIfExist ? [] : await db
             .select({
-                scriptDraft: scriptsDrafts,
+                scriptDraft: {
+                    scriptId: scriptsDrafts.scriptId,
+                    scriptDraftId: scriptsDrafts.scriptDraftId,
+                    hospitalId: scriptsDrafts.hospitalId,
+                    data: scriptsDrafts.data,
+                    createdByUserId: scriptsDrafts.createdByUserId,
+                },
                 hospitalName: hospitals.name,
             })
             .from(scriptsDrafts)
@@ -213,6 +219,10 @@ export async function _getScript(
 
         let draft = (returnDraftIfExists && whereScriptDraftId) ? await db.query.scriptsDrafts.findFirst({
             where: whereScriptDraftId,
+            columns: {
+                data: true,
+                createdByUserId: true,
+            },
         }) : undefined;
 
         let responseData = !draft ? null : {
@@ -234,7 +244,10 @@ export async function _getScript(
             .select({
                 script: scripts,
                 pendingDeletion,
-                draft: scriptsDrafts,
+                draft: {
+                    data: scriptsDrafts.data,
+                    createdByUserId: scriptsDrafts.createdByUserId,
+                },
                 hospitalName: hospitals.name,
             })
             .from(scripts)

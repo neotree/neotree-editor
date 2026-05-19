@@ -17,11 +17,14 @@ export type SaveScriptsResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScripts({ data, broadcastAction, syncSilently, userId, }: {
+export type ScriptDraftOrigin = "editor" | "data_key_sync" | "import" | "other";
+
+export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
+    draftOrigin?: ScriptDraftOrigin;
 }) {
     const response: SaveScriptsResponse = { success: false, };
     const errors = [];
@@ -57,6 +60,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                                 data,
                                 position: data.position,
                                 hospitalId: data.hospitalId,
+                                draftOrigin,
                             }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
 
                         info.query = q.toSQL();
@@ -92,6 +96,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             position: data.position,
                             hospitalId: data.hospitalId,
                             scriptId: published?.scriptId,
+                            draftOrigin,
                             createdByUserId: userId,
                         });
 
