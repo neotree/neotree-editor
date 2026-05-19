@@ -82,6 +82,7 @@ export function useScriptForm(params: UseScriptFormParams) {
       exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
       nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
       nuidSearchFields: formData?.nuidSearchFields || [],
+      eligibilityCriteria: formData?.eligibilityCriteria || null,
       preferences: formData?.preferences || defaultPreferences,
       printSections: formData?.printSections || [],
       printConfig: (formData?.printConfig || scriptPrintConfig) satisfies NonNullable<

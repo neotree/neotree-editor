@@ -27,12 +27,14 @@ export function FieldItems({
   disabled,
   fieldType,
   dataKey,
+  hideManualEntry = false,
   onChange,
 }: {
   disabled: boolean
   items: Item[]
   fieldType: string
   dataKey?: DataKey | null
+  hideManualEntry?: boolean
   onChange: (items: Item[]) => void
 }) {
   const { confirm } = useConfirmModal()
@@ -53,6 +55,7 @@ export function FieldItems({
             setCurrentItemIndex(-1)
             setNewItem(false)
           }}
+          hideManualEntry={hideManualEntry}
           onChange={(data) => {
             if (newItem) {
               onChange([...items, data])
@@ -111,9 +114,11 @@ export function FieldItems({
             {
               name: "Enter Value Manually",
               align: "center",
+              cellClassName: hideManualEntry ? "hidden" : "",
             },
             {
               name: "Manual Value Label",
+              cellClassName: hideManualEntry ? "hidden" : "",
             },
             {
               name: "Exclusive Group",
@@ -175,6 +180,7 @@ function Form({
   allItems,
   fieldType,
   fieldDataKey,
+  hideManualEntry,
   onClose,
   onChange,
 }: {
@@ -182,6 +188,7 @@ function Form({
   allItems: Item[]
   fieldType: string
   fieldDataKey?: DataKey | null
+  hideManualEntry?: boolean
   onClose: () => void
   onChange: (item: Item) => void
 }) {
@@ -225,7 +232,7 @@ function Form({
   const onSave = handleSubmit(async (data) => {
     const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
 
-    if (data.enterValueManually && !manualLabel) {
+    if (!hideManualEntry && data.enterValueManually && !manualLabel) {
       alert({
         title: "Manual value label required",
         message: "Add a label for the manual entry textbox before saving this option.",
@@ -236,7 +243,8 @@ function Form({
 
     const payload = {
       ...data,
-      enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
+      enterValueManually: hideManualEntry ? false : data.enterValueManually,
+      enterValueManuallyLabel: !hideManualEntry && data.enterValueManually ? manualLabel : "",
     }
     onChange(payload)
     onClose()
@@ -342,22 +350,24 @@ function Form({
               </>
             )}
 
-            <Controller
-              control={control}
-              name="enterValueManually"
-              render={({ field: { value, onChange } }) => {
-                return (
-                  <div className="px-4 flex items-center space-x-2">
-                    <Switch id="enterValueManually" checked={value} onCheckedChange={() => onChange(!value)} />
-                    <Label secondary htmlFor="enterValueManually">
-                      Enter value manually if selected
-                    </Label>
-                  </div>
-                )
-              }}
-            />
+            {!hideManualEntry && (
+              <Controller
+                control={control}
+                name="enterValueManually"
+                render={({ field: { value, onChange } }) => {
+                  return (
+                    <div className="px-4 flex items-center space-x-2">
+                      <Switch id="enterValueManually" checked={value} onCheckedChange={() => onChange(!value)} />
+                      <Label secondary htmlFor="enterValueManually">
+                        Enter value manually if selected
+                      </Label>
+                    </div>
+                  )
+                }}
+              />
+            )}
 
-            {enterValueManually && (
+            {!hideManualEntry && enterValueManually && (
               <div className="px-4">
                 <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
                 <Input
