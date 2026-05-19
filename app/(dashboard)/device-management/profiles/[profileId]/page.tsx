@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: { profileId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
 };
 
-export default async function EditMdmProfilePage({ params }: Props) {
+export default async function EditMdmProfilePage({ params, searchParams }: Props) {
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");
@@ -51,7 +52,11 @@ export default async function EditMdmProfilePage({ params }: Props) {
               </Link>
               <span>Edit MDM profile</span>
             </div>
-            <DeviceManagementProfileForm profile={profile.data} />
+            <DeviceManagementProfileForm
+              profile={profile.data}
+              error={typeof searchParams?.error === "string" ? searchParams.error : null}
+              returnTo={`/device-management/profiles/${params.profileId}`}
+            />
           </CardContent>
         </Card>
       </Content>

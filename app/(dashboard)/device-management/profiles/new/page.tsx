@@ -10,7 +10,11 @@ import { DeviceManagementProfileForm } from "../../components/device-management-
 
 export const dynamic = "force-dynamic";
 
-export default async function NewMdmProfilePage() {
+type Props = {
+  searchParams?: { [key: string]: string | string[] | undefined };
+};
+
+export default async function NewMdmProfilePage({ searchParams }: Props) {
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");
@@ -39,7 +43,10 @@ export default async function NewMdmProfilePage() {
               </Link>
               <span>New MDM profile</span>
             </div>
-            <DeviceManagementProfileForm />
+            <DeviceManagementProfileForm
+              error={typeof searchParams?.error === "string" ? searchParams.error : null}
+              returnTo="/device-management/profiles/new"
+            />
           </CardContent>
         </Card>
       </Content>

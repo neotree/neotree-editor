@@ -6,6 +6,7 @@ import { devices } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getUniqueDeviceHash } from '@/databases/queries/devices';
 import { DeviceDetails } from '@/types';
+import { createDeviceAuthSecret } from '@/lib/device-credentials';
 
 export type SaveDevicesData = Omit<typeof devices.$inferInsert, 'deviceHash'> & {
     deviceHash?: string;
@@ -63,7 +64,12 @@ export async function _saveDevices({ data, returnSaved, }: {
 
             for(const d of insertData) {
                 const deviceHash = await _getUniqueDeviceHash(d.deviceId);
-                _insertData.push({ ...d, deviceHash, });
+                _insertData.push({
+                    ...d,
+                    deviceHash,
+                    deviceAuthSecret: d.deviceAuthSecret || createDeviceAuthSecret(),
+                    deviceAuthSecretRotatedAt: d.deviceAuthSecretRotatedAt || new Date(),
+                });
             }
 
             const q = db.insert(devices).values(_insertData);

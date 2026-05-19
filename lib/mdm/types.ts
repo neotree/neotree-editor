@@ -32,4 +32,8 @@ export interface MdmProvider {
   readonly name: MdmProviderName
   getDeviceStatus(mdmDeviceId: string): Promise<MdmDeviceStatus>
   syncDevices(): Promise<MdmDeviceStatus[]>
+  lockDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
+  wipeDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
+  assignKioskPolicy(mdmDeviceId: string, policyId: string): Promise<MdmActionResult>
+  pushApk(mdmDeviceId: string, apk: { apkReleaseId: string; downloadUrl: string }): Promise<MdmActionResult>
 }

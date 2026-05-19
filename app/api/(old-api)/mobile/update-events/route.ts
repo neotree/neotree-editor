@@ -1,27 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
-import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _saveDeviceUpdateEvents } from "@/databases/mutations/device-update-events";
-import { _getDevice } from "@/databases/queries/devices";
+import { authenticateMobileDevice } from "@/lib/mobile-device-auth";
 
 export async function POST(req: NextRequest) {
     try {
         logger.log(`[POST] /api/mobile/update-events`);
 
-        const isAuthorised = await isAuthenticated();
-        if (!isAuthorised.yes) return NextResponse.json({ errors: ["Unauthorised"] });
-
-        const body = await req.json();
+        const rawBody = await req.text();
+        const body = rawBody ? JSON.parse(rawBody) : {};
 
         const deviceId = body?.deviceId || "";
         const eventType = body?.eventType || "";
 
         if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] });
         if (!eventType) return NextResponse.json({ errors: ["Missing eventType"] });
-        const deviceRes = await _getDevice({ deviceId });
-        if (deviceRes.errors?.length) return NextResponse.json({ errors: deviceRes.errors, data: null });
-        if (!deviceRes.data) return NextResponse.json({ errors: ["Device not registered"], data: null });
+        const auth = await authenticateMobileDevice(req, deviceId, { body: rawBody });
+        if (!auth.ok) return NextResponse.json({ errors: auth.errors, data: null }, { status: auth.status });
 
         const res = await _saveDeviceUpdateEvents({
             returnSaved: true,

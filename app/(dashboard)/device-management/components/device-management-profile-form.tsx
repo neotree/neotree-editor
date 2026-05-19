@@ -4,13 +4,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { mdmProviderProfiles } from "@/databases/pg/schema";
+import { maskSecret } from "@/lib/mdm";
 
 type Profile = typeof mdmProviderProfiles.$inferSelect;
 
-export function DeviceManagementProfileForm({ profile }: { profile?: Profile | null }) {
+export function DeviceManagementProfileForm({
+  profile,
+  error,
+  returnTo,
+}: {
+  profile?: Profile | null;
+  error?: string | null;
+  returnTo?: string;
+}) {
   return (
     <form action={saveMdmProviderProfileFromForm} className="p-4 space-y-4">
       <input type="hidden" name="profileId" value={profile?.profileId || ""} />
+      <input type="hidden" name="returnTo" value={returnTo || ""} />
+
+      {error ? (
+        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          {error}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-1">
@@ -31,7 +47,16 @@ export function DeviceManagementProfileForm({ profile }: { profile?: Profile | n
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="mdm-api-key">API token</Label>
-          <Input id="mdm-api-key" name="apiKey" type="password" defaultValue={profile?.apiKey || ""} placeholder="Headwind API token" />
+          <Input
+            id="mdm-api-key"
+            name="apiKey"
+            type="password"
+            defaultValue=""
+            placeholder={profile?.apiKey ? `Current token: ${maskSecret(profile.apiKey)}` : "Headwind API token"}
+          />
+          {profile?.apiKey ? (
+            <p className="text-xs text-muted-foreground">Leave blank to keep the current token.</p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label htmlFor="mdm-kiosk-policy">Kiosk policy</Label>

@@ -15,7 +15,14 @@ import {
 import {
   _linkDeviceToMdm,
   _saveMdmProviderProfile,
+  _unlinkDeviceFromMdm,
 } from "@/databases/mutations/device-management"
+
+function formErrorRedirect(formData: FormData, message: string) {
+  const returnTo = `${formData.get("returnTo") || "/device-management"}`
+  const separator = returnTo.includes("?") ? "&" : "?"
+  redirect(`${returnTo}${separator}error=${encodeURIComponent(message)}`)
+}
 
 export const getDeviceManagementOverview: typeof _getDeviceManagementOverview = async (...args) => {
   try {
@@ -73,16 +80,26 @@ export async function saveMdmProviderProfileFromForm(formData: FormData) {
   try {
     await isAllowed()
     const settingsRaw = `${formData.get("settings") || ""}`.trim()
-    const settings = settingsRaw ? JSON.parse(settingsRaw) : {}
+    let settings = {}
+    try {
+      settings = settingsRaw ? JSON.parse(settingsRaw) : {}
+    } catch {
+      formErrorRedirect(formData, "Provider settings must be valid JSON")
+    }
+
+    const profileId = `${formData.get("profileId") || ""}` || undefined
+    const apiKeyInput = `${formData.get("apiKey") || ""}`.trim()
+    const existing = profileId ? await _getMdmProviderProfile(profileId) : null
+    const apiKey = apiKeyInput || existing?.data?.apiKey || null
 
     const result = await _saveMdmProviderProfile({
-      profileId: `${formData.get("profileId") || ""}` || undefined,
+      profileId,
       name: `${formData.get("name") || ""}`,
       provider: "headwind",
       countryISO: `${formData.get("countryISO") || ""}`,
       hospitalId: `${formData.get("hospitalId") || ""}` || null,
       baseUrl: `${formData.get("baseUrl") || ""}`,
-      apiKey: `${formData.get("apiKey") || ""}` || null,
+      apiKey,
       defaultKioskPolicy: `${formData.get("defaultKioskPolicy") || ""}` || null,
       settings,
       isEnabled: formData.get("isEnabled") !== "off",
@@ -91,9 +108,13 @@ export async function saveMdmProviderProfileFromForm(formData: FormData) {
     if (result.success) {
       revalidatePath("/device-management")
       shouldRedirect = true
+    } else {
+      formErrorRedirect(formData, result.errors?.[0] || "Could not save MDM profile")
     }
   } catch (e: any) {
+    if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
     logger.error("saveMdmProviderProfileFromForm ERROR", e.message)
+    formErrorRedirect(formData, e.message || "Could not save MDM profile")
   }
 
   if (shouldRedirect) redirect("/device-management")
@@ -105,6 +126,7 @@ export async function linkDeviceToMdmFromForm(formData: FormData) {
   try {
     await isAllowed()
     const result = await _linkDeviceToMdm({
+      linkId: `${formData.get("linkId") || ""}` || undefined,
       deviceId: `${formData.get("deviceId") || ""}`,
       provider: "headwind",
       profileId: `${formData.get("profileId") || ""}` || null,
@@ -120,10 +142,30 @@ export async function linkDeviceToMdmFromForm(formData: FormData) {
     if (result.success) {
       revalidatePath("/device-management")
       shouldRedirect = true
+    } else {
+      formErrorRedirect(formData, result.errors?.[0] || "Could not save device MDM link")
     }
   } catch (e: any) {
+    if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
     logger.error("linkDeviceToMdmFromForm ERROR", e.message)
+    formErrorRedirect(formData, e.message || "Could not save device MDM link")
   }
 
   if (shouldRedirect) redirect("/device-management")
+}
+
+export async function unlinkDeviceFromMdmFromForm(formData: FormData) {
+  try {
+    await isAllowed()
+    const linkId = `${formData.get("linkId") || ""}`
+    const result = await _unlinkDeviceFromMdm(linkId)
+    if (!result.success) formErrorRedirect(formData, result.errors?.[0] || "Could not unlink device")
+    revalidatePath("/device-management")
+  } catch (e: any) {
+    if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
+    logger.error("unlinkDeviceFromMdmFromForm ERROR", e.message)
+    formErrorRedirect(formData, e.message || "Could not unlink device")
+  }
+
+  redirect("/device-management?section=devices")
 }

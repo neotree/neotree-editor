@@ -47,7 +47,12 @@ export default async function NewDeviceMdmLinkPage({ searchParams }: Props) {
               </Link>
               <span>Link device to MDM</span>
             </div>
-            <DeviceMdmLinkForm profiles={profiles.data} initialDeviceId={initialDeviceId} />
+            <DeviceMdmLinkForm
+              profiles={profiles.data}
+              initialDeviceId={initialDeviceId}
+              error={typeof searchParams?.error === "string" ? searchParams.error : null}
+              returnTo={`/device-management/links/new${initialDeviceId ? `?deviceId=${encodeURIComponent(initialDeviceId)}` : ""}`}
+            />
           </CardContent>
         </Card>
       </Content>
