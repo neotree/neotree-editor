@@ -3,7 +3,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
-import { _getFileByFileId, _getFiles, _getFullFileByFileId } from "@/databases/queries/files";
+import { _getFileByFileId, _getFiles, _getFullFileByFileId, _getReferencedFiles } from "@/databases/queries/files";
 import logger from "@/lib/logger";
 import { parseJSON } from "@/lib/parse-json";
 import { parseNumber } from "@/lib/parseNumber";
@@ -13,6 +13,8 @@ import queryString from "query-string";
 import { _getSites } from "@/databases/queries/sites";
 
 export const getFiles: typeof _getFiles = _getFiles;
+
+export const getReferencedFiles: typeof _getReferencedFiles = _getReferencedFiles;
 
 export async function uploadFile(
     formData: FormData,
