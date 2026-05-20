@@ -64,6 +64,7 @@ export function ScriptForm(props: Props) {
         getDefaultNuidSearchFields,
         getDefaultScreenReviewConfigurations,
         onSubmit,
+        saveDraft,
     } = form;
 
     const { mode } = useAppContext();
@@ -230,7 +231,13 @@ export function ScriptForm(props: Props) {
                             disabled={disabled}
                             scriptId={props.formData?.scriptId}
                             value={eligibilityCriteria || null}
-                            onChange={(data) => setValue('eligibilityCriteria', data, { shouldDirty: true, })}
+                            onChange={async (data) => {
+                                setValue('eligibilityCriteria', data, { shouldDirty: true, });
+                                return await saveDraft({
+                                    ...form.getValues(),
+                                    eligibilityCriteria: data,
+                                });
+                            }}
                         />
                     </div>
 

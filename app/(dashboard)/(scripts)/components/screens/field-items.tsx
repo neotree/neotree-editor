@@ -27,6 +27,7 @@ export function FieldItems({
   disabled,
   fieldType,
   dataKey,
+  allowCustomKey = false,
   hideManualEntry = false,
   onChange,
 }: {
@@ -34,6 +35,7 @@ export function FieldItems({
   items: Item[]
   fieldType: string
   dataKey?: DataKey | null
+  allowCustomKey?: boolean
   hideManualEntry?: boolean
   onChange: (items: Item[]) => void
 }) {
@@ -56,6 +58,7 @@ export function FieldItems({
             setNewItem(false)
           }}
           hideManualEntry={hideManualEntry}
+          allowCustomKey={allowCustomKey}
           onChange={(data) => {
             if (newItem) {
               onChange([...items, data])
@@ -180,6 +183,7 @@ function Form({
   allItems,
   fieldType,
   fieldDataKey,
+  allowCustomKey,
   hideManualEntry,
   onClose,
   onChange,
@@ -188,6 +192,7 @@ function Form({
   allItems: Item[]
   fieldType: string
   fieldDataKey?: DataKey | null
+  allowCustomKey?: boolean
   hideManualEntry?: boolean
   onClose: () => void
   onChange: (item: Item) => void
@@ -260,30 +265,47 @@ function Form({
           </SheetHeader>
 
           <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-            <div className="px-4">
+            <div className="px-4 space-y-2">
               <Label htmlFor="value">Key *</Label>
               <Controller
                 control={control}
                 name="value"
+                rules={{ required: "Key is required." }}
                 render={({ field: { value, onChange } }) => {
                   return (
-                    <SelectDataKey
-                      value={`${value || ""}`}
-                      disabled={false}
-                      onChange={([item]) => {
-                        onChange(item.name)
-                        setValue("keyId", item?.uniqueKey, { shouldDirty: true })
-                        setValue("label", item.label || "", { shouldDirty: true })
-                      }}
-                      filterDataKeys={(k) => {
-                        const opts = fieldDataKey?.options || []
-                        if (!fieldDataKey) return true
-                        return opts.includes(k.uniqueKey)
-                      }}
-                    />
+                    <>
+                      <SelectDataKey
+                        value={`${value || ""}`}
+                        disabled={false}
+                        placeholder={allowCustomKey ? "Select existing key" : "Select key"}
+                        onChange={([item]) => {
+                          onChange(item.name)
+                          setValue("keyId", item?.uniqueKey, { shouldDirty: true })
+                          setValue("label", item.label || "", { shouldDirty: true })
+                        }}
+                        filterDataKeys={(k) => {
+                          const opts = fieldDataKey?.options || []
+                          if (!fieldDataKey) return true
+                          return opts.includes(k.uniqueKey)
+                        }}
+                      />
+                      {allowCustomKey && (
+                        <Input
+                          id="value"
+                          value={`${value || ""}`}
+                          placeholder="Or enter a new key"
+                          error={!!errors.value}
+                          onChange={(event) => {
+                            onChange(event.target.value)
+                            setValue("keyId", undefined, { shouldDirty: true })
+                          }}
+                        />
+                      )}
+                    </>
                   )
                 }}
               />
+              {!!errors.value && <p className="text-xs text-destructive">{`${errors.value.message || ""}`}</p>}
             </div>
 
             <div className="px-4">

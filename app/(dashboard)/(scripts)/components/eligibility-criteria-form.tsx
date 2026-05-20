@@ -21,7 +21,7 @@ type Props = {
   disabled: boolean
   scriptId?: string
   value?: EligibilityCriteria | null
-  onChange: (value: EligibilityCriteria | null) => void
+  onChange: (value: EligibilityCriteria | null) => void | boolean | Promise<void | boolean>
 }
 
 type KeyOption = {
@@ -43,6 +43,13 @@ const criteriaTypes: { value: EligibilityCriteria["criteria_type"]; label: strin
   { value: "yesno", label: "Yes/No" },
 ]
 
+const feasibilityPromptKey = "feasibilityprompt"
+const alternativeActivationCondition = `$${feasibilityPromptKey}="No"`
+const yesNoItems: NonNullable<EligibilityCriteria["items"]> = [
+  { itemId: "yes", value: "yes", label: "Yes" },
+  { itemId: "no", value: "no", label: "No" },
+]
+
 export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const { keys, loadKeys, keysLoading } = useScriptsContext()
@@ -60,8 +67,8 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
   const hasCriteria = !!value?.criteria_type && !!value?.criteria_label
 
   useEffect(() => {
-    if (open && scriptId) loadKeys()
-  }, [loadKeys, open, scriptId])
+    if (open) loadKeys()
+  }, [loadKeys, open])
 
   return (
     <>
@@ -82,9 +89,9 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
           keyOptionsError={safeKeys.error}
           keysLoading={keysLoading}
           onClose={() => setOpen(false)}
-          onChange={(nextValue) => {
-            onChange(nextValue)
-            setOpen(false)
+          onChange={async (nextValue) => {
+            const saved = await onChange(nextValue)
+            if (saved !== false) setOpen(false)
           }}
         />
       )}
@@ -105,11 +112,12 @@ function Form({
   keyOptionsError: string
   keysLoading: boolean
   onClose: () => void
-  onChange: (value: EligibilityCriteria) => void
+  onChange: (value: EligibilityCriteria) => void | boolean | Promise<void | boolean>
 }) {
   const { alert } = useAlertModal()
   const [conditionCursor, setConditionCursor] = useState((value?.criteria_condition || "").length)
   const [conditionError, setConditionError] = useState("")
+  const [hasAlternative, setHasAlternative] = useState(!!(value?.feasibilityprompt || value?.alternative_criteria_condition))
   const {
     control,
     register,
@@ -128,6 +136,17 @@ function Form({
       max_date: value?.max_date || "",
       min_date_current: value?.min_date_current || false,
       max_date_current: value?.max_date_current || false,
+      alternative_activation_prompt: value?.feasibilityprompt?.criteria_label || value?.alternative_activation_prompt || "",
+      alternative_activation_condition: alternativeActivationCondition,
+      alternative_criteria_type: value?.alternative_criteria_type,
+      alternative_criteria_label: value?.alternative_criteria_label || "",
+      alternative_auto_fills: value?.alternative_auto_fills || "",
+      alternative_criteria_condition: value?.alternative_criteria_condition || "",
+      alternative_items: value?.alternative_items || [],
+      alternative_min_date: value?.alternative_min_date || "",
+      alternative_max_date: value?.alternative_max_date || "",
+      alternative_min_date_current: value?.alternative_min_date_current || false,
+      alternative_max_date_current: value?.alternative_max_date_current || false,
     },
   })
 
@@ -140,9 +159,22 @@ function Form({
   const maxDate = watch("max_date") || ""
   const minDateCurrent = watch("min_date_current")
   const maxDateCurrent = watch("max_date_current")
+  const alternativeActivationPrompt = watch("alternative_activation_prompt") || ""
+  const alternativeCriteriaType = watch("alternative_criteria_type")
+  const alternativeCriteriaLabel = watch("alternative_criteria_label") || ""
+  const alternativeAutoFills = watch("alternative_auto_fills") || ""
+  const alternativeCondition = watch("alternative_criteria_condition") || ""
+  const alternativeItems = watch("alternative_items") || []
+  const alternativeMinDate = watch("alternative_min_date") || ""
+  const alternativeMaxDate = watch("alternative_max_date") || ""
+  const alternativeMinDateCurrent = watch("alternative_min_date_current")
+  const alternativeMaxDateCurrent = watch("alternative_max_date_current")
   const dateInputType = criteriaType === "datetime" ? "datetime-local" : "date"
   const usesOptions = criteriaType === "dropdown" || criteriaType === "yesno"
   const usesDates = criteriaType === "date" || criteriaType === "datetime"
+  const alternativeDateInputType = alternativeCriteriaType === "datetime" ? "datetime-local" : "date"
+  const alternativeUsesOptions = alternativeCriteriaType === "dropdown" || alternativeCriteriaType === "yesno"
+  const alternativeUsesDates = alternativeCriteriaType === "date" || alternativeCriteriaType === "datetime"
   const currentPayload = useMemo(
     () =>
       normalizeCriteriaPayload(
@@ -156,24 +188,95 @@ function Form({
           max_date: maxDate,
           min_date_current: !!minDateCurrent,
           max_date_current: !!maxDateCurrent,
+          alternative_activation_prompt: hasAlternative ? alternativeActivationPrompt : "",
+          alternative_activation_condition: hasAlternative ? alternativeActivationCondition : "",
+          alternative_criteria_type: hasAlternative ? alternativeCriteriaType : undefined,
+          alternative_criteria_label: hasAlternative ? alternativeCriteriaLabel : "",
+          alternative_auto_fills: hasAlternative ? alternativeAutoFills : "",
+          alternative_criteria_condition: hasAlternative ? alternativeCondition : "",
+          alternative_items: hasAlternative ? alternativeItems : [],
+          alternative_min_date: hasAlternative ? alternativeMinDate : "",
+          alternative_max_date: hasAlternative ? alternativeMaxDate : "",
+          alternative_min_date_current: hasAlternative ? !!alternativeMinDateCurrent : false,
+          alternative_max_date_current: hasAlternative ? !!alternativeMaxDateCurrent : false,
         },
         usesOptions,
         usesDates,
+        hasAlternative,
+        alternativeUsesOptions,
+        alternativeUsesDates,
       ),
-    [autoFills, condition, criteriaLabel, criteriaType, items, maxDate, maxDateCurrent, minDate, minDateCurrent, usesDates, usesOptions],
+    [
+      alternativeActivationPrompt,
+      alternativeAutoFills,
+      alternativeCondition,
+      alternativeCriteriaLabel,
+      alternativeCriteriaType,
+      alternativeItems,
+      alternativeMaxDate,
+      alternativeMaxDateCurrent,
+      alternativeMinDate,
+      alternativeMinDateCurrent,
+      alternativeUsesDates,
+      alternativeUsesOptions,
+      autoFills,
+      condition,
+      criteriaLabel,
+      criteriaType,
+      hasAlternative,
+      items,
+      maxDate,
+      maxDateCurrent,
+      minDate,
+      minDateCurrent,
+      usesDates,
+      usesOptions,
+    ],
   )
   const originalPayload = useMemo(
-    () => normalizeCriteriaPayload(value, isOptionsType(value?.criteria_type), isDateType(value?.criteria_type)),
+    () =>
+      normalizeCriteriaPayload(
+        value,
+        isOptionsType(value?.criteria_type),
+        isDateType(value?.criteria_type),
+        !!(value?.feasibilityprompt || value?.alternative_criteria_condition),
+        isOptionsType(value?.alternative_criteria_type),
+        isDateType(value?.alternative_criteria_type),
+      ),
     [value],
   )
   const hasRequiredFields = !!currentPayload.criteria_type && !!currentPayload.criteria_label && !!currentPayload.criteria_condition
+  const hasRequiredAlternativeFields =
+    !hasAlternative ||
+    (!!currentPayload.feasibilityprompt?.criteria_label &&
+      !!currentPayload.alternative_criteria_type &&
+      !!currentPayload.alternative_criteria_label &&
+      !!currentPayload.alternative_criteria_condition)
   const invalidConditionKeys = useMemo(
-    () => getInvalidConditionKeys(condition, keyOptions),
-    [condition, keyOptions],
+    () => (keysLoading || !keyOptions.length ? [] : getInvalidConditionKeys(condition, keyOptions)),
+    [condition, keyOptions, keysLoading],
   )
-  const hasValidConditionKeys = !invalidConditionKeys.length
+  const invalidAlternativeConditionKeys = useMemo(
+    () => (keysLoading || !keyOptions.length ? [] : getInvalidConditionKeys(alternativeCondition, keyOptions)),
+    [alternativeCondition, keyOptions, keysLoading],
+  )
+  const incompleteCondition = useMemo(() => hasIncompleteExpression(condition), [condition])
+  const incompleteAlternativeCondition = useMemo(
+    () => (hasAlternative ? hasIncompleteExpression(alternativeCondition) : false),
+    [alternativeCondition, hasAlternative],
+  )
+  const hasValidConditionKeys =
+    !invalidConditionKeys.length && !invalidAlternativeConditionKeys.length
   const hasChanged = JSON.stringify(currentPayload) !== JSON.stringify(originalPayload)
-  const saveDisabled = !hasRequiredFields || !hasValidConditionKeys || !!conditionError || (!!value && !hasChanged)
+  const saveDisabled =
+    !hasRequiredFields ||
+    !hasRequiredAlternativeFields ||
+    !hasValidConditionKeys ||
+    incompleteCondition ||
+    incompleteAlternativeCondition ||
+    keysLoading ||
+    !!conditionError ||
+    (!!value && !hasChanged)
 
   const activeConditionToken = useMemo(() => {
     return getConditionTokenAtCursor(condition, conditionCursor)
@@ -182,7 +285,7 @@ function Form({
     if (!activeConditionToken) return []
     const token = activeConditionToken.token
     if (token.toLowerCase() === "self") return []
-    if (keyOptions.some((option) => option.value.toLowerCase() === token.toLowerCase())) return []
+    if (token.length > 3 && keyOptions.some((option) => option.value.toLowerCase() === token.toLowerCase())) return []
     return sortKeyMatches(keyOptions, token).slice(0, 8)
   }, [activeConditionToken, keyOptions])
   const showNoConditionMatches = !!(
@@ -192,9 +295,11 @@ function Form({
     !conditionMatches.length
   )
 
-  const save = handleSubmit((data) => {
+  const save = handleSubmit(async (data) => {
     try {
-      onChange(normalizeCriteriaPayload(data, usesOptions, usesDates))
+      return await onChange(
+        normalizeCriteriaPayload(data, usesOptions, usesDates, hasAlternative, alternativeUsesOptions, alternativeUsesDates),
+      )
     } catch (error: any) {
       alert({
         title: "Eligibility criteria could not be saved",
@@ -225,8 +330,7 @@ function Form({
                     onChange(nextValue)
                     if (nextValue === "yesno" && !items.length) {
                       setValue("items", [
-                        { itemId: "yes", value: "yes", label: "Yes" },
-                        { itemId: "no", value: "no", label: "No" },
+                        ...yesNoItems,
                       ], { shouldDirty: true })
                     }
                   }}
@@ -321,6 +425,10 @@ function Form({
               <p className="text-xs text-destructive">{conditionError}</p>
             )}
 
+            {incompleteCondition && (
+              <p className="text-xs text-destructive">Eligibility criteria needs a value on the right side of the expression.</p>
+            )}
+
             {!!invalidConditionKeys.length && (
               <p className="text-xs text-destructive">
                 Unknown key{invalidConditionKeys.length === 1 ? "" : "s"}: {invalidConditionKeys.join(", ")}
@@ -363,7 +471,14 @@ function Form({
               control={control}
               name="items"
               render={({ field: { value, onChange } }) => (
-                <FieldItems disabled={false} items={value || []} fieldType="dropdown" hideManualEntry onChange={onChange} />
+                <FieldItems
+                  disabled={false}
+                  items={value || []}
+                  fieldType="dropdown"
+                  allowCustomKey
+                  hideManualEntry
+                  onChange={onChange}
+                />
               )}
             />
           )}
@@ -388,6 +503,174 @@ function Form({
               />
             </div>
           )}
+
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label>Alternative criteria</Label>
+                <p className="text-xs text-muted-foreground">Use this when the original criteria cannot be assessed.</p>
+              </div>
+              <Switch
+                checked={hasAlternative}
+                onCheckedChange={(checked) => setHasAlternative(checked)}
+              />
+            </div>
+
+            {hasAlternative && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="alternative_activation_prompt">Feasibility prompt *</Label>
+                  <Input
+                    id="alternative_activation_prompt"
+                    placeholder="Is date of birth known?"
+                    {...register("alternative_activation_prompt", { required: "Feasibility prompt is required." })}
+                    error={!!errors.alternative_activation_prompt}
+                  />
+                  {!!errors.alternative_activation_prompt && (
+                    <p className="mt-1 text-xs text-destructive">{errors.alternative_activation_prompt.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="alternative_criteria_type">Alternative criteria type *</Label>
+                  <Controller
+                    control={control}
+                    name="alternative_criteria_type"
+                    render={({ field: { value, onChange } }) => (
+                      <Select
+                        value={value}
+                        onValueChange={(nextValue: EligibilityCriteria["criteria_type"]) => {
+                          onChange(nextValue)
+                          if (nextValue === "yesno" && !alternativeItems.length) {
+                            setValue("alternative_items", [
+                              ...yesNoItems,
+                            ], { shouldDirty: true })
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {criteriaTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="alternative_criteria_label">Alternative label *</Label>
+                  <Input
+                    id="alternative_criteria_label"
+                    {...register("alternative_criteria_label", { required: "Alternative label is required." })}
+                    error={!!errors.alternative_criteria_label}
+                  />
+                  {!!errors.alternative_criteria_label && (
+                    <p className="mt-1 text-xs text-destructive">{errors.alternative_criteria_label.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="alternative_auto_fills">Alternative criteria auto fills</Label>
+                  <ReactSelect
+                    isClearable
+                    isLoading={keysLoading}
+                    placeholder="Search script key to fill"
+                    options={keyOptions}
+                    value={keyOptions.find((option) => option.value === alternativeAutoFills) || null}
+                    onChange={(option) => {
+                      const selected = option as KeyOption | null
+                      if (!selected) {
+                        setValue("alternative_auto_fills", "", { shouldDirty: true })
+                        return
+                      }
+
+                      const selectedType = getSupportedCriteriaType(selected.dataType)
+                      if (!selectedType) {
+                        alert({
+                          title: "Unsupported auto-fill key type",
+                          message: `The selected key type "${selected.dataType || "unknown"}" is not yet supported for eligibility criteria.`,
+                          variant: "info",
+                        })
+                        return
+                      }
+
+                      setValue("alternative_auto_fills", selected.value, { shouldDirty: true })
+                      setValue("alternative_criteria_type", selectedType, { shouldDirty: true })
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="alternative_criteria_condition">Alternative eligibility criteria *</Label>
+                  <Textarea
+                    id="alternative_criteria_condition"
+                    rows={3}
+                    placeholder="$self>=30"
+                    {...register("alternative_criteria_condition", { required: "Alternative eligibility criteria is required." })}
+                  />
+                  {!!errors.alternative_criteria_condition && (
+                    <p className="mt-1 text-xs text-destructive">{errors.alternative_criteria_condition.message}</p>
+                  )}
+                  {incompleteAlternativeCondition && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Alternative eligibility criteria needs a value on the right side of the expression.
+                    </p>
+                  )}
+                  {!!invalidAlternativeConditionKeys.length && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Unknown key{invalidAlternativeConditionKeys.length === 1 ? "" : "s"}: {invalidAlternativeConditionKeys.join(", ")}
+                    </p>
+                  )}
+                </div>
+
+                {alternativeUsesOptions && (
+                  <Controller
+                    control={control}
+                    name="alternative_items"
+                    render={({ field: { value, onChange } }) => (
+                      <FieldItems
+                        disabled={false}
+                        items={value || []}
+                        fieldType="dropdown"
+                        allowCustomKey
+                        hideManualEntry
+                        onChange={onChange}
+                      />
+                    )}
+                  />
+                )}
+
+                {alternativeUsesDates && (
+                  <div className="space-y-4">
+                    <DateLimit
+                      id="alternative_min_date"
+                      label="Alternative min date"
+                      inputType={alternativeDateInputType}
+                      current={!!alternativeMinDateCurrent}
+                      register={register}
+                      onToggle={(checked) => setValue("alternative_min_date_current", checked, { shouldDirty: true })}
+                    />
+                    <DateLimit
+                      id="alternative_max_date"
+                      label="Alternative max date"
+                      inputType={alternativeDateInputType}
+                      current={!!alternativeMaxDateCurrent}
+                      register={register}
+                      onToggle={(checked) => setValue("alternative_max_date_current", checked, { shouldDirty: true })}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-x-2 border-t border-t-border px-4 py-2">
@@ -415,7 +698,7 @@ function DateLimit({
   register,
   onToggle,
 }: {
-  id: "min_date" | "max_date"
+  id: "min_date" | "max_date" | "alternative_min_date" | "alternative_max_date"
   label: string
   inputType: "date" | "datetime-local"
   current: boolean
@@ -498,6 +781,27 @@ function getInvalidConditionKeys(condition: string, keyOptions: KeyOption[]) {
   })
 }
 
+function hasIncompleteExpression(condition: string) {
+  const trimmed = condition.trim()
+  if (!trimmed) return false
+  if (/\b(?:and|or)\s*$/i.test(trimmed)) return true
+
+  const segments = condition
+    .split(/\b(?:and|or)\b/i)
+    .map((segment) => segment.trim())
+
+  return segments.some((segment) => {
+    if (!segment) return true
+
+    const match = segment.match(/^(.*?)\s*(>=|<=|!=|==|=|>|<)\s*(.*)$/)
+    if (!match) return true
+
+    const leftSide = (match[1] || "").trim()
+    const rightSide = (match[3] || "").trim()
+    return !leftSide || !rightSide || rightSide === "'" || rightSide === '"' || rightSide === "`"
+  })
+}
+
 function sortKeyMatches(options: KeyOption[], token: string) {
   const normalizedToken = token.toLowerCase()
   const matches = options.filter((option) => {
@@ -554,6 +858,9 @@ function normalizeCriteriaPayload(
   data: EligibilityCriteria | null,
   usesOptions: boolean,
   usesDates: boolean,
+  hasAlternative = false,
+  alternativeUsesOptions = false,
+  alternativeUsesDates = false,
 ): EligibilityCriteria {
   const payload: EligibilityCriteria = {
     criteria_type: data?.criteria_type || "date",
@@ -570,5 +877,30 @@ function normalizeCriteriaPayload(
     payload.max_date_current = !!data?.max_date_current
   }
 
+  if (hasAlternative) {
+    payload.feasibilityprompt = {
+      criteria_type: "yesno",
+      criteria_label: getFeasibilityPromptLabel(data),
+      items: yesNoItems,
+    }
+    payload.alternative_activation_condition = alternativeActivationCondition
+    payload.alternative_criteria_type = data?.alternative_criteria_type
+    payload.alternative_criteria_label = data?.alternative_criteria_label?.trim() || ""
+    payload.alternative_auto_fills = data?.alternative_auto_fills?.trim() || ""
+    payload.alternative_criteria_condition = data?.alternative_criteria_condition?.trim() || ""
+
+    if (alternativeUsesOptions) payload.alternative_items = data?.alternative_items || []
+    if (alternativeUsesDates) {
+      payload.alternative_min_date = data?.alternative_min_date_current ? "" : data?.alternative_min_date || ""
+      payload.alternative_max_date = data?.alternative_max_date_current ? "" : data?.alternative_max_date || ""
+      payload.alternative_min_date_current = !!data?.alternative_min_date_current
+      payload.alternative_max_date_current = !!data?.alternative_max_date_current
+    }
+  }
+
   return payload
+}
+
+function getFeasibilityPromptLabel(data: EligibilityCriteria | null) {
+  return (data?.feasibilityprompt?.criteria_label || data?.alternative_activation_prompt || "").trim()
 }
