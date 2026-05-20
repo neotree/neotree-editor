@@ -35,17 +35,10 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
         const existingDiagnosisIds = Array.from(new Set(
             data.map((item) => item.diagnosisId).filter((id): id is string => !!id)
         ));
-        const referencedScriptIds = Array.from(new Set(
-            data.map((item) => item.scriptId).filter((id): id is string => !!id)
-        ));
 
         const [
             drafts,
             publishedDiagnoses,
-            publishedScripts,
-            scriptDraftsRows,
-            maxPublishedDiagnosis,
-            maxDraftDiagnosis,
         ] = await Promise.all([
             existingDiagnosisIds.length
                 ? executor.query.diagnosesDrafts.findMany({
@@ -57,33 +50,10 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     where: inArray(diagnoses.diagnosisId, existingDiagnosisIds),
                 })
                 : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scripts.findMany({
-                    where: inArray(scripts.scriptId, referencedScriptIds),
-                    columns: { scriptId: true, },
-                })
-                : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scriptsDrafts.findMany({
-                    where: inArray(scriptsDrafts.scriptDraftId, referencedScriptIds),
-                    columns: { scriptDraftId: true, },
-                })
-                : Promise.resolve([]),
-            executor.query.diagnoses.findFirst({
-                columns: { position: true, },
-                orderBy: desc(diagnoses.position),
-            }),
-            executor.query.diagnosesDrafts.findFirst({
-                columns: { position: true, },
-                orderBy: desc(diagnosesDrafts.position),
-            }),
         ]);
 
         const draftsById = new Map(drafts.map((draft) => [draft.diagnosisDraftId, draft]));
         const publishedDiagnosesById = new Map(publishedDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis]));
-        const publishedScriptIds = new Set(publishedScripts.map((script) => script.scriptId));
-        const scriptDraftIds = new Set(scriptDraftsRows.map((draft) => draft.scriptDraftId).filter(Boolean));
-        let nextPosition = Math.max(0, maxPublishedDiagnosis?.position || 0, maxDraftDiagnosis?.position || 0) + 1;
 
         let index = 0;
         for (const { diagnosisId: itemDiagnosisId, ...item } of data) {
@@ -117,8 +87,17 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            position = nextPosition;
-                            nextPosition++;
+                            const diagnosis = await db.query.diagnoses.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(diagnoses.position),
+                            });
+
+                            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(diagnosesDrafts.position),
+                            });
+
+                            position = Math.max(0, diagnosis?.position || 0, diagnosisDraft?.position || 0) + 1;
                         }
 
                         const data = {
@@ -130,14 +109,21 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraftId = scriptDraftIds.has(data.scriptId) ? data.scriptId : undefined;
-                            const publishedScriptId = publishedScriptIds.has(data.scriptId) ? data.scriptId : undefined;
+                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
+                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
+                                columns: { scriptDraftId: true, },
+                            });
 
-                            if (scriptDraftId || publishedScriptId) {
+                            const publishedScript = await db.query.scripts.findFirst({
+                                where: eq(scripts.scriptId, data.scriptId),
+                                columns: { scriptId: true, },
+                            });
+
+                            if (scriptDraft || publishedScript) {
                                 const q = executor.insert(diagnosesDrafts).values({
                                     data,
-                                    scriptId: publishedScriptId,
-                                    scriptDraftId,
+                                    scriptId: publishedScript?.scriptId,
+                                    scriptDraftId: scriptDraft?.scriptDraftId,
                                     diagnosisDraftId: diagnosisId,
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
@@ -151,8 +137,8 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                                 draftsById.set(diagnosisId, {
                                     diagnosisDraftId: diagnosisId,
                                     diagnosisId: published?.diagnosisId,
-                                    scriptId: publishedScriptId || null,
-                                    scriptDraftId: scriptDraftId || null,
+                                    scriptId: publishedScript?.scriptId || null,
+                                    scriptDraftId: scriptDraft?.scriptDraftId || null,
                                     createdByUserId: userId || null,
                                     data,
                                     position: data.position || null,
