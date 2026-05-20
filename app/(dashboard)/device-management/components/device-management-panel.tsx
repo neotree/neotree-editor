@@ -4,12 +4,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable } from "@/components/data-table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs } from "@/components/tabs"
 import type { _getDeviceManagementOverview } from "@/databases/queries/device-management"
 import { maskSecret } from "@/lib/mdm"
 import { PlusIcon } from "lucide-react"
 import Link from "next/link"
-import { useQueryState } from "nuqs"
+import { useSearchParams } from "next/navigation"
 import { DeviceManagementRowActions } from "./device-management-row-actions"
 
 type Overview = Awaited<ReturnType<typeof _getDeviceManagementOverview>>["data"]
@@ -30,17 +30,21 @@ function enrollmentBadgeVariant(status?: string | null) {
 
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const { profiles, devices } = overview
-  const [section, setSection] = useQueryState("section", { defaultValue: "profiles" })
+  const searchParams = useSearchParams()
+  const section = searchParams.get("section")
   const activeSection = section === "devices" ? "devices" : "profiles"
 
   return (
-    <Tabs value={activeSection} onValueChange={setSection} className="w-full">
-      <TabsList className="mb-4 grid w-full grid-cols-2">
-        <TabsTrigger value="profiles">MDM profiles</TabsTrigger>
-        <TabsTrigger value="devices">Device fleet</TabsTrigger>
-      </TabsList>
+    <div className="w-full space-y-4">
+      <Tabs
+        searchParamsKey="section"
+        options={[
+          { value: "profiles", label: "MDM profiles" },
+          { value: "devices", label: "Device fleet" },
+        ]}
+      />
 
-      <TabsContent value="profiles" className="mt-0">
+      {activeSection === "profiles" ? (
         <Card className="w-full">
           <CardContent className="p-0 overflow-x-auto">
             <DataTable
@@ -96,9 +100,9 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
             />
           </CardContent>
         </Card>
-      </TabsContent>
+      ) : null}
 
-      <TabsContent value="devices" className="mt-0">
+      {activeSection === "devices" ? (
         <Card className="w-full">
           <CardContent className="p-0 overflow-x-auto">
             <DataTable
@@ -169,7 +173,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
             />
           </CardContent>
         </Card>
-      </TabsContent>
-    </Tabs>
+      ) : null}
+    </div>
   )
 }
