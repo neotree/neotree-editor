@@ -1,15 +1,14 @@
 'use client';
 
 import { useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs } from "@/components/tabs";
 import { useAppContext } from "@/contexts/app";
 import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
-import { useQueryState } from "nuqs";
 
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases, deviceAppStates, deviceUpdateEvents } from "@/databases/pg/schema";
@@ -69,10 +68,12 @@ export function AppUpdatesClient({
   screen = "overview",
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { viewOnly } = useAppContext();
   const editingDisabled = viewOnly;
-  const [section, setSection] = useQueryState("section", { defaultValue: "apk" });
-  const activeSection = section === "ota" ? "ota" : "apk";
+  const section = searchParams.get("section");
+  const activeOverviewSection = section === "ota" ? "ota" : "apk";
+  const activeOtaSection = section === "acknowledgements" || section === "exceptions" ? section : "adoption";
 
   const releaseRows = useMemo(() => {
     const byId = new Map<string, any>();
@@ -165,13 +166,16 @@ export function AppUpdatesClient({
   return (
     <>
       {screen === "overview" ? (
-        <Tabs value={activeSection} onValueChange={setSection} className="w-full">
-          <TabsList className="mb-4 grid w-full grid-cols-2">
-            <TabsTrigger value="apk">APK Updates</TabsTrigger>
-            <TabsTrigger value="ota">OTA Updates</TabsTrigger>
-          </TabsList>
+        <div className="w-full space-y-4">
+          <Tabs
+            searchParamsKey="section"
+            options={[
+              { value: "apk", label: "APK Updates" },
+              { value: "ota", label: "OTA Updates" },
+            ]}
+          />
 
-          <TabsContent value="apk" className="mt-0">
+          {activeOverviewSection === "apk" ? (
             <Card className="w-full">
               <CardContent className="p-0 overflow-x-auto">
                 <DataTable
@@ -244,9 +248,9 @@ export function AppUpdatesClient({
                 />
               </CardContent>
             </Card>
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="ota" className="mt-0">
+          {activeOverviewSection === "ota" ? (
             <Card className="w-full">
               <CardContent className="p-0 overflow-x-auto">
                 <DataTable
@@ -280,8 +284,8 @@ export function AppUpdatesClient({
                 />
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          ) : null}
+        </div>
       ) : null}
 
       {screen === "apk" ? (
@@ -396,116 +400,107 @@ export function AppUpdatesClient({
 
       {screen === "ota" ? (
           <div className="grid grid-cols-1 gap-4">
+            <Tabs
+              searchParamsKey="section"
+              options={[
+                { value: "adoption", label: "Fleet APK adoption" },
+                { value: "acknowledgements", label: "OTA acknowledgements" },
+                { value: "exceptions", label: "Rollout exceptions" },
+              ]}
+            />
+
+            {activeOtaSection === "adoption" ? (
             <Card>
-              <CardContent className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">Fleet APK adoption</div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-4">Release</th>
-                        <th className="py-2 pr-4">Runtime</th>
-                        <th className="py-2 pr-4">Devices</th>
-                        <th className="py-2 pr-4">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {releaseAdoption.map((item) => (
-                        <tr key={item.key} className="border-b">
-                          <td className="py-2 pr-4">{item.label}</td>
-                          <td className="py-2 pr-4">{item.runtimeVersion}</td>
-                          <td className="py-2 pr-4">{item.count}</td>
-                          <td className="py-2 pr-4">
-                            {item.isCurrent ? <Badge variant="default">Current</Badge> : <Badge variant="secondary">Older</Badge>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!releaseAdoption.length ? (
-                    <div className="text-muted-foreground text-sm">No device app state reports yet.</div>
-                  ) : null}
-                </div>
+              <CardContent className="p-0 overflow-x-auto">
+                <DataTable
+                  title="Fleet APK adoption"
+                  tableClassname="min-w-[680px]"
+                  search={{ inputPlaceholder: "Search fleet adoption" }}
+                  noDataMessage={<div>No device app state reports yet.</div>}
+                  columns={[
+                    { name: "Release" },
+                    { name: "Runtime" },
+                    { name: "Devices" },
+                    {
+                      name: "Status",
+                      cellRenderer({ rowIndex }) {
+                        const item = releaseAdoption[rowIndex]
+                        return item?.isCurrent ? <Badge variant="default">Current</Badge> : <Badge variant="secondary">Older</Badge>
+                      },
+                    },
+                  ]}
+                  data={releaseAdoption.map((item) => [
+                    item.label,
+                    item.runtimeVersion,
+                    `${item.count}`,
+                    item.isCurrent ? "Current" : "Older",
+                  ])}
+                />
               </CardContent>
             </Card>
+            ) : null}
 
+            {activeOtaSection === "acknowledgements" ? (
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-muted-foreground">OTA updates applied (device acknowledgements)</div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-4">Device</th>
-                        <th className="py-2 pr-4">App Version</th>
-                        <th className="py-2 pr-4">Runtime</th>
-                        <th className="py-2 pr-4">OTA Update ID</th>
-                        <th className="py-2 pr-4">Channel</th>
-                        <th className="py-2 pr-4">Received</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {otaAppliedEvents.map((event) => (
-                        <tr key={event.eventId} className="border-b">
-                          <td className="py-2 pr-4">{event.deviceId}</td>
-                          <td className="py-2 pr-4">{event.appVersion || ""}</td>
-                          <td className="py-2 pr-4">{event.runtimeVersion || ""}</td>
-                          <td className="py-2 pr-4">{event.otaUpdateId || ""}</td>
-                          <td className="py-2 pr-4">{event.otaChannel || ""}</td>
-                          <td className="py-2 pr-4">{formatDateTime(event.createdAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!otaAppliedEvents.length ? (
-                    <div className="text-muted-foreground text-sm">No OTA acknowledgements yet.</div>
-                  ) : null}
-                </div>
+              <CardContent className="p-0 overflow-x-auto">
+                <DataTable
+                  title="OTA updates applied"
+                  tableClassname="min-w-[900px]"
+                  search={{ inputPlaceholder: "Search OTA acknowledgements" }}
+                  noDataMessage={<div>No OTA acknowledgements yet.</div>}
+                  columns={[
+                    { name: "Device" },
+                    { name: "App Version" },
+                    { name: "Runtime" },
+                    { name: "OTA Update ID" },
+                    { name: "Channel" },
+                    { name: "Received" },
+                  ]}
+                  data={otaAppliedEvents.map((event) => [
+                    event.deviceId,
+                    event.appVersion || "",
+                    event.runtimeVersion || "",
+                    event.otaUpdateId || "",
+                    event.otaChannel || "",
+                    formatDateTime(event.createdAt),
+                  ])}
+                />
               </CardContent>
             </Card>
+            ) : null}
 
+            {activeOtaSection === "exceptions" ? (
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-muted-foreground">Recent rollout exceptions</div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-4">Device</th>
-                        <th className="py-2 pr-4">Event</th>
-                        <th className="py-2 pr-4">App Version</th>
-                        <th className="py-2 pr-4">Runtime</th>
-                        <th className="py-2 pr-4">Received</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentFailures.map((event) => (
-                        <tr key={event.eventId} className="border-b">
-                          <td className="py-2 pr-4">{event.deviceId}</td>
-                          <td className="py-2 pr-4">
-                            <Badge variant="destructive">{event.eventType}</Badge>
-                          </td>
-                          <td className="py-2 pr-4">{event.appVersion || ""}</td>
-                          <td className="py-2 pr-4">{event.runtimeVersion || ""}</td>
-                          <td className="py-2 pr-4">{formatDateTime(event.createdAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!recentFailures.length ? (
-                    <div className="text-muted-foreground text-sm">No rollout exceptions in the last 72 hours.</div>
-                  ) : null}
-                </div>
+              <CardContent className="p-0 overflow-x-auto">
+                <DataTable
+                  title="Recent rollout exceptions"
+                  tableClassname="min-w-[820px]"
+                  search={{ inputPlaceholder: "Search rollout exceptions" }}
+                  noDataMessage={<div>No rollout exceptions in the last 72 hours.</div>}
+                  columns={[
+                    { name: "Device" },
+                    {
+                      name: "Event",
+                      cellRenderer({ rowIndex }) {
+                        const event = recentFailures[rowIndex]
+                        return event ? <Badge variant="destructive">{event.eventType}</Badge> : null
+                      },
+                    },
+                    { name: "App Version" },
+                    { name: "Runtime" },
+                    { name: "Received" },
+                  ]}
+                  data={recentFailures.map((event) => [
+                    event.deviceId,
+                    event.eventType,
+                    event.appVersion || "",
+                    event.runtimeVersion || "",
+                    formatDateTime(event.createdAt),
+                  ])}
+                />
               </CardContent>
             </Card>
+            ) : null}
           </div>
       ) : null}
     </>
