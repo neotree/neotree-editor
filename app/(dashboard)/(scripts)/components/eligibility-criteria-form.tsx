@@ -131,6 +131,7 @@ function Form({
       criteria_label: value?.criteria_label || "",
       auto_fills: value?.auto_fills || "",
       criteria_condition: value?.criteria_condition || "",
+      failure_message: value?.failure_message || "",
       items: value?.items || [],
       min_date: value?.min_date || "",
       max_date: value?.max_date || "",
@@ -152,6 +153,7 @@ function Form({
 
   const criteriaType = watch("criteria_type")
   const condition = watch("criteria_condition") || ""
+  const failureMessage = watch("failure_message") || ""
   const criteriaLabel = watch("criteria_label") || ""
   const autoFills = watch("auto_fills") || ""
   const items = watch("items") || []
@@ -183,6 +185,7 @@ function Form({
           criteria_label: criteriaLabel,
           auto_fills: autoFills,
           criteria_condition: condition,
+          failure_message: failureMessage,
           items,
           min_date: minDate,
           max_date: maxDate,
@@ -223,6 +226,7 @@ function Form({
       condition,
       criteriaLabel,
       criteriaType,
+      failureMessage,
       hasAlternative,
       items,
       maxDate,
@@ -245,7 +249,11 @@ function Form({
       ),
     [value],
   )
-  const hasRequiredFields = !!currentPayload.criteria_type && !!currentPayload.criteria_label && !!currentPayload.criteria_condition
+  const hasRequiredFields =
+    !!currentPayload.criteria_type &&
+    !!currentPayload.criteria_label &&
+    !!currentPayload.criteria_condition &&
+    !!currentPayload.failure_message
   const hasRequiredAlternativeFields =
     !hasAlternative ||
     (!!currentPayload.feasibilityprompt?.criteria_label &&
@@ -464,6 +472,17 @@ function Form({
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="failure_message">Failure message *</Label>
+            <Textarea
+              id="failure_message"
+              rows={3}
+              placeholder="This patient does not meet the eligibility criteria for this script."
+              {...register("failure_message", { required: "Failure message is required." })}
+            />
+            {!!errors.failure_message && <p className="mt-1 text-xs text-destructive">{errors.failure_message.message}</p>}
           </div>
 
           {usesOptions && (
@@ -867,6 +886,7 @@ function normalizeCriteriaPayload(
     criteria_label: data?.criteria_label?.trim() || "",
     auto_fills: data?.auto_fills?.trim() || "",
     criteria_condition: data?.criteria_condition?.trim() || "",
+    failure_message: data?.failure_message?.trim() || "",
   }
 
   if (usesOptions) payload.items = data?.items || []
