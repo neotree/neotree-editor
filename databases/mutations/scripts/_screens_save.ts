@@ -104,6 +104,31 @@ function getConfidentialDataKeyIds(screen: SaveScreensData) {
     return Array.from(ids).filter(Boolean);
 }
 
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not the raw payload.
+     * Partial saves can omit scriptId in the request, while the final merged
+     * screen still has a valid scriptId from the existing draft/published row.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
+}
+
 async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string) {
     const ids = Array.from(new Set(uniqueKeys.filter(Boolean)));
     if (!ids.length) return;
@@ -184,11 +209,11 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                 getConfidentialDataKeyIds(normalizedItem).forEach((id) => confidentialDataKeyIds.add(id));
 
                 if (!errors.length) {
-                    const draft = !itemScreenId ? null : await db.query.screensDrafts.findFirst({
+                    const draft = !itemScreenId ? null : await executor.query.screensDrafts.findFirst({
                         where: eq(screensDrafts.screenDraftId, screenId),
                     });
 
-                    const published = (draft || !itemScreenId) ? null : await db.query.screens.findFirst({
+                    const published = (draft || !itemScreenId) ? null : await executor.query.screens.findFirst({
                         where: eq(screens.screenId, screenId),
                     });
 
@@ -214,12 +239,12 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const screen = await db.query.screens.findFirst({
+                            const screen = await executor.query.screens.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screens.position),
                             });
 
-                            const screenDraft = await db.query.screensDrafts.findFirst({
+                            const screenDraft = await executor.query.screensDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(screensDrafts.position),
                             });
@@ -236,22 +261,14 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                         } as typeof screensDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
-                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
-                                columns: { scriptDraftId: true, },
-                            });
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            const publishedScript = await db.query.scripts.findFirst({
-                                where: eq(scripts.scriptId, data.scriptId),
-                                columns: { scriptId: true, },
-                            });
-
-                            if (scriptDraft || publishedScript) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    scriptId,
+                                    scriptDraftId,
                                     screenDraftId: screenId,
                                     position: data.position,
                                     screenId: published?.screenId,
@@ -264,11 +281,9 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                                 await q.execute();
                             } else {
                                 errors.push(`Could not save screen ${index}: ${data.title}, because script was not found`);
-                                errors.push(JSON.stringify(data));
                             }
                         } else {
                             errors.push(`Could not save screen ${index}: ${data.title}, because scriptId was not specified`);
-                            errors.push(JSON.stringify(data));
                         }
                     }
                 }

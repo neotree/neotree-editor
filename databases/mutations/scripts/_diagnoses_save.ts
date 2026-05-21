@@ -17,6 +17,31 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not only the incoming payload.
+     * Partial saves can omit scriptId in the request while the final merged
+     * diagnosis still legitimately belongs to a script.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
+}
+
 export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
@@ -40,11 +65,11 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemDiagnosisId ? null : await db.query.diagnosesDrafts.findFirst({
+                    const draft = !itemDiagnosisId ? null : await executor.query.diagnosesDrafts.findFirst({
                         where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
                     });
 
-                    const published = (draft || !itemDiagnosisId) ? null : await db.query.diagnoses.findFirst({
+                    const published = (draft || !itemDiagnosisId) ? null : await executor.query.diagnoses.findFirst({
                         where: eq(diagnoses.diagnosisId, diagnosisId),
                     });
 
@@ -69,12 +94,12 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const diagnosis = await db.query.diagnoses.findFirst({
+                            const diagnosis = await executor.query.diagnoses.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnoses.position),
                             });
 
-                            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
+                            const diagnosisDraft = await executor.query.diagnosesDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(diagnosesDrafts.position),
                             });
@@ -91,21 +116,13 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
-                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
-                                columns: { scriptDraftId: true, },
-                            });
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            const publishedScript = await db.query.scripts.findFirst({
-                                where: eq(scripts.scriptId, data.scriptId),
-                                columns: { scriptId: true, },
-                            });
-
-                            if (scriptDraft || publishedScript) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(diagnosesDrafts).values({
                                     data,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    scriptId,
+                                    scriptDraftId,
                                     diagnosisDraftId: diagnosisId,
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
