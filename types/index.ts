@@ -124,6 +124,7 @@ export type EligibilityCriteria = {
     criteria_label: string;
     auto_fills?: string;
     criteria_condition: string;
+    failure_message: string;
     items?: NonNullable<ScriptField['items']>;
     min_date?: string;
     max_date?: string;
