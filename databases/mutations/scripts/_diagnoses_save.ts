@@ -32,29 +32,6 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
     const executor = client || db;
 
     try {
-        const existingDiagnosisIds = Array.from(new Set(
-            data.map((item) => item.diagnosisId).filter((id): id is string => !!id)
-        ));
-
-        const [
-            drafts,
-            publishedDiagnoses,
-        ] = await Promise.all([
-            existingDiagnosisIds.length
-                ? executor.query.diagnosesDrafts.findMany({
-                    where: inArray(diagnosesDrafts.diagnosisDraftId, existingDiagnosisIds),
-                })
-                : Promise.resolve([]),
-            existingDiagnosisIds.length
-                ? executor.query.diagnoses.findMany({
-                    where: inArray(diagnoses.diagnosisId, existingDiagnosisIds),
-                })
-                : Promise.resolve([]),
-        ]);
-
-        const draftsById = new Map(drafts.map((draft) => [draft.diagnosisDraftId, draft]));
-        const publishedDiagnosesById = new Map(publishedDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis]));
-
         let index = 0;
         for (const { diagnosisId: itemDiagnosisId, ...item } of data) {
             try {
@@ -63,8 +40,13 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemDiagnosisId ? null : draftsById.get(diagnosisId) || null;
-                    const published = (draft || !itemDiagnosisId) ? null : publishedDiagnosesById.get(diagnosisId) || null;
+                    const draft = !itemDiagnosisId ? null : await db.query.diagnosesDrafts.findFirst({
+                        where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
+                    });
+
+                    const published = (draft || !itemDiagnosisId) ? null : await db.query.diagnoses.findFirst({
+                        where: eq(diagnoses.diagnosisId, diagnosisId),
+                    });
 
                     if (draft) {
                         const data = {
@@ -134,15 +116,6 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                                 sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();
 
                                 await q.execute();
-                                draftsById.set(diagnosisId, {
-                                    diagnosisDraftId: diagnosisId,
-                                    diagnosisId: published?.diagnosisId,
-                                    scriptId: publishedScript?.scriptId || null,
-                                    scriptDraftId: scriptDraft?.scriptDraftId || null,
-                                    createdByUserId: userId || null,
-                                    data,
-                                    position: data.position || null,
-                                } as typeof diagnosesDrafts.$inferSelect);
                             } else {
                                 errors.push(`Could not save diagnosis ${index}: ${data.name}, because script was not found`);
                             }
