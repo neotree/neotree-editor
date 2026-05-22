@@ -243,6 +243,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
             printTitle: s.printTitle,
             id: s.id,
             nuid_search_enabled: s.nuidSearchEnabled,
+            eligibilityCriteria: s.eligibilityCriteria || null,
             nuidSearchFields: (s.nuidSearchFields as ScriptField[]).map(f => ({
                 calculation: f.calculation,
                 condition: f.condition,

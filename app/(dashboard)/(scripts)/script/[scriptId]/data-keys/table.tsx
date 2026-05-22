@@ -34,7 +34,7 @@ import {
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
-import { getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { getDataKeyIntegrityEntryFingerprint, getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
 import { pendingChangesAPI } from "@/lib/indexed-db";
@@ -263,9 +263,10 @@ function buildImpactSummaryInlineText(summary?: IntegrityImpactSummary | null) {
     return base.replaceAll("Â·", "|");
 }
 
-export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
+export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, initialFocus = "all" }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
-    integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null }) | null;
+    integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null; newlyIntroducedFingerprints?: string[] }) | null;
+    initialFocus?: "all" | "newly_introduced";
 }) {
     type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
@@ -273,7 +274,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
-    const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "non_blocking">("all");
+    const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "newly_introduced" | "non_blocking">(
+        initialFocus === "newly_introduced" ? "newly_introduced" : "all"
+    );
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [tableSearchValue, setTableSearchValue] = useState("");
@@ -314,11 +317,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return `${a.location || ""}`.trim().toLowerCase().localeCompare(`${b.location || ""}`.trim().toLowerCase());
     }), [integrity?.entries]);
     const summary = integrity?.summary;
+    const newlyIntroducedFingerprintSet = useMemo(() => new Set(integrity?.newlyIntroducedFingerprints || []), [integrity?.newlyIntroducedFingerprints]);
     const availableTypes = useMemo(() => dataKeyTypes.filter((type) =>
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     ), [entries]);
     const availableStatusOptions = useMemo(() => statusFilterOptions.filter((option) => {
         if (option.value === "all") return true;
+        if (issueScopeFilter === "newly_introduced") {
+            return option.value !== "resolved";
+        }
         if (issueScopeFilter === "blocking") {
             return option.value !== "resolved";
         }
@@ -328,12 +335,13 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return true;
     }), [issueScopeFilter]);
     const filteredEntries = useMemo(() => entries.filter((entry) => {
+        if (issueScopeFilter === "newly_introduced" && !newlyIntroducedFingerprintSet.has(getDataKeyIntegrityEntryFingerprint(entry))) return false;
         if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
         if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
-    }), [entries, issueScopeFilter, statusFilter, typeFilter]);
+    }), [entries, issueScopeFilter, statusFilter, typeFilter, newlyIntroducedFingerprintSet]);
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
     const bulkResolvableEntries = useMemo(() => ({
@@ -1571,6 +1579,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     <SelectContent>
                                         <SelectItem value="all">All issues</SelectItem>
                                         <SelectItem value="blocking">Blocking issues</SelectItem>
+                                        <SelectItem value="newly_introduced">Newly introduced issues</SelectItem>
                                         <SelectItem value="non_blocking">Non-blocking issues</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -1636,8 +1645,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 : integrity?.policy?.enforcementMode === "off"
                                     ? "Integrity enforcement is currently turned off in settings. The issue counts below still reflect the configured rule set."
                                     : integrity?.policy?.enforcementMode === "block_new_issues_only"
-                                        ? "Blocking issues match the configured rule set. In block new issues only mode, existing baseline issues may still be allowed at publish."
-                                    : "Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope."}
+                                        ? issueScopeFilter === "newly_introduced"
+                                            ? "This view is focused on newly introduced blocking issues only. Switch the filter back to view all issues on this script."
+                                            : "Blocking issues match the configured rule set. In block new issues only mode, existing baseline issues may still be allowed at publish."
+                                        : "Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope."}
                         </div>
 
                         {!viewOnly && hasBulkResolveActions && (
