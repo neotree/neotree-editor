@@ -12,9 +12,9 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBlockingEntry, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
-import { getIntegrityPolicyState } from '@/lib/integrity-policy';
+import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
 
 type BulkIntegrityRepairItemInput = {
@@ -73,6 +73,10 @@ function buildRegistryIntegrityReport({
         rawReport,
         integrityContext,
     };
+}
+
+function getBlockingEntriesForRegistry(entries: DataKeyIntegrityEntry[]) {
+    return entries.filter((entry) => isBlockingEntry(entry));
 }
 
 function buildImpactSummary({
@@ -317,12 +321,24 @@ export const getDataKeysIntegrity = async (params?: {
             onlyIssues: params?.onlyIssues !== false,
         });
 
+        // Expose the currently enforced "newly introduced" issue set so the
+        // script registry can open directly into the same blocking slice a
+        // user saw from the publish modal.
+        const blockingEntries = getBlockingEntriesForRegistry(rawReport.entries);
+        const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
+            policy: integrityPolicyState.policy,
+            baseline: integrityPolicyState.baseline,
+            blockingEntries,
+            getFingerprint: getDataKeyIntegrityEntryFingerprint,
+        });
+
         return {
             success: true,
             data: {
                 ...rawReport,
                 policy: integrityPolicyState.policy,
                 summary: rawReport.summary,
+                newlyIntroducedFingerprints: policyEvaluation.enforcedBlockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)),
             },
         };
     } catch (e: any) {
