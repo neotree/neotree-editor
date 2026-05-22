@@ -878,12 +878,26 @@ export function buildDataKeyIntegrityPublishDetails(
     const blocking = getBlockingIntegrityEntries(report.entries);
     if (!blocking.length) return null;
 
-    const grouped = new Map<string, DataKeyIntegrityEntry[]>();
+    const grouped = new Map<string, {
+        scriptId: string;
+        scriptTitle: string;
+        entries: DataKeyIntegrityEntry[];
+    }>();
     for (const entry of blocking) {
-        const key = `${entry.scriptId}::${entry.scriptTitle || entry.scriptId}`;
-        const current = grouped.get(key) || [];
-        current.push(entry);
-        grouped.set(key, current);
+        const scriptId = `${entry.scriptId || ""}`.trim();
+        if (!scriptId) continue;
+        const current = grouped.get(scriptId) || {
+            scriptId,
+            scriptTitle: `${entry.scriptTitle || ""}`.trim(),
+            entries: [],
+        };
+        // At this point script titles should already be enriched from the
+        // owning script. Never fall back to showing raw internal ids here.
+        if (entry.scriptTitle) {
+            current.scriptTitle = `${entry.scriptTitle}`.trim();
+        }
+        current.entries.push(entry);
+        grouped.set(scriptId, current);
     }
 
     const countsByRule = blocking.reduce((acc, entry) => {
@@ -903,9 +917,7 @@ export function buildDataKeyIntegrityPublishDetails(
             `Publish blocked: ${blocking.length} data key validation issue${blocking.length === 1 ? "" : "s"} found across ${grouped.size} script${grouped.size === 1 ? "" : "s"}.`,
             `Blocking rules triggered: ${topLevelSummary}.`,
         ],
-        scripts: Array.from(grouped.entries()).map(([groupKey, entries]) => {
-            const [scriptId, scriptTitleRaw] = groupKey.split("::");
-            const scriptTitle = scriptTitleRaw || scriptId;
+        scripts: Array.from(grouped.values()).map(({ scriptId, scriptTitle, entries }) => {
             return {
                 scriptId,
                 scriptTitle,
