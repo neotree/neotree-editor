@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
-import { problems, problemsDrafts, hospitals, pendingDeletion, scripts, } from "@/databases/pg/schema";
+import { problems, problemsDrafts, hospitals, pendingDeletion, scripts, scriptsDrafts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { Preferences, ScriptImage } from "@/types";
 
@@ -77,6 +77,38 @@ export async function _getProblems(
             },
         });
 
+        const draftPublishedScriptIds = Array.from(new Set(drafts.map((draft) => draft.scriptId).filter(Boolean))) as string[];
+        const draftScriptDraftIds = Array.from(new Set(drafts.map((draft) => draft.scriptDraftId).filter(Boolean))) as string[];
+
+        const [draftPublishedScripts, draftScriptDrafts] = await Promise.all([
+            !draftPublishedScriptIds.length
+                ? Promise.resolve([])
+                : db.query.scripts.findMany({
+                    where: inArray(scripts.scriptId, draftPublishedScriptIds),
+                    columns: { scriptId: true, title: true, hospitalId: true, },
+                }),
+            !draftScriptDraftIds.length
+                ? Promise.resolve([])
+                : db.query.scriptsDrafts.findMany({
+                    where: inArray(scriptsDrafts.scriptDraftId, draftScriptDraftIds),
+                    columns: { scriptDraftId: true, hospitalId: true, data: true, },
+                }),
+        ]);
+
+        const draftHospitalIds = Array.from(new Set([
+            ...draftPublishedScripts.map((script) => script.hospitalId).filter(Boolean),
+            ...draftScriptDrafts.map((script) => script.hospitalId).filter(Boolean),
+        ])) as string[];
+
+        const draftHospitals = !draftHospitalIds.length ? [] : await db.query.hospitals.findMany({
+            where: inArray(hospitals.hospitalId, draftHospitalIds),
+            columns: { hospitalId: true, name: true, },
+        });
+
+        const publishedScriptById = new Map(draftPublishedScripts.map((script) => [script.scriptId, script]));
+        const scriptDraftById = new Map(draftScriptDrafts.map((script) => [script.scriptDraftId, script]));
+        const hospitalNameById = new Map(draftHospitals.map((hospital) => [hospital.hospitalId, hospital.name]));
+
         // published problems conditions
         const publishedRes = await db
             .select({
@@ -129,12 +161,24 @@ export async function _getProblems(
                 isDeleted: false,
             } as GetProblemsResults['data'][0])),
 
-            ...drafts.map((s => ({
-                ...s.data,
-                isDraft: true,
-                isDeleted: false,
-                draftCreatedByUserId: s.createdByUserId,
-            } as GetProblemsResults['data'][0])))
+            ...drafts.map((s => {
+                const publishedScript = s.scriptId ? publishedScriptById.get(s.scriptId) : undefined;
+                const scriptDraft = s.scriptDraftId ? scriptDraftById.get(s.scriptDraftId) : undefined;
+                const resolvedHospitalId = publishedScript?.hospitalId || scriptDraft?.hospitalId || null;
+                const resolvedScriptTitle = publishedScript?.title || scriptDraft?.data?.title || "";
+
+                return ({
+                    ...s.data,
+                    // Problem drafts can be copied between scripts; resolve the
+                    // current owner name from relations so publish blockers and
+                    // registries point at the right script.
+                    scriptTitle: resolvedScriptTitle,
+                    hospitalName: resolvedHospitalId ? (hospitalNameById.get(resolvedHospitalId) || "") : "",
+                    isDraft: true,
+                    isDeleted: false,
+                    draftCreatedByUserId: s.createdByUserId,
+                } as GetProblemsResults['data'][0]);
+            }))
         ]
             .sort((a, b) => a.position - b.position)
             .filter(s => !inPendingDeletion.map(s => s.problemId).includes(s.problemId))
