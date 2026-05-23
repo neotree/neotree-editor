@@ -63,6 +63,42 @@ function buildPreviewEntityMap<T extends Record<string, any>>(
   )
 }
 
+async function resolveIntegrityScriptTitles(
+  entries: Array<{ scriptId?: string; scriptTitle?: string }>
+) {
+  const idsToResolve = Array.from(
+    new Set(
+      entries
+        .filter((entry) => {
+          const scriptId = `${entry.scriptId || ""}`.trim()
+          const scriptTitle = `${entry.scriptTitle || ""}`.trim()
+          return !!scriptId && (!scriptTitle || scriptTitle === scriptId)
+        })
+        .map((entry) => `${entry.scriptId || ""}`.trim())
+    )
+  )
+
+  if (!idsToResolve.length) return new Map<string, string>()
+
+  const scriptsRes = await scriptsQueries._getScripts({
+    scriptsIds: idsToResolve,
+    returnDraftsIfExist: true,
+  })
+
+  if (scriptsRes.errors?.length) {
+    throw new Error(scriptsRes.errors.join(", "))
+  }
+
+  return new Map(
+    scriptsRes.data
+      .map((script) => {
+        const title = `${script.title || ""}`.trim()
+        return title ? ([script.scriptId, title] as const) : null
+      })
+      .filter((item): item is readonly [string, string] => !!item)
+  )
+}
+
 function assertCanPublishDrafts(user?: { role?: string | null } | null) {
   const role = `${user?.role || ""}`.trim()
   const allowed = role === "admin" || role === "super_user"
@@ -823,8 +859,13 @@ export async function publishData({
       }
 
       if (enforcedBlockingEntries.length) {
+        const scriptTitlesById = await resolveIntegrityScriptTitles(enforcedBlockingEntries)
+        const enrichedBlockingEntries = enforcedBlockingEntries.map((entry) => ({
+          ...entry,
+          scriptTitle: scriptTitlesById.get(entry.scriptId) || entry.scriptTitle,
+        }))
         const enforcedReport = buildDataKeyIntegrityReportFromEntries(
-          enforcedBlockingEntries,
+          enrichedBlockingEntries,
         )
         const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(
           enforcedReport
@@ -837,6 +878,16 @@ export async function publishData({
           integrityPolicyState.policy.enforcementMode === "block_new_issues_only" &&
           publishIntegrityDetails
         ) {
+          // When publish is blocked only by newly introduced issues, send the
+          // user straight into the script registry with the same focused view.
+          publishIntegrityDetails.scripts = publishIntegrityDetails.scripts.map((script) => ({
+            ...script,
+            registryHref: `${script.registryHref}?focus=newly_introduced`,
+            issues: script.issues.map((issue) => ({
+              ...issue,
+              registryHref: `${issue.registryHref}?focus=newly_introduced`,
+            })),
+          }))
           publishIntegrityDetails.summary = [
             policyEvaluation.policyModeMessage,
             ...triggerSummary,

@@ -339,12 +339,16 @@ export async function saveScriptScreens({
                 createdAt,
                 updatedAt,
                 isDraft,
+                isDeleted,
                 deletedAt,
                 version,
                 oldScriptId,
                 oldScreenId,
                 screenId: _ignoreScreenId,
                 scriptId: _ignoreScriptId,
+                scriptTitle: _ignoreScriptTitle,
+                hospitalName: _ignoreHospitalName,
+                draftCreatedByUserId: _ignoreDraftCreatedByUserId,
                 position,
                 ...s
             } = screen;
@@ -424,11 +428,15 @@ export async function saveScriptDiagnoses({
                 createdAt,
                 updatedAt,
                 isDraft,
+                isDeleted,
                 deletedAt,
                 version,
                 oldDiagnosisId,
                 diagnosisId: _ignoreDiagnosisId,
                 scriptId: _ignoreScriptId,
+                scriptTitle: _ignoreScriptTitle,
+                hospitalName: _ignoreHospitalName,
+                draftCreatedByUserId: _ignoreDraftCreatedByUserId,
                 position,
                 ...d
             } = diagnosis;
@@ -508,10 +516,14 @@ export async function saveScriptProblems({
                 createdAt,
                 updatedAt,
                 isDraft,
+                isDeleted,
                 deletedAt,
                 version,
                 problemId: _ignoreProblemId,
                 scriptId: _ignoreScriptId,
+                scriptTitle: _ignoreScriptTitle,
+                hospitalName: _ignoreHospitalName,
+                draftCreatedByUserId: _ignoreDraftCreatedByUserId,
                 position,
                 ...d
             } = problem;
