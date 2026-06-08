@@ -19,6 +19,7 @@ export const defaultPreferences = {
     textColor: {}, 
     backgroundColor: {}, 
     highlight: {},
+    enableSeverityRanking: false,
 } as Preferences;
 
 export const scriptsPageTabs = [
