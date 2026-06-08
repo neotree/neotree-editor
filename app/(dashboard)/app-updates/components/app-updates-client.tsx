@@ -11,12 +11,13 @@ import { useAppContext } from "@/contexts/app";
 import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
-import type { apkReleases, deviceAppStates, deviceUpdateEvents } from "@/databases/pg/schema";
+import type { apkReleases, deviceAppStates, deviceRolloutStates, deviceUpdateEvents } from "@/databases/pg/schema";
 import { getApkReleaseReadiness, isApkReleaseDeviceAvailable } from "@/lib/app-updates/validation";
 
 type ApkRelease = typeof apkReleases.$inferSelect;
 type DeviceAppState = typeof deviceAppStates.$inferSelect;
 type OtaEvent = typeof deviceUpdateEvents.$inferSelect;
+type RolloutState = typeof deviceRolloutStates.$inferSelect;
 
 const formatDateTime = (value?: string | Date | null) => {
   if (!value) return "";
@@ -56,6 +57,7 @@ type Props = {
   apkReleaseDrafts: ApkReleaseDraft[];
   otaEvents: OtaEvent[];
   deviceAppStates: DeviceAppState[];
+  rolloutStates: RolloutState[];
   screen?: "overview" | "apk" | "ota";
 };
 
@@ -65,6 +67,7 @@ export function AppUpdatesClient({
   apkReleaseDrafts,
   otaEvents,
   deviceAppStates,
+  rolloutStates,
   screen = "overview",
 }: Props) {
   const router = useRouter();
@@ -73,7 +76,7 @@ export function AppUpdatesClient({
   const editingDisabled = viewOnly;
   const section = searchParams.get("section");
   const activeOverviewSection = section === "ota" ? "ota" : "apk";
-  const activeOtaSection = section === "acknowledgements" || section === "exceptions" ? section : "adoption";
+  const activeOtaSection = section === "acknowledgements" || section === "exceptions" || section === "rollout" ? section : "adoption";
 
   const releaseRows = useMemo(() => {
     const byId = new Map<string, any>();
@@ -404,6 +407,7 @@ export function AppUpdatesClient({
               searchParamsKey="section"
               options={[
                 { value: "adoption", label: "Fleet APK adoption" },
+                { value: "rollout", label: "Rollout states" },
                 { value: "acknowledgements", label: "OTA acknowledgements" },
                 { value: "exceptions", label: "Rollout exceptions" },
               ]}
@@ -434,6 +438,45 @@ export function AppUpdatesClient({
                     item.runtimeVersion,
                     `${item.count}`,
                     item.isCurrent ? "Current" : "Older",
+                  ])}
+                />
+              </CardContent>
+            </Card>
+            ) : null}
+
+            {activeOtaSection === "rollout" ? (
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <DataTable
+                  title="Device rollout states"
+                  tableClassname="min-w-[980px]"
+                  search={{ inputPlaceholder: "Search rollout states" }}
+                  noDataMessage={<div>No rollout states reported yet.</div>}
+                  columns={[
+                    { name: "Device" },
+                    { name: "Release" },
+                    { name: "Country" },
+                    { name: "Delivery" },
+                    {
+                      name: "State",
+                      cellRenderer({ rowIndex }) {
+                        const row = rolloutStates[rowIndex]
+                        return row ? <Badge variant={row.rolloutState === "failed" ? "destructive" : "secondary"}>{row.rolloutState}</Badge> : null
+                      },
+                    },
+                    { name: "Progress" },
+                    { name: "Last Error" },
+                    { name: "Updated" },
+                  ]}
+                  data={rolloutStates.map((state) => [
+                    state.deviceId,
+                    state.apkReleaseId || "",
+                    state.countryISO || "",
+                    state.deliveryMode,
+                    state.rolloutState,
+                    `${state.downloadProgress || 0}%`,
+                    state.lastErrorCode || state.lastErrorMessage || "",
+                    formatDateTime(state.updatedAt),
                   ])}
                 />
               </CardContent>

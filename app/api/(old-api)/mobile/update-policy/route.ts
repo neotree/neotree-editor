@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
                     channel: policy.otaChannel,
                 },
                 apk: {
+                    deliveryMode: policy.apkDeliveryMode,
                     autoDownload: policy.apkAutoDownload,
                     forceInstall: policy.apkForceInstall,
                     gracePeriodHours: policy.apkGracePeriodHours,
@@ -69,6 +70,14 @@ export async function GET(req: NextRequest) {
                     installWindow: policy.apkInstallWindow,
                     messageTitle: policy.apkMessageTitle,
                     messageBody: policy.apkMessageBody,
+                },
+                targeting: {
+                    scope: policy.targetScope,
+                    groupId: policy.targetGroupId,
+                    hospitalId: policy.targetHospitalId,
+                },
+                rollback: {
+                    enabled: policy.rollbackEnabled,
                 },
                 currentApkRelease: currentApk,
                 rollbackApkRelease: rollbackApk,

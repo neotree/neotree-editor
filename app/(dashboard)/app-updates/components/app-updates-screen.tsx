@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import * as appUpdatesActions from "@/app/actions/app-updates";
 import { getDeviceAppStates } from "@/app/actions/device-app-states";
-import { getDeviceUpdateEvents } from "@/app/actions/update-events";
+import { getDeviceRolloutStates, getDeviceUpdateEvents } from "@/app/actions/update-events";
 import { Content } from "@/components/content";
 import { Title } from "@/components/title";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +40,7 @@ export async function AppUpdatesScreen({ title, screen }: Props) {
     releaseDraftsRes,
     otaEventsRes,
     deviceStatesRes,
+    rolloutStatesRes,
   ] = await Promise.all([
     appUpdatesActions.getAppUpdatePolicy(),
     appUpdatesActions.getAppUpdatePolicyDrafts(),
@@ -47,6 +48,7 @@ export async function AppUpdatesScreen({ title, screen }: Props) {
     appUpdatesActions.getApkReleaseDrafts(),
     getDeviceUpdateEvents({ limit: 200, offset: 0 }),
     getDeviceAppStates(),
+    getDeviceRolloutStates({ limit: 200, offset: 0 }),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export async function AppUpdatesScreen({ title, screen }: Props) {
           apkReleaseDrafts={releaseDraftsRes.data}
           otaEvents={otaEventsRes.data || []}
           deviceAppStates={deviceStatesRes.data || []}
+          rolloutStates={rolloutStatesRes.data || []}
         />
       </Content>
     </>

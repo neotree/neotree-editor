@@ -18,18 +18,35 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import type { saveAppUpdatePolicies } from "@/app/actions/app-updates";
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
-import type { apkReleases } from "@/databases/pg/schema";
+import type { apkReleases, hospitals as hospitalsTable } from "@/databases/pg/schema";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload, isApkReleaseDeviceAvailable } from "@/lib/app-updates/validation";
 
-const installWindows = ["on_restart", "idle", "immediate"] as const;
+const installWindows = [
+  { value: "on_restart", label: "On restart" },
+  { value: "idle", label: "When idle" },
+  { value: "immediate", label: "Immediate" },
+] as const;
+const deliveryModes = [
+  { value: "in_app", label: "In-app" },
+  { value: "mdm", label: "MDM" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "manual", label: "Manual" },
+] as const;
+const targetScopes = [
+  { value: "country", label: "Country" },
+  { value: "group", label: "MDM group" },
+  { value: "hospital", label: "Hospital" },
+] as const;
 
 type ApkRelease = typeof apkReleases.$inferSelect;
+type Hospital = typeof hospitalsTable.$inferSelect;
 
 type Props = {
   policy: AppUpdatePolicy | null;
   policyDrafts: AppUpdatePolicyDraft[];
   apkReleases: ApkRelease[];
   apkReleaseDrafts: ApkReleaseDraft[];
+  hospitals: Hospital[];
   saveAppUpdatePolicies: typeof saveAppUpdatePolicies;
 };
 
@@ -40,6 +57,7 @@ type PolicyFormState = {
   otaEnabled: boolean;
   otaChannel: string;
   apkAutoDownload: boolean;
+  apkDeliveryMode: string;
   apkForceInstall: boolean;
   apkGracePeriodHours?: number | null;
   apkForceAfter?: string | null;
@@ -48,6 +66,10 @@ type PolicyFormState = {
   apkMessageBody?: string | null;
   currentApkReleaseId?: string | null;
   rollbackApkReleaseId?: string | null;
+  targetScope: string;
+  targetGroupId?: string | null;
+  targetHospitalId?: string | null;
+  rollbackEnabled: boolean;
 };
 
 const defaultPolicy = (): PolicyFormState => ({
@@ -56,6 +78,7 @@ const defaultPolicy = (): PolicyFormState => ({
   otaEnabled: true,
   otaChannel: "production",
   apkAutoDownload: true,
+  apkDeliveryMode: "in_app",
   apkForceInstall: false,
   apkGracePeriodHours: null,
   apkForceAfter: null,
@@ -64,6 +87,10 @@ const defaultPolicy = (): PolicyFormState => ({
   apkMessageBody: "",
   currentApkReleaseId: null,
   rollbackApkReleaseId: null,
+  targetScope: "country",
+  targetGroupId: null,
+  targetHospitalId: null,
+  rollbackEnabled: false,
 });
 
 const toDateInput = (value?: string | Date | null) => {
@@ -84,6 +111,7 @@ export function AppUpdatePolicyForm({
   policyDrafts,
   apkReleases,
   apkReleaseDrafts,
+  hospitals,
   saveAppUpdatePolicies,
 }: Props) {
   const router = useRouter();
@@ -401,6 +429,26 @@ export function AppUpdatePolicyForm({
             </div>
 
             <div>
+              <Label>APK Delivery Mode</Label>
+              <Select
+                value={policyForm.apkDeliveryMode}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, apkDeliveryMode: value }))}
+                disabled={editingDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select delivery mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {deliveryModes.map((mode) => (
+                    <SelectItem key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label>APK Install Window</Label>
               <Select
                 value={policyForm.apkInstallWindow}
@@ -412,12 +460,71 @@ export function AppUpdatePolicyForm({
                 </SelectTrigger>
                 <SelectContent>
                   {installWindows.map((window) => (
-                    <SelectItem key={window} value={window}>
-                      {window}
+                    <SelectItem key={window.value} value={window.value}>
+                      {window.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label>Target Scope</Label>
+              <Select
+                value={policyForm.targetScope}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetScope: value }))}
+                disabled={editingDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select target scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  {targetScopes.map((scope) => (
+                    <SelectItem key={scope.value} value={scope.value}>
+                      {scope.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Target Group ID</Label>
+              <Input
+                value={policyForm.targetGroupId || ""}
+                onChange={(e) => setPolicyForm((prev) => ({ ...prev, targetGroupId: e.target.value || null }))}
+                disabled={editingDisabled}
+              />
+            </div>
+
+            <div>
+              <Label>Target Hospital ID</Label>
+              <Select
+                value={policyForm.targetHospitalId || "none"}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetHospitalId: value === "none" ? null : value }))}
+                disabled={editingDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select hospital" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No hospital</SelectItem>
+                  {hospitals.map((hospital) => (
+                    <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
+                      {hospital.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={policyForm.rollbackEnabled}
+                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, rollbackEnabled: checked }))}
+                disabled={editingDisabled}
+              />
+              <Label>Rollback enabled</Label>
             </div>
 
             <div>

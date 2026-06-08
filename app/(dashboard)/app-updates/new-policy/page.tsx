@@ -6,6 +6,7 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import * as appUpdatesActions from "@/app/actions/app-updates";
+import { getHospitals } from "@/app/actions/hospitals";
 import { AppUpdatePolicyForm } from "../components/policy-form";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +28,12 @@ export default async function AppUpdatePolicyPage() {
     );
   }
 
-  const [policyRes, policyDraftsRes, releasesRes, releaseDraftsRes] = await Promise.all([
+  const [policyRes, policyDraftsRes, releasesRes, releaseDraftsRes, hospitalsRes] = await Promise.all([
     appUpdatesActions.getAppUpdatePolicy(),
     appUpdatesActions.getAppUpdatePolicyDrafts(),
     appUpdatesActions.getApkReleases(),
     appUpdatesActions.getApkReleaseDrafts(),
+    getHospitals({ returnDraftsIfExist: false }),
   ]);
 
   return (
@@ -43,6 +45,7 @@ export default async function AppUpdatePolicyPage() {
           policyDrafts={policyDraftsRes.data}
           apkReleases={releasesRes.data}
           apkReleaseDrafts={releaseDraftsRes.data}
+          hospitals={hospitalsRes.data || []}
           saveAppUpdatePolicies={appUpdatesActions.saveAppUpdatePolicies}
         />
       </Content>

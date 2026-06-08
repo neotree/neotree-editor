@@ -1,6 +1,6 @@
 {
-  "id": "78221b97-003d-42ad-acf1-a9671d100ccd",
-  "prevId": "5773fc16-bbd4-4a43-9772-70991777024b",
+  "id": "aca95bbb-afca-4458-a212-248e164a26e0",
+  "prevId": "78221b97-003d-42ad-acf1-a9671d100ccd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2005,6 +2005,26 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "link_source": {
+          "name": "link_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "match_confidence": {
+          "name": "match_confidence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_reasons": {
+          "name": "match_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "payload": {
           "name": "payload",
@@ -4528,6 +4548,389 @@
         }
       }
     },
+    "public.nt_mdm_device_inventory": {
+      "name": "nt_mdm_device_inventory",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "inventory_id": {
+          "name": "inventory_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "mdm_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'headwind'"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mdm_device_id": {
+          "name": "mdm_device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggested_device_id": {
+          "name": "suggested_device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_device_id": {
+          "name": "linked_device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country_iso": {
+          "name": "country_iso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mdm_config_id": {
+          "name": "mdm_config_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mdm_config_name": {
+          "name": "mdm_config_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mdm_group_id": {
+          "name": "mdm_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mdm_group_name": {
+          "name": "mdm_group_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrollment_status": {
+          "name": "enrollment_status",
+          "type": "mdm_enrollment_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "management_state": {
+          "name": "management_state",
+          "type": "mdm_management_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "serial_number": {
+          "name": "serial_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "android_version": {
+          "name": "android_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "android_sdk": {
+          "name": "android_sdk",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manufacturer": {
+          "name": "manufacturer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_capabilities": {
+          "name": "device_capabilities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "last_mdm_seen_at": {
+          "name": "last_mdm_seen_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_status": {
+          "name": "match_status",
+          "type": "mdm_inventory_match_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unmatched'"
+        },
+        "match_confidence": {
+          "name": "match_confidence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "match_reasons": {
+          "name": "match_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "review_note": {
+          "name": "review_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ignored_at": {
+          "name": "ignored_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by_user_id": {
+          "name": "reviewed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "mdm_device_inventory_profile_device_unique": {
+          "name": "mdm_device_inventory_profile_device_unique",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mdm_device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mdm_device_inventory_profile_idx": {
+          "name": "mdm_device_inventory_profile_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mdm_device_inventory_match_status_idx": {
+          "name": "mdm_device_inventory_match_status_idx",
+          "columns": [
+            {
+              "expression": "match_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mdm_device_inventory_suggested_device_idx": {
+          "name": "mdm_device_inventory_suggested_device_idx",
+          "columns": [
+            {
+              "expression": "suggested_device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mdm_device_inventory_linked_device_idx": {
+          "name": "mdm_device_inventory_linked_device_idx",
+          "columns": [
+            {
+              "expression": "linked_device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mdm_device_inventory_serial_idx": {
+          "name": "mdm_device_inventory_serial_idx",
+          "columns": [
+            {
+              "expression": "serial_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nt_mdm_device_inventory_profile_id_nt_mdm_provider_profiles_profile_id_fk": {
+          "name": "nt_mdm_device_inventory_profile_id_nt_mdm_provider_profiles_profile_id_fk",
+          "tableFrom": "nt_mdm_device_inventory",
+          "tableTo": "nt_mdm_provider_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "profile_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "nt_mdm_device_inventory_suggested_device_id_nt_devices_device_id_fk": {
+          "name": "nt_mdm_device_inventory_suggested_device_id_nt_devices_device_id_fk",
+          "tableFrom": "nt_mdm_device_inventory",
+          "tableTo": "nt_devices",
+          "columnsFrom": [
+            "suggested_device_id"
+          ],
+          "columnsTo": [
+            "device_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "nt_mdm_device_inventory_linked_device_id_nt_devices_device_id_fk": {
+          "name": "nt_mdm_device_inventory_linked_device_id_nt_devices_device_id_fk",
+          "tableFrom": "nt_mdm_device_inventory",
+          "tableTo": "nt_devices",
+          "columnsFrom": [
+            "linked_device_id"
+          ],
+          "columnsTo": [
+            "device_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "nt_mdm_device_inventory_reviewed_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_mdm_device_inventory_reviewed_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_mdm_device_inventory",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "reviewed_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_mdm_device_inventory_inventory_id_unique": {
+          "name": "nt_mdm_device_inventory_inventory_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "inventory_id"
+          ]
+        }
+      }
+    },
     "public.nt_mdm_provider_profiles": {
       "name": "nt_mdm_provider_profiles",
       "schema": "",
@@ -4641,6 +5044,45 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "last_device_sync_status": {
+          "name": "last_device_sync_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_device_sync_at": {
+          "name": "last_device_sync_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_device_sync_error": {
+          "name": "last_device_sync_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auto_sync_enabled": {
+          "name": "auto_sync_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "auto_link_enabled": {
+          "name": "auto_link_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "auto_link_min_confidence": {
+          "name": "auto_link_min_confidence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 95
         },
         "created_at": {
           "name": "created_at",
@@ -7826,6 +8268,18 @@
         "unenrolled",
         "failed",
         "unknown"
+      ]
+    },
+    "public.mdm_inventory_match_status": {
+      "name": "mdm_inventory_match_status",
+      "schema": "public",
+      "values": [
+        "unmatched",
+        "auto_linked",
+        "manually_linked",
+        "needs_review",
+        "conflict",
+        "ignored"
       ]
     },
     "public.mdm_management_state": {
