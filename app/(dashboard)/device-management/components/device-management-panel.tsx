@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable } from "@/components/data-table"
 import { Tabs } from "@/components/tabs"
+import { syncAllEnabledMdmProfilesFromForm } from "@/app/actions/device-management"
 import type { _getDeviceManagementOverview } from "@/databases/queries/device-management"
-import { maskSecret } from "@/lib/mdm"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, RefreshCwIcon } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { DeviceManagementRowActions } from "./device-management-row-actions"
+import { MdmInventoryReviewActions } from "./mdm-inventory-review-actions"
 
 type Overview = Awaited<ReturnType<typeof _getDeviceManagementOverview>>["data"]
 
@@ -28,19 +29,89 @@ function enrollmentBadgeVariant(status?: string | null) {
   return "secondary" as const
 }
 
+function connectionBadgeVariant(status?: string | null) {
+  if (status === "connected") return "default" as const
+  if (status === "failed") return "destructive" as const
+  return "secondary" as const
+}
+
+function authMode(profile: Overview["profiles"][number]) {
+  const settings = (profile.settings || {}) as Record<string, any>
+  const serviceAuth = (settings.serviceAuth || {}) as Record<string, any>
+  if (serviceAuth.username) return `Service user: ${serviceAuth.username}`
+  if (profile.apiKey) return "Token override"
+  return "Not configured"
+}
+
+function matchBadgeVariant(status?: string | null) {
+  if (status === "auto_linked" || status === "manually_linked") return "default" as const
+  if (status === "conflict") return "destructive" as const
+  if (status === "ignored") return "secondary" as const
+  return "outline" as const
+}
+
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
-  const { profiles, devices } = overview
+  const { profiles, devices, inventory } = overview
   const searchParams = useSearchParams()
   const section = searchParams.get("section")
-  const activeSection = section === "devices" ? "devices" : "profiles"
+  const activeSection = section === "devices" || section === "review" ? section : "profiles"
+  const connectedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "connected").length
+  const failedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "failed").length
+  const managedDevices = devices.filter((row) => row.mdmLink?.managementState === "managed").length
+  const reviewItems = inventory.filter((item) => item.matchStatus === "needs_review" || item.matchStatus === "conflict" || item.matchStatus === "unmatched")
+  const autoLinkedItems = inventory.filter((item) => item.matchStatus === "auto_linked").length
 
   return (
     <div className="w-full space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Connected profiles</div>
+            <div className="mt-1 text-2xl font-semibold">{connectedProfiles} / {profiles.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Profile issues</div>
+            <div className="mt-1 text-2xl font-semibold">{failedProfiles}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Managed devices</div>
+            <div className="mt-1 text-2xl font-semibold">{managedDevices} / {devices.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Review queue</div>
+            <div className="mt-1 text-2xl font-semibold">{reviewItems.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Auto-linked</div>
+            <div className="mt-1 text-2xl font-semibold">{autoLinkedItems}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end">
+        <form action={syncAllEnabledMdmProfilesFromForm}>
+          <input type="hidden" name="reason" value="Operator requested full MDM inventory reconciliation" />
+          <Button type="submit" variant="primary-outline">
+            <RefreshCwIcon className="size-4 mr-2" />
+            Sync all MDM profiles
+          </Button>
+        </form>
+      </div>
+
       <Tabs
         searchParamsKey="section"
         options={[
           { value: "profiles", label: "MDM profiles" },
           { value: "devices", label: "Device fleet" },
+          { value: "review", label: `Review queue${reviewItems.length ? ` (${reviewItems.length})` : ""}` },
         ]}
       />
 
@@ -63,9 +134,32 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
               columns={[
                 { name: "Name" },
                 { name: "Country" },
+                { name: "Environment" },
                 { name: "Provider" },
                 { name: "URL" },
-                { name: "Token" },
+                { name: "Authentication" },
+                {
+                  name: "Connection",
+                  cellRenderer({ rowIndex }) {
+                    const profile = profiles[rowIndex]
+                    return (
+                      <Badge variant={connectionBadgeVariant(profile?.lastConnectionStatus)}>
+                        {profile?.lastConnectionStatus || "not checked"}
+                      </Badge>
+                    )
+                  },
+                },
+                {
+                  name: "Device sync",
+                  cellRenderer({ rowIndex }) {
+                    const profile = profiles[rowIndex]
+                    return (
+                      <Badge variant={connectionBadgeVariant(profile?.lastDeviceSyncStatus)}>
+                        {profile?.lastDeviceSyncStatus || "not synced"}
+                      </Badge>
+                    )
+                  },
+                },
                 {
                   name: "Status",
                   cellRenderer({ rowIndex }) {
@@ -84,16 +178,19 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                   cellRenderer({ rowIndex }) {
                     const profile = profiles[rowIndex]
                     if (!profile) return null
-                    return <DeviceManagementRowActions editHref={`/device-management/profiles/${profile.profileId}`} />
+                    return <DeviceManagementRowActions editHref={`/device-management/profiles/${profile.profileId}`} profileId={profile.profileId} />
                   },
                 },
               ]}
               data={profiles.map((profile) => [
                 profile.name || "",
                 profile.countryISO || "",
+                profile.environment || "production",
                 profile.provider || "",
                 profile.baseUrl || "",
-                maskSecret(profile.apiKey),
+                authMode(profile),
+                profile.lastConnectionStatus || "not checked",
+                profile.lastDeviceSyncStatus || "not synced",
                 profile.isEnabled ? "Enabled" : "Disabled",
                 "",
               ])}
@@ -120,6 +217,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
               noDataMessage={<div>No registered devices yet.</div>}
               columns={[
                 { name: "Device" },
+                { name: "Country" },
                 {
                   name: "MDM",
                   cellRenderer({ rowIndex }) {
@@ -132,6 +230,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                   },
                 },
                 { name: "Profile" },
+                { name: "Group" },
                 {
                   name: "Enrollment",
                   cellRenderer({ rowIndex }) {
@@ -145,6 +244,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 },
                 { name: "App" },
                 { name: "Runtime" },
+                { name: "Sync" },
                 { name: "Last Seen" },
                 {
                   name: "Action",
@@ -162,12 +262,74 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
               ]}
               data={devices.map(({ device, appState, mdmLink }) => [
                 device.deviceHash || device.deviceId,
+                mdmLink?.countryISO || appState?.countryISO || "",
                 mdmLink?.managementState || "unlinked",
                 mdmLink?.profile?.name || "",
+                mdmLink?.mdmGroupName || mdmLink?.mdmGroupId || "",
                 mdmLink?.enrollmentStatus || "unknown",
                 appState?.appVersion || "",
                 appState?.runtimeVersion || "",
+                mdmLink?.lastSyncStatus || "",
                 fmt(appState?.lastSeenAt || mdmLink?.lastMdmSeenAt),
+                "",
+              ])}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {activeSection === "review" ? (
+        <Card className="w-full">
+          <CardContent className="p-0 overflow-x-auto">
+            <DataTable
+              title={<div className="text-2xl">MDM review queue</div>}
+              tableClassname="min-w-[1100px]"
+              search={{ inputPlaceholder: "Search remote MDM devices" }}
+              noDataMessage={<div>No MDM devices need review.</div>}
+              columns={[
+                { name: "Remote device" },
+                { name: "Profile" },
+                { name: "Configuration" },
+                {
+                  name: "Match",
+                  cellRenderer({ rowIndex }) {
+                    const item = reviewItems[rowIndex]
+                    return (
+                      <Badge variant={matchBadgeVariant(item?.matchStatus)}>
+                        {item?.matchStatus?.replace("_", " ") || "unknown"}
+                      </Badge>
+                    )
+                  },
+                },
+                { name: "Confidence" },
+                { name: "Suggested NeoTree device" },
+                { name: "Reason" },
+                { name: "Last seen" },
+                {
+                  name: "Action",
+                  align: "right",
+                  cellClassName: "w-10",
+                  cellRenderer({ rowIndex }) {
+                    const item = reviewItems[rowIndex]
+                    if (!item) return null
+                    return (
+                      <MdmInventoryReviewActions
+                        inventoryId={item.inventoryId}
+                        suggestedDeviceId={item.suggestedDeviceId}
+                      />
+                    )
+                  },
+                },
+              ]}
+              data={reviewItems.map((item) => [
+                item.serialNumber || item.mdmDeviceId,
+                item.profile?.name || "",
+                item.mdmConfigName || item.mdmConfigId || "",
+                item.matchStatus || "",
+                `${item.matchConfidence || 0}%`,
+                item.suggestedDevice?.deviceHash || item.suggestedDeviceId || "",
+                (item.matchReasons || []).join(", "),
+                fmt(item.lastMdmSeenAt || item.lastSeenAt),
                 "",
               ])}
             />

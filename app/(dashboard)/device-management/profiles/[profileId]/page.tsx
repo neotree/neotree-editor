@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { getMdmProviderProfile } from "@/app/actions/device-management";
+import { getMdmProviderConfigurations, getMdmProviderProfile } from "@/app/actions/device-management";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import { Alert } from "@/components/alert";
 import { Content } from "@/components/content";
@@ -34,7 +34,10 @@ export default async function EditMdmProfilePage({ params, searchParams }: Props
     );
   }
 
-  const profile = await getMdmProviderProfile(params.profileId);
+  const [profile, configurations] = await Promise.all([
+    getMdmProviderProfile(params.profileId),
+    getMdmProviderConfigurations(params.profileId),
+  ]);
 
   if (!profile.data) {
     return <Alert title="Not found" message="MDM profile was not found or it might have been deleted!" redirectTo="/device-management" />;
@@ -54,6 +57,7 @@ export default async function EditMdmProfilePage({ params, searchParams }: Props
             </div>
             <DeviceManagementProfileForm
               profile={profile.data}
+              kioskPolicyOptions={configurations.data}
               error={typeof searchParams?.error === "string" ? searchParams.error : null}
               returnTo={`/device-management/profiles/${params.profileId}`}
             />

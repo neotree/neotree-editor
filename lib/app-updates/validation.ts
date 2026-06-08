@@ -9,6 +9,7 @@ const apkReleaseStatuses = new Set([
 ])
 
 const installWindows = new Set(["on_restart", "idle", "immediate"])
+const deliveryModes = new Set(["in_app", "mdm", "hybrid", "manual"])
 const sha256Pattern = /^[a-f0-9]{64}$/i
 
 export type ReleaseReadinessCheck = {
@@ -34,7 +35,9 @@ type PolicyLike = {
   runtimeVersion?: string | null
   otaChannel?: string | null
   apkGracePeriodHours?: number | null
+  apkDeliveryMode?: string | null
   apkInstallWindow?: string | null
+  targetScope?: string | null
   currentApkReleaseId?: string | null
   rollbackApkReleaseId?: string | null
 }
@@ -59,9 +62,14 @@ export function normalizeAppUpdatePolicyPayload<T extends Record<string, any>>(p
     ...payload,
     runtimeVersion: `${payload.runtimeVersion || ""}`.trim(),
     otaChannel: `${payload.otaChannel || "production"}`.trim(),
+    apkDeliveryMode: `${payload.apkDeliveryMode || "in_app"}`.trim(),
     apkInstallWindow: `${payload.apkInstallWindow || "on_restart"}`.trim(),
     apkMessageTitle: `${payload.apkMessageTitle || ""}`.trim(),
     apkMessageBody: `${payload.apkMessageBody || ""}`.trim(),
+    targetScope: `${payload.targetScope || "country"}`.trim(),
+    targetGroupId: payload.targetGroupId || null,
+    targetHospitalId: payload.targetHospitalId === "none" ? null : payload.targetHospitalId || null,
+    rollbackEnabled: !!payload.rollbackEnabled,
     currentApkReleaseId: payload.currentApkReleaseId || null,
     rollbackApkReleaseId: payload.rollbackApkReleaseId || null,
   }
@@ -154,6 +162,9 @@ export function validateAppUpdatePolicyPayload(policy: PolicyLike, releasesById?
   }
   if (policy.apkInstallWindow && !installWindows.has(policy.apkInstallWindow)) {
     errors.push(`Invalid APK install window: ${policy.apkInstallWindow}`)
+  }
+  if (policy.apkDeliveryMode && !deliveryModes.has(policy.apkDeliveryMode)) {
+    errors.push(`Invalid APK delivery mode: ${policy.apkDeliveryMode}`)
   }
 
   const validateReferencedRelease = (releaseId: string | null | undefined, label: string) => {

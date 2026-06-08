@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { getMdmProviderProfiles } from "@/app/actions/device-management";
+import { getMdmDeviceInventoryById, getMdmProviderProfiles } from "@/app/actions/device-management";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Title } from "@/components/title";
@@ -34,6 +34,8 @@ export default async function NewDeviceMdmLinkPage({ searchParams }: Props) {
 
   const profiles = await getMdmProviderProfiles({ includeDisabled: true });
   const initialDeviceId = typeof searchParams?.deviceId === "string" ? searchParams.deviceId : undefined;
+  const inventoryId = typeof searchParams?.mdmInventoryId === "string" ? searchParams.mdmInventoryId : undefined;
+  const inventory = inventoryId ? await getMdmDeviceInventoryById(inventoryId) : null;
 
   return (
     <>
@@ -49,7 +51,16 @@ export default async function NewDeviceMdmLinkPage({ searchParams }: Props) {
             </div>
             <DeviceMdmLinkForm
               profiles={profiles.data}
-              initialDeviceId={initialDeviceId}
+              initialDeviceId={initialDeviceId || inventory?.data?.suggestedDeviceId || undefined}
+              initialProfileId={inventory?.data?.profileId}
+              initialMdmDeviceId={inventory?.data?.mdmDeviceId}
+              initialCountryISO={inventory?.data?.countryISO}
+              initialSerialNumber={inventory?.data?.serialNumber}
+              initialAndroidVersion={inventory?.data?.androidVersion}
+              initialMdmConfigId={inventory?.data?.mdmConfigId}
+              initialMdmConfigName={inventory?.data?.mdmConfigName}
+              initialMdmGroupId={inventory?.data?.mdmGroupId}
+              initialMdmGroupName={inventory?.data?.mdmGroupName}
               error={typeof searchParams?.error === "string" ? searchParams.error : null}
               returnTo={`/device-management/links/new${initialDeviceId ? `?deviceId=${encodeURIComponent(initialDeviceId)}` : ""}`}
             />

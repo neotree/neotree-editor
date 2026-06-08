@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
-import { _saveDeviceUpdateEvents } from "@/databases/mutations/device-update-events";
+import { _saveDeviceUpdateEvents, _upsertDeviceRolloutStateFromEvent } from "@/databases/mutations/device-update-events";
 import { authenticateMobileDevice } from "@/lib/mobile-device-auth";
 
 export async function POST(req: NextRequest) {
@@ -19,21 +19,29 @@ export async function POST(req: NextRequest) {
         const auth = await authenticateMobileDevice(req, deviceId, { body: rawBody });
         if (!auth.ok) return NextResponse.json({ errors: auth.errors, data: null }, { status: auth.status });
 
+        const event = {
+            eventId: body?.eventId || undefined,
+            deviceId,
+            eventType,
+            status: body?.status || null,
+            countryISO: body?.countryISO || body?.countryIso || null,
+            appVersion: body?.appVersion || null,
+            runtimeVersion: body?.runtimeVersion || null,
+            apkReleaseId: body?.apkReleaseId || null,
+            otaUpdateId: body?.otaUpdateId || null,
+            otaChannel: body?.otaChannel || null,
+            errorCode: body?.errorCode || null,
+            errorMessage: body?.errorMessage || null,
+            payload: body?.payload || {},
+        };
+
         const res = await _saveDeviceUpdateEvents({
             returnSaved: true,
-            data: [{
-                eventId: body?.eventId || undefined,
-                deviceId,
-                eventType,
-                appVersion: body?.appVersion || null,
-                runtimeVersion: body?.runtimeVersion || null,
-                otaUpdateId: body?.otaUpdateId || null,
-                otaChannel: body?.otaChannel || null,
-                payload: body?.payload || {},
-            }],
+            data: [event],
         });
 
         if (res?.errors?.length) return NextResponse.json({ errors: res.errors, data: null });
+        await _upsertDeviceRolloutStateFromEvent(event);
 
         return NextResponse.json({ data: res.inserted[0] || null, success: res.success });
     } catch (e: any) {

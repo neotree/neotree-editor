@@ -1,8 +1,45 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 
 import db from "@/databases/pg/drizzle"
-import { deviceAppStates, deviceMdmLinks, devices, mdmProviderProfiles } from "@/databases/pg/schema"
+import { deviceAppStates, deviceMdmLinks, devices, mdmDeviceInventory, mdmProviderProfiles } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
+
+type MdmInventoryRow = typeof mdmDeviceInventory.$inferSelect
+
+async function hydrateInventoryRows(rows: MdmInventoryRow[]) {
+  const profileIds = Array.from(new Set(rows.map((row) => row.profileId).filter(Boolean)))
+  const deviceIds = [
+    ...Array.from(new Set(
+      rows
+        .flatMap((row) => [row.suggestedDeviceId, row.linkedDeviceId])
+        .filter((value): value is string => Boolean(value)),
+    )),
+  ]
+
+  const [profiles, deviceRows] = await Promise.all([
+    profileIds.length
+      ? db.query.mdmProviderProfiles.findMany({
+          where: inArray(mdmProviderProfiles.profileId, profileIds),
+          with: { hospital: true },
+        })
+      : Promise.resolve([]),
+    deviceIds.length
+      ? db.query.devices.findMany({
+          where: inArray(devices.deviceId, deviceIds),
+        })
+      : Promise.resolve([]),
+  ])
+
+  const profileById = new Map(profiles.map((profile) => [profile.profileId, profile]))
+  const deviceById = new Map(deviceRows.map((device) => [device.deviceId, device]))
+
+  return rows.map((row) => ({
+    ...row,
+    profile: profileById.get(row.profileId) || null,
+    suggestedDevice: row.suggestedDeviceId ? deviceById.get(row.suggestedDeviceId) || null : null,
+    linkedDevice: row.linkedDeviceId ? deviceById.get(row.linkedDeviceId) || null : null,
+  }))
+}
 
 export type GetMdmProviderProfilesParams = {
   countryISO?: string
@@ -87,9 +124,51 @@ export async function _getDeviceMdmLink(linkId: string) {
   }
 }
 
+export async function _getMdmDeviceInventory(params?: {
+  profileId?: string
+  matchStatus?: "unmatched" | "auto_linked" | "manually_linked" | "needs_review" | "conflict" | "ignored"
+  includeIgnored?: boolean
+}) {
+  try {
+    const where = [
+      ...(params?.profileId ? [eq(mdmDeviceInventory.profileId, params.profileId)] : []),
+      ...(params?.matchStatus ? [eq(mdmDeviceInventory.matchStatus, params.matchStatus)] : []),
+      ...(params?.includeIgnored ? [] : []),
+    ]
+
+    const rows = await db
+      .select()
+      .from(mdmDeviceInventory)
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(desc(mdmDeviceInventory.updatedAt))
+    const data = await hydrateInventoryRows(rows)
+
+    return { data }
+  } catch (e: any) {
+    logger.error("_getMdmDeviceInventory ERROR", e.message)
+    return { data: [], errors: [e.message] }
+  }
+}
+
+export async function _getMdmDeviceInventoryById(inventoryId: string) {
+  try {
+    const [row] = await db
+      .select()
+      .from(mdmDeviceInventory)
+      .where(eq(mdmDeviceInventory.inventoryId, inventoryId))
+      .limit(1)
+    const [data] = row ? await hydrateInventoryRows([row]) : []
+
+    return { data: data || null }
+  } catch (e: any) {
+    logger.error("_getMdmDeviceInventoryById ERROR", e.message)
+    return { data: null, errors: [e.message] }
+  }
+}
+
 export async function _getDeviceManagementOverview() {
   try {
-    const [profiles, links, deviceRows, stateRows] = await Promise.all([
+    const [profiles, links, inventory, deviceRows, stateRows] = await Promise.all([
       db.query.mdmProviderProfiles.findMany({
         where: isNull(mdmProviderProfiles.deletedAt),
         with: { hospital: true },
@@ -99,6 +178,7 @@ export async function _getDeviceManagementOverview() {
         with: { profile: true },
         orderBy: [desc(deviceMdmLinks.updatedAt)],
       }),
+      db.select().from(mdmDeviceInventory).orderBy(desc(mdmDeviceInventory.updatedAt)),
       db.query.devices.findMany({ orderBy: [desc(devices.updatedAt)] }),
       db.query.deviceAppStates.findMany({ orderBy: [desc(deviceAppStates.lastSeenAt)] }),
     ])
@@ -112,9 +192,11 @@ export async function _getDeviceManagementOverview() {
       mdmLink: linkByDevice.get(device.deviceId) || null,
     }))
 
-    return { data: { profiles, links, devices: devicesWithManagement } }
+    const hydratedInventory = await hydrateInventoryRows(inventory)
+
+    return { data: { profiles, links, inventory: hydratedInventory, devices: devicesWithManagement } }
   } catch (e: any) {
     logger.error("_getDeviceManagementOverview ERROR", e.message)
-    return { data: { profiles: [], links: [], devices: [] }, errors: [e.message] }
+    return { data: { profiles: [], links: [], inventory: [], devices: [] }, errors: [e.message] }
   }
 }
