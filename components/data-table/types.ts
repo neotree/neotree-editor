@@ -85,4 +85,5 @@ export type DataTableProps = DataTableHeaderProps & {
         cells: React.ReactElement[];
         rowIndex: number;
     }) => React.ReactNode;
+    preTableNode?: React.ReactNode;
 };

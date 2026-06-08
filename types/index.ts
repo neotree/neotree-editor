@@ -21,6 +21,7 @@ export type Preferences = {
     textColor: { [key: string]: undefined | string; };
     backgroundColor: { [key: string]: undefined | string; };
     highlight: { [key: string]: undefined | boolean; };
+    enableSeverityRanking?: boolean;
 };
 
 export type PrintSection = {
