@@ -29,9 +29,9 @@ const countryOptions = [
 ];
 
 const environmentOptions = [
-  { value: "demo", label: "demo" },
-  { value: "production", label: "production" },
-  { value: "stage", label: "stage" },
+  { value: "demo", label: "Demo" },
+  { value: "stage", label: "Stage" },
+  { value: "production", label: "Production" },
 ];
 
 const capabilityOptions = [
@@ -85,6 +85,7 @@ export function DeviceManagementProfileForm({
   const selectedKioskPolicy = kioskOptions.find((option) => option.id === profile?.defaultKioskPolicy || option.name === profile?.defaultKioskPolicy)?.id || profile?.defaultKioskPolicy || kioskOptions[0]?.id || "";
   const capabilities = (profile?.providerCapabilities || {}) as Record<string, any>;
   const settings = (profile?.settings || {}) as Record<string, any>;
+  const actionPaths = (settings.actionPaths || {}) as Record<string, any>;
   const serviceAuth = (settings.serviceAuth || {}) as Record<string, any>;
   const isBusy = isTesting || isPending;
 
@@ -377,6 +378,44 @@ export function DeviceManagementProfileForm({
               defaultValue={`${settings.deviceStatusPath || ""}`}
               placeholder="/rest/private/devices/:mdmDeviceId"
             />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="mdm-lock-device-path">Remote lock API path</Label>
+              <Input
+                id="mdm-lock-device-path"
+                name="lockDevicePath"
+                defaultValue={`${actionPaths.lockDevice || ""}`}
+                placeholder="/rest/private/devices/:mdmDeviceId/lock"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="mdm-wipe-device-path">Remote wipe API path</Label>
+              <Input
+                id="mdm-wipe-device-path"
+                name="wipeDevicePath"
+                defaultValue={`${actionPaths.wipeDevice || ""}`}
+                placeholder="/rest/private/devices/:mdmDeviceId/wipe"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="mdm-kiosk-action-path">Assign kiosk policy API path</Label>
+              <Input
+                id="mdm-kiosk-action-path"
+                name="assignKioskPolicyPath"
+                defaultValue={`${actionPaths.assignKioskPolicy || ""}`}
+                placeholder="/rest/private/devices/:mdmDeviceId/configuration"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="mdm-push-apk-path">APK push API path</Label>
+              <Input
+                id="mdm-push-apk-path"
+                name="pushApkPath"
+                defaultValue={`${actionPaths.pushApk || ""}`}
+                placeholder="/rest/private/devices/:mdmDeviceId/applications"
+              />
+            </div>
           </div>
         </div>
       </details>

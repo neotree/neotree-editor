@@ -20,12 +20,13 @@ export async function GET(req: NextRequest) {
 
         const policy = policyRes.data;
         if (!policy) return NextResponse.json({ errors: ["Policy not found"], data: null });
+        const allowsInAppDownload = policy.apkDeliveryMode === "in_app" || policy.apkDeliveryMode === "hybrid";
 
         const mapRelease = (release: typeof policy.currentApkRelease) => {
             if (!release) return null;
 
             const available = !!(release.isAvailable && release.status === "available");
-            const downloadUrl = release.fileId
+            const downloadUrl = allowsInAppDownload && release.fileId
                 ? getAppUrl(`/api/mobile/apk-releases/${release.apkReleaseId}/download?deviceId=${encodeURIComponent(deviceId)}`)
                 : null;
 

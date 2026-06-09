@@ -48,6 +48,7 @@ export default async function AppUpdateApkPage({ searchParams }: Props) {
           apkReleaseDrafts={releaseDraftsRes.data}
           apkReleaseId={apkReleaseId}
           saveApkReleases={appUpdatesActions.saveApkReleases}
+          importEasApkReleaseDraft={appUpdatesActions.importEasApkReleaseDraft}
         />
       </Content>
     </>
