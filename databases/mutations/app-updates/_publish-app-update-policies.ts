@@ -6,6 +6,7 @@ import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { appUpdatePolicies, appUpdatePoliciesDrafts, apkReleases } from "@/databases/pg/schema";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
+import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout";
 
 export async function _publishAppUpdatePolicies(opts?: {
     userId?: string | null;
@@ -81,6 +82,17 @@ export async function _publishAppUpdatePolicies(opts?: {
                         changeReason: `App update policy published`,
                         userId: opts.userId,
                     });
+                }
+
+                if (payload.apkDeliveryMode === "mdm" || payload.apkDeliveryMode === "hybrid") {
+                    const rolloutResult = await requestMdmApkRolloutForPolicy({
+                        ...payload,
+                        policyId,
+                        policyVersion,
+                    } as typeof appUpdatePolicies.$inferSelect);
+                    if (rolloutResult.errors.length) {
+                        logger.error("_publishAppUpdatePolicies MDM rollout warnings", rolloutResult.errors.join(", "));
+                    }
                 }
                 publishedDraftIds.push(draft.policyDraftId);
             } catch (e: any) {

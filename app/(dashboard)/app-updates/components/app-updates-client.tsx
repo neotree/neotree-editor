@@ -12,7 +12,7 @@ import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases, deviceAppStates, deviceRolloutStates, deviceUpdateEvents } from "@/databases/pg/schema";
-import { getApkReleaseReadiness, isApkReleaseDeviceAvailable } from "@/lib/app-updates/validation";
+import { getApkReleaseReadiness, isApkReleaseDeviceAvailable, normalizeAppUpdateChannel } from "@/lib/app-updates/validation";
 
 type ApkRelease = typeof apkReleases.$inferSelect;
 type DeviceAppState = typeof deviceAppStates.$inferSelect;
@@ -30,6 +30,14 @@ const formatBytes = (value?: number | null) => {
   if (!value) return "";
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatChannel = (value?: string | null) => {
+  const channel = normalizeAppUpdateChannel(value);
+  if (channel === "prod") return "Prod";
+  if (channel === "stage") return "Stage";
+  if (channel === "demo") return "Demo";
+  return value || "";
 };
 
 const isRecent = (value?: string | Date | null, maxAgeHours = 24) => {
@@ -156,6 +164,22 @@ export function AppUpdatesClient({
       .slice(0, 8);
   }, [otaEvents]);
 
+  const rolloutSummary = useMemo(() => {
+    const currentReleaseId = liveCurrentRelease?.apkReleaseId || policy?.currentApkReleaseId || null;
+    const currentStates = currentReleaseId
+      ? rolloutStates.filter((state) => state.apkReleaseId === currentReleaseId)
+      : rolloutStates;
+    return {
+      total: currentStates.length,
+      installed: currentStates.filter((state) => state.rolloutState === "installed").length,
+      failed: currentStates.filter((state) => state.rolloutState === "failed").length,
+      mdmRequested: currentStates.filter((state) => state.rolloutState === "mdm_push_requested").length,
+    };
+  }, [liveCurrentRelease?.apkReleaseId, policy?.currentApkReleaseId, rolloutStates]);
+
+  const deliveryMode = policy?.apkDeliveryMode || "not configured";
+  const usesMdm = deliveryMode === "mdm" || deliveryMode === "hybrid";
+
   const loadRelease = useCallback(
     (release: any) => {
       const releaseId = release.apkReleaseId || release.apkReleaseDraftId;
@@ -170,6 +194,59 @@ export function AppUpdatesClient({
     <>
       {screen === "overview" ? (
         <div className="w-full space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Live policy</div>
+                <div className="mt-1 text-lg font-semibold">{policy ? `v${policy.policyVersion}` : "Not configured"}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge variant={policy?.otaEnabled ? "default" : "secondary"}>{policy?.otaEnabled ? "OTA on" : "OTA off"}</Badge>
+                    {policy?.otaChannel ? <Badge variant="secondary">{formatChannel(policy.otaChannel)}</Badge> : null}
+                    <Badge variant={policy ? "default" : "secondary"}>{deliveryMode}</Badge>
+                  </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Current APK</div>
+                <div className="mt-1 text-lg font-semibold">
+                  {liveCurrentRelease ? `${liveCurrentRelease.versionName} (${liveCurrentRelease.versionCode})` : "None"}
+                </div>
+                <div className="mt-2">
+                  <Badge variant={liveCurrentRelease && isApkReleaseDeviceAvailable(liveCurrentRelease) ? "default" : "secondary"}>
+                    {liveCurrentRelease && isApkReleaseDeviceAvailable(liveCurrentRelease) ? "Ready" : "Not ready"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Fleet rollout</div>
+                <div className="mt-1 text-lg font-semibold">
+                  {rolloutSummary.installed} / {rolloutSummary.total}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {rolloutSummary.mdmRequested} MDM requested
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-sm text-muted-foreground">Rollout risk</div>
+                <div className="mt-1 text-lg font-semibold">{rolloutSummary.failed + recentFailures.length} issues</div>
+                <div className="mt-2">
+                  <Button
+                    variant="ghost"
+                    className="h-auto w-auto p-0"
+                    onClick={() => router.push(usesMdm ? "/device-management?section=review" : "/app-updates/ota?section=exceptions")}
+                  >
+                    {usesMdm ? "Open Device Management" : "View exceptions"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Tabs
             searchParamsKey="section"
             options={[
@@ -504,7 +581,7 @@ export function AppUpdatesClient({
                     event.appVersion || "",
                     event.runtimeVersion || "",
                     event.otaUpdateId || "",
-                    event.otaChannel || "",
+                    formatChannel(event.otaChannel),
                     formatDateTime(event.createdAt),
                   ])}
                 />

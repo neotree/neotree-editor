@@ -17,9 +17,9 @@ import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
 
-import type { saveApkReleases } from "@/app/actions/app-updates";
+import type { importEasApkReleaseDraft, saveApkReleases } from "@/app/actions/app-updates";
 import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases } from "@/databases/pg/schema";
 import { getApkReleaseReadiness, normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
@@ -41,6 +41,7 @@ type Props = {
   apkReleaseDrafts: ApkReleaseDraft[];
   apkReleaseId?: string | null;
   saveApkReleases: typeof saveApkReleases;
+  importEasApkReleaseDraft: typeof importEasApkReleaseDraft;
 };
 
 type ApkFormState = {
@@ -94,6 +95,7 @@ export function ApkReleaseForm({
   apkReleaseDrafts,
   apkReleaseId,
   saveApkReleases,
+  importEasApkReleaseDraft,
 }: Props) {
   const router = useRouter();
   const { alert } = useAlertModal();
@@ -101,6 +103,9 @@ export function ApkReleaseForm({
   const editingDisabled = viewOnly;
 
   const [loading, setLoading] = useState(false);
+  const [artifactUrl, setArtifactUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [apkSource, setApkSource] = useState<"eas" | "upload">("eas");
 
   const releaseRows = useMemo(() => {
     const byId = new Map<string, any>();
@@ -234,6 +239,52 @@ export function ApkReleaseForm({
     }));
   }, [editingDisabled]);
 
+  const onImportEasArtifact = useCallback(async () => {
+    try {
+      if (editingDisabled) return;
+      if (!artifactUrl.trim()) throw new Error("Paste the EAS APK link first");
+      if (!apkForm.runtimeVersion) throw new Error("Enter the runtime version first");
+      if (!apkForm.versionName) throw new Error("Enter the version name first");
+      if (!apkForm.versionCode) throw new Error("Enter the version code first");
+
+      setImporting(true);
+      const formData = new FormData();
+      formData.set("artifactUrl", artifactUrl.trim());
+      formData.set("apkReleaseId", apkForm.apkReleaseId || "");
+      formData.set("runtimeVersion", apkForm.runtimeVersion);
+      formData.set("versionName", apkForm.versionName);
+      formData.set("versionCode", `${apkForm.versionCode}`);
+      formData.set("releaseNotes", apkForm.releaseNotes || "");
+
+      const result = await importEasApkReleaseDraft(formData);
+      if (!result.success) throw new Error(result.errors?.join(", ") || "Could not import APK");
+
+      setApkForm((prev) => ({
+        ...prev,
+        status: "uploaded",
+        isAvailable: false,
+        fileId: result.data?.fileId || prev.fileId,
+        fileSize: result.data?.fileSize || prev.fileSize,
+        checksumSha256: result.data?.checksumSha256 || prev.checksumSha256,
+        signatureSha256: result.data?.signatureSha256 || prev.signatureSha256,
+      }));
+      router.refresh();
+      alert({
+        title: "APK imported",
+        message: "NeoTree copied the EAS APK into its own storage and saved a release draft for review.",
+        variant: "success",
+      });
+    } catch (e: any) {
+      alert({
+        title: "Import failed",
+        message: e.message || "Could not import the EAS APK link.",
+        variant: "error",
+      });
+    } finally {
+      setImporting(false);
+    }
+  }, [alert, apkForm, artifactUrl, editingDisabled, importEasApkReleaseDraft, router]);
+
   const resetApkForm = useCallback(() => {
     setApkForm(defaultApkForm());
   }, []);
@@ -297,6 +348,72 @@ export function ApkReleaseForm({
             </div>
           ) : null}
 
+          <div className="mt-6 rounded-md border p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium">APK source</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Choose where NeoTree should get the APK from. EAS build link is recommended because it avoids manual file handling.
+                </div>
+              </div>
+              <div className="w-full lg:w-64">
+                <Select
+                  value={apkSource}
+                  onValueChange={(value) => setApkSource(value as "eas" | "upload")}
+                  disabled={editingDisabled || importing}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select APK source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="eas">EAS build link</SelectItem>
+                    <SelectItem value="upload">Upload APK file</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {apkSource === "eas" ? (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      value={artifactUrl}
+                      onChange={(event) => setArtifactUrl(event.target.value)}
+                      placeholder="Paste EAS APK download link"
+                      disabled={editingDisabled || importing}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={onImportEasArtifact}
+                    disabled={editingDisabled || importing}
+                  >
+                    {importing ? "Importing..." : "Import APK"}
+                  </Button>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Fill in runtime version, version name, and version code first. NeoTree will copy the APK into its own storage and save a draft for review.
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                <UploadModal
+                  type=".apk,application/vnd.android.package-archive"
+                  inputProps={{ multiple: false, placeholder: "Choose APK" }}
+                  onUpload={onUploadApk}
+                >
+                  <Button variant="primary-outline" disabled={editingDisabled}>Upload APK</Button>
+                </UploadModal>
+                <span className={cn("text-xs", !apkForm.fileId && "text-muted-foreground")}>
+                  {apkForm.fileId ? `File: ${apkForm.fileId}` : "No file uploaded"}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
             <div>
               <Label>Runtime Version</Label>
@@ -355,19 +472,6 @@ export function ApkReleaseForm({
                 disabled={editingDisabled}
               />
               <Label>Available to devices</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <UploadModal
-                type=".apk,application/vnd.android.package-archive"
-                inputProps={{ multiple: false, placeholder: "Choose APK" }}
-                onUpload={onUploadApk}
-              >
-                <Button variant="primary-outline" disabled={editingDisabled}>Upload APK</Button>
-              </UploadModal>
-              <span className={cn("text-xs", !apkForm.fileId && "text-muted-foreground")}>
-                {apkForm.fileId ? `File: ${apkForm.fileId}` : "No file uploaded"}
-              </span>
             </div>
 
             <div>

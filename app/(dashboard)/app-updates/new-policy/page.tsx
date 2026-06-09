@@ -6,6 +6,7 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { canAccessPage } from "@/app/actions/is-allowed";
 import * as appUpdatesActions from "@/app/actions/app-updates";
+import { getDeviceManagementOverview } from "@/app/actions/device-management";
 import { getHospitals } from "@/app/actions/hospitals";
 import { AppUpdatePolicyForm } from "../components/policy-form";
 
@@ -28,13 +29,31 @@ export default async function AppUpdatePolicyPage() {
     );
   }
 
-  const [policyRes, policyDraftsRes, releasesRes, releaseDraftsRes, hospitalsRes] = await Promise.all([
+  const [policyRes, policyDraftsRes, releasesRes, releaseDraftsRes, hospitalsRes, deviceManagementRes] = await Promise.all([
     appUpdatesActions.getAppUpdatePolicy(),
     appUpdatesActions.getAppUpdatePolicyDrafts(),
     appUpdatesActions.getApkReleases(),
     appUpdatesActions.getApkReleaseDrafts(),
     getHospitals({ returnDraftsIfExist: false }),
+    getDeviceManagementOverview(),
   ]);
+
+  const mdmGroupOptions = Array.from(
+    new Map(
+      [
+        ...(deviceManagementRes.data.links || []),
+        ...(deviceManagementRes.data.inventory || []),
+      ]
+        .filter((item: any) => item.mdmGroupId)
+        .map((item: any) => [
+          item.mdmGroupId,
+          {
+            value: item.mdmGroupId,
+            label: item.mdmGroupName || item.mdmGroupId,
+          },
+        ]),
+    ).values(),
+  );
 
   return (
     <>
@@ -46,6 +65,7 @@ export default async function AppUpdatePolicyPage() {
           apkReleases={releasesRes.data}
           apkReleaseDrafts={releaseDraftsRes.data}
           hospitals={hospitalsRes.data || []}
+          mdmGroupOptions={mdmGroupOptions}
           saveAppUpdatePolicies={appUpdatesActions.saveAppUpdatePolicies}
         />
       </Content>

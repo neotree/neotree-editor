@@ -45,8 +45,10 @@ function mapEventToRolloutState(eventType: string): RolloutState | null {
     if (normalized.includes("policy") && normalized.includes("seen")) return "policy_seen";
     if (normalized.includes("mdm") && normalized.includes("push") && normalized.includes("ack")) return "mdm_push_acknowledged";
     if (normalized.includes("mdm") && normalized.includes("push")) return "mdm_push_requested";
+    if (normalized === "apk_downloaded" || normalized.includes("downloaded")) return "download_completed";
     if (normalized.includes("download") && normalized.includes("complete")) return "download_completed";
     if (normalized.includes("download") && normalized.includes("start")) return "download_started";
+    if (normalized === "apk_installed" || normalized.includes("installed")) return "installed";
     if (normalized.includes("install") && (normalized.includes("complete") || normalized.includes("success"))) return "installed";
     if (normalized.includes("install") && normalized.includes("start")) return "install_started";
     if (normalized.includes("rollback")) return "rolled_back";

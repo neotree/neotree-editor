@@ -4,6 +4,7 @@ import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 import { _getAppUpdatePolicy, _getApkReleases, _getAppUpdatePolicyDrafts, _getApkReleaseDrafts } from "@/databases/queries/app-updates";
 import { _saveAppUpdatePolicies, _saveApkReleases } from "@/databases/mutations/app-updates";
+import { importApkArtifactFromUrl } from "@/lib/app-updates/apk-artifact-import";
 
 
 export const getAppUpdatePolicyDrafts: typeof _getAppUpdatePolicyDrafts = async (...args) => {
@@ -71,3 +72,67 @@ export const saveApkReleases: typeof _saveApkReleases = async (params) => {
         return { success: false, inserted: [], errors: [e.message] };
     }
 };
+
+export async function importEasApkReleaseDraft(formData: FormData) {
+    try {
+        const session = await isAllowed();
+        const artifactUrl = `${formData.get("artifactUrl") || ""}`.trim();
+        const runtimeVersion = `${formData.get("runtimeVersion") || ""}`.trim();
+        const versionName = `${formData.get("versionName") || ""}`.trim();
+        const versionCode = Number(formData.get("versionCode") || 0);
+        const apkReleaseId = `${formData.get("apkReleaseId") || ""}`.trim() || undefined;
+        const releaseNotes = `${formData.get("releaseNotes") || ""}`.trim();
+
+        if (!runtimeVersion) throw new Error("Runtime version is required before importing the APK");
+        if (!versionName) throw new Error("Version name is required before importing the APK");
+        if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error("Version code must be a positive number");
+
+        const imported = await importApkArtifactFromUrl({
+            artifactUrl,
+            source: "eas",
+            metadata: {
+                apkReleaseId: apkReleaseId || null,
+                runtimeVersion,
+                versionName,
+                versionCode,
+                importedByUserId: session.user?.userId || null,
+            },
+        });
+
+        const saveResult = await _saveApkReleases({
+            userId: session.user?.userId,
+            data: [{
+                apkReleaseId,
+                runtimeVersion,
+                versionName,
+                versionCode,
+                status: "uploaded",
+                isAvailable: false,
+                fileId: imported.file.fileId,
+                fileSize: imported.fileSize,
+                checksumSha256: imported.checksumSha256,
+                signatureSha256: imported.signatureSha256,
+                releaseNotes: [
+                    releaseNotes,
+                    `Imported from EAS build artifact: ${imported.artifactUrl}`,
+                ].filter(Boolean).join("\n\n"),
+            }],
+        });
+
+        if (saveResult.errors?.length) throw new Error(saveResult.errors.join(", "));
+
+        return {
+            success: true,
+            data: {
+                fileId: imported.file.fileId,
+                fileSize: imported.fileSize,
+                checksumSha256: imported.checksumSha256,
+                signatureSha256: imported.signatureSha256,
+                artifactUrl: imported.artifactUrl,
+            },
+        };
+    } catch (e: any) {
+        logger.error("importEasApkReleaseDraft ERROR", e.message);
+        return { success: false, errors: [e.message || "Could not import EAS APK"] };
+    }
+}

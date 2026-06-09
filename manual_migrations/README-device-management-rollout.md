@@ -49,6 +49,7 @@ Production requirements:
 
 - Set a strong `MDM_SYNC_SECRET` in the web editor environment.
 - Run the endpoint from a trusted scheduler every 15-60 minutes.
+- The same `MDM_SYNC_SECRET` protects MDM APK downloads at `/api/mdm/apk-releases/:apkReleaseId/download`.
 - Keep MDM profile `autoSyncEnabled` on for active profiles.
 - Keep `autoLinkEnabled` on only when the profile has reliable device identifiers.
 - Review `needs_review`, `conflict`, and `unmatched` rows in Device Management before manually linking them.

@@ -75,11 +75,19 @@ function cleanObject<T extends Record<string, any>>(value: T) {
 }
 
 function buildEndpointSettings(formData: FormData) {
+  const actionPaths = cleanObject({
+    lockDevice: `${formData.get("lockDevicePath") || ""}`.trim(),
+    wipeDevice: `${formData.get("wipeDevicePath") || ""}`.trim(),
+    assignKioskPolicy: `${formData.get("assignKioskPolicyPath") || ""}`.trim(),
+    pushApk: `${formData.get("pushApkPath") || ""}`.trim(),
+  })
+
   return cleanObject({
     configurationsPath: `${formData.get("configurationsPath") || ""}`.trim(),
     devicesPath: `${formData.get("devicesPath") || ""}`.trim(),
     deviceStatusPath: `${formData.get("deviceStatusPath") || ""}`.trim(),
     loginPath: `${formData.get("loginPath") || ""}`.trim(),
+    actionPaths: Object.keys(actionPaths).length ? actionPaths : undefined,
   })
 }
 
@@ -137,7 +145,7 @@ function buildStoredSettings(
     }),
   }
 
-  for (const key of ["configurationsPath", "devicesPath", "deviceStatusPath", "loginPath"]) {
+  for (const key of ["configurationsPath", "devicesPath", "deviceStatusPath", "loginPath", "actionPaths"]) {
     if (!(endpointSettings as Record<string, any>)[key]) delete (settings as Record<string, any>)[key]
   }
 

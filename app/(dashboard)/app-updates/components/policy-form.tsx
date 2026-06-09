@@ -19,7 +19,13 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { saveAppUpdatePolicies } from "@/app/actions/app-updates";
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases, hospitals as hospitalsTable } from "@/databases/pg/schema";
-import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload, isApkReleaseDeviceAvailable } from "@/lib/app-updates/validation";
+import {
+  appUpdateChannels,
+  normalizeAppUpdateChannel,
+  normalizeAppUpdatePolicyPayload,
+  validateAppUpdatePolicyPayload,
+  isApkReleaseDeviceAvailable,
+} from "@/lib/app-updates/validation";
 
 const installWindows = [
   { value: "on_restart", label: "On restart" },
@@ -27,10 +33,10 @@ const installWindows = [
   { value: "immediate", label: "Immediate" },
 ] as const;
 const deliveryModes = [
-  { value: "in_app", label: "In-app" },
-  { value: "mdm", label: "MDM" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "manual", label: "Manual" },
+  { value: "in_app", label: "In-app", description: "NeoTree downloads and prompts for install inside the app." },
+  { value: "mdm", label: "MDM", description: "Headwind pushes the APK; the app only reports state and shows status." },
+  { value: "hybrid", label: "Hybrid", description: "Headwind is primary, with in-app download as a fallback." },
+  { value: "manual", label: "Manual", description: "No automatic install; devices show guidance and telemetry only." },
 ] as const;
 const targetScopes = [
   { value: "country", label: "Country" },
@@ -47,6 +53,7 @@ type Props = {
   apkReleases: ApkRelease[];
   apkReleaseDrafts: ApkReleaseDraft[];
   hospitals: Hospital[];
+  mdmGroupOptions?: { value: string; label: string }[];
   saveAppUpdatePolicies: typeof saveAppUpdatePolicies;
 };
 
@@ -76,7 +83,7 @@ const defaultPolicy = (): PolicyFormState => ({
   runtimeVersion: "",
   policyVersion: 1,
   otaEnabled: true,
-  otaChannel: "production",
+  otaChannel: "prod",
   apkAutoDownload: true,
   apkDeliveryMode: "in_app",
   apkForceInstall: false,
@@ -112,6 +119,7 @@ export function AppUpdatePolicyForm({
   apkReleases,
   apkReleaseDrafts,
   hospitals,
+  mdmGroupOptions = [],
   saveAppUpdatePolicies,
 }: Props) {
   const router = useRouter();
@@ -142,6 +150,7 @@ export function AppUpdatePolicyForm({
         ...defaultPolicy(),
         ...effectivePolicy,
         policyId: effectivePolicy.policyId || null,
+        otaChannel: normalizeAppUpdateChannel((effectivePolicy as any).otaChannel),
         apkForceAfter: toDateInput((effectivePolicy as any).apkForceAfter),
       };
     }
@@ -154,6 +163,7 @@ export function AppUpdatePolicyForm({
         ...defaultPolicy(),
         ...effectivePolicy,
         policyId: (effectivePolicy as any).policyId || null,
+        otaChannel: normalizeAppUpdateChannel((effectivePolicy as any).otaChannel),
         apkForceAfter: toDateInput((effectivePolicy as any).apkForceAfter),
       });
     } else {
@@ -262,6 +272,9 @@ export function AppUpdatePolicyForm({
 
   const currentRelease = policyForm.currentApkReleaseId ? releasesById.get(policyForm.currentApkReleaseId) : null;
   const rollbackRelease = policyForm.rollbackApkReleaseId ? releasesById.get(policyForm.rollbackApkReleaseId) : null;
+  const selectedDeliveryMode = deliveryModes.find((mode) => mode.value === policyForm.apkDeliveryMode);
+  const usesInAppDownload = policyForm.apkDeliveryMode === "in_app" || policyForm.apkDeliveryMode === "hybrid";
+  const usesMdmDelivery = policyForm.apkDeliveryMode === "mdm" || policyForm.apkDeliveryMode === "hybrid";
 
   return (
     <>
@@ -340,6 +353,25 @@ export function AppUpdatePolicyForm({
             </div>
           </div>
 
+          <div className="mt-4 rounded-md border p-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-medium">Delivery plan</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {selectedDeliveryMode?.description || "Choose how this APK should reach tablets."}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={usesMdmDelivery ? "default" : "secondary"}>
+                  {usesMdmDelivery ? "MDM active" : "No MDM push"}
+                </Badge>
+                <Badge variant={usesInAppDownload ? "default" : "secondary"}>
+                  {usesInAppDownload ? "In-app fallback" : "No in-app download"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
           {policyValidationErrors.length ? (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               {policyValidationErrors[0]}
@@ -369,11 +401,25 @@ export function AppUpdatePolicyForm({
 
             <div>
               <Label>OTA Channel</Label>
-              <Input
+              <Select
                 value={policyForm.otaChannel}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, otaChannel: e.target.value }))}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, otaChannel: value }))}
                 disabled={editingDisabled}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select OTA channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {appUpdateChannels.map((channel) => (
+                    <SelectItem key={channel.value} value={channel.value}>
+                      {channel.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Match the Expo update channel used by the tablet build.
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -432,7 +478,11 @@ export function AppUpdatePolicyForm({
               <Label>APK Delivery Mode</Label>
               <Select
                 value={policyForm.apkDeliveryMode}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, apkDeliveryMode: value }))}
+                onValueChange={(value) => setPolicyForm((prev) => ({
+                  ...prev,
+                  apkDeliveryMode: value,
+                  apkAutoDownload: value === "in_app" || value === "hybrid" ? prev.apkAutoDownload : false,
+                }))}
                 disabled={editingDisabled}
               >
                 <SelectTrigger>
@@ -472,7 +522,12 @@ export function AppUpdatePolicyForm({
               <Label>Target Scope</Label>
               <Select
                 value={policyForm.targetScope}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetScope: value }))}
+                onValueChange={(value) => setPolicyForm((prev) => ({
+                  ...prev,
+                  targetScope: value,
+                  targetGroupId: value === "group" ? prev.targetGroupId : null,
+                  targetHospitalId: value === "hospital" ? prev.targetHospitalId : null,
+                }))}
                 disabled={editingDisabled}
               >
                 <SelectTrigger>
@@ -488,15 +543,39 @@ export function AppUpdatePolicyForm({
               </Select>
             </div>
 
+            {policyForm.targetScope === "group" ? (
             <div>
               <Label>Target Group ID</Label>
-              <Input
-                value={policyForm.targetGroupId || ""}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, targetGroupId: e.target.value || null }))}
-                disabled={editingDisabled}
-              />
+              {mdmGroupOptions.length ? (
+                <Select
+                  value={policyForm.targetGroupId || "none"}
+                  onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetGroupId: value === "none" ? null : value }))}
+                  disabled={editingDisabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select MDM group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No MDM group</SelectItem>
+                    {mdmGroupOptions.map((group) => (
+                      <SelectItem key={group.value} value={group.value}>
+                        {group.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={policyForm.targetGroupId || ""}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, targetGroupId: e.target.value || null }))}
+                  disabled={editingDisabled}
+                  placeholder="Sync Headwind devices to load groups"
+                />
+              )}
             </div>
+            ) : null}
 
+            {policyForm.targetScope === "hospital" ? (
             <div>
               <Label>Target Hospital ID</Label>
               <Select
@@ -517,6 +596,7 @@ export function AppUpdatePolicyForm({
                 </SelectContent>
               </Select>
             </div>
+            ) : null}
 
             <div className="flex items-center gap-3">
               <Switch

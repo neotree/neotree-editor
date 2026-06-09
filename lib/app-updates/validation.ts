@@ -10,6 +10,13 @@ const apkReleaseStatuses = new Set([
 
 const installWindows = new Set(["on_restart", "idle", "immediate"])
 const deliveryModes = new Set(["in_app", "mdm", "hybrid", "manual"])
+export const appUpdateChannels = [
+  { value: "demo", label: "Demo" },
+  { value: "stage", label: "Stage" },
+  { value: "prod", label: "Prod" },
+] as const
+
+const appUpdateChannelValues = new Set(appUpdateChannels.map((channel) => channel.value))
 const sha256Pattern = /^[a-f0-9]{64}$/i
 
 export type ReleaseReadinessCheck = {
@@ -38,6 +45,8 @@ type PolicyLike = {
   apkDeliveryMode?: string | null
   apkInstallWindow?: string | null
   targetScope?: string | null
+  targetGroupId?: string | null
+  targetHospitalId?: string | null
   currentApkReleaseId?: string | null
   rollbackApkReleaseId?: string | null
 }
@@ -57,11 +66,17 @@ export function normalizeApkReleasePayload<T extends Record<string, any>>(payloa
   }
 }
 
+export function normalizeAppUpdateChannel(value?: string | null) {
+  const channel = `${value || "prod"}`.trim().toLowerCase()
+  if (channel === "production") return "prod"
+  return channel
+}
+
 export function normalizeAppUpdatePolicyPayload<T extends Record<string, any>>(payload: T): T {
   return {
     ...payload,
     runtimeVersion: `${payload.runtimeVersion || ""}`.trim(),
-    otaChannel: `${payload.otaChannel || "production"}`.trim(),
+    otaChannel: normalizeAppUpdateChannel(payload.otaChannel),
     apkDeliveryMode: `${payload.apkDeliveryMode || "in_app"}`.trim(),
     apkInstallWindow: `${payload.apkInstallWindow || "on_restart"}`.trim(),
     apkMessageTitle: `${payload.apkMessageTitle || ""}`.trim(),
@@ -157,6 +172,9 @@ export function validateAppUpdatePolicyPayload(policy: PolicyLike, releasesById?
 
   if (!policy.runtimeVersion) errors.push("Runtime version is required")
   if (!policy.otaChannel) errors.push("OTA channel is required")
+  if (policy.otaChannel && !appUpdateChannelValues.has(normalizeAppUpdateChannel(policy.otaChannel) as any)) {
+    errors.push("OTA channel must be Demo, Stage, or Prod")
+  }
   if (policy.apkGracePeriodHours != null && (!Number.isInteger(policy.apkGracePeriodHours) || policy.apkGracePeriodHours < 0)) {
     errors.push("APK grace period must be a non-negative whole number")
   }
@@ -165,6 +183,12 @@ export function validateAppUpdatePolicyPayload(policy: PolicyLike, releasesById?
   }
   if (policy.apkDeliveryMode && !deliveryModes.has(policy.apkDeliveryMode)) {
     errors.push(`Invalid APK delivery mode: ${policy.apkDeliveryMode}`)
+  }
+  if (policy.targetScope === "group" && !policy.targetGroupId) {
+    errors.push("Select an MDM group for group-targeted rollout")
+  }
+  if (policy.targetScope === "hospital" && !policy.targetHospitalId) {
+    errors.push("Select a hospital for hospital-targeted rollout")
   }
 
   const validateReferencedRelease = (releaseId: string | null | undefined, label: string) => {
