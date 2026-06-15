@@ -1,6 +1,11 @@
 'use server';
 
 import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { execFileSync } from "child_process";
 
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
 import { _getFileByFileId, _getFiles, _getFullFileByFileId, _getReferencedFiles } from "@/databases/queries/files";
@@ -11,6 +16,7 @@ import { isAllowed } from "./is-allowed";
 import { getSiteAxiosClient } from "@/lib/axios";
 import queryString from "query-string";
 import { _getSites } from "@/databases/queries/sites";
+import { extractApkMetadataFromBuffer } from "@/lib/app-updates/apk-metadata";
 
 export const getFiles: typeof _getFiles = _getFiles;
 
@@ -45,6 +51,47 @@ export async function uploadFile(
 
                 if (metadata.width || metadata.height) {
                     filename = `${filename}?w=${metadata.width}&h=${metadata.height}`;
+                }
+
+                const isApk = (formData.get('contentType')?.toString() || file.type) === 'application/vnd.android.package-archive'
+                    || _filename.toLowerCase().endsWith('.apk');
+
+                if (isApk) {
+                    try {
+                        const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
+                        metadata.apkChecksumSha256 = checksumSha256;
+
+                        // Extract package/version metadata straight from the APK, like
+                        // Headwind does on direct upload (works without Android build-tools).
+                        try {
+                            const apkMeta = await extractApkMetadataFromBuffer(buffer);
+                            if (apkMeta.packageName) metadata.apkPackageName = apkMeta.packageName;
+                            if (apkMeta.versionName) metadata.apkVersionName = apkMeta.versionName;
+                            if (apkMeta.versionCode != null) metadata.apkVersionCode = apkMeta.versionCode;
+                            if (apkMeta.minSdkVersion != null) metadata.apkMinSdkVersion = apkMeta.minSdkVersion;
+                            if (apkMeta.targetSdkVersion != null) metadata.apkTargetSdkVersion = apkMeta.targetSdkVersion;
+                            if (apkMeta.compileSdkVersion != null) metadata.apkCompileSdkVersion = apkMeta.compileSdkVersion;
+                        } catch {
+                            // metadata extraction is best-effort
+                        }
+
+                        const tmpFile = path.join(os.tmpdir(), `${fileId}.apk`);
+                        fs.writeFileSync(tmpFile, buffer);
+                        try {
+                            const output = execFileSync('apksigner', ['verify', '--print-certs', tmpFile], { encoding: 'utf-8' });
+                            const match = output.match(/SHA-256 digest:\\s*([A-Fa-f0-9:]+)/);
+                            if (match?.[1]) {
+                                metadata.apkSignatureSha256 = match[1].replace(/:/g, '').toLowerCase();
+                                metadata.apkSignatureVerifiedAt = new Date().toISOString();
+                            }
+                        } catch (e) {
+                            // apksigner may not be available; best-effort only
+                        } finally {
+                            try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+                        }
+                    } catch (e) {
+                        // ignore checksum/signature errors; upload should still succeed
+                    }
                 }
 
                 response = await _saveFile(

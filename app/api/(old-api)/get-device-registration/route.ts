@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
         if (!deviceId) return NextResponse.json({ deviceId, errors: ['Missing deviceId'], });
 
-        const res = await getDevice(deviceId);
+        const res = await getDevice(deviceId, { req });
 
         if (res.errors?.length) return NextResponse.json({ errors: res.errors, });
 
