@@ -12,10 +12,10 @@ function timestamp() {
 
 async function main() {
   const appUrl = requiredEnv('NEXT_PUBLIC_APP_URL').replace(/\/+$/, '');
-  const syncSecret = process.env.MDM_SYNC_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim();
+  const syncSecret = process.env.NEXTAUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim();
 
   if (!syncSecret) {
-    throw new Error('MDM_SYNC_SECRET or NEXTAUTH_SECRET is required');
+    throw new Error('NEXTAUTH_SECRET or NEXTAUTH_SECRET is required');
   }
 
   const url = `${appUrl}/api/mdm/sync`;

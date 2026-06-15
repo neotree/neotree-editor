@@ -42,12 +42,12 @@ NeoTree supports automatic Headwind inventory reconciliation through:
 
 ```text
 POST /api/mdm/sync
-Authorization: Bearer <MDM_SYNC_SECRET>
+Authorization: Bearer <NEXTAUTH_SECRET>
 ```
 
 Production requirements:
 
-- Set a strong `MDM_SYNC_SECRET` in the web editor environment.
+- Set a strong `NEXTAUTH_SECRET` in the web editor environment.
 - Run the endpoint from a trusted scheduler every 12 hours.
 - `NEXTAUTH_SECRET` remains a backward-compatible fallback only; do not use it in new cron jobs.
 - Keep MDM profile `autoSyncEnabled` on for active profiles.
