@@ -42,14 +42,47 @@ NeoTree supports automatic Headwind inventory reconciliation through:
 
 ```text
 POST /api/mdm/sync
-Authorization: Bearer <NEXTAUTH_SECRET>
+Authorization: Bearer <MDM_SYNC_SECRET>
 ```
 
 Production requirements:
 
-- Set a strong `NEXTAUTH_SECRET` in the web editor environment.
-- Run the endpoint from a trusted scheduler every 15-60 minutes.
-- The same `NEXTAUTH_SECRET` protects MDM APK downloads at `/api/mdm/apk-releases/:apkReleaseId/download`.
+- Set a strong `MDM_SYNC_SECRET` in the web editor environment.
+- Run the endpoint from a trusted scheduler every 12 hours.
+- `NEXTAUTH_SECRET` remains a backward-compatible fallback only; do not use it in new cron jobs.
 - Keep MDM profile `autoSyncEnabled` on for active profiles.
 - Keep `autoLinkEnabled` on only when the profile has reliable device identifiers.
 - Review `needs_review`, `conflict`, and `unmatched` rows in Device Management before manually linking them.
+
+Ubuntu cron example:
+
+```bash
+cd ~/demo-web-editor
+yarn mdm:sync
+
+crontab -e
+```
+
+Add:
+
+```cron
+0 */12 * * * cd /home/ubuntu/demo-web-editor && mkdir -p logs && set -a && . ./.env.production && set +a && yarn -s mdm:sync >> logs/mdm-sync.log 2>&1
+```
+
+If your server uses `.env.development` for the demo editor, replace `.env.production` with that file.
+
+## Enrollment label recommendation
+
+For reliable auto-linking, put a NeoTree identifier into Headwind during tablet enrollment:
+
+- Best: full NeoTree device ID.
+- Good: Android ID.
+- Acceptable for review only: short visible NeoTree device code, such as `9999`.
+
+Suggested Headwind device name or description format:
+
+```text
+NeoTree <country> <hospital> <full-device-id>
+```
+
+Short device codes are intentionally not enough for silent auto-linking because two tablets can share or reuse short human-facing labels over time. NeoTree will still show them in the review queue as evidence.
