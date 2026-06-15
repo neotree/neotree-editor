@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/(ops)/files/manage/page.tsx
+// File: /home/watkay/ReactProjects/neotree-editor/app/(ops)/files/manage/page.tsx
 import * as entry from '../../../../../../app/(ops)/files/manage/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

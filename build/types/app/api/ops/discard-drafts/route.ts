@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/ops/discard-drafts/route.ts
+// File: /home/watkay/ReactProjects/neotree-editor/app/api/ops/discard-drafts/route.ts
 import * as entry from '../../../../../../app/api/ops/discard-drafts/route.js'
 import type { NextRequest } from 'next/server.js'
 
