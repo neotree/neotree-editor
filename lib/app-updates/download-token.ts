@@ -3,7 +3,7 @@ import crypto from "crypto"
 /**
  * #9 — Short-lived, release-scoped download tokens.
  *
- * Previously the global MDM_SYNC_SECRET was embedded directly in the APK
+ * Previously the global NEXTAUTH_SECRET was embedded directly in the APK
  * download URL handed to Headwind (and thus persisted in MDM device configs and
  * logs). Instead we now mint an HMAC token that is bound to a single
  * apkReleaseId and expires, so a leaked URL cannot be used to authenticate
@@ -13,8 +13,8 @@ import crypto from "crypto"
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000 // 24h — long enough for an MDM to fetch
 
 function getSecret() {
-  const secret = process.env.MDM_SYNC_SECRET
-  if (!secret) throw new Error("MDM_SYNC_SECRET is required to sign APK download tokens")
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) throw new Error("NEXTAUTH_SECRET is required to sign APK download tokens")
   return secret
 }
 

@@ -5,7 +5,7 @@ import { syncEnabledMdmProfilesForAutomation } from "@/app/actions/device-manage
 export const dynamic = "force-dynamic"
 
 function isAuthorized(req: Request) {
-  const secret = process.env.MDM_SYNC_SECRET
+  const secret = process.env.NEXTAUTH_SECRET
   if (!secret) return false
 
   const auth = req.headers.get("authorization") || ""
