@@ -35,6 +35,7 @@ export const DataTable = (props: DataTableProps) => {
         tableClassname, 
         tableRowClassname, 
         tableBodyClassname, 
+        preTableNode,
         filter,
         onSort, 
     } = props;
@@ -89,6 +90,12 @@ export const DataTable = (props: DataTableProps) => {
                     setValue: setSearchValue,
                 }}
             />
+
+            {!!preTableNode && (
+                <div className="px-4 mb-5">
+                    {preTableNode}
+                </div>
+            )}
 
             <SortableList 
                 allowDrag={!!canSort}
