@@ -6,6 +6,7 @@ import path from "path"
 import { v4 as uuidv4 } from "uuid"
 
 import { _saveFile } from "@/databases/mutations/files"
+import { extractApkMetadataFromBuffer } from "@/lib/app-updates/apk-metadata"
 
 const APK_CONTENT_TYPE = "application/vnd.android.package-archive"
 const MAX_APK_BYTES = 300 * 1024 * 1024
@@ -78,6 +79,7 @@ export async function importApkArtifactFromUrl({
   const fileId = uuidv4()
   const checksumSha256 = createHash("sha256").update(buffer).digest("hex")
   const signatureSha256 = signatureSha256FromApk(buffer, fileId)
+  const apkMetadata = await extractApkMetadataFromBuffer(buffer)
 
   const saveResult = await _saveFile(
     {
@@ -92,6 +94,12 @@ export async function importApkArtifactFromUrl({
         artifactUrl: normalizedUrl,
         importedAt: new Date().toISOString(),
         apkChecksumSha256: checksumSha256,
+        ...(apkMetadata.packageName ? { apkPackageName: apkMetadata.packageName } : {}),
+        ...(apkMetadata.versionName ? { apkVersionName: apkMetadata.versionName } : {}),
+        ...(apkMetadata.versionCode != null ? { apkVersionCode: apkMetadata.versionCode } : {}),
+        ...(apkMetadata.minSdkVersion != null ? { apkMinSdkVersion: apkMetadata.minSdkVersion } : {}),
+        ...(apkMetadata.targetSdkVersion != null ? { apkTargetSdkVersion: apkMetadata.targetSdkVersion } : {}),
+        ...(apkMetadata.compileSdkVersion != null ? { apkCompileSdkVersion: apkMetadata.compileSdkVersion } : {}),
         ...(signatureSha256
           ? {
               apkSignatureSha256: signatureSha256,
@@ -114,5 +122,6 @@ export async function importApkArtifactFromUrl({
     fileSize: buffer.length,
     filename,
     artifactUrl: normalizedUrl,
+    metadata: apkMetadata,
   }
 }

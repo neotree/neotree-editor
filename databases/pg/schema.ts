@@ -452,6 +452,18 @@ export const devices = pgTable("nt_devices", {
   deletedAt: timestamp("deleted_at"),
 })
 
+// DEVICE AUTH NONCES (replay protection for signed mobile requests)
+export const deviceAuthNonces = pgTable("nt_device_auth_nonces", {
+  id: serial("id").primaryKey(),
+  deviceId: text("device_id").notNull(),
+  nonce: text("nonce").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  deviceNonceUnique: uniqueIndex("device_auth_nonce_unique").on(table.deviceId, table.nonce),
+  expiresIndex: index("device_auth_nonce_expires_idx").on(table.expiresAt),
+}))
+
 // DEVICE UPDATE EVENTS
 export const deviceUpdateEvents = pgTable("nt_device_update_events", {
   id: serial("id").primaryKey(),
@@ -793,6 +805,7 @@ export const appUpdatePolicies = pgTable("nt_app_update_policies", {
   targetScope: text("target_scope").default("country").notNull(),
   targetGroupId: text("target_group_id"),
   targetHospitalId: uuid("target_hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
+  targetCountryISO: text("target_country_iso"),
   rollbackEnabled: boolean("rollback_enabled").default(false).notNull(),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 

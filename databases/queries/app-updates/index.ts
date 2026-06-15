@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, count, isNull, isNotNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts } from "@/databases/pg/schema";
+import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts, deviceMdmLinks } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 
 export type AppUpdatePolicy = (typeof appUpdatePolicies.$inferSelect) & {
@@ -14,12 +14,80 @@ export type GetAppUpdatePolicyResult = {
     errors?: string[];
 };
 
+/**
+ * Resolves the targeting context for a device so that we can apply a policy's
+ * targetScope (#1). Hospital + MDM group come from the device's MDM link when
+ * present; the caller (mobile request) may also pass its own hospital/country.
+ */
+async function resolveDeviceTargeting(params: {
+    deviceId?: string;
+    hospitalId?: string | null;
+    countryISO?: string | null;
+}) {
+    let hospitalId = params.hospitalId || null;
+    let countryISO = params.countryISO || null;
+    let mdmGroupId: string | null = null;
+
+    if (params.deviceId) {
+        try {
+            const link = await db.query.deviceMdmLinks.findFirst({
+                where: eq(deviceMdmLinks.deviceId, params.deviceId),
+                orderBy: [desc(deviceMdmLinks.updatedAt)],
+            });
+            if (link) {
+                hospitalId = hospitalId || link.hospitalId || null;
+                countryISO = countryISO || link.countryISO || null;
+                mdmGroupId = link.mdmGroupId || null;
+            }
+        } catch (e: any) {
+            logger.error("resolveDeviceTargeting ERROR", e.message);
+        }
+    }
+
+    return { hospitalId, countryISO, mdmGroupId };
+}
+
+/**
+ * Score a policy against a device's targeting context. Returns null when the
+ * policy explicitly targets a hospital/group that this device is NOT in (so it
+ * must be excluded). More specific matches score higher so a hospital-targeted
+ * policy wins over a country-wide one for the same runtime.
+ */
+function scorePolicyForDevice(
+    policy: typeof appUpdatePolicies.$inferSelect,
+    targeting: { hospitalId: string | null; mdmGroupId: string | null; countryISO: string | null },
+): number | null {
+    // Country gate (#3): if the policy is pinned to a country and we know the
+    // device's country, they must match. Unknown device country = lenient (don't
+    // exclude) so offline devices that don't report country still get updates.
+    if (policy.targetCountryISO && targeting.countryISO &&
+        policy.targetCountryISO.toUpperCase() !== targeting.countryISO.toUpperCase()) {
+        return null;
+    }
+
+    const scope = policy.targetScope || "country";
+
+    if (scope === "hospital") {
+        if (!policy.targetHospitalId) return null;
+        return policy.targetHospitalId === targeting.hospitalId ? 100 : null;
+    }
+    if (scope === "group") {
+        if (!policy.targetGroupId) return null;
+        return policy.targetGroupId === targeting.mdmGroupId ? 80 : null;
+    }
+    // country / default scope applies to everyone.
+    return 10;
+}
+
 export async function _getAppUpdatePolicy(params?: {
     runtimeVersion?: string;
+    deviceId?: string;
+    hospitalId?: string | null;
+    countryISO?: string | null;
 }): Promise<GetAppUpdatePolicyResult> {
     try {
         const runtimeVersion = params?.runtimeVersion?.trim();
-        const data = await db.query.appUpdatePolicies.findFirst({
+        const candidates = await db.query.appUpdatePolicies.findMany({
             where: runtimeVersion ? eq(appUpdatePolicies.runtimeVersion, runtimeVersion) : undefined,
             with: {
                 currentApkRelease: true,
@@ -28,7 +96,24 @@ export async function _getAppUpdatePolicy(params?: {
             orderBy: [desc(appUpdatePolicies.policyVersion), desc(appUpdatePolicies.updatedAt)],
         });
 
-        return { data: data || null };
+        if (!candidates.length) return { data: null };
+
+        const targeting = await resolveDeviceTargeting({
+            deviceId: params?.deviceId,
+            hospitalId: params?.hospitalId,
+            countryISO: params?.countryISO,
+        });
+
+        let best: { policy: AppUpdatePolicy; score: number } | null = null;
+        for (const policy of candidates) {
+            const score = scorePolicyForDevice(policy, targeting);
+            if (score === null) continue; // device is outside this policy's target
+            // candidates are already ordered by policyVersion/updatedAt desc, so the
+            // first policy at a given score wins the tie-break naturally.
+            if (!best || score > best.score) best = { policy, score };
+        }
+
+        return { data: best?.policy || null };
     } catch (e: any) {
         logger.error("_getAppUpdatePolicy ERROR", e.message);
         return { data: null, errors: [e.message] };

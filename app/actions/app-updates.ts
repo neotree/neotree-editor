@@ -78,14 +78,12 @@ export async function importEasApkReleaseDraft(formData: FormData) {
         const session = await isAllowed();
         const artifactUrl = `${formData.get("artifactUrl") || ""}`.trim();
         const runtimeVersion = `${formData.get("runtimeVersion") || ""}`.trim();
-        const versionName = `${formData.get("versionName") || ""}`.trim();
-        const versionCode = Number(formData.get("versionCode") || 0);
+        const providedVersionName = `${formData.get("versionName") || ""}`.trim();
+        const providedVersionCode = Number(formData.get("versionCode") || 0);
         const apkReleaseId = `${formData.get("apkReleaseId") || ""}`.trim() || undefined;
         const releaseNotes = `${formData.get("releaseNotes") || ""}`.trim();
 
         if (!runtimeVersion) throw new Error("Runtime version is required before importing the APK");
-        if (!versionName) throw new Error("Version name is required before importing the APK");
-        if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error("Version code must be a positive number");
 
         const imported = await importApkArtifactFromUrl({
             artifactUrl,
@@ -93,11 +91,18 @@ export async function importEasApkReleaseDraft(formData: FormData) {
             metadata: {
                 apkReleaseId: apkReleaseId || null,
                 runtimeVersion,
-                versionName,
-                versionCode,
                 importedByUserId: session.user?.userId || null,
             },
         });
+
+        // Auto-fill version fields from the APK when the admin didn't supply them.
+        const versionName = providedVersionName || imported.metadata.versionName || "";
+        const versionCode = Number.isInteger(providedVersionCode) && providedVersionCode > 0
+            ? providedVersionCode
+            : (imported.metadata.versionCode || 0);
+
+        if (!versionName) throw new Error("Version name could not be read from the APK; enter it manually");
+        if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error("Version code could not be read from the APK; enter it manually");
 
         const saveResult = await _saveApkReleases({
             userId: session.user?.userId,
@@ -115,6 +120,7 @@ export async function importEasApkReleaseDraft(formData: FormData) {
                 releaseNotes: [
                     releaseNotes,
                     `Imported from EAS build artifact: ${imported.artifactUrl}`,
+                    imported.metadata.packageName ? `Package: ${imported.metadata.packageName}` : "",
                 ].filter(Boolean).join("\n\n"),
             }],
         });
@@ -129,6 +135,11 @@ export async function importEasApkReleaseDraft(formData: FormData) {
                 checksumSha256: imported.checksumSha256,
                 signatureSha256: imported.signatureSha256,
                 artifactUrl: imported.artifactUrl,
+                versionName,
+                versionCode,
+                packageName: imported.metadata.packageName,
+                minSdkVersion: imported.metadata.minSdkVersion,
+                targetSdkVersion: imported.metadata.targetSdkVersion,
             },
         };
     } catch (e: any) {

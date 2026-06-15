@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import type { NextRequest } from "next/server"
 
-const SIGNATURE_TOLERANCE_MS = 10 * 60 * 1000
+export const SIGNATURE_TOLERANCE_MS = 10 * 60 * 1000
 
 export function createDeviceAuthSecret() {
   return crypto.randomBytes(32).toString("base64url")

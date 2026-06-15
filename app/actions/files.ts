@@ -16,6 +16,7 @@ import { isAllowed } from "./is-allowed";
 import { getSiteAxiosClient } from "@/lib/axios";
 import queryString from "query-string";
 import { _getSites } from "@/databases/queries/sites";
+import { extractApkMetadataFromBuffer } from "@/lib/app-updates/apk-metadata";
 
 export const getFiles: typeof _getFiles = _getFiles;
 
@@ -59,6 +60,20 @@ export async function uploadFile(
                     try {
                         const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
                         metadata.apkChecksumSha256 = checksumSha256;
+
+                        // Extract package/version metadata straight from the APK, like
+                        // Headwind does on direct upload (works without Android build-tools).
+                        try {
+                            const apkMeta = await extractApkMetadataFromBuffer(buffer);
+                            if (apkMeta.packageName) metadata.apkPackageName = apkMeta.packageName;
+                            if (apkMeta.versionName) metadata.apkVersionName = apkMeta.versionName;
+                            if (apkMeta.versionCode != null) metadata.apkVersionCode = apkMeta.versionCode;
+                            if (apkMeta.minSdkVersion != null) metadata.apkMinSdkVersion = apkMeta.minSdkVersion;
+                            if (apkMeta.targetSdkVersion != null) metadata.apkTargetSdkVersion = apkMeta.targetSdkVersion;
+                            if (apkMeta.compileSdkVersion != null) metadata.apkCompileSdkVersion = apkMeta.compileSdkVersion;
+                        } catch {
+                            // metadata extraction is best-effort
+                        }
 
                         const tmpFile = path.join(os.tmpdir(), `${fileId}.apk`);
                         fs.writeFileSync(tmpFile, buffer);

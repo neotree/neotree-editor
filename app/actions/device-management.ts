@@ -28,6 +28,21 @@ import {
 } from "@/databases/mutations/device-management"
 import { createMdmProvider } from "@/lib/mdm"
 import { decryptSecret, encryptSecret } from "@/lib/server/secret-box"
+import { requestMdmApkRolloutForDevice } from "@/lib/app-updates/mdm-rollout"
+
+/** Runs an async mapper over items with a bounded number of concurrent workers (#13). */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await mapper(items[index])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
 
 function formErrorRedirect(formData: FormData, message: string): never {
   const returnTo = `${formData.get("returnTo") || "/device-management"}`
@@ -544,9 +559,11 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
     conflicts: 0,
     unmatched: 0,
   }
+  // Devices auto-linked this run get the managed APK pushed afterwards (#4).
+  const autoLinkedDeviceIds: string[] = []
 
-  for (const remote of remoteDevices) {
-    if (!remote.mdmDeviceId) continue
+  const processRemote = async (remote: typeof remoteDevices[number]) => {
+    if (!remote.mdmDeviceId) return
     const mdmDeviceId = remote.mdmDeviceId
     const existingLink = linksByMdmDeviceId.get(normalizeIdentifier(mdmDeviceId))
 
@@ -603,7 +620,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
         lastSeenAt: new Date(),
       })
       summary.refreshedLinks += 1
-      continue
+      return
     }
 
     const candidates = deviceRows
@@ -641,7 +658,10 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
         matchReasons: best.reasons,
         payload: remote.payload || {},
       })
-      if (linkResult.success) summary.autoLinked += 1
+      if (linkResult.success) {
+        summary.autoLinked += 1
+        autoLinkedDeviceIds.push(best.device.deviceId)
+      }
     } else if (hasConflict) {
       summary.conflicts += 1
     } else if (best) {
@@ -673,6 +693,20 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       matchReasons: best?.reasons || [],
       payload: remote.payload || {},
       lastSeenAt: new Date(),
+    })
+  }
+
+  // Process remote devices with bounded concurrency instead of one-at-a-time (#13).
+  await mapWithConcurrency(
+    remoteDevices.filter((remote) => remote.mdmDeviceId),
+    8,
+    processRemote,
+  )
+
+  // Push the managed APK to newly auto-linked devices (#4), best-effort.
+  if (autoLinkedDeviceIds.length) {
+    await mapWithConcurrency(autoLinkedDeviceIds, 5, async (deviceId) => {
+      await requestMdmApkRolloutForDevice(deviceId).catch(() => null)
     })
   }
 
@@ -808,6 +842,10 @@ async function saveDeviceMdmLink(formData: FormData) {
         saveAnywayReason: `${formData.get("saveAnywayReason") || ""}`.trim() || undefined,
       },
     })
+    // Push the managed APK to the freshly linked device (#4), best-effort.
+    if (result.data?.deviceId) {
+      await requestMdmApkRolloutForDevice(result.data.deviceId).catch(() => null)
+    }
     revalidatePath("/device-management")
     return { success: true, data: result.data }
   } catch (e: any) {
@@ -1011,6 +1049,9 @@ export async function reviewMdmInventoryFromForm(formData: FormData) {
       afterState: { inventory: reviewResult.data, link: linkResult.data },
       metadata: { reason },
     })
+
+    // Push the managed APK to the approved device (#4), best-effort.
+    await requestMdmApkRolloutForDevice(targetDeviceId).catch(() => null)
 
     revalidatePath("/device-management")
   } catch (e: any) {

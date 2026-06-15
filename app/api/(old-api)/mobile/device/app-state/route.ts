@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
         const appVersion = body?.appVersion || "";
         const runtimeVersion = body?.runtimeVersion || "";
 
-        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] });
-        if (!appVersion) return NextResponse.json({ errors: ["Missing appVersion"] });
-        if (!runtimeVersion) return NextResponse.json({ errors: ["Missing runtimeVersion"] });
+        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] }, { status: 400 });
+        if (!appVersion) return NextResponse.json({ errors: ["Missing appVersion"] }, { status: 400 });
+        if (!runtimeVersion) return NextResponse.json({ errors: ["Missing runtimeVersion"] }, { status: 400 });
         const auth = await authenticateMobileDevice(req, deviceId, { body: rawBody });
         if (!auth.ok) return NextResponse.json({ errors: auth.errors, data: null }, { status: auth.status });
 
@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
             }],
         });
 
-        if (res?.errors?.length) return NextResponse.json({ errors: res.errors, data: null });
+        if (res?.errors?.length) return NextResponse.json({ errors: res.errors, data: null }, { status: 500 });
 
         return NextResponse.json({ data: res.inserted[0] || null, success: res.success });
     } catch (e: any) {
         logger.error("[POST_ERROR] /api/mobile/device/app-state", e.message);
-        return NextResponse.json({ errors: ["Internal Error"], data: null });
+        return NextResponse.json({ errors: ["Internal Error"], data: null }, { status: 500 });
     }
 }
