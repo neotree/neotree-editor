@@ -133,8 +133,10 @@ export class HeadwindMdmProvider implements MdmProvider {
     const lastSeenRaw = item?.lastUpdate || item?.lastSeen || item?.lastLogin || null
     const lastSeenMs = lastSeenRaw ? new Date(lastSeenRaw).getTime() : NaN
     const { enrollmentStatus, managementState } = this.deriveDeviceState(item, lastSeenMs)
+    const info = item?.info || {}
 
     return {
+      deviceId: item?.deviceId || item?.neotreeDeviceId || item?.customDeviceId || info?.deviceId || null,
       mdmDeviceId: item?.id != null ? `${item.id}` : item?.deviceId || item?.number || item?.imei || null,
       mdmConfigId: item?.configurationId != null ? `${item.configurationId}` : item?.configId != null ? `${item.configId}` : null,
       mdmConfigName: item?.configurationName || item?.configName || item?.configuration?.name || null,
@@ -142,9 +144,19 @@ export class HeadwindMdmProvider implements MdmProvider {
       mdmGroupName: item?.groupName || item?.deviceGroupName || item?.group?.name || null,
       enrollmentStatus,
       managementState,
-      serialNumber: item?.serialNumber || item?.serial || item?.imei || null,
-      androidVersion: item?.androidVersion || item?.sdkVersion || item?.info?.androidVersion || null,
-      androidSdk: item?.androidSdk || item?.sdkInt || item?.info?.androidSdk || null,
+      serialNumber: item?.serialNumber || item?.serial || item?.androidSerial || info?.serialNumber || info?.serial || item?.imei || null,
+      androidVersion: item?.androidVersion || item?.sdkVersion || info?.androidVersion || null,
+      androidSdk: item?.androidSdk || item?.sdkInt || info?.androidSdk || null,
+      deviceCapabilities: {
+        identifiers: {
+          number: item?.number || null,
+          name: item?.name || null,
+          deviceId: item?.deviceId || null,
+          neotreeDeviceId: item?.neotreeDeviceId || item?.customDeviceId || null,
+          serialNumber: item?.serialNumber || item?.serial || info?.serialNumber || info?.serial || null,
+          imei: item?.imei || info?.imei || null,
+        },
+      },
       lastMdmSeenAt: lastSeenRaw,
       payload: item || {},
     }

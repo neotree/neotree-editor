@@ -243,10 +243,19 @@ export async function _updateMdmProviderDeviceSyncStatus(
     lastDeviceSyncStatus: string
     lastDeviceSyncError?: string | null
     lastDeviceSyncAt?: Date
+    lastDeviceSyncSummary?: Record<string, any>
   },
 ) {
   try {
     if (!profileId) return { success: false, errors: ["MDM profile ID is required"] }
+    const existing = await db.query.mdmProviderProfiles.findFirst({
+      where: eq(mdmProviderProfiles.profileId, profileId),
+      columns: { settings: true },
+    })
+    const settings = {
+      ...((existing?.settings || {}) as Record<string, any>),
+      lastDeviceSyncSummary: status.lastDeviceSyncSummary || null,
+    }
 
     const [updated] = await db
       .update(mdmProviderProfiles)
@@ -254,6 +263,7 @@ export async function _updateMdmProviderDeviceSyncStatus(
         lastDeviceSyncStatus: status.lastDeviceSyncStatus,
         lastDeviceSyncError: status.lastDeviceSyncError || null,
         lastDeviceSyncAt: status.lastDeviceSyncAt || new Date(),
+        settings,
       })
       .where(eq(mdmProviderProfiles.profileId, profileId))
       .returning()
