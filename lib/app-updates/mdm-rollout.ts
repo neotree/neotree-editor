@@ -95,8 +95,8 @@ export async function requestMdmApkRolloutForPolicy(policy: Policy) {
   if (!policy.currentApkReleaseId) {
     return { requested: 0, failed: 0, skipped: 0, errors: ["Policy has no current APK release"] }
   }
-  if (!process.env.MDM_SYNC_SECRET) {
-    return { requested: 0, failed: 0, skipped: 0, errors: ["MDM_SYNC_SECRET is required for MDM APK delivery"] }
+  if (!process.env.NEXTAUTH_SECRET) {
+    return { requested: 0, failed: 0, skipped: 0, errors: ["NEXTAUTH_SECRET is required for MDM APK delivery"] }
   }
   if (!["mdm", "hybrid"].includes(policy.apkDeliveryMode)) {
     return { requested: 0, failed: 0, skipped: 0, errors: [] }
@@ -138,7 +138,7 @@ export async function requestMdmApkRolloutForPolicy(policy: Policy) {
  */
 export async function requestMdmApkRolloutForDevice(deviceId: string) {
   if (!deviceId) return { requested: 0, failed: 0, skipped: 0, errors: ["Missing deviceId"] }
-  if (!process.env.MDM_SYNC_SECRET) return { requested: 0, failed: 0, skipped: 1, errors: [] }
+  if (!process.env.NEXTAUTH_SECRET) return { requested: 0, failed: 0, skipped: 1, errors: [] }
 
   try {
     const link = await db.query.deviceMdmLinks.findFirst({
