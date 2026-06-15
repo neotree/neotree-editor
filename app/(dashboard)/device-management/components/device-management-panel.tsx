@@ -43,11 +43,37 @@ function authMode(profile: Overview["profiles"][number]) {
   return "Not configured"
 }
 
+function syncSummary(profile: Overview["profiles"][number]) {
+  const settings = (profile.settings || {}) as Record<string, any>
+  return (settings.lastDeviceSyncSummary || {}) as Record<string, any>
+}
+
+function formatSyncSummary(profile: Overview["profiles"][number]) {
+  const summary = syncSummary(profile)
+  if (!profile.lastDeviceSyncAt) return "No sync yet"
+  if (profile.lastDeviceSyncStatus === "failed") return summary.error || profile.lastDeviceSyncError || "Sync failed"
+  return [
+    `${summary.remoteDevices || 0} scanned`,
+    `${summary.autoLinked || 0} auto-linked`,
+    `${summary.needsReview || 0} review`,
+    `${summary.conflicts || 0} conflicts`,
+  ].join(" | ")
+}
+
 function matchBadgeVariant(status?: string | null) {
   if (status === "auto_linked" || status === "manually_linked") return "default" as const
   if (status === "conflict") return "destructive" as const
   if (status === "ignored") return "secondary" as const
   return "outline" as const
+}
+
+function reviewEvidence(item: Overview["inventory"][number]) {
+  const reasons = item.matchReasons?.length ? item.matchReasons.join(", ") : "No strong identifier matched"
+  const confidence = item.matchConfidence || 0
+  if (item.matchStatus === "conflict") return `${reasons}. Multiple devices had the same score.`
+  if (confidence >= 95) return reasons
+  if (confidence > 0) return `${reasons}. Below auto-link threshold.`
+  return "No NeoTree ID, Android ID, serial, IMEI, or strong device hash matched."
 }
 
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
@@ -60,6 +86,15 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const managedDevices = devices.filter((row) => row.mdmLink?.managementState === "managed").length
   const reviewItems = inventory.filter((item) => item.matchStatus === "needs_review" || item.matchStatus === "conflict" || item.matchStatus === "unmatched")
   const autoLinkedItems = inventory.filter((item) => item.matchStatus === "auto_linked").length
+  const autoSyncProfiles = profiles.filter((profile) => profile.autoSyncEnabled !== false).length
+  const autoLinkProfiles = profiles.filter((profile) => profile.autoLinkEnabled !== false).length
+  const lastDeviceSyncAt = profiles
+    .map((profile) => profile.lastDeviceSyncAt ? new Date(profile.lastDeviceSyncAt).getTime() : 0)
+    .filter(Boolean)
+    .sort((a, b) => b - a)[0]
+  const latestSyncProfile = profiles
+    .filter((profile) => profile.lastDeviceSyncAt)
+    .sort((a, b) => new Date(b.lastDeviceSyncAt || 0).getTime() - new Date(a.lastDeviceSyncAt || 0).getTime())[0]
 
   return (
     <div className="w-full space-y-4">
@@ -94,6 +129,22 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
             <div className="mt-1 text-2xl font-semibold">{autoLinkedItems}</div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="rounded-md border px-4 py-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm font-medium">MDM automation</div>
+            <div className="text-xs text-muted-foreground">
+              Auto-sync enabled on {autoSyncProfiles} / {profiles.length} profiles. Auto-link enabled on {autoLinkProfiles} / {profiles.length} profiles.
+              {lastDeviceSyncAt ? ` Last sync ${fmt(new Date(lastDeviceSyncAt))}.` : " No sync has run yet."}
+              {latestSyncProfile ? ` ${formatSyncSummary(latestSyncProfile)}.` : ""}
+            </div>
+          </div>
+          <Badge variant={autoSyncProfiles ? "default" : "secondary"}>
+            {autoSyncProfiles ? "automation on" : "automation off"}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -160,6 +211,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                     )
                   },
                 },
+                { name: "Last sync result" },
                 {
                   name: "Status",
                   cellRenderer({ rowIndex }) {
@@ -191,6 +243,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 authMode(profile),
                 profile.lastConnectionStatus || "not checked",
                 profile.lastDeviceSyncStatus || "not synced",
+                formatSyncSummary(profile),
                 profile.isEnabled ? "Enabled" : "Disabled",
                 "",
               ])}
@@ -303,7 +356,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 },
                 { name: "Confidence" },
                 { name: "Suggested NeoTree device" },
-                { name: "Reason" },
+                { name: "Why not auto-linked" },
                 { name: "Last seen" },
                 {
                   name: "Action",
@@ -328,7 +381,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 item.matchStatus || "",
                 `${item.matchConfidence || 0}%`,
                 item.suggestedDevice?.deviceHash || item.suggestedDeviceId || "",
-                (item.matchReasons || []).join(", "),
+                reviewEvidence(item),
                 fmt(item.lastMdmSeenAt || item.lastSeenAt),
                 "",
               ])}

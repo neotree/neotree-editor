@@ -14,6 +14,18 @@ export async function POST(req: NextRequest) {
         const deviceId = body?.deviceId || "";
         const appVersion = body?.appVersion || "";
         const runtimeVersion = body?.runtimeVersion || "";
+        const deviceCapabilities = {
+            ...(body?.deviceCapabilities || {}),
+            deviceId,
+            deviceHash: body?.deviceHash || body?.deviceCapabilities?.deviceHash || null,
+            androidId: body?.androidId || body?.deviceCapabilities?.androidId || null,
+            identifiers: {
+                ...(body?.deviceCapabilities?.identifiers || {}),
+                deviceId,
+                deviceHash: body?.deviceHash || body?.deviceCapabilities?.identifiers?.deviceHash || body?.deviceCapabilities?.deviceHash || null,
+                androidId: body?.androidId || body?.deviceCapabilities?.identifiers?.androidId || body?.deviceCapabilities?.androidId || null,
+            },
+        };
 
         if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] }, { status: 400 });
         if (!appVersion) return NextResponse.json({ errors: ["Missing appVersion"] }, { status: 400 });
@@ -32,7 +44,7 @@ export async function POST(req: NextRequest) {
                 androidSdk: Number.isFinite(Number(body?.androidSdk)) ? Number(body.androidSdk) : null,
                 manufacturer: body?.manufacturer || null,
                 model: body?.model || null,
-                deviceCapabilities: body?.deviceCapabilities || {},
+                deviceCapabilities,
                 otaUpdateId: body?.otaUpdateId || null,
                 otaChannel: body?.otaChannel || null,
                 apkReleaseId: body?.apkReleaseId || null,
