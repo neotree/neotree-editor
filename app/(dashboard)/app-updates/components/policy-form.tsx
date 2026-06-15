@@ -25,6 +25,7 @@ import {
   normalizeAppUpdatePolicyPayload,
   validateAppUpdatePolicyPayload,
   isApkReleaseDeviceAvailable,
+  getApkReleaseReadiness,
 } from "@/lib/app-updates/validation";
 
 const installWindows = [
@@ -209,10 +210,19 @@ export function AppUpdatePolicyForm({
   }, [apkReleaseDrafts, apkReleases]);
 
   const releaseOptions = useMemo(() => {
-    return releaseRows.map((r) => ({
-      value: r.apkReleaseId,
-      label: `${r.versionName || ""} (${r.versionCode || ""})${r.__draft ? " - draft" : ""}${isApkReleaseDeviceAvailable(r) ? "" : " - not ready"}`,
-    }));
+    return releaseRows.map((r) => {
+      const ready = isApkReleaseDeviceAvailable(r);
+      const openChecks = getApkReleaseReadiness(r)
+        .filter((check) => !check.passed)
+        .map((check) => check.label);
+
+      return {
+        value: r.apkReleaseId,
+        ready,
+        label: `${r.versionName || ""} (${r.versionCode || ""})${ready ? "" : " - not ready"}`,
+        description: openChecks[0] || "",
+      };
+    });
   }, [releaseRows]);
 
   const releasesById = useMemo(() => {
@@ -220,7 +230,7 @@ export function AppUpdatePolicyForm({
   }, [releaseRows]);
 
   const latestRelease = useMemo(() => {
-    return releaseRows[0] || null;
+    return releaseRows.find((release) => isApkReleaseDeviceAvailable(release)) || null;
   }, [releaseRows]);
 
   useEffect(() => {
@@ -650,8 +660,8 @@ export function AppUpdatePolicyForm({
                 </SelectTrigger>
                 <SelectContent>
                   {releaseOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                    <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
+                      {opt.description ? `${opt.label} (${opt.description})` : opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -670,8 +680,8 @@ export function AppUpdatePolicyForm({
                 </SelectTrigger>
                 <SelectContent>
                   {releaseOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                    <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
+                      {opt.description ? `${opt.label} (${opt.description})` : opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

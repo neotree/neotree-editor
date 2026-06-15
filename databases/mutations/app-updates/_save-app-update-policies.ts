@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
+import { appUpdatePolicies, appUpdatePoliciesDrafts, apkReleases } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
 
@@ -32,7 +32,17 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 const policyId = itemPolicyId || published?.policyId || uuid.v4();
 
                 const normalizedItem = normalizeAppUpdatePolicyPayload(cleanItem);
-                const validationErrors = validateAppUpdatePolicyPayload(normalizedItem);
+                const referencedReleaseIds = [
+                    normalizedItem.currentApkReleaseId,
+                    normalizedItem.rollbackApkReleaseId,
+                ].filter(Boolean);
+                const releaseRows = !referencedReleaseIds.length
+                    ? []
+                    : await db.query.apkReleases.findMany({
+                        where: inArray(apkReleases.apkReleaseId, referencedReleaseIds as string[]),
+                    });
+                const releasesById = new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
+                const validationErrors = validateAppUpdatePolicyPayload(normalizedItem, releasesById);
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 const draft = await db.query.appUpdatePoliciesDrafts.findFirst({

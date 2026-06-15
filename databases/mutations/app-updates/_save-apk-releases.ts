@@ -56,11 +56,20 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     where: eq(apkReleasesDrafts.apkReleaseDraftId, apkReleaseId),
                 });
 
+                const previous = (draft?.data || published || {}) as Partial<typeof apkReleases.$inferInsert>;
+                const nextFileId = item.fileId ?? previous.fileId ?? null;
+                const previousFileId = previous.fileId ?? null;
+                const fileChanged = !!item.fileId && item.fileId !== previousFileId;
+                const trustedFileSize = fileDetails?.size ?? (!fileChanged ? previous.fileSize : null);
+                const trustedChecksumSha256 = fileMeta?.apkChecksumSha256 ?? (!fileChanged ? previous.checksumSha256 : null);
+                const trustedSignatureSha256 = fileMeta?.apkSignatureSha256 ?? (!fileChanged ? previous.signatureSha256 : null);
+
                 const enriched = normalizeApkReleasePayload({
                     ...cleanItem,
-                    fileSize: item.fileSize ?? fileDetails?.size ?? undefined,
-                    checksumSha256: item.checksumSha256 ?? fileMeta?.apkChecksumSha256 ?? undefined,
-                    signatureSha256: item.signatureSha256 ?? fileMeta?.apkSignatureSha256 ?? undefined,
+                    fileId: nextFileId,
+                    fileSize: trustedFileSize ?? undefined,
+                    checksumSha256: trustedChecksumSha256 ?? undefined,
+                    signatureSha256: trustedSignatureSha256 ?? undefined,
                 });
 
                 const validationErrors = validateApkReleasePayload(enriched, {

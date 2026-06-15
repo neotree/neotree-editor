@@ -4,7 +4,7 @@ import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/c
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
-import { apkReleases, apkReleasesDrafts } from "@/databases/pg/schema";
+import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 export async function _publishApkReleases(opts?: {
@@ -27,7 +27,23 @@ export async function _publishApkReleases(opts?: {
             try {
                 const apkReleaseId = draft.apkReleaseId || draft.data.apkReleaseId || draft.apkReleaseDraftId;
                 const { countryISO: _countryISO, ...rawPayload } = { ...draft.data, apkReleaseId } as any;
-                const payload = normalizeApkReleasePayload(rawPayload);
+                let fileMeta: any = null;
+                let fileSize: number | null = null;
+                if (rawPayload.fileId) {
+                    const file = await executor.query.files.findFirst({
+                        where: eq(files.fileId, rawPayload.fileId),
+                        columns: { size: true, metadata: true },
+                    });
+                    fileMeta = file?.metadata || null;
+                    fileSize = file?.size ?? null;
+                }
+
+                const payload = normalizeApkReleasePayload({
+                    ...rawPayload,
+                    fileSize: fileSize ?? undefined,
+                    checksumSha256: fileMeta?.apkChecksumSha256 ?? null,
+                    signatureSha256: fileMeta?.apkSignatureSha256 ?? null,
+                });
                 const validationErrors = validateApkReleasePayload(payload);
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
