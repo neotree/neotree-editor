@@ -485,24 +485,66 @@ function normalizeIdentifier(value: unknown) {
   return `${value || ""}`.trim().toLowerCase()
 }
 
+function isStrongDeviceHash(value?: string | null) {
+  if (!value) return false
+  // Short human-facing codes like "9999" are useful review evidence but are not
+  // strong enough to silently auto-link a clinical tablet.
+  return value.length >= 8
+}
+
 function remoteIdentifiers(remote: any) {
   const payload = remote?.payload || {}
+  const info = payload.info || {}
+  const custom = payload.custom || payload.customData || payload.customFields || {}
   return {
     mdmDeviceId: normalizeIdentifier(remote?.mdmDeviceId),
-    deviceId: normalizeIdentifier(remote?.deviceId || payload.deviceId || payload.neotreeDeviceId || payload.customDeviceId),
-    deviceHash: normalizeIdentifier(payload.deviceHash || payload.neotreeDeviceHash),
-    serialNumber: normalizeIdentifier(remote?.serialNumber || payload.serialNumber || payload.serial),
-    imei: normalizeIdentifier(payload.imei || payload.imei1 || payload.imei2),
+    deviceId: normalizeIdentifier(
+      remote?.deviceId ||
+      payload.deviceId ||
+      payload.neotreeDeviceId ||
+      payload.customDeviceId ||
+      payload.number ||
+      payload.name ||
+      custom.deviceId ||
+      custom.neotreeDeviceId,
+    ),
+    deviceHash: normalizeIdentifier(
+      payload.deviceHash ||
+      payload.neotreeDeviceHash ||
+      payload.neotreeDeviceCode ||
+      custom.deviceHash ||
+      custom.neotreeDeviceHash,
+    ),
+    serialNumber: normalizeIdentifier(
+      remote?.serialNumber ||
+      payload.serialNumber ||
+      payload.serial ||
+      payload.androidSerial ||
+      info.serialNumber ||
+      info.serial,
+    ),
+    imei: normalizeIdentifier(payload.imei || payload.imei1 || payload.imei2 || info.imei || info.imei1 || info.imei2),
+    label: normalizeIdentifier(`${payload.description || payload.comment || payload.notes || ""}`),
   }
 }
 
 function localDeviceIdentifiers(device: any, appState?: any | null) {
   const details = (device?.details || {}) as Record<string, any>
+  const capabilities = (appState?.deviceCapabilities || {}) as Record<string, any>
+  const identifiers = (capabilities.identifiers || {}) as Record<string, any>
   return {
     deviceId: normalizeIdentifier(device?.deviceId),
-    deviceHash: normalizeIdentifier(device?.deviceHash),
-    serialNumber: normalizeIdentifier(details.serialNumber || details.serial || details.androidSerial || details.imei),
-    imei: normalizeIdentifier(details.imei || details.imei1 || details.imei2),
+    deviceHash: normalizeIdentifier(device?.deviceHash || capabilities.deviceHash || identifiers.deviceHash),
+    androidId: normalizeIdentifier(capabilities.androidId || identifiers.androidId || device?.deviceId),
+    serialNumber: normalizeIdentifier(
+      details.serialNumber ||
+      details.serial ||
+      details.androidSerial ||
+      capabilities.serialNumber ||
+      identifiers.serialNumber ||
+      identifiers.serial,
+    ),
+    imei: normalizeIdentifier(details.imei || details.imei1 || details.imei2 || capabilities.imei || identifiers.imei),
     manufacturer: normalizeIdentifier(appState?.manufacturer || details.manufacturer),
     model: normalizeIdentifier(appState?.model || details.model),
   }
@@ -519,8 +561,17 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
     reasons.push("NeoTree device ID matched")
   }
   if (remoteIds.deviceHash && remoteIds.deviceHash === localIds.deviceHash) {
+    if (isStrongDeviceHash(localIds.deviceHash)) {
+      score = Math.max(score, 98)
+      reasons.push("NeoTree device hash matched")
+    } else {
+      score = Math.max(score, 80)
+      reasons.push("Short NeoTree device hash matched")
+    }
+  }
+  if (remoteIds.deviceId && remoteIds.deviceId === localIds.androidId) {
     score = Math.max(score, 98)
-    reasons.push("NeoTree device hash matched")
+    reasons.push("Android device ID matched")
   }
   if (remoteIds.serialNumber && remoteIds.serialNumber === localIds.serialNumber) {
     score = Math.max(score, 96)
@@ -529,6 +580,15 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
   if (remoteIds.imei && remoteIds.imei === localIds.imei) {
     score = Math.max(score, 96)
     reasons.push("IMEI matched")
+  }
+  if (remoteIds.label && localIds.deviceHash && remoteIds.label.includes(localIds.deviceHash)) {
+    if (isStrongDeviceHash(localIds.deviceHash)) {
+      score = Math.max(score, 95)
+      reasons.push("Headwind description contains NeoTree device hash")
+    } else {
+      score = Math.max(score, 70)
+      reasons.push("Headwind description contains short NeoTree device hash")
+    }
   }
 
   return { device, score, reasons }
@@ -558,6 +618,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
     needsReview: 0,
     conflicts: 0,
     unmatched: 0,
+    startedAt: new Date().toISOString(),
   }
   // Devices auto-linked this run get the managed APK pushed afterwards (#4).
   const autoLinkedDeviceIds: string[] = []
@@ -714,6 +775,10 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
     lastDeviceSyncStatus: "synced",
     lastDeviceSyncError: null,
     lastDeviceSyncAt: new Date(),
+    lastDeviceSyncSummary: {
+      ...summary,
+      finishedAt: new Date().toISOString(),
+    },
   })
 
   return summary
@@ -904,6 +969,11 @@ export async function syncMdmProfileDevicesFromForm(formData: FormData) {
         lastDeviceSyncStatus: "failed",
         lastDeviceSyncError: e.message || "Could not sync Headwind devices",
         lastDeviceSyncAt: new Date(),
+        lastDeviceSyncSummary: {
+          success: false,
+          error: e.message || "Could not sync Headwind devices",
+          finishedAt: new Date().toISOString(),
+        },
       })
       await _updateMdmProviderConnectionStatus(profileId, {
         lastConnectionStatus: "failed",
@@ -955,6 +1025,11 @@ export async function syncEnabledMdmProfilesForAutomation() {
         lastDeviceSyncStatus: "failed",
         lastDeviceSyncError: e.message || "Could not sync Headwind devices",
         lastDeviceSyncAt: new Date(),
+        lastDeviceSyncSummary: {
+          success: false,
+          error: e.message || "Could not sync Headwind devices",
+          finishedAt: new Date().toISOString(),
+        },
       })
       results.push({ profileId: profile.profileId, name: profile.name, success: false, error: e.message })
     }
