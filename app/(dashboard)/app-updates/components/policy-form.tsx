@@ -43,6 +43,11 @@ const targetScopes = [
   { value: "group", label: "MDM group" },
   { value: "hospital", label: "Hospital" },
 ] as const;
+const countryOptions = [
+  { value: "ZW", label: "Zimbabwe" },
+  { value: "MW", label: "Malawi" },
+  { value: "ZM", label: "Zambia" },
+] as const;
 
 type ApkRelease = typeof apkReleases.$inferSelect;
 type Hospital = typeof hospitalsTable.$inferSelect;
@@ -76,6 +81,7 @@ type PolicyFormState = {
   targetScope: string;
   targetGroupId?: string | null;
   targetHospitalId?: string | null;
+  targetCountryISO?: string | null;
   rollbackEnabled: boolean;
 };
 
@@ -97,6 +103,7 @@ const defaultPolicy = (): PolicyFormState => ({
   targetScope: "country",
   targetGroupId: null,
   targetHospitalId: null,
+  targetCountryISO: null,
   rollbackEnabled: false,
 });
 
@@ -541,6 +548,30 @@ export function AppUpdatePolicyForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label>Country</Label>
+              <Select
+                value={policyForm.targetCountryISO || "all"}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetCountryISO: value === "all" ? null : value }))}
+                disabled={editingDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All countries</SelectItem>
+                  {countryOptions.map((country) => (
+                    <SelectItem key={country.value} value={country.value}>
+                      {country.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose the country this policy applies to, or leave it available everywhere.
+              </p>
             </div>
 
             {policyForm.targetScope === "group" ? (

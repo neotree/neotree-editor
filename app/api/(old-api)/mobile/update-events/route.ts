@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
         const deviceId = body?.deviceId || "";
         const eventType = body?.eventType || "";
 
-        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] });
-        if (!eventType) return NextResponse.json({ errors: ["Missing eventType"] });
+        if (!deviceId) return NextResponse.json({ errors: ["Missing deviceId"] }, { status: 400 });
+        if (!eventType) return NextResponse.json({ errors: ["Missing eventType"] }, { status: 400 });
         const auth = await authenticateMobileDevice(req, deviceId, { body: rawBody });
         if (!auth.ok) return NextResponse.json({ errors: auth.errors, data: null }, { status: auth.status });
 
@@ -40,12 +40,12 @@ export async function POST(req: NextRequest) {
             data: [event],
         });
 
-        if (res?.errors?.length) return NextResponse.json({ errors: res.errors, data: null });
+        if (res?.errors?.length) return NextResponse.json({ errors: res.errors, data: null }, { status: 500 });
         await _upsertDeviceRolloutStateFromEvent(event);
 
         return NextResponse.json({ data: res.inserted[0] || null, success: res.success });
     } catch (e: any) {
         logger.error("[POST_ERROR] /api/mobile/update-events", e.message);
-        return NextResponse.json({ errors: ["Internal Error"], data: null });
+        return NextResponse.json({ errors: ["Internal Error"], data: null }, { status: 500 });
     }
 }

@@ -47,6 +47,7 @@ type PolicyLike = {
   targetScope?: string | null
   targetGroupId?: string | null
   targetHospitalId?: string | null
+  targetCountryISO?: string | null
   currentApkReleaseId?: string | null
   rollbackApkReleaseId?: string | null
 }
@@ -84,6 +85,9 @@ export function normalizeAppUpdatePolicyPayload<T extends Record<string, any>>(p
     targetScope: `${payload.targetScope || "country"}`.trim(),
     targetGroupId: payload.targetGroupId || null,
     targetHospitalId: payload.targetHospitalId === "none" ? null : payload.targetHospitalId || null,
+    targetCountryISO: payload.targetCountryISO === "none"
+      ? null
+      : (payload.targetCountryISO ? `${payload.targetCountryISO}`.trim().toUpperCase() : null),
     rollbackEnabled: !!payload.rollbackEnabled,
     currentApkReleaseId: payload.currentApkReleaseId || null,
     rollbackApkReleaseId: payload.rollbackApkReleaseId || null,

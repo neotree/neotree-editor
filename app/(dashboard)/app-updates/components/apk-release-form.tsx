@@ -59,6 +59,10 @@ type ApkFormState = {
   approvedAt?: string | null;
   releasedAt?: string | null;
   releaseNotes?: string | null;
+  // Informational metadata read from the APK (not persisted on the release row).
+  packageName?: string | null;
+  minSdkVersion?: number | null;
+  targetSdkVersion?: number | null;
 };
 
 const defaultApkForm = (): ApkFormState => ({
@@ -75,6 +79,9 @@ const defaultApkForm = (): ApkFormState => ({
   approvedAt: null,
   releasedAt: null,
   releaseNotes: "",
+  packageName: null,
+  minSdkVersion: null,
+  targetSdkVersion: null,
 });
 
 const toDateInput = (value?: string | Date | null) => {
@@ -236,6 +243,12 @@ export function ApkReleaseForm({
       fileSize: file.size || prev.fileSize || null,
       checksumSha256: file.metadata?.apkChecksumSha256 || prev.checksumSha256 || null,
       signatureSha256: file.metadata?.apkSignatureSha256 || prev.signatureSha256 || null,
+      // Auto-fill version details extracted from the APK (like Headwind).
+      versionName: file.metadata?.apkVersionName || prev.versionName,
+      versionCode: file.metadata?.apkVersionCode ?? prev.versionCode,
+      packageName: file.metadata?.apkPackageName || prev.packageName || null,
+      minSdkVersion: file.metadata?.apkMinSdkVersion ?? prev.minSdkVersion ?? null,
+      targetSdkVersion: file.metadata?.apkTargetSdkVersion ?? prev.targetSdkVersion ?? null,
     }));
   }, [editingDisabled]);
 
@@ -244,8 +257,7 @@ export function ApkReleaseForm({
       if (editingDisabled) return;
       if (!artifactUrl.trim()) throw new Error("Paste the EAS APK link first");
       if (!apkForm.runtimeVersion) throw new Error("Enter the runtime version first");
-      if (!apkForm.versionName) throw new Error("Enter the version name first");
-      if (!apkForm.versionCode) throw new Error("Enter the version code first");
+      // Version name/code are read from the APK automatically; no need to type them.
 
       setImporting(true);
       const formData = new FormData();
@@ -267,13 +279,26 @@ export function ApkReleaseForm({
         fileSize: result.data?.fileSize || prev.fileSize,
         checksumSha256: result.data?.checksumSha256 || prev.checksumSha256,
         signatureSha256: result.data?.signatureSha256 || prev.signatureSha256,
+        versionName: result.data?.versionName || prev.versionName,
+        versionCode: result.data?.versionCode ?? prev.versionCode,
+        packageName: result.data?.packageName || prev.packageName || null,
+        minSdkVersion: result.data?.minSdkVersion ?? prev.minSdkVersion ?? null,
+        targetSdkVersion: result.data?.targetSdkVersion ?? prev.targetSdkVersion ?? null,
       }));
       router.refresh();
-      alert({
-        title: "APK imported",
-        message: "NeoTree copied the EAS APK into its own storage and saved a release draft for review.",
-        variant: "success",
-      });
+      if (!result.data?.signatureSha256) {
+        alert({
+          title: "APK imported — signature missing",
+          message: "NeoTree copied the EAS APK but could not capture its signing certificate on the server. Paste the signing certificate SHA-256 into the Signature field before marking this release available to devices.",
+          variant: "info",
+        });
+      } else {
+        alert({
+          title: "APK imported",
+          message: "NeoTree copied the EAS APK into its own storage and saved a release draft for review.",
+          variant: "success",
+        });
+      }
     } catch (e: any) {
       alert({
         title: "Import failed",
@@ -474,6 +499,20 @@ export function ApkReleaseForm({
               <Label>Available to devices</Label>
             </div>
 
+            {apkForm.packageName ? (
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="font-medium mb-1">Detected from APK</p>
+                <p className="text-muted-foreground">Package: {apkForm.packageName}</p>
+                {apkForm.minSdkVersion != null ? (
+                  <p className="text-muted-foreground">Min Android SDK: {apkForm.minSdkVersion}</p>
+                ) : null}
+                {apkForm.targetSdkVersion != null ? (
+                  <p className="text-muted-foreground">Target Android SDK: {apkForm.targetSdkVersion}</p>
+                ) : null}
+                <p className="text-muted-foreground">Version: {apkForm.versionName || "—"} ({apkForm.versionCode ?? "—"})</p>
+              </div>
+            ) : null}
+
             <div>
               <Label>Checksum (SHA-256)</Label>
               <Input value={apkForm.checksumSha256 || ""} disabled />
@@ -481,7 +520,20 @@ export function ApkReleaseForm({
 
             <div>
               <Label>Signature (SHA-256)</Label>
-              <Input value={apkForm.signatureSha256 || ""} disabled />
+              <Input
+                value={apkForm.signatureSha256 || ""}
+                placeholder="Paste the APK signing certificate SHA-256"
+                onChange={(e) => setApkForm((prev) => ({
+                  ...prev,
+                  signatureSha256: e.target.value.trim().replace(/:/g, "").toLowerCase() || null,
+                }))}
+                disabled={editingDisabled}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-captured on upload/import when the server can verify the APK. If it is blank
+                (e.g. an EAS import on a server without Android build-tools), paste the signing
+                certificate SHA-256 from your EAS credentials so the release can go live.
+              </p>
             </div>
 
             <div>

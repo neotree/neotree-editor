@@ -15,11 +15,13 @@ export async function GET(req: NextRequest) {
 
         const runtimeVersion = req.nextUrl.searchParams.get("runtimeVersion") || undefined;
         const nativeBuildVersion = Number(req.nextUrl.searchParams.get("nativeBuildVersion") || NaN);
-        const policyRes = await _getAppUpdatePolicy({ runtimeVersion });
-        if (policyRes?.errors?.length) return NextResponse.json({ errors: policyRes.errors, data: null });
+        const hospitalId = req.nextUrl.searchParams.get("hospitalId") || null;
+        const countryISO = req.nextUrl.searchParams.get("countryISO") || null;
+        const policyRes = await _getAppUpdatePolicy({ runtimeVersion, deviceId, hospitalId, countryISO });
+        if (policyRes?.errors?.length) return NextResponse.json({ errors: policyRes.errors, data: null }, { status: 500 });
 
         const policy = policyRes.data;
-        if (!policy) return NextResponse.json({ errors: ["Policy not found"], data: null });
+        if (!policy) return NextResponse.json({ errors: ["Policy not found"], data: null }, { status: 404 });
         const allowsInAppDownload = policy.apkDeliveryMode === "in_app" || policy.apkDeliveryMode === "hybrid";
 
         const mapRelease = (release: typeof policy.currentApkRelease) => {
@@ -86,6 +88,6 @@ export async function GET(req: NextRequest) {
         });
     } catch (e: any) {
         logger.error("[GET_ERROR] /api/mobile/update-policy", e.message);
-        return NextResponse.json({ errors: ["Internal Error"], data: null });
+        return NextResponse.json({ errors: ["Internal Error"], data: null }, { status: 500 });
     }
 }

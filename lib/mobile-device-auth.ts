@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server"
 
 import { validateApiKey } from "@/app/actions/authenticate"
 import { _getDevice } from "@/databases/queries/devices"
-import { verifyDeviceSignature } from "@/lib/device-credentials"
+import { verifyDeviceSignature, SIGNATURE_TOLERANCE_MS } from "@/lib/device-credentials"
+import { consumeDeviceNonce, pruneExpiredDeviceNonces } from "@/databases/mutations/device-auth-nonces"
 
 const BLOCKED_DEVICE_STATES = new Set(["blocked", "stolen", "revoked"])
 
@@ -55,6 +56,17 @@ export async function authenticateMobileDevice(
       secret: deviceRes.data.deviceAuthSecret,
     })
     if (!signature.ok) return { ok: false, status: 401, errors: [signature.error] }
+
+    // Replay protection (#3): each signed request carries a one-time nonce.
+    const nonce = req.headers.get("x-device-nonce") || ""
+    if (!nonce) return { ok: false, status: 401, errors: ["Missing device nonce"] }
+    const fresh = await consumeDeviceNonce({
+      deviceId,
+      nonce,
+      expiresAt: new Date(Date.now() + SIGNATURE_TOLERANCE_MS),
+    })
+    if (!fresh) return { ok: false, status: 401, errors: ["Replayed device request rejected"] }
+    pruneExpiredDeviceNonces().catch(() => null)
   }
 
   return { ok: true, device: deviceRes.data, apiKeyAuthenticated }
