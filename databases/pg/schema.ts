@@ -113,11 +113,39 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "alias",
   "hospital",
   "release",
+  "app_update_policy",
+  "apk_release",
 ])
-
 
 // DRAFT ORIGIN ENUM
 export const draftOriginEnum = pgEnum("draft_origin", ["data_key_sync", "editor", "import", "other"])
+
+// APP UPDATE ENUMS
+export const apkReleaseStatusEnum = pgEnum("apk_release_status", ["uploaded", "validated", "approved", "available", "deprecated", "revoked", "rolled_back"])
+export const mdmProviderEnum = pgEnum("mdm_provider", ["headwind"])
+export const mdmManagementStateEnum = pgEnum("mdm_management_state", ["managed", "unmanaged", "unknown", "blocked", "stolen", "revoked"])
+export const mdmEnrollmentStatusEnum = pgEnum("mdm_enrollment_status", ["pending", "enrolled", "unenrolled", "failed", "unknown"])
+export const mdmInventoryMatchStatusEnum = pgEnum("mdm_inventory_match_status", [
+  "unmatched",
+  "auto_linked",
+  "manually_linked",
+  "needs_review",
+  "conflict",
+  "ignored",
+])
+export const appUpdateDeliveryModeEnum = pgEnum("app_update_delivery_mode", ["in_app", "mdm", "hybrid", "manual"])
+export const deviceRolloutStateEnum = pgEnum("device_rollout_state", [
+  "pending",
+  "policy_seen",
+  "mdm_push_requested",
+  "mdm_push_acknowledged",
+  "download_started",
+  "download_completed",
+  "install_started",
+  "installed",
+  "failed",
+  "rolled_back",
+])
 
 // MAILER SETTINGS
 export const mailerSettings = pgTable("nt_mailer_settings", {
@@ -412,6 +440,8 @@ export const devices = pgTable("nt_devices", {
   id: serial("id").primaryKey(),
   deviceId: text("device_id").notNull().unique(),
   deviceHash: text("device_hash").notNull().unique(),
+  deviceAuthSecret: text("device_auth_secret"),
+  deviceAuthSecretRotatedAt: timestamp("device_auth_secret_rotated_at"),
   details: jsonb("details").default({}),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -421,6 +451,81 @@ export const devices = pgTable("nt_devices", {
     .$onUpdate(() => new Date()),
   deletedAt: timestamp("deleted_at"),
 })
+
+// DEVICE AUTH NONCES (replay protection for signed mobile requests)
+export const deviceAuthNonces = pgTable("nt_device_auth_nonces", {
+  id: serial("id").primaryKey(),
+  deviceId: text("device_id").notNull(),
+  nonce: text("nonce").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  deviceNonceUnique: uniqueIndex("device_auth_nonce_unique").on(table.deviceId, table.nonce),
+  expiresIndex: index("device_auth_nonce_expires_idx").on(table.expiresAt),
+}))
+
+// DEVICE UPDATE EVENTS
+export const deviceUpdateEvents = pgTable("nt_device_update_events", {
+  id: serial("id").primaryKey(),
+  eventId: uuid("event_id").notNull().unique().defaultRandom(),
+
+  deviceId: text("device_id").notNull(),
+
+  eventType: text("event_type").notNull(),
+  status: text("status"),
+  countryISO: text("country_iso"),
+  appVersion: text("app_version"),
+  runtimeVersion: text("runtime_version"),
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  otaUpdateId: text("ota_update_id"),
+  otaChannel: text("ota_channel"),
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  payload: jsonb("payload").default("{}").notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  deviceIndex: index("device_update_events_device_idx").on(table.deviceId),
+  typeIndex: index("device_update_events_type_idx").on(table.eventType),
+}))
+
+// DEVICE APP STATES
+export const deviceAppStates = pgTable("nt_device_app_states", {
+  id: serial("id").primaryKey(),
+
+  deviceId: text("device_id").notNull(),
+
+  appVersion: text("app_version").notNull(),
+  runtimeVersion: text("runtime_version").notNull(),
+  countryISO: text("country_iso"),
+  androidVersion: text("android_version"),
+  androidSdk: integer("android_sdk"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  deviceCapabilities: jsonb("device_capabilities").default({}).notNull(),
+
+  otaUpdateId: text("ota_update_id"),
+  otaChannel: text("ota_channel"),
+
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  lastPolicySeenVersion: integer("last_policy_seen_version"),
+  lastPolicySeenAt: timestamp("last_policy_seen_at"),
+
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  reportedAt: timestamp("reported_at").defaultNow().notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  deviceUnique: uniqueIndex("device_app_state_unique").on(table.deviceId),
+}))
+
+export const deviceAppStatesRelations = relations(deviceAppStates, ({ one }) => ({
+  apkRelease: one(apkReleases, {
+    fields: [deviceAppStates.apkReleaseId],
+    references: [apkReleases.apkReleaseId],
+  }),
+}))
 
 // FILES
 export const files = pgTable("nt_files", {
@@ -462,7 +567,359 @@ export const filesAliases = pgTable("nt_files_aliases", {
   id: serial("id").primaryKey(),
   fileId: uuid("file_id").references(() => files.fileId, { onDelete: "cascade" }),
   alias: text("alias").notNull(),
-});
+})
+
+// MDM PROVIDER PROFILES
+export const mdmProviderProfiles = pgTable("nt_mdm_provider_profiles", {
+  id: serial("id").primaryKey(),
+  profileId: uuid("profile_id").notNull().unique().defaultRandom(),
+
+  name: text("name").notNull(),
+  provider: mdmProviderEnum("provider").default("headwind").notNull(),
+  countryISO: text("country_iso").notNull(),
+  hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
+  environment: text("environment").default("production"),
+  isSharedInstance: boolean("is_shared_instance").default(false).notNull(),
+
+  baseUrl: text("base_url").notNull(),
+  apiKey: text("api_key"),
+  defaultKioskPolicy: text("default_kiosk_policy"),
+  providerCapabilities: jsonb("provider_capabilities").default({}).notNull(),
+  settings: jsonb("settings").default({}).notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  lastConnectionStatus: text("last_connection_status"),
+  lastConnectionCheckedAt: timestamp("last_connection_checked_at"),
+  lastConnectionError: text("last_connection_error"),
+  lastDeviceSyncStatus: text("last_device_sync_status"),
+  lastDeviceSyncAt: timestamp("last_device_sync_at"),
+  lastDeviceSyncError: text("last_device_sync_error"),
+  autoSyncEnabled: boolean("auto_sync_enabled").default(true).notNull(),
+  autoLinkEnabled: boolean("auto_link_enabled").default(true).notNull(),
+  autoLinkMinConfidence: integer("auto_link_min_confidence").default(95).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  providerIndex: index("mdm_provider_profiles_provider_idx").on(table.provider),
+  countryIndex: index("mdm_provider_profiles_country_idx").on(table.countryISO),
+}))
+
+// DEVICE MDM LINKS
+export const deviceMdmLinks = pgTable("nt_device_mdm_links", {
+  id: serial("id").primaryKey(),
+  linkId: uuid("link_id").notNull().unique().defaultRandom(),
+
+  deviceId: text("device_id").notNull().references(() => devices.deviceId, { onDelete: "cascade" }),
+  provider: mdmProviderEnum("provider").default("headwind").notNull(),
+  profileId: uuid("profile_id").references(() => mdmProviderProfiles.profileId, { onDelete: "set null" }),
+
+  mdmDeviceId: text("mdm_device_id"),
+  mdmConfigId: text("mdm_config_id"),
+  mdmConfigName: text("mdm_config_name"),
+  mdmGroupId: text("mdm_group_id"),
+  mdmGroupName: text("mdm_group_name"),
+  countryISO: text("country_iso"),
+  hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
+  enrollmentStatus: mdmEnrollmentStatusEnum("enrollment_status").default("unknown").notNull(),
+  managementState: mdmManagementStateEnum("management_state").default("unknown").notNull(),
+
+  serialNumber: text("serial_number"),
+  androidVersion: text("android_version"),
+  deviceCapabilities: jsonb("device_capabilities").default({}).notNull(),
+  lastMdmSeenAt: timestamp("last_mdm_seen_at"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastSyncStatus: text("last_sync_status"),
+  lastSyncError: text("last_sync_error"),
+  linkSource: text("link_source").default("manual").notNull(),
+  matchConfidence: integer("match_confidence"),
+  matchReasons: jsonb("match_reasons").$type<string[]>().default([]).notNull(),
+  payload: jsonb("payload").default({}).notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  deviceProviderUnique: uniqueIndex("device_mdm_link_device_provider_unique").on(table.deviceId, table.provider),
+  deviceIndex: index("device_mdm_links_device_idx").on(table.deviceId),
+  mdmDeviceIndex: index("device_mdm_links_mdm_device_idx").on(table.mdmDeviceId),
+  profileIndex: index("device_mdm_links_profile_idx").on(table.profileId),
+  countryIndex: index("device_mdm_links_country_idx").on(table.countryISO),
+}))
+
+export const mdmDeviceInventory = pgTable("nt_mdm_device_inventory", {
+  id: serial("id").primaryKey(),
+  inventoryId: uuid("inventory_id").notNull().unique().defaultRandom(),
+
+  provider: mdmProviderEnum("provider").default("headwind").notNull(),
+  profileId: uuid("profile_id").references(() => mdmProviderProfiles.profileId, { onDelete: "cascade" }).notNull(),
+  mdmDeviceId: text("mdm_device_id").notNull(),
+  suggestedDeviceId: text("suggested_device_id").references(() => devices.deviceId, { onDelete: "set null" }),
+  linkedDeviceId: text("linked_device_id").references(() => devices.deviceId, { onDelete: "set null" }),
+
+  countryISO: text("country_iso"),
+  mdmConfigId: text("mdm_config_id"),
+  mdmConfigName: text("mdm_config_name"),
+  mdmGroupId: text("mdm_group_id"),
+  mdmGroupName: text("mdm_group_name"),
+  enrollmentStatus: mdmEnrollmentStatusEnum("enrollment_status").default("unknown").notNull(),
+  managementState: mdmManagementStateEnum("management_state").default("unknown").notNull(),
+
+  serialNumber: text("serial_number"),
+  androidVersion: text("android_version"),
+  androidSdk: integer("android_sdk"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  deviceCapabilities: jsonb("device_capabilities").default({}).notNull(),
+  lastMdmSeenAt: timestamp("last_mdm_seen_at"),
+
+  matchStatus: mdmInventoryMatchStatusEnum("match_status").default("unmatched").notNull(),
+  matchConfidence: integer("match_confidence").default(0).notNull(),
+  matchReasons: jsonb("match_reasons").$type<string[]>().default([]).notNull(),
+  reviewNote: text("review_note"),
+  ignoredAt: timestamp("ignored_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+  payload: jsonb("payload").default({}).notNull(),
+
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  profileMdmDeviceUnique: uniqueIndex("mdm_device_inventory_profile_device_unique").on(table.profileId, table.mdmDeviceId),
+  profileIndex: index("mdm_device_inventory_profile_idx").on(table.profileId),
+  matchStatusIndex: index("mdm_device_inventory_match_status_idx").on(table.matchStatus),
+  suggestedDeviceIndex: index("mdm_device_inventory_suggested_device_idx").on(table.suggestedDeviceId),
+  linkedDeviceIndex: index("mdm_device_inventory_linked_device_idx").on(table.linkedDeviceId),
+  serialIndex: index("mdm_device_inventory_serial_idx").on(table.serialNumber),
+}))
+
+export const mdmProviderProfilesRelations = relations(mdmProviderProfiles, ({ one, many }) => ({
+  hospital: one(hospitals, {
+    fields: [mdmProviderProfiles.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
+  deviceLinks: many(deviceMdmLinks),
+  deviceInventory: many(mdmDeviceInventory),
+}))
+
+export const deviceMdmLinksRelations = relations(deviceMdmLinks, ({ one }) => ({
+  device: one(devices, {
+    fields: [deviceMdmLinks.deviceId],
+    references: [devices.deviceId],
+  }),
+  profile: one(mdmProviderProfiles, {
+    fields: [deviceMdmLinks.profileId],
+    references: [mdmProviderProfiles.profileId],
+  }),
+  hospital: one(hospitals, {
+    fields: [deviceMdmLinks.hospitalId],
+    references: [hospitals.hospitalId],
+  }),
+}))
+
+export const mdmDeviceInventoryRelations = relations(mdmDeviceInventory, ({ one }) => ({
+  profile: one(mdmProviderProfiles, {
+    fields: [mdmDeviceInventory.profileId],
+    references: [mdmProviderProfiles.profileId],
+  }),
+  suggestedDevice: one(devices, {
+    fields: [mdmDeviceInventory.suggestedDeviceId],
+    references: [devices.deviceId],
+    relationName: "mdmInventorySuggestedDevice",
+  }),
+  linkedDevice: one(devices, {
+    fields: [mdmDeviceInventory.linkedDeviceId],
+    references: [devices.deviceId],
+    relationName: "mdmInventoryLinkedDevice",
+  }),
+  reviewedBy: one(users, {
+    fields: [mdmDeviceInventory.reviewedByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// APK RELEASES
+export const apkReleases = pgTable("nt_apk_releases", {
+  id: serial("id").primaryKey(),
+  apkReleaseId: uuid("apk_release_id").notNull().unique().defaultRandom(),
+  runtimeVersion: text("runtime_version").notNull(),
+  versionName: text("version_name").notNull(),
+  versionCode: integer("version_code").notNull(),
+  status: apkReleaseStatusEnum("status").notNull().default("uploaded"),
+  isAvailable: boolean("is_available").default(false).notNull(),
+
+  fileId: uuid("file_id").references(() => files.fileId, { onDelete: "set null" }),
+  fileSize: integer("file_size"),
+  checksumSha256: text("checksum_sha256"),
+  signatureSha256: text("signature_sha256"),
+
+  validatedAt: timestamp("validated_at"),
+  approvedAt: timestamp("approved_at"),
+
+  releaseNotes: text("release_notes").default(""),
+  releasedAt: timestamp("released_at"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  uniqueVersionPerRuntime: uniqueIndex("apk_release_unique_version").on(table.runtimeVersion, table.versionCode),
+  statusIndex: index("apk_release_status_index").on(table.status),
+}))
+
+export const apkReleasesRelations = relations(apkReleases, ({ one }) => ({
+  file: one(files, {
+    fields: [apkReleases.fileId],
+    references: [files.fileId],
+  }),
+  createdBy: one(users, {
+    fields: [apkReleases.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// APP UPDATE POLICIES
+export const appUpdatePolicies = pgTable("nt_app_update_policies", {
+  id: serial("id").primaryKey(),
+  policyId: uuid("policy_id").notNull().unique().defaultRandom(),
+  runtimeVersion: text("runtime_version").notNull(),
+  policyVersion: integer("policy_version").default(1).notNull(),
+
+  otaEnabled: boolean("ota_enabled").default(true).notNull(),
+  otaChannel: text("ota_channel").default("production").notNull(),
+
+  apkAutoDownload: boolean("apk_auto_download").default(true).notNull(),
+  apkDeliveryMode: appUpdateDeliveryModeEnum("apk_delivery_mode").default("in_app").notNull(),
+  apkForceInstall: boolean("apk_force_install").default(false).notNull(),
+  apkGracePeriodHours: integer("apk_grace_period_hours"),
+  apkForceAfter: timestamp("apk_force_after"),
+  apkInstallWindow: text("apk_install_window").default("on_restart"),
+
+  apkMessageTitle: text("apk_message_title").default(""),
+  apkMessageBody: text("apk_message_body").default(""),
+
+  currentApkReleaseId: uuid("current_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  rollbackApkReleaseId: uuid("rollback_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
+  targetScope: text("target_scope").default("country").notNull(),
+  targetGroupId: text("target_group_id"),
+  targetHospitalId: uuid("target_hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
+  targetCountryISO: text("target_country_iso"),
+  rollbackEnabled: boolean("rollback_enabled").default(false).notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+}))
+
+export const appUpdatePoliciesRelations = relations(appUpdatePolicies, ({ one }) => ({
+  currentApkRelease: one(apkReleases, {
+    fields: [appUpdatePolicies.currentApkReleaseId],
+    references: [apkReleases.apkReleaseId],
+    relationName: "currentApkRelease",
+  }),
+  rollbackApkRelease: one(apkReleases, {
+    fields: [appUpdatePolicies.rollbackApkReleaseId],
+    references: [apkReleases.apkReleaseId],
+    relationName: "rollbackApkRelease",
+  }),
+  createdBy: one(users, {
+    fields: [appUpdatePolicies.createdByUserId],
+    references: [users.userId],
+  }),
+  targetHospital: one(hospitals, {
+    fields: [appUpdatePolicies.targetHospitalId],
+    references: [hospitals.hospitalId],
+  }),
+}))
+
+// DEVICE ROLLOUT STATES
+export const deviceRolloutStates = pgTable("nt_device_rollout_states", {
+  id: serial("id").primaryKey(),
+  rolloutStateId: uuid("rollout_state_id").notNull().unique().defaultRandom(),
+
+  deviceId: text("device_id").notNull(),
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "cascade" }),
+  countryISO: text("country_iso"),
+  deliveryMode: appUpdateDeliveryModeEnum("delivery_mode").default("in_app").notNull(),
+  rolloutState: deviceRolloutStateEnum("rollout_state").default("pending").notNull(),
+  downloadProgress: integer("download_progress").default(0),
+
+  mdmPushRequestedAt: timestamp("mdm_push_requested_at"),
+  mdmPushAcknowledgedAt: timestamp("mdm_push_acknowledged_at"),
+  downloadStartedAt: timestamp("download_started_at"),
+  downloadCompletedAt: timestamp("download_completed_at"),
+  installStartedAt: timestamp("install_started_at"),
+  installCompletedAt: timestamp("install_completed_at"),
+  rollbackRequired: boolean("rollback_required").default(false).notNull(),
+  lastErrorCode: text("last_error_code"),
+  lastErrorMessage: text("last_error_message"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  deviceApkUnique: uniqueIndex("device_rollout_state_device_apk_unique").on(table.deviceId, table.apkReleaseId),
+  deviceIndex: index("device_rollout_states_device_idx").on(table.deviceId),
+  releaseIndex: index("device_rollout_states_release_idx").on(table.apkReleaseId),
+  stateIndex: index("device_rollout_states_state_idx").on(table.rolloutState),
+  countryIndex: index("device_rollout_states_country_idx").on(table.countryISO),
+}))
+
+export const deviceRolloutStatesRelations = relations(deviceRolloutStates, ({ one }) => ({
+  apkRelease: one(apkReleases, {
+    fields: [deviceRolloutStates.apkReleaseId],
+    references: [apkReleases.apkReleaseId],
+  }),
+}))
+
+// APK RELEASES DRAFTS
+export const apkReleasesDrafts = pgTable("nt_apk_releases_drafts", {
+  id: serial("id").primaryKey(),
+  apkReleaseDraftId: uuid("apk_release_draft_id").notNull().unique().defaultRandom(),
+  apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "cascade" }),
+  data: jsonb("data").$type<typeof apkReleases.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+})
+
+export const apkReleasesDraftsRelations = relations(apkReleasesDrafts, ({ one }) => ({
+  apkRelease: one(apkReleases, {
+    fields: [apkReleasesDrafts.apkReleaseId],
+    references: [apkReleases.apkReleaseId],
+  }),
+  createdBy: one(users, {
+    fields: [apkReleasesDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// APP UPDATE POLICIES DRAFTS
+export const appUpdatePoliciesDrafts = pgTable("nt_app_update_policies_drafts", {
+  id: serial("id").primaryKey(),
+  policyDraftId: uuid("policy_draft_id").notNull().unique().defaultRandom(),
+  policyId: uuid("policy_id").references(() => appUpdatePolicies.policyId, { onDelete: "cascade" }),
+  data: jsonb("data").$type<typeof appUpdatePolicies.$inferInsert>().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+})
+
+export const appUpdatePoliciesDraftsRelations = relations(appUpdatePoliciesDrafts, ({ one }) => ({
+  policy: one(appUpdatePolicies, {
+    fields: [appUpdatePoliciesDrafts.policyId],
+    references: [appUpdatePolicies.policyId],
+  }),
+  createdBy: one(users, {
+    fields: [appUpdatePoliciesDrafts.createdByUserId],
+    references: [users.userId],
+  }),
+}))
 
 // CONFIG KEYS
 export const configKeys = pgTable(

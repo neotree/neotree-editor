@@ -38,6 +38,20 @@ export function useRoutes() {
       hidden: false,
     },
     {
+      label: "App Updates",
+      href: "/app-updates",
+      isActive: pathname === "/app-updates" || pathname.startsWith("/app-updates/"),
+      id: v4(),
+      hidden: false,
+    },
+    {
+      label: "Device Management",
+      href: "/device-management",
+      isActive: pathname === "/device-management" || pathname.startsWith("/device-management/"),
+      id: v4(),
+      hidden: false,
+    },
+    {
       label: "Hospitals",
       href: "/hospitals",
       id: v4(),

@@ -17,7 +17,9 @@ import * as hospitalsQueries from "@/databases/queries/hospitals"
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library"
 import * as drugsLibraryQueries from "@/databases/queries/drugs-library"
 import * as dataKeysMutations from "@/databases/mutations/data-keys"
+import * as appUpdatesMutations from "@/databases/mutations/app-updates"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
+import * as appUpdatesQueries from "@/databases/queries/app-updates"
 import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
@@ -676,6 +678,8 @@ export const countAllDrafts = async () => {
     const scripts = await scriptsQueries._countScripts()
     const diagnoses = await scriptsQueries._countDiagnoses()
     const problems = await scriptsQueries._countProblems()
+    const appUpdatePolicies = await appUpdatesQueries._countAppUpdatePolicies()
+    const apkReleases = await appUpdatesQueries._countApkReleases()
 
     return {
       configKeys: configKeys.data.allDrafts,
@@ -686,6 +690,8 @@ export const countAllDrafts = async () => {
       diagnoses: diagnoses.data.allDrafts,
       problems: problems.data.allDrafts,
       dataKeys: dataKeys.data.allDrafts,
+      appUpdatePolicies: appUpdatePolicies.data.allDrafts,
+      apkReleases: apkReleases.data.allDrafts,
     }
   } catch (e: any) {
     logger.error("countAllDrafts ERROR", e.message)
@@ -696,6 +702,10 @@ export const countAllDrafts = async () => {
       hospitals: 0,
       diagnoses: 0,
       problems: 0,
+      dataKeys: 0,
+      drugsLibrary: 0,
+      appUpdatePolicies: 0,
+      apkReleases: 0,
     }
   }
 }
@@ -967,6 +977,20 @@ export async function publishData({
       })
       if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
 
+      const publishApkReleases = await appUpdatesMutations._publishApkReleases({
+        userId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishApkReleases.errors?.length) throw new Error(publishApkReleases.errors.join(", "))
+
+      const publishAppUpdatePolicies = await appUpdatesMutations._publishAppUpdatePolicies({
+        userId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+      if (publishAppUpdatePolicies.errors?.length) throw new Error(publishAppUpdatePolicies.errors.join(", "))
+
       const processPendingDeletion = await _processPendingDeletion({
         userId,
         publisherUserId: publisherUserId || undefined,
@@ -1066,6 +1090,8 @@ export async function discardDrafts({
     await scriptsMutations._deleteAllScreensDrafts({ userId })
     await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
     await scriptsMutations._deleteAllProblemsDrafts({ userId })
+    await appUpdatesMutations._deleteAllAppUpdatePolicyDrafts({ userId })
+    await appUpdatesMutations._deleteAllApkReleaseDrafts({ userId })
     await _clearPendingDeletion({ userId })
 
     const [
