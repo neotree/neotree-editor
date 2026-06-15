@@ -288,8 +288,8 @@ export function ApkReleaseForm({
       router.refresh();
       if (!result.data?.signatureSha256) {
         alert({
-          title: "APK imported — signature missing",
-          message: "NeoTree copied the EAS APK but could not capture its signing certificate on the server. Paste the signing certificate SHA-256 into the Signature field before marking this release available to devices.",
+          title: "APK imported - verification pending",
+          message: "NeoTree copied the EAS APK, but the server could not verify its signing certificate yet. The release is saved as a draft and will stay blocked from device rollout until APK verification is enabled on the server and the APK is imported or uploaded again.",
           variant: "info",
         });
       } else {
@@ -315,7 +315,25 @@ export function ApkReleaseForm({
   }, []);
 
   const readiness = useMemo(() => getApkReleaseReadiness(normalizeApkReleasePayload(apkForm)), [apkForm]);
+  const apkArtifactReady = useMemo(
+    () => readiness.filter((check) => check.key !== "status").every((check) => check.passed),
+    [readiness],
+  );
   const validationErrors = useMemo(() => validateApkReleasePayload(normalizeApkReleasePayload(apkForm)), [apkForm]);
+
+  const explainBlockedAvailability = useCallback(() => {
+    const openChecks = readiness
+      .filter((check) => check.key !== "status" && !check.passed)
+      .map((check) => check.label);
+
+    alert({
+      title: "Release is not ready",
+      message: openChecks.length
+        ? `NeoTree cannot make this APK available yet. Missing: ${openChecks.join(", ")}.`
+        : "NeoTree cannot make this APK available yet. Review the release checks first.",
+      variant: "error",
+    });
+  }, [alert, readiness]);
 
   return (
     <>
@@ -420,7 +438,7 @@ export function ApkReleaseForm({
                   </Button>
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  Fill in runtime version, version name, and version code first. NeoTree will copy the APK into its own storage and save a draft for review.
+                  Enter the runtime version first. NeoTree copies the APK, reads version details, captures checksum and signing certificate, then saves a draft for review.
                 </div>
               </>
             ) : (
@@ -474,7 +492,17 @@ export function ApkReleaseForm({
               <Label>Status</Label>
               <Select
                 value={apkForm.status}
-                onValueChange={(value) => setApkForm((prev) => ({ ...prev, status: value }))}
+                onValueChange={(value) => {
+                  if (value === "available" && !apkArtifactReady) {
+                    explainBlockedAvailability();
+                    return;
+                  }
+                  setApkForm((prev) => ({
+                    ...prev,
+                    status: value,
+                    isAvailable: value === "available" ? true : prev.isAvailable,
+                  }));
+                }}
                 disabled={editingDisabled}
               >
                 <SelectTrigger>
@@ -493,7 +521,17 @@ export function ApkReleaseForm({
             <div className="flex items-center gap-3">
               <Switch
                 checked={apkForm.isAvailable}
-                onCheckedChange={(checked) => setApkForm((prev) => ({ ...prev, isAvailable: checked }))}
+                onCheckedChange={(checked) => {
+                  if (checked && !apkArtifactReady) {
+                    explainBlockedAvailability();
+                    return;
+                  }
+                  setApkForm((prev) => ({
+                    ...prev,
+                    isAvailable: checked,
+                    status: checked ? "available" : prev.status === "available" ? "approved" : prev.status,
+                  }));
+                }}
                 disabled={editingDisabled}
               />
               <Label>Available to devices</Label>
@@ -520,20 +558,19 @@ export function ApkReleaseForm({
 
             <div>
               <Label>Signature (SHA-256)</Label>
-              <Input
-                value={apkForm.signatureSha256 || ""}
-                placeholder="Paste the APK signing certificate SHA-256"
-                onChange={(e) => setApkForm((prev) => ({
-                  ...prev,
-                  signatureSha256: e.target.value.trim().replace(/:/g, "").toLowerCase() || null,
-                }))}
-                disabled={editingDisabled}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Auto-captured on upload/import when the server can verify the APK. If it is blank
-                (e.g. an EAS import on a server without Android build-tools), paste the signing
-                certificate SHA-256 from your EAS credentials so the release can go live.
-              </p>
+              <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border px-3 py-2">
+                <span className="min-w-0 truncate text-sm text-muted-foreground">
+                  {apkForm.signatureSha256 || "Waiting for automatic APK verification"}
+                </span>
+                <Badge variant={apkForm.signatureSha256 ? "default" : "secondary"}>
+                  {apkForm.signatureSha256 ? "Captured" : "Blocked"}
+                </Badge>
+              </div>
+              {!apkForm.signatureSha256 ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  This is captured automatically from the APK. Releases without a verified signing certificate cannot be made available to devices.
+                </p>
+              ) : null}
             </div>
 
             <div>

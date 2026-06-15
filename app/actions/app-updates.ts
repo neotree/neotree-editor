@@ -101,8 +101,8 @@ export async function importEasApkReleaseDraft(formData: FormData) {
             ? providedVersionCode
             : (imported.metadata.versionCode || 0);
 
-        if (!versionName) throw new Error("Version name could not be read from the APK; enter it manually");
-        if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error("Version code could not be read from the APK; enter it manually");
+        if (!versionName) throw new Error("Version name could not be read from the APK. Use a valid EAS APK build link or upload the APK file directly.");
+        if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error("Version code could not be read from the APK. Use a valid EAS APK build link or upload the APK file directly.");
 
         const saveResult = await _saveApkReleases({
             userId: session.user?.userId,
