@@ -13,7 +13,7 @@ type Params = {
 }
 
 function isAuthorized(req: NextRequest, apkReleaseId: string) {
-  const secret = process.env.MDM_SYNC_SECRET
+  const secret = process.env.NEXTAUTH_SECRET
   if (!secret) return false
 
   // Admin/server-to-server bearer (full secret) still works for tooling.
