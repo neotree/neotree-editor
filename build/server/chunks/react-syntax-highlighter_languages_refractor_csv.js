@@ -1,0 +1,1 @@
+"use strict";exports.id=72526,exports.ids=[72526],exports.modules={94740:s=>{function e(s){s.languages.csv={value:/[^\r\n,"]+|"(?:[^"]|"")*"(?!")/,punctuation:/,/}}s.exports=e,e.displayName="csv",e.aliases=[]}};
