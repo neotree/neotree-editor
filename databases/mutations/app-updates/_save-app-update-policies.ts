@@ -1,11 +1,12 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
-import { appUpdatePolicies, appUpdatePoliciesDrafts, apkReleases } from "@/databases/pg/schema";
+import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
+import { resolvePolicyReleaseReferences } from "@/lib/app-updates/policy-release-resolution";
 
 export type SaveAppUpdatePoliciesData = Partial<typeof appUpdatePolicies.$inferInsert>;
 
@@ -32,17 +33,8 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 const policyId = itemPolicyId || published?.policyId || uuid.v4();
 
                 const normalizedItem = normalizeAppUpdatePolicyPayload(cleanItem);
-                const referencedReleaseIds = [
-                    normalizedItem.currentApkReleaseId,
-                    normalizedItem.rollbackApkReleaseId,
-                ].filter(Boolean);
-                const releaseRows = !referencedReleaseIds.length
-                    ? []
-                    : await db.query.apkReleases.findMany({
-                        where: inArray(apkReleases.apkReleaseId, referencedReleaseIds as string[]),
-                    });
-                const releasesById = new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
-                const validationErrors = validateAppUpdatePolicyPayload(normalizedItem, releasesById);
+                const { resolvedPolicy, releasesById, errors: resolutionErrors } = await resolvePolicyReleaseReferences(db, normalizedItem);
+                const validationErrors = [...resolutionErrors, ...validateAppUpdatePolicyPayload(resolvedPolicy, releasesById)];
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 const draft = await db.query.appUpdatePoliciesDrafts.findFirst({
@@ -52,7 +44,7 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 if (draft) {
                     const merged = {
                         ...draft.data,
-                        ...normalizedItem,
+                        ...resolvedPolicy,
                         policyId,
                     } as typeof appUpdatePolicies.$inferInsert;
 
@@ -63,7 +55,7 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                 } else {
                     const merged = {
                         ...(published || {}),
-                        ...normalizedItem,
+                        ...resolvedPolicy,
                         policyId,
                     } as typeof appUpdatePolicies.$inferInsert;
 
@@ -75,6 +67,10 @@ export async function _saveAppUpdatePolicies({ data, broadcastAction = true, use
                     });
                 }
             } catch (e: any) {
+                logger.error("_saveAppUpdatePolicies item ERROR", JSON.stringify({
+                    policyId: itemPolicyId || null,
+                    message: e.message,
+                }));
                 errors.push(e.message);
             }
         }

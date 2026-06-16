@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
 import { Tabs } from "@/components/tabs";
 import { useAppContext } from "@/contexts/app";
+import { buildAppUpdateReleaseRows } from "@/lib/app-updates/release-rows";
 import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
@@ -87,33 +88,7 @@ export function AppUpdatesClient({
   const activeOtaSection = section === "acknowledgements" || section === "exceptions" || section === "rollout" ? section : "adoption";
 
   const releaseRows = useMemo(() => {
-    const byId = new Map<string, any>();
-
-    for (const draft of apkReleaseDrafts) {
-      const payload = (draft.data || {}) as any;
-      const releaseId = payload.apkReleaseId || draft.apkReleaseDraftId;
-      if (!releaseId) continue;
-      byId.set(releaseId, {
-        ...payload,
-        apkReleaseId: releaseId,
-        __draft: true,
-        __draftId: draft.apkReleaseDraftId,
-        __updatedAt: draft.updatedAt || draft.createdAt,
-      });
-    }
-
-    for (const release of apkReleases) {
-      const releaseId = release.apkReleaseId;
-      if (!releaseId) continue;
-      if (byId.has(releaseId)) continue;
-      byId.set(releaseId, { ...release, __draft: false });
-    }
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const aDate = new Date(a.__updatedAt || a.updatedAt || a.createdAt || 0).getTime();
-      const bDate = new Date(b.__updatedAt || b.updatedAt || b.createdAt || 0).getTime();
-      return bDate - aDate;
-    });
+    return buildAppUpdateReleaseRows(apkReleases, apkReleaseDrafts);
   }, [apkReleaseDrafts, apkReleases]);
 
   const otaAppliedEvents = useMemo(() => {
@@ -399,80 +374,89 @@ export function AppUpdatesClient({
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-                  <div className="text-sm text-muted-foreground">APK releases</div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="primary-outline"
-                      onClick={() => router.push("/app-updates/new-apk")}
-                      disabled={editingDisabled}
-                    >
-                      New APK Release
-                    </Button>
-                    <Button onClick={() => router.push("/app-updates/new-policy")}>
-                      {viewOnly ? "View Policy" : "New Policy"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-4">Version</th>
-                        <th className="py-2 pr-4">Runtime</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2 pr-4">Available</th>
-                        <th className="py-2 pr-4">Draft</th>
-                        <th className="py-2 pr-4">File</th>
-                        <th className="py-2 pr-4">Updated</th>
-                        <th className="py-2 pr-4"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {releaseRows.map((release) => (
-                        <tr key={release.apkReleaseId} className="border-b">
-                          <td className="py-2 pr-4">
-                            {release.versionName} ({release.versionCode})
-                          </td>
-                          <td className="py-2 pr-4">{release.runtimeVersion}</td>
-                          <td className="py-2 pr-4">
-                            <Badge variant={statusBadgeVariant(release.status)}>{release.status}</Badge>
-                          </td>
-                          <td className="py-2 pr-4">
-                            {isApkReleaseDeviceAvailable(release) ? (
-                              <Badge variant="default">Ready</Badge>
-                            ) : (
-                              <Badge variant="secondary">Not ready</Badge>
-                            )}
-                          </td>
-                          <td className="py-2 pr-4">{release.__draft ? "Draft" : "Published"}</td>
-                          <td className="py-2 pr-4">
-                            {release.fileId ? (
-                              <span className="inline-flex items-center gap-1">
-                                <Download className="h-3.5 w-3.5" />
-                                {formatBytes(release.fileSize) || "Attached"}
-                              </span>
-                            ) : ""}
-                          </td>
-                          <td className="py-2 pr-4">
-                            {formatDateTime(release.__updatedAt || release.updatedAt)}
-                          </td>
-                          <td className="py-2 pr-4">
-                            <Button variant="ghost" onClick={() => loadRelease(release)}>
-                              {viewOnly ? "View" : "Edit"}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!releaseRows.length ? (
-                    <div className="text-muted-foreground text-sm">No releases found.</div>
-                  ) : null}
-                </div>
+            <Card className="w-full">
+              <CardContent className="p-0 overflow-x-auto">
+                <DataTable
+                  title="APK releases"
+                  tableClassname="min-w-[980px]"
+                  search={{ inputPlaceholder: "Search APK releases" }}
+                  headerActions={
+                    <>
+                      <Button
+                        variant="ghost"
+                        className="w-auto h-auto"
+                        onClick={() => router.push("/app-updates/new-apk")}
+                        disabled={editingDisabled}
+                      >
+                        New APK Release
+                      </Button>
+                      <Button variant="ghost" className="w-auto h-auto" onClick={() => router.push("/app-updates/new-policy")}>
+                        {viewOnly ? "View Policy" : "New Policy"}
+                      </Button>
+                    </>
+                  }
+                  noDataMessage={<div>No APK releases found.</div>}
+                  columns={[
+                    { name: "Version" },
+                    { name: "Runtime" },
+                    {
+                      name: "Status",
+                      cellRenderer({ rowIndex }) {
+                        const release = releaseRows[rowIndex]
+                        return <Badge variant={statusBadgeVariant(release?.status)}>{release?.status || "unknown"}</Badge>
+                      },
+                    },
+                    {
+                      name: "Available",
+                      cellRenderer({ rowIndex }) {
+                        const release = releaseRows[rowIndex]
+                        return isApkReleaseDeviceAvailable(release) ? (
+                          <Badge variant="default">Ready</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not ready</Badge>
+                        )
+                      },
+                    },
+                    { name: "Draft" },
+                    {
+                      name: "File",
+                      cellRenderer({ rowIndex }) {
+                        const release = releaseRows[rowIndex]
+                        return release?.fileId ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Download className="h-3.5 w-3.5" />
+                            {formatBytes(release.fileSize) || "Attached"}
+                          </span>
+                        ) : null
+                      },
+                    },
+                    { name: "Updated" },
+                    {
+                      name: "Action",
+                      align: "right",
+                      cellClassName: "w-10",
+                      cellRenderer({ rowIndex }) {
+                        const release = releaseRows[rowIndex]
+                        if (!release) return null
+                        return (
+                          <Button variant="ghost" onClick={() => loadRelease(release)}>
+                            {viewOnly ? "View" : "Edit"}
+                          </Button>
+                        )
+                      },
+                    },
+                  ]}
+                  data={releaseRows.map((release) => [
+                    `${release.versionName || ""} (${release.versionCode || ""})`,
+                    release.runtimeVersion || "",
+                    release.status || "",
+                    isApkReleaseDeviceAvailable(release) ? "Ready" : "Not ready",
+                    release.__draft ? "Draft" : "Published",
+                    release.fileId ? (formatBytes(release.fileSize) || "Attached") : "",
+                    formatDateTime(release.__updatedAt || release.updatedAt),
+                    "",
+                  ])}
+                />
               </CardContent>
             </Card>
           </div>
