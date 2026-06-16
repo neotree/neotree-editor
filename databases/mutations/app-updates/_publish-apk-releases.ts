@@ -1,10 +1,11 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log";
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
+import { releaseSemanticKey } from "@/lib/app-updates/policy-release-resolution";
 import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 const validatedStatuses = new Set(["validated", "approved", "available"]);
@@ -42,9 +43,21 @@ export async function _publishApkReleases(opts?: {
 
     try {
         const executor = opts?.client || db;
-        const drafts = await executor.query.apkReleasesDrafts.findMany({
+        const allDrafts = await executor.query.apkReleasesDrafts.findMany({
             where: opts?.userId ? eq(apkReleasesDrafts.createdByUserId, opts.userId) : undefined,
         });
+        const seenSemanticKeys = new Set<string>();
+        const drafts = [...allDrafts]
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
+            .filter((draft) => {
+                const key = releaseSemanticKey((draft.data || {}) as any) || draft.apkReleaseDraftId;
+                if (seenSemanticKeys.has(key)) {
+                    publishedDraftIds.push(draft.apkReleaseDraftId);
+                    return false;
+                }
+                seenSemanticKeys.add(key);
+                return true;
+            });
 
         for (const draft of drafts) {
             try {
@@ -69,9 +82,18 @@ export async function _publishApkReleases(opts?: {
                 });
                 const existing = await executor.query.apkReleases.findFirst({
                     where: eq(apkReleases.apkReleaseId, apkReleaseId),
+                }) || await executor.query.apkReleases.findFirst({
+                    where: and(
+                        eq(apkReleases.runtimeVersion, `${normalized.runtimeVersion || ""}`.trim()),
+                        eq(apkReleases.versionCode, Number(normalized.versionCode || 0)),
+                    ),
                 });
 
-                const payload = withServerManagedReleaseDates(normalized, existing || draft.data || {});
+                const resolvedApkReleaseId = existing?.apkReleaseId || apkReleaseId;
+                const payload = withServerManagedReleaseDates({
+                    ...normalized,
+                    apkReleaseId: resolvedApkReleaseId,
+                }, existing || draft.data || {});
                 const validationErrors = validateApkReleasePayload(payload);
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
@@ -81,11 +103,11 @@ export async function _publishApkReleases(opts?: {
                         .set({
                             ...payload,
                         })
-                        .where(eq(apkReleases.apkReleaseId, apkReleaseId));
+                        .where(eq(apkReleases.apkReleaseId, resolvedApkReleaseId));
                 } else {
                     await executor.insert(apkReleases).values({
                         ...payload,
-                        apkReleaseId,
+                        apkReleaseId: resolvedApkReleaseId,
                         releasedAt: payload.releasedAt || new Date(),
                     });
                 }
@@ -93,7 +115,7 @@ export async function _publishApkReleases(opts?: {
                 if (opts?.userId) {
                     const snapshot = structuredClone(payload);
                     changeLogs.push({
-                        entityId: apkReleaseId,
+                        entityId: resolvedApkReleaseId,
                         entityType: "apk_release",
                         action: "publish",
                         dataVersion: opts.dataVersion,
@@ -116,6 +138,9 @@ export async function _publishApkReleases(opts?: {
                     apkReleaseId: draft.apkReleaseId || draft.data?.apkReleaseId || null,
                     message: e.message,
                 }));
+                if (opts?.client) {
+                    throw e;
+                }
                 errors.push(e.message);
             }
         }
