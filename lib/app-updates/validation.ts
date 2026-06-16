@@ -19,6 +19,16 @@ export const appUpdateChannels = [
 const appUpdateChannelValues = new Set(appUpdateChannels.map((channel) => channel.value))
 const sha256Pattern = /^[a-f0-9]{64}$/i
 
+export function normalizeNullableDate(value: unknown): Date | null {
+  if (!value) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  return null
+}
+
 export type ReleaseReadinessCheck = {
   key: string
   label: string
@@ -64,6 +74,9 @@ export function normalizeApkReleasePayload<T extends Record<string, any>>(payloa
     fileId: payload.fileId || null,
     fileSize: payload.fileSize ?? null,
     isAvailable: !!payload.isAvailable,
+    validatedAt: normalizeNullableDate(payload.validatedAt),
+    approvedAt: normalizeNullableDate(payload.approvedAt),
+    releasedAt: normalizeNullableDate(payload.releasedAt),
   }
 }
 
@@ -80,6 +93,7 @@ export function normalizeAppUpdatePolicyPayload<T extends Record<string, any>>(p
     otaChannel: normalizeAppUpdateChannel(payload.otaChannel),
     apkDeliveryMode: `${payload.apkDeliveryMode || "in_app"}`.trim(),
     apkInstallWindow: `${payload.apkInstallWindow || "on_restart"}`.trim(),
+    apkForceAfter: normalizeNullableDate(payload.apkForceAfter),
     apkMessageTitle: `${payload.apkMessageTitle || ""}`.trim(),
     apkMessageBody: `${payload.apkMessageBody || ""}`.trim(),
     targetScope: `${payload.targetScope || "country"}`.trim(),

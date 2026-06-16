@@ -7,6 +7,29 @@ import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
+const validatedStatuses = new Set(["validated", "approved", "available"]);
+const approvedStatuses = new Set(["approved", "available"]);
+
+function withServerManagedReleaseDates(
+    payload: typeof apkReleases.$inferInsert,
+    previous?: Partial<typeof apkReleases.$inferInsert>,
+): typeof apkReleases.$inferInsert {
+    const now = new Date();
+    const next = { ...payload };
+
+    if (validatedStatuses.has(`${next.status || ""}`) && !next.validatedAt) {
+        next.validatedAt = previous?.validatedAt || now;
+    }
+    if (approvedStatuses.has(`${next.status || ""}`) && !next.approvedAt) {
+        next.approvedAt = previous?.approvedAt || now;
+    }
+    if (next.status === "available" && next.isAvailable && !next.releasedAt) {
+        next.releasedAt = previous?.releasedAt || now;
+    }
+
+    return next;
+}
+
 export async function _publishApkReleases(opts?: {
     userId?: string | null;
     dataVersion?: number | null;
@@ -38,19 +61,19 @@ export async function _publishApkReleases(opts?: {
                     fileSize = file?.size ?? null;
                 }
 
-                const payload = normalizeApkReleasePayload({
+                const normalized = normalizeApkReleasePayload({
                     ...rawPayload,
                     fileSize: fileSize ?? undefined,
                     checksumSha256: fileMeta?.apkChecksumSha256 ?? null,
                     signatureSha256: fileMeta?.apkSignatureSha256 ?? null,
                 });
-                const validationErrors = validateApkReleasePayload(payload);
-                if (validationErrors.length) throw new Error(validationErrors.join(", "));
-
                 const existing = await executor.query.apkReleases.findFirst({
                     where: eq(apkReleases.apkReleaseId, apkReleaseId),
-                    columns: { apkReleaseId: true },
                 });
+
+                const payload = withServerManagedReleaseDates(normalized, existing || draft.data || {});
+                const validationErrors = validateApkReleasePayload(payload);
+                if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 if (existing) {
                     await executor
@@ -88,6 +111,11 @@ export async function _publishApkReleases(opts?: {
                 }
                 publishedDraftIds.push(draft.apkReleaseDraftId);
             } catch (e: any) {
+                logger.error("_publishApkReleases item ERROR", JSON.stringify({
+                    draftId: draft.apkReleaseDraftId,
+                    apkReleaseId: draft.apkReleaseId || draft.data?.apkReleaseId || null,
+                    message: e.message,
+                }));
                 errors.push(e.message);
             }
         }

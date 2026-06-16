@@ -55,9 +55,6 @@ type ApkFormState = {
   fileSize?: number | null;
   checksumSha256?: string | null;
   signatureSha256?: string | null;
-  validatedAt?: string | null;
-  approvedAt?: string | null;
-  releasedAt?: string | null;
   releaseNotes?: string | null;
   // Informational metadata read from the APK (not persisted on the release row).
   packageName?: string | null;
@@ -75,21 +72,11 @@ const defaultApkForm = (): ApkFormState => ({
   fileSize: null,
   checksumSha256: null,
   signatureSha256: null,
-  validatedAt: null,
-  approvedAt: null,
-  releasedAt: null,
   releaseNotes: "",
   packageName: null,
   minSdkVersion: null,
   targetSdkVersion: null,
 });
-
-const toDateInput = (value?: string | Date | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 16);
-};
 
 const toNumberOrNull = (value: string) => {
   if (value === "" || value === undefined || value === null) return null;
@@ -162,9 +149,6 @@ export function ApkReleaseForm({
         ...initialRelease,
         apkReleaseId: initialRelease.apkReleaseId,
         versionCode: initialRelease.versionCode ?? null,
-        validatedAt: toDateInput(initialRelease.validatedAt),
-        approvedAt: toDateInput(initialRelease.approvedAt),
-        releasedAt: toDateInput(initialRelease.releasedAt),
       });
       return;
     }
@@ -197,9 +181,6 @@ export function ApkReleaseForm({
       const payload = normalizeApkReleasePayload({
         ...apkForm,
         versionCode: Number(apkForm.versionCode || 0),
-        validatedAt: apkForm.validatedAt ? new Date(apkForm.validatedAt) : null,
-        approvedAt: apkForm.approvedAt ? new Date(apkForm.approvedAt) : null,
-        releasedAt: apkForm.releasedAt ? new Date(apkForm.releasedAt) : null,
       } as any);
 
       const errors = validateApkReleasePayload(payload);
@@ -571,36 +552,6 @@ export function ApkReleaseForm({
                   This is captured automatically from the APK. Releases without a verified signing certificate cannot be made available to devices.
                 </p>
               ) : null}
-            </div>
-
-            <div>
-              <Label>Validated At</Label>
-              <Input
-                type="datetime-local"
-                value={apkForm.validatedAt || ""}
-                onChange={(e) => setApkForm((prev) => ({ ...prev, validatedAt: e.target.value || null }))}
-                disabled={editingDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>Approved At</Label>
-              <Input
-                type="datetime-local"
-                value={apkForm.approvedAt || ""}
-                onChange={(e) => setApkForm((prev) => ({ ...prev, approvedAt: e.target.value || null }))}
-                disabled={editingDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>Released At</Label>
-              <Input
-                type="datetime-local"
-                value={apkForm.releasedAt || ""}
-                onChange={(e) => setApkForm((prev) => ({ ...prev, releasedAt: e.target.value || null }))}
-                disabled={editingDisabled}
-              />
             </div>
           </div>
 
