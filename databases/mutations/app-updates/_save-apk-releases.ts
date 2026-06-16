@@ -18,6 +18,29 @@ export type SaveApkReleasesResponse = {
     errors?: string[];
 };
 
+const validatedStatuses = new Set(["validated", "approved", "available"]);
+const approvedStatuses = new Set(["approved", "available"]);
+
+function withServerManagedReleaseDates(
+    payload: typeof apkReleases.$inferInsert,
+    previous?: Partial<typeof apkReleases.$inferInsert>,
+): typeof apkReleases.$inferInsert {
+    const now = new Date();
+    const next = { ...payload };
+
+    if (validatedStatuses.has(`${next.status || ""}`) && !next.validatedAt) {
+        next.validatedAt = previous?.validatedAt || now;
+    }
+    if (approvedStatuses.has(`${next.status || ""}`) && !next.approvedAt) {
+        next.approvedAt = previous?.approvedAt || now;
+    }
+    if (next.status === "available" && next.isAvailable && !next.releasedAt) {
+        next.releasedAt = previous?.releasedAt || now;
+    }
+
+    return next;
+}
+
 export async function _saveApkReleases({ data, broadcastAction = true, userId }: {
     data: SaveApkReleasesData[];
     broadcastAction?: boolean;
@@ -64,13 +87,13 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                 const trustedChecksumSha256 = fileMeta?.apkChecksumSha256 ?? (!fileChanged ? previous.checksumSha256 : null);
                 const trustedSignatureSha256 = fileMeta?.apkSignatureSha256 ?? (!fileChanged ? previous.signatureSha256 : null);
 
-                const enriched = normalizeApkReleasePayload({
+                const enriched = withServerManagedReleaseDates(normalizeApkReleasePayload({
                     ...cleanItem,
                     fileId: nextFileId,
                     fileSize: trustedFileSize ?? undefined,
                     checksumSha256: trustedChecksumSha256 ?? undefined,
                     signatureSha256: trustedSignatureSha256 ?? undefined,
-                });
+                }), previous);
 
                 const validationErrors = validateApkReleasePayload(enriched, {
                     fileContentType: fileDetails?.contentType,
@@ -104,6 +127,7 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     });
                 }
             } catch (e: any) {
+                logger.error("_saveApkReleases item ERROR", e.message);
                 errors.push(e.message);
             }
         }

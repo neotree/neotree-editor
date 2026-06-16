@@ -96,6 +96,11 @@ export async function _publishAppUpdatePolicies(opts?: {
                 }
                 publishedDraftIds.push(draft.policyDraftId);
             } catch (e: any) {
+                logger.error("_publishAppUpdatePolicies item ERROR", JSON.stringify({
+                    draftId: draft.policyDraftId,
+                    policyId: draft.policyId || draft.data?.policyId || null,
+                    message: e.message,
+                }));
                 errors.push(e.message);
             }
         }
