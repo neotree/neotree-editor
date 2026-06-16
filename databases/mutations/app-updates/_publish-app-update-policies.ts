@@ -4,8 +4,9 @@ import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/c
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
-import { appUpdatePolicies, appUpdatePoliciesDrafts, apkReleases } from "@/databases/pg/schema";
+import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
+import { resolvePolicyReleaseReferences } from "@/lib/app-updates/policy-release-resolution";
 import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout";
 
 export async function _publishAppUpdatePolicies(opts?: {
@@ -28,16 +29,10 @@ export async function _publishAppUpdatePolicies(opts?: {
             try {
                 const policyId = draft.policyId || draft.data.policyId || draft.policyDraftId;
                 const { countryISO: _countryISO, ...rawPayload } = { ...draft.data, policyId } as any;
-                const payload = normalizeAppUpdatePolicyPayload(rawPayload);
-
-                const referencedReleaseIds = [payload.currentApkReleaseId, payload.rollbackApkReleaseId].filter(Boolean);
-                const releaseRows = !referencedReleaseIds.length
-                    ? []
-                    : await executor.query.apkReleases.findMany({
-                        where: inArray(apkReleases.apkReleaseId, referencedReleaseIds as string[]),
-                    });
-                const releasesById = new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
-                const validationErrors = validateAppUpdatePolicyPayload(payload, releasesById);
+                const normalizedPayload = normalizeAppUpdatePolicyPayload(rawPayload);
+                const { resolvedPolicy, releasesById, errors: resolutionErrors } = await resolvePolicyReleaseReferences(executor, normalizedPayload);
+                const payload = resolvedPolicy;
+                const validationErrors = [...resolutionErrors, ...validateAppUpdatePolicyPayload(payload, releasesById)];
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
                 const existing = await executor.query.appUpdatePolicies.findFirst({
@@ -101,6 +96,9 @@ export async function _publishAppUpdatePolicies(opts?: {
                     policyId: draft.policyId || draft.data?.policyId || null,
                     message: e.message,
                 }));
+                if (opts?.client) {
+                    throw e;
+                }
                 errors.push(e.message);
             }
         }

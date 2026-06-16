@@ -14,11 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import type { saveAppUpdatePolicies } from "@/app/actions/app-updates";
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases, hospitals as hospitalsTable } from "@/databases/pg/schema";
+import { buildAppUpdateReleaseRows } from "@/lib/app-updates/release-rows";
+import { releaseSemanticKey } from "@/lib/app-updates/policy-release-resolution";
 import {
   appUpdateChannels,
   normalizeAppUpdateChannel,
@@ -180,37 +181,29 @@ export function AppUpdatePolicyForm({
   }, [effectivePolicy]);
 
   const releaseRows = useMemo(() => {
-    const byId = new Map<string, any>();
-
-    for (const draft of apkReleaseDrafts) {
-      const payload = (draft.data || {}) as any;
-      const releaseId = payload.apkReleaseId || draft.apkReleaseDraftId;
-      if (!releaseId) continue;
-      byId.set(releaseId, {
-        ...payload,
-        apkReleaseId: releaseId,
-        __draft: true,
-        __draftId: draft.apkReleaseDraftId,
-        __updatedAt: draft.updatedAt || draft.createdAt,
-      });
-    }
-
-    for (const release of apkReleases) {
-      const releaseId = release.apkReleaseId;
-      if (!releaseId) continue;
-      if (byId.has(releaseId)) continue;
-      byId.set(releaseId, { ...release, __draft: false });
-    }
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const aDate = new Date(a.__updatedAt || a.updatedAt || a.createdAt || 0).getTime();
-      const bDate = new Date(b.__updatedAt || b.updatedAt || b.createdAt || 0).getTime();
-      return bDate - aDate;
-    });
+    return buildAppUpdateReleaseRows(apkReleases, apkReleaseDrafts);
   }, [apkReleaseDrafts, apkReleases]);
 
+  const publishedReleaseRows = useMemo(() => {
+    return releaseRows.filter((release) => !release.__draft);
+  }, [releaseRows]);
+
+  const resolvePublishedReleaseId = useCallback((releaseId?: string | null) => {
+    if (!releaseId) return null;
+    if (publishedReleaseRows.some((release) => release.apkReleaseId === releaseId)) return releaseId;
+
+    const draft = apkReleaseDrafts.find((entry) => {
+      const payload = (entry.data || {}) as any;
+      return entry.apkReleaseDraftId === releaseId || payload.apkReleaseId === releaseId;
+    });
+    if (!draft) return releaseId;
+
+    const semanticKey = releaseSemanticKey((draft.data || {}) as any);
+    return publishedReleaseRows.find((release) => releaseSemanticKey(release) === semanticKey)?.apkReleaseId || releaseId;
+  }, [apkReleaseDrafts, publishedReleaseRows]);
+
   const releaseOptions = useMemo(() => {
-    return releaseRows.map((r) => {
+    return publishedReleaseRows.map((r) => {
       const ready = isApkReleaseDeviceAvailable(r);
       const openChecks = getApkReleaseReadiness(r)
         .filter((check) => !check.passed)
@@ -223,15 +216,33 @@ export function AppUpdatePolicyForm({
         description: openChecks[0] || "",
       };
     });
-  }, [releaseRows]);
+  }, [publishedReleaseRows]);
 
   const releasesById = useMemo(() => {
-    return new Map(releaseRows.map((release) => [release.apkReleaseId, release]));
-  }, [releaseRows]);
+    return new Map(publishedReleaseRows.map((release) => [release.apkReleaseId, release]));
+  }, [publishedReleaseRows]);
 
   const latestRelease = useMemo(() => {
-    return releaseRows.find((release) => isApkReleaseDeviceAvailable(release)) || null;
-  }, [releaseRows]);
+    return publishedReleaseRows.find((release) => isApkReleaseDeviceAvailable(release)) || null;
+  }, [publishedReleaseRows]);
+
+  useEffect(() => {
+    setPolicyForm((prev) => {
+      const resolvedCurrentApkReleaseId = resolvePublishedReleaseId(prev.currentApkReleaseId);
+      const resolvedRollbackApkReleaseId = resolvePublishedReleaseId(prev.rollbackApkReleaseId);
+
+      if (resolvedCurrentApkReleaseId === prev.currentApkReleaseId
+        && resolvedRollbackApkReleaseId === prev.rollbackApkReleaseId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        currentApkReleaseId: resolvedCurrentApkReleaseId,
+        rollbackApkReleaseId: resolvedRollbackApkReleaseId,
+      };
+    });
+  }, [resolvePublishedReleaseId]);
 
   useEffect(() => {
     if (!latestRelease) return;
@@ -283,15 +294,7 @@ export function AppUpdatePolicyForm({
     }
   }, [alert, editingDisabled, policyForm, releasesById, router, saveAppUpdatePolicies]);
 
-  const policyValidationErrors = useMemo(() => {
-    return validateAppUpdatePolicyPayload(normalizeAppUpdatePolicyPayload(policyForm), releasesById);
-  }, [policyForm, releasesById]);
-
-  const currentRelease = policyForm.currentApkReleaseId ? releasesById.get(policyForm.currentApkReleaseId) : null;
-  const rollbackRelease = policyForm.rollbackApkReleaseId ? releasesById.get(policyForm.rollbackApkReleaseId) : null;
   const selectedDeliveryMode = deliveryModes.find((mode) => mode.value === policyForm.apkDeliveryMode);
-  const usesInAppDownload = policyForm.apkDeliveryMode === "in_app" || policyForm.apkDeliveryMode === "hybrid";
-  const usesMdmDelivery = policyForm.apkDeliveryMode === "mdm" || policyForm.apkDeliveryMode === "hybrid";
 
   return (
     <>
@@ -299,102 +302,22 @@ export function AppUpdatePolicyForm({
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Policy draft</div>
+          <div>
+            <div className="text-sm text-muted-foreground">Policy draft</div>
+            <div className="text-xs text-muted-foreground">
+              {latestPolicyDraft
+                ? `Draft updated ${latestPolicyDraft.updatedAt?.toString?.() || ""}`
+                : policy
+                ? "Published policy is live"
+                : "No policy yet"}
+            </div>
+            {latestRelease ? (
               <div className="text-xs text-muted-foreground">
-                {latestPolicyDraft
-                  ? `Draft updated ${latestPolicyDraft.updatedAt?.toString?.() || ""}`
-                  : policy
-                  ? "Published policy is live"
-                  : "No policy yet"}
+                Latest APK: {latestRelease.versionName} ({latestRelease.versionCode})
               </div>
-              {latestRelease ? (
-                <div className="text-xs text-muted-foreground">
-                  Latest APK: {latestRelease.versionName} ({latestRelease.versionCode})
-                </div>
-              ) : null}
-              <div className="text-xs text-muted-foreground">
-                {viewOnly
-                  ? "View mode: edits disabled"
-                  : mode === "development"
-                  ? "Development mode: drafts enabled"
-                  : `Mode: ${mode}`}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => router.push("/app-updates")}>Cancel</Button>
-              <Button onClick={onSavePolicy} disabled={loading || editingDisabled}>
-                Save Draft
-              </Button>
-            </div>
+            ) : null}
+           
           </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-md border p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Current release</div>
-                  <div className="text-sm font-medium">
-                    {currentRelease ? `${currentRelease.versionName} (${currentRelease.versionCode})` : "Not selected"}
-                  </div>
-                </div>
-                {currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                )}
-              </div>
-              <Badge className="mt-3" variant={currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? "default" : "secondary"}>
-                {currentRelease && isApkReleaseDeviceAvailable(currentRelease) ? "Ready" : "Needs review"}
-              </Badge>
-            </div>
-
-            <div className="rounded-md border p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Rollback release</div>
-                  <div className="text-sm font-medium">
-                    {rollbackRelease ? `${rollbackRelease.versionName} (${rollbackRelease.versionCode})` : "Not selected"}
-                  </div>
-                </div>
-                {rollbackRelease && isApkReleaseDeviceAvailable(rollbackRelease) ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-              <Badge className="mt-3" variant={rollbackRelease && isApkReleaseDeviceAvailable(rollbackRelease) ? "default" : "outline"}>
-                {rollbackRelease ? (isApkReleaseDeviceAvailable(rollbackRelease) ? "Ready" : "Needs review") : "Optional"}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-md border p-3">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-sm font-medium">Delivery plan</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {selectedDeliveryMode?.description || "Choose how this APK should reach tablets."}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant={usesMdmDelivery ? "default" : "secondary"}>
-                  {usesMdmDelivery ? "MDM active" : "No MDM push"}
-                </Badge>
-                <Badge variant={usesInAppDownload ? "default" : "secondary"}>
-                  {usesInAppDownload ? "In-app fallback" : "No in-app download"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {policyValidationErrors.length ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {policyValidationErrors[0]}
-              {policyValidationErrors.length > 1 ? ` and ${policyValidationErrors.length - 1} more` : ""}
-            </div>
-          ) : null}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
             <div>
@@ -513,6 +436,9 @@ export function AppUpdatePolicyForm({
                   ))}
                 </SelectContent>
               </Select>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {selectedDeliveryMode?.description || "Choose how this APK should reach tablets."}
+              </div>
             </div>
 
             <div>
@@ -666,6 +592,9 @@ export function AppUpdatePolicyForm({
                   ))}
                 </SelectContent>
               </Select>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Only published APK releases can be attached to a policy.
+              </div>
             </div>
 
             <div>
@@ -686,6 +615,9 @@ export function AppUpdatePolicyForm({
                   ))}
                 </SelectContent>
               </Select>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Publish the rollback APK release first before selecting it here.
+              </div>
             </div>
           </div>
 
@@ -706,6 +638,15 @@ export function AppUpdatePolicyForm({
                 disabled={editingDisabled}
               />
             </div>
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => router.push("/app-updates")}>
+              Cancel
+            </Button>
+            <Button onClick={onSavePolicy} disabled={loading || editingDisabled}>
+              Save Draft
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
+import { releaseSemanticKey } from "@/lib/app-updates/policy-release-resolution";
 import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 export type SaveApkReleasesData = Partial<typeof apkReleases.$inferInsert> & {
@@ -54,10 +55,15 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
         for (const { apkReleaseId: itemApkReleaseId, ...item } of data) {
             const { countryISO: _countryISO, ...cleanItem } = item as any;
             try {
-                const apkReleaseId = itemApkReleaseId || uuid.v4();
+                const semanticPublished = await db.query.apkReleases.findFirst({
+                    where: and(
+                        eq(apkReleases.runtimeVersion, `${cleanItem.runtimeVersion || ""}`.trim()),
+                        eq(apkReleases.versionCode, Number(cleanItem.versionCode || 0)),
+                    ),
+                });
 
                 const published = await db.query.apkReleases.findFirst({
-                    where: eq(apkReleases.apkReleaseId, apkReleaseId),
+                    where: eq(apkReleases.apkReleaseId, itemApkReleaseId || semanticPublished?.apkReleaseId || uuid.v4()),
                 });
 
                 let fileMeta: any = null;
@@ -75,9 +81,19 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     fileMeta = file?.metadata || null;
                 }
 
-                const draft = await db.query.apkReleasesDrafts.findFirst({
-                    where: eq(apkReleasesDrafts.apkReleaseDraftId, apkReleaseId),
-                });
+                const allDrafts = await db.query.apkReleasesDrafts.findMany();
+                const directDraft = itemApkReleaseId
+                    ? allDrafts.find((entry) => entry.apkReleaseDraftId === itemApkReleaseId) || null
+                    : null;
+                const semanticKey = releaseSemanticKey(cleanItem);
+                const semanticDraft = allDrafts.find((entry) => releaseSemanticKey((entry.data || {}) as any) === semanticKey) || null;
+                const draft = directDraft || semanticDraft;
+                const apkReleaseId =
+                    semanticPublished?.apkReleaseId ||
+                    (typeof draft?.data?.apkReleaseId === "string" ? draft.data.apkReleaseId : null) ||
+                    itemApkReleaseId ||
+                    uuid.v4();
+                const draftRowId = draft?.apkReleaseDraftId || apkReleaseId;
 
                 const previous = (draft?.data || published || {}) as Partial<typeof apkReleases.$inferInsert>;
                 const nextFileId = item.fileId ?? previous.fileId ?? null;
@@ -111,7 +127,7 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     await db
                         .update(apkReleasesDrafts)
                         .set({ data: merged })
-                        .where(eq(apkReleasesDrafts.apkReleaseDraftId, apkReleaseId));
+                        .where(eq(apkReleasesDrafts.apkReleaseDraftId, draftRowId));
                 } else {
                     const merged = {
                         ...(published || {}),
@@ -121,11 +137,12 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
 
                     await db.insert(apkReleasesDrafts).values({
                         data: merged,
-                        apkReleaseDraftId: apkReleaseId,
-                        apkReleaseId: published?.apkReleaseId,
+                        apkReleaseDraftId: draftRowId,
+                        apkReleaseId: semanticPublished?.apkReleaseId || published?.apkReleaseId,
                         createdByUserId: userId,
                     });
                 }
+
             } catch (e: any) {
                 logger.error("_saveApkReleases item ERROR", e.message);
                 errors.push(e.message);
