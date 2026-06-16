@@ -17,11 +17,12 @@ import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 
 import type { importEasApkReleaseDraft, saveApkReleases } from "@/app/actions/app-updates";
 import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases } from "@/databases/pg/schema";
+import { buildAppUpdateReleaseRows } from "@/lib/app-updates/release-rows";
 import { getApkReleaseReadiness, normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 const apkReleaseStatuses = [
@@ -102,33 +103,7 @@ export function ApkReleaseForm({
   const [apkSource, setApkSource] = useState<"eas" | "upload">("eas");
 
   const releaseRows = useMemo(() => {
-    const byId = new Map<string, any>();
-
-    for (const draft of apkReleaseDrafts) {
-      const payload = (draft.data || {}) as any;
-      const releaseId = payload.apkReleaseId || draft.apkReleaseDraftId;
-      if (!releaseId) continue;
-      byId.set(releaseId, {
-        ...payload,
-        apkReleaseId: releaseId,
-        __draft: true,
-        __draftId: draft.apkReleaseDraftId,
-        __updatedAt: draft.updatedAt || draft.createdAt,
-      });
-    }
-
-    for (const release of apkReleases) {
-      const releaseId = release.apkReleaseId;
-      if (!releaseId) continue;
-      if (byId.has(releaseId)) continue;
-      byId.set(releaseId, { ...release, __draft: false });
-    }
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const aDate = new Date(a.__updatedAt || a.updatedAt || a.createdAt || 0).getTime();
-      const bDate = new Date(b.__updatedAt || b.updatedAt || b.createdAt || 0).getTime();
-      return bDate - aDate;
-    });
+    return buildAppUpdateReleaseRows(apkReleases, apkReleaseDrafts);
   }, [apkReleaseDrafts, apkReleases]);
 
   const latestRelease = useMemo(() => {
@@ -300,8 +275,6 @@ export function ApkReleaseForm({
     () => readiness.filter((check) => check.key !== "status").every((check) => check.passed),
     [readiness],
   );
-  const validationErrors = useMemo(() => validateApkReleasePayload(normalizeApkReleasePayload(apkForm)), [apkForm]);
-
   const explainBlockedAvailability = useCallback(() => {
     const openChecks = readiness
       .filter((check) => check.key !== "status" && !check.passed)
@@ -322,55 +295,35 @@ export function ApkReleaseForm({
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">APK release draft</div>
-              {latestRelease ? (
-                <div className="text-xs text-muted-foreground">
-                  Latest APK: {latestRelease.versionName} ({latestRelease.versionCode})
-                </div>
-              ) : null}
+          <div>
+            <div className="text-sm text-muted-foreground">APK release draft</div>
+            {latestRelease ? (
               <div className="text-xs text-muted-foreground">
-                {viewOnly
-                  ? "View mode: edits disabled"
-                  : mode === "development"
-                  ? "Development mode: drafts enabled"
-                  : `Mode: ${mode}`}
+                Latest APK: {latestRelease.versionName} ({latestRelease.versionCode})
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => router.push("/app-updates")}>Cancel</Button>
-              <Button variant="primary-outline" onClick={resetApkForm} disabled={editingDisabled}>
-                Reset
-              </Button>
-              <Button onClick={onSaveApkRelease} disabled={loading || editingDisabled}>
-                Save Draft
-              </Button>
-            </div>
+            ) : null}
+            
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {readiness.map((check) => (
-              <div key={check.key} className="flex items-center justify-between rounded-md border p-3">
-                <div className="flex min-w-0 items-center gap-2 text-sm">
-                  {check.passed ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                  )}
-                  <span>{check.label}</span>
-                </div>
-                <Badge variant={check.passed ? "default" : "secondary"}>{check.passed ? "Pass" : "Open"}</Badge>
-              </div>
-            ))}
-          </div>
-
-          {validationErrors.length ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {validationErrors[0]}
-              {validationErrors.length > 1 ? ` and ${validationErrors.length - 1} more` : ""}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
+            <div>
+              <Label>Runtime Version</Label>
+              <Input
+                value={apkForm.runtimeVersion}
+                onChange={(e) => setApkForm((prev) => ({ ...prev, runtimeVersion: e.target.value }))}
+                disabled={editingDisabled}
+              />
             </div>
-          ) : null}
+
+            <div>
+              <Label>Version Name</Label>
+              <Input
+                value={apkForm.versionName}
+                onChange={(e) => setApkForm((prev) => ({ ...prev, versionName: e.target.value }))}
+                disabled={editingDisabled}
+              />
+            </div>
+          </div>
 
           <div className="mt-6 rounded-md border p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -439,23 +392,6 @@ export function ApkReleaseForm({
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
-            <div>
-              <Label>Runtime Version</Label>
-              <Input
-                value={apkForm.runtimeVersion}
-                onChange={(e) => setApkForm((prev) => ({ ...prev, runtimeVersion: e.target.value }))}
-                disabled={editingDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>Version Name</Label>
-              <Input
-                value={apkForm.versionName}
-                onChange={(e) => setApkForm((prev) => ({ ...prev, versionName: e.target.value }))}
-                disabled={editingDisabled}
-              />
-            </div>
 
             <div>
               <Label>Version Code</Label>
@@ -562,6 +498,18 @@ export function ApkReleaseForm({
               onChange={(e) => setApkForm((prev) => ({ ...prev, releaseNotes: e.target.value }))}
               disabled={editingDisabled}
             />
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => router.push("/app-updates")}>
+              Cancel
+            </Button>
+            <Button variant="primary-outline" onClick={resetApkForm} disabled={editingDisabled}>
+              Reset
+            </Button>
+            <Button onClick={onSaveApkRelease} disabled={loading || editingDisabled}>
+              Save Draft
+            </Button>
           </div>
         </CardContent>
       </Card>
