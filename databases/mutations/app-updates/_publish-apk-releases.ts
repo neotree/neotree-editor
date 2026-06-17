@@ -6,7 +6,12 @@ import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import { releaseSemanticKey } from "@/lib/app-updates/policy-release-resolution";
-import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
+import {
+    normalizeApkReleasePayload,
+    normalizeNullableDate,
+    sanitizeApkReleaseWritePayload,
+    validateApkReleasePayload,
+} from "@/lib/app-updates/validation";
 
 const validatedStatuses = new Set(["validated", "approved", "available"]);
 const approvedStatuses = new Set(["approved", "available"]);
@@ -19,13 +24,13 @@ function withServerManagedReleaseDates(
     const next = { ...payload };
 
     if (validatedStatuses.has(`${next.status || ""}`) && !next.validatedAt) {
-        next.validatedAt = previous?.validatedAt || now;
+        next.validatedAt = normalizeNullableDate(previous?.validatedAt) || now;
     }
     if (approvedStatuses.has(`${next.status || ""}`) && !next.approvedAt) {
-        next.approvedAt = previous?.approvedAt || now;
+        next.approvedAt = normalizeNullableDate(previous?.approvedAt) || now;
     }
     if (next.status === "available" && next.isAvailable && !next.releasedAt) {
-        next.releasedAt = previous?.releasedAt || now;
+        next.releasedAt = normalizeNullableDate(previous?.releasedAt) || now;
     }
 
     return next;
@@ -90,10 +95,10 @@ export async function _publishApkReleases(opts?: {
                 });
 
                 const resolvedApkReleaseId = existing?.apkReleaseId || apkReleaseId;
-                const payload = withServerManagedReleaseDates({
+                const payload = sanitizeApkReleaseWritePayload(withServerManagedReleaseDates({
                     ...normalized,
                     apkReleaseId: resolvedApkReleaseId,
-                }, existing || draft.data || {});
+                }, existing || draft.data || {}));
                 const validationErrors = validateApkReleasePayload(payload);
                 if (validationErrors.length) throw new Error(validationErrors.join(", "));
 
@@ -137,6 +142,7 @@ export async function _publishApkReleases(opts?: {
                     draftId: draft.apkReleaseDraftId,
                     apkReleaseId: draft.apkReleaseId || draft.data?.apkReleaseId || null,
                     message: e.message,
+                    stack: e.stack,
                 }));
                 if (opts?.client) {
                     throw e;
@@ -170,7 +176,10 @@ export async function _publishApkReleases(opts?: {
     } catch (e: any) {
         results.success = false;
         results.errors = [e.message];
-        logger.error("_publishApkReleases ERROR", e.message);
+        logger.error("_publishApkReleases ERROR", JSON.stringify({
+            message: e.message,
+            stack: e.stack,
+        }));
     }
 
     return results;
