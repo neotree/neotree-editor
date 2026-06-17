@@ -6,7 +6,7 @@ import db from "@/databases/pg/drizzle";
 import { apkReleases, apkReleasesDrafts, files } from "@/databases/pg/schema";
 import socket from "@/lib/socket";
 import { releaseSemanticKey } from "@/lib/app-updates/policy-release-resolution";
-import { normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
+import { normalizeApkReleasePayload, normalizeNullableDate, validateApkReleasePayload } from "@/lib/app-updates/validation";
 
 export type SaveApkReleasesData = Partial<typeof apkReleases.$inferInsert> & {
     runtimeVersion: string;
@@ -30,13 +30,13 @@ function withServerManagedReleaseDates(
     const next = { ...payload };
 
     if (validatedStatuses.has(`${next.status || ""}`) && !next.validatedAt) {
-        next.validatedAt = previous?.validatedAt || now;
+        next.validatedAt = normalizeNullableDate(previous?.validatedAt) || now;
     }
     if (approvedStatuses.has(`${next.status || ""}`) && !next.approvedAt) {
-        next.approvedAt = previous?.approvedAt || now;
+        next.approvedAt = normalizeNullableDate(previous?.approvedAt) || now;
     }
     if (next.status === "available" && next.isAvailable && !next.releasedAt) {
-        next.releasedAt = previous?.releasedAt || now;
+        next.releasedAt = normalizeNullableDate(previous?.releasedAt) || now;
     }
 
     return next;
