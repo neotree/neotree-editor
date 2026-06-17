@@ -80,6 +80,19 @@ export function normalizeApkReleasePayload<T extends Record<string, any>>(payloa
   }
 }
 
+export function sanitizeApkReleaseWritePayload<T extends Record<string, any>>(payload: T): T {
+  const normalized = normalizeApkReleasePayload(payload)
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    deletedAt: _deletedAt,
+    ...writePayload
+  } = normalized as any
+
+  return writePayload as T
+}
+
 export function normalizeAppUpdateChannel(value?: string | null) {
   const channel = `${value || "prod"}`.trim().toLowerCase()
   if (channel === "production") return "prod"
