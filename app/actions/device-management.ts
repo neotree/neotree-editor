@@ -9,6 +9,7 @@ import {
   _getDeviceMdmLink,
   _getDeviceManagementOverview,
   _getDeviceMdmLinks,
+  _getMdmDeviceInventory,
   _getMdmDeviceInventoryById,
   _getMdmProviderProfile,
   _getMdmProviderProfiles,
@@ -19,6 +20,7 @@ import {
 import db from "@/databases/pg/drizzle"
 import {
   _linkDeviceToMdm,
+  _markMdmDeviceInventoryRowsIgnored,
   _upsertMdmDeviceInventory,
   _updateMdmDeviceInventoryReview,
   _saveMdmProviderProfile,
@@ -27,6 +29,7 @@ import {
   _unlinkDeviceFromMdm,
 } from "@/databases/mutations/device-management"
 import { createMdmProvider } from "@/lib/mdm"
+import { isHeadwindApplicationRow } from "@/lib/mdm/headwind-shape"
 import { decryptSecret, encryptSecret } from "@/lib/server/secret-box"
 import { requestMdmApkRolloutForDevice } from "@/lib/app-updates/mdm-rollout"
 
@@ -496,6 +499,10 @@ function normalizeIdentifier(value: unknown) {
   return `${value || ""}`.trim().toLowerCase()
 }
 
+function uniqueIdentifiers(values: unknown[]) {
+  return Array.from(new Set(values.map(normalizeIdentifier).filter(Boolean)))
+}
+
 function isStrongDeviceHash(value?: string | null) {
   if (!value) return false
   // Short human-facing codes like "9999" are useful review evidence but are not
@@ -507,6 +514,7 @@ function remoteIdentifiers(remote: any) {
   const payload = remote?.payload || {}
   const info = payload.info || {}
   const custom = payload.custom || payload.customData || payload.customFields || {}
+  const identifiers = (remote?.deviceCapabilities?.identifiers || payload.identifiers || payload.deviceCapabilities?.identifiers || {}) as Record<string, any>
   return {
     mdmDeviceId: normalizeIdentifier(remote?.mdmDeviceId),
     deviceId: normalizeIdentifier(
@@ -514,6 +522,8 @@ function remoteIdentifiers(remote: any) {
       payload.deviceId ||
       payload.neotreeDeviceId ||
       payload.customDeviceId ||
+      identifiers.neotreeDeviceId ||
+      identifiers.deviceId ||
       payload.number ||
       payload.name ||
       custom.deviceId ||
@@ -526,6 +536,8 @@ function remoteIdentifiers(remote: any) {
       custom.deviceHash ||
       custom.neotreeDeviceHash,
     ),
+    headwindNumber: normalizeIdentifier(payload.number || identifiers.number),
+    headwindName: normalizeIdentifier(payload.name || payload.deviceName || identifiers.name || identifiers.displayName),
     serialNumber: normalizeIdentifier(
       remote?.serialNumber ||
       payload.serialNumber ||
@@ -535,7 +547,38 @@ function remoteIdentifiers(remote: any) {
       info.serial,
     ),
     imei: normalizeIdentifier(payload.imei || payload.imei1 || payload.imei2 || info.imei || info.imei1 || info.imei2),
-    label: normalizeIdentifier(`${payload.description || payload.comment || payload.notes || ""}`),
+    label: normalizeIdentifier(`${payload.description || payload.comment || payload.notes || identifiers.description || ""}`),
+    aliases: uniqueIdentifiers([
+      remote?.mdmDeviceId,
+      remote?.deviceId,
+      payload.id,
+      payload.deviceId,
+      payload.neotreeDeviceId,
+      payload.customDeviceId,
+      payload.number,
+      payload.name,
+      payload.deviceName,
+      payload.description,
+      payload.comment,
+      payload.notes,
+      payload.custom1,
+      payload.custom2,
+      payload.custom3,
+      identifiers.headwindId,
+      identifiers.number,
+      identifiers.name,
+      identifiers.displayName,
+      identifiers.deviceId,
+      identifiers.neotreeDeviceId,
+      identifiers.description,
+      identifiers.custom1,
+      identifiers.custom2,
+      identifiers.custom3,
+      custom.deviceId,
+      custom.neotreeDeviceId,
+      custom.deviceHash,
+      custom.neotreeDeviceHash,
+    ]),
   }
 }
 
@@ -543,21 +586,52 @@ function localDeviceIdentifiers(device: any, appState?: any | null) {
   const details = (device?.details || {}) as Record<string, any>
   const capabilities = (appState?.deviceCapabilities || {}) as Record<string, any>
   const identifiers = (capabilities.identifiers || {}) as Record<string, any>
+  const mdm = (capabilities.mdm || identifiers.mdm || {}) as Record<string, any>
+  const deviceId = normalizeIdentifier(device?.deviceId)
+  const deviceHash = normalizeIdentifier(device?.deviceHash || capabilities.deviceHash || identifiers.deviceHash)
+  const androidId = normalizeIdentifier(capabilities.androidId || identifiers.androidId || device?.deviceId)
+  const serialNumber = normalizeIdentifier(
+    details.serialNumber ||
+    details.serial ||
+    details.androidSerial ||
+    capabilities.serialNumber ||
+    identifiers.serialNumber ||
+    identifiers.serial,
+  )
+  const imei = normalizeIdentifier(details.imei || details.imei1 || details.imei2 || capabilities.imei || identifiers.imei)
   return {
-    deviceId: normalizeIdentifier(device?.deviceId),
-    deviceHash: normalizeIdentifier(device?.deviceHash || capabilities.deviceHash || identifiers.deviceHash),
-    androidId: normalizeIdentifier(capabilities.androidId || identifiers.androidId || device?.deviceId),
-    serialNumber: normalizeIdentifier(
-      details.serialNumber ||
-      details.serial ||
-      details.androidSerial ||
-      capabilities.serialNumber ||
-      identifiers.serialNumber ||
-      identifiers.serial,
-    ),
-    imei: normalizeIdentifier(details.imei || details.imei1 || details.imei2 || capabilities.imei || identifiers.imei),
+    deviceId,
+    deviceHash,
+    androidId,
+    serialNumber,
+    imei,
+    mdmDeviceId: normalizeIdentifier(mdm.deviceId || mdm.mdmDeviceId || mdm.headwindId || identifiers.mdmDeviceId || identifiers.headwindId),
+    mdmDeviceNumber: normalizeIdentifier(mdm.deviceNumber || mdm.number || mdm.headwindNumber || identifiers.mdmDeviceNumber || identifiers.headwindNumber),
+    mdmDeviceName: normalizeIdentifier(mdm.deviceName || mdm.name || mdm.headwindName || identifiers.mdmDeviceName || identifiers.headwindName),
     manufacturer: normalizeIdentifier(appState?.manufacturer || details.manufacturer),
     model: normalizeIdentifier(appState?.model || details.model),
+    aliases: uniqueIdentifiers([
+      deviceId,
+      deviceHash,
+      androidId,
+      serialNumber,
+      imei,
+      mdm.deviceId,
+      mdm.mdmDeviceId,
+      mdm.headwindId,
+      mdm.deviceNumber,
+      mdm.number,
+      mdm.headwindNumber,
+      mdm.deviceName,
+      mdm.name,
+      mdm.headwindName,
+      identifiers.mdmDeviceId,
+      identifiers.headwindId,
+      identifiers.mdmDeviceNumber,
+      identifiers.headwindNumber,
+      identifiers.mdmDeviceName,
+      identifiers.headwindName,
+    ]),
   }
 }
 
@@ -570,6 +644,18 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
   if (remoteIds.deviceId && remoteIds.deviceId === localIds.deviceId) {
     score = Math.max(score, 100)
     reasons.push("NeoTree device ID matched")
+  }
+  if (remoteIds.mdmDeviceId && remoteIds.mdmDeviceId === localIds.mdmDeviceId) {
+    score = Math.max(score, 100)
+    reasons.push("Headwind device ID matched NeoTree-reported MDM device ID")
+  }
+  if (remoteIds.headwindNumber && remoteIds.headwindNumber === localIds.mdmDeviceNumber) {
+    score = Math.max(score, 100)
+    reasons.push("Headwind device number matched NeoTree-reported MDM device number")
+  }
+  if (remoteIds.headwindName && remoteIds.headwindName === localIds.mdmDeviceName) {
+    score = Math.max(score, 98)
+    reasons.push("Headwind device name matched NeoTree-reported MDM device name")
   }
   if (remoteIds.deviceHash && remoteIds.deviceHash === localIds.deviceHash) {
     if (isStrongDeviceHash(localIds.deviceHash)) {
@@ -601,19 +687,73 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
       reasons.push("Headwind description contains short NeoTree device hash")
     }
   }
+  if (localIds.deviceHash && remoteIds.aliases.includes(localIds.deviceHash)) {
+    if (isStrongDeviceHash(localIds.deviceHash)) {
+      score = Math.max(score, 95)
+      reasons.push("Headwind device aliases contain NeoTree device hash")
+    } else {
+      score = Math.max(score, 80)
+      reasons.push("Headwind device aliases contain short NeoTree device hash")
+    }
+  }
 
   return { device, score, reasons }
 }
 
+function getProfileConfigurationScopes(profile: { defaultKioskPolicy?: string | null; settings?: unknown }) {
+  const settings = (profile.settings || {}) as Record<string, any>
+  return uniqueIdentifiers([
+    profile.defaultKioskPolicy,
+    settings.syncConfigurationId,
+    settings.syncConfigurationName,
+    ...(Array.isArray(settings.syncConfigurationIds) ? settings.syncConfigurationIds : []),
+    ...(Array.isArray(settings.syncConfigurationNames) ? settings.syncConfigurationNames : []),
+  ])
+}
+
+function remoteDeviceMatchesProfileScope(remote: { mdmConfigId?: string | null; mdmConfigName?: string | null; payload?: Record<string, any> }, scopes: string[]) {
+  if (!scopes.length) return true
+  const payload = remote.payload || {}
+  const config = (payload.configuration || payload.config || {}) as Record<string, any>
+  const values = uniqueIdentifiers([
+    remote.mdmConfigId,
+    remote.mdmConfigName,
+    payload.configurationId,
+    payload.configId,
+    payload.configurationName,
+    payload.configName,
+    config.id,
+    config.name,
+  ])
+  return values.some((value) => scopes.includes(value))
+}
+
 async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnType<typeof _getMdmProviderProfile>>["data"]>) {
   const provider = createProviderFromProfile(profile)
-  const remoteDevices = await provider.syncDevices()
+  const allRemoteDevices = await provider.syncDevices()
+  const profileScopes = getProfileConfigurationScopes(profile)
+  const applicationRowsFromProvider = allRemoteDevices.filter((remote) => isHeadwindApplicationRow(remote.payload || remote))
+  const actualRemoteDevices = allRemoteDevices.filter((remote) => !isHeadwindApplicationRow(remote.payload || remote))
+  const remoteDevices = actualRemoteDevices
+    .filter((remote) => remoteDeviceMatchesProfileScope(remote, profileScopes))
   const syncDiagnostics = provider.getLastSyncDiagnostics?.() || null
-  const [deviceRows, stateRows, existingLinks] = await Promise.all([
+  const [deviceRows, stateRows, existingLinks, existingInventory] = await Promise.all([
     db.query.devices.findMany(),
     db.query.deviceAppStates.findMany(),
     _getDeviceMdmLinks({ profileId: profile.profileId }),
+    _getMdmDeviceInventory({ profileId: profile.profileId, includeIgnored: true }),
   ])
+
+  const legacyApplicationRows = (existingInventory.data || []).filter((row) => {
+    if (row.matchStatus === "ignored") return false
+    return isHeadwindApplicationRow(row.payload)
+  })
+  if (legacyApplicationRows.length) {
+    await _markMdmDeviceInventoryRowsIgnored(
+      legacyApplicationRows.map((row) => row.inventoryId),
+      "Ignored legacy Headwind application row imported before device response parsing was tightened",
+    )
+  }
 
   const appStateByDevice = new Map(stateRows.map((state) => [state.deviceId, state]))
   const linksByMdmDeviceId = new Map(
@@ -626,6 +766,11 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
   const autoLinkEnabled = profile.autoLinkEnabled !== false
   const summary = {
     remoteDevices: remoteDevices.length,
+    rawRemoteDevices: actualRemoteDevices.length,
+    scopedOutRemoteDevices: actualRemoteDevices.length - remoteDevices.length,
+    configurationScope: profileScopes,
+    ignoredApplicationRows: applicationRowsFromProvider.length,
+    ignoredLegacyApplicationRows: legacyApplicationRows.length,
     autoLinked: 0,
     refreshedLinks: 0,
     needsReview: 0,
