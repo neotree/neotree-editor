@@ -30,6 +30,9 @@ import { createMdmProvider } from "@/lib/mdm"
 import { decryptSecret, encryptSecret } from "@/lib/server/secret-box"
 import { requestMdmApkRolloutForDevice } from "@/lib/app-updates/mdm-rollout"
 
+const DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE = 90
+const DEFAULT_MDM_REVIEW_MIN_CONFIDENCE = 50
+
 /** Runs an async mapper over items with a bounded number of concurrent workers (#13). */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length)
@@ -150,10 +153,12 @@ function buildStoredSettings(
     ? encryptSecret(passwordInput)
     : existingAuth.passwordEncrypted || null
   const endpointSettings = buildEndpointSettings(formData)
+  const reviewMinConfidence = Number(formData.get("reviewMinConfidence") || existingSettings?.reviewMinConfidence || DEFAULT_MDM_REVIEW_MIN_CONFIDENCE)
 
   const settings = {
     ...(existingSettings || {}),
     ...endpointSettings,
+    reviewMinConfidence: Number.isFinite(reviewMinConfidence) ? reviewMinConfidence : DEFAULT_MDM_REVIEW_MIN_CONFIDENCE,
     serviceAuth: cleanObject({
       username: serviceUsername,
       passwordEncrypted,
@@ -171,6 +176,12 @@ function checkboxIsOn(formData: FormData, name: string, defaultValue = false) {
   const values = formData.getAll(name).map((value) => `${value}`)
   if (!values.length) return defaultValue
   return values.includes("on")
+}
+
+function getReviewMinConfidence(settings?: unknown) {
+  const value = Number((settings as Record<string, any> | null)?.reviewMinConfidence || DEFAULT_MDM_REVIEW_MIN_CONFIDENCE)
+  if (!Number.isFinite(value)) return DEFAULT_MDM_REVIEW_MIN_CONFIDENCE
+  return Math.max(1, Math.min(100, value))
 }
 
 export const getDeviceManagementOverview: typeof _getDeviceManagementOverview = async (...args) => {
@@ -414,7 +425,7 @@ async function saveMdmProviderProfile(formData: FormData) {
       isEnabled: formData.get("isEnabled") !== "off",
       autoSyncEnabled: checkboxIsOn(formData, "autoSyncEnabled", true),
       autoLinkEnabled: checkboxIsOn(formData, "autoLinkEnabled", true),
-      autoLinkMinConfidence: Number(formData.get("autoLinkMinConfidence") || 95),
+      autoLinkMinConfidence: Number(formData.get("autoLinkMinConfidence") || DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE),
     })
 
     if (result.success) {
@@ -610,7 +621,8 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       .filter((link) => link.mdmDeviceId)
       .map((link) => [normalizeIdentifier(link.mdmDeviceId), link]),
   )
-  const minConfidence = profile.autoLinkMinConfidence || 95
+  const minConfidence = profile.autoLinkMinConfidence || DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE
+  const reviewMinConfidence = getReviewMinConfidence(profile.settings)
   const autoLinkEnabled = profile.autoLinkEnabled !== false
   const summary = {
     remoteDevices: remoteDevices.length,
@@ -691,9 +703,16 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       .filter((candidate) => candidate.score > 0)
       .sort((a, b) => b.score - a.score)
     const best = candidates[0]
-    const hasConflict = Boolean(best && candidates[1] && candidates[1].score === best.score)
+    const hasReviewableMatch = Boolean(best && best.score >= reviewMinConfidence)
+    const hasConflict = Boolean(hasReviewableMatch && candidates[1] && candidates[1].score === best!.score)
     const canAutoLink = autoLinkEnabled && best && best.score >= minConfidence && !hasConflict
-    const matchStatus = canAutoLink ? "auto_linked" : hasConflict ? "conflict" : best ? "needs_review" : "unmatched"
+    const matchStatus = canAutoLink
+      ? "auto_linked"
+      : hasConflict
+        ? "conflict"
+        : hasReviewableMatch
+          ? "needs_review"
+          : "unmatched"
 
     if (canAutoLink && best) {
       const linkResult = await _linkDeviceToMdm({
@@ -727,7 +746,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       }
     } else if (hasConflict) {
       summary.conflicts += 1
-    } else if (best) {
+    } else if (hasReviewableMatch) {
       summary.needsReview += 1
     } else {
       summary.unmatched += 1
@@ -737,7 +756,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       provider: profile.provider,
       profileId: profile.profileId,
       mdmDeviceId,
-      suggestedDeviceId: best?.device.deviceId || null,
+      suggestedDeviceId: hasReviewableMatch || canAutoLink ? best?.device.deviceId || null : null,
       linkedDeviceId: canAutoLink ? best?.device.deviceId : null,
       countryISO: profile.countryISO,
       mdmConfigId: remote.mdmConfigId || null,
