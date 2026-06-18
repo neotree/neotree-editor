@@ -1,10 +1,13 @@
 'use server';
 
+import { revalidatePath } from "next/cache";
+
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 import { _getAppUpdatePolicy, _getApkReleases, _getAppUpdatePolicyDrafts, _getApkReleaseDrafts } from "@/databases/queries/app-updates";
 import { _saveAppUpdatePolicies, _saveApkReleases } from "@/databases/mutations/app-updates";
 import { importApkArtifactFromUrl } from "@/lib/app-updates/apk-artifact-import";
+import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout";
 
 
 export const getAppUpdatePolicyDrafts: typeof _getAppUpdatePolicyDrafts = async (...args) => {
@@ -145,5 +148,47 @@ export async function importEasApkReleaseDraft(formData: FormData) {
     } catch (e: any) {
         logger.error("importEasApkReleaseDraft ERROR", e.message);
         return { success: false, errors: [e.message || "Could not import EAS APK"] };
+    }
+}
+
+export async function requestCurrentPolicyMdmApkRollout() {
+    try {
+        await isAllowed();
+        const policyResult = await _getAppUpdatePolicy();
+        const policy = policyResult.data;
+
+        if (!policy) {
+            return {
+                success: false,
+                data: { requested: 0, failed: 0, skipped: 0, errors: ["No published app update policy is configured"] },
+                errors: ["No published app update policy is configured"],
+            };
+        }
+
+        if (!["mdm", "hybrid"].includes(policy.apkDeliveryMode)) {
+            return {
+                success: false,
+                data: { requested: 0, failed: 0, skipped: 0, errors: ["The live policy is not configured for MDM APK delivery"] },
+                errors: ["The live policy is not configured for MDM APK delivery"],
+            };
+        }
+
+        const result = await requestMdmApkRolloutForPolicy(policy);
+        revalidatePath("/app-updates");
+        revalidatePath("/app-updates/ota");
+        revalidatePath("/device-management");
+
+        return {
+            success: result.failed === 0 && result.errors.length === 0,
+            data: result,
+            errors: result.errors,
+        };
+    } catch (e: any) {
+        logger.error("requestCurrentPolicyMdmApkRollout ERROR", e.message);
+        return {
+            success: false,
+            data: { requested: 0, failed: 1, skipped: 0, errors: [e.message || "Could not request MDM APK rollout"] },
+            errors: [e.message || "Could not request MDM APK rollout"],
+        };
     }
 }

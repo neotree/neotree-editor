@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
         const deviceId = body?.deviceId || "";
         const appVersion = body?.appVersion || "";
         const runtimeVersion = body?.runtimeVersion || "";
+        const updateRelease = body?.updateRelease || body?.deviceCapabilities?.software?.updateRelease || null;
         const deviceCapabilities = {
             ...(body?.deviceCapabilities || {}),
             deviceId,
@@ -24,6 +25,14 @@ export async function POST(req: NextRequest) {
                 deviceId,
                 deviceHash: body?.deviceHash || body?.deviceCapabilities?.identifiers?.deviceHash || body?.deviceCapabilities?.deviceHash || null,
                 androidId: body?.androidId || body?.deviceCapabilities?.identifiers?.androidId || body?.deviceCapabilities?.androidId || null,
+            },
+            software: {
+                ...(body?.deviceCapabilities?.software || {}),
+                appVersion,
+                runtimeVersion,
+                updateRelease,
+                otaUpdateId: body?.otaUpdateId || null,
+                otaChannel: body?.otaChannel || null,
             },
         };
 
@@ -45,6 +54,7 @@ export async function POST(req: NextRequest) {
                 manufacturer: body?.manufacturer || null,
                 model: body?.model || null,
                 deviceCapabilities,
+                updateRelease,
                 otaUpdateId: body?.otaUpdateId || null,
                 otaChannel: body?.otaChannel || null,
                 apkReleaseId: body?.apkReleaseId || null,

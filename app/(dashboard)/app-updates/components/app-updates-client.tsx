@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +9,12 @@ import { DataTable } from "@/components/data-table";
 import { Tabs } from "@/components/tabs";
 import { useAppContext } from "@/contexts/app";
 import { buildAppUpdateReleaseRows } from "@/lib/app-updates/release-rows";
-import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Loader2Icon } from "lucide-react";
 
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
 import type { apkReleases, deviceAppStates, deviceRolloutStates, deviceUpdateEvents } from "@/databases/pg/schema";
 import { getApkReleaseReadiness, isApkReleaseDeviceAvailable, normalizeAppUpdateChannel } from "@/lib/app-updates/validation";
+import { requestCurrentPolicyMdmApkRollout } from "@/app/actions/app-updates";
 
 type ApkRelease = typeof apkReleases.$inferSelect;
 type DeviceAppState = typeof deviceAppStates.$inferSelect;
@@ -53,6 +54,45 @@ const isFailureEvent = (eventType: string) => {
   return normalized.includes("fail") || normalized.includes("error") || normalized.includes("rollback");
 };
 
+const getCapabilitySoftware = (state?: DeviceAppState | null) => {
+  return ((state?.deviceCapabilities as Record<string, any> | null)?.software || {}) as Record<string, any>;
+};
+
+const getStateUpdateRelease = (state?: DeviceAppState | null) => {
+  return state?.updateRelease || getCapabilitySoftware(state).updateRelease || "";
+};
+
+const getEventUpdateRelease = (event?: OtaEvent | null) => {
+  return event?.updateRelease || ((event?.payload as Record<string, any> | null)?.updateRelease || "");
+};
+
+const formatUpdateRelease = (value?: string | null) => {
+  return value || "-";
+};
+
+const parseVersionParts = (value?: string | null) => {
+  return `${value || ""}`
+    .split(".")
+    .map((part) => Number(part))
+    .map((part) => (Number.isFinite(part) ? part : 0));
+};
+
+const compareVersionDesc = (a?: string | null, b?: string | null) => {
+  const aParts = parseVersionParts(a);
+  const bParts = parseVersionParts(b);
+  const max = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < max; i += 1) {
+    const diff = (bParts[i] || 0) - (aParts[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+};
+
+const parseUpdateSequence = (value?: string | null) => {
+  const match = `${value || ""}`.match(/-(\d+)$/);
+  return match ? Number(match[1]) : 0;
+};
+
 function statusBadgeVariant(status?: string | null) {
   if (status === "available") return "default" as const;
   if (status === "revoked" || status === "deprecated") return "destructive" as const;
@@ -82,6 +122,8 @@ export function AppUpdatesClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { viewOnly } = useAppContext();
+  const [isRolloutPending, startRolloutTransition] = useTransition();
+  const [rolloutActionMessage, setRolloutActionMessage] = useState<string | null>(null);
   const editingDisabled = viewOnly;
   const section = searchParams.get("section");
   const activeOverviewSection = section === "ota" ? "ota" : "apk";
@@ -92,8 +134,21 @@ export function AppUpdatesClient({
   }, [apkReleaseDrafts, apkReleases]);
 
   const otaAppliedEvents = useMemo(() => {
-    return [...otaEvents]
-      .filter((event) => event.eventType === "ota_update_applied")
+    const unique = new Map<string, OtaEvent>();
+    for (const event of otaEvents.filter((item) => item.eventType === "ota_update_applied")) {
+      const key = [
+        event.deviceId,
+        event.otaUpdateId || "embedded",
+        getEventUpdateRelease(event) || "no-update-release",
+        event.otaChannel || "",
+      ].join("|");
+      const existing = unique.get(key);
+      if (!existing || new Date(event.createdAt || 0).getTime() > new Date(existing.createdAt || 0).getTime()) {
+        unique.set(key, event);
+      }
+    }
+
+    return Array.from(unique.values())
       .sort((a, b) => {
         const aDate = new Date(a.createdAt || 0).getTime();
         const bDate = new Date(b.createdAt || 0).getTime();
@@ -112,24 +167,44 @@ export function AppUpdatesClient({
   }, [policy, releaseRows]);
 
   const releaseAdoption = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { count: number; state: DeviceAppState }>();
     for (const state of deviceAppStates) {
-      const key = state.apkReleaseId || `${state.appVersion || "unknown"}:${state.runtimeVersion || "unknown"}`;
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const updateRelease = getStateUpdateRelease(state);
+      const key = state.apkReleaseId || [
+        state.appVersion || "Unknown",
+        updateRelease || "no-update-release",
+        state.runtimeVersion || "Unknown",
+      ].join("|");
+      const existing = counts.get(key);
+      counts.set(key, { count: (existing?.count || 0) + 1, state: existing?.state || state });
     }
 
-    return Array.from(counts.entries())
-      .map(([key, count]) => {
+    const rows = Array.from(counts.entries())
+      .map(([key, value]) => {
         const release = releaseRows.find((item) => item.apkReleaseId === key);
+        const state = value.state;
+        const updateRelease = getStateUpdateRelease(state);
         return {
           key,
-          count,
-          label: release ? `${release.versionName} (${release.versionCode})` : key,
-          runtimeVersion: release?.runtimeVersion || "",
+          count: value.count,
+          appVersion: release?.versionName || state?.appVersion || "Unknown",
+          versionCode: release?.versionCode || null,
+          runtimeVersion: release?.runtimeVersion || state?.runtimeVersion || "",
+          updateRelease,
           isCurrent: !!liveCurrentRelease?.apkReleaseId && key === liveCurrentRelease.apkReleaseId,
         };
       })
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => {
+        if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+        const versionDiff = compareVersionDesc(a.appVersion, b.appVersion);
+        if (versionDiff !== 0) return versionDiff;
+        const updateDiff = parseUpdateSequence(b.updateRelease) - parseUpdateSequence(a.updateRelease);
+        if (updateDiff !== 0) return updateDiff;
+        return b.count - a.count;
+      });
+
+    if (liveCurrentRelease?.apkReleaseId) return rows;
+    return rows.map((row, index) => ({ ...row, isCurrent: index === 0 }));
   }, [deviceAppStates, liveCurrentRelease, releaseRows]);
 
   const recentFailures = useMemo(() => {
@@ -154,6 +229,7 @@ export function AppUpdatesClient({
 
   const deliveryMode = policy?.apkDeliveryMode || "not configured";
   const usesMdm = deliveryMode === "mdm" || deliveryMode === "hybrid";
+  const currentApkReady = !!liveCurrentRelease && isApkReleaseDeviceAvailable(liveCurrentRelease);
 
   const loadRelease = useCallback(
     (release: any) => {
@@ -164,6 +240,22 @@ export function AppUpdatesClient({
     },
     [router],
   );
+
+  const requestMdmRollout = useCallback(() => {
+    setRolloutActionMessage(null);
+    startRolloutTransition(async () => {
+      const result = await requestCurrentPolicyMdmApkRollout();
+      const summary = result.data;
+      if (result.success) {
+        setRolloutActionMessage(
+          `MDM rollout requested for ${summary.requested} device${summary.requested === 1 ? "" : "s"}. ${summary.skipped} skipped.`,
+        );
+      } else {
+        setRolloutActionMessage(result.errors?.[0] || "Could not request MDM rollout");
+      }
+      router.refresh();
+    });
+  }, [router]);
 
   return (
     <>
@@ -203,6 +295,30 @@ export function AppUpdatesClient({
                 <div className="mt-2 text-xs text-muted-foreground">
                   {rolloutSummary.mdmRequested} MDM requested
                 </div>
+                {usesMdm ? (
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      variant="outline"
+                      className="h-9 w-full"
+                      onClick={requestMdmRollout}
+                      disabled={editingDisabled || isRolloutPending || !currentApkReady}
+                    >
+                      {isRolloutPending ? (
+                        <>
+                          <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                          Requesting push...
+                        </>
+                      ) : (
+                        "Push APK via MDM"
+                      )}
+                    </Button>
+                    {rolloutActionMessage ? (
+                      <div className="text-xs text-muted-foreground">
+                        {rolloutActionMessage}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
             <Card>
@@ -310,7 +426,7 @@ export function AppUpdatesClient({
               <CardContent className="p-0 overflow-x-auto">
                 <DataTable
                   title="OTA Updates"
-                  tableClassname="min-w-[680px]"
+                  tableClassname="min-w-[860px]"
                   search={{ inputPlaceholder: "Search OTA adoption" }}
                   headerActions={
                     <Button variant="ghost" className="w-auto h-auto" onClick={() => router.push("/app-updates/ota")}>
@@ -319,22 +435,24 @@ export function AppUpdatesClient({
                   }
                   noDataMessage={<div>No device app state reports yet.</div>}
                   columns={[
-                    { name: "Release" },
+                    { name: "App Version" },
+                    { name: "Update Release" },
                     { name: "Runtime" },
                     { name: "Devices" },
                     {
                       name: "Status",
                       cellRenderer({ rowIndex }) {
                         const item = releaseAdoption[rowIndex]
-                        return item?.isCurrent ? <Badge variant="default">Current</Badge> : <Badge variant="secondary">Older</Badge>
+                        return item?.isCurrent ? <Badge variant="default">Latest</Badge> : <Badge variant="secondary">Older</Badge>
                       },
                     },
                   ]}
                   data={releaseAdoption.map((item) => [
-                    item.label,
+                    item.versionCode ? `${item.appVersion} (${item.versionCode})` : item.appVersion,
+                    formatUpdateRelease(item.updateRelease),
                     item.runtimeVersion,
                     `${item.count}`,
-                    item.isCurrent ? "Current" : "Older",
+                    item.isCurrent ? "Latest" : "Older",
                   ])}
                 />
               </CardContent>
@@ -467,7 +585,7 @@ export function AppUpdatesClient({
             <Tabs
               searchParamsKey="section"
               options={[
-                { value: "adoption", label: "Fleet APK adoption" },
+                { value: "adoption", label: "Fleet app adoption" },
                 { value: "rollout", label: "Rollout states" },
                 { value: "acknowledgements", label: "OTA acknowledgements" },
                 { value: "exceptions", label: "Rollout exceptions" },
@@ -478,27 +596,29 @@ export function AppUpdatesClient({
             <Card>
               <CardContent className="p-0 overflow-x-auto">
                 <DataTable
-                  title="Fleet APK adoption"
-                  tableClassname="min-w-[680px]"
+                  title="Fleet app adoption"
+                  tableClassname="min-w-[860px]"
                   search={{ inputPlaceholder: "Search fleet adoption" }}
                   noDataMessage={<div>No device app state reports yet.</div>}
                   columns={[
-                    { name: "Release" },
+                    { name: "App Version" },
+                    { name: "Update Release" },
                     { name: "Runtime" },
                     { name: "Devices" },
                     {
                       name: "Status",
                       cellRenderer({ rowIndex }) {
                         const item = releaseAdoption[rowIndex]
-                        return item?.isCurrent ? <Badge variant="default">Current</Badge> : <Badge variant="secondary">Older</Badge>
+                        return item?.isCurrent ? <Badge variant="default">Latest</Badge> : <Badge variant="secondary">Older</Badge>
                       },
                     },
                   ]}
                   data={releaseAdoption.map((item) => [
-                    item.label,
+                    item.versionCode ? `${item.appVersion} (${item.versionCode})` : item.appVersion,
+                    formatUpdateRelease(item.updateRelease),
                     item.runtimeVersion,
                     `${item.count}`,
-                    item.isCurrent ? "Current" : "Older",
+                    item.isCurrent ? "Latest" : "Older",
                   ])}
                 />
               </CardContent>
@@ -555,6 +675,7 @@ export function AppUpdatesClient({
                   columns={[
                     { name: "Device" },
                     { name: "App Version" },
+                    { name: "Update Release" },
                     { name: "Runtime" },
                     { name: "OTA Update ID" },
                     { name: "Channel" },
@@ -563,6 +684,7 @@ export function AppUpdatesClient({
                   data={otaAppliedEvents.map((event) => [
                     event.deviceId,
                     event.appVersion || "",
+                    formatUpdateRelease(getEventUpdateRelease(event)),
                     event.runtimeVersion || "",
                     event.otaUpdateId || "",
                     formatChannel(event.otaChannel),
@@ -591,6 +713,7 @@ export function AppUpdatesClient({
                       },
                     },
                     { name: "App Version" },
+                    { name: "Update Release" },
                     { name: "Runtime" },
                     { name: "Received" },
                   ]}
@@ -598,6 +721,7 @@ export function AppUpdatesClient({
                     event.deviceId,
                     event.eventType,
                     event.appVersion || "",
+                    formatUpdateRelease(getEventUpdateRelease(event)),
                     event.runtimeVersion || "",
                     formatDateTime(event.createdAt),
                   ])}
