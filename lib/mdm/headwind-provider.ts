@@ -1,4 +1,5 @@
 import crypto from "crypto"
+import { isHeadwindDeviceRow } from "./headwind-shape"
 import type { MdmActionResult, MdmApkPayload, MdmConfiguration, MdmDeviceStatus, MdmProvider, MdmProviderConfig, MdmSyncDiagnostics } from "./types"
 
 // A device not seen by Headwind in this long is treated as no longer actively
@@ -123,7 +124,6 @@ export class HeadwindMdmProvider implements MdmProvider {
       if (Array.isArray(value)) return value
     }
     for (const value of Object.values(payload)) {
-      if (Array.isArray(value)) return value
       const nested = this.findArrayByKeys(value, keys, depth + 1)
       if (nested) return nested
     }
@@ -132,6 +132,26 @@ export class HeadwindMdmProvider implements MdmProvider {
 
   private objectKeys(value: any) {
     return value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value).slice(0, 12) : []
+  }
+
+  private extractDeviceItems(payload: any) {
+    const devicePage = payload?.devices || payload?.data?.devices
+    const candidates = [
+      devicePage?.items,
+      Array.isArray(devicePage) ? devicePage : null,
+      Array.isArray(payload) ? payload : null,
+      Array.isArray(payload?.data) ? payload.data : null,
+      payload?.device ? [payload.device] : null,
+      payload?.data?.device ? [payload.data.device] : null,
+    ]
+
+    for (const candidate of candidates) {
+      if (!Array.isArray(candidate)) continue
+      const devices = candidate.filter((item) => isHeadwindDeviceRow(item))
+      if (devices.length || candidate.length === 0) return devices
+    }
+
+    return []
   }
 
   private deriveDeviceState(item: any, lastSeenMs: number): Pick<MdmDeviceStatus, "enrollmentStatus" | "managementState"> {
@@ -170,20 +190,59 @@ export class HeadwindMdmProvider implements MdmProvider {
       enrollmentStatus,
       managementState,
       serialNumber: item?.serialNumber || item?.serial || item?.androidSerial || info?.serialNumber || info?.serial || item?.imei || null,
-      androidVersion: item?.androidVersion || item?.sdkVersion || info?.androidVersion || null,
+      androidVersion: item?.androidVersion || item?.sdkVersion || info?.androidVersion || item?.info?.androidVersion || null,
       androidSdk: item?.androidSdk || item?.sdkInt || info?.androidSdk || null,
       deviceCapabilities: {
         identifiers: {
+          headwindId: item?.id != null ? `${item.id}` : null,
           number: item?.number || null,
-          name: item?.name || null,
+          name: item?.name || item?.number || null,
+          displayName: item?.number || item?.name || item?.deviceName || null,
           deviceId: item?.deviceId || null,
           neotreeDeviceId: item?.neotreeDeviceId || item?.customDeviceId || null,
           serialNumber: item?.serialNumber || item?.serial || info?.serialNumber || info?.serial || null,
           imei: item?.imei || info?.imei || null,
+          description: item?.description || item?.comment || item?.notes || null,
+          custom1: item?.custom1 || null,
+          custom2: item?.custom2 || null,
+          custom3: item?.custom3 || null,
         },
       },
       lastMdmSeenAt: lastSeenRaw,
       payload: item || {},
+    }
+  }
+
+  private async withConfigurationNames(devices: MdmDeviceStatus[]) {
+    const missingNames = devices.filter((device) => device.mdmConfigId && !device.mdmConfigName)
+    if (!missingNames.length) return devices
+
+    try {
+      const configurations = await this.listConfigurations()
+      const nameById = new Map(
+        configurations
+          .filter((configuration) => configuration.id && configuration.name)
+          .map((configuration) => [`${configuration.id}`.trim().toLowerCase(), configuration.name]),
+      )
+
+      if (!nameById.size) return devices
+
+      return devices.map((device) => {
+        if (!device.mdmConfigId || device.mdmConfigName) return device
+        const mdmConfigName = nameById.get(`${device.mdmConfigId}`.trim().toLowerCase()) || null
+        if (!mdmConfigName) return device
+
+        return {
+          ...device,
+          mdmConfigName,
+          payload: {
+            ...(device.payload || {}),
+            configurationName: mdmConfigName,
+          },
+        }
+      })
+    } catch {
+      return devices
     }
   }
 
@@ -299,16 +358,18 @@ export class HeadwindMdmProvider implements MdmProvider {
     const configuredPath = this.config.settings?.devicesPath
     // Each strategy describes how to request a single page; `paged` ones get
     // looped until exhausted (#5), non-paged GETs are single-shot fallbacks.
+    const defaultStrategies: { path: string; method: string; paged: boolean }[] = [
+      { path: "/rest/private/devices/search", method: "POST", paged: true },
+      { path: "/rest/private/devices/search", method: "GET", paged: false },
+      { path: "/rest/private/devices", method: "GET", paged: false },
+    ]
     const strategies: { path: string; method: string; paged: boolean }[] = configuredPath
       ? [
           { path: configuredPath, method: "POST", paged: true },
           { path: configuredPath, method: "GET", paged: false },
+          ...defaultStrategies.filter((strategy) => strategy.path !== configuredPath),
         ]
-      : [
-          { path: "/rest/private/devices/search", method: "POST", paged: true },
-          { path: "/rest/private/devices/search", method: "GET", paged: false },
-          { path: "/rest/private/devices", method: "GET", paged: false },
-        ]
+      : defaultStrategies
 
     const errors: string[] = []
     const attempts: MdmSyncDiagnostics["attempts"] = []
@@ -321,11 +382,22 @@ export class HeadwindMdmProvider implements MdmProvider {
         for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum += 1) {
           const init: RequestInit =
             strategy.method === "POST"
-              ? { method: "POST", body: JSON.stringify({ pageSize: PAGE_SIZE, pageNum }) }
+              ? {
+                  method: "POST",
+                  body: JSON.stringify({
+                    value: "",
+                    groupId: -1,
+                    configurationId: -1,
+                    pageSize: PAGE_SIZE,
+                    pageNum,
+                    sortBy: null,
+                    sortDir: "ASC",
+                  }),
+                }
               : { method: "GET" }
           const payload = await this.requestJson(strategy.path, init)
           lastPayload = payload
-          const page = this.extractArray(payload, ["devices", "items", "results", "data"])
+          const page = this.extractDeviceItems(payload)
           collected.push(...page)
           // Stop when the server can't page, or returned a short/empty final page.
           if (!strategy.paged || page.length < PAGE_SIZE) break
@@ -338,7 +410,7 @@ export class HeadwindMdmProvider implements MdmProvider {
           dataKeys: this.objectKeys(lastPayload?.data),
           error: null,
         })
-        const mapped = collected.map((item: any) => this.mapDeviceStatus(item))
+        const mapped = await this.withConfigurationNames(collected.map((item: any) => this.mapDeviceStatus(item)))
         if (mapped.length > 0) {
           this.lastSyncDiagnostics = {
             attempts,
