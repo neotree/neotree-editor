@@ -87,6 +87,7 @@ export function DeviceManagementProfileForm({
   const settings = (profile?.settings || {}) as Record<string, any>;
   const actionPaths = (settings.actionPaths || {}) as Record<string, any>;
   const serviceAuth = (settings.serviceAuth || {}) as Record<string, any>;
+  const reviewMinConfidence = `${settings.reviewMinConfidence || 50}`;
   const isBusy = isTesting || isPending;
 
   async function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
@@ -285,7 +286,7 @@ export function DeviceManagementProfileForm({
 
       <div className="space-y-2">
         <Label>Automatic device matching</Label>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
           <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
             <input type="hidden" name="autoSyncEnabled" value="off" />
             <input
@@ -319,9 +320,25 @@ export function DeviceManagementProfileForm({
                 <SelectItem value="95">Serial/IMEI or better</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Uncertain matches go to the review queue.</p>
+            <p className="text-xs text-muted-foreground">Strong matches are linked automatically.</p>
+          </div>
+          <div className="space-y-1">
+            <Select name="reviewMinConfidence" defaultValue={reviewMinConfidence}>
+              <SelectTrigger id="mdm-review-confidence">
+                <SelectValue placeholder="Review threshold" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="70">Only strong suggestions</SelectItem>
+                <SelectItem value="50">Balanced review queue</SelectItem>
+                <SelectItem value="25">Include weak suggestions</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Lower confidence devices stay in unmatched inventory.</p>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Best result: store the NeoTree device ID or device hash in the Headwind device description or custom fields during enrollment. NeoTree will use that as deterministic evidence before falling back to inferred matching.
+        </p>
       </div>
 
       <details className="rounded-md border p-3">

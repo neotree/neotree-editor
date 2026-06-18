@@ -1,19 +1,34 @@
 "use client"
 
+import { useMemo, useTransition } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable } from "@/components/data-table"
 import { Tabs } from "@/components/tabs"
-import { syncAllEnabledMdmProfilesFromForm } from "@/app/actions/device-management"
+import { syncAllEnabledMdmProfilesReport } from "@/app/actions/device-management"
 import type { _getDeviceManagementOverview } from "@/databases/queries/device-management"
-import { PlusIcon, RefreshCwIcon } from "lucide-react"
+import { Loader2Icon, PlusIcon, RefreshCwIcon } from "lucide-react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DeviceManagementRowActions } from "./device-management-row-actions"
 import { MdmInventoryReviewActions } from "./mdm-inventory-review-actions"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Overview = Awaited<ReturnType<typeof _getDeviceManagementOverview>>["data"]
+type InventoryItem = Overview["inventory"][number]
+type ConsolidatedInventoryItem = {
+  key: string
+  item: InventoryItem
+  profileNames: string[]
+  configurationNames: string[]
+  rowCount: number
+  lastSeenAt?: Date | string | null
+  isStale: boolean
+}
+
+const STALE_UNMATCHED_DAYS = 30
+const STALE_UNMATCHED_MS = STALE_UNMATCHED_DAYS * 24 * 60 * 60 * 1000
 
 const fmt = (value?: Date | string | null) => value ? new Date(value).toLocaleString() : "Never"
 
@@ -48,16 +63,30 @@ function syncSummary(profile: Overview["profiles"][number]) {
   return (settings.lastDeviceSyncSummary || {}) as Record<string, any>
 }
 
+function profileReviewThreshold(profile: Overview["profiles"][number]) {
+  const settings = (profile.settings || {}) as Record<string, any>
+  const value = Number(settings.reviewMinConfidence || 50)
+  return Number.isFinite(value) ? value : 50
+}
+
 function formatSyncSummary(profile: Overview["profiles"][number]) {
   const summary = syncSummary(profile)
   if (!profile.lastDeviceSyncAt) return "No sync yet"
   if (profile.lastDeviceSyncStatus === "failed") return summary.error || profile.lastDeviceSyncError || "Sync failed"
+  const diagnostics = summary.diagnostics as { selectedMethod?: string | null; selectedPath?: string | null; attempts?: Array<{ method: string; path: string; count: number; error?: string | null }> } | null
+  const selected = diagnostics?.selectedPath
+    ? `${diagnostics.selectedMethod} ${diagnostics.selectedPath}`
+    : diagnostics?.attempts?.length
+      ? diagnostics.attempts.map((attempt) => `${attempt.method} ${attempt.path}: ${attempt.error || `${attempt.count} found`}`).join("; ")
+      : ""
   return [
     `${summary.remoteDevices || 0} scanned`,
     `${summary.autoLinked || 0} auto-linked`,
     `${summary.needsReview || 0} review`,
+    `${summary.unmatched || 0} unmatched`,
     `${summary.conflicts || 0} conflicts`,
-  ].join(" | ")
+    selected,
+  ].filter(Boolean).join(" | ")
 }
 
 function matchBadgeVariant(status?: string | null) {
@@ -76,15 +105,135 @@ function reviewEvidence(item: Overview["inventory"][number]) {
   return "No NeoTree ID, Android ID, serial, IMEI, or strong device hash matched."
 }
 
+function unmatchedEvidence(item: Overview["inventory"][number]) {
+  if (item.matchConfidence > 0 && item.matchReasons?.length) {
+    return `${item.matchReasons.join(", ")}. Below review threshold.`
+  }
+  return "No credible NeoTree device evidence was found."
+}
+
+function staleUnmatchedEvidence(item: Overview["inventory"][number]) {
+  return `${unmatchedEvidence(item)} No evidence has appeared for ${STALE_UNMATCHED_DAYS}+ days, so it is kept out of the active unmatched view.`
+}
+
+function normalizeInventoryKey(value?: string | null) {
+  return `${value || ""}`.trim().toLowerCase()
+}
+
+function remoteInventoryKey(item: InventoryItem) {
+  const payload = (item.payload || {}) as Record<string, any>
+  const info = (payload.info || {}) as Record<string, any>
+  const identifiers = [
+    item.serialNumber,
+    payload.serialNumber,
+    payload.serial,
+    info.serialNumber,
+    payload.imei,
+    payload.imei1,
+    payload.imei2,
+    item.mdmDeviceId,
+  ]
+    .map(normalizeInventoryKey)
+    .filter(Boolean)
+
+  return identifiers[0] || item.inventoryId
+}
+
+function latestDate(...values: Array<Date | string | null | undefined>) {
+  const timestamps = values
+    .map((value) => value ? new Date(value).getTime() : 0)
+    .filter((value) => Number.isFinite(value) && value > 0)
+  return timestamps.length ? new Date(Math.max(...timestamps)) : null
+}
+
+function joinUnique(values: string[]) {
+  const unique = Array.from(new Set(values.filter(Boolean)))
+  return unique.join(", ")
+}
+
+function consolidateUnmatchedInventory(items: InventoryItem[]) {
+  const grouped = new Map<string, ConsolidatedInventoryItem>()
+
+  for (const item of items) {
+    const key = remoteInventoryKey(item)
+    const existing = grouped.get(key)
+    const lastSeenAt = latestDate(item.lastMdmSeenAt, item.lastSeenAt)
+    const profileName = item.profile?.name || ""
+    const configurationName = item.mdmConfigName || item.mdmConfigId || ""
+
+    const isStale = Boolean(
+      lastSeenAt &&
+      Date.now() - lastSeenAt.getTime() > STALE_UNMATCHED_MS &&
+      !item.matchConfidence &&
+      !item.matchReasons?.length,
+    )
+
+    if (!existing) {
+      grouped.set(key, {
+        key,
+        item,
+        profileNames: profileName ? [profileName] : [],
+        configurationNames: configurationName ? [configurationName] : [],
+        rowCount: 1,
+        lastSeenAt,
+        isStale,
+      })
+      continue
+    }
+
+    existing.rowCount += 1
+    if (profileName) existing.profileNames.push(profileName)
+    if (configurationName) existing.configurationNames.push(configurationName)
+
+    const existingTime = latestDate(existing.lastSeenAt)?.getTime() || 0
+    const itemTime = lastSeenAt?.getTime() || 0
+    if (itemTime >= existingTime) {
+      existing.item = item
+      existing.lastSeenAt = lastSeenAt
+    }
+    existing.isStale = existing.isStale && isStale
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    const aTime = latestDate(a.lastSeenAt)?.getTime() || 0
+    const bTime = latestDate(b.lastSeenAt)?.getTime() || 0
+    return bTime - aTime
+  })
+}
+
+function escapeHtml(value: unknown) {
+  return `${value ?? ""}`
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function formatResultLine(result: any) {
+  if (!result?.success) {
+    return `<li><strong>${escapeHtml(result?.name || "Profile")}</strong>: failed - ${escapeHtml(result?.error || "Could not sync")}</li>`
+  }
+  return `<li><strong>${escapeHtml(result.name)}</strong>: ${result.remoteDevices || 0} scanned, ${result.autoLinked || 0} auto-linked, ${result.needsReview || 0} review, ${result.unmatched || 0} unmatched, ${result.conflicts || 0} conflicts.</li>`
+}
+
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
+  const router = useRouter()
+  const { alert } = useAlertModal()
+  const [syncAllPending, startSyncAllTransition] = useTransition()
   const { profiles, devices, inventory } = overview
   const searchParams = useSearchParams()
   const section = searchParams.get("section")
-  const activeSection = section === "devices" || section === "review" ? section : "profiles"
+  const activeSection = section === "devices" || section === "review" || section === "unmatched" || section === "stale" ? section : "profiles"
   const connectedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "connected").length
   const failedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "failed").length
   const managedDevices = devices.filter((row) => row.mdmLink?.managementState === "managed").length
-  const reviewItems = inventory.filter((item) => item.matchStatus === "needs_review" || item.matchStatus === "conflict" || item.matchStatus === "unmatched")
+  const activeInventory = inventory.filter((item) => item.matchStatus !== "ignored")
+  const reviewItems = activeInventory.filter((item) => item.matchStatus === "needs_review" || item.matchStatus === "conflict")
+  const unmatchedItems = activeInventory.filter((item) => item.matchStatus === "unmatched")
+  const consolidatedUnmatchedInventory = consolidateUnmatchedInventory(unmatchedItems)
+  const consolidatedUnmatchedItems = consolidatedUnmatchedInventory.filter((item) => !item.isStale)
+  const staleUnmatchedItems = consolidatedUnmatchedInventory.filter((item) => item.isStale)
   const autoLinkedItems = inventory.filter((item) => item.matchStatus === "auto_linked").length
   const autoSyncProfiles = profiles.filter((profile) => profile.autoSyncEnabled !== false).length
   const autoLinkProfiles = profiles.filter((profile) => profile.autoLinkEnabled !== false).length
@@ -95,6 +244,42 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const latestSyncProfile = profiles
     .filter((profile) => profile.lastDeviceSyncAt)
     .sort((a, b) => new Date(b.lastDeviceSyncAt || 0).getTime() - new Date(a.lastDeviceSyncAt || 0).getTime())[0]
+  const syncAllReportMessage = useMemo(() => {
+    return "NeoTree will scan all enabled Headwind profiles and reconcile device links."
+  }, [])
+
+  function syncAllProfiles() {
+    startSyncAllTransition(async () => {
+      const result = await syncAllEnabledMdmProfilesReport("Operator requested full MDM inventory reconciliation")
+      router.refresh()
+      if (result.results.length) {
+        const scanned = result.results.reduce((total: number, item: any) => total + (item.remoteDevices || 0), 0)
+        const autoLinked = result.results.reduce((total: number, item: any) => total + (item.autoLinked || 0), 0)
+        const review = result.results.reduce((total: number, item: any) => total + (item.needsReview || 0), 0)
+        const unmatched = result.results.reduce((total: number, item: any) => total + (item.unmatched || 0), 0)
+        const conflicts = result.results.reduce((total: number, item: any) => total + (item.conflicts || 0), 0)
+        const failed = result.results.filter((item: any) => !item.success).length
+        alert({
+          title: failed ? "MDM sync completed with issues" : "MDM sync complete",
+          variant: failed ? "info" : "success",
+          buttonLabel: "Ok",
+          message: `
+            <p>${scanned} devices scanned across ${result.results.length} profile${result.results.length === 1 ? "" : "s"}.</p>
+            <p>${autoLinked} auto-linked, ${review} need review, ${unmatched} unmatched, ${conflicts} conflicts${failed ? `, ${failed} failed` : ""}.</p>
+            <ul class="mt-3 list-disc pl-5 text-sm">${result.results.map(formatResultLine).join("")}</ul>
+            <p class="mt-3 text-sm"><a href="/device-management?section=review">Open review queue</a> or <a href="/device-management?section=unmatched">open unmatched inventory</a>.</p>
+          `,
+        })
+      } else {
+        alert({
+          title: "MDM sync failed",
+          variant: "error",
+          buttonLabel: "Ok",
+          message: escapeHtml(result.errors?.[0] || "Could not sync MDM profiles"),
+        })
+      }
+    })
+  }
 
   return (
     <div className="w-full space-y-4">
@@ -119,7 +304,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Review queue</div>
+            <div className="text-sm text-muted-foreground">Actionable review</div>
             <div className="mt-1 text-2xl font-semibold">{reviewItems.length}</div>
           </CardContent>
         </Card>
@@ -139,6 +324,8 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
               Auto-sync enabled on {autoSyncProfiles} / {profiles.length} profiles. Auto-link enabled on {autoLinkProfiles} / {profiles.length} profiles.
               {lastDeviceSyncAt ? ` Last sync ${fmt(new Date(lastDeviceSyncAt))}.` : " No sync has run yet."}
               {latestSyncProfile ? ` ${formatSyncSummary(latestSyncProfile)}.` : ""}
+              {unmatchedItems.length ? ` ${unmatchedItems.length} unmatched inventory record${unmatchedItems.length === 1 ? "" : "s"} consolidated into ${consolidatedUnmatchedItems.length} active remote device${consolidatedUnmatchedItems.length === 1 ? "" : "s"}.` : ""}
+              {staleUnmatchedItems.length ? ` ${staleUnmatchedItems.length} stale remote device${staleUnmatchedItems.length === 1 ? "" : "s"} hidden from the active unmatched view.` : ""}
             </div>
           </div>
           <Badge variant={autoSyncProfiles ? "default" : "secondary"}>
@@ -148,13 +335,26 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
       </div>
 
       <div className="flex justify-end">
-        <form action={syncAllEnabledMdmProfilesFromForm}>
-          <input type="hidden" name="reason" value="Operator requested full MDM inventory reconciliation" />
-          <Button type="submit" variant="primary-outline">
-            <RefreshCwIcon className="size-4 mr-2" />
-            Sync all MDM profiles
-          </Button>
-        </form>
+        <Button
+          type="button"
+          variant="primary-outline"
+          disabled={syncAllPending}
+          aria-busy={syncAllPending}
+          title={syncAllReportMessage}
+          onClick={syncAllProfiles}
+        >
+          {syncAllPending ? (
+            <>
+              <Loader2Icon className="size-4 mr-2 animate-spin" />
+              Syncing profiles...
+            </>
+          ) : (
+            <>
+              <RefreshCwIcon className="size-4 mr-2" />
+              Sync all MDM profiles
+            </>
+          )}
+        </Button>
       </div>
 
       <Tabs
@@ -163,6 +363,8 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
           { value: "profiles", label: "MDM profiles" },
           { value: "devices", label: "Device fleet" },
           { value: "review", label: `Review queue${reviewItems.length ? ` (${reviewItems.length})` : ""}` },
+          { value: "unmatched", label: `Unmatched inventory${consolidatedUnmatchedItems.length ? ` (${consolidatedUnmatchedItems.length})` : ""}` },
+          { value: "stale", label: `Stale inventory${staleUnmatchedItems.length ? ` (${staleUnmatchedItems.length})` : ""}` },
         ]}
       />
 
@@ -171,7 +373,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
           <CardContent className="p-0 overflow-x-auto">
             <DataTable
               title={<div className="text-2xl">MDM profiles</div>}
-              tableClassname="min-w-[860px]"
+              tableClassname="min-w-[980px]"
               search={{ inputPlaceholder: "Search MDM profiles" }}
               headerActions={
                 <Button asChild variant="ghost" className="w-auto h-auto">
@@ -189,6 +391,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 { name: "Provider" },
                 { name: "URL" },
                 { name: "Authentication" },
+                { name: "Matching" },
                 {
                   name: "Connection",
                   cellRenderer({ rowIndex }) {
@@ -241,6 +444,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 profile.provider || "",
                 profile.baseUrl || "",
                 authMode(profile),
+                `Auto ${profile.autoLinkMinConfidence || 95}% | Review ${profileReviewThreshold(profile)}%`,
                 profile.lastConnectionStatus || "not checked",
                 profile.lastDeviceSyncStatus || "not synced",
                 formatSyncSummary(profile),
@@ -296,6 +500,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                   },
                 },
                 { name: "App" },
+                { name: "Update" },
                 { name: "Runtime" },
                 { name: "Sync" },
                 { name: "Last Seen" },
@@ -321,6 +526,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 mdmLink?.mdmGroupName || mdmLink?.mdmGroupId || "",
                 mdmLink?.enrollmentStatus || "unknown",
                 appState?.appVersion || "",
+                appState?.updateRelease || "",
                 appState?.runtimeVersion || "",
                 mdmLink?.lastSyncStatus || "",
                 fmt(appState?.lastSeenAt || mdmLink?.lastMdmSeenAt),
@@ -384,6 +590,66 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 reviewEvidence(item),
                 fmt(item.lastMdmSeenAt || item.lastSeenAt),
                 "",
+              ])}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {activeSection === "unmatched" ? (
+        <Card className="w-full">
+          <CardContent className="p-0 overflow-x-auto">
+            <DataTable
+              title={<div className="text-2xl">Unmatched MDM inventory</div>}
+              tableClassname="min-w-[980px]"
+              search={{ inputPlaceholder: "Search unmatched MDM devices" }}
+              noDataMessage={<div>No unmatched MDM inventory.</div>}
+              columns={[
+                { name: "Remote device" },
+                { name: "Profile" },
+                { name: "Configuration" },
+                { name: "Overlap" },
+                { name: "Confidence" },
+                { name: "Why unmatched" },
+                { name: "Last seen" },
+              ]}
+              data={consolidatedUnmatchedItems.map((entry) => [
+                entry.item.serialNumber || entry.item.mdmDeviceId,
+                entry.profileNames.length > 1 ? `${joinUnique(entry.profileNames)} (${entry.rowCount} records)` : joinUnique(entry.profileNames),
+                joinUnique(entry.configurationNames),
+                entry.profileNames.length > 1 ? "Seen in multiple profiles" : "Single profile",
+                `${entry.item.matchConfidence || 0}%`,
+                unmatchedEvidence(entry.item),
+                fmt(entry.lastSeenAt),
+              ])}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {activeSection === "stale" ? (
+        <Card className="w-full">
+          <CardContent className="p-0 overflow-x-auto">
+            <DataTable
+              title={<div className="text-2xl">Stale MDM inventory</div>}
+              tableClassname="min-w-[980px]"
+              search={{ inputPlaceholder: "Search stale MDM devices" }}
+              noDataMessage={<div>No stale unmatched MDM inventory.</div>}
+              columns={[
+                { name: "Remote device" },
+                { name: "Profile" },
+                { name: "Configuration" },
+                { name: "Overlap" },
+                { name: "Why hidden" },
+                { name: "Last seen" },
+              ]}
+              data={staleUnmatchedItems.map((entry) => [
+                entry.item.serialNumber || entry.item.mdmDeviceId,
+                entry.profileNames.length > 1 ? `${joinUnique(entry.profileNames)} (${entry.rowCount} records)` : joinUnique(entry.profileNames),
+                joinUnique(entry.configurationNames),
+                entry.profileNames.length > 1 ? "Seen in multiple profiles" : "Single profile",
+                staleUnmatchedEvidence(entry.item),
+                fmt(entry.lastSeenAt),
               ])}
             />
           </CardContent>

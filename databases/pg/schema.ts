@@ -476,6 +476,7 @@ export const deviceUpdateEvents = pgTable("nt_device_update_events", {
   countryISO: text("country_iso"),
   appVersion: text("app_version"),
   runtimeVersion: text("runtime_version"),
+  updateRelease: text("update_release"),
   apkReleaseId: uuid("apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
   otaUpdateId: text("ota_update_id"),
   otaChannel: text("ota_channel"),
@@ -497,6 +498,7 @@ export const deviceAppStates = pgTable("nt_device_app_states", {
 
   appVersion: text("app_version").notNull(),
   runtimeVersion: text("runtime_version").notNull(),
+  updateRelease: text("update_release"),
   countryISO: text("country_iso"),
   androidVersion: text("android_version"),
   androidSdk: integer("android_sdk"),
@@ -776,6 +778,37 @@ export const apkReleasesRelations = relations(apkReleases, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [apkReleases.createdByUserId],
+    references: [users.userId],
+  }),
+}))
+
+// OTA RELEASES
+export const otaReleases = pgTable("nt_ota_releases", {
+  id: serial("id").primaryKey(),
+  otaReleaseId: uuid("ota_release_id").notNull().unique().defaultRandom(),
+  label: text("label").notNull(),
+  appVersion: text("app_version"),
+  runtimeVersion: text("runtime_version").notNull(),
+  channel: text("channel").notNull(),
+  platform: text("platform").default("android").notNull(),
+  easUpdateGroupId: text("eas_update_group_id"),
+  easUpdateId: text("eas_update_id"),
+  message: text("message").default(""),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  uniqueReleasePerChannelRuntime: uniqueIndex("ota_release_unique_label_channel_runtime").on(table.label, table.channel, table.runtimeVersion),
+  channelIndex: index("ota_release_channel_idx").on(table.channel),
+  runtimeIndex: index("ota_release_runtime_idx").on(table.runtimeVersion),
+}))
+
+export const otaReleasesRelations = relations(otaReleases, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [otaReleases.createdByUserId],
     references: [users.userId],
   }),
 }))
