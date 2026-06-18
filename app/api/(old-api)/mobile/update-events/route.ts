@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
             countryISO: body?.countryISO || body?.countryIso || null,
             appVersion: body?.appVersion || null,
             runtimeVersion: body?.runtimeVersion || null,
+            updateRelease: body?.updateRelease || body?.payload?.updateRelease || null,
             apkReleaseId: body?.apkReleaseId || null,
             otaUpdateId: body?.otaUpdateId || null,
             otaChannel: body?.otaChannel || null,

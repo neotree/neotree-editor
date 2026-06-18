@@ -1,5 +1,5 @@
 import crypto from "crypto"
-import type { MdmActionResult, MdmConfiguration, MdmDeviceStatus, MdmProvider, MdmProviderConfig } from "./types"
+import type { MdmActionResult, MdmApkPayload, MdmConfiguration, MdmDeviceStatus, MdmProvider, MdmProviderConfig, MdmSyncDiagnostics } from "./types"
 
 // A device not seen by Headwind in this long is treated as no longer actively
 // managed (#8) so we stop pushing rollouts to decommissioned/offline tablets.
@@ -16,8 +16,13 @@ const TOKEN_TTL_MS = 5 * 60 * 1000
 export class HeadwindMdmProvider implements MdmProvider {
   readonly name = "headwind" as const
   private accessToken?: string | null
+  private lastSyncDiagnostics: MdmSyncDiagnostics | null = null
 
   constructor(private readonly config: MdmProviderConfig) {}
+
+  getLastSyncDiagnostics() {
+    return this.lastSyncDiagnostics
+  }
 
   private get baseUrl() {
     return this.config.baseUrl.replace(/\/+$/, "")
@@ -106,7 +111,27 @@ export class HeadwindMdmProvider implements MdmProvider {
       if (Array.isArray(value)) return value
     }
     if (Array.isArray(payload?.data)) return payload.data
+    const nested = this.findArrayByKeys(payload, keys)
+    if (nested) return nested
     return []
+  }
+
+  private findArrayByKeys(payload: any, keys: string[], depth = 0): any[] | null {
+    if (!payload || typeof payload !== "object" || depth > 4) return null
+    for (const key of keys) {
+      const value = payload[key]
+      if (Array.isArray(value)) return value
+    }
+    for (const value of Object.values(payload)) {
+      if (Array.isArray(value)) return value
+      const nested = this.findArrayByKeys(value, keys, depth + 1)
+      if (nested) return nested
+    }
+    return null
+  }
+
+  private objectKeys(value: any) {
+    return value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value).slice(0, 12) : []
   }
 
   private deriveDeviceState(item: any, lastSeenMs: number): Pick<MdmDeviceStatus, "enrollmentStatus" | "managementState"> {
@@ -275,7 +300,10 @@ export class HeadwindMdmProvider implements MdmProvider {
     // Each strategy describes how to request a single page; `paged` ones get
     // looped until exhausted (#5), non-paged GETs are single-shot fallbacks.
     const strategies: { path: string; method: string; paged: boolean }[] = configuredPath
-      ? [{ path: configuredPath, method: "POST", paged: true }]
+      ? [
+          { path: configuredPath, method: "POST", paged: true },
+          { path: configuredPath, method: "GET", paged: false },
+        ]
       : [
           { path: "/rest/private/devices/search", method: "POST", paged: true },
           { path: "/rest/private/devices/search", method: "GET", paged: false },
@@ -283,27 +311,65 @@ export class HeadwindMdmProvider implements MdmProvider {
         ]
 
     const errors: string[] = []
+    const attempts: MdmSyncDiagnostics["attempts"] = []
+    let emptyResult: MdmDeviceStatus[] | null = null
 
     for (const strategy of strategies) {
       try {
         const collected: any[] = []
+        let lastPayload: any = null
         for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum += 1) {
           const init: RequestInit =
             strategy.method === "POST"
               ? { method: "POST", body: JSON.stringify({ pageSize: PAGE_SIZE, pageNum }) }
               : { method: "GET" }
           const payload = await this.requestJson(strategy.path, init)
+          lastPayload = payload
           const page = this.extractArray(payload, ["devices", "items", "results", "data"])
           collected.push(...page)
           // Stop when the server can't page, or returned a short/empty final page.
           if (!strategy.paged || page.length < PAGE_SIZE) break
         }
-        return collected.map((item: any) => this.mapDeviceStatus(item))
+        attempts.push({
+          path: strategy.path,
+          method: strategy.method,
+          count: collected.length,
+          payloadKeys: this.objectKeys(lastPayload),
+          dataKeys: this.objectKeys(lastPayload?.data),
+          error: null,
+        })
+        const mapped = collected.map((item: any) => this.mapDeviceStatus(item))
+        if (mapped.length > 0) {
+          this.lastSyncDiagnostics = {
+            attempts,
+            selectedPath: strategy.path,
+            selectedMethod: strategy.method,
+            selectedCount: mapped.length,
+          }
+          return mapped
+        }
+        emptyResult = mapped
       } catch (e: any) {
         errors.push(`${strategy.method} ${strategy.path}: ${e.message}`)
+        attempts.push({
+          path: strategy.path,
+          method: strategy.method,
+          count: 0,
+          payloadKeys: [],
+          dataKeys: [],
+          error: e.message,
+        })
       }
     }
 
+    this.lastSyncDiagnostics = {
+      attempts,
+      selectedPath: null,
+      selectedMethod: null,
+      selectedCount: 0,
+    }
+
+    if (emptyResult) return emptyResult
     throw new Error(`Headwind device lookup failed. Tried ${errors.join("; ")}`)
   }
 
@@ -319,7 +385,15 @@ export class HeadwindMdmProvider implements MdmProvider {
     return this.postAction("assignKioskPolicy", mdmDeviceId, { policyId })
   }
 
-  async pushApk(mdmDeviceId: string, apk: { apkReleaseId: string; downloadUrl: string }): Promise<MdmActionResult> {
-    return this.postAction("pushApk", mdmDeviceId, apk)
+  async pushApk(mdmDeviceId: string, apk: MdmApkPayload): Promise<MdmActionResult> {
+    return this.postAction("pushApk", mdmDeviceId, {
+      ...apk,
+      // Common aliases make the configurable Headwind action endpoint easier
+      // to integrate with without forcing admins to understand payload shape.
+      url: apk.downloadUrl,
+      fileUrl: apk.downloadUrl,
+      apkUrl: apk.downloadUrl,
+      install: true,
+    })
   }
 }

@@ -35,6 +35,7 @@ function createProviderFromProfile(profile: typeof mdmProviderProfiles.$inferSel
 }
 
 function policyMatchesLink(policy: Policy, link: Link) {
+  if (policy.targetScope === "country" && policy.targetCountryISO) return policy.targetCountryISO === link.countryISO
   if (policy.targetScope === "group") return !!policy.targetGroupId && policy.targetGroupId === link.mdmGroupId
   if (policy.targetScope === "hospital") return !!policy.targetHospitalId && policy.targetHospitalId === link.hospitalId
   return true
@@ -54,7 +55,13 @@ async function pushReleaseToLink(link: Link & { profile?: typeof mdmProviderProf
   const result = await provider.pushApk(link.mdmDeviceId, {
     apkReleaseId: release.apkReleaseId,
     downloadUrl: buildDownloadUrl(release),
+    versionName: release.versionName,
+    versionCode: release.versionCode,
+    runtimeVersion: release.runtimeVersion,
+    checksumSha256: release.checksumSha256,
+    fileSize: release.fileSize,
   })
+  const requestedAt = new Date()
 
   await db
     .insert(deviceRolloutStates)
@@ -64,7 +71,7 @@ async function pushReleaseToLink(link: Link & { profile?: typeof mdmProviderProf
       countryISO: link.countryISO,
       deliveryMode: policy.apkDeliveryMode,
       rolloutState: result.success ? "mdm_push_requested" : "failed",
-      mdmPushRequestedAt: result.success ? new Date() : null,
+      mdmPushRequestedAt: result.success ? requestedAt : null,
       lastErrorCode: result.success ? null : "mdm_push_failed",
       lastErrorMessage: result.success ? null : result.message || "MDM push failed",
     })
@@ -74,12 +81,22 @@ async function pushReleaseToLink(link: Link & { profile?: typeof mdmProviderProf
         countryISO: link.countryISO,
         deliveryMode: policy.apkDeliveryMode,
         rolloutState: result.success ? "mdm_push_requested" : "failed",
-        mdmPushRequestedAt: result.success ? new Date() : null,
+        mdmPushRequestedAt: result.success ? requestedAt : null,
         lastErrorCode: result.success ? null : "mdm_push_failed",
         lastErrorMessage: result.success ? null : result.message || "MDM push failed",
         updatedAt: new Date(),
       },
     })
+
+  if (!result.success) {
+    logger.error("pushReleaseToLink MDM APK push ERROR", JSON.stringify({
+      deviceId: link.deviceId,
+      mdmDeviceId: link.mdmDeviceId,
+      profileId: profile.profileId,
+      apkReleaseId: release.apkReleaseId,
+      message: result.message || "MDM push failed",
+    }))
+  }
 
   return result
 }

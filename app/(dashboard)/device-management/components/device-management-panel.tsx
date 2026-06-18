@@ -1,17 +1,19 @@
 "use client"
 
+import { useMemo, useTransition } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable } from "@/components/data-table"
 import { Tabs } from "@/components/tabs"
-import { syncAllEnabledMdmProfilesFromForm } from "@/app/actions/device-management"
+import { syncAllEnabledMdmProfilesReport } from "@/app/actions/device-management"
 import type { _getDeviceManagementOverview } from "@/databases/queries/device-management"
-import { PlusIcon, RefreshCwIcon } from "lucide-react"
+import { Loader2Icon, PlusIcon, RefreshCwIcon } from "lucide-react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DeviceManagementRowActions } from "./device-management-row-actions"
 import { MdmInventoryReviewActions } from "./mdm-inventory-review-actions"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Overview = Awaited<ReturnType<typeof _getDeviceManagementOverview>>["data"]
 
@@ -52,12 +54,19 @@ function formatSyncSummary(profile: Overview["profiles"][number]) {
   const summary = syncSummary(profile)
   if (!profile.lastDeviceSyncAt) return "No sync yet"
   if (profile.lastDeviceSyncStatus === "failed") return summary.error || profile.lastDeviceSyncError || "Sync failed"
+  const diagnostics = summary.diagnostics as { selectedMethod?: string | null; selectedPath?: string | null; attempts?: Array<{ method: string; path: string; count: number; error?: string | null }> } | null
+  const selected = diagnostics?.selectedPath
+    ? `${diagnostics.selectedMethod} ${diagnostics.selectedPath}`
+    : diagnostics?.attempts?.length
+      ? diagnostics.attempts.map((attempt) => `${attempt.method} ${attempt.path}: ${attempt.error || `${attempt.count} found`}`).join("; ")
+      : ""
   return [
     `${summary.remoteDevices || 0} scanned`,
     `${summary.autoLinked || 0} auto-linked`,
     `${summary.needsReview || 0} review`,
     `${summary.conflicts || 0} conflicts`,
-  ].join(" | ")
+    selected,
+  ].filter(Boolean).join(" | ")
 }
 
 function matchBadgeVariant(status?: string | null) {
@@ -76,7 +85,26 @@ function reviewEvidence(item: Overview["inventory"][number]) {
   return "No NeoTree ID, Android ID, serial, IMEI, or strong device hash matched."
 }
 
+function escapeHtml(value: unknown) {
+  return `${value ?? ""}`
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function formatResultLine(result: any) {
+  if (!result?.success) {
+    return `<li><strong>${escapeHtml(result?.name || "Profile")}</strong>: failed - ${escapeHtml(result?.error || "Could not sync")}</li>`
+  }
+  return `<li><strong>${escapeHtml(result.name)}</strong>: ${result.remoteDevices || 0} scanned, ${result.autoLinked || 0} auto-linked, ${result.needsReview || 0} review, ${result.conflicts || 0} conflicts.</li>`
+}
+
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
+  const router = useRouter()
+  const { alert } = useAlertModal()
+  const [syncAllPending, startSyncAllTransition] = useTransition()
   const { profiles, devices, inventory } = overview
   const searchParams = useSearchParams()
   const section = searchParams.get("section")
@@ -95,6 +123,40 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const latestSyncProfile = profiles
     .filter((profile) => profile.lastDeviceSyncAt)
     .sort((a, b) => new Date(b.lastDeviceSyncAt || 0).getTime() - new Date(a.lastDeviceSyncAt || 0).getTime())[0]
+  const syncAllReportMessage = useMemo(() => {
+    return "NeoTree will scan all enabled Headwind profiles and reconcile device links."
+  }, [])
+
+  function syncAllProfiles() {
+    startSyncAllTransition(async () => {
+      const result = await syncAllEnabledMdmProfilesReport("Operator requested full MDM inventory reconciliation")
+      router.refresh()
+      if (result.results.length) {
+        const scanned = result.results.reduce((total: number, item: any) => total + (item.remoteDevices || 0), 0)
+        const autoLinked = result.results.reduce((total: number, item: any) => total + (item.autoLinked || 0), 0)
+        const review = result.results.reduce((total: number, item: any) => total + (item.needsReview || 0), 0)
+        const conflicts = result.results.reduce((total: number, item: any) => total + (item.conflicts || 0), 0)
+        const failed = result.results.filter((item: any) => !item.success).length
+        alert({
+          title: failed ? "MDM sync completed with issues" : "MDM sync complete",
+          variant: failed ? "info" : "success",
+          buttonLabel: "Ok",
+          message: `
+            <p>${scanned} devices scanned across ${result.results.length} profile${result.results.length === 1 ? "" : "s"}.</p>
+            <p>${autoLinked} auto-linked, ${review} need review, ${conflicts} conflicts${failed ? `, ${failed} failed` : ""}.</p>
+            <ul class="mt-3 list-disc pl-5 text-sm">${result.results.map(formatResultLine).join("")}</ul>
+          `,
+        })
+      } else {
+        alert({
+          title: "MDM sync failed",
+          variant: "error",
+          buttonLabel: "Ok",
+          message: escapeHtml(result.errors?.[0] || "Could not sync MDM profiles"),
+        })
+      }
+    })
+  }
 
   return (
     <div className="w-full space-y-4">
@@ -148,13 +210,26 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
       </div>
 
       <div className="flex justify-end">
-        <form action={syncAllEnabledMdmProfilesFromForm}>
-          <input type="hidden" name="reason" value="Operator requested full MDM inventory reconciliation" />
-          <Button type="submit" variant="primary-outline">
-            <RefreshCwIcon className="size-4 mr-2" />
-            Sync all MDM profiles
-          </Button>
-        </form>
+        <Button
+          type="button"
+          variant="primary-outline"
+          disabled={syncAllPending}
+          aria-busy={syncAllPending}
+          title={syncAllReportMessage}
+          onClick={syncAllProfiles}
+        >
+          {syncAllPending ? (
+            <>
+              <Loader2Icon className="size-4 mr-2 animate-spin" />
+              Syncing profiles...
+            </>
+          ) : (
+            <>
+              <RefreshCwIcon className="size-4 mr-2" />
+              Sync all MDM profiles
+            </>
+          )}
+        </Button>
       </div>
 
       <Tabs
@@ -296,6 +371,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                   },
                 },
                 { name: "App" },
+                { name: "Update" },
                 { name: "Runtime" },
                 { name: "Sync" },
                 { name: "Last Seen" },
@@ -321,6 +397,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 mdmLink?.mdmGroupName || mdmLink?.mdmGroupId || "",
                 mdmLink?.enrollmentStatus || "unknown",
                 appState?.appVersion || "",
+                appState?.updateRelease || "",
                 appState?.runtimeVersion || "",
                 mdmLink?.lastSyncStatus || "",
                 fmt(appState?.lastSeenAt || mdmLink?.lastMdmSeenAt),

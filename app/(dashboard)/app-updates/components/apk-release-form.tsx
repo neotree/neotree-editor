@@ -17,7 +17,7 @@ import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
-import { Link2 } from "lucide-react";
+import { Link2, Loader2Icon } from "lucide-react";
 
 import type { importEasApkReleaseDraft, saveApkReleases } from "@/app/actions/app-updates";
 import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
@@ -368,7 +368,14 @@ export function ApkReleaseForm({
                     onClick={onImportEasArtifact}
                     disabled={editingDisabled || importing}
                   >
-                    {importing ? "Importing..." : "Import APK"}
+                    {importing ? (
+                      <>
+                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                        Importing APK...
+                      </>
+                    ) : (
+                      "Import APK"
+                    )}
                   </Button>
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">
@@ -507,8 +514,15 @@ export function ApkReleaseForm({
             <Button variant="primary-outline" onClick={resetApkForm} disabled={editingDisabled}>
               Reset
             </Button>
-            <Button onClick={onSaveApkRelease} disabled={loading || editingDisabled}>
-              Save Draft
+            <Button onClick={onSaveApkRelease} disabled={loading || editingDisabled} aria-busy={loading}>
+              {loading ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Saving draft...
+                </>
+              ) : (
+                "Save Draft"
+              )}
             </Button>
           </div>
         </CardContent>

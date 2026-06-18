@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { Loader2Icon } from "lucide-react";
 
 import type { saveAppUpdatePolicies } from "@/app/actions/app-updates";
 import type { AppUpdatePolicy, AppUpdatePolicyDraft, ApkReleaseDraft } from "@/databases/queries/app-updates";
@@ -644,8 +645,15 @@ export function AppUpdatePolicyForm({
             <Button variant="ghost" onClick={() => router.push("/app-updates")}>
               Cancel
             </Button>
-            <Button onClick={onSavePolicy} disabled={loading || editingDisabled}>
-              Save Draft
+            <Button onClick={onSavePolicy} disabled={loading || editingDisabled} aria-busy={loading}>
+              {loading ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Saving draft...
+                </>
+              ) : (
+                "Save Draft"
+              )}
             </Button>
           </div>
         </CardContent>
