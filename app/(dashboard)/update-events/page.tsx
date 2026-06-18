@@ -23,6 +23,7 @@ export default async function UpdateEventsPage() {
                     <th className="py-2 pr-4">Device</th>
                     <th className="py-2 pr-4">Type</th>
                     <th className="py-2 pr-4">App</th>
+                    <th className="py-2 pr-4">Update</th>
                     <th className="py-2 pr-4">Runtime</th>
                     <th className="py-2 pr-4">OTA ID</th>
                     <th className="py-2 pr-4">Channel</th>
@@ -35,6 +36,7 @@ export default async function UpdateEventsPage() {
                       <td className="py-2 pr-4">{e.deviceId}</td>
                       <td className="py-2 pr-4">{e.eventType}</td>
                       <td className="py-2 pr-4">{e.appVersion || ""}</td>
+                      <td className="py-2 pr-4">{e.updateRelease || ""}</td>
                       <td className="py-2 pr-4">{e.runtimeVersion || ""}</td>
                       <td className="py-2 pr-4">{e.otaUpdateId || ""}</td>
                       <td className="py-2 pr-4">{e.otaChannel || ""}</td>

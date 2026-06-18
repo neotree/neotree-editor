@@ -597,6 +597,7 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
 async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnType<typeof _getMdmProviderProfile>>["data"]>) {
   const provider = createProviderFromProfile(profile)
   const remoteDevices = await provider.syncDevices()
+  const syncDiagnostics = provider.getLastSyncDiagnostics?.() || null
   const [deviceRows, stateRows, existingLinks] = await Promise.all([
     db.query.devices.findMany(),
     db.query.deviceAppStates.findMany(),
@@ -618,6 +619,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
     needsReview: 0,
     conflicts: 0,
     unmatched: 0,
+    diagnostics: syncDiagnostics,
     startedAt: new Date().toISOString(),
   }
   // Devices auto-linked this run get the managed APK pushed afterwards (#4).
@@ -987,6 +989,69 @@ export async function syncMdmProfileDevicesFromForm(formData: FormData) {
   redirect("/device-management?section=profiles")
 }
 
+export async function syncMdmProfileDevicesReport(profileId: string, reason?: string) {
+  try {
+    const session = await requireDeviceManagementAdmin()
+    const profile = await _getMdmProviderProfile(profileId)
+    if (!profile.data) throw new Error("MDM profile not found")
+
+    const summary = await reconcileMdmProfileDevices(profile.data)
+
+    await _updateMdmProviderConnectionStatus(profileId, {
+      lastConnectionStatus: "connected",
+      lastConnectionError: null,
+      lastConnectionCheckedAt: new Date(),
+    })
+
+    await writeDeviceManagementAudit({
+      actorUserId: session.user?.userId,
+      action: "mdm_profile_devices_synced",
+      beforeState: { profileId },
+      afterState: { profileId, ...summary },
+      metadata: {
+        reason: reason?.trim() || undefined,
+      },
+    })
+
+    revalidatePath("/device-management")
+
+    return {
+      success: true,
+      profileId,
+      profileName: profile.data.name,
+      summary,
+      errors: [] as string[],
+    }
+  } catch (e: any) {
+    logger.error("syncMdmProfileDevicesReport ERROR", e.message)
+    if (profileId) {
+      await _updateMdmProviderDeviceSyncStatus(profileId, {
+        lastDeviceSyncStatus: "failed",
+        lastDeviceSyncError: e.message || "Could not sync Headwind devices",
+        lastDeviceSyncAt: new Date(),
+        lastDeviceSyncSummary: {
+          success: false,
+          error: e.message || "Could not sync Headwind devices",
+          finishedAt: new Date().toISOString(),
+        },
+      })
+      await _updateMdmProviderConnectionStatus(profileId, {
+        lastConnectionStatus: "failed",
+        lastConnectionError: e.message || "Could not sync Headwind devices",
+        lastConnectionCheckedAt: new Date(),
+      })
+    }
+
+    return {
+      success: false,
+      profileId,
+      profileName: "",
+      summary: null,
+      errors: [e.message || "Could not sync Headwind devices"],
+    }
+  }
+}
+
 export async function syncAllEnabledMdmProfilesFromForm(formData: FormData) {
   try {
     const session = await requireDeviceManagementAdmin()
@@ -1009,6 +1074,29 @@ export async function syncAllEnabledMdmProfilesFromForm(formData: FormData) {
   }
 
   redirect("/device-management?section=review")
+}
+
+export async function syncAllEnabledMdmProfilesReport(reason?: string) {
+  try {
+    const session = await requireDeviceManagementAdmin()
+    const results = await syncEnabledMdmProfilesForAutomation()
+
+    await writeDeviceManagementAudit({
+      actorUserId: session.user?.userId,
+      action: "mdm_all_profiles_auto_sync_requested",
+      afterState: { profiles: results },
+      metadata: {
+        reason: reason?.trim() || undefined,
+      },
+    })
+
+    revalidatePath("/device-management")
+
+    return { success: results.every((result) => result.success), results, errors: [] as string[] }
+  } catch (e: any) {
+    logger.error("syncAllEnabledMdmProfilesReport ERROR", e.message)
+    return { success: false, results: [], errors: [e.message || "Could not sync MDM profiles"] }
+  }
 }
 
 export async function syncEnabledMdmProfilesForAutomation() {
@@ -1173,6 +1261,46 @@ export async function runDeviceMdmRemoteActionFromForm(formData: FormData) {
     if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
     logger.error("runDeviceMdmRemoteActionFromForm ERROR", e.message)
     formErrorRedirect(formData, e.message || "Could not run remote device action")
+  }
+
+  redirect("/device-management?section=devices")
+}
+
+export async function requestDeviceMdmApkRolloutFromForm(formData: FormData) {
+  try {
+    const session = await requireDeviceManagementAdmin()
+    const linkId = `${formData.get("linkId") || ""}`
+    const reason = `${formData.get("reason") || ""}`.trim()
+
+    if (!reason) formErrorRedirect(formData, "Reason is required")
+
+    const link = await _getDeviceMdmLink(linkId)
+    if (!link.data) formErrorRedirect(formData, "Device MDM link not found")
+    if (!link.data.mdmDeviceId || link.data.managementState !== "managed") {
+      formErrorRedirect(formData, "Device must be managed by MDM before an APK can be pushed")
+    }
+
+    const result = await requestMdmApkRolloutForDevice(link.data.deviceId)
+
+    await writeDeviceManagementAudit({
+      actorUserId: session.user?.userId,
+      action: "device_mdm_apk_push_requested",
+      beforeState: link.data,
+      afterState: result,
+      metadata: { reason },
+    })
+
+    if (result.failed > 0 || result.errors.length > 0 || result.requested === 0) {
+      formErrorRedirect(formData, result.errors[0] || "No eligible MDM APK rollout was found for this device")
+    }
+
+    revalidatePath("/device-management")
+    revalidatePath("/app-updates")
+    revalidatePath("/app-updates/ota")
+  } catch (e: any) {
+    if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
+    logger.error("requestDeviceMdmApkRolloutFromForm ERROR", e.message)
+    formErrorRedirect(formData, e.message || "Could not request MDM APK push")
   }
 
   redirect("/device-management?section=devices")
