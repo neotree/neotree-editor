@@ -127,13 +127,16 @@ export function DeviceManagementRowActions({
             router.refresh();
             setSyncOpen(false);
             if (result.success && result.summary) {
+                const scanned = result.summary.rawRemoteDevices && result.summary.rawRemoteDevices !== result.summary.remoteDevices
+                    ? `${result.summary.remoteDevices || 0} in scope from ${result.summary.rawRemoteDevices} scanned`
+                    : `${result.summary.remoteDevices || 0} devices scanned`;
                 alert({
                     title: "Headwind sync complete",
                     variant: "success",
                     buttonLabel: "Ok",
                     message: `
                         <p><strong>${escapeHtml(result.profileName || "MDM profile")}</strong> synced successfully.</p>
-                        <p>${result.summary.remoteDevices || 0} devices scanned, ${result.summary.autoLinked || 0} auto-linked, ${result.summary.needsReview || 0} need review, ${result.summary.unmatched || 0} unmatched, ${result.summary.conflicts || 0} conflicts.</p>
+                        <p>${scanned}, ${result.summary.autoLinked || 0} auto-linked, ${result.summary.needsReview || 0} need review, ${result.summary.unmatched || 0} unmatched, ${result.summary.conflicts || 0} conflicts.</p>
                     `,
                 });
             } else {

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 
 import db from "@/databases/pg/drizzle"
 import { deviceMdmLinks, mdmDeviceInventory, mdmProviderProfiles } from "@/databases/pg/schema"
@@ -233,6 +233,30 @@ export async function _updateMdmDeviceInventoryReview(
     return { success: true, data: updated }
   } catch (e: any) {
     logger.error("_updateMdmDeviceInventoryReview ERROR", e.message)
+    return { success: false, errors: [e.message] }
+  }
+}
+
+export async function _markMdmDeviceInventoryRowsIgnored(inventoryIds: string[], reason: string) {
+  try {
+    const ids = Array.from(new Set(inventoryIds.filter(Boolean)))
+    if (!ids.length) return { success: true, data: [] }
+
+    const now = new Date()
+    const data = await db
+      .update(mdmDeviceInventory)
+      .set({
+        matchStatus: "ignored",
+        reviewNote: reason,
+        ignoredAt: now,
+        reviewedAt: now,
+      })
+      .where(inArray(mdmDeviceInventory.inventoryId, ids))
+      .returning()
+
+    return { success: true, data }
+  } catch (e: any) {
+    logger.error("_markMdmDeviceInventoryRowsIgnored ERROR", e.message)
     return { success: false, errors: [e.message] }
   }
 }

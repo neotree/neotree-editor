@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { DeviceManagementRowActions } from "./device-management-row-actions"
 import { MdmInventoryReviewActions } from "./mdm-inventory-review-actions"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { isHeadwindApplicationRow } from "@/lib/mdm/headwind-shape"
 
 type Overview = Awaited<ReturnType<typeof _getDeviceManagementOverview>>["data"]
 type InventoryItem = Overview["inventory"][number]
@@ -79,12 +80,16 @@ function formatSyncSummary(profile: Overview["profiles"][number]) {
     : diagnostics?.attempts?.length
       ? diagnostics.attempts.map((attempt) => `${attempt.method} ${attempt.path}: ${attempt.error || `${attempt.count} found`}`).join("; ")
       : ""
+  const scope = summary.rawRemoteDevices && summary.rawRemoteDevices !== summary.remoteDevices
+    ? `${summary.remoteDevices || 0} in scope from ${summary.rawRemoteDevices} scanned`
+    : `${summary.remoteDevices || 0} scanned`
   return [
-    `${summary.remoteDevices || 0} scanned`,
+    scope,
     `${summary.autoLinked || 0} auto-linked`,
     `${summary.needsReview || 0} review`,
     `${summary.unmatched || 0} unmatched`,
     `${summary.conflicts || 0} conflicts`,
+    summary.ignoredLegacyApplicationRows ? `${summary.ignoredLegacyApplicationRows} legacy app rows ignored` : "",
     selected,
   ].filter(Boolean).join(" | ")
 }
@@ -120,23 +125,44 @@ function normalizeInventoryKey(value?: string | null) {
   return `${value || ""}`.trim().toLowerCase()
 }
 
-function remoteInventoryKey(item: InventoryItem) {
+function inventoryIdentifiers(item: InventoryItem) {
   const payload = (item.payload || {}) as Record<string, any>
+  const capabilities = (item.deviceCapabilities || {}) as Record<string, any>
+  const identifiers = (capabilities.identifiers || payload.identifiers || payload.deviceCapabilities?.identifiers || {}) as Record<string, any>
   const info = (payload.info || {}) as Record<string, any>
-  const identifiers = [
-    item.serialNumber,
-    payload.serialNumber,
-    payload.serial,
-    info.serialNumber,
-    payload.imei,
-    payload.imei1,
-    payload.imei2,
+
+  return {
+    displayName: identifiers.displayName || identifiers.number || identifiers.name || payload.number || payload.name || payload.deviceName || item.serialNumber || item.mdmDeviceId,
+    number: identifiers.number || payload.number,
+    name: identifiers.name || payload.name || payload.deviceName,
+    serialNumber: item.serialNumber || identifiers.serialNumber || payload.serialNumber || payload.serial || info.serialNumber,
+    imei: identifiers.imei || payload.imei || payload.imei1 || payload.imei2,
+  }
+}
+
+function remoteDeviceDisplay(item: InventoryItem) {
+  return inventoryIdentifiers(item).displayName || item.mdmDeviceId
+}
+
+function configurationDisplay(name?: string | null, id?: string | null) {
+  if (name && name !== id) return name
+  if (id) return `Unknown configuration (ID ${id})`
+  return ""
+}
+
+function remoteInventoryKey(item: InventoryItem) {
+  const identifiers = inventoryIdentifiers(item)
+  const values = [
+    identifiers.serialNumber,
+    identifiers.imei,
+    identifiers.number,
+    identifiers.name,
     item.mdmDeviceId,
   ]
     .map(normalizeInventoryKey)
     .filter(Boolean)
 
-  return identifiers[0] || item.inventoryId
+  return values[0] || item.inventoryId
 }
 
 function latestDate(...values: Array<Date | string | null | undefined>) {
@@ -159,7 +185,7 @@ function consolidateUnmatchedInventory(items: InventoryItem[]) {
     const existing = grouped.get(key)
     const lastSeenAt = latestDate(item.lastMdmSeenAt, item.lastSeenAt)
     const profileName = item.profile?.name || ""
-    const configurationName = item.mdmConfigName || item.mdmConfigId || ""
+    const configurationName = configurationDisplay(item.mdmConfigName, item.mdmConfigId)
 
     const isStale = Boolean(
       lastSeenAt &&
@@ -214,7 +240,15 @@ function formatResultLine(result: any) {
   if (!result?.success) {
     return `<li><strong>${escapeHtml(result?.name || "Profile")}</strong>: failed - ${escapeHtml(result?.error || "Could not sync")}</li>`
   }
-  return `<li><strong>${escapeHtml(result.name)}</strong>: ${result.remoteDevices || 0} scanned, ${result.autoLinked || 0} auto-linked, ${result.needsReview || 0} review, ${result.unmatched || 0} unmatched, ${result.conflicts || 0} conflicts.</li>`
+  const scanned = result.rawRemoteDevices && result.rawRemoteDevices !== result.remoteDevices
+    ? `${result.remoteDevices || 0} in scope from ${result.rawRemoteDevices} scanned`
+    : `${result.remoteDevices || 0} scanned`
+  const ignored = result.ignoredLegacyApplicationRows ? `, ${result.ignoredLegacyApplicationRows} legacy application rows ignored` : ""
+  return `<li><strong>${escapeHtml(result.name)}</strong>: ${scanned}, ${result.autoLinked || 0} auto-linked, ${result.needsReview || 0} review, ${result.unmatched || 0} unmatched, ${result.conflicts || 0} conflicts${ignored}.</li>`
+}
+
+function isApplicationInventoryItem(item: InventoryItem) {
+  return isHeadwindApplicationRow(item.payload)
 }
 
 export function DeviceManagementPanel({ overview }: { overview: Overview }) {
@@ -227,14 +261,16 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const activeSection = section === "devices" || section === "review" || section === "unmatched" || section === "stale" ? section : "profiles"
   const connectedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "connected").length
   const failedProfiles = profiles.filter((profile) => profile.lastConnectionStatus === "failed").length
+  const legacyApplicationInventory = inventory.filter((item) => item.matchStatus !== "ignored" && isApplicationInventoryItem(item))
+  const activeInventory = inventory.filter((item) => item.matchStatus !== "ignored" && !isApplicationInventoryItem(item))
+  const remoteMdmDevices = consolidateUnmatchedInventory(activeInventory).length
   const managedDevices = devices.filter((row) => row.mdmLink?.managementState === "managed").length
-  const activeInventory = inventory.filter((item) => item.matchStatus !== "ignored")
   const reviewItems = activeInventory.filter((item) => item.matchStatus === "needs_review" || item.matchStatus === "conflict")
   const unmatchedItems = activeInventory.filter((item) => item.matchStatus === "unmatched")
   const consolidatedUnmatchedInventory = consolidateUnmatchedInventory(unmatchedItems)
   const consolidatedUnmatchedItems = consolidatedUnmatchedInventory.filter((item) => !item.isStale)
   const staleUnmatchedItems = consolidatedUnmatchedInventory.filter((item) => item.isStale)
-  const autoLinkedItems = inventory.filter((item) => item.matchStatus === "auto_linked").length
+  const autoLinkedItems = activeInventory.filter((item) => item.matchStatus === "auto_linked").length
   const autoSyncProfiles = profiles.filter((profile) => profile.autoSyncEnabled !== false).length
   const autoLinkProfiles = profiles.filter((profile) => profile.autoLinkEnabled !== false).length
   const lastDeviceSyncAt = profiles
@@ -254,6 +290,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
       router.refresh()
       if (result.results.length) {
         const scanned = result.results.reduce((total: number, item: any) => total + (item.remoteDevices || 0), 0)
+        const rawScanned = result.results.reduce((total: number, item: any) => total + (item.rawRemoteDevices || item.remoteDevices || 0), 0)
         const autoLinked = result.results.reduce((total: number, item: any) => total + (item.autoLinked || 0), 0)
         const review = result.results.reduce((total: number, item: any) => total + (item.needsReview || 0), 0)
         const unmatched = result.results.reduce((total: number, item: any) => total + (item.unmatched || 0), 0)
@@ -264,7 +301,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
           variant: failed ? "info" : "success",
           buttonLabel: "Ok",
           message: `
-            <p>${scanned} devices scanned across ${result.results.length} profile${result.results.length === 1 ? "" : "s"}.</p>
+            <p>${scanned} in-scope devices reconciled across ${result.results.length} profile${result.results.length === 1 ? "" : "s"}${rawScanned !== scanned ? ` from ${rawScanned} raw Headwind rows` : ""}.</p>
             <p>${autoLinked} auto-linked, ${review} need review, ${unmatched} unmatched, ${conflicts} conflicts${failed ? `, ${failed} failed` : ""}.</p>
             <ul class="mt-3 list-disc pl-5 text-sm">${result.results.map(formatResultLine).join("")}</ul>
             <p class="mt-3 text-sm"><a href="/device-management?section=review">Open review queue</a> or <a href="/device-management?section=unmatched">open unmatched inventory</a>.</p>
@@ -283,7 +320,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
 
   return (
     <div className="w-full space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Connected profiles</div>
@@ -298,7 +335,13 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Managed devices</div>
+            <div className="text-sm text-muted-foreground">Remote MDM devices</div>
+            <div className="mt-1 text-2xl font-semibold">{remoteMdmDevices}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Managed NeoTree devices</div>
             <div className="mt-1 text-2xl font-semibold">{managedDevices} / {devices.length}</div>
           </CardContent>
         </Card>
@@ -326,6 +369,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
               {latestSyncProfile ? ` ${formatSyncSummary(latestSyncProfile)}.` : ""}
               {unmatchedItems.length ? ` ${unmatchedItems.length} unmatched inventory record${unmatchedItems.length === 1 ? "" : "s"} consolidated into ${consolidatedUnmatchedItems.length} active remote device${consolidatedUnmatchedItems.length === 1 ? "" : "s"}.` : ""}
               {staleUnmatchedItems.length ? ` ${staleUnmatchedItems.length} stale remote device${staleUnmatchedItems.length === 1 ? "" : "s"} hidden from the active unmatched view.` : ""}
+              {legacyApplicationInventory.length ? ` ${legacyApplicationInventory.length} legacy Headwind application row${legacyApplicationInventory.length === 1 ? "" : "s"} hidden from device counts until the next sync marks them ignored.` : ""}
             </div>
           </div>
           <Badge variant={autoSyncProfiles ? "default" : "secondary"}>
@@ -581,9 +625,9 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 },
               ]}
               data={reviewItems.map((item) => [
-                item.serialNumber || item.mdmDeviceId,
+                remoteDeviceDisplay(item),
                 item.profile?.name || "",
-                item.mdmConfigName || item.mdmConfigId || "",
+                configurationDisplay(item.mdmConfigName, item.mdmConfigId),
                 item.matchStatus || "",
                 `${item.matchConfidence || 0}%`,
                 item.suggestedDevice?.deviceHash || item.suggestedDeviceId || "",
@@ -614,7 +658,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 { name: "Last seen" },
               ]}
               data={consolidatedUnmatchedItems.map((entry) => [
-                entry.item.serialNumber || entry.item.mdmDeviceId,
+                remoteDeviceDisplay(entry.item),
                 entry.profileNames.length > 1 ? `${joinUnique(entry.profileNames)} (${entry.rowCount} records)` : joinUnique(entry.profileNames),
                 joinUnique(entry.configurationNames),
                 entry.profileNames.length > 1 ? "Seen in multiple profiles" : "Single profile",
@@ -644,7 +688,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                 { name: "Last seen" },
               ]}
               data={staleUnmatchedItems.map((entry) => [
-                entry.item.serialNumber || entry.item.mdmDeviceId,
+                remoteDeviceDisplay(entry.item),
                 entry.profileNames.length > 1 ? `${joinUnique(entry.profileNames)} (${entry.rowCount} records)` : joinUnique(entry.profileNames),
                 joinUnique(entry.configurationNames),
                 entry.profileNames.length > 1 ? "Seen in multiple profiles" : "Single profile",
