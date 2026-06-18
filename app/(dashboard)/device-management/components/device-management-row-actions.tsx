@@ -133,7 +133,7 @@ export function DeviceManagementRowActions({
                     buttonLabel: "Ok",
                     message: `
                         <p><strong>${escapeHtml(result.profileName || "MDM profile")}</strong> synced successfully.</p>
-                        <p>${result.summary.remoteDevices || 0} devices scanned, ${result.summary.autoLinked || 0} auto-linked, ${result.summary.needsReview || 0} need review, ${result.summary.conflicts || 0} conflicts.</p>
+                        <p>${result.summary.remoteDevices || 0} devices scanned, ${result.summary.autoLinked || 0} auto-linked, ${result.summary.needsReview || 0} need review, ${result.summary.unmatched || 0} unmatched, ${result.summary.conflicts || 0} conflicts.</p>
                     `,
                 });
             } else {
