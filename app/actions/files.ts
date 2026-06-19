@@ -48,13 +48,15 @@ export async function uploadFile(
 
                 const _filename = formData.get('filename')?.toString() ||  file.name;
                 let filename = [fileId, _filename].filter(s => s).join('__');
+                const submittedContentType = formData.get('contentType')?.toString() || file.type;
 
                 if (metadata.width || metadata.height) {
                     filename = `${filename}?w=${metadata.width}&h=${metadata.height}`;
                 }
 
-                const isApk = (formData.get('contentType')?.toString() || file.type) === 'application/vnd.android.package-archive'
+                const isApk = submittedContentType === 'application/vnd.android.package-archive'
                     || _filename.toLowerCase().endsWith('.apk');
+                const contentType = isApk ? 'application/vnd.android.package-archive' : submittedContentType;
 
                 if (isApk) {
                     try {
@@ -79,13 +81,13 @@ export async function uploadFile(
                         fs.writeFileSync(tmpFile, buffer);
                         try {
                             const output = execFileSync('apksigner', ['verify', '--print-certs', tmpFile], { encoding: 'utf-8' });
-                            const match = output.match(/SHA-256 digest:\\s*([A-Fa-f0-9:]+)/);
+                            const match = output.match(/SHA-256 digest:\s*([A-Fa-f0-9:]+)/);
                             if (match?.[1]) {
                                 metadata.apkSignatureSha256 = match[1].replace(/:/g, '').toLowerCase();
                                 metadata.apkSignatureVerifiedAt = new Date().toISOString();
                             }
-                        } catch (e) {
-                            // apksigner may not be available; best-effort only
+                        } catch (e: any) {
+                            logger.error('uploadFile APK signature verification ERROR', e.message || `${e}`);
                         } finally {
                             try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
                         }
@@ -100,7 +102,7 @@ export async function uploadFile(
                         data: buffer,
                         filename,
                         size,
-                        contentType: formData.get('contentType')?.toString() || file.type,
+                        contentType,
                         metadata,
                     }, 
                     opts
