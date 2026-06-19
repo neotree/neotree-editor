@@ -331,16 +331,6 @@ export function AppUpdatePolicyForm({
             </div>
 
             <div>
-              <Label>Policy Version</Label>
-              <Input
-                type="number"
-                value={policyForm.policyVersion ?? 1}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, policyVersion: Number(e.target.value || 1) }))}
-                disabled={editingDisabled}
-              />
-            </div>
-
-            <div>
               <Label>OTA Channel</Label>
               <Select
                 value={policyForm.otaChannel}
@@ -363,56 +353,27 @@ export function AppUpdatePolicyForm({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={policyForm.otaEnabled}
-                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, otaEnabled: checked }))}
-                disabled={editingDisabled}
-              />
-              <Label>OTA Enabled</Label>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={policyForm.apkAutoDownload}
-                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkAutoDownload: checked }))}
-                disabled={editingDisabled}
-              />
-              <Label>Auto-download APK</Label>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={policyForm.apkForceInstall}
-                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkForceInstall: checked }))}
-                disabled={editingDisabled}
-              />
-              <Label>Force install APK</Label>
-            </div>
-
             <div>
-              <Label>APK Grace Period (hours)</Label>
-              <Input
-                type="number"
-                value={policyForm.apkGracePeriodHours ?? ""}
-                onChange={(e) =>
-                  setPolicyForm((prev) => ({
-                    ...prev,
-                    apkGracePeriodHours: toNumberOrNull(e.target.value),
-                  }))
-                }
+              <Label>Current APK Release</Label>
+              <Select
+                value={policyForm.currentApkReleaseId || ""}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, currentApkReleaseId: value || null }))}
                 disabled={editingDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>APK Force After</Label>
-              <Input
-                type="datetime-local"
-                value={policyForm.apkForceAfter ?? ""}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkForceAfter: e.target.value || null }))}
-                disabled={editingDisabled}
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select current APK" />
+                </SelectTrigger>
+                <SelectContent>
+                  {releaseOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
+                      {opt.description ? `${opt.label} (${opt.description})` : opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Only published APK releases can be attached to a policy.
+              </div>
             </div>
 
             <div>
@@ -443,23 +404,27 @@ export function AppUpdatePolicyForm({
             </div>
 
             <div>
-              <Label>APK Install Window</Label>
+              <Label>Country</Label>
               <Select
-                value={policyForm.apkInstallWindow}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, apkInstallWindow: value }))}
+                value={policyForm.targetCountryISO || "all"}
+                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetCountryISO: value === "all" ? null : value }))}
                 disabled={editingDisabled}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select install window" />
+                  <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {installWindows.map((window) => (
-                    <SelectItem key={window.value} value={window.value}>
-                      {window.label}
+                  <SelectItem value="all">All countries</SelectItem>
+                  {countryOptions.map((country) => (
+                    <SelectItem key={country.value} value={country.value}>
+                      {country.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose the country this policy applies to, or leave it available everywhere.
+              </p>
             </div>
 
             <div>
@@ -485,30 +450,6 @@ export function AppUpdatePolicyForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div>
-              <Label>Country</Label>
-              <Select
-                value={policyForm.targetCountryISO || "all"}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, targetCountryISO: value === "all" ? null : value }))}
-                disabled={editingDisabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All countries</SelectItem>
-                  {countryOptions.map((country) => (
-                    <SelectItem key={country.value} value={country.value}>
-                      {country.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Choose the country this policy applies to, or leave it available everywhere.
-              </p>
             </div>
 
             {policyForm.targetScope === "group" ? (
@@ -568,78 +509,141 @@ export function AppUpdatePolicyForm({
 
             <div className="flex items-center gap-3">
               <Switch
-                checked={policyForm.rollbackEnabled}
-                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, rollbackEnabled: checked }))}
+                checked={policyForm.otaEnabled}
+                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, otaEnabled: checked }))}
                 disabled={editingDisabled}
               />
-              <Label>Rollback enabled</Label>
+              <Label>OTA Enabled</Label>
             </div>
 
-            <div>
-              <Label>Current APK Release</Label>
-              <Select
-                value={policyForm.currentApkReleaseId || ""}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, currentApkReleaseId: value || null }))}
-                disabled={editingDisabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select current APK" />
-                </SelectTrigger>
-                <SelectContent>
-                  {releaseOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
-                      {opt.description ? `${opt.label} (${opt.description})` : opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Only published APK releases can be attached to a policy.
-              </div>
-            </div>
-
-            <div>
-              <Label>Rollback APK Release</Label>
-              <Select
-                value={policyForm.rollbackApkReleaseId || ""}
-                onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, rollbackApkReleaseId: value || null }))}
-                disabled={editingDisabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select rollback APK" />
-                </SelectTrigger>
-                <SelectContent>
-                  {releaseOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
-                      {opt.description ? `${opt.label} (${opt.description})` : opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Publish the rollback APK release first before selecting it here.
-              </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={policyForm.apkAutoDownload}
+                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkAutoDownload: checked }))}
+                disabled={editingDisabled || policyForm.apkDeliveryMode === "mdm" || policyForm.apkDeliveryMode === "manual"}
+              />
+              <Label>Auto-download APK</Label>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 mt-4">
-            <div>
-              <Label>APK Message Title</Label>
-              <Input
-                value={policyForm.apkMessageTitle || ""}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkMessageTitle: e.target.value }))}
-                disabled={editingDisabled}
-              />
+          <details className="mt-6 rounded-md border p-4">
+            <summary className="cursor-pointer text-sm font-medium">Advanced update rules</summary>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label>Policy Version</Label>
+                <Input
+                  type="number"
+                  value={policyForm.policyVersion ?? 1}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, policyVersion: Number(e.target.value || 1) }))}
+                  disabled={editingDisabled}
+                />
+              </div>
+
+              <div>
+                <Label>APK Install Window</Label>
+                <Select
+                  value={policyForm.apkInstallWindow}
+                  onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, apkInstallWindow: value }))}
+                  disabled={editingDisabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select install window" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {installWindows.map((window) => (
+                      <SelectItem key={window.value} value={window.value}>
+                        {window.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={policyForm.apkForceInstall}
+                  onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkForceInstall: checked }))}
+                  disabled={editingDisabled}
+                />
+                <Label>Force install APK</Label>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={policyForm.rollbackEnabled}
+                  onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, rollbackEnabled: checked }))}
+                  disabled={editingDisabled}
+                />
+                <Label>Rollback enabled</Label>
+              </div>
+
+              <div>
+                <Label>APK Grace Period (hours)</Label>
+                <Input
+                  type="number"
+                  value={policyForm.apkGracePeriodHours ?? ""}
+                  onChange={(e) =>
+                    setPolicyForm((prev) => ({
+                      ...prev,
+                      apkGracePeriodHours: toNumberOrNull(e.target.value),
+                    }))
+                  }
+                  disabled={editingDisabled}
+                />
+              </div>
+
+              <div>
+                <Label>APK Force After</Label>
+                <Input
+                  type="datetime-local"
+                  value={policyForm.apkForceAfter ?? ""}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkForceAfter: e.target.value || null }))}
+                  disabled={editingDisabled}
+                />
+              </div>
+
+              <div>
+                <Label>Rollback APK Release</Label>
+                <Select
+                  value={policyForm.rollbackApkReleaseId || ""}
+                  onValueChange={(value) => setPolicyForm((prev) => ({ ...prev, rollbackApkReleaseId: value || null }))}
+                  disabled={editingDisabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rollback APK" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {releaseOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} disabled={!opt.ready}>
+                        {opt.description ? `${opt.label} (${opt.description})` : opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Publish the rollback APK release first before selecting it here.
+                </div>
+              </div>
+
+              <div>
+                <Label>APK Message Title</Label>
+                <Input
+                  value={policyForm.apkMessageTitle || ""}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkMessageTitle: e.target.value }))}
+                  disabled={editingDisabled}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>APK Message Body</Label>
+                <Textarea
+                  value={policyForm.apkMessageBody || ""}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkMessageBody: e.target.value }))}
+                  disabled={editingDisabled}
+                />
+              </div>
             </div>
-            <div>
-              <Label>APK Message Body</Label>
-              <Textarea
-                value={policyForm.apkMessageBody || ""}
-                onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkMessageBody: e.target.value }))}
-                disabled={editingDisabled}
-              />
-            </div>
-          </div>
+          </details>
 
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => router.push("/app-updates")}>
