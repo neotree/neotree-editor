@@ -16,8 +16,7 @@ import { UploadModal } from "@/components/upload-modal";
 import { Loader } from "@/components/loader";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
-import { cn } from "@/lib/utils";
-import { Link2, Loader2Icon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileArchive, Link2, Loader2Icon } from "lucide-react";
 
 import type { importEasApkReleaseDraft, saveApkReleases } from "@/app/actions/app-updates";
 import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
@@ -83,6 +82,13 @@ const toNumberOrNull = (value: string) => {
   if (value === "" || value === undefined || value === null) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatBytes = (value?: number | null) => {
+  if (!value) return null;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 };
 
 export function ApkReleaseForm({
@@ -195,6 +201,8 @@ export function ApkReleaseForm({
 
     setApkForm((prev) => ({
       ...prev,
+      status: prev.status === "available" ? "uploaded" : prev.status || "uploaded",
+      isAvailable: false,
       fileId: file.fileId,
       fileSize: file.size || prev.fileSize || null,
       checksumSha256: file.metadata?.apkChecksumSha256 || prev.checksumSha256 || null,
@@ -271,6 +279,12 @@ export function ApkReleaseForm({
   }, []);
 
   const readiness = useMemo(() => getApkReleaseReadiness(normalizeApkReleasePayload(apkForm)), [apkForm]);
+  const uploadedApkVerified = !!apkForm.fileId && !!apkForm.checksumSha256 && !!apkForm.signatureSha256;
+  const uploadedApkSummary = useMemo(() => {
+    if (!apkForm.fileId) return "Upload a local APK build from this computer.";
+    if (uploadedApkVerified) return "APK uploaded and verified. It can be saved as a release draft.";
+    return "APK uploaded, but automatic verification is not complete yet.";
+  }, [apkForm.fileId, uploadedApkVerified]);
   const apkArtifactReady = useMemo(
     () => readiness.filter((check) => check.key !== "status").every((check) => check.passed),
     [readiness],
@@ -383,17 +397,72 @@ export function ApkReleaseForm({
                 </div>
               </>
             ) : (
-              <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
-                <UploadModal
-                  type=".apk,application/vnd.android.package-archive"
-                  inputProps={{ multiple: false, placeholder: "Choose APK" }}
-                  onUpload={onUploadApk}
-                >
-                  <Button variant="primary-outline" disabled={editingDisabled}>Upload APK</Button>
-                </UploadModal>
-                <span className={cn("text-xs", !apkForm.fileId && "text-muted-foreground")}>
-                  {apkForm.fileId ? `File: ${apkForm.fileId}` : "No file uploaded"}
-                </span>
+              <div className="mt-4 rounded-md border bg-muted/30 p-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-background">
+                      <FileArchive className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">
+                          {apkForm.fileId ? "APK file attached" : "No APK file uploaded"}
+                        </p>
+                        {apkForm.fileId ? (
+                          <Badge variant={uploadedApkVerified ? "default" : "secondary"}>
+                            {uploadedApkVerified ? "Verified" : "Needs verification"}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{uploadedApkSummary}</p>
+                    </div>
+                  </div>
+
+                  <UploadModal
+                    title="Upload APK file"
+                    description="Choose the APK from your local build. NeoTree will attach it and read the package details automatically."
+                    type=".apk,application/vnd.android.package-archive"
+                    inputProps={{ multiple: false, placeholder: "Choose APK" }}
+                    successTitle="APK uploaded"
+                    successMessage="NeoTree attached the APK and read the package details it could verify."
+                    onUpload={onUploadApk}
+                  >
+                    <Button variant="primary-outline" disabled={editingDisabled}>
+                      {apkForm.fileId ? "Replace APK" : "Upload APK"}
+                    </Button>
+                  </UploadModal>
+                </div>
+
+                {apkForm.fileId ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2 border-t pt-3 text-xs text-muted-foreground md:grid-cols-3">
+                    <div>
+                      <span className="font-medium text-foreground">File size</span>
+                      <div>{formatBytes(apkForm.fileSize) || "Captured"}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Checksum</span>
+                      <div className="flex items-center gap-1">
+                        {apkForm.checksumSha256 ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                        {apkForm.checksumSha256 ? "Captured" : "Missing"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Signing certificate</span>
+                      <div className="flex items-center gap-1">
+                        {apkForm.signatureSha256 ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                        {apkForm.signatureSha256 ? "Captured" : "Missing"}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
