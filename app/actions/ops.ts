@@ -35,6 +35,7 @@ import {
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
 import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
 import { getAcceptedImportFingerprintLookup, getAcceptedImportScriptAllowanceLookup } from "./integrity-imports"
+import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -990,6 +991,7 @@ export async function publishData({
         client: tx,
       })
       if (publishAppUpdatePolicies.errors?.length) throw new Error(publishAppUpdatePolicies.errors.join(", "))
+      const mdmRolloutPolicies = publishAppUpdatePolicies.mdmRolloutPolicies || []
 
       const processPendingDeletion = await _processPendingDeletion({
         userId,
@@ -1006,7 +1008,7 @@ export async function publishData({
       })
       if (editorInfoSave.errors?.length) throw new Error(editorInfoSave.errors.join(", "))
 
-      return { editorInfoSave }
+      return { editorInfoSave, mdmRolloutPolicies }
     }).catch((error: any) => ({
       errors: [error?.message || "Publish failed"],
     }))
@@ -1018,6 +1020,10 @@ export async function publishData({
     const editorInfoSave = ("editorInfoSave" in publishTransactionResult)
       ? publishTransactionResult.editorInfoSave
       : { data: null, success: false, errors: ["Publish failed"] }
+
+    const mdmRolloutPolicies = ("mdmRolloutPolicies" in publishTransactionResult)
+      ? publishTransactionResult.mdmRolloutPolicies || []
+      : []
 
     if (results.success && editorInfoSave.success && editorInfoSave.data?.dataVersion && publisherUserId) {
       const releaseDataVersion = editorInfoSave.data.dataVersion
@@ -1056,6 +1062,25 @@ export async function publishData({
 
       if (!releaseLog.success) {
         logger.error("publishData release changelog warning", releaseLog.errors?.join(", ") || "Unknown error")
+      }
+    }
+
+    for (const policy of mdmRolloutPolicies) {
+      try {
+        const rolloutResult = await requestMdmApkRolloutForPolicy(policy)
+        if (rolloutResult.errors.length) {
+          logger.error("publishData MDM rollout warning", JSON.stringify({
+            policyId: policy.policyId,
+            policyVersion: policy.policyVersion,
+            errors: rolloutResult.errors,
+          }))
+        }
+      } catch (error: any) {
+        logger.error("publishData MDM rollout ERROR", JSON.stringify({
+          policyId: policy.policyId,
+          policyVersion: policy.policyVersion,
+          message: error?.message || "Unknown MDM rollout error",
+        }))
       }
     }
 

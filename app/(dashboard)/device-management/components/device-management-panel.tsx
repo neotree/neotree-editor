@@ -89,6 +89,8 @@ function formatSyncSummary(profile: Overview["profiles"][number]) {
     `${summary.needsReview || 0} review`,
     `${summary.unmatched || 0} unmatched`,
     `${summary.conflicts || 0} conflicts`,
+    `${summary.identityStamped || 0} stamped`,
+    summary.identityStampFailed ? `${summary.identityStampFailed} stamp failed` : "",
     summary.ignoredLegacyApplicationRows ? `${summary.ignoredLegacyApplicationRows} legacy app rows ignored` : "",
     selected,
   ].filter(Boolean).join(" | ")
@@ -107,7 +109,7 @@ function reviewEvidence(item: Overview["inventory"][number]) {
   if (item.matchStatus === "conflict") return `${reasons}. Multiple devices had the same score.`
   if (confidence >= 95) return reasons
   if (confidence > 0) return `${reasons}. Below auto-link threshold.`
-  return "No NeoTree ID, Android ID, serial, IMEI, or strong device hash matched."
+  return "No Headwind device number or NeoTree identity stamp matched."
 }
 
 function unmatchedEvidence(item: Overview["inventory"][number]) {
@@ -134,9 +136,7 @@ function inventoryIdentifiers(item: InventoryItem) {
   return {
     displayName: identifiers.displayName || identifiers.number || identifiers.name || payload.number || payload.name || payload.deviceName || item.serialNumber || item.mdmDeviceId,
     number: identifiers.number || payload.number,
-    name: identifiers.name || payload.name || payload.deviceName,
     serialNumber: item.serialNumber || identifiers.serialNumber || payload.serialNumber || payload.serial || info.serialNumber,
-    imei: identifiers.imei || payload.imei || payload.imei1 || payload.imei2,
   }
 }
 
@@ -154,9 +154,7 @@ function remoteInventoryKey(item: InventoryItem) {
   const identifiers = inventoryIdentifiers(item)
   const values = [
     identifiers.serialNumber,
-    identifiers.imei,
     identifiers.number,
-    identifiers.name,
     item.mdmDeviceId,
   ]
     .map(normalizeInventoryKey)

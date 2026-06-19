@@ -282,7 +282,7 @@ export function DeviceMdmLinkForm({
               name="mdmDeviceId"
               value={mdmDeviceId}
               onChange={(event) => setMdmDeviceId(event.target.value)}
-              placeholder="Headwind device number, ID, serial, or IMEI"
+              placeholder="Headwind device number, ID, or serial"
               required
             />
           )}

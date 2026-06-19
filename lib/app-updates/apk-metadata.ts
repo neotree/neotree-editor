@@ -83,14 +83,24 @@ function readFromAapt(filePath: string): ApkMetadata | null {
   return null
 }
 
+/** Extracts APK metadata from a local APK file. Never throws. */
+export async function extractApkMetadataFromFile(filePath: string): Promise<ApkMetadata> {
+  try {
+    const fromManifest = await readFromManifest(filePath)
+    if (fromManifest?.packageName) return fromManifest
+    return readFromAapt(filePath) || fromManifest || EMPTY
+  } catch (e: any) {
+    logger.error("extractApkMetadataFromFile ERROR", e.message)
+    return EMPTY
+  }
+}
+
 /** Extracts APK metadata from an in-memory buffer. Never throws. */
 export async function extractApkMetadataFromBuffer(buffer: Buffer): Promise<ApkMetadata> {
   const tmpFile = path.join(os.tmpdir(), `${uuidv4()}.apk`)
   try {
     fs.writeFileSync(tmpFile, buffer)
-    const fromManifest = await readFromManifest(tmpFile)
-    if (fromManifest?.packageName) return fromManifest
-    return readFromAapt(tmpFile) || fromManifest || EMPTY
+    return await extractApkMetadataFromFile(tmpFile)
   } catch (e: any) {
     logger.error("extractApkMetadataFromBuffer ERROR", e.message)
     return EMPTY

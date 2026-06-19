@@ -17,6 +17,11 @@ export type MdmDeviceStatus = {
   payload?: Record<string, any>
 }
 
+export type MdmDeviceIdentityStamp = {
+  neotreeDeviceId?: string | null
+  neotreeDeviceHash?: string | null
+}
+
 export type MdmConfiguration = {
   id: string
   name: string
@@ -78,4 +83,5 @@ export interface MdmProvider {
   wipeDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
   assignKioskPolicy(mdmDeviceId: string, policyId: string): Promise<MdmActionResult>
   pushApk(mdmDeviceId: string, apk: MdmApkPayload): Promise<MdmActionResult>
+  stampDeviceIdentity?(device: MdmDeviceStatus, identity: MdmDeviceIdentityStamp): Promise<MdmActionResult>
 }

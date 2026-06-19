@@ -317,7 +317,7 @@ export function DeviceManagementProfileForm({
               <SelectContent>
                 <SelectItem value="100">Exact NeoTree ID only</SelectItem>
                 <SelectItem value="98">Device hash or better</SelectItem>
-                <SelectItem value="95">Serial/IMEI or better</SelectItem>
+                <SelectItem value="95">NeoTree identity stamp or better</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">Strong matches are linked automatically.</p>
