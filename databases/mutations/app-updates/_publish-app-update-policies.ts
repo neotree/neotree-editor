@@ -7,17 +7,19 @@ import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { appUpdatePolicies, appUpdatePoliciesDrafts } from "@/databases/pg/schema";
 import { normalizeAppUpdatePolicyPayload, validateAppUpdatePolicyPayload } from "@/lib/app-updates/validation";
 import { resolvePolicyReleaseReferences } from "@/lib/app-updates/policy-release-resolution";
-import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout";
+
+type PublishedMdmRolloutPolicy = typeof appUpdatePolicies.$inferSelect;
 
 export async function _publishAppUpdatePolicies(opts?: {
     userId?: string | null;
     dataVersion?: number | null;
     client?: DbOrTransaction;
-}): Promise<{ success: boolean; errors?: string[] }> {
-    const results: { success: boolean; errors?: string[] } = { success: false };
+}): Promise<{ success: boolean; errors?: string[]; mdmRolloutPolicies?: PublishedMdmRolloutPolicy[] }> {
+    const results: { success: boolean; errors?: string[]; mdmRolloutPolicies?: PublishedMdmRolloutPolicy[] } = { success: false };
     const errors: string[] = [];
     const changeLogs: SaveChangeLogData[] = [];
     const publishedDraftIds: string[] = [];
+    const mdmRolloutPolicies: PublishedMdmRolloutPolicy[] = [];
 
     try {
         const executor = opts?.client || db;
@@ -80,14 +82,11 @@ export async function _publishAppUpdatePolicies(opts?: {
                 }
 
                 if (payload.apkDeliveryMode === "mdm" || payload.apkDeliveryMode === "hybrid") {
-                    const rolloutResult = await requestMdmApkRolloutForPolicy({
+                    mdmRolloutPolicies.push({
                         ...payload,
                         policyId,
                         policyVersion,
-                    } as typeof appUpdatePolicies.$inferSelect);
-                    if (rolloutResult.errors.length) {
-                        logger.error("_publishAppUpdatePolicies MDM rollout warnings", rolloutResult.errors.join(", "));
-                    }
+                    } as PublishedMdmRolloutPolicy);
                 }
                 publishedDraftIds.push(draft.policyDraftId);
             } catch (e: any) {
@@ -125,6 +124,7 @@ export async function _publishAppUpdatePolicies(opts?: {
         } else {
             results.success = true;
         }
+        results.mdmRolloutPolicies = mdmRolloutPolicies;
     } catch (e: any) {
         results.success = false;
         results.errors = [e.message];

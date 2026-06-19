@@ -1,6 +1,6 @@
 import crypto from "crypto"
 import { isHeadwindDeviceRow } from "./headwind-shape"
-import type { MdmActionResult, MdmApkPayload, MdmConfiguration, MdmDeviceStatus, MdmProvider, MdmProviderConfig, MdmSyncDiagnostics } from "./types"
+import type { MdmActionResult, MdmApkPayload, MdmConfiguration, MdmDeviceIdentityStamp, MdmDeviceStatus, MdmProvider, MdmProviderConfig, MdmSyncDiagnostics } from "./types"
 
 // A device not seen by Headwind in this long is treated as no longer actively
 // managed (#8) so we stop pushing rollouts to decommissioned/offline tablets.
@@ -179,37 +179,211 @@ export class HeadwindMdmProvider implements MdmProvider {
     const lastSeenMs = lastSeenRaw ? new Date(lastSeenRaw).getTime() : NaN
     const { enrollmentStatus, managementState } = this.deriveDeviceState(item, lastSeenMs)
     const info = item?.info || {}
+    const headwindId = item?.id != null ? `${item.id}` : null
+    const headwindNumber = item?.number || info?.deviceId || null
+    const oldHeadwindNumber = item?.oldNumber || info?.oldNumber || null
+    const serialNumber = item?.serialNumber || item?.serial || item?.androidSerial || info?.serialNumber || info?.serial || null
+    const custom1 = item?.custom1 || info?.custom1 || null
+    const custom2 = item?.custom2 || info?.custom2 || null
+    const custom3 = item?.custom3 || info?.custom3 || null
 
     return {
-      deviceId: item?.deviceId || item?.neotreeDeviceId || item?.customDeviceId || info?.deviceId || null,
-      mdmDeviceId: item?.id != null ? `${item.id}` : item?.deviceId || item?.number || item?.imei || null,
+      deviceId: item?.neotreeDeviceId || item?.customDeviceId || info?.neotreeDeviceId || null,
+      // Headwind device number is the stable cross-system key. The internal id is
+      // kept as metadata only because older links may have stored it.
+      mdmDeviceId: headwindNumber || headwindId || null,
       mdmConfigId: item?.configurationId != null ? `${item.configurationId}` : item?.configId != null ? `${item.configId}` : null,
       mdmConfigName: item?.configurationName || item?.configName || item?.configuration?.name || null,
       mdmGroupId: item?.groupId != null ? `${item.groupId}` : item?.deviceGroupId != null ? `${item.deviceGroupId}` : null,
       mdmGroupName: item?.groupName || item?.deviceGroupName || item?.group?.name || null,
       enrollmentStatus,
       managementState,
-      serialNumber: item?.serialNumber || item?.serial || item?.androidSerial || info?.serialNumber || info?.serial || item?.imei || null,
+      serialNumber,
       androidVersion: item?.androidVersion || item?.sdkVersion || info?.androidVersion || item?.info?.androidVersion || null,
       androidSdk: item?.androidSdk || item?.sdkInt || info?.androidSdk || null,
       deviceCapabilities: {
         identifiers: {
-          headwindId: item?.id != null ? `${item.id}` : null,
-          number: item?.number || null,
-          name: item?.name || item?.number || null,
-          displayName: item?.number || item?.name || item?.deviceName || null,
-          deviceId: item?.deviceId || null,
-          neotreeDeviceId: item?.neotreeDeviceId || item?.customDeviceId || null,
-          serialNumber: item?.serialNumber || item?.serial || info?.serialNumber || info?.serial || null,
-          imei: item?.imei || info?.imei || null,
-          description: item?.description || item?.comment || item?.notes || null,
-          custom1: item?.custom1 || null,
-          custom2: item?.custom2 || null,
-          custom3: item?.custom3 || null,
+          headwindId,
+          headwindNumber,
+          headwindOldNumber: oldHeadwindNumber,
+          number: headwindNumber,
+          deviceNumber: headwindNumber,
+          oldNumber: oldHeadwindNumber,
+          neotreeDeviceId: item?.neotreeDeviceId || item?.customDeviceId || info?.neotreeDeviceId || null,
+          serialNumber,
+          custom1,
+          custom2,
+          custom3,
+          displayName: headwindNumber,
+        },
+        mdm: {
+          provider: "headwind",
+          headwindId,
+          deviceId: headwindId,
+          deviceNumber: headwindNumber,
+          headwindNumber,
+          oldDeviceNumber: oldHeadwindNumber,
+          oldNumber: oldHeadwindNumber,
+          custom1,
+          custom2,
+          custom3,
+          serialNumber,
+          managed: item?.mdmMode ?? info?.mdmMode ?? managementState === "managed",
+          kiosk: item?.kioskMode ?? info?.kioskMode ?? null,
+          serverDeviceId: info?.deviceId || null,
         },
       },
       lastMdmSeenAt: lastSeenRaw,
       payload: item || {},
+    }
+  }
+
+  private stampValue(prefix: "nt_hash" | "nt_device", value?: string | null) {
+    const clean = `${value || ""}`.trim()
+    return clean ? `${prefix}:${clean}` : null
+  }
+
+  private stampIfSafe(current: unknown, next?: string | null) {
+    const currentValue = `${current || ""}`.trim()
+    if (!next) return currentValue || null
+    if (!currentValue || currentValue.startsWith("nt_hash:") || currentValue.startsWith("nt_device:")) return next
+    return currentValue
+  }
+
+  private normalized(value: unknown) {
+    return `${value || ""}`.trim().toLowerCase()
+  }
+
+  private deviceMatchesLookupValue(device: any, value: string) {
+    const normalizedValue = this.normalized(value)
+    if (!normalizedValue) return false
+    const info = device?.info || {}
+    return [
+      device?.id,
+      device?.number,
+      device?.oldNumber,
+      device?.serial,
+      device?.serialNumber,
+      device?.androidSerial,
+      info?.deviceId,
+      info?.oldNumber,
+      info?.serial,
+      info?.serialNumber,
+    ].some((candidate) => this.normalized(candidate) === normalizedValue)
+  }
+
+  private async searchRawDevice(value: string): Promise<any | null> {
+    try {
+      const payload = await this.requestJson("/rest/private/devices/search", {
+        method: "POST",
+        body: JSON.stringify({
+          value,
+          groupId: -1,
+          configurationId: -1,
+          pageSize: PAGE_SIZE,
+          pageNum: 1,
+          sortBy: null,
+          sortDir: "ASC",
+        }),
+      })
+      const devices = this.extractDeviceItems(payload)
+      return devices.find((device) => this.deviceMatchesLookupValue(device, value)) || null
+    } catch {
+      return null
+    }
+  }
+
+  /** Fetches the authoritative full device record so a PUT never drops fields. */
+  private async getRawDevice(numberOrId: string): Promise<any | null> {
+    const value = `${numberOrId || ""}`.trim()
+    if (!value) return null
+
+    const configuredPath = this.config.settings?.deviceStatusPath
+    const paths = [
+      configuredPath ? `${configuredPath}`.replace(":mdmDeviceId", encodeURIComponent(value)) : null,
+      `/rest/private/devices/number/${encodeURIComponent(value)}`,
+      `/rest/private/devices/${encodeURIComponent(value)}`,
+    ].filter(Boolean) as string[]
+
+    for (const path of paths) {
+      try {
+        const payload = await this.requestJson(path)
+        const device = payload?.data ?? payload?.device ?? payload?.data?.device ?? payload ?? null
+        // Guard against endpoints that return a list/wrapper instead of a device.
+        if (device && typeof device === "object" && (device.id != null || device.number != null)) return device
+      } catch {
+        // Try the next known Headwind lookup shape.
+      }
+    }
+
+    return this.searchRawDevice(value)
+  }
+
+  async stampDeviceIdentity(device: MdmDeviceStatus, identity: MdmDeviceIdentityStamp): Promise<MdmActionResult> {
+    const payload = device.payload || {}
+    const identifiers = (device.deviceCapabilities?.identifiers || {}) as Record<string, any>
+    const headwindNumber = `${payload.number || identifiers.number || identifiers.headwindNumber || device.mdmDeviceId || ""}`.trim()
+
+    if (!headwindNumber) {
+      return {
+        success: false,
+        provider: this.name,
+        message: "Headwind device number is required for stamp-back",
+      }
+    }
+
+    // Headwind's device PUT is a full-object replace, and the device LIST payload
+    // does not include groups/description/config. Re-fetch the authoritative
+    // record and override ONLY the custom fields, so we never wipe membership.
+    const full = await this.getRawDevice(headwindNumber)
+    if (!full) {
+      return {
+        success: false,
+        provider: this.name,
+        message: "Could not load the full Headwind device record; skipped stamp-back to avoid overwriting device data",
+      }
+    }
+
+    const id = full.id ?? payload.id ?? identifiers.headwindId
+    const configurationId = full.configurationId ?? full.configId ?? payload.configurationId ?? device.mdmConfigId
+    if (id == null || configurationId == null) {
+      return {
+        success: false,
+        provider: this.name,
+        message: "Headwind device record is missing id/configurationId required for stamp-back",
+      }
+    }
+
+    const custom1 = this.stampIfSafe(full.custom1, this.stampValue("nt_hash", identity.neotreeDeviceHash))
+    const custom2 = this.stampIfSafe(full.custom2, this.stampValue("nt_device", identity.neotreeDeviceId))
+
+    if (custom1 === (full.custom1 || null) && custom2 === (full.custom2 || null)) {
+      return {
+        success: true,
+        provider: this.name,
+        message: "Headwind device identity stamp already current",
+        payload: { skipped: true },
+      }
+    }
+
+    // Echo the full device back with only the custom fields changed.
+    const request = {
+      ...full,
+      custom1,
+      custom2,
+    }
+
+    await this.requestJson("/rest/private/devices", {
+      method: "PUT",
+      body: JSON.stringify(request),
+    })
+
+    return {
+      success: true,
+      provider: this.name,
+      providerActionId: `${id}`,
+      message: "Headwind custom fields stamped with NeoTree identity",
+      payload: { custom1, custom2 },
     }
   }
 
@@ -342,15 +516,13 @@ export class HeadwindMdmProvider implements MdmProvider {
       }
     }
 
-    await this.authenticate()
-    const path = this.config.settings?.deviceStatusPath || `/rest/private/devices/${encodeURIComponent(mdmDeviceId)}`
-    const res = await fetch(`${this.baseUrl}${path}`, { headers: this.headers, cache: "no-store" })
-    if (!res.ok) throw new Error(`Headwind device status failed: ${res.status}`)
-    const payload = await res.json()
+    const payload = await this.getRawDevice(mdmDeviceId)
+    if (!payload) throw new Error("Headwind device status failed: device not found")
+    const mapped = this.mapDeviceStatus(payload)
 
     return {
-      ...this.mapDeviceStatus(payload),
-      mdmDeviceId,
+      ...mapped,
+      mdmDeviceId: mapped.mdmDeviceId || mdmDeviceId,
     }
   }
 
