@@ -4,6 +4,8 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { _getDataKeys } from '@/databases/queries/data-keys';
+import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -36,6 +38,8 @@ export async function _deleteDataKeys(
         const dataKeysIds = dataKeysIdsParam;
 
         if (dataKeysIds.length) {
+            const { data: _dataKeys, } = await _getDataKeys({ dataKeysIds, });
+
             // delete drafts
             await db.delete(dataKeysDrafts).where(inArray(dataKeysDrafts.uuid, dataKeysIds));
 
@@ -55,6 +59,13 @@ export async function _deleteDataKeys(
             }));
             
             if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
+
+            if (_dataKeys.length) {
+                await _deleteReferencedDataKeyOptions({ 
+                    userId: userId || undefined, 
+                    uniqueKeys: _dataKeys.map(d => d.uniqueKey), 
+                });
+            }
         }
 
         response.success = true;
