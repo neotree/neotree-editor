@@ -90,6 +90,7 @@ function Modal({
         value: string;
     })[];
 }) {
+    console.log({ disabled })
     const [searchValue, setSearchValue] = useState('');
     const searchValueDebounced = useDebounce(searchValue);
 
