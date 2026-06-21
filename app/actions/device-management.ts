@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import logger from "@/lib/logger"
+import { hardwareSerialsMatchForReview } from "@/lib/mdm/device-matching"
+import { getProfileConfigurationScopes, remoteDeviceMatchesProfileScope } from "@/lib/mdm/profile-scope"
 import { isAllowed } from "./is-allowed"
 import {
   _getDeviceMdmLink,
@@ -33,7 +35,8 @@ import { isHeadwindApplicationRow } from "@/lib/mdm/headwind-shape"
 import { decryptSecret, encryptSecret } from "@/lib/server/secret-box"
 import { requestMdmApkRolloutForDevice } from "@/lib/app-updates/mdm-rollout"
 
-const DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE = 90
+const DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE = 95
+const MIN_MDM_AUTO_LINK_CONFIDENCE = 95
 const DEFAULT_MDM_REVIEW_MIN_CONFIDENCE = 50
 
 /** Runs an async mapper over items with a bounded number of concurrent workers (#13). */
@@ -157,6 +160,7 @@ function buildStoredSettings(
     : existingAuth.passwordEncrypted || null
   const endpointSettings = buildEndpointSettings(formData)
   const reviewMinConfidence = Number(formData.get("reviewMinConfidence") || existingSettings?.reviewMinConfidence || DEFAULT_MDM_REVIEW_MIN_CONFIDENCE)
+  const submittedSyncConfiguration = `${formData.get("syncConfigurationId") || ""}`.trim()
 
   const settings = {
     ...(existingSettings || {}),
@@ -166,6 +170,18 @@ function buildStoredSettings(
       username: serviceUsername,
       passwordEncrypted,
     }),
+  }
+  const mutableSettings = settings as Record<string, any>
+
+  if (formData.has("syncConfigurationId")) {
+    delete mutableSettings.syncConfigurationName
+    delete mutableSettings.syncConfigurationIds
+    delete mutableSettings.syncConfigurationNames
+    if (submittedSyncConfiguration && submittedSyncConfiguration !== "__all__") {
+      mutableSettings.syncConfigurationId = submittedSyncConfiguration
+    } else {
+      delete mutableSettings.syncConfigurationId
+    }
   }
 
   for (const key of ["configurationsPath", "devicesPath", "deviceStatusPath", "loginPath", "actionPaths"]) {
@@ -185,6 +201,12 @@ function getReviewMinConfidence(settings?: unknown) {
   const value = Number((settings as Record<string, any> | null)?.reviewMinConfidence || DEFAULT_MDM_REVIEW_MIN_CONFIDENCE)
   if (!Number.isFinite(value)) return DEFAULT_MDM_REVIEW_MIN_CONFIDENCE
   return Math.max(1, Math.min(100, value))
+}
+
+function getAutoLinkMinConfidence(value: unknown) {
+  const confidence = Number(value || DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE)
+  if (!Number.isFinite(confidence)) return DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE
+  return Math.max(MIN_MDM_AUTO_LINK_CONFIDENCE, Math.min(100, confidence))
 }
 
 export const getDeviceManagementOverview: typeof _getDeviceManagementOverview = async (...args) => {
@@ -403,6 +425,13 @@ async function saveMdmProviderProfile(formData: FormData) {
     const existingSettings = (existing?.data?.settings || {}) as Record<string, any>
     const apiKey = buildStoredTokenOverride(formData, existing?.data?.apiKey || null)
     const settings = buildStoredSettings(formData, existingSettings)
+    const isSharedInstance = formData.get("isSharedInstance") === "on"
+    if (isSharedInstance && !getProfileConfigurationScopes(settings).length) {
+      return {
+        success: false,
+        errors: ["Select the Headwind configuration whose devices belong to this shared profile."],
+      }
+    }
 
     const providerCapabilities = {
       deviceSync: formData.get("capability_deviceSync") === "on",
@@ -419,7 +448,7 @@ async function saveMdmProviderProfile(formData: FormData) {
       countryISO: `${formData.get("countryISO") || ""}`,
       hospitalId: `${formData.get("hospitalId") || ""}` || null,
       environment: `${formData.get("environment") || "production"}`,
-      isSharedInstance: formData.get("isSharedInstance") === "on",
+      isSharedInstance,
       baseUrl: `${formData.get("baseUrl") || ""}`,
       apiKey,
       defaultKioskPolicy: `${formData.get("defaultKioskPolicy") || ""}` || null,
@@ -428,7 +457,7 @@ async function saveMdmProviderProfile(formData: FormData) {
       isEnabled: formData.get("isEnabled") !== "off",
       autoSyncEnabled: checkboxIsOn(formData, "autoSyncEnabled", true),
       autoLinkEnabled: checkboxIsOn(formData, "autoLinkEnabled", true),
-      autoLinkMinConfidence: Number(formData.get("autoLinkMinConfidence") || DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE),
+      autoLinkMinConfidence: getAutoLinkMinConfidence(formData.get("autoLinkMinConfidence")),
     })
 
     if (result.success) {
@@ -599,12 +628,7 @@ function remoteIdentifiers(remote: any) {
       payload.customDeviceId,
       headwindNumber,
       oldHeadwindNumber,
-      payload.serialNumber,
-      payload.serial,
-      payload.androidSerial,
       info.deviceId,
-      info.serialNumber,
-      info.serial,
       payload.custom1,
       payload.custom2,
       identifiers.headwindId,
@@ -613,7 +637,6 @@ function remoteIdentifiers(remote: any) {
       identifiers.number,
       identifiers.oldNumber,
       identifiers.neotreeDeviceId,
-      identifiers.serialNumber,
       identifiers.custom1,
       identifiers.custom2,
       mdm.headwindId,
@@ -622,7 +645,6 @@ function remoteIdentifiers(remote: any) {
       mdm.headwindNumber,
       mdm.oldDeviceNumber,
       mdm.oldNumber,
-      mdm.serialNumber,
       mdm.custom1,
       mdm.custom2,
       custom.deviceId,
@@ -728,6 +750,13 @@ function scoreMdmDeviceMatch(remote: any, device: any, appState?: any | null) {
   if (remoteIds.oldHeadwindNumber && localIds.mdmOldDeviceNumber && remoteIds.oldHeadwindNumber === localIds.mdmOldDeviceNumber) {
     score = Math.max(score, 98)
     reasons.push("Previous Headwind device number matched NeoTree-reported previous MDM device number")
+  }
+  // Serial values are useful corroboration but are not safe automatic identity:
+  // Android/OEM builds can expose placeholders or duplicated serials. Keep a
+  // valid equality in the human-review range, below every auto-link threshold.
+  if (hardwareSerialsMatchForReview(remoteIds.serialNumber, localIds.serialNumber)) {
+    score = Math.max(score, 70)
+    reasons.push("Hardware serial number matched (review required)")
   }
   if (remoteIds.customValues.includes(localIds.deviceId)) {
     score = Math.max(score, 100)
@@ -853,38 +882,15 @@ async function stampMdmIdentityForLink({
   }
 }
 
-function getProfileConfigurationScopes(profile: { defaultKioskPolicy?: string | null; settings?: unknown }) {
-  const settings = (profile.settings || {}) as Record<string, any>
-  return uniqueIdentifiers([
-    profile.defaultKioskPolicy,
-    settings.syncConfigurationId,
-    settings.syncConfigurationName,
-    ...(Array.isArray(settings.syncConfigurationIds) ? settings.syncConfigurationIds : []),
-    ...(Array.isArray(settings.syncConfigurationNames) ? settings.syncConfigurationNames : []),
-  ])
-}
-
-function remoteDeviceMatchesProfileScope(remote: { mdmConfigId?: string | null; mdmConfigName?: string | null; payload?: Record<string, any> }, scopes: string[]) {
-  if (!scopes.length) return true
-  const payload = remote.payload || {}
-  const config = (payload.configuration || payload.config || {}) as Record<string, any>
-  const values = uniqueIdentifiers([
-    remote.mdmConfigId,
-    remote.mdmConfigName,
-    payload.configurationId,
-    payload.configId,
-    payload.configurationName,
-    payload.configName,
-    config.id,
-    config.name,
-  ])
-  return values.some((value) => scopes.includes(value))
-}
-
 async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnType<typeof _getMdmProviderProfile>>["data"]>) {
   const provider = createProviderFromProfile(profile)
   const allRemoteDevices = await provider.syncDevices()
-  const profileScopes = getProfileConfigurationScopes(profile)
+  // Default kiosk assignment and inventory ownership are separate concerns.
+  // Shared tenants must explicitly identify the configuration this profile owns.
+  const profileScopes = getProfileConfigurationScopes(profile.settings)
+  if (profile.isSharedInstance && !profileScopes.length) {
+    throw new Error("Shared MDM profiles require an explicit Headwind configuration scope before devices can be synchronized")
+  }
   const applicationRowsFromProvider = allRemoteDevices.filter((remote) => isHeadwindApplicationRow(remote.payload || remote))
   const actualRemoteDevices = allRemoteDevices.filter((remote) => !isHeadwindApplicationRow(remote.payload || remote))
   const remoteDevices = actualRemoteDevices
@@ -916,7 +922,7 @@ async function reconcileMdmProfileDevices(profile: NonNullable<Awaited<ReturnTyp
       if (!linksByMdmDeviceId.has(key)) linksByMdmDeviceId.set(key, link)
     }
   }
-  const minConfidence = profile.autoLinkMinConfidence || DEFAULT_MDM_AUTO_LINK_MIN_CONFIDENCE
+  const minConfidence = getAutoLinkMinConfidence(profile.autoLinkMinConfidence)
   const reviewMinConfidence = getReviewMinConfidence(profile.settings)
   const autoLinkEnabled = profile.autoLinkEnabled !== false
   const summary = {

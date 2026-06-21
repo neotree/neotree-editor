@@ -767,7 +767,7 @@ export const apkReleases = pgTable("nt_apk_releases", {
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   deletedAt: timestamp("deleted_at"),
 }, (table) => ({
-  uniqueVersionPerRuntime: uniqueIndex("apk_release_unique_version").on(table.runtimeVersion, table.versionCode),
+  uniqueVersionCode: uniqueIndex("apk_release_unique_version").on(table.versionCode),
   statusIndex: index("apk_release_status_index").on(table.status),
 }))
 

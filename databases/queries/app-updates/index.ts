@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, count, isNull, isNotNull } from "drizzle-orm";
 import db from "@/databases/pg/drizzle";
 import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts, deviceMdmLinks } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { deviceBelongsToMdmGroup, getMdmGroupIds } from "@/lib/mdm/group-membership";
 
 export type AppUpdatePolicy = (typeof appUpdatePolicies.$inferSelect) & {
     currentApkRelease?: (typeof apkReleases.$inferSelect) | null;
@@ -27,6 +28,7 @@ async function resolveDeviceTargeting(params: {
     let hospitalId = params.hospitalId || null;
     let countryISO = params.countryISO || null;
     let mdmGroupId: string | null = null;
+    let mdmGroupIds: string[] = [];
 
     if (params.deviceId) {
         try {
@@ -38,13 +40,14 @@ async function resolveDeviceTargeting(params: {
                 hospitalId = hospitalId || link.hospitalId || null;
                 countryISO = countryISO || link.countryISO || null;
                 mdmGroupId = link.mdmGroupId || null;
+                mdmGroupIds = getMdmGroupIds(link);
             }
         } catch (e: any) {
             logger.error("resolveDeviceTargeting ERROR", e.message);
         }
     }
 
-    return { hospitalId, countryISO, mdmGroupId };
+    return { hospitalId, countryISO, mdmGroupId, mdmGroupIds };
 }
 
 /**
@@ -55,7 +58,7 @@ async function resolveDeviceTargeting(params: {
  */
 function scorePolicyForDevice(
     policy: typeof appUpdatePolicies.$inferSelect,
-    targeting: { hospitalId: string | null; mdmGroupId: string | null; countryISO: string | null },
+    targeting: { hospitalId: string | null; mdmGroupId: string | null; mdmGroupIds: string[]; countryISO: string | null },
 ): number | null {
     // Country gate (#3): if the policy is pinned to a country and we know the
     // device's country, they must match. Unknown device country = lenient (don't
@@ -73,7 +76,10 @@ function scorePolicyForDevice(
     }
     if (scope === "group") {
         if (!policy.targetGroupId) return null;
-        return policy.targetGroupId === targeting.mdmGroupId ? 80 : null;
+        return deviceBelongsToMdmGroup({
+            mdmGroupId: targeting.mdmGroupId,
+            deviceCapabilities: { groups: { ids: targeting.mdmGroupIds } },
+        }, policy.targetGroupId) ? 80 : null;
     }
     // country / default scope applies to everyone.
     return 10;
