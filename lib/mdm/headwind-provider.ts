@@ -174,11 +174,28 @@ export class HeadwindMdmProvider implements MdmProvider {
     return { enrollmentStatus, managementState }
   }
 
+  /** Headwind's device `info` arrives as a JSON string; parse it defensively. */
+  private parseDeviceInfo(raw: unknown): Record<string, any> {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, any>
+    if (typeof raw === "string" && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  }
+
   private mapDeviceStatus(item: any): MdmDeviceStatus {
     const lastSeenRaw = item?.lastUpdate || item?.lastSeen || item?.lastLogin || null
     const lastSeenMs = lastSeenRaw ? new Date(lastSeenRaw).getTime() : NaN
     const { enrollmentStatus, managementState } = this.deriveDeviceState(item, lastSeenMs)
-    const info = item?.info || {}
+    // Headwind serialises the device DTO with `info` as a JSON STRING (the
+    // DeviceInfo blob: serial, imei, custom1..3, etc.), not a nested object. Parse
+    // it so the info-level fallbacks below are actually live instead of dead code.
+    const info = this.parseDeviceInfo(item?.info)
     const headwindId = item?.id != null ? `${item.id}` : null
     const headwindNumber = item?.number || info?.deviceId || null
     const oldHeadwindNumber = item?.oldNumber || info?.oldNumber || null
@@ -186,6 +203,35 @@ export class HeadwindMdmProvider implements MdmProvider {
     const custom1 = item?.custom1 || info?.custom1 || null
     const custom2 = item?.custom2 || info?.custom2 || null
     const custom3 = item?.custom3 || info?.custom3 || null
+    // Headwind returns group membership as a LIST (`groups: [{ id, name }]`), not a
+    // scalar groupId. Without reading the list the link's mdmGroupId/Name stay null,
+    // which silently breaks group-targeted APK rollout policies (#group-target).
+    const groups = (Array.isArray(item?.groups) ? item.groups : [])
+      .filter((group: any) => group && (group.id != null || group.name))
+      .map((group: any) => ({
+        id: group.id != null ? `${group.id}` : null,
+        name: group.name ? `${group.name}` : null,
+      }))
+      .sort((left: any, right: any) => `${left.id || left.name || ""}`.localeCompare(`${right.id || right.name || ""}`))
+    const scalarGroup = item?.groupId != null || item?.deviceGroupId != null || item?.groupName || item?.deviceGroupName || item?.group?.name
+      ? {
+          id: item?.groupId != null ? `${item.groupId}` : item?.deviceGroupId != null ? `${item.deviceGroupId}` : null,
+          name: item?.groupName || item?.deviceGroupName || item?.group?.name || null,
+        }
+      : null
+    const memberships = [scalarGroup, ...groups]
+      .filter(Boolean)
+      .filter((group: any, index, values) => values.findIndex((candidate: any) =>
+        `${candidate?.id || ""}` === `${group?.id || ""}` && `${candidate?.name || ""}` === `${group?.name || ""}`,
+      ) === index)
+    const primaryGroup = scalarGroup || memberships[0] || null
+    const headwindGroupIds = Array.from(new Set(memberships.map((group: any) => group?.id).filter(Boolean))) as string[]
+    const headwindGroupNames = Array.from(new Set(memberships.map((group: any) => group?.name).filter(Boolean))) as string[]
+    const headwindGroupId =
+      item?.groupId != null ? `${item.groupId}` :
+      item?.deviceGroupId != null ? `${item.deviceGroupId}` :
+      primaryGroup?.id != null ? `${primaryGroup.id}` : null
+    const headwindGroupName = item?.groupName || item?.deviceGroupName || item?.group?.name || primaryGroup?.name || null
 
     return {
       deviceId: item?.neotreeDeviceId || item?.customDeviceId || info?.neotreeDeviceId || null,
@@ -194,8 +240,10 @@ export class HeadwindMdmProvider implements MdmProvider {
       mdmDeviceId: headwindNumber || headwindId || null,
       mdmConfigId: item?.configurationId != null ? `${item.configurationId}` : item?.configId != null ? `${item.configId}` : null,
       mdmConfigName: item?.configurationName || item?.configName || item?.configuration?.name || null,
-      mdmGroupId: item?.groupId != null ? `${item.groupId}` : item?.deviceGroupId != null ? `${item.deviceGroupId}` : null,
-      mdmGroupName: item?.groupName || item?.deviceGroupName || item?.group?.name || null,
+      mdmGroupId: headwindGroupId,
+      mdmGroupName: headwindGroupName,
+      mdmGroupIds: headwindGroupIds,
+      mdmGroupNames: headwindGroupNames,
       enrollmentStatus,
       managementState,
       serialNumber,
@@ -231,6 +279,11 @@ export class HeadwindMdmProvider implements MdmProvider {
           managed: item?.mdmMode ?? info?.mdmMode ?? managementState === "managed",
           kiosk: item?.kioskMode ?? info?.kioskMode ?? null,
           serverDeviceId: info?.deviceId || null,
+        },
+        groups: {
+          ids: headwindGroupIds,
+          names: headwindGroupNames,
+          memberships,
         },
       },
       lastMdmSeenAt: lastSeenRaw,

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log";
 import logger from "@/lib/logger";
@@ -85,14 +85,20 @@ export async function _publishApkReleases(opts?: {
                     checksumSha256: fileMeta?.apkChecksumSha256 ?? null,
                     signatureSha256: fileMeta?.apkSignatureSha256 ?? null,
                 });
-                const existing = await executor.query.apkReleases.findFirst({
-                    where: eq(apkReleases.apkReleaseId, apkReleaseId),
-                }) || await executor.query.apkReleases.findFirst({
-                    where: and(
-                        eq(apkReleases.runtimeVersion, `${normalized.runtimeVersion || ""}`.trim()),
-                        eq(apkReleases.versionCode, Number(normalized.versionCode || 0)),
-                    ),
+                const releasesWithVersionCode = await executor.query.apkReleases.findMany({
+                    where: eq(apkReleases.versionCode, Number(normalized.versionCode || 0)),
                 });
+                if (releasesWithVersionCode.length > 1) {
+                    throw new Error(`Android version code ${normalized.versionCode} belongs to multiple historical releases. Resolve the duplicate releases before publishing.`);
+                }
+                const existingById = await executor.query.apkReleases.findFirst({
+                    where: eq(apkReleases.apkReleaseId, apkReleaseId),
+                });
+                const existingByVersionCode = releasesWithVersionCode[0] || null;
+                if (existingById && existingByVersionCode && existingById.apkReleaseId !== existingByVersionCode.apkReleaseId) {
+                    throw new Error(`Android version code ${normalized.versionCode} already belongs to ${existingByVersionCode.versionName}. Choose a new APK build.`);
+                }
+                const existing = existingById || existingByVersionCode;
 
                 const resolvedApkReleaseId = existing?.apkReleaseId || apkReleaseId;
                 const payload = sanitizeApkReleaseWritePayload(withServerManagedReleaseDates({

@@ -7,6 +7,8 @@ export type MdmDeviceStatus = {
   mdmConfigName?: string | null
   mdmGroupId?: string | null
   mdmGroupName?: string | null
+  mdmGroupIds?: string[]
+  mdmGroupNames?: string[]
   enrollmentStatus: "pending" | "enrolled" | "unenrolled" | "failed" | "unknown"
   managementState: "managed" | "unmanaged" | "unknown"
   serialNumber?: string | null

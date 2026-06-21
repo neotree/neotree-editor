@@ -88,6 +88,22 @@ export function DeviceManagementProfileForm({
   const actionPaths = (settings.actionPaths || {}) as Record<string, any>;
   const serviceAuth = (settings.serviceAuth || {}) as Record<string, any>;
   const reviewMinConfidence = `${settings.reviewMinConfidence || 50}`;
+  const savedSyncConfiguration = `${
+    settings.syncConfigurationId ||
+    settings.syncConfigurationName ||
+    (Array.isArray(settings.syncConfigurationIds) ? settings.syncConfigurationIds[0] : "") ||
+    (Array.isArray(settings.syncConfigurationNames) ? settings.syncConfigurationNames[0] : "") ||
+    "__all__"
+  }`;
+  const initialSyncConfiguration = kioskOptions.find((option) =>
+    option.id === savedSyncConfiguration || option.name === savedSyncConfiguration,
+  )?.id || savedSyncConfiguration;
+  const [isSharedInstance, setIsSharedInstance] = useState(!!profile?.isSharedInstance);
+  const [selectedSyncConfiguration, setSelectedSyncConfiguration] = useState(initialSyncConfiguration);
+  const configurationOptions = Array.from(new Map([
+    ...kioskOptions,
+    ...(testResult?.success ? testResult.configurations : []),
+  ].map((configuration) => [configuration.id, configuration])).values());
   const isBusy = isTesting || isPending;
 
   async function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
@@ -108,10 +124,15 @@ export function DeviceManagementProfileForm({
 
   function savePendingProfile() {
     if (!pendingFormData) return;
+    if (pendingFormData.get("isSharedInstance") === "on" && (!selectedSyncConfiguration || selectedSyncConfiguration === "__all__")) {
+      setSaveError("Select the Headwind configuration whose devices belong to this shared profile.");
+      return;
+    }
     if (!testResult?.success && !saveAnywayReason.trim()) {
       setSaveError("Please add a reason before saving an unverified Headwind profile.");
       return;
     }
+    pendingFormData.set("syncConfigurationId", selectedSyncConfiguration || "__all__");
     pendingFormData.set("saveAnywayReason", saveAnywayReason.trim());
     startTransition(async () => {
       const result = await saveMdmProviderProfileDraft(pendingFormData);
@@ -204,7 +225,8 @@ export function DeviceManagementProfileForm({
             id="mdm-shared-instance"
             name="isSharedInstance"
             type="checkbox"
-            defaultChecked={!!profile?.isSharedInstance}
+            checked={isSharedInstance}
+            onChange={(event) => setIsSharedInstance(event.target.checked)}
             className="h-4 w-4 rounded border-input"
           />
           <Label htmlFor="mdm-shared-instance">Shared MDM instance</Label>
@@ -264,6 +286,33 @@ export function DeviceManagementProfileForm({
           ) : (
             <p className="text-xs text-muted-foreground">Save the Headwind URL and service credentials, then test the connection to load configurations.</p>
           )}
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="mdm-sync-configuration">Devices included in this profile</Label>
+          <Select
+            name="syncConfigurationId"
+            value={selectedSyncConfiguration}
+            onValueChange={setSelectedSyncConfiguration}
+          >
+            <SelectTrigger id="mdm-sync-configuration">
+              <SelectValue placeholder="Select Headwind configuration" />
+            </SelectTrigger>
+            <SelectContent>
+              {!isSharedInstance ? (
+                <SelectItem value="__all__">All configurations on this dedicated instance</SelectItem>
+              ) : null}
+              {configurationOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {isSharedInstance
+              ? "Required for shared instances so this country only imports its own tablets."
+              : "Dedicated instances may synchronize every Headwind configuration."}
+          </p>
         </div>
       </div>
 
@@ -453,15 +502,29 @@ export function DeviceManagementProfileForm({
               <div className="space-y-3">
                 <p>{testResult?.message || "Connection test did not return a result."}</p>
                 {testResult?.success ? (
-                  <div className="rounded-md border bg-primary/5 p-3 text-sm text-foreground">
-                    <div className="font-medium">Ready to save</div>
-                    <div className="mt-1 text-muted-foreground">
-                      {testResult.configurations.length} Headwind configuration{testResult.configurations.length === 1 ? "" : "s"} found.
+                  <div className="space-y-3">
+                    <div className="rounded-md border bg-primary/5 p-3 text-sm text-foreground">
+                      <div className="font-medium">Ready to save</div>
+                      <div className="mt-1 text-muted-foreground">
+                        {testResult.configurations.length} Headwind configuration{testResult.configurations.length === 1 ? "" : "s"} found.
+                      </div>
                     </div>
-                    {testResult.configurations.length ? (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        {testResult.configurations.slice(0, 5).map((configuration) => configuration.name).join(", ")}
-                        {testResult.configurations.length > 5 ? "..." : ""}
+                    {isSharedInstance ? (
+                      <div className="space-y-1 text-foreground">
+                        <Label htmlFor="review-sync-configuration">Devices included in this profile</Label>
+                        <Select value={selectedSyncConfiguration} onValueChange={setSelectedSyncConfiguration}>
+                          <SelectTrigger id="review-sync-configuration">
+                            <SelectValue placeholder="Select Headwind configuration" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {configurationOptions.map((configuration) => (
+                              <SelectItem key={configuration.id} value={configuration.id}>
+                                {configuration.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Only devices in this configuration will be synchronized.</p>
                       </div>
                     ) : null}
                   </div>
