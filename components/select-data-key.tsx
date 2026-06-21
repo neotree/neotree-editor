@@ -57,6 +57,7 @@ export function SelectDataKey({
     return (
         <>
             <SelectModal 
+                disabled={disabled}
                 multiple={multiple}
                 modal={modal}
                 error={error}
