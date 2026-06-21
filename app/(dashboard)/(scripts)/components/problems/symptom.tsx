@@ -83,6 +83,8 @@ export function Symptom<P = {}>({
         setOpen(false);
     });
 
+    const isKeyDisabled = disabled || !!symptom;
+
     return (
         <>
             <Modal
@@ -147,7 +149,7 @@ export function Symptom<P = {}>({
                                         <Label htmlFor="key" error={!disabled && !value}>Key *</Label>
                                         <SelectDataKey
                                             value={`${value || ''}`}
-                                            disabled={false}
+                                            disabled={isKeyDisabled}
                                             onChange={([item]) => {
                                                 onChange(item.name);
                                                 setValue('name', item?.label, { shouldDirty: true, });
@@ -163,7 +165,7 @@ export function Symptom<P = {}>({
                     <div>
                         <Label error={!disabled && !name} htmlFor="name">Name *</Label>
                         <Input
-                            {...register('name', { disabled, required: true, })}
+                            {...register('name', { disabled: isKeyDisabled, required: true, })}
                             name="name"
                             error={!disabled && !name}
                         />
