@@ -121,7 +121,7 @@ export async function _getDataKeysRefs({
             ..._screens,
         ];
 
-        function extractDataKeys<T>(o: object, parentKey?: string) {
+        const extractDataKeys = (o: object, parentKey?: string) => {
             let dataKeys: typeof defaultResData[0]['dataKeys'] = [];
 
             if (!o || (typeof o !== 'object')) return dataKeys;
@@ -157,7 +157,7 @@ export async function _getDataKeysRefs({
             }
 
             return dataKeys;
-        }
+        };
 
         const diagnosesDataKeys: typeof defaultResData = diagnoses.map(s => ({
             data: s,
