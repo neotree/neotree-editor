@@ -74,6 +74,13 @@ type PolicyFormState = {
   apkAutoDownload: boolean;
   apkDeliveryMode: string;
   apkForceInstall: boolean;
+  apkWifiOnly: boolean;
+  apkRolloutPercentage: number;
+  apkRolloutHalted: boolean;
+  apkRolloutHaltedReason?: string | null;
+  apkHealthCheckHours: number;
+  apkAutoHaltThresholdPercent: number;
+  apkAutoHaltMinDevices: number;
   apkGracePeriodHours?: number | null;
   apkForceAfter?: string | null;
   apkInstallWindow: string;
@@ -96,6 +103,13 @@ const defaultPolicy = (): PolicyFormState => ({
   apkAutoDownload: true,
   apkDeliveryMode: "in_app",
   apkForceInstall: false,
+  apkWifiOnly: false,
+  apkRolloutPercentage: 100,
+  apkRolloutHalted: false,
+  apkRolloutHaltedReason: null,
+  apkHealthCheckHours: 24,
+  apkAutoHaltThresholdPercent: 25,
+  apkAutoHaltMinDevices: 5,
   apkGracePeriodHours: null,
   apkForceAfter: null,
   apkInstallWindow: "on_restart",
@@ -524,6 +538,15 @@ export function AppUpdatePolicyForm({
               />
               <Label>Auto-download APK</Label>
             </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={policyForm.apkWifiOnly}
+                onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkWifiOnly: checked }))}
+                disabled={editingDisabled || policyForm.apkDeliveryMode === "mdm" || policyForm.apkDeliveryMode === "manual"}
+              />
+              <Label>Download over Wi-Fi only</Label>
+            </div>
           </div>
 
           <details className="mt-6 rounded-md border p-4">
@@ -566,6 +589,65 @@ export function AppUpdatePolicyForm({
                   disabled={editingDisabled}
                 />
                 <Label>Force install APK</Label>
+              </div>
+
+              <div>
+                <Label>Canary rollout (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={policyForm.apkRolloutPercentage ?? 100}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkRolloutPercentage: Math.min(100, Math.max(0, Number(e.target.value || 0))) }))}
+                  disabled={editingDisabled}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Percent of eligible devices served this release. Ramp up gradually; the rest stay on their version.</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={policyForm.apkRolloutHalted}
+                  onCheckedChange={(checked) => setPolicyForm((prev) => ({ ...prev, apkRolloutHalted: checked, apkRolloutHaltedReason: checked ? prev.apkRolloutHaltedReason : null }))}
+                  disabled={editingDisabled}
+                />
+                <Label>Rollout halted{policyForm.apkRolloutHaltedReason ? ` — ${policyForm.apkRolloutHaltedReason}` : ""}</Label>
+              </div>
+
+              <div>
+                <Label>Health check window (hours)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={policyForm.apkHealthCheckHours ?? 24}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkHealthCheckHours: Math.max(1, Number(e.target.value || 24)) }))}
+                  disabled={editingDisabled}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">How long after install to confirm a device is running the new build before it counts as failed.</p>
+              </div>
+
+              <div>
+                <Label>Auto-halt failure threshold (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={policyForm.apkAutoHaltThresholdPercent ?? 25}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkAutoHaltThresholdPercent: Math.min(100, Math.max(0, Number(e.target.value || 0))) }))}
+                  disabled={editingDisabled}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Freeze the rollout automatically when this share of reporting devices fail to install.</p>
+              </div>
+
+              <div>
+                <Label>Auto-halt minimum devices</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={policyForm.apkAutoHaltMinDevices ?? 5}
+                  onChange={(e) => setPolicyForm((prev) => ({ ...prev, apkAutoHaltMinDevices: Math.max(1, Number(e.target.value || 1)) }))}
+                  disabled={editingDisabled}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Minimum reporting devices before auto-halt can trigger (avoids halting on a tiny sample).</p>
               </div>
 
               <div className="flex items-center gap-3">

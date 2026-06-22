@@ -6,13 +6,16 @@ import { useFormStatus } from "react-dom";
 import {
     EditIcon,
     EyeIcon,
+    KeyRoundIcon,
     Loader2Icon,
     LockIcon,
     MoreVertical,
     PackageIcon,
+    PowerIcon,
     RefreshCwIcon,
     Trash2Icon,
     UnlinkIcon,
+    UnlockIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -99,14 +102,73 @@ function ActionSubmitButton({
     );
 }
 
+type RemoteCommand = "lock" | "unlock" | "wipe" | "reboot" | "resetPassword";
+
+// Maps each command to the provider capability that must be enabled on the device's
+// MDM profile. When `capabilities` is supplied we hide actions that are not enabled,
+// matching the server-side default-deny gating in runDeviceMdmRemoteActionFromForm.
+const COMMAND_CAPABILITY: Record<RemoteCommand, string> = {
+    lock: "remoteLock",
+    unlock: "remoteLock",
+    wipe: "remoteWipe",
+    reboot: "reboot",
+    resetPassword: "resetPassword",
+};
+
+const COMMAND_COPY: Record<
+    RemoteCommand,
+    { title: string; description: string; cta: string; pending: string; reasonPlaceholder: string; destructive?: boolean }
+> = {
+    lock: {
+        title: "Lock device?",
+        description: "Headwind will lock the device when it next receives the command.",
+        cta: "Lock device",
+        pending: "Locking...",
+        reasonPlaceholder: "Tablet reported missing",
+    },
+    unlock: {
+        title: "Unlock device?",
+        description: "Headwind will remove the remote device lock when it next receives the command.",
+        cta: "Unlock device",
+        pending: "Unlocking...",
+        reasonPlaceholder: "Tablet recovered and identity confirmed",
+    },
+    wipe: {
+        title: "Factory reset device?",
+        description:
+            "Headwind will factory reset (wipe) the device when it next receives the command. This deletes Headwind MDM and all data; the device must be re-enrolled. Use only for a confirmed loss or breach.",
+        cta: "Factory reset",
+        pending: "Requesting reset...",
+        reasonPlaceholder: "Stolen device or confirmed breach",
+        destructive: true,
+    },
+    reboot: {
+        title: "Reboot device?",
+        description: "Headwind will reboot the device when it next receives the command.",
+        cta: "Reboot device",
+        pending: "Requesting reboot...",
+        reasonPlaceholder: "Clear a stuck tablet",
+    },
+    resetPassword: {
+        title: "Reset device password?",
+        description:
+            "Headwind will set (or clear) the device screen-lock password when it next receives the command. Leave the password blank to clear it.",
+        cta: "Reset password",
+        pending: "Requesting reset...",
+        reasonPlaceholder: "Staff locked out of tablet",
+    },
+};
+
 export function DeviceManagementRowActions({
     editHref,
     linkId,
     profileId,
+    capabilities,
 }: {
     editHref: string;
     linkId?: string | null;
     profileId?: string | null;
+    capabilities?: Record<string, any> | null;
 }) {
     const { viewOnly } = useAppContext();
     const router = useRouter();
@@ -115,10 +177,18 @@ export function DeviceManagementRowActions({
     const [unlinkOpen, setUnlinkOpen] = useState(false);
     const [syncOpen, setSyncOpen] = useState(false);
     const [pushApkOpen, setPushApkOpen] = useState(false);
-    const [remoteAction, setRemoteAction] = useState<"lock" | "wipe" | null>(
-        null,
-    );
+    const [remoteAction, setRemoteAction] = useState<RemoteCommand | null>(null);
     const [reason, setReason] = useState("");
+    const [password, setPassword] = useState("");
+
+    // When capabilities are known, only offer enabled commands; otherwise show all
+    // (the server still enforces the capability and rejects disabled commands).
+    const can = (command: RemoteCommand) => !capabilities || !!capabilities[COMMAND_CAPABILITY[command]];
+    const openRemote = (command: RemoteCommand) => {
+        setReason("");
+        setPassword("");
+        setRemoteAction(command);
+    };
 
     function syncProfileDevices() {
         if (!profileId) return;
@@ -147,6 +217,46 @@ export function DeviceManagementRowActions({
                     message: escapeHtml(result.errors?.[0] || "Could not sync Headwind devices"),
                 });
             }
+        });
+    }
+
+    async function submitRemoteAction(formData: FormData) {
+        const response = await runDeviceMdmRemoteActionFromForm(formData);
+        router.refresh();
+
+        if (!response.success || !response.result) {
+            alert({
+                title: "Remote action failed",
+                variant: "error",
+                buttonLabel: "Ok",
+                message: escapeHtml(response.errors?.[0] || "Headwind did not accept the remote action"),
+            });
+            return;
+        }
+
+        setRemoteAction(null);
+        const result = response.result;
+        const state = result.state;
+        const reportedState = response.action === "lock" && state?.deviceLocked === true
+            ? "Headwind reports the device as locked."
+            : response.action === "unlock" && state?.deviceLocked === false
+                ? "Headwind reports the device as unlocked."
+                : "The command was accepted and will be applied when the device checks in.";
+        const actionName = COMMAND_COPY[response.action].cta;
+        const details = [
+            result.providerStatus ? `Provider status: ${escapeHtml(result.providerStatus)}.` : "",
+            result.providerActionId ? `Request ID: ${escapeHtml(result.providerActionId)}.` : "",
+        ].filter(Boolean).join(" ");
+
+        alert({
+            title: `${actionName} requested`,
+            variant: "success",
+            buttonLabel: "Ok",
+            message: `
+                <p>${escapeHtml(result.message || `${actionName} was accepted by Headwind.`)}</p>
+                <p>${escapeHtml(reportedState)}</p>
+                ${details ? `<p>${details}</p>` : ""}
+            `,
         });
     }
 
@@ -194,26 +304,58 @@ export function DeviceManagementRowActions({
                                 <PackageIcon className="h-4 w-4 mr-2" /> Push
                                 APK
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={(event) => {
-                                    event.preventDefault();
-                                    setReason("");
-                                    setRemoteAction("lock");
-                                }}
-                            >
-                                <LockIcon className="h-4 w-4 mr-2" /> Request
-                                lock
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={(event) => {
-                                    event.preventDefault();
-                                    setReason("");
-                                    setRemoteAction("wipe");
-                                }}
-                            >
-                                <Trash2Icon className="h-4 w-4 mr-2" /> Request
-                                wipe
-                            </DropdownMenuItem>
+                            {can("lock") ? (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        openRemote("lock");
+                                    }}
+                                >
+                                    <LockIcon className="h-4 w-4 mr-2" /> Lock
+                                </DropdownMenuItem>
+                            ) : null}
+                            {can("unlock") ? (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        openRemote("unlock");
+                                    }}
+                                >
+                                    <UnlockIcon className="h-4 w-4 mr-2" /> Unlock
+                                </DropdownMenuItem>
+                            ) : null}
+                            {can("reboot") ? (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        openRemote("reboot");
+                                    }}
+                                >
+                                    <PowerIcon className="h-4 w-4 mr-2" /> Reboot
+                                </DropdownMenuItem>
+                            ) : null}
+                            {can("resetPassword") ? (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        openRemote("resetPassword");
+                                    }}
+                                >
+                                    <KeyRoundIcon className="h-4 w-4 mr-2" /> Reset
+                                    password
+                                </DropdownMenuItem>
+                            ) : null}
+                            {can("wipe") ? (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        openRemote("wipe");
+                                    }}
+                                >
+                                    <Trash2Icon className="h-4 w-4 mr-2" /> Factory
+                                    reset
+                                </DropdownMenuItem>
+                            ) : null}
                         </>
                     ) : null}
                     {linkId && !viewOnly ? (
@@ -385,18 +527,14 @@ export function DeviceManagementRowActions({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            {remoteAction === "wipe"
-                                ? "Request remote wipe?"
-                                : "Request remote lock?"}
+                            {remoteAction ? COMMAND_COPY[remoteAction].title : ""}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {remoteAction === "wipe"
-                                ? "This asks Headwind to wipe the device when it next receives the command. Use only for serious security incidents."
-                                : "This asks Headwind to lock the device when it next receives the command."}
+                            {remoteAction ? COMMAND_COPY[remoteAction].description : ""}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <form
-                        action={runDeviceMdmRemoteActionFromForm}
+                        action={submitRemoteAction}
                         className="space-y-4"
                     >
                         <input
@@ -410,6 +548,9 @@ export function DeviceManagementRowActions({
                             value={remoteAction || ""}
                         />
                         <input type="hidden" name="reason" value={reason} />
+                        {remoteAction === "resetPassword" ? (
+                            <input type="hidden" name="password" value={password} />
+                        ) : null}
                         <div className="space-y-1">
                             <Label htmlFor="remote-action-reason">Reason</Label>
                             <Input
@@ -419,34 +560,44 @@ export function DeviceManagementRowActions({
                                     setReason(event.target.value)
                                 }
                                 placeholder={
-                                    remoteAction === "wipe"
-                                        ? "Stolen device or confirmed breach"
-                                        : "Tablet reported missing"
+                                    remoteAction ? COMMAND_COPY[remoteAction].reasonPlaceholder : ""
                                 }
                                 required
                             />
                         </div>
+                        {remoteAction === "resetPassword" ? (
+                            <div className="space-y-1">
+                                <Label htmlFor="remote-action-password">
+                                    New password (leave blank to clear)
+                                </Label>
+                                <Input
+                                    id="remote-action-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={password}
+                                    onChange={(event) =>
+                                        setPassword(event.target.value)
+                                    }
+                                    placeholder="Blank clears the screen-lock password"
+                                />
+                            </div>
+                        ) : null}
                         <AlertDialogFooter>
                             <AlertDialogCancel type="button">
                                 Cancel
                             </AlertDialogCancel>
                             <ActionSubmitButton
                                 variant={
-                                    remoteAction === "wipe"
+                                    remoteAction && COMMAND_COPY[remoteAction].destructive
                                         ? "destructive"
                                         : "default"
                                 }
                                 disabled={!reason.trim()}
                                 pendingLabel={
-                                    remoteAction === "wipe"
-                                        ? "Requesting wipe..."
-                                        : "Requesting lock..."
+                                    remoteAction ? COMMAND_COPY[remoteAction].pending : ""
                                 }
-                                onComplete={() => setRemoteAction(null)}
                             >
-                                {remoteAction === "wipe"
-                                    ? "Request wipe"
-                                    : "Request lock"}
+                                {remoteAction ? COMMAND_COPY[remoteAction].cta : ""}
                             </ActionSubmitButton>
                         </AlertDialogFooter>
                     </form>

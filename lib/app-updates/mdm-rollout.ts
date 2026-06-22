@@ -7,6 +7,7 @@ import { decryptSecret } from "@/lib/server/secret-box"
 import { getAppUrl } from "@/lib/urls"
 import { createApkDownloadToken } from "@/lib/app-updates/download-token"
 import logger from "@/lib/logger"
+import { deviceBelongsToMdmGroup } from "@/lib/mdm/group-membership"
 
 type Policy = typeof appUpdatePolicies.$inferSelect
 type Link = typeof deviceMdmLinks.$inferSelect
@@ -36,7 +37,7 @@ function createProviderFromProfile(profile: typeof mdmProviderProfiles.$inferSel
 
 function policyMatchesLink(policy: Policy, link: Link) {
   if (policy.targetScope === "country" && policy.targetCountryISO) return policy.targetCountryISO === link.countryISO
-  if (policy.targetScope === "group") return !!policy.targetGroupId && policy.targetGroupId === link.mdmGroupId
+  if (policy.targetScope === "group") return deviceBelongsToMdmGroup(link, policy.targetGroupId)
   if (policy.targetScope === "hospital") return !!policy.targetHospitalId && policy.targetHospitalId === link.hospitalId
   return true
 }
