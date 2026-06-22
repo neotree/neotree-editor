@@ -767,7 +767,7 @@ export const apkReleases = pgTable("nt_apk_releases", {
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   deletedAt: timestamp("deleted_at"),
 }, (table) => ({
-  uniqueVersionPerRuntime: uniqueIndex("apk_release_unique_version").on(table.runtimeVersion, table.versionCode),
+  uniqueVersionCode: uniqueIndex("apk_release_unique_version").on(table.versionCode),
   statusIndex: index("apk_release_status_index").on(table.status),
 }))
 
@@ -832,6 +832,24 @@ export const appUpdatePolicies = pgTable("nt_app_update_policies", {
 
   apkMessageTitle: text("apk_message_title").default(""),
   apkMessageBody: text("apk_message_body").default(""),
+
+  // Fleet data-cost control: when true, tablets only auto-download the APK over an
+  // unmetered (Wi-Fi/Ethernet) connection. Enforced client-side by the background
+  // download controller; the device still receives the policy on any network.
+  apkWifiOnly: boolean("apk_wifi_only").default(false).notNull(),
+
+  // Staged canary rollout. `apk_rollout_percentage` (0-100) deterministically gates
+  // what fraction of eligible devices are served the current release; the rest stay
+  // on their version until the percentage is ramped. `apk_rollout_halted` freezes the
+  // rollout (no device is served the current release) — set manually or automatically
+  // when post-install health regresses past the auto-halt thresholds below.
+  apkRolloutPercentage: integer("apk_rollout_percentage").default(100).notNull(),
+  apkRolloutHalted: boolean("apk_rollout_halted").default(false).notNull(),
+  apkRolloutHaltedReason: text("apk_rollout_halted_reason"),
+  // Post-install health / auto-halt tuning.
+  apkHealthCheckHours: integer("apk_health_check_hours").default(24).notNull(),
+  apkAutoHaltThresholdPercent: integer("apk_auto_halt_threshold_percent").default(25).notNull(),
+  apkAutoHaltMinDevices: integer("apk_auto_halt_min_devices").default(5).notNull(),
 
   currentApkReleaseId: uuid("current_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),
   rollbackApkReleaseId: uuid("rollback_apk_release_id").references(() => apkReleases.apkReleaseId, { onDelete: "set null" }),

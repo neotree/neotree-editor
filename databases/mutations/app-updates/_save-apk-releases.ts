@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import logger from "@/lib/logger";
@@ -55,16 +55,20 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
         for (const { apkReleaseId: itemApkReleaseId, ...item } of data) {
             const { countryISO: _countryISO, ...cleanItem } = item as any;
             try {
-                const semanticPublished = await db.query.apkReleases.findFirst({
-                    where: and(
-                        eq(apkReleases.runtimeVersion, `${cleanItem.runtimeVersion || ""}`.trim()),
-                        eq(apkReleases.versionCode, Number(cleanItem.versionCode || 0)),
-                    ),
+                const releasesWithVersionCode = await db.query.apkReleases.findMany({
+                    where: eq(apkReleases.versionCode, Number(cleanItem.versionCode || 0)),
                 });
-
-                const published = await db.query.apkReleases.findFirst({
-                    where: eq(apkReleases.apkReleaseId, itemApkReleaseId || semanticPublished?.apkReleaseId || uuid.v4()),
-                });
+                if (releasesWithVersionCode.length > 1) {
+                    throw new Error(`Android version code ${cleanItem.versionCode} belongs to multiple historical releases. Resolve the duplicate releases before saving.`);
+                }
+                const semanticPublished = releasesWithVersionCode[0] || null;
+                const publishedById = itemApkReleaseId
+                    ? await db.query.apkReleases.findFirst({ where: eq(apkReleases.apkReleaseId, itemApkReleaseId) })
+                    : null;
+                if (publishedById && semanticPublished && publishedById.apkReleaseId !== semanticPublished.apkReleaseId) {
+                    throw new Error(`Android version code ${cleanItem.versionCode} already belongs to ${semanticPublished.versionName}. Choose a new APK build.`);
+                }
+                const published = publishedById || semanticPublished;
 
                 let fileMeta: any = null;
                 let fileDetails: { size: number; contentType: string; filename: string } | null = null;
@@ -89,7 +93,7 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                 const semanticDraft = allDrafts.find((entry) => releaseSemanticKey((entry.data || {}) as any) === semanticKey) || null;
                 const draft = directDraft || semanticDraft;
                 const apkReleaseId =
-                    semanticPublished?.apkReleaseId ||
+                    published?.apkReleaseId ||
                     (typeof draft?.data?.apkReleaseId === "string" ? draft.data.apkReleaseId : null) ||
                     itemApkReleaseId ||
                     uuid.v4();
@@ -138,7 +142,7 @@ export async function _saveApkReleases({ data, broadcastAction = true, userId }:
                     await db.insert(apkReleasesDrafts).values({
                         data: merged,
                         apkReleaseDraftId: draftRowId,
-                        apkReleaseId: semanticPublished?.apkReleaseId || published?.apkReleaseId,
+                        apkReleaseId: published?.apkReleaseId,
                         createdByUserId: userId,
                     });
                 }

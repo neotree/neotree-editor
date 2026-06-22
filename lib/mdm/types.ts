@@ -7,6 +7,8 @@ export type MdmDeviceStatus = {
   mdmConfigName?: string | null
   mdmGroupId?: string | null
   mdmGroupName?: string | null
+  mdmGroupIds?: string[]
+  mdmGroupNames?: string[]
   enrollmentStatus: "pending" | "enrolled" | "unenrolled" | "failed" | "unknown"
   managementState: "managed" | "unmanaged" | "unknown"
   serialNumber?: string | null
@@ -49,7 +51,17 @@ export type MdmActionResult = {
   success: boolean
   provider: MdmProviderName
   providerActionId?: string | null
+  providerStatus?: string | null
   message?: string | null
+  state?: {
+    deviceId?: string | null
+    deviceLocked?: boolean | null
+    lockMessage?: string | null
+    statusResetRequestedAt?: string | null
+    statusResetConfirmedAt?: string | null
+    rebootRequestedAt?: string | null
+    rebootConfirmedAt?: string | null
+  }
   payload?: Record<string, any>
 }
 
@@ -80,7 +92,10 @@ export interface MdmProvider {
   getDeviceStatus(mdmDeviceId: string): Promise<MdmDeviceStatus>
   syncDevices(): Promise<MdmDeviceStatus[]>
   lockDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
+  unlockDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
   wipeDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
+  rebootDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult>
+  resetPassword(mdmDeviceId: string, password?: string | null): Promise<MdmActionResult>
   assignKioskPolicy(mdmDeviceId: string, policyId: string): Promise<MdmActionResult>
   pushApk(mdmDeviceId: string, apk: MdmApkPayload): Promise<MdmActionResult>
   stampDeviceIdentity?(device: MdmDeviceStatus, identity: MdmDeviceIdentityStamp): Promise<MdmActionResult>
