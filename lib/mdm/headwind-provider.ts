@@ -528,7 +528,6 @@ export class HeadwindMdmProvider implements MdmProvider {
   }
 
   private async postAction(action: string, mdmDeviceId: string, body: Record<string, any>): Promise<MdmActionResult> {
-    await this.authenticate()
     const actionPaths = this.config.settings?.actionPaths || {}
     const template = actionPaths[action]
 
@@ -542,20 +541,17 @@ export class HeadwindMdmProvider implements MdmProvider {
     }
 
     const path = `${template}`.replace(":mdmDeviceId", encodeURIComponent(mdmDeviceId))
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify({ mdmDeviceId, ...body }),
-      cache: "no-store",
-    })
-    const payload = await res.json().catch(() => ({}))
-
-    return {
-      success: res.ok,
-      provider: this.name,
-      providerActionId: payload?.id || payload?.actionId || null,
-      message: res.ok ? payload?.message || null : payload?.message || `Headwind ${action} failed: ${res.status}`,
-      payload,
+    const request = { mdmDeviceId, ...body }
+    try {
+      const response = await this.requestJson(path, { method: "POST", body: JSON.stringify(request) })
+      return this.normalizeActionResult({ action, path, request, response })
+    } catch (e: any) {
+      return {
+        success: false,
+        provider: this.name,
+        message: e?.message || `Headwind ${action} failed`,
+        payload: { action, path, request: this.redactActionValue(request) },
+      }
     }
   }
 
@@ -670,12 +666,167 @@ export class HeadwindMdmProvider implements MdmProvider {
     throw new Error(`Headwind device lookup failed. Tried ${errors.join("; ")}`)
   }
 
-  async lockDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult> {
-    return this.postAction("lockDevice", mdmDeviceId, { reason: reason || null })
+  // Remote device control is provided by Headwind's "Reboot, lock, reset" plugin
+  // (devicereset). Endpoints + payloads confirmed against a 5.39.3 cloud instance
+  // from the web panel's own requests:
+  //   PUT /rest/plugins/devicereset/private/reboot/{id}    body {}
+  //   PUT /rest/plugins/devicereset/private/reset/{id}     body {}   (factory reset)
+  //   PUT /rest/plugins/devicereset/private/lock           body {deviceId, lock, message}
+  //   PUT /rest/plugins/devicereset/private/password       body {deviceId, password}
+  // {id}/deviceId is the Headwind INTERNAL device id (Device.id), not the device
+  // number. An admin can still override any endpoint via settings.actionPaths
+  // (templated with :headwindId / :mdmDeviceId) for a differently-configured server.
+  private static readonly DEVICERESET_BASE = "/rest/plugins/devicereset/private"
+
+  private redactActionValue(value: any): any {
+    if (Array.isArray(value)) return value.map((item) => this.redactActionValue(item))
+    if (!value || typeof value !== "object") return value
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        /password|token|secret|authorization|api[_-]?key/i.test(key)
+          ? "[REDACTED]"
+          : this.redactActionValue(item),
+      ]),
+    )
   }
 
-  async wipeDevice(mdmDeviceId: string, reason?: string): Promise<MdmActionResult> {
-    return this.postAction("wipeDevice", mdmDeviceId, { reason: reason || null })
+  private actionTimestamp(value: unknown): string | null {
+    if (value == null || value === "") return null
+    const numeric = typeof value === "number" ? value : Number(`${value}`)
+    const date = Number.isFinite(numeric) ? new Date(numeric) : new Date(`${value}`)
+    return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  }
+
+  private normalizeActionResult({
+    action,
+    path,
+    request,
+    response,
+    httpSuccess = true,
+    httpStatus,
+  }: {
+    action: string
+    path: string
+    request?: Record<string, any>
+    response: any
+    httpSuccess?: boolean
+    httpStatus?: number
+  }): MdmActionResult {
+    const responseData = response?.data && typeof response.data === "object" ? response.data : response || {}
+    const providerStatus = response?.status == null ? null : `${response.status}`
+    const normalizedStatus = `${providerStatus || ""}`.trim().toUpperCase()
+    const providerAccepted = !normalizedStatus || normalizedStatus === "OK" || normalizedStatus === "SUCCESS"
+    const success = httpSuccess && providerAccepted
+    const providerActionId = responseData?.id ?? responseData?.actionId ?? response?.id ?? response?.actionId ?? null
+    const state = {
+      deviceId: responseData?.deviceId == null ? null : `${responseData.deviceId}`,
+      deviceLocked: typeof responseData?.deviceLocked === "boolean" ? responseData.deviceLocked : null,
+      lockMessage: typeof responseData?.lockMessage === "string" ? responseData.lockMessage : null,
+      statusResetRequestedAt: this.actionTimestamp(responseData?.statusResetRequested),
+      statusResetConfirmedAt: this.actionTimestamp(responseData?.statusResetConfirmed),
+      rebootRequestedAt: this.actionTimestamp(responseData?.rebootRequested),
+      rebootConfirmedAt: this.actionTimestamp(responseData?.rebootConfirmed),
+    }
+    const hasState = Object.values(state).some((value) => value !== null)
+    const actionLabel = action.replace(/([A-Z])/g, " $1").toLowerCase()
+    const fallbackMessage = success
+      ? `Headwind accepted the ${actionLabel} request`
+      : `Headwind rejected the ${actionLabel} request${httpStatus ? ` (${httpStatus})` : providerStatus ? ` (${providerStatus})` : ""}`
+
+    return {
+      success,
+      provider: this.name,
+      providerActionId: providerActionId == null ? null : `${providerActionId}`,
+      providerStatus,
+      message: response?.message || fallbackMessage,
+      state: hasState ? state : undefined,
+      payload: {
+        action,
+        path,
+        request: this.redactActionValue(request || {}),
+        response: this.redactActionValue(responseData),
+      },
+    }
+  }
+
+  private async deviceResetCommand(
+    command: "reboot" | "factoryReset" | "lock" | "unlock" | "resetPassword",
+    settingsKey: "rebootDevice" | "wipeDevice" | "lockDevice" | "resetPassword",
+    headwindId: string,
+    body?: Record<string, any>,
+  ): Promise<MdmActionResult> {
+    const id = `${headwindId || ""}`.trim()
+    if (!id) {
+      return { success: false, provider: this.name, message: "Missing Headwind device id for command" }
+    }
+    const numericId = Number(id)
+    if (!Number.isSafeInteger(numericId) || numericId <= 0) {
+      return {
+        success: false,
+        provider: this.name,
+        message: "Headwind internal device id is invalid; re-sync the MDM profile before retrying",
+      }
+    }
+
+    const endpoint = command === "factoryReset" ? "reset" : command === "resetPassword" ? "password" : command === "unlock" ? "lock" : command
+    const override = this.config.settings?.actionPaths?.[settingsKey]
+    const idInPath = endpoint === "reboot" || endpoint === "reset"
+
+    let path: string
+    let payload: Record<string, any>
+    if (override) {
+      // Custom endpoint: template the id and carry the body (deviceId + extras).
+      path = `${override}`
+        .replace(":headwindId", encodeURIComponent(id))
+        .replace(":mdmDeviceId", encodeURIComponent(id))
+      payload = idInPath ? {} : { deviceId: numericId, ...(body || {}) }
+    } else if (idInPath) {
+      path = `${HeadwindMdmProvider.DEVICERESET_BASE}/${endpoint}/${encodeURIComponent(id)}`
+      payload = {}
+    } else {
+      path = `${HeadwindMdmProvider.DEVICERESET_BASE}/${endpoint}`
+      payload = { deviceId: numericId, ...(body || {}) }
+    }
+
+    try {
+      const res = await this.requestJson(path, { method: "PUT", body: JSON.stringify(payload) })
+      return this.normalizeActionResult({ action: command, path, request: payload, response: res })
+    } catch (e: any) {
+      return {
+        success: false,
+        provider: this.name,
+        message: e?.message || `Headwind ${command} failed`,
+        payload: { action: command, path, request: this.redactActionValue(payload) },
+      }
+    }
+  }
+
+  // The lock endpoint toggles lock state via a `lock` boolean. Confirmed payload:
+  // {deviceId, lock, message}. Locking sets lock:true with the on-device message;
+  // unlocking sets lock:false with an empty message (matches the panel's request).
+  async lockDevice(headwindId: string, reason?: string): Promise<MdmActionResult> {
+    return this.deviceResetCommand("lock", "lockDevice", headwindId, {
+      lock: true,
+      message: `${reason || ""}`.trim(),
+    })
+  }
+
+  async unlockDevice(headwindId: string, _reason?: string): Promise<MdmActionResult> {
+    return this.deviceResetCommand("unlock", "lockDevice", headwindId, { lock: false, message: "" })
+  }
+
+  async wipeDevice(headwindId: string, _reason?: string): Promise<MdmActionResult> {
+    return this.deviceResetCommand("factoryReset", "wipeDevice", headwindId)
+  }
+
+  async rebootDevice(headwindId: string, _reason?: string): Promise<MdmActionResult> {
+    return this.deviceResetCommand("reboot", "rebootDevice", headwindId)
+  }
+
+  async resetPassword(headwindId: string, password?: string | null): Promise<MdmActionResult> {
+    return this.deviceResetCommand("resetPassword", "resetPassword", headwindId, { password: `${password || ""}` })
   }
 
   async assignKioskPolicy(mdmDeviceId: string, policyId: string): Promise<MdmActionResult> {

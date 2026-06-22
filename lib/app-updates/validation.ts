@@ -8,8 +8,15 @@ const apkReleaseStatuses = new Set([
   "rolled_back",
 ])
 
+import { clampPercentage } from "./rollout-canary"
+
 const installWindows = new Set(["on_restart", "idle", "immediate"])
 const deliveryModes = new Set(["in_app", "mdm", "hybrid", "manual"])
+
+const toPositiveInt = (value: unknown, fallback: number) => {
+  const n = Math.round(Number(value))
+  return Number.isFinite(n) && n >= 1 ? n : fallback
+}
 export const appUpdateChannels = [
   { value: "demo", label: "Demo" },
   { value: "stage", label: "Stage" },
@@ -54,6 +61,10 @@ type PolicyLike = {
   apkGracePeriodHours?: number | null
   apkDeliveryMode?: string | null
   apkInstallWindow?: string | null
+  apkRolloutPercentage?: number | null
+  apkAutoHaltThresholdPercent?: number | null
+  apkAutoHaltMinDevices?: number | null
+  apkHealthCheckHours?: number | null
   targetScope?: string | null
   targetGroupId?: string | null
   targetHospitalId?: string | null
@@ -116,6 +127,19 @@ export function normalizeAppUpdatePolicyPayload<T extends Record<string, any>>(p
       ? null
       : (payload.targetCountryISO ? `${payload.targetCountryISO}`.trim().toUpperCase() : null),
     rollbackEnabled: !!payload.rollbackEnabled,
+    apkWifiOnly: !!payload.apkWifiOnly,
+    apkRolloutPercentage: clampPercentage(
+      payload.apkRolloutPercentage == null ? 100 : payload.apkRolloutPercentage,
+    ),
+    apkRolloutHalted: !!payload.apkRolloutHalted,
+    apkRolloutHaltedReason: payload.apkRolloutHaltedReason
+      ? `${payload.apkRolloutHaltedReason}`.trim()
+      : null,
+    apkHealthCheckHours: toPositiveInt(payload.apkHealthCheckHours, 24),
+    apkAutoHaltThresholdPercent: clampPercentage(
+      payload.apkAutoHaltThresholdPercent == null ? 25 : payload.apkAutoHaltThresholdPercent,
+    ),
+    apkAutoHaltMinDevices: toPositiveInt(payload.apkAutoHaltMinDevices, 5),
     currentApkReleaseId: payload.currentApkReleaseId || null,
     rollbackApkReleaseId: payload.rollbackApkReleaseId || null,
   }
@@ -214,6 +238,24 @@ export function validateAppUpdatePolicyPayload(policy: PolicyLike, releasesById?
   }
   if (policy.apkDeliveryMode && !deliveryModes.has(policy.apkDeliveryMode)) {
     errors.push(`Invalid APK delivery mode: ${policy.apkDeliveryMode}`)
+  }
+  if (
+    policy.apkRolloutPercentage != null &&
+    (!Number.isInteger(policy.apkRolloutPercentage) || policy.apkRolloutPercentage < 0 || policy.apkRolloutPercentage > 100)
+  ) {
+    errors.push("APK rollout percentage must be a whole number between 0 and 100")
+  }
+  if (
+    policy.apkAutoHaltThresholdPercent != null &&
+    (!Number.isInteger(policy.apkAutoHaltThresholdPercent) || policy.apkAutoHaltThresholdPercent < 0 || policy.apkAutoHaltThresholdPercent > 100)
+  ) {
+    errors.push("APK auto-halt threshold must be a whole number between 0 and 100")
+  }
+  if (policy.apkAutoHaltMinDevices != null && (!Number.isInteger(policy.apkAutoHaltMinDevices) || policy.apkAutoHaltMinDevices < 1)) {
+    errors.push("APK auto-halt minimum devices must be a whole number of at least 1")
+  }
+  if (policy.apkHealthCheckHours != null && (!Number.isInteger(policy.apkHealthCheckHours) || policy.apkHealthCheckHours < 1)) {
+    errors.push("APK health check window must be a whole number of hours of at least 1")
   }
   if (policy.targetScope === "group" && !policy.targetGroupId) {
     errors.push("Select an MDM group for group-targeted rollout")

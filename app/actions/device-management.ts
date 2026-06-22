@@ -102,6 +102,8 @@ function buildEndpointSettings(formData: FormData) {
   const actionPaths = cleanObject({
     lockDevice: `${formData.get("lockDevicePath") || ""}`.trim(),
     wipeDevice: `${formData.get("wipeDevicePath") || ""}`.trim(),
+    rebootDevice: `${formData.get("rebootDevicePath") || ""}`.trim(),
+    resetPassword: `${formData.get("resetPasswordPath") || ""}`.trim(),
     assignKioskPolicy: `${formData.get("assignKioskPolicyPath") || ""}`.trim(),
     pushApk: `${formData.get("pushApkPath") || ""}`.trim(),
   })
@@ -308,6 +310,32 @@ export async function getMdmProviderDevices(profileId: string) {
   }
 }
 
+// Remote device control commands and the provider capability each requires. The
+// tokens match what the row-actions UI submits. Capability gating is default-deny,
+// so a destructive action (factory reset) is impossible unless explicitly enabled
+// on the profile.
+export type MdmDeviceCommandToken = "lock" | "unlock" | "wipe" | "reboot" | "resetPassword"
+
+const MDM_COMMAND_CAPABILITY: Record<MdmDeviceCommandToken, string> = {
+  lock: "remoteLock",
+  unlock: "remoteLock",
+  wipe: "remoteWipe",
+  reboot: "reboot",
+  resetPassword: "resetPassword",
+}
+
+const MDM_COMMAND_AUDIT_ACTION: Record<MdmDeviceCommandToken, string> = {
+  lock: "device_remote_lock_requested",
+  unlock: "device_remote_unlock_requested",
+  wipe: "device_remote_wipe_requested",
+  reboot: "device_remote_reboot_requested",
+  resetPassword: "device_remote_password_reset_requested",
+}
+
+function isMdmDeviceCommandToken(value: string): value is MdmDeviceCommandToken {
+  return value in MDM_COMMAND_CAPABILITY
+}
+
 export async function testMdmProviderConnectionDraft(formData: FormData) {
   try {
     await requireDeviceManagementAdmin()
@@ -439,6 +467,8 @@ async function saveMdmProviderProfile(formData: FormData) {
       apkPush: formData.get("capability_apkPush") === "on",
       remoteLock: formData.get("capability_remoteLock") === "on",
       remoteWipe: formData.get("capability_remoteWipe") === "on",
+      reboot: formData.get("capability_reboot") === "on",
+      resetPassword: formData.get("capability_resetPassword") === "on",
     }
 
     const result = await _saveMdmProviderProfile({
@@ -1601,43 +1631,92 @@ export async function reviewMdmInventoryFromForm(formData: FormData) {
 }
 
 export async function runDeviceMdmRemoteActionFromForm(formData: FormData) {
+  let action: MdmDeviceCommandToken | null = null
   try {
     const session = await requireDeviceManagementAdmin()
     const linkId = `${formData.get("linkId") || ""}`
-    const action = `${formData.get("action") || ""}`
+    const submittedAction = `${formData.get("action") || ""}`
     const reason = `${formData.get("reason") || ""}`.trim()
+    const password = `${formData.get("password") || ""}`
 
-    if (!reason) formErrorRedirect(formData, "Reason is required")
-    if (!["lock", "wipe"].includes(action)) formErrorRedirect(formData, "Unsupported remote action")
+    if (!reason) throw new Error("Reason is required")
+    if (!isMdmDeviceCommandToken(submittedAction)) throw new Error("Unsupported remote action")
+    action = submittedAction
 
     const link = await _getDeviceMdmLink(linkId)
-    if (!link.data) formErrorRedirect(formData, "Device MDM link not found")
-    if (!link.data.profile) formErrorRedirect(formData, "Device is not linked to an MDM profile")
-    if (!link.data.mdmDeviceId) formErrorRedirect(formData, "Headwind device ID is missing")
+    if (!link.data) throw new Error("Device MDM link not found")
+    if (!link.data.profile) throw new Error("Device is not linked to an MDM profile")
+    if (link.data.profile.isEnabled === false) throw new Error("This MDM profile is disabled")
+
+    // The Headwind "Reboot, lock, reset" plugin keys on the INTERNAL device id
+    // (Device.id), not the device number, so resolve that from the synced
+    // capabilities. Fall back to the stored mdmDeviceId only if the internal id was
+    // never captured (older link → prompt a re-sync).
+    const caps = (link.data.deviceCapabilities || {}) as Record<string, any>
+    const headwindId = `${caps?.identifiers?.headwindId ?? caps?.mdm?.headwindId ?? caps?.mdm?.deviceId ?? ""}`.trim()
+    const targetId = headwindId || `${link.data.mdmDeviceId || ""}`.trim()
+    if (!targetId) throw new Error("Headwind device id is missing; re-sync the profile first")
+
+    // Default-deny capability gating: the action is only allowed when the profile
+    // explicitly enables it (factory reset / reboot / password reset are opt-in).
+    const capabilityKey = MDM_COMMAND_CAPABILITY[action]
+    const capabilities = (link.data.profile.providerCapabilities || {}) as Record<string, any>
+    if (!capabilities[capabilityKey]) {
+      throw new Error(`This action is not enabled for the device's MDM profile`)
+    }
 
     const provider = createProviderFromProfile(link.data.profile)
-    const result = action === "lock"
-      ? await provider.lockDevice(link.data.mdmDeviceId, reason)
-      : await provider.wipeDevice(link.data.mdmDeviceId, reason)
+    const result =
+      action === "lock" ? await provider.lockDevice(targetId, reason)
+      : action === "unlock" ? await provider.unlockDevice(targetId, reason)
+      : action === "wipe" ? await provider.wipeDevice(targetId, reason)
+      : action === "reboot" ? await provider.rebootDevice(targetId, reason)
+      : await provider.resetPassword(targetId, password || null)
 
     await writeDeviceManagementAudit({
       actorUserId: session.user?.userId,
-      action: action === "lock" ? "device_remote_lock_requested" : "device_remote_wipe_requested",
+      action: MDM_COMMAND_AUDIT_ACTION[action],
       beforeState: link.data,
-      afterState: result,
-      metadata: { reason },
+      afterState: {
+        success: result.success,
+        providerActionId: result.providerActionId || null,
+        providerStatus: result.providerStatus || null,
+        message: result.message || null,
+        state: result.state || null,
+      },
+      // Never store the password itself — only whether one was provided.
+      metadata: { reason, passwordProvided: action === "resetPassword" ? !!password : undefined },
     })
 
-    if (!result.success) formErrorRedirect(formData, result.message || `Headwind ${action} failed`)
+    if (!result.success) {
+      logger.error("runDeviceMdmRemoteActionFromForm PROVIDER ERROR", JSON.stringify({
+        action,
+        linkId,
+        providerStatus: result.providerStatus || null,
+        message: result.message || null,
+      }))
+      return {
+        success: false as const,
+        action,
+        errors: [result.message || `Headwind ${action} failed`],
+        result,
+      }
+    }
 
     revalidatePath("/device-management")
+    return { success: true as const, action, errors: [], result }
   } catch (e: any) {
-    if (`${e?.digest || ""}`.startsWith("NEXT_REDIRECT")) throw e
-    logger.error("runDeviceMdmRemoteActionFromForm ERROR", e.message)
-    formErrorRedirect(formData, e.message || "Could not run remote device action")
+    logger.error("runDeviceMdmRemoteActionFromForm ERROR", JSON.stringify({
+      action,
+      message: e?.message || "Could not run remote device action",
+    }))
+    return {
+      success: false as const,
+      action,
+      errors: [e?.message || "Could not run remote device action"],
+      result: null,
+    }
   }
-
-  redirect("/device-management?section=devices")
 }
 
 export async function requestDeviceMdmApkRolloutFromForm(formData: FormData) {

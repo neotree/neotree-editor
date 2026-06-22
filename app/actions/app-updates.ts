@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
-import { _getAppUpdatePolicy, _getApkReleases, _getAppUpdatePolicyDrafts, _getApkReleaseDrafts } from "@/databases/queries/app-updates";
+import { _getAppUpdatePolicy, _getApkReleases, _getAppUpdatePolicyDrafts, _getApkReleaseDrafts, _getApkRolloutHealth } from "@/databases/queries/app-updates";
 import { _saveAppUpdatePolicies, _saveApkReleases } from "@/databases/mutations/app-updates";
 import { importApkArtifactFromUrl } from "@/lib/app-updates/apk-artifact-import";
 import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout";
@@ -36,6 +36,16 @@ export const getAppUpdatePolicy: typeof _getAppUpdatePolicy = async (...args) =>
         return await _getAppUpdatePolicy(...args);
     } catch (e: any) {
         logger.error("getAppUpdatePolicy ERROR", e.message);
+        return { data: null, errors: [e.message] };
+    }
+};
+
+export const getApkRolloutHealth: typeof _getApkRolloutHealth = async (...args) => {
+    try {
+        await isAllowed();
+        return await _getApkRolloutHealth(...args);
+    } catch (e: any) {
+        logger.error("getApkRolloutHealth ERROR", e.message);
         return { data: null, errors: [e.message] };
     }
 };
