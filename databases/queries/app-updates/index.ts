@@ -1,9 +1,11 @@
 import { and, desc, eq, inArray, count, isNull, isNotNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts, deviceMdmLinks } from "@/databases/pg/schema";
+import { appUpdatePolicies, apkReleases, appUpdatePoliciesDrafts, apkReleasesDrafts, deviceMdmLinks, deviceRolloutStates } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { deviceBelongsToMdmGroup, getMdmGroupIds } from "@/lib/mdm/group-membership";
+import { shouldServeCanaryRelease } from "@/lib/app-updates/rollout-canary";
+import { summarizeRolloutHealth, type RolloutHealth } from "@/lib/app-updates/rollout-health";
 
 export type AppUpdatePolicy = (typeof appUpdatePolicies.$inferSelect) & {
     currentApkRelease?: (typeof apkReleases.$inferSelect) | null;
@@ -119,9 +121,66 @@ export async function _getAppUpdatePolicy(params?: {
             if (!best || score > best.score) best = { policy, score };
         }
 
-        return { data: best?.policy || null };
+        if (!best?.policy) return { data: null };
+
+        // Staged canary + auto-halt (#5): a device outside the current rollout
+        // percentage — or any device once the rollout is halted — is served the
+        // policy WITHOUT a current APK release, so it stays on its version. The
+        // rollback release is left intact so a halt can actively pull devices back.
+        const policy = best.policy;
+        const served = shouldServeCanaryRelease({
+            deviceId: params?.deviceId,
+            apkReleaseId: policy.currentApkReleaseId,
+            percentage: policy.apkRolloutPercentage,
+            halted: policy.apkRolloutHalted,
+        });
+        if (!served && (policy.currentApkRelease || policy.currentApkReleaseId)) {
+            return { data: { ...policy, currentApkRelease: null, currentApkReleaseId: null } };
+        }
+
+        return { data: policy };
     } catch (e: any) {
         logger.error("_getAppUpdatePolicy ERROR", e.message);
+        return { data: null, errors: [e.message] };
+    }
+}
+
+export type ApkRolloutHealthResult = {
+    data: (RolloutHealth & { apkReleaseId: string; stalledDevices: { deviceId: string; rolloutState: string; updatedAt: Date | null }[] }) | null;
+    errors?: string[];
+};
+
+/**
+ * Fleet rollout observability (#6): aggregates per-device rollout states for a
+ * release into download/install/failure/stall counts, plus the list of stuck
+ * devices operators need to chase. `stallHours` defines how long a download/install
+ * may sit without progress before it counts as stalled.
+ */
+export async function _getApkRolloutHealth(params: {
+    apkReleaseId: string;
+    stallHours?: number;
+}): Promise<ApkRolloutHealthResult> {
+    try {
+        if (!params.apkReleaseId) return { data: null };
+        const rows = await db.query.deviceRolloutStates.findMany({
+            where: eq(deviceRolloutStates.apkReleaseId, params.apkReleaseId),
+        });
+
+        const health = summarizeRolloutHealth(rows, { stallHours: params.stallHours });
+
+        const stallMs = Math.max(1, params.stallHours ?? 6) * 60 * 60 * 1000;
+        const now = Date.now();
+        const stalledDevices = rows
+            .filter((row) => {
+                if (row.rolloutState !== "download_started" && row.rolloutState !== "install_started") return false;
+                const updated = row.updatedAt ? new Date(row.updatedAt).getTime() : null;
+                return updated !== null && now - updated >= stallMs;
+            })
+            .map((row) => ({ deviceId: row.deviceId, rolloutState: row.rolloutState, updatedAt: row.updatedAt || null }));
+
+        return { data: { apkReleaseId: params.apkReleaseId, ...health, stalledDevices } };
+    } catch (e: any) {
+        logger.error("_getApkRolloutHealth ERROR", e.message);
         return { data: null, errors: [e.message] };
     }
 }

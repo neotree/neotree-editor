@@ -68,6 +68,8 @@ export async function GET(req: NextRequest) {
                     deliveryMode: policy.apkDeliveryMode,
                     autoDownload: policy.apkAutoDownload,
                     forceInstall: policy.apkForceInstall,
+                    wifiOnly: policy.apkWifiOnly,
+                    healthCheckHours: policy.apkHealthCheckHours,
                     gracePeriodHours: policy.apkGracePeriodHours,
                     forceAfter: policy.apkForceAfter,
                     installWindow: policy.apkInstallWindow,

@@ -39,7 +39,9 @@ const capabilityOptions = [
   { key: "kiosk", label: "Kiosk mode" },
   { key: "apkPush", label: "APK push" },
   { key: "remoteLock", label: "Remote lock" },
-  { key: "remoteWipe", label: "Remote wipe" },
+  { key: "remoteWipe", label: "Remote wipe (factory reset)" },
+  { key: "reboot", label: "Remote reboot" },
+  { key: "resetPassword", label: "Reset device password" },
 ] as const;
 
 function connectionBadgeVariant(status?: string | null) {
@@ -445,6 +447,11 @@ export function DeviceManagementProfileForm({
               placeholder="/rest/private/devices/:mdmDeviceId"
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Leave these blank to use Headwind&apos;s built-in &quot;Reboot, lock, reset&quot; plugin
+            (devicereset). Only override them for a server that exposes different endpoints; use
+            <code className="mx-1">:headwindId</code> where the internal device id belongs.
+          </p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="mdm-lock-device-path">Remote lock API path</Label>
@@ -452,16 +459,34 @@ export function DeviceManagementProfileForm({
                 id="mdm-lock-device-path"
                 name="lockDevicePath"
                 defaultValue={`${actionPaths.lockDevice || ""}`}
-                placeholder="/rest/private/devices/:mdmDeviceId/lock"
+                placeholder="Default: /rest/plugins/devicereset/private/lock"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="mdm-wipe-device-path">Remote wipe API path</Label>
+              <Label htmlFor="mdm-wipe-device-path">Factory reset API path</Label>
               <Input
                 id="mdm-wipe-device-path"
                 name="wipeDevicePath"
                 defaultValue={`${actionPaths.wipeDevice || ""}`}
-                placeholder="/rest/private/devices/:mdmDeviceId/wipe"
+                placeholder="Default: /rest/plugins/devicereset/private/reset/:headwindId"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="mdm-reboot-device-path">Remote reboot API path</Label>
+              <Input
+                id="mdm-reboot-device-path"
+                name="rebootDevicePath"
+                defaultValue={`${actionPaths.rebootDevice || ""}`}
+                placeholder="Default: /rest/plugins/devicereset/private/reboot/:headwindId"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="mdm-reset-password-path">Reset password API path</Label>
+              <Input
+                id="mdm-reset-password-path"
+                name="resetPasswordPath"
+                defaultValue={`${actionPaths.resetPassword || ""}`}
+                placeholder="Default: /rest/plugins/devicereset/private/password"
               />
             </div>
             <div className="space-y-1">
