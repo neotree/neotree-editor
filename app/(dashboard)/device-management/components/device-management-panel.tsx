@@ -254,6 +254,11 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
   const { alert } = useAlertModal()
   const [syncAllPending, startSyncAllTransition] = useTransition()
   const { profiles, devices, inventory } = overview
+  // Capabilities by profile so each device row only offers the remote commands its
+  // MDM profile enables (the server enforces the same gate authoritatively).
+  const capabilitiesByProfileId = new Map(
+    profiles.map((profile) => [profile.profileId, (profile.providerCapabilities || {}) as Record<string, any>]),
+  )
   const searchParams = useSearchParams()
   const section = searchParams.get("section")
   const activeSection = section === "devices" || section === "review" || section === "unmatched" || section === "stale" ? section : "profiles"
@@ -556,7 +561,7 @@ export function DeviceManagementPanel({ overview }: { overview: Overview }) {
                     const href = row.mdmLink?.linkId
                       ? `/device-management/links/${row.mdmLink.linkId}`
                       : `/device-management/links/new?deviceId=${row.device.deviceId}`
-                    return <DeviceManagementRowActions editHref={href} linkId={row.mdmLink?.linkId} />
+                    return <DeviceManagementRowActions editHref={href} linkId={row.mdmLink?.linkId} capabilities={row.mdmLink?.profileId ? capabilitiesByProfileId.get(row.mdmLink.profileId) : undefined} />
                   },
                 },
               ]}

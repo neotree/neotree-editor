@@ -9,11 +9,13 @@ export function releaseSemanticKey(value: {
   runtimeVersion?: string | null
   versionCode?: number | null
 }) {
-  const runtimeVersion = `${value.runtimeVersion || ""}`.trim()
   const versionCode = Number(value.versionCode)
 
-  if (runtimeVersion && Number.isFinite(versionCode) && versionCode > 0) {
-    return `${runtimeVersion}::${versionCode}`
+  // Android requires versionCode to increase for every package build. Treat it
+  // as the global APK identity across runtimes so the editor cannot represent
+  // one build code as multiple binaries.
+  if (Number.isInteger(versionCode) && versionCode > 0) {
+    return `android-build::${versionCode}`
   }
 
   return value.apkReleaseId || null
@@ -80,4 +82,3 @@ export async function resolvePolicyReleaseReferences<T extends {
 
   return { resolvedPolicy, releasesById, errors }
 }
-

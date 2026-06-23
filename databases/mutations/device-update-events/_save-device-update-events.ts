@@ -1,6 +1,7 @@
 import logger from "@/lib/logger";
 import db from "@/databases/pg/drizzle";
 import { deviceRolloutStates, deviceUpdateEvents } from "@/databases/pg/schema";
+import { _evaluateApkRolloutAutoHalt } from "@/databases/mutations/app-updates/_evaluate-apk-rollout-auto-halt";
 
 export type SaveDeviceUpdateEventsData = typeof deviceUpdateEvents.$inferInsert;
 
@@ -101,4 +102,12 @@ export async function _upsertDeviceRolloutStateFromEvent(event: SaveDeviceUpdate
                 updatedAt: now,
             },
         });
+
+    // A failure/rollback may push the release past its auto-halt threshold (#5).
+    // Best-effort and self-gating, so it is safe to run on every such event.
+    if (rolloutState === "failed" || rolloutState === "rolled_back") {
+        await _evaluateApkRolloutAutoHalt(event.apkReleaseId).catch((e) =>
+            logger.error("_upsertDeviceRolloutStateFromEvent auto-halt ERROR", e?.message),
+        );
+    }
 }
