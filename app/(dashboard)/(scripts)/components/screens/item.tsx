@@ -62,6 +62,7 @@ export function Item<P = {}>({
   const rankItems = form.watch('rankItems');
   const screenRefIdDataKey = form.getValues("refIdDataKey")
   const isDiagnosisScreen = screenType === "diagnosis"
+  const isProblemsScreen = screenType === "problems"
   const isProgressScreen = screenType === "progress"
   const isChecklistScreen = screenType === "checklist"
   const isMultiSelectScreen = screenType === "multi_select"
@@ -475,9 +476,9 @@ export function Item<P = {}>({
                       </>
                     )}
 
-                    {(isMultiSelectScreen || isDiagnosisScreen) && (
+                    {(isMultiSelectScreen || isDiagnosisScreen || isProblemsScreen) && (
                       <>
-                        {isDiagnosisScreen && (
+                        {(isDiagnosisScreen || isProblemsScreen) && (
                           <div>
                             <Label htmlFor="severity_order">Severity Order</Label>
                             <Input
