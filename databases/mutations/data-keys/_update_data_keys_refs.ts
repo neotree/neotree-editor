@@ -25,14 +25,13 @@ export type UpdateDataKeysRefsParams = {
     userId?: string;
     draftOrigin?: "data_key_sync" | "import";
     matchUniqueKeysByDataKey?: Record<string, string[]>;
-    matchLegacyNamesByDataKey?: Record<string, string[]>;
     // Delete-replace uses alias-only matching so existing replacement usages are not rewritten unnecessarily.
     includePrimaryUniqueKeys?: boolean;
     forceFullScan?: boolean;
     client?: DbOrTransaction;
 };
 
-type MatchSource = 'uniqueKey' | 'legacyName';
+type MatchSource = 'uniqueKey';
 
 type UpdateStats = {
     candidateScripts: number;
@@ -165,7 +164,6 @@ export async function _updateDataKeysRefs({
     userId,
     draftOrigin = "data_key_sync",
     matchUniqueKeysByDataKey = {},
-    matchLegacyNamesByDataKey = {},
     includePrimaryUniqueKeys = true,
     forceFullScan = false,
     client,
@@ -208,10 +206,8 @@ export async function _updateDataKeysRefs({
 
         const getUpdatedDataKey = ({
             uniqueKey,
-            legacyName,
         }: {
             uniqueKey?: string | null;
-            legacyName?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
                 if (includePrimaryUniqueKeys) {
@@ -226,21 +222,11 @@ export async function _updateDataKeysRefs({
                 }
             }
 
-            const normalizedLegacyName = `${legacyName || ''}`.trim();
-            if (normalizedLegacyName) {
-                for (const [currentUniqueKey, aliases] of Object.entries(matchLegacyNamesByDataKey)) {
-                    if (!aliases.includes(normalizedLegacyName)) continue;
-                    const aliasedDataKey = byUniqueKey.get(currentUniqueKey);
-                    if (aliasedDataKey) return { dataKey: aliasedDataKey, source: 'legacyName' };
-                }
-            }
-
             return {};
         };
 
         const trackMatchSource = (source?: MatchSource) => {
             if (source === 'uniqueKey') stats.matchedByUniqueKey++;
-            if (source === 'legacyName') stats.matchedByLegacyName++;
         };
 
         const usagesMap = new Map<string, AffectedUsage>();
@@ -399,14 +385,14 @@ export async function _updateDataKeysRefs({
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
         const { data: screensArr, errors: screensGetErrors } = await _getScreens(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
         const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const { data: problemsArr, errors: problemsGetErrors } = await _getProblems(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const prefetchErrors = [
@@ -429,7 +415,6 @@ export async function _updateDataKeysRefs({
             trackMatchSource(refMatchSource);
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
-                legacyName: s.key,
             });
             trackMatchSource(screenMatchSource);
 
@@ -458,7 +443,6 @@ export async function _updateDataKeysRefs({
                 : (s.items || []).map((item, itemIndex) => {
                     const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
-                        legacyName: item.key || item.id,
                     });
                     trackMatchSource(itemMatchSource);
 
@@ -509,37 +493,31 @@ export async function _updateDataKeysRefs({
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
-                    legacyName: field.key,
                 });
                 trackMatchSource(fieldMatchSource);
 
                 const { dataKey: refKeyDataKey, source: refKeyMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.refKeyId,
-                    legacyName: field.refKey,
                 });
                 trackMatchSource(refKeyMatchSource);
 
                 const { dataKey: minDateKeyDataKey, source: minDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minDateKeyId,
-                    legacyName: field.minDateKey,
                 });
                 trackMatchSource(minDateMatchSource);
 
                 const { dataKey: maxDateKeyDataKey, source: maxDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxDateKeyId,
-                    legacyName: field.maxDateKey,
                 });
                 trackMatchSource(maxDateMatchSource);
 
                 const { dataKey: minTimeKeyDataKey, source: minTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minTimeKeyId,
-                    legacyName: field.minTimeKey,
                 });
                 trackMatchSource(minTimeMatchSource);
 
                 const { dataKey: maxTimeKeyDataKey, source: maxTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxTimeKeyId,
-                    legacyName: field.maxTimeKey,
                 });
                 trackMatchSource(maxTimeMatchSource);
 
@@ -560,7 +538,6 @@ export async function _updateDataKeysRefs({
                 const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
                     const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
-                        legacyName: `${item.value || ''}` || `${item.label || ''}`,
                     });
                     trackMatchSource(fieldItemMatchSource);
 
@@ -679,7 +656,6 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: diagnosisDataKey, source: diagnosisMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
-                legacyName: d.key || d.name,
             });
             trackMatchSource(diagnosisMatchSource);
 
@@ -700,7 +676,6 @@ export async function _updateDataKeysRefs({
             const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
-                    legacyName: item.key || item.name,
                 });
                 trackMatchSource(symptomMatchSource);
 
@@ -745,7 +720,6 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: problemDataKey, source: problemMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
-                legacyName: d.key || d.name,
             });
             trackMatchSource(problemMatchSource);
 

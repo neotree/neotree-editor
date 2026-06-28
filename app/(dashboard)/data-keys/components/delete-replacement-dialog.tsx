@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { isDataKeyReplacementCompatible } from '@/lib/data-key-option-compatibility';
 import { cn } from '@/lib/utils';
 
 import type { DeleteImpactItem } from './delete-confirmation';
@@ -119,7 +120,11 @@ export function DataKeyDeleteReplacementDialog({
                         dataKeyId !== item.dataKeyId &&
                         !deletedIds.has(dataKeyId) &&
                         normalizeType(dataKey.dataType) === itemType &&
-                        !dataKey.isDeleted
+                        !dataKey.isDeleted &&
+                        isDataKeyReplacementCompatible({
+                            target: item,
+                            replacement: dataKey,
+                        })
                     );
                 })
                 .sort((a, b) => getReplacementOptionKey(a).localeCompare(getReplacementOptionKey(b)));
@@ -197,8 +202,8 @@ export function DataKeyDeleteReplacementDialog({
                                         candidates.length ? "text-slate-500" : "text-destructive",
                                     )}>
                                         {candidates.length
-                                            ? 'Only same-type data keys are listed.'
-                                            : `No available ${dataTypeLabel} replacement was found.`}
+                                            ? 'Only same-type data keys with compatible options are listed.'
+                                            : `No available ${dataTypeLabel} replacement with compatible options was found.`}
                                     </p>
                                 </div>
                             </div>

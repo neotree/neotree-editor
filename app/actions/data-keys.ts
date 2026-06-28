@@ -363,7 +363,7 @@ export const getDataKeysDeleteImpact = async (params?: {
         name: string;
         label: string;
         dataType: string;
-        hasLegacyUsages: boolean;
+        options: string[];
         scripts: Array<{
             scriptId: string;
             scriptTitle: string;

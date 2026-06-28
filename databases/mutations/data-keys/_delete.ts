@@ -7,6 +7,7 @@ import socket from '@/lib/socket';
 import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
+import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
 export type DeleteDataKeysParams = {
@@ -20,10 +21,6 @@ export type DeleteDataKeysResponse = {
     success: boolean;
     errors?: string[];
 };
-
-function normalizeDataType(value?: string | null) {
-    return `${value || ''}`.trim().toLowerCase();
-}
 
 function getDataKeyTitle(dataKey?: Pick<DataKey, 'name' | 'label' | 'uniqueKey'> | null) {
     return dataKey?.name || dataKey?.label || dataKey?.uniqueKey || 'Data key';
@@ -49,24 +46,16 @@ async function applyRequiredDeletionReplacements({
     client: Parameters<typeof _updateDataKeysRefs>[0]["client"];
 }) {
     const usedTargetIds = new Set(impact.filter((item) => item.scripts.length > 0).map((item) => item.dataKeyId));
-    const usedTargetsWithLegacyUsages = new Set(impact.filter((item) => item.hasLegacyUsages).map((item) => item.dataKeyId));
     const usedTargets = targets.filter((target) => usedTargetIds.has(target.uuid));
     if (!usedTargets.length) return;
 
     const replacementIds = uniqueValues(Object.values(replacements || {}));
-    const dataKeyNameCounts = new Map<string, number>();
-    allDataKeys.forEach((dataKey) => {
-        const name = `${dataKey.name || ''}`.trim();
-        if (!name) return;
-        dataKeyNameCounts.set(name, (dataKeyNameCounts.get(name) || 0) + 1);
-    });
     const targetsById = new Map(targets.map((target) => [target.uuid, target]));
     const replacementById = new Map(allDataKeys
         .filter((dataKey) => replacementIds.includes(dataKey.uuid))
         .map((replacement) => [replacement.uuid, replacement]));
     const deletedIds = new Set(targets.map((target) => target.uuid));
     const aliasesByReplacementUniqueKey: Record<string, string[]> = {};
-    const legacyNamesByReplacementUniqueKey: Record<string, string[]> = {};
     const replacementKeysById = new Map<string, DataKey>();
 
     for (const target of usedTargets) {
@@ -90,8 +79,12 @@ async function applyRequiredDeletionReplacements({
             throw new Error(`"${getDataKeyTitle(replacement)}" cannot replace "${targetTitle}" because it is also being deleted.`);
         }
 
-        if (normalizeDataType(replacement.dataType) !== normalizeDataType(target.dataType)) {
-            throw new Error(`"${getDataKeyTitle(replacement)}" cannot replace "${targetTitle}" because their data types do not match.`);
+        const compatibilityError = getDataKeyReplacementCompatibilityError({
+            target,
+            replacement,
+        });
+        if (compatibilityError) {
+            throw new Error(`"${getDataKeyTitle(replacement)}" cannot replace "${targetTitle}". ${compatibilityError}`);
         }
 
         if (!target.uniqueKey || !replacement.uniqueKey) {
@@ -100,12 +93,6 @@ async function applyRequiredDeletionReplacements({
 
         const aliases = aliasesByReplacementUniqueKey[replacement.uniqueKey] || [];
         aliasesByReplacementUniqueKey[replacement.uniqueKey] = uniqueValues([...aliases, target.uniqueKey]);
-
-        const targetName = `${target.name || ''}`.trim();
-        if (usedTargetsWithLegacyUsages.has(target.uuid) && targetName && dataKeyNameCounts.get(targetName) === 1) {
-            const legacyNames = legacyNamesByReplacementUniqueKey[replacement.uniqueKey] || [];
-            legacyNamesByReplacementUniqueKey[replacement.uniqueKey] = uniqueValues([...legacyNames, targetName]);
-        }
 
         replacementKeysById.set(replacement.uuid, replacement);
     }
@@ -121,9 +108,7 @@ async function applyRequiredDeletionReplacements({
         draftOrigin: "data_key_sync",
         broadcastAction: false,
         matchUniqueKeysByDataKey: aliasesByReplacementUniqueKey,
-        matchLegacyNamesByDataKey: legacyNamesByReplacementUniqueKey,
         includePrimaryUniqueKeys: false,
-        forceFullScan: !!Object.keys(legacyNamesByReplacementUniqueKey).length,
         client,
     });
 
