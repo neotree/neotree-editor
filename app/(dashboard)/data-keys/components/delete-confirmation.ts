@@ -8,7 +8,7 @@ export type DeleteImpactItem = {
     name: string;
     label: string;
     dataType: string;
-    hasLegacyUsages: boolean;
+    options: string[];
     scripts: Array<{
         scriptId: string;
         scriptTitle: string;
