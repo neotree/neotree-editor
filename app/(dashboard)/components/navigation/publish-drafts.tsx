@@ -34,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { pendingChangesAPI } from "@/lib/indexed-db"
 import type { DataKeyIntegrityPublishDetails } from "@/lib/data-key-integrity"
+import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules"
 
 type Props = {
   variant: "publish" | "discard"
@@ -162,6 +163,9 @@ export function PublishDrafts({ variant }: Props) {
     ) : (
       <Button className="h-auto text-xs px-4 py-1">Publish</Button>
     )
+  const validationRulesHref = publishBlockingDetails?.scripts[0]?.scriptId
+    ? getDataKeyIntegrityRulesHref(publishBlockingDetails.scripts[0].scriptId)
+    : null
 
   return (
     <>
@@ -272,6 +276,14 @@ export function PublishDrafts({ variant }: Props) {
           </div>
 
           <AlertDialogFooter className="shrink-0 border-t border-border px-6 py-3">
+            {validationRulesHref && (
+              <Button asChild variant="outline">
+                <Link href={validationRulesHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
+                  View validation rules
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             <AlertDialogCancel onClick={closePublishBlockingModal}>
               Close
             </AlertDialogCancel>
