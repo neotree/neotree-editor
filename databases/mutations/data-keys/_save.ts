@@ -9,8 +9,11 @@ import { _getDataKeys } from '@/databases/queries/data-keys';
 import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
+import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 
-export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect>;
+export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
+    deletedUniqueKeys?: string[];
+};
 
 export type SaveDataKeysParams = {
     data: SaveDataKeysData[],
@@ -133,7 +136,18 @@ export async function _saveDataKeys({
         // }
 
         let index = 0;
-        for (const { uuid: dataKeyUuid, isNewUuid, createdAt, publishDate, deletedAt, updatedAt, ...item } of data) {
+        for (
+            const { 
+                uuid: dataKeyUuid, 
+                isNewUuid, 
+                createdAt, 
+                publishDate, 
+                deletedAt, 
+                updatedAt, 
+                deletedUniqueKeys = [],
+                ...item 
+            } of data
+        ) {
             try {
                 const normalizedItem = normalizeIncomingDataKeyPatch(item);
 
@@ -225,6 +239,8 @@ export async function _saveDataKeys({
 
                         uniqueKeys.push(data.uniqueKey);
                     }
+
+                    if (deletedUniqueKeys.length) await _deleteReferencedDataKeyOptions({ userId, uniqueKeys: deletedUniqueKeys, });
                 }
             } catch(e: any) {
                 errors.push(e.message);

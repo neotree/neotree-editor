@@ -135,6 +135,7 @@ function Form({
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
             version: dataKey?.version || 1,
+            deletedUniqueKeys: [] as string[],
         },
     });
 
@@ -182,6 +183,7 @@ function Form({
     const confidential = !!watch('confidential');
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
+    const deletedUniqueKeys = watch('deletedUniqueKeys');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -722,10 +724,16 @@ function Form({
                                                                         <DropdownMenuItem 
                                                                             className="text-destructive"
                                                                             onClick={() => setTimeout(() => confirm(
-                                                                                () => setValue(
-                                                                                    'options',
-                                                                                    options.filter((_, i) => i !== rowIndex),
-                                                                                ),
+                                                                                () => {
+                                                                                    setValue(
+                                                                                        'options',
+                                                                                        options.filter((_, i) => i !== rowIndex),
+                                                                                    );
+                                                                                    setValue(
+                                                                                        'deletedUniqueKeys',
+                                                                                        [...deletedUniqueKeys, children[rowIndex].uniqueKey]
+                                                                                    );
+                                                                                },
                                                                                 {
                                                                                     title: 'Delete',
                                                                                     message: 'Are you sure you want to delete data key option?',

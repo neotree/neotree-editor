@@ -272,7 +272,9 @@ function Form({
     }
     onChange(payload)
     onClose()
-  })
+  });
+
+  const isKeyDisabled = !!item;
 
   return (
     <>
@@ -295,7 +297,7 @@ function Form({
                     <>
                       <SelectDataKey
                         value={`${value || ""}`}
-                        disabled={false}
+                        disabled={isKeyDisabled}
                         placeholder={allowCustomKey ? "Select existing key" : "Select key"}
                         onChange={([item]) => {
                           onChange(item.name)
@@ -333,7 +335,7 @@ function Form({
                 disabled={false}
                 {...register("label", {
                   required: true,
-                  disabled: false,
+                  disabled: isKeyDisabled,
                 })}
               />
             </div>
