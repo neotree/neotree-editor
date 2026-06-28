@@ -8,6 +8,7 @@ import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
+import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
 export type DeleteDataKeysParams = {
@@ -169,6 +170,19 @@ export async function _deleteDataKeys(
                     userId,
                     client: tx,
                 });
+
+                const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
+                if (deletedUniqueKeys.length) {
+                    const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
+                        userId: userId || undefined,
+                        uniqueKeys: deletedUniqueKeys,
+                        client: tx,
+                    });
+
+                    if (deleteReferencedOptionsRes.errors?.length) {
+                        throw new Error(deleteReferencedOptionsRes.errors[0]);
+                    }
+                }
 
                 // delete drafts
                 await tx.delete(dataKeysDrafts).where(inArray(dataKeysDrafts.uuid, dataKeysIds));

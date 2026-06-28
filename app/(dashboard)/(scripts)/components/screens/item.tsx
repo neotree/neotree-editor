@@ -196,7 +196,7 @@ export function Item<P = {}>({
     onClose()
   })
 
-  const isKeyDisabled = false // isChecklistScreen ? disabled : true;
+  const isKeyDisabled = disabled || !!item // isChecklistScreen ? disabled : true;
 
   const dataKey = useMemo(() => {
     const [keyData] = !keyId ? [null] : extractDataKeys([keyId])
@@ -220,7 +220,7 @@ export function Item<P = {}>({
   }: {
     value: string
     label?: string
-    variant?: "key" | "id"
+    variant?: "key" | "id";
   }) => {
     // const _type = isChecklistScreen ? 'checklist_option' : type;
     const _type = screenType + "_option"
@@ -290,7 +290,7 @@ export function Item<P = {}>({
                         Label *
                       </Label>
                       <Input
-                        {...register("label", { disabled, required: true })}
+                        {...register("label", { disabled: isKeyDisabled, required: true })}
                         name="label"
                         error={!disabled && !label}
                       />
