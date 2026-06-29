@@ -3,6 +3,10 @@ import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import { DEFAULT_INTEGRITY_POLICY, getIntegrityEntryFingerprint, type IntegrityPolicy } from "@/lib/integrity-policy";
 import {
+    getDataKeyIntegrityPublishRuleLabel,
+    isDataKeyIntegrityRuleBlocking,
+} from "@/lib/data-key-integrity-rules";
+import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
@@ -188,14 +192,7 @@ export type DataKeyIntegrityContext = {
 export function isBlockingEntry(
     entry: Pick<DataKeyIntegrityEntry, "status" | "kind">,
 ) {
-    return (
-        entry.status === "missing" ||
-        entry.status === "legacy_match" ||
-        entry.status === "unmanaged" ||
-        entry.kind === "screen_option_collection" ||
-        entry.kind === "field_option_collection" ||
-        entry.kind === "duplicate_parent_data_key"
-    );
+    return isDataKeyIntegrityRuleBlocking(entry);
 }
 
 export function getBlockingIntegrityEntries(
@@ -862,14 +859,7 @@ function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
 }
 
 function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
-    if (entry.kind === "duplicate_parent_data_key") return "duplicate parent data key";
-    if (entry.kind === "screen_option_collection" || entry.kind === "field_option_collection") {
-        return "invalid script option";
-    }
-    if (entry.status === "missing") return "missing data key";
-    if (entry.status === "legacy_match") return "unlinked match";
-    if (entry.status === "unmanaged") return "unmanaged reference";
-    return getDataKeyIntegrityStatusLabel(entry.status).toLowerCase();
+    return getDataKeyIntegrityPublishRuleLabel(entry);
 }
 
 export function buildDataKeyIntegrityPublishDetails(
