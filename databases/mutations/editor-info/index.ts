@@ -20,9 +20,9 @@ export type SaveEditorInfoResults = {
     errors?: string[];
 };
 
-export async function _saveEditorInfo({ data, increaseVersion, broadcastAction ,syncSilently, client}: SaveEditorInfoParams): Promise<SaveEditorInfoResults> {
+export async function _saveEditorInfo({ data, increaseVersion, broadcastAction ,syncSilently, client }: SaveEditorInfoParams): Promise<SaveEditorInfoResults> {
     try {
-        const executor = client ?? db
+        const executor = client || db;
         let info = await executor.query.editorInfo.findFirst();
 
         if (info) {

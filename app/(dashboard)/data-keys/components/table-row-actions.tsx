@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
@@ -16,10 +16,12 @@ import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { buildDeleteConfirmationFooterMessage, buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
+import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
 
-export function DataKeysTableRowActions({ 
-    rowIndex, 
-    disabled, 
+export function DataKeysTableRowActions({
+    rowIndex,
+    disabled,
     setCurrentDataKeyUuid,
 }: {
     rowIndex: number;
@@ -27,8 +29,11 @@ export function DataKeysTableRowActions({
     setCurrentDataKeyUuid: (uuid: string) => void;
 }) {
     const [isTransitionPending, startTransition] = useTransition();
+    const [isPreparingDelete, setIsPreparingDelete] = useState(false);
+    const [replacementImpact, setReplacementImpact] = useState<DeleteImpactItem[]>([]);
+    const [showReplacementDialog, setShowReplacementDialog] = useState(false);
 
-    const { dataKeys, deleteDataKeys, } = useDataKeysCtx();
+    const { dataKeys, allDataKeys, deleteDataKeys, deleting } = useDataKeysCtx();
     const { confirm } = useConfirmModal();
 
     const dataKey = dataKeys[rowIndex];
@@ -47,7 +52,20 @@ export function DataKeysTableRowActions({
 
     return (
         <div className="flex gap-x-2">
-            {isTransitionPending && <Loader overlay />}
+            {(isTransitionPending || isPreparingDelete) && <Loader overlay />}
+
+            <DataKeyDeleteReplacementDialog
+                open={showReplacementDialog}
+                onOpenChange={setShowReplacementDialog}
+                impact={replacementImpact}
+                dataKeys={allDataKeys}
+                deleting={deleting}
+                onConfirm={async (replacements) => {
+                    const success = await deleteDataKeys([dataKey.uuid], replacements);
+                    if (success) setShowReplacementDialog(false);
+                    return success;
+                }}
+            />
 
             <LockStatus {...lockStatusParams} />
 
@@ -57,7 +75,7 @@ export function DataKeysTableRowActions({
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                         asChild
                         onClick={() => setTimeout(() => startTransition(() => {}), 0)}
                     >
@@ -81,13 +99,28 @@ export function DataKeysTableRowActions({
                         </Link>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                         className={cn('text-destructive', disabled && 'hidden')}
-                        onClick={() => setTimeout(() => {
-                            confirm(() => deleteDataKeys([dataKey.uuid]), {
-                                title: 'Delete data key',
-                                message: 'Are you sure?',
-                            });
+                        onClick={() => setTimeout(async () => {
+                            try {
+                                setIsPreparingDelete(true);
+                                const impact = await fetchDataKeyDeleteImpact([dataKey.uuid]);
+                                if (impact.some((item) => item.scripts.length > 0)) {
+                                    setReplacementImpact(impact);
+                                    setShowReplacementDialog(true);
+                                    return;
+                                }
+
+                                confirm(() => deleteDataKeys([dataKey.uuid]), {
+                                    title: 'Delete data key',
+                                    message: buildDeleteConfirmationMessage(impact),
+                                    footerMessage: buildDeleteConfirmationFooterMessage(impact),
+                                    positiveLabel: 'Delete',
+                                    danger: true,
+                                });
+                            } finally {
+                                setIsPreparingDelete(false);
+                            }
                         }, 0)}
                     >
                         <TrashIcon className="h-4 w-4 mr-2" /> Delete

@@ -14,7 +14,7 @@ export async function _clearPendingDeletion(params?: {
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
         const { items, broadcastAction, } = { ...params };
-        const client = params?.client ?? db
+        const executor = params?.client || db;
 
         const where = [
             items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
@@ -31,7 +31,7 @@ export async function _clearPendingDeletion(params?: {
             !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
         ];
 
-        await client.delete(pendingDeletion).where(!where.length ? undefined : and(...where));
+        await executor.delete(pendingDeletion).where(!where.length ? undefined : and(...where));
 
         if (broadcastAction) socket.emit('data_changed', 'clear_pending_deletion');
 
@@ -51,9 +51,9 @@ export async function _processPendingDeletion(params?: {
 }): Promise<{ success: boolean; errors?: string[]; }> {
     try {
         const { items, } = { ...params };
-        const client = params?.client ?? db
+        const executor = params?.client || db;
 
-        const _configKeys = await client.query.pendingDeletion.findMany({
+        const _configKeys = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
@@ -61,19 +61,19 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_configKeys.length) {
-            await client.update(configKeys)
+            await executor.update(configKeys)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(configKeys.configKeyId, _configKeys.map(c => c.configKeyId!)));
         }
 
-        const _drugsLibraryItems = await client.query.pendingDeletion.findMany({
+        const _drugsLibraryItems = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
             ),
         });
 
-        const _dataKeys = await client.query.pendingDeletion.findMany({
+        const _dataKeys = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
@@ -81,7 +81,7 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_dataKeys.length) {
-            await client.update(dataKeys)
+            await executor.update(dataKeys)
                 .set({ 
                     deletedAt: new Date(),
                     name: sql`CONCAT(${dataKeys.name}, '_', ${dataKeys.uuid})`,
@@ -90,7 +90,7 @@ export async function _processPendingDeletion(params?: {
         }
 
         if (_drugsLibraryItems.length) {
-            await client.update(drugsLibrary)
+            await executor.update(drugsLibrary)
                 .set({ 
                     deletedAt: new Date(), 
                     key: sql`CONCAT(${drugsLibrary.key}, '_', ${drugsLibrary.itemId})`,
@@ -98,7 +98,7 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(drugsLibrary.itemId, _drugsLibraryItems.map(c => c.drugsLibraryItemId!)));
         }
 
-        const _scripts = await client.query.pendingDeletion.findMany({
+        const _scripts = await executor.query.pendingDeletion.findMany({
             where: items === 'scripts' ? and(
                 isNotNull(pendingDeletion.scriptId),
                 isNull(pendingDeletion.screenId),
@@ -108,24 +108,24 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_scripts.length) {
-            await client.update(scripts)
+            await executor.update(scripts)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(scripts.scriptId, _scripts.map(c => c.scriptId!)));
 
-            await client.update(screens)
+            await executor.update(screens)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(screens.scriptId, _scripts.map(c => c.scriptId!)));
 
-            await client.update(diagnoses)
+            await executor.update(diagnoses)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(diagnoses.scriptId, _scripts.map(c => c.scriptId!)));
 
-            await client.update(problems)
+            await executor.update(problems)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(problems.scriptId, _scripts.map(c => c.scriptId!)));
         }
 
-        const _screens = await client.query.pendingDeletion.findMany({
+        const _screens = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
@@ -133,12 +133,12 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_screens.length) {
-            await client.update(screens)
+            await executor.update(screens)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(screens.screenId, _screens.map(c => c.screenId!)));
         }
 
-        const _diagnoses = await client.query.pendingDeletion.findMany({
+        const _diagnoses = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
@@ -146,12 +146,12 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_diagnoses.length) {
-            await client.update(diagnoses)
+            await executor.update(diagnoses)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(diagnoses.diagnosisId, _diagnoses.map(c => c.diagnosisId!)));
         }
 
-        const _problems = await client.query.pendingDeletion.findMany({
+        const _problems = await executor.query.pendingDeletion.findMany({
             where: and(
                 items === 'problems' ? isNotNull(pendingDeletion.problemId) : undefined,
                 !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
@@ -159,12 +159,12 @@ export async function _processPendingDeletion(params?: {
         });
 
         if (_problems.length) {
-            await client.update(problems)
+            await executor.update(problems)
                 .set({ deletedAt: new Date(), })
                 .where(inArray(problems.problemId, _problems.map(c => c.problemId!)));
         }
 
-        await _clearPendingDeletion({ ...params, client });
+        await _clearPendingDeletion(params);
 
         return { success: true, };
     } catch(e: any) {

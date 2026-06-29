@@ -137,6 +137,139 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.actionText || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'actionText',
+                fieldValue: s.actionText,
+            });
+        }
+
+        if (`${s.previewPrintTitle || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'previewPrintTitle',
+                fieldValue: s.previewPrintTitle,
+            });
+        }
+
+        if (`${s.previewTitle || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'previewTitle',
+                fieldValue: s.previewTitle,
+            });
+        }
+
+        if (`${s.instructions || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'instructions',
+                fieldValue: s.instructions,
+            });
+        }
+
+        if (`${s.instructions2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'instructions2',
+                fieldValue: s.instructions2,
+            });
+        }
+
+        if (`${s.instructions3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'instructions3',
+                fieldValue: s.instructions3,
+            });
+        }
+
+        if (`${s.instructions4 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'instructions4',
+                fieldValue: s.instructions4,
+            });
+        }
+
+        if (`${s.contentText || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'contentText',
+                fieldValue: s.contentText,
+            });
+        }
+
+        if (`${s.suggestedDiagnosesInstructions || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'suggestedDiagnosesInstructions',
+                fieldValue: s.suggestedDiagnosesInstructions,
+            });
+        }
+
+        if (`${s.suggestedProblemsInstructions || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'suggestedProblemsInstructions',
+                fieldValue: s.suggestedProblemsInstructions,
+            });
+        }
+
+        if (`${s.hcwDiagnosesInstructions || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'hcwDiagnosesInstructions',
+                fieldValue: s.hcwDiagnosesInstructions,
+            });
+        }
+
+        if (`${s.hcwProblemsInstructions || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'hcwProblemsInstructions',
+                fieldValue: s.hcwProblemsInstructions,
+            });
+        }
+
+        if (`${s.infoText || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'infoText',
+                fieldValue: s.infoText,
+            });
+        }
+
+        if (`${s.text1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text1',
+                fieldValue: s.text1,
+            });
+        }
+
+        if (`${s.text2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text2',
+                fieldValue: s.text2,
+            });
+        }
+
+        if (`${s.text3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text3',
+                fieldValue: s.text3,
+            });
+        }
+
+        if (`${s.title1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title1',
+                fieldValue: s.title1,
+            });
+        }
+
+        if (`${s.title2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title2',
+                fieldValue: s.title2,
+            });
+        }
+
+        if (`${s.title3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'title3',
+                fieldValue: s.title3,
+            });
+        }
+
         if (`${s.key || ''}`.match(searchRegex)) {
             matches.push({
                 field: 'key',
@@ -381,6 +514,27 @@ export function parseScriptsSearchResults({
             });
         }
 
+        if (`${s.text1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text1',
+                fieldValue: s.text1,
+            });
+        }
+
+        if (`${s.text2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text2',
+                fieldValue: s.text2,
+            });
+        }
+
+        if (`${s.text3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text3',
+                fieldValue: s.text3,
+            });
+        }
+
         if (`${s.key || ''}`.match(searchRegex)) {
             matches.push({
                 field: 'key',
@@ -392,6 +546,20 @@ export function parseScriptsSearchResults({
             matches.push({
                 field: 'expression',
                 fieldValue: s.expression!,
+            });
+        }
+
+        if (`${s.description || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'description',
+                fieldValue: s.description!,
+            });
+        }
+
+        if (`${s.expressionMeaning || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'expressionMeaning',
+                fieldValue: s.expressionMeaning!,
             });
         }
 
@@ -530,6 +698,82 @@ export const scriptsSearchResultsFilters = [
         value: 'manual_entry',
         label: 'Manual entry only',
     },
+    {
+        value: 'text1',
+        label: 'Text 1',
+    },
+    {
+        value: 'text2',
+        label: 'Text 2',
+    },
+    {
+        value: 'text3',
+        label: 'Text 3',
+    },
+    {
+        value: 'title1',
+        label: 'Title 1',
+    },
+    {
+        value: 'title2',
+        label: 'Title 2',
+    },
+    {
+        value: 'title3',
+        label: 'Title 3',
+    },
+    {
+        value: 'actionText',
+        label: 'Action Text',
+    },
+    {
+        value: 'previewPrintTitle',
+        label: 'Preview Print Title',
+    },
+    {
+        value: 'previewTitle',
+        label: 'Preview Title',
+    },
+    {
+        value: 'instructions',
+        label: 'Instructions',
+    },
+    {
+        value: 'contentText',
+        label: 'Content Text',
+    },
+    {
+        value: 'suggestedDiagnosesInstructions',
+        label: 'Suggested Diagnoses Instructions',
+    },
+    {
+        value: 'suggestedProblemsInstructions',
+        label: 'Suggested Problems Instructions',
+    },
+    {
+        value: 'hcwDiagnosesInstructions',
+        label: 'HCW Diagnoses Instructions',
+    },
+    {
+        value: 'hcwProblemsInstructions',
+        label: 'HCW Problems Instructions',
+    },
+    {
+        value: 'infoText',
+        label: 'Info Text',
+    },
+    {
+        value: 'expression',
+        label: 'Expression',
+    },
+    {
+        value: 'expressionMeaning',
+        label: 'Expression Meaning',
+    },
+    {
+        value: 'description',
+        label: 'Description',
+    },
 ] as const;
 
 export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResultsFilters>['value'];
@@ -549,6 +793,9 @@ const matchedFieldFilterMap: Record<string, string> = {
     field_item_label: 'label',
     item_label: 'label',
     condition: 'condition',
+    expression: 'expression',
+    expressionMeaning: 'expressionMeaning',
+    description: 'description',
     field_condition: 'condition',
     field_calculation: 'condition',
     item_condition: 'condition',
@@ -556,6 +803,22 @@ const matchedFieldFilterMap: Record<string, string> = {
     item_manual_entry: 'manual_entry',
     field_item_manual_label: 'manual_entry',
     item_manual_label: 'manual_entry',
+    text1: 'text1',
+    text2: 'text2',
+    text3: 'text3',
+    title1: 'title1',
+    title2: 'title2',
+    title3: 'title3',
+    actionText: 'actionText',
+    previewPrintTitle: 'previewPrintTitle',
+    previewTitle: 'previewTitle',
+    instructions: 'instructions',
+    contentText: 'contentText',
+    suggestedDiagnosesInstructions: 'suggestedDiagnosesInstructions',
+    suggestedProblemsInstructions: 'suggestedProblemsInstructions',
+    hcwDiagnosesInstructions: 'hcwDiagnosesInstructions',
+    hcwProblemsInstructions: 'hcwProblemsInstructions',
+    infoText: 'infoText',
 };
 
 export function filterScriptsSearchResults({ searchValue, filter, results, }: {
@@ -564,7 +827,7 @@ export function filterScriptsSearchResults({ searchValue, filter, results, }: {
     results: ScriptsSearchResultsItem[];
 }) {
     if (filter === 'all') return results;
-    
+
     const filterFn = (m: ScriptsSearchResultsItem['matches'][0]) => {
         if (matchedFieldFilterMap[m.field] !== filter) return false;
         // if (!`${m.fieldValue || ''}`.toLowerCase().includes(`${searchValue || ''}`.toLowerCase())) return false;

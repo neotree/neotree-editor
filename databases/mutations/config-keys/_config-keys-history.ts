@@ -3,8 +3,6 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { configKeysDrafts, configKeys, configKeysHistory } from "@/databases/pg/schema"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
-import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveConfigKeysHistory({
   previous,
@@ -20,18 +18,18 @@ export async function _saveConfigKeysHistory({
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
-    const executor = client ?? db
+    const executor = client || db
     const insertData: typeof configKeysHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const configKeyId = c?.data?.configKeyId
       if (!configKeyId) continue
-      const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
-      const isCreate = !prev
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
 
       const changeHistoryData: typeof configKeysHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         configKeyId,
         changes: {},
       }
@@ -44,6 +42,8 @@ export async function _saveConfigKeysHistory({
           newValues: [],
         }
       } else {
+        const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
+
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -71,16 +71,14 @@ export async function _saveConfigKeysHistory({
 
       if (userId) {
         const { ...rest } = c.data || {}
-        const sanitizedSnapshot = removeHexCharacters(rest)
-        const previousSnapshot = isCreate
-          ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.configKeyId === configKeyId) || {})
+        const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
+        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.configKeyId === configKeyId) || {}))
 
         changeLogsData.push({
           entityId: configKeyId,
           entityType: "config_key",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -96,7 +94,6 @@ export async function _saveConfigKeysHistory({
     }
   } catch (e: any) {
     logger.error(e.message)
-    throw e
   }
 
   return changeLogsData

@@ -57,6 +57,7 @@ import { ScriptType } from "@/databases/queries/scripts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = {
     scriptId: string;
@@ -422,7 +423,7 @@ export function ScreenForm(props: Props) {
                 </div>
 
                 <div>
-                    <Label secondary htmlFor="condition">Conditional expression</Label>
+                    <Label secondary htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
                     <Textarea
                         {...register('condition', { disabled, })}
                         name="condition"

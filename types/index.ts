@@ -21,6 +21,7 @@ export type Preferences = {
     textColor: { [key: string]: undefined | string; };
     backgroundColor: { [key: string]: undefined | string; };
     highlight: { [key: string]: undefined | boolean; };
+    enableSeverityRanking?: boolean;
 };
 
 export type PrintSection = {
@@ -75,6 +76,8 @@ export type ScriptField = {
     dataType: string;
     defaultValue: string;
     format: string;
+    minLength?: string;
+    maxLength?: string;
     minValue: string;
     maxValue: string;
     minDate: string;
@@ -115,6 +118,35 @@ export type ScriptField = {
         enterValueManuallyLabel?: string;
         keyId?: string;
     }[];
+};
+
+export type EligibilityCriteria = {
+    criteria_type: 'date' | 'datetime' | 'dropdown' | 'yesno';
+    criteria_label: string;
+    auto_fills?: string;
+    criteria_condition: string;
+    failure_message: string;
+    items?: NonNullable<ScriptField['items']>;
+    min_date?: string;
+    max_date?: string;
+    min_date_current?: boolean;
+    max_date_current?: boolean;
+    feasibilityprompt?: {
+        criteria_type: 'yesno';
+        criteria_label: string;
+        items: NonNullable<ScriptField['items']>;
+    };
+    alternative_activation_prompt?: string;
+    alternative_activation_condition?: string;
+    alternative_criteria_type?: 'date' | 'datetime' | 'dropdown' | 'yesno';
+    alternative_criteria_label?: string;
+    alternative_auto_fills?: string;
+    alternative_criteria_condition?: string;
+    alternative_items?: NonNullable<ScriptField['items']>;
+    alternative_min_date?: string;
+    alternative_max_date?: string;
+    alternative_min_date_current?: boolean;
+    alternative_max_date_current?: boolean;
 };
 
 export type DiagnosisSymptom = {
@@ -164,6 +196,7 @@ export type Script = {
     description: string;
     hospitalId: string;
     exportable: boolean;
+    eligibilityCriteria: EligibilityCriteria | null;
     nuidSearchEnabled: boolean;
     publishDate: boolean;
     createdAt: string;

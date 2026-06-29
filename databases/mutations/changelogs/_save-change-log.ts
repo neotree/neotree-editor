@@ -151,6 +151,7 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   hospital: { table: hospitals, idColumn: hospitals.hospitalId, entityLabel: "hospital" },
 }
 
+
 function hashToInt32(value: string): number {
   let hash = 0
   for (let i = 0; i < value.length; i++) {
@@ -333,7 +334,7 @@ async function getLatestChangeLog(
     .orderBy(desc(changeLogs.version))
     .limit(1)
 
-  return rows?.[0]
+  return rows[0]
 }
 
 async function reconcileChangeLogGap(params: {
@@ -622,8 +623,8 @@ export async function _saveChangeLog({
       if (!snapshotHash) throw new Error("snapshotHash is required")
 
       const previousSnapshot = resolvedData.previousSnapshot ?? resolvedData.baselineSnapshot ?? {}
-
       const changeTimestamp = new Date()
+
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
         entityId: resolvedData.entityId,

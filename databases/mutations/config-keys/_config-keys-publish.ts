@@ -65,7 +65,11 @@ export async function _publishConfigKeys(opts?: {
           version: sql`${configKeys.version} + 1`,
         }
 
-        const [persisted] = await client.update(configKeys).set(nextData).where(eq(configKeys.configKeyId, configKeyId)).returning()
+        const [persisted] = await client
+          .update(configKeys)
+          .set(nextData)
+          .where(eq(configKeys.configKeyId, configKeyId))
+          .returning()
         if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
@@ -157,7 +161,9 @@ export async function _publishConfigKeys(opts?: {
       const deletedById = new Map(deletedRows.map((row) => [row.configKeyId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: deletedById.get(c.configKeyId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.configKey!.version, isCreate: false }),
+        version:
+          deletedById.get(c.configKeyId!)?.version ??
+          getPublishedEntityVersion({ currentVersion: c.configKey!.version, isCreate: false }),
         configKeyId: c.configKeyId!,
         changes: {
           action: "delete_config_key",

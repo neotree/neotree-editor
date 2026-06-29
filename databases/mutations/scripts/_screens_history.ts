@@ -4,8 +4,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { screensDrafts, screens, screensHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveScreensHistory({
   previous,
@@ -21,18 +20,18 @@ export async function _saveScreensHistory({
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
-    const executor = client ?? db
+    const executor = client || db
     const insertData: typeof screensHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const screenId = c?.data?.screenId
       if (!screenId) continue
-      const prev = previous.find((prevC) => prevC.screenId === screenId)
-      const isCreate = !prev
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
 
       const changeHistoryData: typeof screensHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         screenId,
         scriptId: c?.data?.scriptId,
         changes: {},
@@ -46,6 +45,8 @@ export async function _saveScreensHistory({
           newValues: [],
         }
       } else {
+        const prev = previous.find((prevC) => prevC.screenId === screenId)
+
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -61,22 +62,11 @@ export async function _saveScreensHistory({
             }
           })
 
-        const syncChangeReason = getDataKeySyncChangeReason(
-          removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {}),
-          removeHexCharacters(c.data || {}),
-        )
-
         changeHistoryData.changes = {
           action: "update_screen",
           description: "Update screen",
           oldValues,
           newValues,
-          metadata: syncChangeReason
-            ? {
-                source: "data_key_reference_sync",
-                mode: syncChangeReason === "Published via data key reference sync" ? "pure" : "mixed",
-              }
-            : undefined,
         }
       }
 
@@ -88,13 +78,17 @@ export async function _saveScreensHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: screenId,
           entityType: "screen",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -112,7 +106,6 @@ export async function _saveScreensHistory({
     }
   } catch (e: any) {
     logger.error(e.message)
-    throw e
   }
 
   return changeLogsData

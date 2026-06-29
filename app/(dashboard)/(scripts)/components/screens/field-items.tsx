@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { v4 as uuidV4 } from "uuid"
 import { arrayMoveImmutable } from "array-move"
+import { useQueryState } from "nuqs"
 
 import type { ScriptField } from "@/types"
 import { DataTable } from "@/components/data-table"
@@ -16,8 +17,10 @@ import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys"
+import { isNumericQueryValue } from "@/lib/query-state"
 import { SelectDataKey } from "@/components/select-data-key"
 import { SelectModal } from "@/components/select-modal"
+import { useAlertModal } from "@/hooks/use-alert-modal"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -26,19 +29,41 @@ export function FieldItems({
   disabled,
   fieldType,
   dataKey,
+  allowCustomKey = false,
+  hideManualEntry = false,
   onChange,
 }: {
   disabled: boolean
   items: Item[]
   fieldType: string
   dataKey?: DataKey | null
+  allowCustomKey?: boolean
+  hideManualEntry?: boolean
   onChange: (items: Item[]) => void
 }) {
   const { confirm } = useConfirmModal()
-  const [currentItemIndex, setCurrentItemIndex] = useState<number>(-1)
-  const [newItem, setNewItem] = useState(false)
+  const [currentItem, setCurrentItem] = useQueryState("fieldItem", {
+    defaultValue: "",
+    clearOnDefault: true,
+  })
 
-  const showForm = newItem || currentItemIndex >= 0
+  const currentItemIndex =
+    currentItem === "new"
+      ? -1
+      : null
+  const activeItem =
+    currentItem === "new"
+      ? null
+      : items.find((item) => item.itemId === currentItem)
+        || (isNumericQueryValue(currentItem) ? items[Number(currentItem)] || null : null)
+  const resolvedCurrentItemIndex = currentItem === "new"
+    ? -1
+    : (() => {
+        const indexById = items.findIndex((item) => item.itemId === currentItem)
+        if (indexById >= 0) return indexById
+        return isNumericQueryValue(currentItem) ? Number(currentItem) : null
+      })()
+  const showForm = currentItem === "new" || !!activeItem
 
   return (
     <>
@@ -46,19 +71,20 @@ export function FieldItems({
         <Form
           fieldDataKey={dataKey}
           fieldType={fieldType}
-          item={items[currentItemIndex] || null}
+          item={activeItem}
           allItems={items}
           onClose={() => {
-            setCurrentItemIndex(-1)
-            setNewItem(false)
+            setCurrentItem("")
           }}
+          hideManualEntry={hideManualEntry}
+          allowCustomKey={allowCustomKey}
           onChange={(data) => {
-            if (newItem) {
+            if (currentItem === "new") {
               onChange([...items, data])
-            } else {
+            } else if (resolvedCurrentItemIndex !== null && resolvedCurrentItemIndex >= 0) {
               onChange(
                 items.map((item, i) => {
-                  if (i !== currentItemIndex) return item
+                  if (i !== resolvedCurrentItemIndex) return item
                   return {
                     ...item,
                     ...data,
@@ -90,7 +116,7 @@ export function FieldItems({
           }}
           headerActions={
             disabled ? null : (
-              <Button variant="ghost" onClick={() => setNewItem(true)}>
+              <Button variant="ghost" onClick={() => setCurrentItem("new")}>
                 <PlusIcon className="h-4 w-4 mr-2" /> Add
               </Button>
             )
@@ -110,9 +136,11 @@ export function FieldItems({
             {
               name: "Enter Value Manually",
               align: "center",
+              cellClassName: hideManualEntry ? "hidden" : "",
             },
             {
               name: "Manual Value Label",
+              cellClassName: hideManualEntry ? "hidden" : "",
             },
             {
               name: "Exclusive Group",
@@ -139,7 +167,7 @@ export function FieldItems({
                       </DropdownMenuTrigger>
 
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setTimeout(() => setCurrentItemIndex(rowIndex), 0)}>
+                        <DropdownMenuItem onClick={() => setTimeout(() => setCurrentItem(items[rowIndex]?.itemId || `${rowIndex}`), 0)}>
                           <EditIcon className="h-4 w-4 mr-2" /> Edit
                         </DropdownMenuItem>
 
@@ -174,6 +202,8 @@ function Form({
   allItems,
   fieldType,
   fieldDataKey,
+  allowCustomKey,
+  hideManualEntry,
   onClose,
   onChange,
 }: {
@@ -181,16 +211,21 @@ function Form({
   allItems: Item[]
   fieldType: string
   fieldDataKey?: DataKey | null
+  allowCustomKey?: boolean
+  hideManualEntry?: boolean
   onClose: () => void
   onChange: (item: Item) => void
 }) {
   const { extractDataKeys } = useDataKeysCtx()
+  const { alert } = useAlertModal()
 
   const {
     control,
     register,
     handleSubmit,
     setValue,
+    watch,
+    formState: { errors },
   } = useForm<Item>({
     defaultValues: {
       ...item,
@@ -206,6 +241,7 @@ function Form({
       keyId: item?.keyId,
     },
   })
+  const enterValueManually = watch("enterValueManually")
 
   const forbidOptions = useMemo(() => {
     const currentItemId = item?.itemId
@@ -219,13 +255,26 @@ function Form({
 
   const onSave = handleSubmit(async (data) => {
     const manualLabel = `${data.enterValueManuallyLabel || ""}`.trim()
+
+    if (!hideManualEntry && data.enterValueManually && !manualLabel) {
+      alert({
+        title: "Manual value label required",
+        message: "Add a label for the manual entry textbox before saving this option.",
+        variant: "error",
+      })
+      return
+    }
+
     const payload = {
       ...data,
-      enterValueManuallyLabel: data.enterValueManually ? manualLabel : "",
+      enterValueManually: hideManualEntry ? false : data.enterValueManually,
+      enterValueManuallyLabel: !hideManualEntry && data.enterValueManually ? manualLabel : "",
     }
     onChange(payload)
     onClose()
-  })
+  });
+
+  const isKeyDisabled = !!item;
 
   return (
     <>
@@ -237,30 +286,47 @@ function Form({
           </SheetHeader>
 
           <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-            <div className="px-4">
+            <div className="px-4 space-y-2">
               <Label htmlFor="value">Key *</Label>
               <Controller
                 control={control}
                 name="value"
+                rules={{ required: "Key is required." }}
                 render={({ field: { value, onChange } }) => {
                   return (
-                    <SelectDataKey
-                      value={`${value || ""}`}
-                      disabled={false}
-                      onChange={([item]) => {
-                        onChange(item.name)
-                        setValue("keyId", item?.uniqueKey, { shouldDirty: true })
-                        setValue("label", item.label || "", { shouldDirty: true })
-                      }}
-                      filterDataKeys={(k) => {
-                        const opts = fieldDataKey?.options || []
-                        if (!fieldDataKey) return true
-                        return opts.includes(k.uniqueKey)
-                      }}
-                    />
+                    <>
+                      <SelectDataKey
+                        value={`${value || ""}`}
+                        disabled={isKeyDisabled}
+                        placeholder={allowCustomKey ? "Select existing key" : "Select key"}
+                        onChange={([item]) => {
+                          onChange(item.name)
+                          setValue("keyId", item?.uniqueKey, { shouldDirty: true })
+                          setValue("label", item.label || "", { shouldDirty: true })
+                        }}
+                        filterDataKeys={(k) => {
+                          const opts = fieldDataKey?.options || []
+                          if (!fieldDataKey) return true
+                          return opts.includes(k.uniqueKey)
+                        }}
+                      />
+                      {allowCustomKey && (
+                        <Input
+                          id="value"
+                          value={`${value || ""}`}
+                          placeholder="Or enter a new key"
+                          error={!!errors.value}
+                          onChange={(event) => {
+                            onChange(event.target.value)
+                            setValue("keyId", undefined, { shouldDirty: true })
+                          }}
+                        />
+                      )}
+                    </>
                   )
                 }}
               />
+              {!!errors.value && <p className="text-xs text-destructive">{`${errors.value.message || ""}`}</p>}
             </div>
 
             <div className="px-4">
@@ -269,7 +335,7 @@ function Form({
                 disabled={false}
                 {...register("label", {
                   required: true,
-                  disabled: false,
+                  disabled: isKeyDisabled,
                 })}
               />
             </div>
@@ -327,20 +393,44 @@ function Form({
               </>
             )}
 
-            <Controller
-              control={control}
-              name="enterValueManually"
-              render={({ field: { value, onChange } }) => {
-                return (
-                  <div className="px-4 flex items-center space-x-2">
-                    <Switch id="enterValueManually" checked={value} onCheckedChange={() => onChange(!value)} />
-                    <Label secondary htmlFor="enterValueManually">
-                      Enter value manually if selected
-                    </Label>
-                  </div>
-                )
-              }}
-            />
+            {!hideManualEntry && (
+              <Controller
+                control={control}
+                name="enterValueManually"
+                render={({ field: { value, onChange } }) => {
+                  return (
+                    <div className="px-4 flex items-center space-x-2">
+                      <Switch id="enterValueManually" checked={value} onCheckedChange={() => onChange(!value)} />
+                      <Label secondary htmlFor="enterValueManually">
+                        Enter value manually if selected
+                      </Label>
+                    </div>
+                  )
+                }}
+              />
+            )}
+
+            {!hideManualEntry && enterValueManually && (
+              <div className="px-4">
+                <Label htmlFor="enterValueManuallyLabel">Manual value label *</Label>
+                <Input
+                  {...register("enterValueManuallyLabel", {
+                    validate: (value) => {
+                      if (!enterValueManually) return true
+                      return !!`${value || ""}`.trim() || "Manual value label is required."
+                    },
+                  })}
+                  error={!!errors.enterValueManuallyLabel}
+                  placeholder="e.g. Specify medication"
+                />
+                <span className="text-xs text-muted-foreground">
+                  This label is shown on the app textbox when manual entry is enabled.
+                </span>
+                {!!errors.enterValueManuallyLabel && (
+                  <span className="text-xs text-destructive">{`${errors.enterValueManuallyLabel.message || ""}`}</span>
+                )}
+              </div>
+            )}
 
           </div>
 

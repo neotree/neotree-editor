@@ -4,8 +4,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { problemsDrafts, problems, problemsHistory } from "@/databases/pg/schema"
 import { removeHexCharacters } from "../../utils"
-import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { getDataKeySyncChangeReason, getIntegrityManualRepairChangeReason } from "@/lib/changelog-data-key-sync"
 
 export async function _saveProblemsHistory({
   previous,
@@ -21,15 +20,14 @@ export async function _saveProblemsHistory({
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
-    const executor = client ?? db
+    const executor = client || db
     const insertData: typeof problemsHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const problemId = c?.data?.problemId
       if (!problemId) continue
 
-      const prev = previous.find((prevC) => prevC.problemId === problemId)
-      const isCreate = !prev
+      const isCreate = (c?.data?.version || 1) === 1
       const changeDescription = isCreate ? "Create problem" : "Update problem"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -39,16 +37,19 @@ export async function _saveProblemsHistory({
         newValues: [],
       }
 
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+      const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof problemsHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         problemId,
         scriptId: c?.data?.scriptId ?? "",
         changes: changePayload,
       }
 
       if (!isCreate) {
+        const prev = previous.find((prevC) => prevC.problemId === problemId)
+
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -60,16 +61,6 @@ export async function _saveProblemsHistory({
               changePayload.newValues.push({ [key]: newValue })
             }
           })
-        const syncChangeReason = getDataKeySyncChangeReason(
-          removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {}),
-          removeHexCharacters(c.data || {}),
-        )
-        if (syncChangeReason) {
-          ;(changePayload as any).metadata = {
-            source: "data_key_reference_sync",
-            mode: syncChangeReason === "Published via data key reference sync" ? "pure" : "mixed",
-          }
-        }
       }
 
       insertData.push(changeHistoryData)
@@ -79,13 +70,17 @@ export async function _saveProblemsHistory({
         const previousSnapshot = isCreate
           ? {}
           : removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {})
-        const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
+        const changeReason = isCreate
+          ? undefined
+          : c.draftOrigin === "other"
+            ? getIntegrityManualRepairChangeReason()
+            : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: problemId,
           entityType: "problem",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -104,7 +99,6 @@ export async function _saveProblemsHistory({
     }
   } catch (e: any) {
     logger.error(e.message)
-    throw e
   }
 
   return changeLogsData

@@ -2,15 +2,183 @@
 
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
-import { _getScreens } from '@/databases/queries/scripts';
+import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
+import { _saveDiagnoses, _saveProblems, _saveScreens } from '@/databases/mutations/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
 import { validateApiKey, validateHeadersItem } from './authenticate';
 import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
-import { dataKeys, dataKeysDrafts, screens, screensDrafts } from '@/databases/pg/schema';
-import { count, isNull, max } from 'drizzle-orm';
+import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
+import { count, eq, isNull, max } from 'drizzle-orm';
+import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBlockingEntry, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { _getEditorInfo } from '@/databases/queries/editor-info';
+import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
+import socket from '@/lib/socket';
+import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
+
+type BulkIntegrityRepairItemInput = {
+    entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
+    reviewed?: boolean;
+};
+
+type IntegritySummarySnapshot = {
+    total: number;
+    resolved: number;
+    out_of_sync: number;
+    missing: number;
+    legacy_match: number;
+    conflict: number;
+    unmanaged: number;
+    blocking: number;
+};
+
+type IntegrityImpactSummary = {
+    before: IntegritySummarySnapshot;
+    after: IntegritySummarySnapshot;
+    delta: IntegritySummarySnapshot;
+    touched: {
+        screens: number;
+        diagnoses: number;
+        problems: number;
+    };
+};
+
+function buildRegistryIntegrityReport({
+    dataKeys,
+    screens,
+    diagnoses,
+    problems,
+    onlyIssues,
+}: {
+    dataKeys: Awaited<ReturnType<typeof _getDataKeys>>["data"];
+    screens: Awaited<ReturnType<typeof _getScreens>>["data"];
+    diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
+    problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+    onlyIssues: boolean;
+}) {
+    const integrityContext = buildDataKeyIntegrityContext(dataKeys);
+
+    const rawReport = scanDataKeyIntegrity({
+        dataKeys,
+        screens,
+        diagnoses,
+        problems,
+        onlyIssues,
+        context: integrityContext,
+    });
+
+    return {
+        rawReport,
+        integrityContext,
+    };
+}
+
+function getBlockingEntriesForRegistry(entries: DataKeyIntegrityEntry[]) {
+    return entries.filter((entry) => isBlockingEntry(entry));
+}
+
+function buildImpactSummary({
+    before,
+    after,
+    touched,
+}: {
+    before: IntegritySummarySnapshot;
+    after: IntegritySummarySnapshot;
+    touched: IntegrityImpactSummary["touched"];
+}): IntegrityImpactSummary {
+    return {
+        before,
+        after,
+        delta: {
+            total: after.total - before.total,
+            resolved: after.resolved - before.resolved,
+            out_of_sync: after.out_of_sync - before.out_of_sync,
+            missing: after.missing - before.missing,
+            legacy_match: after.legacy_match - before.legacy_match,
+            conflict: after.conflict - before.conflict,
+            unmanaged: after.unmanaged - before.unmanaged,
+            blocking: after.blocking - before.blocking,
+        },
+        touched,
+    };
+}
+
+async function loadIntegrityScriptState(scriptId: string) {
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        _getDataKeys({ returnDraftsIfExist: true }),
+        _getScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+        _getDiagnoses({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+        _getProblems({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+    ]);
+
+    const errors = [
+        ...(dataKeysRes.errors || []),
+        ...(screensRes.errors || []),
+        ...(diagnosesRes.errors || []),
+        ...(problemsRes.errors || []),
+    ];
+
+    return {
+        success: errors.length === 0,
+        errors,
+        dataKeys: dataKeysRes.data,
+        screens: screensRes.data,
+        diagnoses: diagnosesRes.data,
+        problems: problemsRes.data,
+    };
+}
+
+async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        _getDataKeys({ returnDraftsIfExist: true }),
+        _getScreens({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+        _getDiagnoses({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+        _getProblems({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+    ]);
+
+    const errors = [
+        ...(dataKeysRes.errors || []),
+        ...(screensRes.errors || []),
+        ...(diagnosesRes.errors || []),
+        ...(problemsRes.errors || []),
+    ];
+
+    if (errors.length) {
+        return {
+            success: false as const,
+            errors,
+            dataKeys: [] as Awaited<ReturnType<typeof _getDataKeys>>["data"],
+            screens: [] as Awaited<ReturnType<typeof _getScreens>>["data"],
+            diagnoses: [] as Awaited<ReturnType<typeof _getDiagnoses>>["data"],
+            problems: [] as Awaited<ReturnType<typeof _getProblems>>["data"],
+            repairs: null,
+        };
+    }
+
+    return {
+        success: true as const,
+        errors: [] as string[],
+        dataKeys: dataKeysRes.data,
+        screens: screensRes.data,
+        diagnoses: diagnosesRes.data,
+        problems: problemsRes.data,
+        repairs: (() => {
+            const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
+            return repairSingleDataKeyIntegrityReference({
+                entry,
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                problems: problemsRes.data,
+                overrideTargetUniqueKey: selectedTargetUniqueKey,
+                context: integrityContext,
+            });
+        })(),
+    };
+}
 
 async function assertCanManageDataKeys(
     user?: { role?: string | null } | null,
@@ -27,6 +195,16 @@ async function assertCanManageDataKeys(
 
     if (!allowed) logger.error('assertCanManageDataKeys ERROR', JSON.stringify({ role, allowApiKeyAuth: !!options?.allowApiKeyAuth, allowedByApiKey }));
     if (!allowed) throw new Error('Forbidden: only super_user can add or edit data keys');
+}
+
+async function assertCanManageEditorDrafts(
+    user?: { role?: string | null } | null,
+) {
+    const role = `${user?.role || ''}`.trim();
+    const allowed = role === 'admin' || role === 'super_user';
+
+    if (!allowed) logger.error('assertCanManageEditorDrafts ERROR', JSON.stringify({ role }));
+    if (!allowed) throw new Error('Forbidden: only admin or super_user can update script integrity drafts');
 }
 
 export const saveDataKeys: typeof _saveDataKeys = async params => {
@@ -84,6 +262,804 @@ export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = asyn
 export const getDataKeys = async (params?: GetDataKeysParams) => {
     const res = await _getDataKeys(params);
     return res;
+}
+
+export const getDataKeysIntegrity = async (params?: {
+    scriptsIds?: string[];
+    onlyIssues?: boolean;
+}) => {
+    try {
+        const session = await isAllowed();
+        const userId = session.user?.userId;
+
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+            _getProblems({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+        ]);
+        const pendingDeletedDataKeys = userId
+            ? await db.query.pendingDeletion.findMany({
+                where: eq(pendingDeletion.createdByUserId, userId),
+                columns: { dataKeyId: true },
+            })
+            : [];
+        const pendingDeletedDataKeyIds = new Set(
+            pendingDeletedDataKeys.map((entry) => entry.dataKeyId).filter((id): id is string => !!id)
+        );
+        const scopedDataKeys = dataKeysRes.data.filter((item) => !pendingDeletedDataKeyIds.has(item.uuid));
+        const editorInfoRes = await _getEditorInfo();
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+            ...(problemsRes.errors || []),
+            ...(editorInfoRes.errors || []),
+        ];
+
+        if (errors.length) {
+            logger.error('getDataKeysIntegrity RETURNED_ERRORS', {
+                scriptsIds: params?.scriptsIds || [],
+                onlyIssues: params?.onlyIssues,
+                errors,
+            });
+            return {
+                success: false,
+                data: null,
+                errors,
+            };
+        }
+
+        const integrityPolicyState = getIntegrityPolicyState(editorInfoRes.data);
+        const {
+            rawReport,
+        } = buildRegistryIntegrityReport({
+            dataKeys: scopedDataKeys,
+            screens: screensRes.data,
+            diagnoses: diagnosesRes.data,
+            problems: problemsRes.data,
+            onlyIssues: params?.onlyIssues !== false,
+        });
+
+        // Expose the currently enforced "newly introduced" issue set so the
+        // script registry can open directly into the same blocking slice a
+        // user saw from the publish modal.
+        const blockingEntries = getBlockingEntriesForRegistry(rawReport.entries);
+        const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
+            policy: integrityPolicyState.policy,
+            baseline: integrityPolicyState.baseline,
+            blockingEntries,
+            getFingerprint: getDataKeyIntegrityEntryFingerprint,
+        });
+
+        return {
+            success: true,
+            data: {
+                ...rawReport,
+                policy: integrityPolicyState.policy,
+                summary: rawReport.summary,
+                newlyIntroducedFingerprints: policyEvaluation.enforcedBlockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)),
+            },
+        };
+    } catch (e: any) {
+        logger.error('getDataKeysIntegrity ERROR', e.message);
+        return {
+            success: false,
+            data: null,
+            errors: [e.message],
+        };
+    }
+}
+
+export const getDataKeysDeleteImpact = async (params?: {
+    dataKeysIds?: string[];
+    uniqueKeys?: string[];
+}): Promise<{
+    success: boolean;
+    data: Array<{
+        dataKeyId: string;
+        uniqueKey: string;
+        name: string;
+        label: string;
+        dataType: string;
+        options: string[];
+        scripts: Array<{
+            scriptId: string;
+            scriptTitle: string;
+            usages: Array<{
+                label: string;
+                href: string;
+            }>;
+        }>;
+    }>;
+    errors?: string[];
+}> => {
+    try {
+        await isAllowed();
+
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ returnDraftsIfExist: true }),
+            _getDiagnoses({ returnDraftsIfExist: true }),
+            _getProblems({ returnDraftsIfExist: true }),
+        ]);
+
+        const errors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+            ...(problemsRes.errors || []),
+        ];
+
+        if (errors.length) return { success: false, data: [], errors };
+
+        return {
+            success: true,
+            data: buildDataKeysDeleteImpact({
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                problems: problemsRes.data,
+                dataKeysIds: params?.dataKeysIds,
+                uniqueKeys: params?.uniqueKeys,
+            }),
+        };
+    } catch (e: any) {
+        logger.error('getDataKeysDeleteImpact ERROR', e.message);
+        return {
+            success: false,
+            data: [],
+            errors: [e.message],
+        };
+    }
+}
+
+export const resolveDataKeyIntegrityEntry = async (params: {
+    entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
+}) => {
+    try {
+        const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
+        const prepared = await prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey);
+
+        if (!prepared.success) {
+            logger.error('resolveDataKeyIntegrityEntry FETCH_ERRORS', {
+                entry: params.entry,
+                errors: prepared.errors,
+            });
+            return {
+                success: false,
+                changed: false,
+                reportAfter: null,
+                impactSummary: null,
+                errors: prepared.errors,
+                warnings: [],
+            };
+        }
+        const repairs = prepared.repairs;
+        const beforeReport = buildRegistryIntegrityReport({
+            dataKeys: prepared.dataKeys,
+            screens: prepared.screens,
+            diagnoses: prepared.diagnoses,
+            problems: prepared.problems,
+            onlyIssues: false,
+        }).rawReport;
+
+        if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) {
+            return {
+                success: true,
+                changed: false,
+                reportAfter: null,
+                impactSummary: null,
+                errors: [],
+                warnings: [],
+            };
+        }
+
+        const warnings: string[] = [];
+        try {
+            await db.transaction(async (tx) => {
+                if (repairs.screens.length) {
+                    const repairedScreens = await _saveScreens({
+                        data: repairs.screens,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScreens.errors?.length) {
+                        warnings.push(...(repairedScreens.warnings || []));
+                        throw new Error(repairedScreens.errors.join(', '));
+                    }
+                    warnings.push(...(repairedScreens.warnings || []));
+                }
+
+                if (repairs.diagnoses.length) {
+                    const repairedDiagnoses = await _saveDiagnoses({
+                        data: repairs.diagnoses,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedDiagnoses.errors?.length) {
+                        throw new Error(repairedDiagnoses.errors.join(', '));
+                    }
+                }
+
+                if (repairs.problems.length) {
+                    const repairedProblems = await _saveProblems({
+                        data: repairs.problems,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedProblems.errors?.length) {
+                        throw new Error(repairedProblems.errors.join(', '));
+                    }
+                }
+            });
+        } catch (e: any) {
+            logger.error('resolveDataKeyIntegrityEntry SAVE_TRANSACTION_ERROR', {
+                entry: params.entry,
+                screensCount: repairs.screens.length,
+                diagnosesCount: repairs.diagnoses.length,
+                problemsCount: repairs.problems.length,
+                error: e.message,
+            });
+            return {
+                success: false,
+                changed: false,
+                reportAfter: null,
+                impactSummary: null,
+                errors: [e.message],
+                warnings,
+            };
+        }
+
+        const persistedState = await loadIntegrityScriptState(params.entry.scriptId);
+        if (!persistedState.success) {
+            logger.error('resolveDataKeyIntegrityEntry REFETCH_ERRORS', {
+                entry: params.entry,
+                errors: persistedState.errors,
+            });
+            socket.emit('data_changed', 'resolve_data_key_integrity_entry');
+            return {
+                success: true,
+                changed: true,
+                reportAfter: null,
+                impactSummary: null,
+                errors: [],
+                warnings: [
+                    ...warnings,
+                    ...(persistedState.errors?.length ? [`Draft saved, but summary refresh failed: ${persistedState.errors.join(', ')}`] : []),
+                ],
+            };
+        }
+
+        const afterReport = buildRegistryIntegrityReport({
+            dataKeys: persistedState.dataKeys,
+            screens: persistedState.screens,
+            diagnoses: persistedState.diagnoses,
+            problems: persistedState.problems,
+            onlyIssues: false,
+        }).rawReport;
+
+        socket.emit('data_changed', 'resolve_data_key_integrity_entry');
+
+        return {
+            success: true,
+            changed: true,
+            reportAfter: null,
+            impactSummary: buildImpactSummary({
+                before: beforeReport.summary,
+                after: afterReport.summary,
+                touched: {
+                    screens: repairs.screens.length,
+                    diagnoses: repairs.diagnoses.length,
+                    problems: repairs.problems.length,
+                },
+            }),
+            errors: [],
+            warnings,
+        };
+    } catch (e: any) {
+        logger.error('resolveDataKeyIntegrityEntry ERROR', {
+            entry: params.entry,
+            error: e.message,
+            stack: e.stack,
+        });
+        return {
+            success: false,
+            changed: false,
+            reportAfter: null,
+            impactSummary: null,
+            errors: [e.message],
+            warnings: [],
+        };
+    }
+}
+
+export const resolveDataKeyIntegrityEntriesBulk = async (params: {
+    entries?: DataKeyIntegrityEntry[];
+    items?: BulkIntegrityRepairItemInput[];
+}) => {
+    try {
+        const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
+        const items: BulkIntegrityRepairItemInput[] = (params.items?.length
+            ? params.items
+            : (params.entries || []).map((entry) => ({ entry })))
+            .filter((item) => item?.entry);
+        const reviewedItems = items.filter((item) => item.reviewed !== false);
+        const entries = reviewedItems.map((item) => item.entry);
+
+        if (!reviewedItems.length) {
+            return {
+                success: true,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: [],
+                warnings: [],
+            };
+        }
+
+        const scriptIds = Array.from(new Set(entries.map((entry) => entry.scriptId).filter(Boolean)));
+        if (scriptIds.length !== 1) {
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: ['Bulk resolve currently supports one script at a time'],
+                warnings: [],
+            };
+        }
+
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getProblems({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+        ]);
+
+        const fetchErrors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+            ...(problemsRes.errors || []),
+        ];
+        if (fetchErrors.length) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk FETCH_ERRORS', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                errors: fetchErrors,
+            });
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: fetchErrors,
+                warnings: [],
+            };
+        }
+
+        let currentScreens = screensRes.data;
+        let currentDiagnoses = diagnosesRes.data;
+        let currentProblems = problemsRes.data;
+        const currentScreensById = new Map(currentScreens.map((screen) => [screen.screenId, screen] as const));
+        const currentDiagnosesById = new Map(currentDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis] as const));
+        const currentProblemsById = new Map(currentProblems.map((problem) => [problem.problemId, problem] as const));
+        const changedScreenIds = new Set<string>();
+        const changedDiagnosisIds = new Set<string>();
+        const changedProblemIds = new Set<string>();
+        let resolvedCount = 0;
+        const warnings: string[] = [];
+        const beforeReport = buildRegistryIntegrityReport({
+            dataKeys: dataKeysRes.data,
+            screens: currentScreens,
+            diagnoses: currentDiagnoses,
+            problems: currentProblems,
+            onlyIssues: false,
+        }).rawReport;
+
+        for (const item of reviewedItems) {
+            const entry = item.entry;
+            const repairs = repairSingleDataKeyIntegrityReference({
+                entry,
+                dataKeys: dataKeysRes.data,
+                screens: currentScreens,
+                diagnoses: currentDiagnoses,
+                problems: currentProblems,
+                overrideTargetUniqueKey: item.selectedTargetUniqueKey,
+            });
+
+            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) continue;
+
+            resolvedCount++;
+            if (repairs.screens.length) {
+                repairs.screens.forEach((screen) => {
+                    currentScreensById.set(screen.screenId, screen);
+                    changedScreenIds.add(screen.screenId);
+                });
+                currentScreens = currentScreens.map((screen) => currentScreensById.get(screen.screenId) || screen);
+            }
+            if (repairs.diagnoses.length) {
+                repairs.diagnoses.forEach((diagnosis) => {
+                    currentDiagnosesById.set(diagnosis.diagnosisId, diagnosis);
+                    changedDiagnosisIds.add(diagnosis.diagnosisId);
+                });
+                currentDiagnoses = currentDiagnoses.map((diagnosis) => currentDiagnosesById.get(diagnosis.diagnosisId) || diagnosis);
+            }
+            if (repairs.problems.length) {
+                repairs.problems.forEach((problem) => {
+                    currentProblemsById.set(problem.problemId, problem);
+                    changedProblemIds.add(problem.problemId);
+                });
+                currentProblems = currentProblems.map((problem) => currentProblemsById.get(problem.problemId) || problem);
+            }
+        }
+
+        const changedScreens = Array.from(changedScreenIds)
+            .map((screenId) => currentScreensById.get(screenId))
+            .filter((screen): screen is typeof screensRes.data[number] => !!screen);
+        const changedDiagnoses = Array.from(changedDiagnosisIds)
+            .map((diagnosisId) => currentDiagnosesById.get(diagnosisId))
+            .filter((diagnosis): diagnosis is typeof diagnosesRes.data[number] => !!diagnosis);
+        const changedProblems = Array.from(changedProblemIds)
+            .map((problemId) => currentProblemsById.get(problemId))
+            .filter((problem): problem is typeof problemsRes.data[number] => !!problem);
+
+        if (!changedScreens.length && !changedDiagnoses.length && !changedProblems.length) {
+            return {
+                success: true,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: [],
+                warnings: [],
+            };
+        }
+
+        try {
+            await db.transaction(async (tx) => {
+                if (changedScreens.length) {
+                    const repairedScreens = await _saveScreens({
+                        data: changedScreens,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScreens.errors?.length) {
+                        warnings.push(...(repairedScreens.warnings || []));
+                        throw new Error(repairedScreens.errors.join(', '));
+                    }
+                    warnings.push(...(repairedScreens.warnings || []));
+                }
+
+                if (changedDiagnoses.length) {
+                    const repairedDiagnoses = await _saveDiagnoses({
+                        data: changedDiagnoses,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedDiagnoses.errors?.length) {
+                        throw new Error(repairedDiagnoses.errors.join(', '));
+                    }
+                }
+
+                if (changedProblems.length) {
+                    const repairedProblems = await _saveProblems({
+                        data: changedProblems,
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedProblems.errors?.length) {
+                        throw new Error(repairedProblems.errors.join(', '));
+                    }
+                }
+            });
+        } catch (e: any) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_TRANSACTION_ERROR', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                screensCount: changedScreens.length,
+                diagnosesCount: changedDiagnoses.length,
+                problemsCount: changedProblems.length,
+                error: e.message,
+            });
+            return {
+                success: false,
+                changed: false,
+                resolvedCount: 0,
+                impactSummary: null,
+                errors: [e.message],
+                warnings,
+            };
+        }
+
+        const persistedState = await loadIntegrityScriptState(scriptIds[0]);
+        if (!persistedState.success) {
+            logger.error('resolveDataKeyIntegrityEntriesBulk REFETCH_ERRORS', {
+                entriesCount: entries.length,
+                scriptId: scriptIds[0],
+                errors: persistedState.errors,
+            });
+            socket.emit('data_changed', 'resolve_data_key_integrity_entries_bulk');
+            return {
+                success: true,
+                changed: true,
+                resolvedCount,
+                impactSummary: null,
+                errors: [],
+                warnings: [
+                    ...warnings,
+                    ...(persistedState.errors?.length ? [`Drafts saved, but summary refresh failed: ${persistedState.errors.join(', ')}`] : []),
+                ],
+            };
+        }
+
+        const afterReport = buildRegistryIntegrityReport({
+            dataKeys: persistedState.dataKeys,
+            screens: persistedState.screens,
+            diagnoses: persistedState.diagnoses,
+            problems: persistedState.problems,
+            onlyIssues: false,
+        }).rawReport;
+
+        socket.emit('data_changed', 'resolve_data_key_integrity_entries_bulk');
+
+        return {
+            success: true,
+            changed: true,
+            resolvedCount,
+            impactSummary: buildImpactSummary({
+                before: beforeReport.summary,
+                after: afterReport.summary,
+                touched: {
+                    screens: changedScreens.length,
+                    diagnoses: changedDiagnoses.length,
+                    problems: changedProblems.length,
+                },
+            }),
+            errors: [],
+            warnings,
+        };
+    } catch (e: any) {
+        logger.error('resolveDataKeyIntegrityEntriesBulk ERROR', {
+            error: e.message,
+            stack: e.stack,
+            entriesCount: params.entries?.length || 0,
+        });
+        return {
+            success: false,
+            changed: false,
+            resolvedCount: 0,
+            impactSummary: null,
+            errors: [e.message],
+            warnings: [],
+        };
+    }
+}
+
+export const previewDataKeyIntegrityEntriesBulk = async (params: {
+    entries?: DataKeyIntegrityEntry[];
+    items?: BulkIntegrityRepairItemInput[];
+}) => {
+    try {
+        const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
+
+        const items: BulkIntegrityRepairItemInput[] = (params.items?.length
+            ? params.items
+            : (params.entries || []).map((entry) => ({ entry })))
+            .filter((item) => item?.entry);
+        if (!items.length) {
+            return {
+                success: true,
+                previews: [],
+                errors: [],
+            };
+        }
+
+        const scriptIds = Array.from(new Set(items.map((item) => item.entry.scriptId).filter(Boolean)));
+        if (scriptIds.length !== 1) {
+            return {
+                success: false,
+                previews: [],
+                errors: ['Bulk resolve currently supports one script at a time'],
+            };
+        }
+
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            _getDataKeys({ returnDraftsIfExist: true }),
+            _getScreens({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getDiagnoses({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getProblems({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+        ]);
+
+        const fetchErrors = [
+            ...(dataKeysRes.errors || []),
+            ...(screensRes.errors || []),
+            ...(diagnosesRes.errors || []),
+            ...(problemsRes.errors || []),
+        ];
+        if (fetchErrors.length) {
+            return {
+                success: false,
+                previews: [],
+                errors: fetchErrors,
+            };
+        }
+
+        const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
+        const dataKeysByUniqueKey = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uniqueKey, dataKey] as const));
+
+        const previews = items.map((item) => {
+            const repairs = repairSingleDataKeyIntegrityReference({
+                entry: item.entry,
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                problems: problemsRes.data,
+                overrideTargetUniqueKey: item.selectedTargetUniqueKey,
+                context: integrityContext,
+            });
+
+            const preferredUniqueKey = item.selectedTargetUniqueKey
+                || item.entry.matchedUniqueKey
+                || item.entry.suggestedUniqueKeys?.[0]
+                || item.entry.currentUniqueKey;
+            const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
+
+            return {
+                entry: item.entry,
+                selectedTargetUniqueKey: item.selectedTargetUniqueKey || matchedDataKey?.uniqueKey || '',
+                targetDataKey: !matchedDataKey ? null : {
+                    uniqueKey: matchedDataKey.uniqueKey,
+                    name: matchedDataKey.name || '',
+                    label: matchedDataKey.label || '',
+                    dataType: matchedDataKey.dataType || '',
+                    confidential: !!matchedDataKey.confidential,
+                    isDraft: !!matchedDataKey.isDraft,
+                    isDeleted: !!matchedDataKey.isDeleted,
+                    optionsCount: Array.isArray(matchedDataKey.options) ? matchedDataKey.options.length : 0,
+                    metadata: (matchedDataKey.metadata || {}) as Record<string, any>,
+                },
+                screens: repairs.screens.map((screen) => ({
+                    screenId: screen.screenId,
+                    title: screen.title || screen.label || screen.refId || screen.screenId,
+                    scriptId: screen.scriptId,
+                })),
+                diagnoses: repairs.diagnoses.map((diagnosis) => ({
+                    diagnosisId: diagnosis.diagnosisId,
+                    title: diagnosis.name || diagnosis.key || diagnosis.diagnosisId,
+                    scriptId: diagnosis.scriptId,
+                })),
+                problems: repairs.problems.map((problem) => ({
+                    problemId: problem.problemId,
+                    title: problem.name || problem.key || problem.problemId,
+                    scriptId: problem.scriptId,
+                })),
+                changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length,
+                reviewed: item.reviewed === true,
+            };
+        });
+
+        return {
+            success: true,
+            previews,
+            errors: [],
+        };
+    } catch (e: any) {
+        logger.error('previewDataKeyIntegrityEntriesBulk ERROR', {
+            error: e.message,
+            stack: e.stack,
+            entriesCount: params.items?.length || params.entries?.length || 0,
+        });
+        return {
+            success: false,
+            previews: [],
+            errors: [e.message],
+        };
+    }
+}
+
+export const previewDataKeyIntegrityEntryRepair = async (params: {
+    entry: DataKeyIntegrityEntry;
+    selectedTargetUniqueKey?: string;
+}) => {
+    try {
+        const session = await isAllowed();
+        await assertCanManageEditorDrafts(session.user);
+        const [prepared, dataKeysRes] = await Promise.all([
+            prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey),
+            _getDataKeys({ returnDraftsIfExist: true }),
+        ]);
+
+        if (!prepared.success) {
+            return {
+                success: false,
+                changed: false,
+                preview: null,
+                errors: prepared.errors,
+            };
+        }
+        if (dataKeysRes.errors?.length) {
+            return {
+                success: false,
+                changed: false,
+                preview: null,
+                errors: dataKeysRes.errors,
+            };
+        }
+        const repairs = prepared.repairs;
+        const dataKeysByUniqueKey = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uniqueKey, dataKey] as const));
+        const preferredUniqueKey =
+            params.selectedTargetUniqueKey
+            || params.entry.matchedUniqueKey
+            || params.entry.suggestedUniqueKeys?.[0]
+            || params.entry.currentUniqueKey;
+        const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
+        return {
+            success: true,
+            changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length,
+            preview: {
+                entry: params.entry,
+                targetDataKey: !matchedDataKey ? null : {
+                    uniqueKey: matchedDataKey.uniqueKey,
+                    name: matchedDataKey.name || '',
+                    label: matchedDataKey.label || '',
+                    dataType: matchedDataKey.dataType || '',
+                    confidential: !!matchedDataKey.confidential,
+                    isDraft: !!matchedDataKey.isDraft,
+                    isDeleted: !!matchedDataKey.isDeleted,
+                    optionsCount: Array.isArray(matchedDataKey.options) ? matchedDataKey.options.length : 0,
+                    metadata: (matchedDataKey.metadata || {}) as Record<string, any>,
+                },
+                screens: repairs.screens.map((screen) => ({
+                    screenId: screen.screenId,
+                    title: screen.title || screen.label || screen.refId || screen.screenId,
+                    scriptId: screen.scriptId,
+                })),
+                diagnoses: repairs.diagnoses.map((diagnosis) => ({
+                    diagnosisId: diagnosis.diagnosisId,
+                    title: diagnosis.name || diagnosis.key || diagnosis.diagnosisId,
+                    scriptId: diagnosis.scriptId,
+                })),
+                problems: repairs.problems.map((problem) => ({
+                    problemId: problem.problemId,
+                    title: problem.name || problem.key || problem.problemId,
+                    scriptId: problem.scriptId,
+                })),
+                savesAsDraft: true,
+                publishRequired: true,
+            },
+            errors: [],
+        };
+    } catch (e: any) {
+        logger.error('previewDataKeyIntegrityEntryRepair ERROR', {
+            entry: params.entry,
+            error: e.message,
+            stack: e.stack,
+        });
+        return {
+            success: false,
+            changed: false,
+            preview: null,
+            errors: [e.message],
+        };
+    }
 }
 
 type UsageExportCache = {
@@ -285,6 +1261,7 @@ export const getDataKeysUsageExportRows = async (params?: {
 
         screensRes.data.forEach(screen => {
             const scriptTitle = screen.scriptTitle || '';
+            const includeScreenItems = `${screen.type || ''}`.trim().toLowerCase() !== 'progress';
 
             addRow({
                 keyId: screen.keyId,
@@ -308,13 +1285,15 @@ export const getDataKeysUsageExportRows = async (params?: {
                 });
             });
 
-            (screen.items || []).forEach(item => {
-                addRow({
-                    keyId: item.keyId,
-                    keyName: item.key || item.id,
-                    scriptTitle,
+            if (includeScreenItems) {
+                (screen.items || []).forEach(item => {
+                    addRow({
+                        keyId: item.keyId,
+                        keyName: item.key || item.id,
+                        scriptTitle,
+                    });
                 });
-            });
+            }
         });
 
         const data = normalizeUsageExportRows(Array.from(rowsMap.values()))
@@ -363,7 +1342,7 @@ export const exportDataKeys = async ({
         await assertCanManageDataKeys(session.user);
 
         const axiosClient = await getSiteAxiosClient(siteId);
-        
+
         const dataKeys = await _getDataKeys({
             dataKeysIds: uuids,
             returnDraftsIfExist: true,

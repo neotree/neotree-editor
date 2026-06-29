@@ -3,6 +3,7 @@ import { create } from 'zustand';
 type Options = {
     title: string;
     message: string;
+    footerMessage?: string;
     positiveLabel: string;
     negativeLabel: string;
     danger?: boolean;
@@ -19,6 +20,7 @@ const defaults: Options = {
     danger: false,
     title: 'Confirm',
     message: 'Are you sure?',
+    footerMessage: '',
     positiveLabel: 'Ok',
     negativeLabel: 'Cancel',
 };

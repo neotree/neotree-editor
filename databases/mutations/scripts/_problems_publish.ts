@@ -26,19 +26,16 @@ export async function _publishProblems(opts?: {
   const changeLogs: SaveChangeLogData[] = []
 
   if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
-    return {
-      success: false,
-      errors: ["Problem publish must run inside a release transaction with a valid dataVersion"],
-    }
+    return { success: false, errors: ["Problem publish must run inside a release transaction with a valid dataVersion"] }
   }
 
   try {
-    const client = opts.client
+    const executor = opts.client
     let updates: (typeof problemsDrafts.$inferSelect)[] = []
     let inserts: (typeof problemsDrafts.$inferSelect)[] = []
 
     if (scriptsIds?.length || problemsIds?.length) {
-      const res = await client.query.problemsDrafts.findMany({
+      const res = await executor.query.problemsDrafts.findMany({
         where: and(
           or(
             !scriptsIds?.length ? undefined : inArray(problemsDrafts.scriptId, scriptsIds),
@@ -53,7 +50,7 @@ export async function _publishProblems(opts?: {
       updates = res.filter((s) => s.problemId)
       inserts = res.filter((s) => !s.problemId)
     } else {
-      const _problemsDrafts = await client.query.problemsDrafts.findMany({
+      const _problemsDrafts = await executor.query.problemsDrafts.findMany({
         where: and(
           isNotNull(problemsDrafts.scriptId),
           !opts?.userId ? undefined : eq(problemsDrafts.createdByUserId, opts.userId),
@@ -68,7 +65,7 @@ export async function _publishProblems(opts?: {
       let dataBefore: (typeof problems.$inferSelect)[] = []
       const persistedUpdates: typeof problemsDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.problemId).length) {
-        dataBefore = await client.query.problems.findMany({
+        dataBefore = await executor.query.problems.findMany({
           where: inArray(
             problems.problemId,
             updates.filter((c) => c.problemId).map((c) => c.problemId!),
@@ -88,7 +85,7 @@ export async function _publishProblems(opts?: {
           version: sql`${problems.version} + 1`,
         }
 
-        const [persisted] = await client.update(problems).set(nextData).where(eq(problems.problemId, problemId)).returning()
+        const [persisted] = await executor.update(problems).set(nextData).where(eq(problems.problemId, problemId)).returning()
         if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
@@ -96,7 +93,7 @@ export async function _publishProblems(opts?: {
         drafts: persistedUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client,
+        client: executor,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -109,7 +106,7 @@ export async function _publishProblems(opts?: {
       let dataBefore: (typeof problems.$inferSelect)[] = []
       const persistedInserts: typeof problemsDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.problemId).length) {
-        dataBefore = await client.query.problems.findMany({
+        dataBefore = await executor.query.problems.findMany({
           where: inArray(
             problems.problemId,
             inserts.filter((c) => c.problemId).map((c) => c.problemId!),
@@ -132,7 +129,7 @@ export async function _publishProblems(opts?: {
           return d
         })
 
-        const [persisted] = await client.insert(problems).values(payload).returning()
+        const [persisted] = await executor.insert(problems).values(payload).returning()
         const sourceDraft = inserts.find((draft) => draft.id === id)
         if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
@@ -141,7 +138,7 @@ export async function _publishProblems(opts?: {
         drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client,
+        client: executor,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -149,19 +146,14 @@ export async function _publishProblems(opts?: {
       })))
     }
 
-    const processedDraftIds = [...updates, ...inserts].map((entry) => entry.id)
-    if (processedDraftIds.length) {
-      await client.delete(problemsDrafts).where(inArray(problemsDrafts.id, processedDraftIds))
-    }
+    await executor.delete(problemsDrafts).where(!opts?.userId ? undefined : eq(problemsDrafts.createdByUserId, opts.userId))
 
-    let deleted = await client.query.pendingDeletion.findMany({
+    let deleted = await executor.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.problemId),
-        scriptsIds?.length ? inArray(pendingDeletion.problemScriptId, scriptsIds) : undefined,
-        problemsIds?.length ? inArray(pendingDeletion.problemId, problemsIds) : undefined,
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
       ),
-      columns: { id: true, problemId: true },
+      columns: { problemId: true },
       with: {
         problem: true,
       },
@@ -172,7 +164,7 @@ export async function _publishProblems(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      const deletedRows = await client
+      const deletedRows = await executor
         .update(problems)
         .set({ deletedAt, version: sql`${problems.version} + 1` })
         .where(
@@ -185,7 +177,8 @@ export async function _publishProblems(opts?: {
       const deletedById = new Map(deletedRows.map((row) => [row.problemId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: deletedById.get(c.problemId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.problem!.version, isCreate: false }),
+        version:
+          deletedById.get(c.problemId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.problem!.version, isCreate: false }),
         problemId: c.problemId!,
         scriptId: c.problem!.scriptId,
         changes: {
@@ -196,7 +189,7 @@ export async function _publishProblems(opts?: {
         },
       }))
 
-      await client.insert(problemsHistory).values(historyPayload)
+      await executor.insert(problemsHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -230,12 +223,17 @@ export async function _publishProblems(opts?: {
       }
     }
 
-    if (deleted.length) {
-      await client.delete(pendingDeletion).where(inArray(pendingDeletion.id, deleted.map((entry) => entry.id)))
-    }
+    await executor
+      .delete(pendingDeletion)
+      .where(
+        and(
+          or(isNotNull(pendingDeletion.problemId), isNotNull(pendingDeletion.problemDraftId)),
+          !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
+        ),
+      )
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client: executor })
       if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save problem changelogs")
     }
 

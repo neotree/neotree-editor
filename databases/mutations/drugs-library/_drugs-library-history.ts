@@ -3,8 +3,6 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { drugsLibraryDrafts, drugsLibrary, drugsLibraryHistory } from "@/databases/pg/schema"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
-import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveDrugsLibraryItemsHistory({
   previous,
@@ -20,15 +18,14 @@ export async function _saveDrugsLibraryItemsHistory({
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
-    const executor = client ?? db
+    const executor = client || db
     const insertData: typeof drugsLibraryHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const itemId = c?.data?.itemId
       if (!itemId) continue
 
-      const prev = previous.find((prevC) => prevC.itemId === itemId)
-      const isCreate = !prev
+      const isCreate = (c?.data?.version || 1) === 1
       const changeDescription = isCreate ? "Create drugs library item" : "Update drugs library item"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -38,15 +35,18 @@ export async function _saveDrugsLibraryItemsHistory({
         newValues: [],
       }
 
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+      const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         itemId,
         changes: changePayload,
       }
 
       if (!isCreate) {
+        const prev = previous.find((prevC) => prevC.itemId === itemId)
+
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -63,16 +63,16 @@ export async function _saveDrugsLibraryItemsHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const sanitizedSnapshot = removeHexCharacters(c.data || {})
+        const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
         const previousSnapshot = isCreate
           ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.itemId === itemId) || {})
+          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.itemId === itemId) || {}))
 
         changeLogsData.push({
           entityId: itemId,
           entityType: "drugs_library",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -89,7 +89,6 @@ export async function _saveDrugsLibraryItemsHistory({
     }
   } catch (e: any) {
     logger.error(e.message)
-    throw e
   }
 
   return changeLogsData
