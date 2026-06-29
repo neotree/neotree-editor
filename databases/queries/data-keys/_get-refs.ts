@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, isNull, notInArray, or, sql } from "drizzle-orm";
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import * as schema from "@/databases/pg/schema";
 import { PgColumn } from "drizzle-orm/pg-core";
 
 export type GetDataKeysRefsParams = {
     uniqueKeys: string[];
+    client?: DbOrTransaction;
 };
 
 const defaultResData = [] as {
@@ -27,23 +29,25 @@ export const defaultRes: {
 
 export async function _getDataKeysRefs({
     uniqueKeys = [],
+    client,
 }: GetDataKeysRefsParams): Promise<typeof defaultRes> {
     try {
         if (!uniqueKeys.length) return defaultRes;
+        const executor = client || db;
 
         const whereUniqueKey = (column: PgColumn) => or(
             ...uniqueKeys.map(k => sql`${column}::text like ${`%${k}%`}`),
         );
 
         // diagnoses
-        const _diagnosesDrafts = await db.query.diagnosesDrafts.findMany({
+        const _diagnosesDrafts = await executor.query.diagnosesDrafts.findMany({
             where: whereUniqueKey(schema.diagnosesDrafts.data),
             orderBy: asc(schema.diagnosesDrafts.position),
         });
 
         const diagnosesIds = _diagnosesDrafts.map(d => d.diagnosisId!).filter(d => d);
 
-        const _diagnoses = await db.query.diagnoses.findMany({
+        const _diagnoses = await executor.query.diagnoses.findMany({
             where: and(
                 or(
                     whereUniqueKey(schema.diagnoses.symptoms),
@@ -56,14 +60,14 @@ export async function _getDataKeysRefs({
         });
 
         // problems
-        const _problemsDrafts = await db.query.problemsDrafts.findMany({
+        const _problemsDrafts = await executor.query.problemsDrafts.findMany({
             where: whereUniqueKey(schema.problemsDrafts.data),
             orderBy: asc(schema.problemsDrafts.position),
         });
 
         const problemsIds = _problemsDrafts.map(d => d.problemId!).filter(d => d);
 
-        const _problems = await db.query.problems.findMany({
+        const _problems = await executor.query.problems.findMany({
             where: and(
                 or(
                     whereUniqueKey(schema.problems.symptoms),
@@ -76,14 +80,14 @@ export async function _getDataKeysRefs({
         });
 
         // screens
-        const _screensDrafts = await db.query.screensDrafts.findMany({
+        const _screensDrafts = await executor.query.screensDrafts.findMany({
             where: whereUniqueKey(schema.screensDrafts.data),
             orderBy: asc(schema.screensDrafts.position),
         });
 
         const screensIds = _screensDrafts.map(d => d.screenId!).filter(d => d);
 
-        const _screens = await db.query.screens.findMany({
+        const _screens = await executor.query.screens.findMany({
             where: and(
                 or(
                     whereUniqueKey(schema.screens.fields),

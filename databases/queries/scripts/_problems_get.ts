@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { problems, problemsDrafts, hospitals, pendingDeletion, scripts, scriptsDrafts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { Preferences, ScriptImage } from "@/types";
@@ -12,6 +13,7 @@ export type GetProblemsParams = {
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
     withImagesOnly?: boolean;
+    client?: DbOrTransaction;
 };
 
 export type ProblemType = typeof problems.$inferSelect & {
@@ -35,12 +37,14 @@ export async function _getProblems(
     params?: GetProblemsParams
 ): Promise<GetProblemsResults> {
     try {
-        let { 
+        let {
             scriptsIds: scriptsIds = [],
-            problemsIds: problemsIds = [], 
-            returnDraftsIfExist = true, 
+            problemsIds: problemsIds = [],
+            returnDraftsIfExist = true,
             withImagesOnly,
+            client,
         } = { ...params };
+        const executor = client || db;
 
         problemsIds = problemsIds.filter(s => uuid.validate(s));
 
@@ -48,7 +52,7 @@ export async function _getProblems(
         const _oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
 
         if (_oldScriptsIds.length) {
-            const res = await db.query.scripts.findMany({
+            const res = await executor.query.scripts.findMany({
                 where: inArray(scripts.oldScriptId, _oldScriptsIds),
                 columns: { scriptId: true, oldScriptId: true, },
             });
@@ -57,9 +61,9 @@ export async function _getProblems(
                 scriptsIds.push(s?.scriptId || uuid.v4());
             });
         }
-        
+
         // unpublished problems conditions
-        const drafts = !returnDraftsIfExist ? [] : await db.query.problemsDrafts.findMany({
+        const drafts = !returnDraftsIfExist ? [] : await executor.query.problemsDrafts.findMany({
             where: and(
                 !scriptsIds?.length ? undefined : or(
                     inArray(problemsDrafts.scriptId, scriptsIds),
@@ -83,13 +87,13 @@ export async function _getProblems(
         const [draftPublishedScripts, draftScriptDrafts] = await Promise.all([
             !draftPublishedScriptIds.length
                 ? Promise.resolve([])
-                : db.query.scripts.findMany({
+                : executor.query.scripts.findMany({
                     where: inArray(scripts.scriptId, draftPublishedScriptIds),
                     columns: { scriptId: true, title: true, hospitalId: true, },
                 }),
             !draftScriptDraftIds.length
                 ? Promise.resolve([])
-                : db.query.scriptsDrafts.findMany({
+                : executor.query.scriptsDrafts.findMany({
                     where: inArray(scriptsDrafts.scriptDraftId, draftScriptDraftIds),
                     columns: { scriptDraftId: true, hospitalId: true, data: true, },
                 }),
@@ -100,7 +104,7 @@ export async function _getProblems(
             ...draftScriptDrafts.map((script) => script.hospitalId).filter(Boolean),
         ])) as string[];
 
-        const draftHospitals = !draftHospitalIds.length ? [] : await db.query.hospitals.findMany({
+        const draftHospitals = !draftHospitalIds.length ? [] : await executor.query.hospitals.findMany({
             where: inArray(hospitals.hospitalId, draftHospitalIds),
             columns: { hospitalId: true, name: true, },
         });
@@ -110,7 +114,7 @@ export async function _getProblems(
         const hospitalNameById = new Map(draftHospitals.map((hospital) => [hospital.hospitalId, hospital.name]));
 
         // published problems conditions
-        const publishedRes = await db
+        const publishedRes = await executor
             .select({
                 problem: problems,
                 pendingDeletion: pendingDeletion,
@@ -149,7 +153,7 @@ export async function _getProblems(
             hospitalName: s.hospital?.name || '',
         }));
 
-        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
+        const inPendingDeletion = !published.length ? [] : await executor.query.pendingDeletion.findMany({
             where: inArray(pendingDeletion.problemId, published.map(s => s.problemId)),
             columns: { problemId: true, },
         });
@@ -188,7 +192,7 @@ export async function _getProblems(
                 hospitalName: s.hospitalName || '',
             }));
 
-        return  { 
+        return  {
             data: responseData,
         };
     } catch(e: any) {
@@ -269,11 +273,11 @@ export async function _getProblem(
 
         if (!responseData) return { data: null, };
 
-        return  { 
-            data: responseData, 
+        return  {
+            data: responseData,
         };
     } catch(e: any) {
         logger.error('_getProblem ERROR', e.message);
         return { errors: [e.message], };
     }
-} 
+}
