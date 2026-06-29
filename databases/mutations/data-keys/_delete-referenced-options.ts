@@ -1,20 +1,24 @@
 import logger from '@/lib/logger';
-import { _getDataKeysRefs, _getDataKeys, } from '@/databases/queries/data-keys';
+import { _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { _saveScreens, _saveDiagnoses, _saveProblems, } from '../scripts';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 
 export async function _deleteReferencedDataKeyOptions({
     uniqueKeys,
     userId,
+    client,
 }: {
     uniqueKeys: string[];
     userId?: string;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
 }> {
     try {
         if (uniqueKeys.length) {
-            const refs = await _getDataKeysRefs({ uniqueKeys, });
+            const refs = await _getDataKeysRefs({ uniqueKeys, client, });
+            if (refs.errors?.length) throw new Error(refs.errors[0]);
 
             const saveScreensData = refs.data
                 .filter(d => {
@@ -45,6 +49,8 @@ export async function _deleteReferencedDataKeyOptions({
                 await _saveScreens({
                     userId: userId || undefined,
                     data: saveScreensData,
+                    draftOrigin: 'data_key_sync',
+                    client,
                 });
             }
 
@@ -70,6 +76,8 @@ export async function _deleteReferencedDataKeyOptions({
                 await _saveDiagnoses({
                     userId: userId || undefined,
                     data: saveDiagnosesData,
+                    draftOrigin: 'data_key_sync',
+                    client,
                 });
             }
 
@@ -95,6 +103,8 @@ export async function _deleteReferencedDataKeyOptions({
                 await _saveProblems({
                     userId: userId || undefined,
                     data: saveProblemsData,
+                    draftOrigin: 'data_key_sync',
+                    client,
                 });
             }
         }
