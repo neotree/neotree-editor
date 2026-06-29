@@ -34,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { pendingChangesAPI } from "@/lib/indexed-db"
 import type { DataKeyIntegrityPublishDetails } from "@/lib/data-key-integrity"
+import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules"
 
 type Props = {
   variant: "publish" | "discard"
@@ -45,6 +46,31 @@ const scopeOptions = [
 ]
 
 const DETAILED_SCRIPT_THRESHOLD = 3
+
+const ruleFixHints: Record<string, string> = {
+  "missing data key": "Relink to an existing data key.",
+  "unlinked match": "Link the reference to its matching data key.",
+  "unmanaged reference": "Choose or create the correct managed data key.",
+  "invalid script option": "Resync options from the parent data key.",
+  "duplicate parent data key": "Use each parent key only once in the script.",
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function getRuleCounts(details: DataKeyIntegrityPublishDetails) {
+  const counts = new Map<string, number>()
+  details.scripts.forEach((script) => {
+    script.issues.forEach((issue) => {
+      counts.set(issue.ruleLabel, (counts.get(issue.ruleLabel) || 0) + 1)
+    })
+  })
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, count]) => ({ label, count }))
+}
 
 export function PublishDrafts({ variant }: Props) {
   const { alert } = useAlertModal()
@@ -162,6 +188,12 @@ export function PublishDrafts({ variant }: Props) {
     ) : (
       <Button className="h-auto text-xs px-4 py-1">Publish</Button>
     )
+  const validationRulesHref = publishBlockingDetails?.scripts[0]?.scriptId
+    ? getDataKeyIntegrityRulesHref(publishBlockingDetails.scripts[0].scriptId)
+    : null
+  const primaryRegistryHref = publishBlockingDetails?.scripts[0]?.registryHref || null
+  const ruleCounts = publishBlockingDetails ? getRuleCounts(publishBlockingDetails) : []
+  const blocksOnlyNewIssues = !!publishBlockingDetails?.summary.some((line) => line.toLowerCase().includes("block new issues only"))
 
   return (
     <>
@@ -176,7 +208,7 @@ export function PublishDrafts({ variant }: Props) {
           <AlertDialogHeader className="shrink-0 border-b border-border px-6 py-5">
             <AlertDialogTitle>Publish blocked</AlertDialogTitle>
             <AlertDialogDescription>
-              Resolve the blocking data key validation issues below before publishing.
+              Review the blocking data key issues, fix them in the registry, then publish again.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -194,15 +226,58 @@ export function PublishDrafts({ variant }: Props) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="space-y-3">
-                  {publishBlockingDetails.summary.map((line, index) => (
-                    <div
-                      key={`${index}-${line}`}
-                      className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700"
-                    >
-                      {line}
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="font-medium text-red-950">
+                        Fix {pluralize(publishBlockingDetails.totalIssues, "blocking issue")} in {pluralize(publishBlockingDetails.totalScripts, "script")}
+                      </div>
+                      <p className="text-sm leading-6 text-red-800">
+                        {blocksOnlyNewIssues
+                          ? "Only newly introduced blocking issues are stopping this publish."
+                          : "These blocking issues must be resolved before this publish can continue."}
+                      </p>
                     </div>
-                  ))}
+
+                    {primaryRegistryHref && (
+                      <Button asChild size="sm">
+                        <Link href={primaryRegistryHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
+                          Review blocking issues
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+
+                  {!!ruleCounts.length && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {ruleCounts.slice(0, 4).map((rule) => (
+                        <span
+                          key={rule.label}
+                          className="rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-800"
+                          title={ruleFixHints[rule.label]}
+                        >
+                          {rule.count} {rule.label}{rule.count === 1 ? "" : "s"}
+                        </span>
+                      ))}
+                      {ruleCounts.length > 4 && (
+                        <span className="rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-800">
+                          +{ruleCounts.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {!!ruleCounts.length && (
+                    <div className="mt-3 space-y-1 text-xs leading-5 text-red-800">
+                      {ruleCounts.slice(0, 3).map((rule) => (
+                        <div key={`hint-${rule.label}`}>
+                          <span className="font-medium capitalize">{rule.label}:</span>{" "}
+                          {ruleFixHints[rule.label] || "Open the registry and review the affected reference."}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -229,7 +304,7 @@ export function PublishDrafts({ variant }: Props) {
 
                             <Button asChild variant="outline" size="sm">
                               <Link href={script.registryHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
-                                Open data key integrity registry
+                                Review issues
                                 <ExternalLink className="ml-2 h-4 w-4" />
                               </Link>
                             </Button>
@@ -260,7 +335,7 @@ export function PublishDrafts({ variant }: Props) {
                           </div>
                         ) : (
                           <div className="px-4 py-3 text-sm text-muted-foreground">
-                            Too many issues to show individually here. Open the data key integrity registry for this script to review and resolve them.
+                            Too many issues to show here. Review the focused registry view for the blocking list.
                           </div>
                         )}
                       </div>
@@ -272,6 +347,14 @@ export function PublishDrafts({ variant }: Props) {
           </div>
 
           <AlertDialogFooter className="shrink-0 border-t border-border px-6 py-3">
+            {validationRulesHref && (
+              <Button asChild variant="outline">
+                <Link href={validationRulesHref} target="_blank" rel="noreferrer" onClick={closePublishBlockingModal}>
+                  View validation rules
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             <AlertDialogCancel onClick={closePublishBlockingModal}>
               Close
             </AlertDialogCancel>
