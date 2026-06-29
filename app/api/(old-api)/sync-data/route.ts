@@ -102,7 +102,20 @@ export async function GET(req: NextRequest) {
                 scriptIdToOldScriptId[s.scriptId] = s.oldScriptId || null;
                 return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
             });
-            logger.log("....REE",_scripts)
+            logger.log(
+                'sync-data eligibilityCriteria',
+                JSON.stringify(
+                    _scripts
+                        .filter(s => !!s.data?.eligibilityCriteria)
+                        .map(s => ({
+                            scriptId: s.script_id,
+                            title: s.data?.title,
+                            eligibilityCriteria: s.data?.eligibilityCriteria,
+                        })),
+                    null,
+                    2,
+                ),
+            )
             const obj = _scripts.reduce((acc, s) => {
                 acc[s.script_id] = acc[s.script_id] || [];
                 acc[s.script_id].push(s);

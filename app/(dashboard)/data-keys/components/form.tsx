@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
 import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
@@ -63,6 +63,7 @@ function Form({
     disabled?: boolean;
 }) {
     const { dataKeyId, } = useParams();
+    const searchParams = useSearchParams();
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
@@ -73,6 +74,11 @@ function Form({
         (k.uuid === dataKeyId) ||
         (k.uniqueKey === dataKeyId)
     )), [dataKeys, dataKeyId]);
+    const prefill = useMemo(() => ({
+        name: searchParams.get('name') || '',
+        label: searchParams.get('label') || '',
+        dataType: searchParams.get('dataType') || '',
+    }), [searchParams]);
 
     const isLocked = useIsLocked({
         isDraft: !!dataKey?.isDraft,
@@ -91,22 +97,27 @@ function Form({
     } = useForm({
         defaultValues: {
             ...dataKey,
-            name: dataKey?.name || '',
+            name: dataKey?.name || prefill.name || '',
             refId: dataKey?.refId || '',
-            dataType: dataKey?.dataType || '',
+            dataType: dataKey?.dataType || prefill.dataType || '',
             confidential: dataKey ? !!dataKey.confidential : true,
-            label: dataKey?.label || '',
+            label: dataKey?.label || prefill.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
             version: dataKey?.version || 1,
+            deletedUniqueKeys: [] as string[],
         },
     });
 
     const dataType = watch('dataType');
+    const uniqueKeyValue = watch('uniqueKey');
     const options = watch('options');
     const nameValue = watch('name');
     const labelValue = watch('label');
     const confidential = !!watch('confidential');
+    const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
+    const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
+    const deletedUniqueKeys = watch('deletedUniqueKeys');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -158,8 +169,10 @@ function Form({
         const changed = (
             `${nameValue || ''}` !== `${dataKey.name || ''}` ||
             `${labelValue || ''}` !== `${dataKey.label || ''}` ||
+            `${uniqueKeyValue || ''}` !== `${dataKey.uniqueKey || ''}` ||
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
-            !!confidential !== !!dataKey.confidential
+            !!confidential !== !!dataKey.confidential ||
+            optionsSignature !== savedOptionsSignature
         );
         if (!changed) {
             setImpactPreview(undefined);
@@ -176,8 +189,11 @@ function Form({
         dataKey,
         nameValue,
         labelValue,
+        uniqueKeyValue,
         dataType,
         confidential,
+        optionsSignature,
+        savedOptionsSignature,
         loadImpactPreview,
     ]);
 
@@ -218,6 +234,64 @@ function Form({
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
 
+        const getUsageLinkLabel = (usage: NonNullable<UpdateDataKeysRefsResponse['affected']>['usages'][number]) => {
+            if (usage.kind === 'screen') return 'screen';
+            if (usage.kind === 'screen_field') return 'field';
+            if (usage.kind === 'screen_item') return 'item';
+            if (usage.kind === 'screen_field_item') return 'field item';
+            if (usage.kind === 'diagnosis') return 'diagnosis';
+            if (usage.kind === 'diagnosis_symptom') return 'symptom';
+            if (usage.kind === 'problem') return 'problem';
+            return 'open';
+        };
+
+        const getUsageHref = (usage: NonNullable<UpdateDataKeysRefsResponse['affected']>['usages'][number]) => {
+            if (usage.kind === 'screen_field' && usage.screenId && usage.id) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.id}`;
+            }
+            if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+            }
+            if (usage.kind === 'screen_item' && usage.screenId && usage.id) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.id}`;
+            }
+            if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
+            }
+            if (
+                usage.kind === 'screen_field_item'
+                && usage.screenId
+                && Number.isFinite(usage.fieldIndex)
+                && usage.id
+            ) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.id}`;
+            }
+            if (
+                usage.kind === 'screen_field_item'
+                && usage.screenId
+                && Number.isFinite(usage.fieldIndex)
+                && Number.isFinite(usage.fieldItemIndex)
+            ) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}&fieldItem=${usage.fieldItemIndex}`;
+            }
+            if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
+                return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && usage.id) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.id}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId && Number.isFinite(usage.diagnosisSymptomIndex)) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}?symptom=${usage.diagnosisSymptomIndex}`;
+            }
+            if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
+                return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+            }
+            if (usage.problemId) return `/script/${usage.scriptId}/problem/${usage.problemId}`;
+            if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
+            if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
+            return `/script/${usage.scriptId}`;
+        };
+
         const usageByScript = new Map<string, NonNullable<UpdateDataKeysRefsResponse['affected']>['usages']>();
         (affected.usages || []).forEach((usage) => {
             const current = usageByScript.get(usage.scriptId) || [];
@@ -249,33 +323,6 @@ function Form({
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {row.usages.map((usage, index) => {
-                                                    const linkLabel = (() => {
-                                                        if (usage.kind === 'screen') return 'screen';
-                                                        if (usage.kind === 'screen_field') return 'field';
-                                                        if (usage.kind === 'screen_item') return 'item';
-                                                        if (usage.kind === 'screen_field_item') return 'field item';
-                                                        if (usage.kind === 'diagnosis') return 'diagnosis';
-                                                        if (usage.kind === 'diagnosis_symptom') return 'symptom';
-                                                        return 'open';
-                                                    })();
-                                                    const href = (() => {
-                                                        if (usage.kind === 'screen_field' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
-                                                        }
-                                                        if (usage.kind === 'screen_item' && usage.screenId && Number.isFinite(usage.screenItemIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?item=${usage.screenItemIndex}`;
-                                                        }
-                                                        if (usage.kind === 'screen_field_item' && usage.screenId && Number.isFinite(usage.fieldIndex)) {
-                                                            return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.fieldIndex}`;
-                                                        }
-                                                        if (usage.kind === 'diagnosis_symptom' && usage.diagnosisId) {
-                                                            return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
-                                                        }
-                                                        if (usage.screenId) return `/script/${usage.scriptId}/screen/${usage.screenId}`;
-                                                        if (usage.diagnosisId) return `/script/${usage.scriptId}/diagnosis/${usage.diagnosisId}`;
-                                                        return `/script/${usage.scriptId}`;
-                                                    })();
-
                                                     return (
                                                         <div key={`${usage.kind}-${usage.id}-${index}`} className="text-xs">
                                                             <div className="flex items-center gap-x-2 p-2 px-4">
@@ -283,12 +330,12 @@ function Form({
                                                                 <div className="text-muted-foreground">{usage.location}</div>
                                                                 <div className="ml-auto flex gap-x-2">
                                                                     <Link
-                                                                        href={href}
+                                                                        href={getUsageHref(usage)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="flex items-center gap-x-1"
                                                                     >
-                                                                        {linkLabel}
+                                                                        {getUsageLinkLabel(usage)}
                                                                         <ExternalLinkIcon className="h-3 w-3" />
                                                                     </Link>
                                                                 </div>
@@ -308,6 +355,40 @@ function Form({
                         { name: 'Script title' },
                         { name: 'Script ID' },
                         { name: 'Matches', align: 'right' },
+                        {
+                            name: 'Usage links',
+                            cellClassName: 'min-w-[220px]',
+                            cellRenderer({ rowIndex }) {
+                                const script = scriptRows[rowIndex];
+                                if (!script?.usages.length) {
+                                    return <span className="text-xs text-muted-foreground">No direct usage links</span>;
+                                }
+
+                                const visibleUsages = script.usages.slice(0, 3);
+
+                                return (
+                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                        {visibleUsages.map((usage, index) => (
+                                            <Link
+                                                key={`${usage.kind}-${usage.id}-${index}`}
+                                                href={getUsageHref(usage)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 rounded border px-2 py-1 text-primary hover:bg-primary/10"
+                                            >
+                                                <span>{usage.title || getUsageLinkLabel(usage)}</span>
+                                                <ExternalLinkIcon className="h-3 w-3" />
+                                            </Link>
+                                        ))}
+                                        {script.usages.length > visibleUsages.length && (
+                                            <span className="text-muted-foreground">
+                                                +{script.usages.length - visibleUsages.length} more
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            },
+                        },
                         {
                             name: '',
                             align: 'right',
@@ -333,6 +414,7 @@ function Form({
                         s.scriptTitle || '',
                         s.scriptId || '',
                         `${s.usages.length}`,
+                        '',
                         '',
                     ])}
                 />
@@ -539,10 +621,16 @@ function Form({
                                                                         <DropdownMenuItem 
                                                                             className="text-destructive"
                                                                             onClick={() => setTimeout(() => confirm(
-                                                                                () => setValue(
-                                                                                    'options',
-                                                                                    options.filter((_, i) => i !== rowIndex),
-                                                                                ),
+                                                                                () => {
+                                                                                    setValue(
+                                                                                        'options',
+                                                                                        options.filter((_, i) => i !== rowIndex),
+                                                                                    );
+                                                                                    setValue(
+                                                                                        'deletedUniqueKeys',
+                                                                                        [...deletedUniqueKeys, children[rowIndex].uniqueKey]
+                                                                                    );
+                                                                                },
                                                                                 {
                                                                                     title: 'Delete',
                                                                                     message: 'Are you sure you want to delete data key option?',
@@ -629,7 +717,7 @@ function Form({
                         )}
                     </div>
 
-                    <CardFooter className="gap-x-2">
+                    <CardFooter className="gap-x-2 mt-4">
                         <div className="ml-auto" />
 
                         <Button

@@ -16,6 +16,7 @@ import { SymptomTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { SelectDataKey } from "@/components/select-data-key";
 import { Title } from "../title";
 import { useProblemForm } from "../../hooks/use-problem-form";
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -82,6 +83,8 @@ export function Symptom<P = {}>({
         setOpen(false);
     });
 
+    const isKeyDisabled = disabled || !!symptom;
+
     return (
         <>
             <Modal
@@ -146,7 +149,7 @@ export function Symptom<P = {}>({
                                         <Label htmlFor="key" error={!disabled && !value}>Key *</Label>
                                         <SelectDataKey
                                             value={`${value || ''}`}
-                                            disabled={false}
+                                            disabled={isKeyDisabled}
                                             onChange={([item]) => {
                                                 onChange(item.name);
                                                 setValue('name', item?.label, { shouldDirty: true, });
@@ -162,7 +165,7 @@ export function Symptom<P = {}>({
                     <div>
                         <Label error={!disabled && !name} htmlFor="name">Name *</Label>
                         <Input
-                            {...register('name', { disabled, required: true, })}
+                            {...register('name', { disabled: isKeyDisabled, required: true, })}
                             name="name"
                             error={!disabled && !name}
                         />
@@ -175,11 +178,11 @@ export function Symptom<P = {}>({
                             name="weight"
                             type="number"
                         />
-                        <span className="text-xs text-muted-foreground">Must be in the range: 0.0 - 1.0 (<b>default 1.0</b>)</span>
+                        <span className="text-xs text-muted-foreground">Must be in the range: 0.0 - 1.0 (<b>default 1.0</b>) <ConditionalExpressionModal /></span>
                     </div>
 
                     <div>
-                        <Label htmlFor="expression">Sign/Risk expression </Label>
+                        <Label htmlFor="expression">Sign/Risk expression <ConditionalExpressionModal /></Label>
                         <Input
                             {...register('expression', { disabled, })}
                             name="expression"

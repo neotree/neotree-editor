@@ -3,8 +3,6 @@ import db from "@/databases/pg/drizzle"
 import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import { dataKeysDrafts, dataKeys, dataKeysHistory } from "@/databases/pg/schema"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
-import { removeHexCharacters } from "@/databases/utils"
 
 export async function _saveDataKeysHistory({
   previous,
@@ -18,17 +16,18 @@ export async function _saveDataKeysHistory({
   client?: DbOrTransaction
 }): Promise<SaveChangeLogData[]> {
   const changeLogsData: SaveChangeLogData[] = []
+  const executor = client || db
+  const insertData: typeof dataKeysHistory.$inferInsert[] = []
 
   try {
-    const executor = client ?? db
-    const insertData: typeof dataKeysHistory.$inferInsert[] = []
-
     for (const c of drafts) {
-      const dataKeyId = c?.data?.uuid
-      if (!dataKeyId) continue
+      const resolvedDataKeyId = c.dataKeyId || c?.data?.uuid
+      if (!resolvedDataKeyId) {
+        logger.error("_saveDataKeysHistory ERROR", "Missing data key id for draft history entry")
+        continue
+      }
 
-      const prev = previous.find((prevC) => prevC.uuid === dataKeyId)
-      const isCreate = !prev
+      const isCreate = (c?.data?.version || 1) === 1
       const changeDescription = isCreate ? "Create data key" : "Update data key"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -38,15 +37,18 @@ export async function _saveDataKeysHistory({
         newValues: [],
       }
 
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+      const versionValue = c?.data?.version || 1
+      const nextVersion = isCreate ? 1 : versionValue + 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
-        version: versionValue,
-        dataKeyId,
+        version: nextVersion,
+        dataKeyId: resolvedDataKeyId,
         changes: changePayload,
       }
 
       if (!isCreate) {
+        const prev = previous.find((prevC) => prevC.uuid === resolvedDataKeyId)
+
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -63,23 +65,26 @@ export async function _saveDataKeysHistory({
       insertData.push(changeHistoryData)
 
       if (userId) {
-        const sanitizedSnapshot = removeHexCharacters(c.data || {})
+        const sanitizedSnapshot = JSON.parse(JSON.stringify({
+          ...(c.data || {}),
+          uuid: resolvedDataKeyId,
+        }))
         const previousSnapshot = isCreate
           ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.uuid === dataKeyId) || {})
+          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.uuid === resolvedDataKeyId) || {}))
 
         changeLogsData.push({
-          entityId: dataKeyId,
+          entityId: resolvedDataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: versionValue,
+          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
           baselineSnapshot: previousSnapshot,
           description: changeDescription,
           userId,
-          dataKeyId,
+          dataKeyId: resolvedDataKeyId,
         })
       }
     }
@@ -88,7 +93,7 @@ export async function _saveDataKeysHistory({
       await executor.insert(dataKeysHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveDataKeysHistory ERROR", e.message)
     throw e
   }
 

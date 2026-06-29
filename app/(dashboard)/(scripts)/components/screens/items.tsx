@@ -16,6 +16,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { isNumericQueryValue } from "@/lib/query-state";
 import { ItemsBottomActions } from "./items-bottom-actions";
 import { Item } from "./item";
 
@@ -28,25 +29,25 @@ export function Items({
     form,
     disabled,
 }: Props) {
+    const {
+        getValues,
+        setValue,
+        watch,
+    } = form;
+
     const btnRef = useRef<HTMLButtonElement>(null);
-    const screenType = form.getValues('type');
+    const screenType = getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
-    const isChecklistScreen = screenType === 'checklist';
-    const isProgressScreen = screenType === 'progress';
+    const isProblemsScreen = screenType === 'problems';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
-    const items = form.watch('items');
-    const rankItems = form.watch('rankItems');
+    const items = watch('items');
+    const rankItems = watch('rankItems');
+    const preferences = watch('preferences');
     
     const canRankItems = screenType === 'multi_select';
-
-    const [showAddItemForm, setShowAddItemForm] = useState(false);
-    const [activeItem, setActiveItem] = useState<null | {
-        index: number;
-        data: typeof items[0];
-    }>(null);
 
     const onSort = useCallback((oldIndex: number, newIndex: number) => {
         const data = arrayMoveImmutable([...items], oldIndex, newIndex);
@@ -111,20 +112,33 @@ export function Items({
         defaultValue: '',
         clearOnDefault: true,
     });
+    const parsedCurrentItemIndex = currentItem === 'new'
+        ? -1
+        : null;
+    const activeItem = currentItem === 'new'
+        ? undefined
+        : items.find((item) => item.itemId === currentItem)
+            || (isNumericQueryValue(currentItem) ? items[Number(currentItem)] : undefined);
+    const activeItemIndex = currentItem === 'new'
+        ? -1
+        : items.findIndex((item) => item.itemId === currentItem);
+    const resolvedCurrentItemIndex = activeItemIndex >= 0
+        ? activeItemIndex
+        : (isNumericQueryValue(currentItem) ? Number(currentItem) : parsedCurrentItemIndex);
 
     return (
         <>
             <button ref={btnRef} />
 
-            {!!currentItem && (
+            {!!currentItem && (currentItem === 'new' || !!activeItem) && (
                 <Item
                     open={!!currentItem}
                     onClose={() => setCurrentItem('')}
                     form={form}
                     disabled={disabled}
-                    item={!items[Number(currentItem)] ? undefined : {
-                        data: items[Number(currentItem)],
-                        index: Number(currentItem),
+                    item={!activeItem || resolvedCurrentItemIndex === null || resolvedCurrentItemIndex < 0 ? undefined : {
+                        data: activeItem,
+                        index: resolvedCurrentItemIndex,
                     }}
                 />
             )}
@@ -136,6 +150,19 @@ export function Items({
                 onSort={onSort}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
+                preTableNode={!isProblemsScreen ? undefined : (
+                    <div className="flex items-center space-x-2">
+                        <Checkbox
+                            id="enableSeverityRanking"
+                            checked={!!preferences.enableSeverityRanking}
+                            disabled={disabled}
+                            onCheckedChange={checked => {
+                                setValue('preferences.enableSeverityRanking', !!checked, { shouldDirty: true, });
+                            }}
+                        />
+                        <Label htmlFor="enableSeverityRanking">Enable severity ranking</Label>
+                    </div>
+                )}
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
@@ -202,7 +229,7 @@ export function Items({
                                     <DropdownMenuContent>
                                         <DropdownMenuItem 
                                             onClick={() => {
-                                                setTimeout(() => setCurrentItem(`${rowIndex}`), 0);
+                                                setTimeout(() => setCurrentItem(items[rowIndex]?.itemId || `${rowIndex}`), 0);
                                             }}
                                         >
                                             <Edit className="w-4 h-4 mr-2" />

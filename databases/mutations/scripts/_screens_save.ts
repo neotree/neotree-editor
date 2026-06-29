@@ -1,4 +1,4 @@
-import { desc, eq, Query } from 'drizzle-orm';
+import { desc, eq, inArray, Query } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -8,7 +8,7 @@ import { screens, screensDrafts, scripts, scriptsDrafts } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
-import { validateSelectionRules } from '@/lib/selection-rules';
+import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 
 
 export type SaveScreensData = Partial<ScreenType>;
@@ -16,8 +16,71 @@ export type SaveScreensData = Partial<ScreenType>;
 export type SaveScreensResponse = { 
     success: boolean; 
     errors?: string[]; 
+    warnings?: string[];
     info?: { query?: Query; };
 };
+
+export type DraftOrigin = "editor" | "data_key_sync" | "import" | "other";
+
+function summarizeSelectionRuleWarnings(contextLabel: string, warnings: string[]) {
+    if (!warnings.length) return [];
+
+    const counters = {
+        assignedItemIds: 0,
+        remappedDuplicateItemIds: 0,
+        remappedForbidWith: 0,
+        droppedSelfForbidWith: 0,
+        droppedUnknownForbidWith: 0,
+        other: [] as string[],
+    };
+
+    warnings.forEach((warning) => {
+        if (warning.startsWith('Assigned generated itemId ')) counters.assignedItemIds++;
+        else if (warning.startsWith('Remapped duplicate itemId ')) counters.remappedDuplicateItemIds++;
+        else if (warning.startsWith('Remapped forbidWith ')) counters.remappedForbidWith++;
+        else if (warning.startsWith('Dropped self-referencing forbidWith ')) counters.droppedSelfForbidWith++;
+        else if (warning.startsWith('Dropped unknown forbidWith ')) counters.droppedUnknownForbidWith++;
+        else counters.other.push(warning);
+    });
+
+    const summary: string[] = [];
+    if (counters.assignedItemIds) summary.push(`${contextLabel}: assigned generated itemIds to ${counters.assignedItemIds} item${counters.assignedItemIds === 1 ? '' : 's'}`);
+    if (counters.remappedDuplicateItemIds) summary.push(`${contextLabel}: remapped ${counters.remappedDuplicateItemIds} duplicate itemId${counters.remappedDuplicateItemIds === 1 ? '' : 's'}`);
+    if (counters.remappedForbidWith) summary.push(`${contextLabel}: remapped ${counters.remappedForbidWith} forbidWith link${counters.remappedForbidWith === 1 ? '' : 's'}`);
+    if (counters.droppedSelfForbidWith) summary.push(`${contextLabel}: dropped ${counters.droppedSelfForbidWith} self-referencing forbidWith link${counters.droppedSelfForbidWith === 1 ? '' : 's'}`);
+    if (counters.droppedUnknownForbidWith) summary.push(`${contextLabel}: dropped ${counters.droppedUnknownForbidWith} unknown forbidWith link${counters.droppedUnknownForbidWith === 1 ? '' : 's'}`);
+
+    return [...summary, ...counters.other.map((warning) => `${contextLabel}: ${warning}`)];
+}
+
+function normalizeScreenSelectionRuleItemIds(screen: SaveScreensData): {
+    value: SaveScreensData;
+    warnings: string[];
+} {
+    const screenItems = normalizeSelectionRuleItems(screen.items || [], () => uuid.v4());
+    const fieldWarnings: string[] = [];
+    const fields = (screen.fields || []).map((field, fieldIndex) => {
+        const result = normalizeSelectionRuleItems(field.items || [], () => uuid.v4());
+        const fieldLabel = field.label || field.key || `field ${fieldIndex}`;
+        fieldWarnings.push(...summarizeSelectionRuleWarnings(`Field "${fieldLabel}" items`, result.warnings));
+        return {
+            ...field,
+            items: result.items,
+        };
+    });
+
+    return {
+        value: {
+            ...screen,
+            items: screenItems.items,
+            fields,
+        },
+        warnings: [
+            ...summarizeSelectionRuleWarnings('Screen items', screenItems.warnings),
+            ...fieldWarnings,
+        ],
+    };
+}
 
 function getConfidentialDataKeyIds(screen: SaveScreensData) {
     const ids = new Set<string>();
@@ -39,6 +102,31 @@ function getConfidentialDataKeyIds(screen: SaveScreensData) {
     }
 
     return Array.from(ids).filter(Boolean);
+}
+
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not the raw payload.
+     * Partial saves can omit scriptId in the request, while the final merged
+     * screen still has a valid scriptId from the existing draft/published row.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
 }
 
 async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string) {
@@ -75,31 +163,38 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
     }
 }
 
-export async function _saveScreens({ data, broadcastAction, userId, client, }: {
+export async function _saveScreens({ data, broadcastAction, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
     userId?: string;
     client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveScreensResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
+    const warnings: string[] = [];
     const info: SaveScreensResponse['info'] = {};
     const confidentialDataKeyIds = new Set<string>();
-    const executor = client ?? db;
+    const executor = client || db;
     
     try {
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
             try {
                 index++;
+                const normalized = normalizeScreenSelectionRuleItemIds(item);
+                const normalizedItem = normalized.value;
 
                 const screenId = itemScreenId || uuid.v4();
 
-                const screenLabel = item.title || item.label || itemScreenId || `screen ${index}`;
+                const screenLabel = normalizedItem.title || normalizedItem.label || itemScreenId || `screen ${index}`;
+                if (normalized.warnings.length) {
+                    warnings.push(...normalized.warnings.map((warning) => `Screen "${screenLabel}": ${warning}`));
+                }
                 const validationErrors = [
-                    ...validateSelectionRules(item.items || [], `Screen "${screenLabel}" items`),
-                    ...(item.fields || []).flatMap((field, fieldIndex) =>
+                    ...validateSelectionRules(normalizedItem.items || [], `Screen "${screenLabel}" items`),
+                    ...(normalizedItem.fields || []).flatMap((field, fieldIndex) =>
                         validateSelectionRules(
                             field.items || [],
                             `Screen "${screenLabel}" field "${field.label || field.key || fieldIndex}" items`
@@ -111,7 +206,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
                     errors.push(...validationErrors);
                 }
 
-                getConfidentialDataKeyIds(item).forEach((id) => confidentialDataKeyIds.add(id));
+                getConfidentialDataKeyIds(normalizedItem).forEach((id) => confidentialDataKeyIds.add(id));
 
                 if (!errors.length) {
                     const draft = !itemScreenId ? null : await executor.query.screensDrafts.findFirst({
@@ -122,17 +217,20 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
                         where: eq(screens.screenId, screenId),
                     });
 
-                    if (draft) {
+                    if (draft) {                        
+                        const persistedDraftOrigin = requestedDraftOrigin;
+
                         const data = {
                             ...draft.data,
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = executor
+                        const q = db
                             .update(screensDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(screensDrafts.screenDraftId, screenId));
 
                         info.query = q.toSQL();
@@ -163,26 +261,19 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
                         } as typeof screensDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
-                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
-                                columns: { scriptDraftId: true, },
-                            });
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            const publishedScript = await executor.query.scripts.findFirst({
-                                where: eq(scripts.scriptId, data.scriptId),
-                                columns: { scriptId: true, },
-                            });
-
-                            if (scriptDraft || publishedScript) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    scriptId,
+                                    scriptDraftId,
                                     screenDraftId: screenId,
                                     position: data.position,
                                     screenId: published?.screenId,
                                     createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
                                 });
 
                                 info.query = q.toSQL();
@@ -210,13 +301,16 @@ export async function _saveScreens({ data, broadcastAction, userId, client, }: {
             }
             response.success = true;
         }
+        if (warnings.length) {
+            response.warnings = Array.from(new Set(warnings));
+        }
     } catch(e: any) {
         response.success = false;
         response.errors = [e.message];
         response.info = info;
         logger.error('_saveScreens ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !client) socket.emit('data_changed', 'save_screens');
+        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_screens');
         return response;
     }
 }

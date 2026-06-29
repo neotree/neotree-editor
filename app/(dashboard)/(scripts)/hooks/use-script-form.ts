@@ -49,6 +49,7 @@ export function useScriptForm(params: UseScriptFormParams) {
       exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
       nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
       nuidSearchFields: formData?.nuidSearchFields || [],
+      eligibilityCriteria: formData?.eligibilityCriteria || null,
       preferences: formData?.preferences || defaultPreferences,
       printSections: formData?.printSections || [],
       printConfig: (formData?.printConfig || scriptPrintConfig) satisfies NonNullable<
@@ -92,7 +93,7 @@ export function useScriptForm(params: UseScriptFormParams) {
 
   const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields])
 
-  const onSubmit = handleSubmit(async (data) => {
+  const saveDraft = useCallback(async (data: ScriptFormDataType) => {
     setLoading(true)
 
     const generateScriptId = () =>
@@ -102,6 +103,9 @@ export function useScriptForm(params: UseScriptFormParams) {
     const payload: typeof data = {
       ...data,
       scriptId,
+    }
+    if (scriptId && data.scriptId !== scriptId) {
+      form.setValue("scriptId", scriptId, { shouldDirty: false })
     }
 
     // const res = await saveScripts({ data: [data], broadcastAction: true, });
@@ -126,6 +130,20 @@ export function useScriptForm(params: UseScriptFormParams) {
     }
 
     setLoading(false)
+    return !res.errors?.length
+  }, [
+    alert,
+    authenticatedUser?.displayName,
+    authenticatedUser?.userId,
+    changeTrackerRef,
+    form,
+    isNewScript,
+    originalSnapshotRef,
+    router,
+  ])
+
+  const onSubmit = handleSubmit(async (data) => {
+    await saveDraft(data)
   })
 
   const lockedByUserId = params.formData?.draftCreatedByUserId || params.formData?.itemsChangedByUserId
@@ -149,6 +167,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     getDefaultFormValues,
     getDefaultNuidSearchFields,
     getDefaultScreenReviewConfigurations,
+    saveDraft,
     onSubmit,
   }
 }

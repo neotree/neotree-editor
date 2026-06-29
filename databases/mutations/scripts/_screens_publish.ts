@@ -187,7 +187,8 @@ export async function _publishScreens(opts?: {
       const deletedById = new Map(deletedRows.map((row) => [row.screenId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: deletedById.get(c.screenId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.screen!.version, isCreate: false }),
+        version:
+          deletedById.get(c.screenId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.screen!.version, isCreate: false }),
         screenId: c.screenId!,
         scriptId: c.screen!.scriptId,
         changes: {
@@ -240,7 +241,7 @@ export async function _publishScreens(opts?: {
       new Set((updates ?? []).map((ud) => ud.scriptId).filter((id): id is string => Boolean(id))),
     )
     if (updatedScripts.length) {
-      await _generateScreenAliases(updatedScripts, client)
+      await _generateScreenAliases(updatedScripts, { client })
     }
 
     if (changeLogs.length) {

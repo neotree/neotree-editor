@@ -5,7 +5,6 @@ import { scriptsDrafts, scripts, scriptsHistory } from "@/databases/pg/schema"
 import logger from "@/lib/logger"
 import { removeHexCharacters } from "../../utils"
 import { getDataKeySyncChangeReason } from "@/lib/changelog-data-key-sync"
-import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 
 export async function _saveScriptsHistory({
   previous,
@@ -21,18 +20,18 @@ export async function _saveScriptsHistory({
   const changeLogsData: SaveChangeLogData[] = []
 
   try {
-    const executor = client ?? db
+    const executor = client || db
     const insertData: typeof scriptsHistory.$inferInsert[] = []
 
     for (const c of drafts) {
       const scriptId = c?.data?.scriptId
       if (!scriptId) continue
-      const prev = previous.find((prevC) => prevC.scriptId === scriptId)
-      const isCreate = !prev
-      const versionValue = Number.isFinite(c?.data?.version) ? Number(c.data.version) : 1
+
+      const isCreate = (c?.data?.version || 1) === 1
+      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
 
       const changeHistoryData: typeof scriptsHistory.$inferInsert = {
-        version: versionValue,
+        version: nextVersion,
         scriptId,
         changes: {},
       }
@@ -45,6 +44,8 @@ export async function _saveScriptsHistory({
           newValues: [],
         }
       } else {
+        const prev = previous.find((prevC) => prevC.scriptId === scriptId)
+
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -82,7 +83,7 @@ export async function _saveScriptsHistory({
           entityId: scriptId,
           entityType: "script",
           action: isCreate ? "create" : "update",
-          version: changeHistoryData.version || 1,
+          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -99,7 +100,6 @@ export async function _saveScriptsHistory({
     }
   } catch (e: any) {
     logger.error(e.message)
-    throw e
   }
 
   return changeLogsData

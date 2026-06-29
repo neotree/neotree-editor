@@ -2,7 +2,6 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { scripts, scriptsDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _deleteScreens } from './_screens_delete';
@@ -14,7 +13,7 @@ export type DeleteScriptsData = {
     broadcastAction?: boolean;
     confirmDeleteAll?: boolean;
     userId?: string | null;
-    client?: DbOrTransaction;
+    draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
 };
 
 export type DeleteScriptsResponse = { 
@@ -24,11 +23,9 @@ export type DeleteScriptsResponse = {
 
 export async function _deleteAllScriptsDrafts(opts?: {
     userId?: string | null;
-    client?: DbOrTransaction;
 }): Promise<boolean> {
     try {
-        const executor = opts?.client ?? db;
-        await executor.delete(scriptsDrafts).where(!opts?.userId ? undefined : eq(scriptsDrafts.createdByUserId, opts.userId));
+        await db.delete(scriptsDrafts).where(!opts?.userId ? undefined : eq(scriptsDrafts.createdByUserId, opts.userId));
         return true;
     } catch(e: any) {
         throw e;
@@ -36,26 +33,22 @@ export async function _deleteAllScriptsDrafts(opts?: {
 }
 
 export async function _deleteScripts(
-    { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, client, }: DeleteScriptsData,
+    { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, draftOrigin = "editor", }: DeleteScriptsData,
 ) {
     const response: DeleteScriptsResponse = { success: false, };
-    const executor = client ?? db;
 
     try {
         const shouldConfirmDeleteAll = !scriptsIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the scripts, please confirm this action!');
 
         // delete drafts
-        await executor.delete(scriptsDrafts).where(and(
-            or(
-                inArray(scriptsDrafts.scriptId, scriptsIds),
-                inArray(scriptsDrafts.scriptDraftId, scriptsIds)
-            ),
-            !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
+        await db.delete(scriptsDrafts).where(or(
+            inArray(scriptsDrafts.scriptId, scriptsIds),
+            inArray(scriptsDrafts.scriptDraftId, scriptsIds)
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
-        let scriptsToDelete = await executor
+        let scriptsToDelete = await db
             .select({
                 scriptId: scripts.scriptId,
                 pendingDeletion: pendingDeletion,
@@ -68,19 +61,17 @@ export async function _deleteScripts(
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
             ));
 
-        scriptsToDelete = scriptsToDelete.map(s => ({
-            ...s,
-            createdByUserId: userId,
-        }));
-
         if (scriptsToDelete.length) {
-            await executor.insert(pendingDeletion).values(scriptsToDelete.map(s => ({
-                scriptId: s.scriptId,
-                createdByUserId: userId,
-            })));
-            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });
-            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });
-            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), client: executor, userId });
+            await db.insert(pendingDeletion).values(
+                scriptsToDelete.map(s => ({
+                    scriptId: s.scriptId,
+                    draftOrigin,
+                    createdByUserId: userId,
+                }))
+            );
+            await _deleteScreens({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
+            await _deleteDiagnoses({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
+            await _deleteProblems({ scriptsIds: scriptsToDelete.map(s => s.scriptId), userId, draftOrigin });
         }
 
         response.success = true;
@@ -89,7 +80,7 @@ export async function _deleteScripts(
         response.errors = [e.message];
         logger.error('_deleteScripts ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !client) socket.emit('data_changed', 'delete_scripts');
+        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_scripts');
         return response;
     }
 }

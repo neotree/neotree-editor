@@ -3,7 +3,6 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
@@ -18,18 +17,19 @@ export type SaveScriptsResponse = {
     info?: { query?: Query; };
 };
 
-export async function _saveScripts({ data, broadcastAction, syncSilently, userId, client, }: {
+export type ScriptDraftOrigin = "editor" | "data_key_sync" | "import" | "other";
+
+export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
-    client?: DbOrTransaction;
+    draftOrigin?: ScriptDraftOrigin;
 }) {
     const response: SaveScriptsResponse = { success: false, };
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
-    const executor = client ?? db;
-    data = removeHexCharacters(data)
+     data = removeHexCharacters(data)
 
     try {
         let index = 0;
@@ -40,11 +40,11 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                 const scriptId = itemScriptId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemScriptId ? null : await executor.query.scriptsDrafts.findFirst({
+                    const draft = !itemScriptId ? null : await db.query.scriptsDrafts.findFirst({
                         where: eq(scriptsDrafts.scriptDraftId, scriptId),
                     });
 
-                    const published = (draft || !itemScriptId) ? null : await executor.query.scripts.findFirst({
+                    const published = (draft || !itemScriptId) ? null : await db.query.scripts.findFirst({
                         where: eq(scripts.scriptId, scriptId),
                     });
 
@@ -54,12 +54,13 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = executor
+                        const q = db
                             .update(scriptsDrafts)
                             .set({
                                 data,
                                 position: data.position,
                                 hospitalId: data.hospitalId,
+                                draftOrigin,
                             }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
 
                         info.query = q.toSQL();
@@ -68,12 +69,12 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const script = await executor.query.scripts.findFirst({
+                            const script = await db.query.scripts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scripts.position),
                             });
 
-                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scriptsDrafts.position),
                             });
@@ -89,12 +90,13 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             position,
                         } as typeof scriptsDrafts.$inferInsert['data'];
 
-                        const q = executor.insert(scriptsDrafts).values({
+                        const q = db.insert(scriptsDrafts).values({
                             data,
                             scriptDraftId: scriptId,
                             position: data.position,
                             hospitalId: data.hospitalId,
                             scriptId: published?.scriptId,
+                            draftOrigin,
                             createdByUserId: userId,
                         });
 
@@ -120,7 +122,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
         response.info = info;
         logger.error('_saveScripts ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !syncSilently && !client) {
+        if (!response?.errors?.length && broadcastAction && !syncSilently) {
             socket.emit('data_changed', 'save_scripts');}
         return response;
     }

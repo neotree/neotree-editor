@@ -35,6 +35,11 @@ export async function _searchScripts({
         // SCRIPTS
         const scriptsDrafts = !returnDraftsIfExist ? [] : await db.query.scriptsDrafts.findMany({
             where: sql`lower(${schema.scriptsDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const scripts = await db.select({
@@ -56,6 +61,13 @@ export async function _searchScripts({
         // SCREENS
         const screensDrafts = !returnDraftsIfExist ? [] : await db.query.screensDrafts.findMany({
             where: sql`lower(${schema.screensDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                screenId: true,
+                screenDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const screens = await db.select({
@@ -70,6 +82,20 @@ export async function _searchScripts({
             !screensDrafts.length ? undefined : notInArray(schema.screens.screenId, screensDrafts.map(d => d.screenDraftId)),
             or(
                 sql`lower(${schema.screens.condition}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.actionText}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.instructions}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.contentText}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.suggestedDiagnosesInstructions}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.suggestedProblemsInstructions}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.hcwDiagnosesInstructions}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.hcwProblemsInstructions}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.infoText}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.text3}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.screens.title3}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.sectionTitle}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.previewTitle}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.screens.previewPrintTitle}::text) like ${`%${searchTerm}%`}`,
@@ -88,6 +114,13 @@ export async function _searchScripts({
         // DIAGNOSES
         const diagnosesDrafts = !returnDraftsIfExist ? [] : await db.query.diagnosesDrafts.findMany({
             where: sql`lower(${schema.diagnosesDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                diagnosisId: true,
+                diagnosisDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const diagnoses = await db.select({
@@ -102,7 +135,12 @@ export async function _searchScripts({
             !diagnosesDrafts.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesDrafts.map(d => d.diagnosisDraftId)),
             or(
                 sql`lower(${schema.diagnoses.name}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.description}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.text3}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.expression}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.diagnoses.expressionMeaning}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.symptoms}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.diagnoses.key}::text) like ${`%${searchTerm}%`}`,
             ),
@@ -111,6 +149,13 @@ export async function _searchScripts({
         // PROOBLEMS
         const problemsDrafts = !returnDraftsIfExist ? [] : await db.query.problemsDrafts.findMany({
             where: sql`lower(${schema.problemsDrafts.data}::text) like ${`%${searchTerm}%`}`,
+            columns: {
+                problemId: true,
+                problemDraftId: true,
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const problems = await db.select({
@@ -196,6 +241,11 @@ export async function _searchScripts({
                 inArray(schema.scriptsDrafts.scriptId, scriptsIdsFromItems),
                 inArray(schema.scriptsDrafts.scriptDraftId, scriptsIdsFromItems),
             ),
+            columns: {
+                scriptId: true,
+                scriptDraftId: true,
+                data: true,
+            },
         });
 
         const scriptsFromItems = !scriptsIdsFromItems.length ? [] : await db.select({

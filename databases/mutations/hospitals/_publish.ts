@@ -22,10 +22,7 @@ export async function _publishHospitals(opts?: {
   const changeLogs: SaveChangeLogData[] = []
 
   if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
-    return {
-      success: false,
-      errors: ["Hospital publish must run inside a release transaction with a valid dataVersion"],
-    }
+    return { success: false, errors: ["Hospital publish must run inside a release transaction with a valid dataVersion"] }
   }
 
   try {
@@ -157,7 +154,8 @@ export async function _publishHospitals(opts?: {
       const deletedById = new Map(deletedRows.map((row) => [row.hospitalId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: deletedById.get(c.hospitalId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.hospital!.version, isCreate: false }),
+        version:
+          deletedById.get(c.hospitalId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.hospital!.version, isCreate: false }),
         hospitalId: c.hospitalId!,
         changes: {
           action: "delete_hospital",

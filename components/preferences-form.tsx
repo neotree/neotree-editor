@@ -51,9 +51,11 @@ export function PreferencesForm({
 }: Props) {
     const isUpdating = useMemo(() => {
         let isUpdating = false;
-        Object.values(data).forEach(pref => {
-            if (pref[id]) isUpdating = true;
-        });
+        Object.values(data)
+            .filter(pref => typeof pref !== 'boolean')
+            .forEach(pref => {
+                if (pref[id]) isUpdating = true;
+            });
         return isUpdating;
     }, [data, id]);
 

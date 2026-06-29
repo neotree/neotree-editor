@@ -1,4 +1,4 @@
-import { desc, eq, Query } from 'drizzle-orm';
+import { desc, eq, inArray, Query } from 'drizzle-orm';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -8,6 +8,7 @@ import { diagnoses, diagnosesDrafts, scripts, scriptsDrafts } from '@/databases/
 import socket from '@/lib/socket';
 import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 import { removeHexCharacters } from '../../utils'
+import type { DraftOrigin } from './_screens_save';
 
 export type SaveDiagnosesData = Partial<DiagnosisType>;
 
@@ -16,18 +17,44 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, }: {
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not only the incoming payload.
+     * Partial saves can omit scriptId in the request while the final merged
+     * diagnosis still legitimately belongs to a script.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
+}
+
+export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
     client?: DbOrTransaction;
+    draftOrigin?: DraftOrigin;
 }) {
     const response: SaveDiagnosesResponse = { success: false, };
     data = removeHexCharacters(data)
     const errors = [];
     let sqlInfo: { [key: string]: Query; } = {};
-    const executor = client ?? db;
+    const executor = client || db;
 
     try {
         let index = 0;
@@ -38,21 +65,13 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const getDiagnosisDraftQuery = executor.query.diagnosesDrafts.findFirst({
+                    const draft = !itemDiagnosisId ? null : await executor.query.diagnosesDrafts.findFirst({
                         where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
                     });
 
-                    sqlInfo[`${diagnosisId} - getDiagnosisDraftQuery`] = getDiagnosisDraftQuery.toSQL();
-
-                    const draft = !itemDiagnosisId ? null : await getDiagnosisDraftQuery.execute();
-
-                    const getPublishedDiagnosisQuery = executor.query.diagnoses.findFirst({
+                    const published = (draft || !itemDiagnosisId) ? null : await executor.query.diagnoses.findFirst({
                         where: eq(diagnoses.diagnosisId, diagnosisId),
                     });
-
-                    sqlInfo[`${diagnosisId} - getPublishedDiagnosisQuery`] = getPublishedDiagnosisQuery.toSQL();
-
-                    const published = (draft || !itemDiagnosisId) ? null : await getPublishedDiagnosisQuery.execute();
 
                     if (draft) {
                         const data = {
@@ -60,11 +79,13 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                             ...item,
                         } as typeof draft.data;
                         
+                        const persistedDraftOrigin = requestedDraftOrigin;
                         const q = executor
                             .update(diagnosesDrafts)
                             .set({
                                 data,
                                 position: data.position,
+                                draftOrigin: persistedDraftOrigin,
                             }).where(eq(diagnosesDrafts.diagnosisDraftId, diagnosisId));
 
                         sqlInfo[`${diagnosisId} - updateDiagnosisDraft`] = q.toSQL();
@@ -95,25 +116,18 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
-                                where: eq(scriptsDrafts.scriptDraftId, data.scriptId),
-                                columns: { scriptDraftId: true, },
-                            });
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            const publishedScript = await executor.query.scripts.findFirst({
-                                where: eq(scripts.scriptId, data.scriptId),
-                                columns: { scriptId: true, },
-                            });
-
-                            if (scriptDraft || publishedScript) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(diagnosesDrafts).values({
                                     data,
-                                    scriptId: publishedScript?.scriptId,
-                                    scriptDraftId: scriptDraft?.scriptDraftId,
+                                    scriptId,
+                                    scriptDraftId,
                                     diagnosisDraftId: diagnosisId,
                                     position: data.position,
                                     diagnosisId: published?.diagnosisId,
                                     createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
                                 });
 
                                 sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();
@@ -143,7 +157,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
         response.errors = [e.message];
         logger.error('_saveDiagnoses ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction && !syncSilently && !client) socket.emit('data_changed', 'save_diagnoses');
+        if (!response?.errors?.length && broadcastAction && !syncSilently) socket.emit('data_changed', 'save_diagnoses');
         return response;
     }
 }

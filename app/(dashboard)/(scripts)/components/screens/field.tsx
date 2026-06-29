@@ -39,6 +39,7 @@ import type { useScreenForm } from "../../hooks/use-screen-form"
 import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 
 type Props = {
   open: boolean
@@ -142,16 +143,85 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const disabled = useMemo(() => !!disabledProp, [disabledProp])
 
   const onSave = handleSubmit(async (data) => {
+    const normalizeCharacterLimit = (value?: string) => {
+      const trimmed = `${value || ""}`.trim()
+      if (!trimmed) return { value: "", valid: true }
+
+      const parsed = Number(trimmed)
+      const isValid = Number.isInteger(parsed) && parsed > 0
+
+      return {
+        value: isValid ? `${parsed}` : trimmed,
+        valid: isValid,
+      }
+    }
+
+    const normalizedMinLength = normalizeCharacterLimit(data.minLength)
+    const normalizedMaxLength = normalizeCharacterLimit(data.maxLength)
+
+    if (!normalizedMinLength.valid) {
+      alert({
+        title: "Invalid minimum characters",
+        message: "Minimum characters must be a whole number greater than 0.",
+        variant: "error",
+      })
+      return
+    }
+
+    if (!normalizedMaxLength.valid) {
+      alert({
+        title: "Invalid maximum characters",
+        message: "Maximum characters must be a whole number greater than 0.",
+        variant: "error",
+      })
+      return
+    }
+
+    if (
+      normalizedMinLength.value &&
+      normalizedMaxLength.value &&
+      Number(normalizedMinLength.value) > Number(normalizedMaxLength.value)
+    ) {
+      alert({
+        title: "Invalid character range",
+        message: "Minimum characters cannot be greater than maximum characters.",
+        variant: "error",
+      })
+      return
+    }
+
+    const normalizedData = {
+      ...data,
+      minLength: normalizedMinLength.value,
+      maxLength: normalizedMaxLength.value,
+    }
+
+    if (form.changeTracker) {
+      const currentFields = form.getValues("fields")
+      const updatedFields =
+        !isEmpty(fieldIndex) && field
+          ? currentFields.map((f, i) => ({
+              ...f,
+              ...(i === fieldIndex ? normalizedData : null),
+            }))
+          : [...currentFields, normalizedData]
+
+      await form.changeTracker.trackChanges(
+        { ...form.getValues(), fields: updatedFields },
+        `Field "${normalizedData.label}" ${field ? "updated" : "added"}`,
+      )
+    }
+
     if (!isEmpty(fieldIndex) && field) {
       form.setValue(
         "fields",
         form.getValues("fields").map((f, i) => ({
           ...f,
-          ...(i === fieldIndex ? data : null),
+          ...(i === fieldIndex ? normalizedData : null),
         })),
       )
     } else {
-      form.setValue("fields", [...form.getValues("fields"), data], { shouldDirty: true })
+      form.setValue("fields", [...form.getValues("fields"), normalizedData], { shouldDirty: true })
     }
     onClose()
   })
@@ -180,7 +250,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     if (confidential !== inheritedConfidential) {
       setValue("confidential", inheritedConfidential, { shouldDirty: true })
     }
-  }, [confidential, inheritedConfidential, setValue])
+  }, [confidential, inheritedConfidential, setValue]);
+
+  const isKeyDisabled = disabled || !!field;
 
   return (
     <>
@@ -275,7 +347,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             <>
               <Title>Flow control</Title>
               <div>
-                <Label htmlFor="condition">Conditional expression</Label>
+                <Label htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
                 <Textarea {...register("condition", { disabled })} name="condition" noRing={false} rows={5} />
                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
               </div>
@@ -292,12 +364,12 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <SelectDataKey
                     modal
                     value={key}
-                    disabled={disabled}
+                    disabled={isKeyDisabled}
                     type={type}
                     filterDataKeys={(k) => {
                       const opts = screenDataKey?.options || []
-                      if (!screenDataKey) return true
-                      return opts.includes(k.uniqueKey)
+                      if (!screenDataKey) return true;
+                      return opts.includes(k.uniqueKey);
                     }}
                     onChange={([item]) => {
                       setValue("key", item?.name, { shouldDirty: true })
@@ -312,7 +384,13 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <Label error={!disabled && !label} htmlFor="label">
                     Label *
                   </Label>
-                  <Input {...register("label", { disabled })} name="label" error={!disabled && !label} />
+                  <Input 
+                    {...register("label", { 
+                      disabled: isKeyDisabled, 
+                    })} 
+                    name="label" 
+                    error={!disabled && !label} 
+                  />
                 </div>
               </div>
 
@@ -324,6 +402,40 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                     Displayed next to the value on summaries and printouts.
                   </span>
                 </div>
+              )}
+
+              {isTextField && (
+                <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                  <div className="sm:flex-1">
+                    <Label htmlFor="minLength">Min characters (optional)</Label>
+                    <Input
+                      {...register("minLength", { disabled })}
+                      name="minLength"
+                      type="number"
+                      min={1}
+                      step={1}
+                      noRing={false}
+                    />
+                  </div>
+
+                  <div className="sm:flex-1">
+                    <Label htmlFor="maxLength">Max characters (optional)</Label>
+                    <Input
+                      {...register("maxLength", { disabled })}
+                      name="maxLength"
+                      type="number"
+                      min={1}
+                      step={1}
+                      noRing={false}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isTextField && (
+                <span className="text-xs text-muted-foreground">
+                  Leave empty for no limit. Mobile will enforce these only while clinicians type into standard text fields.
+                </span>
               )}
 
               <div>
@@ -446,7 +558,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
               {(isPeriodField || isNumberField) && (
                 <>
                   <div>
-                    <Label htmlFor="calculation">Reference expression</Label>
+                    <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
                     <Input {...register("calculation", { disabled })} name="calculation" noRing={false} />
                     <span className="text-xs text-muted-foreground">
                       Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or

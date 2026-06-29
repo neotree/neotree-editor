@@ -3,16 +3,32 @@ import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import socket from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
+import {
+    shouldSyncFieldOwnedOptions,
+    shouldSyncScreenOwnedOptions,
+    syncDiagnosisReference,
+    syncFieldReference,
+    syncKeyOnlyReference,
+    syncScreenEntityReference,
+    syncScreenReference,
+} from './_update_data_keys_refs.helpers';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
     dataKeys: DataKey[];
     dryRun?: boolean;
     userId?: string;
+    draftOrigin?: "data_key_sync" | "import";
+    matchUniqueKeysByDataKey?: Record<string, string[]>;
+    // Delete-replace uses alias-only matching so existing replacement usages are not rewritten unnecessarily.
+    includePrimaryUniqueKeys?: boolean;
+    forceFullScan?: boolean;
+    client?: DbOrTransaction;
 };
 
 type MatchSource = 'uniqueKey';
@@ -63,6 +79,11 @@ export type UpdateDataKeysRefsResponse = {
     errors?: string[];
     success: boolean;
     info?: UpdateStats;
+    preview?: {
+        screens: Awaited<ReturnType<typeof _getScreens>>["data"];
+        diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
+        problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+    };
     affected?: {
         scripts: { scriptId: string; scriptTitle?: string; }[];
         screens: AffectedEntity[];
@@ -102,6 +123,21 @@ function escapeLikePattern(value: string) {
     return value.replace(/[\\%_]/g, '\\$&');
 }
 
+function buildJsonKeyIdPatterns(uniqueKeys: string[], jsonKeys: string[]) {
+    return uniqueKeys
+        .filter(Boolean)
+        .slice(0, 120)
+        .flatMap((uniqueKey) => {
+            const escapedUniqueKey = escapeLikePattern(uniqueKey);
+            return jsonKeys.flatMap((jsonKey) => ([
+                `%\"${jsonKey}\":\"${escapedUniqueKey}\"%`,
+                `%\"${jsonKey}\": \"${escapedUniqueKey}\"%`,
+                `%\"${jsonKey}\"%\"${escapedUniqueKey}\"%`,
+                `%${escapeLikePattern(jsonKey)}%${escapedUniqueKey}%`,
+            ]));
+        });
+}
+
 async function mapWithConcurrency<T>(
     items: T[],
     concurrency: number,
@@ -126,8 +162,14 @@ export async function _updateDataKeysRefs({
     dryRun = false,
     broadcastAction,
     userId,
+    draftOrigin = "data_key_sync",
+    matchUniqueKeysByDataKey = {},
+    includePrimaryUniqueKeys = true,
+    forceFullScan = false,
+    client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
+        const executor = client || db;
         const stats: UpdateStats = {
             candidateScripts: 0,
             fetchedScreens: 0,
@@ -151,7 +193,16 @@ export async function _updateDataKeysRefs({
             if (key.uniqueKey) byUniqueKey.set(key.uniqueKey, key);
         });
 
-        const changedUniqueKeys = Array.from(byUniqueKey.keys());
+        const changedUniqueKeys = Array.from(new Set(
+            dataKeys.flatMap((key) => {
+                const currentUniqueKey = `${key.uniqueKey || ''}`.trim();
+                const aliases = currentUniqueKey ? (matchUniqueKeysByDataKey[currentUniqueKey] || []) : [];
+                return [
+                    ...(includePrimaryUniqueKeys ? [currentUniqueKey] : []),
+                    ...aliases,
+                ].filter(Boolean);
+            }),
+        ));
 
         const getUpdatedDataKey = ({
             uniqueKey,
@@ -159,8 +210,16 @@ export async function _updateDataKeysRefs({
             uniqueKey?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
-                const keyById = byUniqueKey.get(uniqueKey);
-                if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+                if (includePrimaryUniqueKeys) {
+                    const keyById = byUniqueKey.get(uniqueKey);
+                    if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+                }
+
+                for (const [currentUniqueKey, aliases] of Object.entries(matchUniqueKeysByDataKey)) {
+                    if (!aliases.includes(uniqueKey)) continue;
+                    const aliasedDataKey = byUniqueKey.get(currentUniqueKey);
+                    if (aliasedDataKey) return { dataKey: aliasedDataKey, source: 'uniqueKey' };
+                }
             }
 
             return {};
@@ -169,9 +228,9 @@ export async function _updateDataKeysRefs({
         const trackMatchSource = (source?: MatchSource) => {
             if (source === 'uniqueKey') stats.matchedByUniqueKey++;
         };
-        const getDataKeyOptional = (key?: DataKey) => !!(key?.metadata as Record<string, any> | undefined)?.optional;
 
         const usagesMap = new Map<string, AffectedUsage>();
+        const warningOnlyScreensMap = new Map<string, AffectedEntity>();
         const addUsage = (usage: AffectedUsage) => {
             const dedupeKey = [
                 usage.kind,
@@ -183,18 +242,34 @@ export async function _updateDataKeysRefs({
             ].join('|');
             usagesMap.set(dedupeKey, usage);
         };
-
-        const keyIdPatterns = changedUniqueKeys
-            .filter(Boolean)
-            .slice(0, 120)
-            .flatMap(keyId => {
-                const id = escapeLikePattern(keyId);
-                return [
-                    `%\"keyId\":\"${id}\"%`,
-                    `%\"keyId\": \"${id}\"%`,
-                    `%\"keyId\"%\"${id}\"%`,
-                ];
+        const addWarningOnlyScreen = (screen: {
+            screenId: string;
+            scriptId: string;
+            scriptTitle?: string | null;
+            title?: string | null;
+            label?: string | null;
+            refId?: string | null;
+        }) => {
+            if (!screen.screenId || !screen.scriptId) return;
+            warningOnlyScreensMap.set(screen.screenId, {
+                id: screen.screenId,
+                scriptId: screen.scriptId,
+                scriptTitle: screen.scriptTitle || undefined,
+                title: screen.title || screen.label || screen.refId || screen.screenId,
+                type: 'screen',
             });
+        };
+
+        const screenJsonReferenceKeys = [
+            'keyId',
+            'refKeyId',
+            'minDateKeyId',
+            'maxDateKeyId',
+            'minTimeKeyId',
+            'maxTimeKeyId',
+            'refIdDataKey',
+        ];
+        const keyIdPatterns = buildJsonKeyIdPatterns(changedUniqueKeys, screenJsonReferenceKeys);
         const likePatterns = Array.from(new Set([
             ...keyIdPatterns,
         ])).slice(0, 240);
@@ -202,7 +277,7 @@ export async function _updateDataKeysRefs({
         const candidateScripts = new Set<string>();
 
         if (changedUniqueKeys.length || likePatterns.length) {
-            const screensPublishedCandidates = await db
+            const screensPublishedCandidates = await executor
                 .select({ scriptId: screens.scriptId })
                 .from(screens)
                 .where(and(
@@ -219,7 +294,7 @@ export async function _updateDataKeysRefs({
                 if (row.scriptId) candidateScripts.add(row.scriptId);
             });
 
-            const diagnosesPublishedCandidates = await db
+            const diagnosesPublishedCandidates = await executor
                 .select({ scriptId: diagnoses.scriptId })
                 .from(diagnoses)
                 .where(and(
@@ -234,7 +309,7 @@ export async function _updateDataKeysRefs({
                 if (row.scriptId) candidateScripts.add(row.scriptId);
             });
 
-            const problemsPublishedCandidates = await db
+            const problemsPublishedCandidates = await executor
                 .select({ scriptId: problems.scriptId })
                 .from(problems)
                 .where(and(
@@ -249,7 +324,7 @@ export async function _updateDataKeysRefs({
             });
 
             if (likePatterns.length) {
-                const screensDraftCandidates = await db
+                const screensDraftCandidates = await executor
                     .select({
                         scriptId: screensDrafts.scriptId,
                         scriptDraftId: screensDrafts.scriptDraftId,
@@ -262,7 +337,7 @@ export async function _updateDataKeysRefs({
                     if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
                 });
 
-                const diagnosesDraftCandidates = await db
+                const diagnosesDraftCandidates = await executor
                     .select({
                         scriptId: diagnosesDrafts.scriptId,
                         scriptDraftId: diagnosesDrafts.scriptDraftId,
@@ -275,7 +350,7 @@ export async function _updateDataKeysRefs({
                     if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
                 });
 
-                const problemsDraftCandidates = await db
+                const problemsDraftCandidates = await executor
                     .select({
                         scriptId: problemsDrafts.scriptId,
                         scriptDraftId: problemsDrafts.scriptDraftId,
@@ -292,9 +367,7 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        const shouldFallbackToFullScan = !candidateScripts.size && changedUniqueKeys.length > 0;
-
-        const useFullScan = dryRun || shouldFallbackToFullScan;
+        const useFullScan = forceFullScan;
 
         if (!candidateScripts.size && !useFullScan) {
             return {
@@ -312,19 +385,20 @@ export async function _updateDataKeysRefs({
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
         const { data: screensArr, errors: screensGetErrors } = await _getScreens(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
         const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const { data: problemsArr, errors: problemsGetErrors } = await _getProblems(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const prefetchErrors = [
             ...(screensGetErrors || []),
             ...(diagnosesGetErrors || []),
+            ...(problemsGetErrors || []),
         ];
         if (prefetchErrors.length) {
             return { success: false, errors: prefetchErrors, info: stats };
@@ -339,7 +413,6 @@ export async function _updateDataKeysRefs({
                 uniqueKey: s.refIdDataKey || s.refId,
             });
             trackMatchSource(refMatchSource);
-
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
             });
@@ -358,37 +431,64 @@ export async function _updateDataKeysRefs({
             }
 
             let updated = !!screenDataKey || !!refIdDataKey;
-
-            const items = (s.items || []).map((item, itemIndex) => {
-                const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
-                    uniqueKey: item.keyId,
-                });
-                trackMatchSource(itemMatchSource);
-
-                if (itemDataKey) {
-                    updated = true;
-                    addUsage({
-                        id: item.itemId || `${s.screenId}:item:${itemIndex}`,
-                        kind: 'screen_item',
-                        title: item.label || item.key || item.id || `${itemIndex + 1}`,
-                        location: s.title || s.label || s.refId || s.screenId,
-                        scriptId: s.scriptId,
-                        scriptTitle: s.scriptTitle || undefined,
-                        screenId: s.screenId,
-                        screenItemIndex: itemIndex,
-                    });
-                }
-                return {
-                    ...item,
-                    ...(!itemDataKey ? {} : {
-                        keyId: itemDataKey.uniqueKey,
-                        label: itemDataKey.label,
-                        confidential: !!itemDataKey.confidential,
-                        ...(!(`${item.key || ''}`.length) ? {} : { key: itemDataKey.name, }),
-                        ...(!(`${item.id || ''}`.length) ? {} : { id: itemDataKey.name, }),
-                    }),
-                };
+            const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
+            const shouldSyncScreenOptions = shouldSyncScreenOwnedOptions({
+                screenType: s.type,
+                dataKey: screenDataKey,
+                currentItemsCount: (s.items || []).length,
             });
+
+            const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
+                ? (s.items || [])
+                : (s.items || []).map((item, itemIndex) => {
+                    const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                    });
+                    trackMatchSource(itemMatchSource);
+
+                    if (itemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                            kind: 'screen_item',
+                            title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                            location: s.title || s.label || s.refId || s.screenId,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            screenItemIndex: itemIndex,
+                        });
+                    }
+                    if (shouldSyncScreenOptions) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !screenOptionUniqueKeys.has(keyId)) {
+                            addUsage({
+                                id: item.itemId || `${s.screenId}:item:${itemIndex}`,
+                                kind: 'screen_item',
+                                title: item.label || item.key || item.id || `${itemIndex + 1}`,
+                                location: s.title || s.label || s.refId || s.screenId,
+                                scriptId: s.scriptId,
+                                scriptTitle: s.scriptTitle || undefined,
+                                screenId: s.screenId,
+                                screenItemIndex: itemIndex,
+                            });
+                        }
+                    }
+                    const syncedItem = syncScreenReference(item, itemDataKey);
+                    if (syncedItem.changed) {
+                        updated = true;
+                    }
+                    return {
+                        ...item,
+                        ...syncedItem.value,
+                    };
+                });
+            if (shouldSyncScreenOptions && (items || []).some((item) => {
+                const keyId = `${item.keyId || ''}`.trim();
+                return !!keyId && !screenOptionUniqueKeys.has(keyId);
+            })) {
+                addWarningOnlyScreen(s);
+            }
 
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
@@ -421,10 +521,6 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(maxTimeMatchSource);
 
-                if (fieldDataKey || refKeyDataKey || minDateKeyDataKey || maxDateKeyDataKey || minTimeKeyDataKey || maxTimeKeyDataKey) {
-                    updated = true;
-                }
-
                 if (fieldDataKey) {
                     addUsage({
                         id: field.fieldId || `${s.screenId}:field:${fieldIndex}`,
@@ -438,43 +534,37 @@ export async function _updateDataKeysRefs({
                     });
                 }
 
-                return {
-                    ...field,
-                    ...(!fieldDataKey ? {} : {
-                        keyId: fieldDataKey.uniqueKey,
-                        key: fieldDataKey.name,
-                        label: fieldDataKey.label,
-                        confidential: !!fieldDataKey.confidential,
-                        optional: getDataKeyOptional(fieldDataKey),
-                    }),
-                    ...(!refKeyDataKey ? {} : {
-                        refKeyId: refKeyDataKey.uniqueKey,
-                        refKey: refKeyDataKey.name,
-                    }),
-                    ...(!minDateKeyDataKey ? {} : {
-                        minDateKeyId: minDateKeyDataKey.uniqueKey,
-                        minDateKey: minDateKeyDataKey.name,
-                    }),
-                    ...(!maxDateKeyDataKey ? {} : {
-                        maxDateKeyId: maxDateKeyDataKey.uniqueKey,
-                        maxDateKey: maxDateKeyDataKey.name,
-                    }),
-                    ...(!minTimeKeyDataKey ? {} : {
-                        minTimeKeyId: minTimeKeyDataKey.uniqueKey,
-                        minTimeKey: minTimeKeyDataKey.name,
-                    }),
-                    ...(!maxTimeKeyDataKey ? {} : {
-                        maxTimeKeyId: maxTimeKeyDataKey.uniqueKey,
-                        maxTimeKey: maxTimeKeyDataKey.name,
-                    }),
-                    items: (field.items || []).map((item, fieldItemIndex) => {
-                        const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
-                            uniqueKey: item.keyId,
-                        });
-                        trackMatchSource(fieldItemMatchSource);
+                const fieldOptionUniqueKeys = new Set((fieldDataKey?.options || []).filter(Boolean));
+                const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
+                    const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
+                        uniqueKey: item.keyId,
+                    });
+                    trackMatchSource(fieldItemMatchSource);
 
-                        if (fieldItemDataKey) {
-                            updated = true;
+                    if (fieldItemDataKey) {
+                        updated = true;
+                        addUsage({
+                            id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
+                            kind: 'screen_field_item',
+                            title: `${item.label || item.value || (fieldItemIndex + 1)}`,
+                            location: `${s.title || s.label || s.refId || s.screenId} > ${field.label || field.key || field.fieldId || fieldIndex}`,
+                            scriptId: s.scriptId,
+                            scriptTitle: s.scriptTitle || undefined,
+                            screenId: s.screenId,
+                            fieldIndex,
+                            fieldItemIndex,
+                        });
+                    }
+                    if (
+                        shouldSyncFieldOwnedOptions({
+                            fieldType: field.type,
+                            dataKey: fieldDataKey,
+                            currentItemsCount: (field.items || []).length,
+                        })
+                    ) {
+                        const keyId = `${item.keyId || ''}`.trim();
+                        if (keyId && !fieldOptionUniqueKeys.has(keyId)) {
+                            addWarningOnlyScreen(s);
                             addUsage({
                                 id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
                                 kind: 'screen_field_item',
@@ -487,33 +577,78 @@ export async function _updateDataKeysRefs({
                                 fieldItemIndex,
                             });
                         }
-                        return {
-                            ...item,
-                            ...(!fieldItemDataKey ? {} : {
-                                keyId: fieldItemDataKey.uniqueKey,
-                                value: fieldItemDataKey.name,
-                                label: fieldItemDataKey.label,
-                            }),
-                        };
-                    }),
+                    }
+                    const syncedFieldItem = syncKeyOnlyReference(item, fieldItemDataKey, {
+                        id: "keyId",
+                        name: "value",
+                    });
+                    const fieldItemValue = fieldItemDataKey ? {
+                        ...syncedFieldItem.value,
+                        label: fieldItemDataKey.label,
+                    } : item;
+                    if (JSON.stringify(fieldItemValue) !== JSON.stringify(item)) {
+                        updated = true;
+                    }
+                    return {
+                        ...item,
+                        ...fieldItemValue,
+                    };
+                });
+                const syncedField = syncFieldReference(field, fieldDataKey);
+                const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
+                    id: "refKeyId",
+                    name: "refKey",
+                });
+                const syncedMinDateField = syncKeyOnlyReference(syncedRefField.value, minDateKeyDataKey, {
+                    id: "minDateKeyId",
+                    name: "minDateKey",
+                });
+                const syncedMaxDateField = syncKeyOnlyReference(syncedMinDateField.value, maxDateKeyDataKey, {
+                    id: "maxDateKeyId",
+                    name: "maxDateKey",
+                });
+                const syncedMinTimeField = syncKeyOnlyReference(syncedMaxDateField.value, minTimeKeyDataKey, {
+                    id: "minTimeKeyId",
+                    name: "minTimeKey",
+                });
+                const syncedMaxTimeField = syncKeyOnlyReference(syncedMinTimeField.value, maxTimeKeyDataKey, {
+                    id: "maxTimeKeyId",
+                    name: "maxTimeKey",
+                });
+                if (
+                    syncedField.changed ||
+                    syncedRefField.changed ||
+                    syncedMinDateField.changed ||
+                    syncedMaxDateField.changed ||
+                    syncedMinTimeField.changed ||
+                    syncedMaxTimeField.changed
+                ) {
+                    updated = true;
+                }
+
+                return {
+                    ...syncedMaxTimeField.value,
+                    items: fieldItems,
                 };
             });
 
+            const syncedScreen = syncScreenEntityReference(s, screenDataKey);
+            if (syncedScreen.changed) {
+                updated = true;
+            }
+            const syncedRefScreen = syncKeyOnlyReference(syncedScreen.value, refIdDataKey, {
+                id: "refIdDataKey",
+                name: "refId",
+            });
+            if (syncedRefScreen.changed) {
+                updated = true;
+            }
+
             return {
-                ...s,
+                ...syncedRefScreen.value,
                 updated,
                 items,
                 fields,
-                ...(!screenDataKey ? {} : {
-                    keyId: screenDataKey.uniqueKey,
-                    key: screenDataKey.name,
-                    label: screenDataKey.label,
-                    confidential: !!screenDataKey.confidential,
-                }),
-                ...(!refIdDataKey ? {} : {
-                    refId: refIdDataKey.name,
-                    refIdDataKey: refIdDataKey.uniqueKey,
-                }),
             };
         }).filter(s => !!s.updated).map(({ updated, ...s }) => s);
 
@@ -557,26 +692,27 @@ export async function _updateDataKeysRefs({
                         diagnosisSymptomIndex: symptomIndex,
                     });
                 }
+                const syncedSymptom = syncDiagnosisReference(item, symptomDataKey);
+                if (syncedSymptom.changed) {
+                    updated = true;
+                }
                 return {
                     ...item,
-                    ...(!symptomDataKey ? {} : {
-                        keyId: symptomDataKey.uniqueKey,
-                        key: symptomDataKey.name,
-                        name: symptomDataKey.label,
-                    }),
+                    ...syncedSymptom.value,
                 };
             });
-
-            return {
+            const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
+            }, diagnosisDataKey);
+            if (syncedDiagnosis.changed) {
+                updated = true;
+            }
+
+            return {
+                ...syncedDiagnosis.value,
                 symptoms,
                 updated,
-                ...(!diagnosisDataKey ? {} : {
-                    keyId: diagnosisDataKey.uniqueKey,
-                    key: diagnosisDataKey.name,
-                    name: diagnosisDataKey.label,
-                }),
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
@@ -595,7 +731,7 @@ export async function _updateDataKeysRefs({
                     location: 'Problem',
                     scriptId: d.scriptId,
                     scriptTitle: d.scriptTitle || undefined,
-                    diagnosisId: d.problemId,
+                    problemId: d.problemId,
                 });
             }
 
@@ -617,13 +753,20 @@ export async function _updateDataKeysRefs({
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
         stats.updatedProblems = problemsUpdatedData.length;
 
-        const affectedScreens: AffectedEntity[] = screensUpdatedData.map(s => ({
-            id: s.screenId,
-            scriptId: s.scriptId,
-            scriptTitle: s.scriptTitle || undefined,
-            title: s.title || s.label || s.refId || s.screenId,
-            type: 'screen',
-        }));
+        const affectedScreensMap = new Map<string, AffectedEntity>();
+        screensUpdatedData.forEach((s) => {
+            affectedScreensMap.set(s.screenId, {
+                id: s.screenId,
+                scriptId: s.scriptId,
+                scriptTitle: s.scriptTitle || undefined,
+                title: s.title || s.label || s.refId || s.screenId,
+                type: 'screen',
+            });
+        });
+        warningOnlyScreensMap.forEach((screen) => {
+            affectedScreensMap.set(screen.id, screen);
+        });
+        const affectedScreens: AffectedEntity[] = Array.from(affectedScreensMap.values());
         const affectedDiagnoses: AffectedEntity[] = diagnosesUpdatedData.map(d => ({
             id: d.diagnosisId,
             scriptId: d.scriptId,
@@ -660,6 +803,11 @@ export async function _updateDataKeysRefs({
             return {
                 success: true,
                 info: stats,
+                preview: {
+                    screens: screensUpdatedData,
+                    diagnoses: diagnosesUpdatedData,
+                    problems: problemsUpdatedData,
+                },
                 affected,
             };
         }
@@ -668,11 +816,11 @@ export async function _updateDataKeysRefs({
 
         const saveDiagnosesTask = async () => {
             for (const chunk of chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveDiagnoses({ data: chunk, userId, });
+                const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (diagnosis) => {
-                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, });
+                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[diagnosis:${diagnosis.diagnosisId}] ${e}`));
                         } else {
@@ -687,11 +835,11 @@ export async function _updateDataKeysRefs({
 
         const saveProblemsTask = async () => {
             for (const chunk of chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveProblems({ data: chunk, userId, });
+                const res = await _saveProblems({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (problem) => {
-                        const singleRes = await _saveProblems({ data: [problem], userId, });
+                        const singleRes = await _saveProblems({ data: [problem], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[problem:${problem.problemId}] ${e}`));
                         } else {
@@ -706,11 +854,11 @@ export async function _updateDataKeysRefs({
 
         const saveScreensTask = async () => {
             for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveScreens({ data: chunk, userId, });
+                const res = await _saveScreens({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (screen) => {
-                        const singleRes = await _saveScreens({ data: [screen], userId, });
+                        const singleRes = await _saveScreens({ data: [screen], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[screen:${screen.screenId}] ${e}`));
                         } else {

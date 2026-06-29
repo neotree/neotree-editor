@@ -58,7 +58,6 @@ export async function _publishScripts({
     const updates = drafts.filter((c) => c.scriptId)
 
     const errors: string[] = []
-    const processedScripts: { scriptId: string; errors?: string[] }[] = []
 
     if (updates.length) {
       // we'll use data before to compare changes
@@ -92,7 +91,6 @@ export async function _publishScripts({
           })
         }
 
-        processedScripts.push({ scriptId })
       }
 
       const updateChangeLogs = await _saveScriptsHistory({
@@ -138,8 +136,6 @@ export async function _publishScripts({
 
       for (const insertedScript of inserts) {
         const scriptId = insertedScript.data.scriptId!
-        processedScripts.push({ scriptId })
-
         await executor
           .update(screensDrafts)
           .set({ scriptId })
@@ -219,7 +215,8 @@ export async function _publishScripts({
       const deletedById = new Map(deletedRows.map((row) => [row.scriptId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: deletedById.get(c.scriptId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.script!.version, isCreate: false }),
+        version:
+          deletedById.get(c.scriptId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.script!.version, isCreate: false }),
         scriptId: c.scriptId!,
         changes: {
           action: "delete_script",

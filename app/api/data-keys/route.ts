@@ -6,6 +6,13 @@ import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { GetDataKeysParams, GetDataKeysResults, _getDataKeys } from "@/databases/queries/data-keys";
 import { _deleteDataKeys } from "@/databases/mutations/data-keys";
 
+function parseOptionalBoolean(value: unknown) {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    if (typeof value === "boolean") return value;
+    return undefined;
+}
+
 export async function GET(req: NextRequest) {
 	let res: GetDataKeysResults = { data: [], };
 	try {
@@ -13,7 +20,15 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const params = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams;
+        const parsed = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams & {
+            returnDraftsIfExist?: string | boolean;
+            withDeleted?: string | boolean;
+        };
+        const params: GetDataKeysParams = {
+            ...parsed,
+            returnDraftsIfExist: parseOptionalBoolean(parsed.returnDraftsIfExist),
+            withDeleted: parseOptionalBoolean(parsed.withDeleted),
+        };
 
         res = await _getDataKeys(params);
         res = {
@@ -40,7 +55,17 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ errors: ['Forbidden'] }, { status: 403 });
         }
 
-        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
+        let params = {} as Parameters<typeof _deleteDataKeys>[0];
+        const queryPayload = req.nextUrl.searchParams.get('data');
+        if (queryPayload) {
+            params = JSON.parse(queryPayload) as Parameters<typeof _deleteDataKeys>[0];
+        } else {
+            try {
+                params = await req.json() as Parameters<typeof _deleteDataKeys>[0];
+            } catch {
+                params = {} as Parameters<typeof _deleteDataKeys>[0];
+            }
+        }
 
         const res = await _deleteDataKeys({
             ...params,
