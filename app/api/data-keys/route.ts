@@ -55,7 +55,17 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ errors: ['Forbidden'] }, { status: 403 });
         }
 
-        const params = JSON.parse(req.nextUrl.searchParams.get('data') || '{}') as Parameters<typeof _deleteDataKeys>[0];
+        let params = {} as Parameters<typeof _deleteDataKeys>[0];
+        const queryPayload = req.nextUrl.searchParams.get('data');
+        if (queryPayload) {
+            params = JSON.parse(queryPayload) as Parameters<typeof _deleteDataKeys>[0];
+        } else {
+            try {
+                params = await req.json() as Parameters<typeof _deleteDataKeys>[0];
+            } catch {
+                params = {} as Parameters<typeof _deleteDataKeys>[0];
+            }
+        }
 
         const res = await _deleteDataKeys({
             ...params,
