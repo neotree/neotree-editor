@@ -133,12 +133,8 @@ export function useScriptForm(params: UseScriptFormParams) {
     return !res.errors?.length
   }, [
     alert,
-    authenticatedUser?.displayName,
-    authenticatedUser?.userId,
-    changeTrackerRef,
     form,
     isNewScript,
-    originalSnapshotRef,
     router,
   ])
 
