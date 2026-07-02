@@ -27,7 +27,8 @@ export async function _saveDataKeysHistory({
         continue
       }
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.uuid === resolvedDataKeyId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create data key" : "Update data key"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -37,8 +38,12 @@ export async function _saveDataKeysHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
-      const nextVersion = isCreate ? 1 : versionValue + 1
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof dataKeysHistory.$inferInsert = {
         version: nextVersion,
@@ -47,8 +52,6 @@ export async function _saveDataKeysHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.uuid === resolvedDataKeyId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -69,15 +72,12 @@ export async function _saveDataKeysHistory({
           ...(c.data || {}),
           uuid: resolvedDataKeyId,
         }))
-        const previousSnapshot = isCreate
-          ? {}
-          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.uuid === resolvedDataKeyId) || {}))
+        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(prev || {}))
 
         changeLogsData.push({
           entityId: resolvedDataKeyId,
           entityType: "data_key",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,

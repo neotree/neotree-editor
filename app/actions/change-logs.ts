@@ -249,8 +249,11 @@ export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) =
 
 export const updateChangeLog: typeof mutations._updateChangeLog = async (params) => {
   try {
-    await ensureSuperUser()
-    return await mutations._updateChangeLog(params)
+    const session = await ensureSuperUser()
+    return await mutations._updateChangeLog({
+      ...params,
+      actorUserId: session.user?.userId || null,
+    })
   } catch (e: any) {
     logUnexpectedActionError("updateChangeLog ERROR", e)
     return { errors: [e.message], success: false }
@@ -259,8 +262,11 @@ export const updateChangeLog: typeof mutations._updateChangeLog = async (params)
 
 export const markVersionAsSuperseded: typeof mutations._markVersionAsSuperseded = async (params) => {
   try {
-    await ensureSuperUser()
-    return await mutations._markVersionAsSuperseded(params)
+    const session = await ensureSuperUser()
+    return await mutations._markVersionAsSuperseded({
+      ...params,
+      actorUserId: session.user?.userId || null,
+    })
   } catch (e: any) {
     logUnexpectedActionError("markVersionAsSuperseded ERROR", e)
     return { errors: [e.message], success: false }

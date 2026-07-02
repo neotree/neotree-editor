@@ -17,10 +17,13 @@ import {
 import {
   applyRollbackSnapshot,
   assertSnapshotIntegrity,
+  buildScriptChildBundleMaps,
   CHANGELOG_ENTITY_BINDINGS,
   ensureActiveChangeApplied,
+  isMeaningfulSnapshot,
   lockChangeLogChain,
   lockEntityRow,
+  nonEmptySnapshotCondition,
   normalizeSnapshot,
 } from "./_rollback-shared"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
@@ -28,7 +31,11 @@ import { buildReleasePublishChangeLog } from "./_release-log"
 import { isUuidLike } from "@/lib/uuid"
 import { buildDataKeyDependentRollbackSnapshot, buildDataKeyRollbackDependencies } from "@/lib/changelog-dependencies"
 import { getProtectedDependentRollbackMessage, isProtectedDependentRollbackChange } from "@/lib/changelog-rollback-guards"
-import { assertRollbackAllowedWithDrafts } from "./_rollback-draft-guard"
+import {
+  assertRollbackAllowedWithDrafts,
+  buildOwnDraftRollbackWarning,
+  getOwnPendingDraftCount,
+} from "./_rollback-draft-guard"
 
 export type RollbackChangeLogParams = {
   entityId: string
@@ -42,6 +49,7 @@ export type RollbackChangeLogParams = {
 export type RollbackChangeLogResponse = {
   success: boolean
   errors?: string[]
+  warnings?: string[]
   newVersion?: number
   data?: typeof changeLogs.$inferSelect
 }
@@ -68,6 +76,13 @@ export async function _rollbackChangeLog({
     }
 
     const result = await db.transaction(async (tx) => {
+      // Lock editor info before any entity locks. Publish and release rollback acquire
+      // it first, so taking entity locks first here could deadlock against them.
+      const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(
+        sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
+      )
+      const editor = lockedEditorInfo?.[0]
+
       await assertRollbackAllowedWithDrafts(tx, userId)
 
       const findTargetByVersion = async ({
@@ -142,6 +157,7 @@ export async function _rollbackChangeLog({
                 eq(changeLogs.entityId, entityId),
                 eq(changeLogs.entityType, entityType),
                 lte(changeLogs.dataVersion, Number(targetDataVersion)),
+                nonEmptySnapshotCondition,
               ),
               orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
             })) ?? null
@@ -169,6 +185,7 @@ export async function _rollbackChangeLog({
               eq(changeLogs.entityId, entityId),
               eq(changeLogs.entityType, entityType),
               lte(changeLogs.dataVersion, Number(targetDataVersion)),
+              nonEmptySnapshotCondition,
             ),
             orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
           })) ?? null
@@ -202,7 +219,6 @@ export async function _rollbackChangeLog({
       }
 
       const explicitPreviousVersion = getRollbackTargetVersion({
-        action: current.action,
         parentVersion: current.parentVersion,
         mergedFromVersion: current.mergedFromVersion,
       })
@@ -229,14 +245,15 @@ export async function _rollbackChangeLog({
       if (!target.fullSnapshot) {
         throw new Error(`Target version ${target.version} is missing a full snapshot`)
       }
+      // An explicitly requested version must be restorable as-is; only implicit targets
+      // may fall back to the pre-creation soft-delete path.
+      if (Number.isFinite(toVersion) && target.version > 0 && !isMeaningfulSnapshot(target.fullSnapshot)) {
+        throw new Error(`Target version ${target.version} has an empty snapshot and cannot be restored`)
+      }
       if (current.entityType === "script" && !Number.isFinite(target.dataVersion)) {
         throw new Error("Script rollback requires a target changelog with dataVersion to restore a release-consistent child bundle")
       }
 
-      const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(
-        sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
-      )
-      const editor = lockedEditorInfo?.[0]
       const nextDataVersion = getNextRollbackDataVersion({
         editorDataVersion: editor?.dataVersion,
         currentDataVersion: current.dataVersion,
@@ -256,7 +273,14 @@ export async function _rollbackChangeLog({
         targetSnapshotOverride?: any
         allowSoftDeleteIfCreated?: boolean
       }) => {
-        const meaningfulTarget = targetChange && normalizePublishedRollbackVersion(targetChange.version) !== null ? targetChange : null
+        // A target with an empty snapshot (e.g. a baseline row) must never be restored as
+        // entity state; treating it as absent routes to the pre-creation soft-delete path.
+        const meaningfulTarget =
+          targetChange &&
+          normalizePublishedRollbackVersion(targetChange.version) !== null &&
+          isMeaningfulSnapshot(targetChange.fullSnapshot)
+            ? targetChange
+            : null
         const restoredVersion = normalizePublishedRollbackVersion(meaningfulTarget?.version)
         const shouldSoftDeleteCreated = allowSoftDeleteIfCreated && !meaningfulTarget && !targetSnapshotOverride
         const effectiveSnapshotSource = targetSnapshotOverride ?? meaningfulTarget?.fullSnapshot ?? currentChange.fullSnapshot
@@ -364,7 +388,11 @@ export async function _rollbackChangeLog({
           target.dataVersion === null || target.dataVersion === undefined
             ? []
             : await tx.query.changeLogs.findMany({
-                where: and(eq(changeLogs.scriptId, entityId), lte(changeLogs.dataVersion, target.dataVersion)),
+                where: and(
+                  eq(changeLogs.scriptId, entityId),
+                  lte(changeLogs.dataVersion, target.dataVersion),
+                  nonEmptySnapshotCondition,
+                ),
                 orderBy: (changeLogs, { desc, asc }) => [
                   asc(changeLogs.entityType),
                   asc(changeLogs.entityId),
@@ -372,24 +400,11 @@ export async function _rollbackChangeLog({
                   desc(changeLogs.version),
                 ],
               })
-        const targetChildrenByEntity = new Map<string, typeof changeLogs.$inferSelect>()
-        for (const entry of targetBundleChildren) {
-          if (!childTypes.includes(entry.entityType)) continue
-          const key = `${entry.entityType}:${entry.entityId}`
-          if (!targetChildrenByEntity.has(key)) {
-            targetChildrenByEntity.set(key, entry)
-          }
-        }
-        const childStubsByEntity = new Map<string, typeof changeLogs.$inferSelect>()
-        for (const entry of activeChildren.filter((child) => childTypes.includes(child.entityType))) {
-          childStubsByEntity.set(`${entry.entityType}:${entry.entityId}`, entry)
-        }
-        for (const entry of Array.from(targetChildrenByEntity.values())) {
-          const key = `${entry.entityType}:${entry.entityId}`
-          if (!childStubsByEntity.has(key)) {
-            childStubsByEntity.set(key, entry)
-          }
-        }
+        const { childStubsByEntity } = buildScriptChildBundleMaps({
+          activeChildren,
+          targetBundleChildren,
+          childTypes,
+        })
 
         for (const childStub of Array.from(childStubsByEntity.values())) {
           const childBinding = CHANGELOG_ENTITY_BINDINGS[childStub.entityType]
@@ -576,12 +591,17 @@ export async function _rollbackChangeLog({
         throw new Error(releaseLog.errors?.join(", ") || "Failed to save rollback release changelog")
       }
 
-      return savedRoot
+      const ownDraftCount = await getOwnPendingDraftCount(tx, userId)
+
+      return { savedRoot, ownDraftCount }
     })
 
     response.success = true
-    response.newVersion = result?.version
-    response.data = result
+    response.newVersion = result?.savedRoot?.version
+    response.data = result?.savedRoot
+
+    const ownDraftWarning = buildOwnDraftRollbackWarning(result?.ownDraftCount ?? 0)
+    if (ownDraftWarning) response.warnings = [ownDraftWarning]
 
     if (broadcastAction) {
       socket.emit("data_changed", "rollback_change_log")

@@ -22,7 +22,6 @@ export function buildDeleteChangeSnapshots<T>(params: {
 }
 
 export function getRollbackButtonTargetVersion(params: {
-  action?: string | null
   parentVersion?: number | null
   mergedFromVersion?: number | null
 }) {

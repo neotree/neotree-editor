@@ -266,16 +266,21 @@ export function ChangelogsTable(props: Props) {
         throw new Error(res.data.errors.join(", "))
       }
 
+      const warnings: string[] = res.data?.warnings || []
       alert({
-        title: "Rollback queued",
-        message: `Release v${dataVersion} will be rolled back to the state of v${restoreToVersion}. New release v${dataVersion + 1} will be created. Refreshing...`,
+        title: "Rollback complete",
+        message: [
+          `Release v${dataVersion} was rolled back to the state of v${restoreToVersion}. New release v${dataVersion + 1} was created. Refreshing...`,
+          ...warnings,
+        ].join("\n\n"),
         variant: "success",
         onClose: () => window.location.reload(),
       })
     } catch (e: any) {
+      const serverErrors: string[] = e?.response?.data?.errors || []
       alert({
         title: "Rollback failed",
-        message: e.message || "An unexpected error occurred.",
+        message: serverErrors.length ? serverErrors.join(", ") : e.message || "An unexpected error occurred.",
         variant: "error",
       })
     } finally {

@@ -25,7 +25,8 @@ export async function _saveDrugsLibraryItemsHistory({
       const itemId = c?.data?.itemId
       if (!itemId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.itemId === itemId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create drugs library item" : "Update drugs library item"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -35,8 +36,12 @@ export async function _saveDrugsLibraryItemsHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
-      const nextVersion = isCreate ? 1 : versionValue + 1
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof drugsLibraryHistory.$inferInsert = {
         version: nextVersion,
@@ -45,8 +50,6 @@ export async function _saveDrugsLibraryItemsHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.itemId === itemId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -64,15 +67,12 @@ export async function _saveDrugsLibraryItemsHistory({
 
       if (userId) {
         const sanitizedSnapshot = JSON.parse(JSON.stringify(c.data || {}))
-        const previousSnapshot = isCreate
-          ? {}
-          : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.itemId === itemId) || {}))
+        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(prev || {}))
 
         changeLogsData.push({
           entityId: itemId,
           entityType: "drugs_library",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -88,7 +88,8 @@ export async function _saveDrugsLibraryItemsHistory({
       await executor.insert(drugsLibraryHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveDrugsLibraryItemsHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

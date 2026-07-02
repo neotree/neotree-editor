@@ -27,7 +27,8 @@ export async function _saveProblemsHistory({
       const problemId = c?.data?.problemId
       if (!problemId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.problemId === problemId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create problem" : "Update problem"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -37,8 +38,12 @@ export async function _saveProblemsHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
-      const nextVersion = isCreate ? 1 : versionValue + 1
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof problemsHistory.$inferInsert = {
         version: nextVersion,
@@ -48,8 +53,6 @@ export async function _saveProblemsHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.problemId === problemId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -67,9 +70,7 @@ export async function _saveProblemsHistory({
 
       if (userId) {
         const sanitizedSnapshot = removeHexCharacters(c.data || {})
-        const previousSnapshot = isCreate
-          ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.problemId === problemId) || {})
+        const previousSnapshot = isCreate ? {} : removeHexCharacters(prev || {})
         const changeReason = isCreate
           ? undefined
           : c.draftOrigin === "other"
@@ -80,7 +81,6 @@ export async function _saveProblemsHistory({
           entityId: problemId,
           entityType: "problem",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -98,7 +98,8 @@ export async function _saveProblemsHistory({
       await executor.insert(problemsHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveProblemsHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

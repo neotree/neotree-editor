@@ -19,8 +19,8 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
-import { sql } from "drizzle-orm"
 import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback"
+import { lockChangeLogChain } from "./_rollback-shared"
 
 export type SaveChangeLogData = {
   entityId: string
@@ -151,20 +151,6 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
   hospital: { table: hospitals, idColumn: hospitals.hospitalId, entityLabel: "hospital" },
 }
 
-
-function hashToInt32(value: string): number {
-  let hash = 0
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0
-  }
-  return hash
-}
-
-async function lockChangeLogChain(client: DbOrTransaction, entityType: string, entityId: string) {
-  const key1 = hashToInt32(entityType)
-  const key2 = hashToInt32(entityId)
-  await client.execute(sql`select pg_advisory_xact_lock(${key1}, ${key2})`)
-}
 
 async function resolveUserId(data: SaveChangeLogData) {
   const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""

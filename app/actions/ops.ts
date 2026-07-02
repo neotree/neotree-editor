@@ -1364,8 +1364,13 @@ export async function publishData({ scope }: { scope: number }) {
     ])
 
     const publisherUserId = session?.user?.userId || null
+    if (!publisherUserId) {
+      // Without a publisher every entity changelog and the release row would be skipped,
+      // minting a data version that is invisible to the changelog UI and rollbacks.
+      throw new Error("Publishing requires an authenticated user")
+    }
 
-    let userId = publisherUserId
+    let userId: string | null = publisherUserId
 
     if (scope === 1) userId = null
 
@@ -1386,7 +1391,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishConfigKeys.errors?.length) throw new Error(publishConfigKeys.errors.join(", "))
+      if (!publishConfigKeys.success) throw new Error(publishConfigKeys.errors?.join(", ") || "Failed to publish config keys")
 
       const publishHospitals = await hospitalsMutations._publishHospitals({
         userId,
@@ -1394,7 +1399,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishHospitals.errors?.length) throw new Error(publishHospitals.errors.join(", "))
+      if (!publishHospitals.success) throw new Error(publishHospitals.errors?.join(", ") || "Failed to publish hospitals")
 
       const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
         userId,
@@ -1402,7 +1407,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishDrugsLibraryItems.errors?.length) throw new Error(publishDrugsLibraryItems.errors.join(", "))
+      if (!publishDrugsLibraryItems.success) throw new Error(publishDrugsLibraryItems.errors?.join(", ") || "Failed to publish drugs library items")
 
       const publishDataKeys = await dataKeysMutations._publishDataKeys({
         userId,
@@ -1410,7 +1415,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishDataKeys.errors?.length) throw new Error(publishDataKeys.errors.join(", "))
+      if (!publishDataKeys.success) throw new Error(publishDataKeys.errors?.join(", ") || "Failed to publish data keys")
 
       const publishScripts = await scriptsMutations._publishScripts({
         userId,
@@ -1418,7 +1423,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishScripts.errors?.length) throw new Error(publishScripts.errors.join(", "))
+      if (!publishScripts.success) throw new Error(publishScripts.errors?.join(", ") || "Failed to publish scripts")
 
       const publishScreens = await scriptsMutations._publishScreens({
         userId,
@@ -1426,7 +1431,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishScreens.errors?.length) throw new Error(publishScreens.errors.join(", "))
+      if (!publishScreens.success) throw new Error(publishScreens.errors?.join(", ") || "Failed to publish screens")
 
       const publishDiagnoses = await scriptsMutations._publishDiagnoses({
         userId,
@@ -1434,7 +1439,7 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishDiagnoses.errors?.length) throw new Error(publishDiagnoses.errors.join(", "))
+      if (!publishDiagnoses.success) throw new Error(publishDiagnoses.errors?.join(", ") || "Failed to publish diagnoses")
 
       const publishProblems = await scriptsMutations._publishProblems({
         userId,
@@ -1442,29 +1447,27 @@ export async function publishData({ scope }: { scope: number }) {
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
+      if (!publishProblems.success) throw new Error(publishProblems.errors?.join(", ") || "Failed to publish problems")
 
       const processPendingDeletion = await _processPendingDeletion({
         userId,
         publisherUserId: publisherUserId || undefined,
         client: tx,
       })
-      if (processPendingDeletion.errors?.length) throw new Error(processPendingDeletion.errors.join(", "))
+      if (!processPendingDeletion.success) throw new Error(processPendingDeletion.errors?.join(", ") || "Failed to publish pending deletions")
 
       await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
 
-      if (publisherUserId) {
-        const releaseLog = await _saveChangeLog({
-          data: buildReleasePublishChangeLog({
-            dataVersion: nextDataVersion,
-            userId: publisherUserId,
-          }),
-          client: tx,
-        })
+      const releaseLog = await _saveChangeLog({
+        data: buildReleasePublishChangeLog({
+          dataVersion: nextDataVersion,
+          userId: publisherUserId,
+        }),
+        client: tx,
+      })
 
-        if (!releaseLog.success) {
-          throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
-        }
+      if (!releaseLog.success) {
+        throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
       }
     })
 
@@ -1481,27 +1484,41 @@ export async function publishData({ scope }: { scope: number }) {
 export async function discardDrafts({ scope }: { scope: number }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
-    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_diagnoses", "delete_screens"])
+    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_problems", "delete_screens"])
 
-    let userId = session?.user?.userId
+    let userId: string | null | undefined = session?.user?.userId
 
-    if (scope === 1) userId = undefined
+    if (scope === 1) {
+      // Discarding every user's drafts is destructive to other people's work
+      if (!["admin", "super_user"].includes(session?.user?.role || "")) {
+        throw new Error("Only admins can discard drafts belonging to other users")
+      }
+      userId = undefined
+    }
 
-    await configKeysMutations._deleteAllConfigKeysDrafts({ userId })
-    await hospitalsMutations._deleteAllHospitalsDrafts({ userId })
-    await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts({ userId })
-    await dataKeysMutations._deleteAllDataKeysDrafts({ userId })
-    await scriptsMutations._deleteAllScriptsDrafts({ userId })
-    await scriptsMutations._deleteAllScreensDrafts({ userId })
-    await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
-    await scriptsMutations._deleteAllProblemsDrafts({ userId })
-    await _clearPendingDeletion({ userId })
+    await db.transaction(async (tx) => {
+      const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+
+      await tx.delete(configKeysDrafts).where(byUser(configKeysDrafts.createdByUserId))
+      await tx.delete(hospitalsDrafts).where(byUser(hospitalsDrafts.createdByUserId))
+      await tx.delete(drugsLibraryDrafts).where(byUser(drugsLibraryDrafts.createdByUserId))
+      await tx.delete(dataKeysDrafts).where(byUser(dataKeysDrafts.createdByUserId))
+      await tx.delete(scriptsDrafts).where(byUser(scriptsDrafts.createdByUserId))
+      await tx.delete(screensDrafts).where(byUser(screensDrafts.createdByUserId))
+      await tx.delete(diagnosesDrafts).where(byUser(diagnosesDrafts.createdByUserId))
+      await tx.delete(problemsDrafts).where(byUser(problemsDrafts.createdByUserId))
+
+      const clearPendingDeletion = await _clearPendingDeletion({ userId, client: tx })
+      if (!clearPendingDeletion.success) {
+        throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
+      }
+    })
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {
     results.success = false
     results.errors = [e.message]
-    logger.error("publishData ERROR", e.message)
+    logger.error("discardDrafts ERROR", e.message)
   } finally {
     return results
   }

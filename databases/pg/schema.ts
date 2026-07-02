@@ -1409,9 +1409,10 @@ export const changeLogs = pgTable(
     supersededBy: integer("superseded_by"),
     supersededAt: timestamp("superseded_at"),
 
-    // User tracking
+    // User tracking. RESTRICT, not SET NULL: the column is NOT NULL, so a SET NULL
+    // cascade would fail anyway — this makes "audited users cannot be hard-deleted" explicit.
     userId: uuid("user_id")
-      .references(() => users.userId, { onDelete: "set null" })
+      .references(() => users.userId, { onDelete: "restrict" })
       .notNull(),
 
     // Timestamps

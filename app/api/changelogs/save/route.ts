@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
     // Support both single and multiple changelog saves
     const data = Array.isArray(body.data) ? await saveChangeLogs(body) : await saveChangeLog(body)
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: data?.success ? 200 : 400 })
   } catch (e: any) {
     logger.log("/api/changelogs/save", e)
-    return NextResponse.json({ errors: [e.message] })
+    return NextResponse.json({ success: false, errors: [e.message] }, { status: 500 })
   }
 }

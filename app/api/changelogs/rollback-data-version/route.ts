@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const data = await rollbackDataVersion(body)
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: data?.success ? 200 : 400 })
   } catch (e: any) {
     logger.log("/api/changelogs/rollback-data-version", e)
-    return NextResponse.json({ errors: [e.message] })
+    return NextResponse.json({ success: false, errors: [e.message] }, { status: 500 })
   }
 }

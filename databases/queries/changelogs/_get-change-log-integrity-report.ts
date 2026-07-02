@@ -1,6 +1,6 @@
-import { changeLogs, configKeys, dataKeys, diagnoses, drugsLibrary, hospitals, problems, screens, scripts } from "@/databases/pg/schema"
+import { changeLogs } from "@/databases/pg/schema"
 import db from "@/databases/pg/drizzle"
-import { desc, sql } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import logger from "@/lib/logger"
 
 type EntityType = (typeof changeLogs.$inferSelect)["entityType"]
@@ -29,110 +29,113 @@ export type ChangeLogIntegrityReport = {
   errors?: string[]
 }
 
-const VERSIONED_ENTITY_SOURCES = [
-  { entityType: "script", table: scripts, idColumn: scripts.scriptId, versionColumn: scripts.version },
-  { entityType: "screen", table: screens, idColumn: screens.screenId, versionColumn: screens.version },
-  { entityType: "diagnosis", table: diagnoses, idColumn: diagnoses.diagnosisId, versionColumn: diagnoses.version },
-  { entityType: "problem", table: problems, idColumn: problems.problemId, versionColumn: problems.version },
-  { entityType: "config_key", table: configKeys, idColumn: configKeys.configKeyId, versionColumn: configKeys.version },
-  { entityType: "drugs_library", table: drugsLibrary, idColumn: drugsLibrary.itemId, versionColumn: drugsLibrary.version },
-  { entityType: "data_key", table: dataKeys, idColumn: dataKeys.uuid, versionColumn: dataKeys.version },
-  { entityType: "hospital", table: hospitals, idColumn: hospitals.hospitalId, versionColumn: hospitals.version },
-] as const
-
-function toFiniteNumber(value: unknown): number | null {
-  const numericValue = typeof value === "number" ? value : Number(value)
-  return Number.isFinite(numericValue) ? numericValue : null
-}
-
-function classifyStatus(entityVersion: number, latestChangeLogVersion: number | null): DriftStatus {
-  if (latestChangeLogVersion === null) return "missing_chain"
-
-  const versionGap = entityVersion - latestChangeLogVersion
-  if (versionGap === 0) return "healthy"
-  if (versionGap === 1) return "auto_healable"
-  if (versionGap > 1) return "rebaseline_required"
-  return "changelog_ahead"
-}
+// All classification, ordering, and limiting happens in SQL so we never load every
+// entity and changelog row into memory to render a bounded report.
+const integrityRowsCte = sql`
+  with entities as (
+    select 'script'::text as entity_type, script_id as entity_id, version from nt_scripts
+    union all
+    select 'screen', screen_id, version from nt_screens
+    union all
+    select 'diagnosis', diagnosis_id, version from nt_diagnoses
+    union all
+    select 'problem', problem_id, version from nt_problems
+    union all
+    select 'config_key', config_key_id, version from nt_config_keys
+    union all
+    select 'drugs_library', item_id, version from nt_drugs_library
+    union all
+    select 'data_key', uuid, version from nt_data_keys
+    union all
+    select 'hospital', hospital_id, version from nt_hospitals
+  ),
+  latest as (
+    select entity_type::text as entity_type, entity_id, max(version) as latest_version
+    from nt_change_logs
+    group by entity_type, entity_id
+  ),
+  joined as (
+    select
+      e.entity_type,
+      e.entity_id,
+      e.version as entity_version,
+      l.latest_version,
+      case when l.latest_version is null then e.version else e.version - l.latest_version end as version_gap,
+      case
+        when l.latest_version is null then 'missing_chain'
+        when e.version - l.latest_version = 0 then 'healthy'
+        when e.version - l.latest_version = 1 then 'auto_healable'
+        when e.version - l.latest_version > 1 then 'rebaseline_required'
+        else 'changelog_ahead'
+      end as status
+    from entities e
+    left join latest l on l.entity_type = e.entity_type and l.entity_id = e.entity_id
+    where e.version is not null
+  )
+`
 
 export async function _getChangeLogIntegrityReport(params?: { limit?: number }): Promise<ChangeLogIntegrityReport> {
   try {
     const limit = Math.max(1, Math.min(Number(params?.limit) || 500, 5000))
-    const latestChangeLogRows = await db
-      .select({
-        entityType: changeLogs.entityType,
-        entityId: changeLogs.entityId,
-        latestChangeLogVersion: sql<number>`max(${changeLogs.version})`.as("latestChangeLogVersion"),
-      })
-      .from(changeLogs)
-      .groupBy(changeLogs.entityType, changeLogs.entityId)
 
-    const latestChangeLogMap = new Map<string, number>()
-    for (const row of latestChangeLogRows) {
-      const version = toFiniteNumber(row.latestChangeLogVersion)
-      if (version === null) continue
-      latestChangeLogMap.set(`${row.entityType}:${row.entityId}`, version)
+    const [rows, summaryRows] = await Promise.all([
+      db.execute<{
+        entityType: EntityType
+        entityId: string
+        entityVersion: number
+        latestChangeLogVersion: number | null
+        versionGap: number
+        status: DriftStatus
+      }>(sql`
+        ${integrityRowsCte}
+        select
+          entity_type as "entityType",
+          entity_id as "entityId",
+          entity_version::int as "entityVersion",
+          latest_version::int as "latestChangeLogVersion",
+          version_gap::int as "versionGap",
+          status
+        from joined
+        order by
+          case status
+            when 'rebaseline_required' then 0
+            when 'missing_chain' then 1
+            when 'changelog_ahead' then 2
+            when 'auto_healable' then 3
+            else 4
+          end,
+          version_gap desc,
+          entity_type asc
+        limit ${limit}
+      `),
+      db.execute<{ status: DriftStatus; total: number }>(sql`
+        ${integrityRowsCte}
+        select status, count(*)::int as total
+        from joined
+        group by status
+      `),
+    ])
+
+    const summary = { healthy: 0, autoHealable: 0, rebaselineRequired: 0, missingChain: 0, changeLogAhead: 0, total: 0 }
+    for (const row of summaryRows) {
+      const total = Number(row.total) || 0
+      summary.total += total
+      if (row.status === "healthy") summary.healthy = total
+      if (row.status === "auto_healable") summary.autoHealable = total
+      if (row.status === "rebaseline_required") summary.rebaselineRequired = total
+      if (row.status === "missing_chain") summary.missingChain = total
+      if (row.status === "changelog_ahead") summary.changeLogAhead = total
     }
-
-    const rows: ChangeLogIntegrityRow[] = []
-
-    for (const source of VERSIONED_ENTITY_SOURCES) {
-      const entities = await db
-        .select({
-          entityId: source.idColumn,
-          entityVersion: source.versionColumn,
-        })
-        .from(source.table)
-
-      for (const entity of entities) {
-        const entityVersion = toFiniteNumber(entity.entityVersion)
-        if (entityVersion === null) continue
-
-        const latestChangeLogVersion = latestChangeLogMap.get(`${source.entityType}:${entity.entityId}`) ?? null
-        const versionGap = latestChangeLogVersion === null ? entityVersion : entityVersion - latestChangeLogVersion
-        rows.push({
-          entityType: source.entityType,
-          entityId: entity.entityId,
-          entityVersion,
-          latestChangeLogVersion,
-          versionGap,
-          status: classifyStatus(entityVersion, latestChangeLogVersion),
-        })
-      }
-    }
-
-    const sortedRows = [...rows].sort((a, b) => {
-      const severityOrder: Record<DriftStatus, number> = {
-        rebaseline_required: 0,
-        missing_chain: 1,
-        changelog_ahead: 2,
-        auto_healable: 3,
-        healthy: 4,
-      }
-
-      if (severityOrder[a.status] !== severityOrder[b.status]) {
-        return severityOrder[a.status] - severityOrder[b.status]
-      }
-
-      if (b.versionGap !== a.versionGap) return b.versionGap - a.versionGap
-      return a.entityType.localeCompare(b.entityType)
-    })
-
-    const summary = sortedRows.reduce(
-      (acc, row) => {
-        acc.total += 1
-        if (row.status === "healthy") acc.healthy += 1
-        if (row.status === "auto_healable") acc.autoHealable += 1
-        if (row.status === "rebaseline_required") acc.rebaselineRequired += 1
-        if (row.status === "missing_chain") acc.missingChain += 1
-        if (row.status === "changelog_ahead") acc.changeLogAhead += 1
-        return acc
-      },
-      { healthy: 0, autoHealable: 0, rebaselineRequired: 0, missingChain: 0, changeLogAhead: 0, total: 0 },
-    )
 
     return {
-      data: sortedRows.slice(0, limit),
+      data: rows.map((row) => ({
+        entityType: row.entityType,
+        entityId: row.entityId,
+        entityVersion: Number(row.entityVersion),
+        latestChangeLogVersion: row.latestChangeLogVersion === null ? null : Number(row.latestChangeLogVersion),
+        versionGap: Number(row.versionGap),
+        status: row.status,
+      })),
       summary,
     }
   } catch (e: any) {

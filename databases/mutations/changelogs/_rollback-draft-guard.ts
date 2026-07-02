@@ -125,3 +125,39 @@ export async function assertRollbackAllowedWithDrafts(tx: Tx, currentUserId: str
 
   throw new Error(buildRollbackDraftConflictMessage(report))
 }
+
+export async function getOwnPendingDraftCount(tx: Tx, currentUserId: string): Promise<number> {
+  const rows = await tx.execute<{ totalPendingChanges: number }>(sql`
+    with own_drafts as (
+      select id from nt_scripts_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_screens_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_diagnoses_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_problems_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_config_keys_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_hospitals_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_drugs_library_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_data_keys_drafts where created_by_user_id = ${currentUserId}
+      union all
+      select id from nt_pending_deletion where created_by_user_id = ${currentUserId}
+    )
+    select count(*)::int as "totalPendingChanges" from own_drafts
+  `)
+
+  return Number(rows?.[0]?.totalPendingChanges) || 0
+}
+
+export function buildOwnDraftRollbackWarning(count: number) {
+  if (count <= 0) return null
+  return (
+    `You have ${count} unpublished draft${count === 1 ? "" : "s"} that ${count === 1 ? "was" : "were"} ` +
+    `created before this rollback. They still reflect the pre-rollback state — publishing them will reapply ` +
+    `the changes you just rolled back. Review or discard them before the next publish.`
+  )
+}
