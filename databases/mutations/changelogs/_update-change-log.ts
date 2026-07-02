@@ -1,10 +1,11 @@
-import { eq, and, sql } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
-import { changeLogs } from "@/databases/pg/schema"
+import { adminAuditLogs, changeLogs } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
+import { lockChangeLogChain } from "./_rollback-shared"
 
 export type UpdateChangeLogData = {
   changeLogId?: string
@@ -24,24 +25,14 @@ export type UpdateChangeLogResponse = {
   data?: typeof changeLogs.$inferSelect
 }
 
-function hashToInt32(value: string): number {
-  let hash = 0
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0
-  }
-  return hash
-}
-
-async function lockChangeLogChain(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], entityType: string, entityId: string) {
-  await tx.execute(sql`select pg_advisory_xact_lock(${hashToInt32(entityType)}, ${hashToInt32(entityId)})`)
-}
-
 export async function _updateChangeLog({
   data,
   broadcastAction,
+  actorUserId,
 }: {
   data: UpdateChangeLogData
   broadcastAction?: boolean
+  actorUserId?: string | null
 }): Promise<UpdateChangeLogResponse> {
   const response: UpdateChangeLogResponse = { success: false }
 
@@ -102,6 +93,38 @@ export async function _updateChangeLog({
       const whereClause = eq(changeLogs.changeLogId, existing.changeLogId)
       const [updated] = await tx.update(changeLogs).set(updateData).where(whereClause).returning()
 
+      if (updated) {
+        // The changelog is the audit trail; edits to it must themselves be audited
+        await tx.insert(adminAuditLogs).values({
+          area: "changelogs",
+          action: "change_log_updated",
+          actorUserId: actorUserId || null,
+          beforeState: {
+            changeLogId: existing.changeLogId,
+            entityType: existing.entityType,
+            entityId: existing.entityId,
+            version: existing.version,
+            isActive: existing.isActive,
+            supersededBy: existing.supersededBy,
+            supersededAt: existing.supersededAt,
+            description: existing.description,
+            changeReason: existing.changeReason,
+          },
+          afterState: {
+            changeLogId: updated.changeLogId,
+            entityType: updated.entityType,
+            entityId: updated.entityId,
+            version: updated.version,
+            isActive: updated.isActive,
+            supersededBy: updated.supersededBy,
+            supersededAt: updated.supersededAt,
+            description: updated.description,
+            changeReason: updated.changeReason,
+          },
+          metadata: { updatedFields: Object.keys(updateData) },
+        })
+      }
+
       if (!updated) {
         logger.error("_updateChangeLog update returned no row", {
           changeLogId: existing.changeLogId,
@@ -144,12 +167,14 @@ export async function _markVersionAsSuperseded({
   version,
   supersededBy,
   broadcastAction,
+  actorUserId,
 }: {
   entityId: string
   entityType: (typeof changeLogs.$inferSelect)["entityType"]
   version: number
   supersededBy: number
   broadcastAction?: boolean
+  actorUserId?: string | null
 }): Promise<UpdateChangeLogResponse> {
   return _updateChangeLog({
     data: {
@@ -161,5 +186,6 @@ export async function _markVersionAsSuperseded({
       supersededAt: new Date(),
     },
     broadcastAction,
+    actorUserId,
   })
 }

@@ -40,7 +40,6 @@ export function getRollbackParentVersion(previousChangeLogVersion: number): numb
 }
 
 export function getRollbackTargetVersion(params: {
-  action?: string | null
   parentVersion?: number | null
   mergedFromVersion?: number | null
 }) {
@@ -57,8 +56,15 @@ export function getPublishedEntityVersion(params: {
   currentVersion?: number | null
   isCreate?: boolean
 }): number {
-  const currentVersion = Number.isFinite(params.currentVersion) ? Number(params.currentVersion) : 1
-  return currentVersion + 1
+  const currentVersion = Number.isFinite(params.currentVersion) ? Number(params.currentVersion) : null
+
+  if (params.isCreate) {
+    // A brand-new entity keeps the version its draft was staged at (1 for fresh drafts);
+    // bumping here would desync the entity row from the changelog chain's create entry.
+    return currentVersion && currentVersion > 0 ? currentVersion : 1
+  }
+
+  return (currentVersion ?? 1) + 1
 }
 
 export function applySoftDeleteRollbackSideEffects(params: {
@@ -201,23 +207,9 @@ export function coerceRollbackSnapshotValues(
     forceNullKeys?: string[]
   } = {},
 ) {
+  // Only keys explicitly listed by the caller are coerced. Pattern-matching key names
+  // here previously nulled out text fields that merely looked temporal.
   const nextPayload = { ...payload }
-  const temporalPattern = /(_at|_on|_date|_time|Date$|Time$)/i
-  const dateLikeKeys = Object.keys(nextPayload).filter((key) => temporalPattern.test(key))
-
-  for (const key of dateLikeKeys) {
-    const value = nextPayload[key]
-    if (value instanceof Date) continue
-    if (value && (typeof value === "string" || typeof value === "number")) {
-      const coerced = new Date(value)
-      if (!isNaN(coerced.valueOf())) {
-        nextPayload[key] = coerced
-        continue
-      }
-    }
-
-    nextPayload[key] = null
-  }
 
   for (const key of options.numericKeys ?? []) {
     if (!(key in nextPayload)) continue

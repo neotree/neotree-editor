@@ -62,21 +62,24 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
       }
 
       const nextDataVersion = response.data?.data?.dataVersion ?? (dataVersion ?? 0) + 1
+      const warnings: string[] = response.data?.warnings || []
+      const baseMessage = rollingBackCreation
+        ? `Entity rolled back to its pre-creation state. A new changelog entry was created (data v${nextDataVersion}).`
+        : `Restored to v${targetVersion}. A new changelog entry was created (data v${nextDataVersion}).`
 
       alert({
-        title: "Rollback scheduled",
-        message: rollingBackCreation
-          ? `Entity rolled back to its pre-creation state. A new changelog entry was created (data v${nextDataVersion}).`
-          : `Restored to v${targetVersion}. A new changelog entry was created (data v${nextDataVersion}).`,
+        title: "Rollback complete",
+        message: [baseMessage, ...warnings].join("\n\n"),
         variant: "success",
         buttonLabel: "Refresh",
         onClose: () => window.location.reload(),
       })
       setOpen(false)
     } catch (e: any) {
+      const serverErrors: string[] = e?.response?.data?.errors || []
       alert({
         title: "Rollback failed",
-        message: e.message || "An unexpected error occurred while rolling back.",
+        message: serverErrors.length ? serverErrors.join(", ") : e.message || "An unexpected error occurred while rolling back.",
         variant: "error",
         buttonLabel: "Close",
       })

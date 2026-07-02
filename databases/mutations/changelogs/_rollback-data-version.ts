@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm"
 
 import logger from "@/lib/logger"
 import {
@@ -20,14 +20,20 @@ import socket from "@/lib/socket"
 import {
   applyRollbackSnapshot,
   assertSnapshotIntegrity,
+  buildScriptChildBundleMaps,
   CHANGELOG_ENTITY_BINDINGS,
   ensureActiveChangeApplied,
   lockEntityRow,
   lockChangeLogChain,
+  nonEmptySnapshotCondition,
   normalizeSnapshot,
   type VersionedEntityBinding,
 } from "./_rollback-shared"
-import { assertRollbackAllowedWithDrafts } from "./_rollback-draft-guard"
+import {
+  assertRollbackAllowedWithDrafts,
+  buildOwnDraftRollbackWarning,
+  getOwnPendingDraftCount,
+} from "./_rollback-draft-guard"
 import { _saveChangeLog, type SaveChangeLogData } from "./_save-change-log"
 import { buildReleasePublishChangeLog } from "./_release-log"
 
@@ -43,10 +49,14 @@ export type RollbackDataVersionParams = {
 export type RollbackDataVersionResponse = {
   success: boolean
   errors?: string[]
+  warnings?: string[]
   restoredVersion?: number
 }
 
 const RELEASE_ROLLBACK_ENTITY_TYPES = Object.keys(CHANGELOG_ENTITY_BINDINGS) as (typeof changeLogs.$inferSelect)["entityType"][]
+
+// Rows with an empty snapshot (baselines) are never valid restore targets
+const nonEmptySnapshot = nonEmptySnapshotCondition
 
 async function findRollbackTargetChangeLog(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -58,16 +68,21 @@ async function findRollbackTargetChangeLog(
       eq(changeLogs.entityId, current.entityId),
       eq(changeLogs.entityType, current.entityType),
       lte(changeLogs.dataVersion, targetDataVersion),
+      nonEmptySnapshot,
     ),
     orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
   })
   if (target) return target
 
+  // Legacy fallback: only pre-dataVersion rows, and never one at or past the current
+  // active version — a null-dataVersion row must not restore newer state than the target.
   const legacyTarget = await tx.query.changeLogs.findFirst({
     where: and(
       eq(changeLogs.entityId, current.entityId),
       eq(changeLogs.entityType, current.entityType),
-      or(isNull(changeLogs.dataVersion), lte(changeLogs.dataVersion, targetDataVersion)),
+      isNull(changeLogs.dataVersion),
+      lt(changeLogs.version, current.version),
+      nonEmptySnapshot,
     ),
     orderBy: (changeLogs, { desc }) => [desc(changeLogs.version)],
   })
@@ -84,6 +99,7 @@ export async function _rollbackDataVersion({
 }: RollbackDataVersionParams): Promise<RollbackDataVersionResponse> {
   const response: RollbackDataVersionResponse = { success: false }
   let restoredVersion: number | undefined
+  let ownDraftCount = 0
 
   try {
     if (!isUuidLike(userId)) throw new Error("Invalid userId")
@@ -173,6 +189,7 @@ export async function _rollbackDataVersion({
             eq(changeLogs.entityId, scriptChange.entityId),
             eq(changeLogs.entityType, scriptChange.entityType),
             lte(changeLogs.dataVersion, restoreSourceDataVersion),
+            nonEmptySnapshot,
           ),
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
@@ -210,6 +227,7 @@ export async function _rollbackDataVersion({
           where: and(
             eq(changeLogs.scriptId, scriptScopeId),
             lte(changeLogs.dataVersion, scriptTargetDataVersion),
+            nonEmptySnapshot,
           ),
           orderBy: (changeLogs, { desc, asc }) => [
             asc(changeLogs.entityType),
@@ -218,29 +236,13 @@ export async function _rollbackDataVersion({
             desc(changeLogs.version),
           ],
         })
-        const targetChildrenByEntity = new Map<string, typeof changeLogs.$inferSelect>()
-        for (const entry of targetBundleChildren) {
-          if (!childTypes.includes(entry.entityType)) continue
-          const key = `${entry.entityType}:${entry.entityId}`
-          if (!targetChildrenByEntity.has(key)) {
-            targetChildrenByEntity.set(key, entry)
-          }
-        }
-        const childStubsByEntity = new Map<string, typeof changeLogs.$inferSelect>()
-        for (const childType of childTypes) {
-          const children = rollbackCandidates.filter(
-            (c) => c.entityType === childType && c.scriptId === scriptChange.scriptId,
-          )
-          for (const child of children) {
-            childStubsByEntity.set(`${child.entityType}:${child.entityId}`, child)
-          }
-        }
-        for (const entry of Array.from(targetChildrenByEntity.values())) {
-          const key = `${entry.entityType}:${entry.entityId}`
-          if (!childStubsByEntity.has(key)) {
-            childStubsByEntity.set(key, entry)
-          }
-        }
+        const { targetChildrenByEntity, childStubsByEntity } = buildScriptChildBundleMaps({
+          activeChildren: rollbackCandidates.filter(
+            (c) => childTypes.includes(c.entityType) && c.scriptId === scriptChange.scriptId,
+          ),
+          targetBundleChildren,
+          childTypes,
+        })
         for (const childStub of Array.from(childStubsByEntity.values())) {
           const childBinding = CHANGELOG_ENTITY_BINDINGS[childStub.entityType]
           if (!childBinding) throw new Error(`Unsupported entity type ${childStub.entityType}`)
@@ -383,6 +385,7 @@ export async function _rollbackDataVersion({
             eq(changeLogs.entityId, current.entityId),
             eq(changeLogs.entityType, current.entityType),
             lte(changeLogs.dataVersion, restoreSourceDataVersion),
+            nonEmptySnapshot,
           ),
           orderBy: (changeLogs, { desc }) => [desc(changeLogs.dataVersion), desc(changeLogs.version)],
         })
@@ -489,10 +492,16 @@ export async function _rollbackDataVersion({
       if (!releaseLog.success) {
         throw new Error(releaseLog.errors?.join(", ") || "Failed to save rollback release changelog")
       }
+
+      ownDraftCount = await getOwnPendingDraftCount(tx, userId)
     })
 
     response.success = true
     response.restoredVersion = restoredVersion
+
+    const ownDraftWarning = buildOwnDraftRollbackWarning(ownDraftCount)
+    if (ownDraftWarning) response.warnings = [ownDraftWarning]
+
     socket.emit("data_changed", "rollback_data_version")
     return response
   } catch (e: any) {

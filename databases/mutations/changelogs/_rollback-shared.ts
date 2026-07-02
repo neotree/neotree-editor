@@ -1,6 +1,7 @@
 import { eq, getTableColumns, sql } from "drizzle-orm"
 
 import db from "@/databases/pg/drizzle"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import logger from "@/lib/logger"
 import {
   aliases,
@@ -135,6 +136,51 @@ export function normalizeSnapshot(snapshot: any) {
   return snapshot ?? {}
 }
 
+// SQL condition mirroring isMeaningfulSnapshot for use in target-selection queries
+export const nonEmptySnapshotCondition = sql`${changeLogs.fullSnapshot} <> '{}'::jsonb`
+
+// Empty baselines ({}) are valid changelog rows but must never be restored as entity state
+export function isMeaningfulSnapshot(snapshot: any): boolean {
+  const normalized = normalizeSnapshot(snapshot)
+  return (
+    !!normalized &&
+    typeof normalized === "object" &&
+    !Array.isArray(normalized) &&
+    Object.keys(normalized).length > 0
+  )
+}
+
+// Builds the per-entity maps used to pair a script's active children with the
+// latest child changelog at or before the rollback target's data version.
+export function buildScriptChildBundleMaps(params: {
+  activeChildren: (typeof changeLogs.$inferSelect)[]
+  targetBundleChildren: (typeof changeLogs.$inferSelect)[]
+  childTypes: readonly (typeof changeLogs.$inferSelect)["entityType"][]
+}) {
+  const targetChildrenByEntity = new Map<string, typeof changeLogs.$inferSelect>()
+  for (const entry of params.targetBundleChildren) {
+    if (!params.childTypes.includes(entry.entityType)) continue
+    const key = `${entry.entityType}:${entry.entityId}`
+    if (!targetChildrenByEntity.has(key)) {
+      targetChildrenByEntity.set(key, entry)
+    }
+  }
+
+  const childStubsByEntity = new Map<string, typeof changeLogs.$inferSelect>()
+  for (const entry of params.activeChildren) {
+    if (!params.childTypes.includes(entry.entityType)) continue
+    childStubsByEntity.set(`${entry.entityType}:${entry.entityId}`, entry)
+  }
+  for (const entry of Array.from(targetChildrenByEntity.values())) {
+    const key = `${entry.entityType}:${entry.entityId}`
+    if (!childStubsByEntity.has(key)) {
+      childStubsByEntity.set(key, entry)
+    }
+  }
+
+  return { targetChildrenByEntity, childStubsByEntity }
+}
+
 function hashToInt32(value: string): number {
   let hash = 0
   for (let i = 0; i < value.length; i++) {
@@ -143,12 +189,10 @@ function hashToInt32(value: string): number {
   return hash
 }
 
-export async function lockChangeLogChain(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  entityType: string,
-  entityId: string,
-) {
-  await tx.execute(sql`select pg_advisory_xact_lock(${hashToInt32(entityType)}, ${hashToInt32(entityId)})`)
+// Single definition for the per-entity advisory lock — every changelog writer must use
+// this same key derivation or the serialization guarantee silently breaks.
+export async function lockChangeLogChain(client: DbOrTransaction, entityType: string, entityId: string) {
+  await client.execute(sql`select pg_advisory_xact_lock(${hashToInt32(entityType)}, ${hashToInt32(entityId)})`)
 }
 
 export async function ensureSnapshotHash(
@@ -274,6 +318,21 @@ function getRollbackColumnDefaultValue(column: any) {
   return defaultValue
 }
 
+// Coercion targets are derived from the actual column types so that text fields whose
+// names merely look temporal or numeric are never touched.
+function getColumnTypeCoercionKeys(table: any) {
+  const numericKeys: string[] = []
+  const timestampKeys: string[] = []
+
+  for (const [key, column] of Object.entries(getTableColumns(table) as Record<string, any>)) {
+    if (!column || typeof column !== "object" || !("dataType" in column)) continue
+    if (column.dataType === "number") numericKeys.push(key)
+    if (column.dataType === "date") timestampKeys.push(key)
+  }
+
+  return { numericKeys, timestampKeys }
+}
+
 function getRollbackManagedFieldFallback(params: {
   binding: VersionedEntityBinding
   key: string
@@ -329,9 +388,10 @@ export function buildRollbackSnapshotPayload({
     throw new Error(`Rollback snapshot is missing required fields: ${missingRequiredKeys.join(", ")}`)
   }
 
+  const columnDerived = getColumnTypeCoercionKeys(binding.table)
   const coercedPayload = coerceRollbackSnapshotValues(basePayload, {
-    numericKeys: binding.numericKeys,
-    timestampKeys: binding.timestampKeys,
+    numericKeys: Array.from(new Set([...(binding.numericKeys ?? []), ...columnDerived.numericKeys])),
+    timestampKeys: Array.from(new Set([...(binding.timestampKeys ?? []), ...columnDerived.timestampKeys])),
     forceNullKeys: binding.forceNullKeys,
   })
 

@@ -15,13 +15,16 @@
         "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
         "start:production": "NODE_ENV=production pm2 start pm2.production.json",
         "tsx": "tsx $1",
-        "test:changelog-sanitize": "tsx tests/changelog-sanitize.test.ts",
+        "test:changelog-version-authority": "tsx tests/changelog-version-authority.test.ts",
+        "test:changelog-rollback-draft-guard": "tsx tests/changelog-rollback-draft-guard.test.ts",
+        "test:changelog-legacy-repair": "tsx tests/changelog-legacy-repair.test.ts",
         "test:integrity-policy": "tsx tests/integrity-policy.test.ts",
         "test:data-key-integrity": "tsx tests/data-key-integrity.test.ts",
         "test:integrity-draft-origin": "tsx tests/integrity-draft-origin.test.ts",
         "test:integrity-scan-scope": "tsx tests/integrity-scan-scope.test.ts",
         "test:integrity-baseline": "tsx tests/integrity-baseline.test.ts",
-        "test:integrity-imports": "tsx tests/integrity-imports.test.ts"
+        "test:integrity-imports": "tsx tests/integrity-imports.test.ts",
+        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/changelog-legacy-repair.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",

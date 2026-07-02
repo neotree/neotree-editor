@@ -119,7 +119,6 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   const groupedSummaries = groupFieldChangeInsights(visibleInsights).filter((group) => group.stats.total > 0)
   const hasAnyDiffs = visibleInsights.some((entry) => entry.stats.total > 0)
   const rollbackTargetVersion = getRollbackButtonTargetVersion({
-    action: change.action,
     parentVersion: change.parentVersion,
     mergedFromVersion: change.mergedFromVersion,
   })

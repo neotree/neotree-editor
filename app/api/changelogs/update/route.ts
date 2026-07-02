@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
 
     const data = await updateChangeLog(body)
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: data?.success ? 200 : 400 })
   } catch (e: any) {
     logger.log("/api/changelogs/update", e)
-    return NextResponse.json({ errors: [e.message] })
+    return NextResponse.json({ success: false, errors: [e.message] }, { status: 500 })
   }
 }
