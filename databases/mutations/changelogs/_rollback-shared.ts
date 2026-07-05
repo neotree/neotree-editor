@@ -231,7 +231,24 @@ export async function assertSnapshotIntegrity(
     return
   }
 
-  throw new Error(`Snapshot hash mismatch for ${label} v${change.version}`)
+  // Post-cutoff mismatch: the stored snapshot no longer matches the hash written with it,
+  // which means the changelog row was corrupted or altered outside the writers. Users are
+  // never asked to run tooling — full diagnostics go to the server logs for admins.
+  logger.error("rollback blocked by snapshot integrity failure", {
+    changeLogId: (change as any).id,
+    entityType: change.entityType,
+    entityId: change.entityId,
+    version: change.version,
+    dataVersion: change.dataVersion,
+    dateOfChange: change.dateOfChange,
+    label,
+    storedHash,
+    computedHash,
+  })
+  throw new Error(
+    `Rollback is not available for this item right now: its stored version history failed an integrity check. ` +
+      `The issue has been logged automatically for an administrator to review.`,
+  )
 }
 
 export async function lockEntityRow({

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
-import { AlertTriangle, ArrowRight, Download, ExternalLink, Eye, Filter, MoreVertical, Search, Users } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ArrowRight, Download, ExternalLink, Eye, MoreVertical, Search } from "lucide-react"
 
 import type {
   PendingDraftQueueEntry,
@@ -15,10 +15,10 @@ import type {
 } from "@/app/actions/ops"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { TablePagination } from "@/components/table-pagination"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -59,15 +59,6 @@ const entityBadgeClasses: Record<PendingDraftQueueEntry["entityType"], string> =
   alias: "border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 }
 
-const summaryCardClasses = {
-  entries: "border-l-slate-500 bg-slate-500/[0.03]",
-  drafts: "border-l-blue-500 bg-blue-500/[0.03]",
-  deletes: "border-l-red-500 bg-red-500/[0.03]",
-  creates: "border-l-emerald-500 bg-emerald-500/[0.03]",
-  updates: "border-l-sky-500 bg-sky-500/[0.03]",
-  risks: "border-l-amber-500 bg-amber-500/[0.03]",
-}
-
 const friendlyFieldLabels: Record<string, string> = {
   key: "Key",
   keyId: "Key ID",
@@ -95,15 +86,6 @@ type DraftEntryGroup = {
   id: string
   label: string
   entries: PendingDraftQueueEntry[]
-}
-
-function formatEntityMix(entityCounts: PendingDraftQueueSummary["entityCounts"]) {
-  const items = Object.entries(entityCounts).sort(([, a], [, b]) => b - a)
-  if (!items.length) return "No pending entities"
-  return items
-    .slice(0, 5)
-    .map(([entityType, count]) => `${count} ${entityLabels[entityType as PendingDraftQueueEntry["entityType"]] || entityType}`)
-    .join(" | ")
 }
 
 function buildCsv(entries: PendingDraftQueueEntry[]) {
@@ -241,11 +223,6 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
   const standaloneGroups = useMemo(() => groupedEntries.filter((group) => !isScriptScopedGroup(group.id)), [groupedEntries])
   const shouldSplitScriptGroups = meta.filters.groupBy === "parent"
 
-  const openVisibleEditors = () => {
-    const hrefs = Array.from(new Set(entries.map((entry) => entry.href).filter(Boolean))).slice(0, 10)
-    hrefs.forEach((href) => window.open(href as string, "_blank", "noopener,noreferrer"))
-  }
-
   const exportVisibleEntries = () => {
     const blob = new Blob([buildCsv(entries)], {
       type: "text/csv;charset=utf-8;",
@@ -261,101 +238,30 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Pending Draft Changes</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {summary.scopeLabel}. Only saved draft changes appear here. If you are editing a form, save it first so it is protected in this
-            queue.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border border-l-4 border-l-primary bg-primary/[0.03] p-4">
-            <div className="font-medium">What will happen when this is published?</div>
-            <div className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-4">
-              <span>
-                {summary.totalCreates} new {summary.totalCreates === 1 ? "item" : "items"} will be created
-              </span>
-              <span>
-                {summary.totalUpdates} existing {summary.totalUpdates === 1 ? "item" : "items"} will be updated
-              </span>
-              <span>
-                {summary.totalDeletes} {summary.totalDeletes === 1 ? "item" : "items"} will be deleted
-              </span>
-              <span>
-                {summary.conflictEntries + summary.staleEntries}{" "}
-                {summary.conflictEntries + summary.staleEntries === 1 ? "warning" : "warnings"} need attention
-              </span>
-            </div>
-          </div>
-
-          {!!(summary.conflictEntries + summary.staleEntries || summary.totalDeletes) && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
-              <div className="font-semibold">Review needed before publishing</div>
-              <div className="mt-1">
-                {summary.totalDeletes ? `${summary.totalDeletes} queued delete ${summary.totalDeletes === 1 ? "change" : "changes"}. ` : ""}
-                {summary.staleEntries ? `${summary.staleEntries} stale ${summary.staleEntries === 1 ? "draft" : "drafts"}. ` : ""}
-                {summary.conflictEntries
-                  ? `${summary.conflictEntries} conflict ${summary.conflictEntries === 1 ? "warning" : "warnings"}.`
-                  : ""}{" "}
-                Open each warning or delete and confirm it is intentional.
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.entries)}>
-              <div className="text-sm text-muted-foreground">Pending Changes</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.totalEntries}</div>
-            </div>
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.drafts)}>
-              <div className="text-sm text-muted-foreground">Saved Draft Changes</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.totalDrafts}</div>
-            </div>
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.deletes)}>
-              <div className="text-sm text-muted-foreground">Queued Deletes</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.totalDeletes}</div>
-            </div>
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.creates)}>
-              <div className="text-sm text-muted-foreground">New Drafts</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.totalCreates}</div>
-            </div>
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.updates)}>
-              <div className="text-sm text-muted-foreground">Updates</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.totalUpdates}</div>
-            </div>
-            <div className={cn("rounded-lg border border-l-4 p-4", summaryCardClasses.risks)}>
-              <div className="text-sm text-muted-foreground">Warnings</div>
-              <div className="mt-1 text-2xl font-semibold">{summary.conflictEntries + summary.staleEntries}</div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>{summary.uniqueEntities} unique entities affected</span>
-            </div>
-            <span>|</span>
-            <span>{formatEntityMix(summary.entityCounts)}</span>
-            {!!summary.staleEntries && (
-              <>
-                <span>|</span>
-                <span>{summary.staleEntries} older drafts need review</span>
-              </>
-            )}
-            {!!summary.conflictEntries && (
-              <>
-                <span>|</span>
-                <span>{summary.conflictEntries} conflict warnings</span>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 pb-20">
+      {!!(summary.conflictEntries + summary.staleEntries || summary.totalDeletes) && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
+          <span className="font-semibold">Review needed before publishing.</span>{" "}
+          {summary.totalDeletes ? `${summary.totalDeletes} queued delete ${summary.totalDeletes === 1 ? "change" : "changes"}. ` : ""}
+          {summary.staleEntries ? `${summary.staleEntries} stale ${summary.staleEntries === 1 ? "draft" : "drafts"}. ` : ""}
+          {summary.conflictEntries
+            ? `${summary.conflictEntries} conflict ${summary.conflictEntries === 1 ? "warning" : "warnings"}.`
+            : ""}
+        </div>
+      )}
 
       <Card>
         <CardContent className="space-y-4 p-4">
+          <div className="flex items-center gap-x-4">
+            <Link href="/changelogs" className="text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <span className="text-2xl">Pending draft changes</span>
+            <span className="ml-auto text-sm text-muted-foreground">
+              {summary.totalEntries} pending &middot; {summary.scopeLabel}
+            </span>
+          </div>
+
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <Tabs value={meta.filters.tab} onValueChange={(value) => updateQuery({ tab: value, page: "1" })}>
               <TabsList className="grid w-full grid-cols-5 xl:w-auto">
@@ -368,29 +274,15 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
               </TabsList>
             </Tabs>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={openVisibleEditors}
-                disabled={!entries.some((entry) => entry.href)}
-              >
-                <ArrowRight className="mr-2 h-4 w-4" />
-                Open visible editors
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {isPending && <span className="text-xs text-muted-foreground">Updating...</span>}
               <Button type="button" variant="outline" size="sm" onClick={exportVisibleEntries} disabled={!entries.length}>
                 <Download className="mr-2 h-4 w-4" />
-                Export current view
+                Export
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Filter className="h-4 w-4" />
-            Filters
-            {isPending && <span className="text-xs text-muted-foreground">Updating...</span>}
-          </div>
           <div className="grid gap-3 xl:grid-cols-6">
             <div className="relative xl:col-span-2">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -517,43 +409,14 @@ export function DraftReviewWorkspace({ entries, summary, meta }: Props) {
             />
           )}
 
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  aria-disabled={!meta.pagination.hasPreviousPage}
-                  className={!meta.pagination.hasPreviousPage ? "pointer-events-none opacity-50" : ""}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (meta.pagination.hasPreviousPage)
-                      updateQuery({
-                        page: String(meta.pagination.page - 1),
-                      })
-                  }}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <span className="px-3 text-sm text-muted-foreground">
-                  Page {meta.pagination.page} of {meta.pagination.totalPages}
-                </span>
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  aria-disabled={!meta.pagination.hasNextPage}
-                  className={!meta.pagination.hasNextPage ? "pointer-events-none opacity-50" : ""}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (meta.pagination.hasNextPage)
-                      updateQuery({
-                        page: String(meta.pagination.page + 1),
-                      })
-                  }}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+          <TablePagination
+            page={meta.pagination.page}
+            totalPages={meta.pagination.totalPages}
+            total={meta.pagination.totalEntries}
+            pageSize={meta.pagination.pageSize}
+            itemNoun="pending changes"
+            onPageChange={(page) => updateQuery({ page: String(page) })}
+          />
         </div>
       )}
     </div>

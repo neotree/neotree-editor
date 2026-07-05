@@ -8,6 +8,7 @@ import socket from "@/lib/socket"
 import {
   applySoftDeleteRollbackSideEffects,
   computeRollbackSnapshotHash,
+  evaluateEntityRollbackTargetPolicy,
   getNextRollbackDataVersion,
   getRollbackParentVersion,
   getRollbackTargetVersion,
@@ -63,6 +64,7 @@ export async function _rollbackChangeLog({
   broadcastAction,
 }: RollbackChangeLogParams): Promise<RollbackChangeLogResponse> {
   const response: RollbackChangeLogResponse = { success: false }
+  const startedAt = Date.now()
 
   try {
     if (!entityId || !uuid.validate(entityId)) {
@@ -252,6 +254,18 @@ export async function _rollbackChangeLog({
       }
       if (current.entityType === "script" && !Number.isFinite(target.dataVersion)) {
         throw new Error("Script rollback requires a target changelog with dataVersion to restore a release-consistent child bundle")
+      }
+
+      // Age policy applies to the root target only: children restored as part of a script
+      // or data-key bundle follow the root and may legitimately resolve to older snapshots.
+      const targetAgePolicy = evaluateEntityRollbackTargetPolicy({
+        entityType: current.entityType,
+        currentVersion: current.version,
+        targetVersion: target.version,
+        targetDate: target.dateOfChange,
+      })
+      if (!targetAgePolicy.allowed) {
+        throw new Error(targetAgePolicy.reason)
       }
 
       const nextDataVersion = getNextRollbackDataVersion({
@@ -578,6 +592,8 @@ export async function _rollbackChangeLog({
               rolledBackEntityId: entityId,
               rolledBackEntityType: entityType,
               rollbackTargetVersion: target.version,
+              // Whether the operator picked this exact version or the system resolved "previous"
+              requestedToVersion: Number.isFinite(toVersion) ? Number(toVersion) : null,
               fromDataVersion: current.dataVersion,
               toDataVersion: nextDataVersion,
               dependentRollbackCount: rolledBackDependencies.length,
@@ -593,12 +609,22 @@ export async function _rollbackChangeLog({
 
       const ownDraftCount = await getOwnPendingDraftCount(tx, userId)
 
-      return { savedRoot, ownDraftCount }
+      return { savedRoot, ownDraftCount, dependentRollbackCount: rolledBackDependencies.length, nextDataVersion }
     })
 
     response.success = true
     response.newVersion = result?.savedRoot?.version
     response.data = result?.savedRoot
+
+    logger.log("rollbackChangeLog completed", {
+      entityType,
+      entityId,
+      requestedToVersion: Number.isFinite(toVersion) ? Number(toVersion) : null,
+      newVersion: result?.savedRoot?.version,
+      dataVersion: result?.nextDataVersion,
+      dependentRollbackCount: result?.dependentRollbackCount ?? 0,
+      durationMs: Date.now() - startedAt,
+    })
 
     const ownDraftWarning = buildOwnDraftRollbackWarning(result?.ownDraftCount ?? 0)
     if (ownDraftWarning) response.warnings = [ownDraftWarning]
@@ -611,7 +637,12 @@ export async function _rollbackChangeLog({
   } catch (e: any) {
     response.success = false
     response.errors = [e.message]
-    logger.error("_rollbackChangeLog ERROR", e.message)
+    logger.error("_rollbackChangeLog ERROR", e.message, {
+      entityType,
+      entityId,
+      requestedToVersion: Number.isFinite(toVersion) ? Number(toVersion) : null,
+      durationMs: Date.now() - startedAt,
+    })
     return response
   }
 }

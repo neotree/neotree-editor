@@ -31,7 +31,6 @@ export type SaveChangeLogData = {
   changes?: any
   fullSnapshot?: any
   previousSnapshot?: any
-  snapshotHash?: string | null
   description?: string
   changeReason?: string
   parentVersion?: number | null
@@ -602,10 +601,9 @@ export async function _saveChangeLog({
         }
       }
 
-      const snapshotHash =
-        realignedVersionFrom === undefined
-          ? resolvedData.snapshotHash || computeRollbackSnapshotHash(effectiveFullSnapshot)
-          : computeRollbackSnapshotHash(effectiveFullSnapshot)
+      // Always derived from the snapshot actually being stored — a caller-supplied hash
+      // that doesn't match would poison later rollback integrity checks.
+      const snapshotHash = computeRollbackSnapshotHash(effectiveFullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
 
       const previousSnapshot = resolvedData.previousSnapshot ?? resolvedData.baselineSnapshot ?? {}

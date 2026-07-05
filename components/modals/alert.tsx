@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from "react";
+import DOMPurify from "dompurify";
 import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
 
 import {
@@ -60,7 +61,18 @@ export function AlertModal() {
                             )}
                             
                             <div className="flex-1 text-lg">
-                                <div dangerouslySetInnerHTML={{ __html: message, }} />
+                                {/* Messages can embed server-built strings containing user data
+                                    (display names, entity titles), so they must be sanitized
+                                    before being rendered as HTML. whitespace-pre-line keeps
+                                    plain-text messages joined with \n readable. */}
+                                <div
+                                    className="whitespace-pre-line"
+                                    dangerouslySetInnerHTML={{
+                                        // DOMPurify needs a DOM; during SSR the modal is closed
+                                        // (message is empty), so rendering nothing is safe.
+                                        __html: typeof window === "undefined" ? "" : DOMPurify.sanitize(message),
+                                    }}
+                                />
                             </div>
                         </div>
                     )}

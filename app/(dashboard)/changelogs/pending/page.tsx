@@ -1,12 +1,8 @@
-import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
-
 import { Content } from "@/components/content"
 import { Title } from "@/components/title"
 import { Card, CardContent } from "@/components/ui/card"
 import { getPendingDraftQueue } from "@/app/actions/ops"
 import { DraftReviewWorkspace } from "../components/draft-review-workspace"
-import { ChangelogWorkflowRail } from "../components/workflow-rail"
 
 export const dynamic = "force-dynamic"
 
@@ -39,16 +35,9 @@ export default async function PendingChangesPage({
     <>
       <Title>Pending Draft Changes</Title>
 
-      <Content className="space-y-6">
-        <ChangelogWorkflowRail current="drafts" />
-
-        <Link href="/changelogs" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-          Back to published releases
-        </Link>
-
+      <Content>
         {pendingDraftQueue.errors?.length ? (
-          <Card>
+          <Card className="mb-20">
             <CardContent className="p-4">
               <div className="text-sm text-danger">{pendingDraftQueue.errors.join(", ")}</div>
             </CardContent>

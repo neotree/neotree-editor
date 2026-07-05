@@ -1,20 +1,28 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
-import { ArrowLeft } from "lucide-react"
 
 import { Title } from "@/components/title"
-import { Content } from "@/components/content"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { PageContainer } from "@/app/(dashboard)/(scripts)/components/page-container"
 import { getChangeLog } from "@/app/actions/change-logs"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
-import { formatChangeValue, getDataVersion, isHistoryRepairChange, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import {
+  formatChangeValue,
+  getChangelogActionLabel,
+  getChangelogEntityEditorHref,
+  getChangelogEntityTypeLabel,
+  getDataVersion,
+  isHistoryRepairChange,
+  normalizeChanges,
+  resolveEntityTitle,
+} from "@/lib/changelog-utils"
 import { buildHumanDiffRows, type HumanDiffRow } from "@/lib/changelog-human-diff"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
+import { isRollbackTargetOlderThanMaxAge, SCRIPT_CHILD_ENTITY_TYPES } from "@/lib/changelog-rollback"
 import { getProtectedDependentRollbackMessage, isProtectedDependentRollbackChange } from "@/lib/changelog-rollback-guards"
 import { cn } from "@/lib/utils"
 import {
@@ -38,27 +46,6 @@ function parseDataVersionParam(param: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
-const entityTypeLabels: Record<string, string> = {
-  script: "Script",
-  screen: "Screen",
-  diagnosis: "Diagnosis",
-  problem: "Problem",
-  config_key: "Config Key",
-  drugs_library: "Drugs Library",
-  data_key: "Data Key",
-  alias: "Alias",
-}
-
-const actionBadgeClasses: Record<string, string> = {
-  create: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  update: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  delete: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400",
-  publish: "border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-400",
-  restore: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  rollback: "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-400",
-  merge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
-}
-
 const lifecycleBadgeClasses: Record<ChangeLifecycleState, string> = {
   active: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   inactive: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400",
@@ -76,15 +63,8 @@ const systemFieldNames = new Set([
   "deletedAt",
 ])
 
-function getEntityEditorHref(change: ChangeLogType) {
-  if (change.entityType === "script") return `/script/${change.entityId}`
-  if (change.entityType === "screen" && change.scriptId) return `/script/${change.scriptId}/screen/${change.entityId}`
-  if (change.entityType === "diagnosis" && change.scriptId) return `/script/${change.scriptId}/diagnosis/${change.entityId}`
-  if (change.entityType === "problem" && change.scriptId) return `/script/${change.scriptId}/problem/${change.entityId}`
-  if (change.entityType === "config_key") return "/configuration"
-  if (change.entityType === "drugs_library") return `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(change.entityId)}`
-  if (change.entityType === "data_key") return `/data-keys/edit/${encodeURIComponent(change.entityId)}`
-  return null
+function isMeaningfulRestoreSnapshot(snapshot: unknown): boolean {
+  return !!snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) && Object.keys(snapshot).length > 0
 }
 
 export default async function ChangeDetailsPage({ params }: { params: Params }) {
@@ -104,7 +84,7 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
   }
 
   const change = data as ChangeLogType
-  const entityLabel = entityTypeLabels[change.entityType as keyof typeof entityTypeLabels] || change.entityType
+  const entityLabel = getChangelogEntityTypeLabel(change.entityType)
   const entityTitle = resolveEntityTitle(change)
   const changedOn = format(new Date(change.dateOfChange), "PPpp")
   const dataVersion = getDataVersion(change) ?? numericVersion
@@ -123,136 +103,100 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
     mergedFromVersion: change.mergedFromVersion,
   })
   const isProtectedDependentRollback = isProtectedDependentRollbackChange(change)
+  const isSuperUser = currentUser?.role === "super_user"
   const canRollback =
-    currentUser?.role === "super_user" &&
+    isSuperUser &&
     change.isActive &&
     (rollbackTargetVersion ?? null) !== null &&
     !isProtectedDependentRollback
-  const editorHref = getEntityEditorHref(change)
+  // A historical (superseded) entry can be restored directly: the backend accepts an
+  // explicit toVersion and validates it against the current active version. Targets older
+  // than the rollback age window are hidden for parent entities; child entities keep the
+  // button because the server allows them a shallow-depth restore at any age.
+  const isChildEntity = (SCRIPT_CHILD_ENTITY_TYPES as readonly string[]).includes(change.entityType)
+  const targetTooOld = isRollbackTargetOlderThanMaxAge({ targetDate: change.dateOfChange })
+  const canRestoreThisVersion =
+    isSuperUser &&
+    !change.isActive &&
+    change.entityType !== "release" &&
+    change.version > 0 &&
+    !isProtectedDependentRollback &&
+    (!targetTooOld || isChildEntity) &&
+    isMeaningfulRestoreSnapshot(change.fullSnapshot)
+  const editorHref = getChangelogEntityEditorHref(change)
 
   return (
     <>
       <Title>Change Details</Title>
-      <Content className="space-y-6">
-        <Link
-          href={`/changelogs/v${numericVersion}`}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to data version v{numericVersion}
-        </Link>
-
-        <Card>
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">{entityTitle}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {isHistoryRepair
-                ? `${entityTitle} had its changelog history repaired before published version v${dataVersion} was written.`
-                : `${entityTitle} was ${
-                    change.action === "update"
-                      ? "updated"
-                      : change.action === "create"
-                        ? "created"
-                        : change.action === "delete"
-                          ? "deleted"
-                          : change.action
-                  }. ${visibleInsights.length} ${visibleInsights.length === 1 ? "detail" : "details"} changed in published version v${dataVersion}.`}
-            </p>
-            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                {entityLabel}
-              </Badge>
-              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                Entity v{change.version}
-              </Badge>
-              {dataVersion && (
-                <Badge variant="outline" className="bg-muted text-muted-foreground">
-                  Data v{dataVersion}
-                </Badge>
-              )}
-              <Badge variant="outline" className={actionBadgeClasses[change.action] ?? "bg-muted text-muted-foreground"}>
-                {change.action}
-              </Badge>
+      <PageContainer title="Change details" backLink={`/changelogs/v${numericVersion}`}>
+        <div className="flex flex-col gap-y-4 px-4 pb-4">
+          <div className="flex flex-wrap items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-xl font-medium">{entityTitle}</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isHistoryRepair
+                  ? `${entityLabel} · history repaired before v${dataVersion} was published.`
+                  : `${entityLabel} · ${getChangelogActionLabel(change.action).toLowerCase()} in v${dataVersion} · ${
+                      visibleInsights.length
+                    } ${visibleInsights.length === 1 ? "detail" : "details"} changed`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={lifecycleBadgeClasses[lifecycle.state]}>
                 {lifecycle.label}
               </Badge>
+              <Badge variant="outline" className="bg-muted text-muted-foreground">
+                v{change.version}
+              </Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap justify-end gap-2">
-              {editorHref && (
-                <Link
-                  href={editorHref}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                >
-                  Open this item
-                </Link>
-              )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {editorHref && (
               <Link
-                href={`/changelogs/v${numericVersion}`}
+                href={editorHref}
                 className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
               >
-                Back to published version
+                Open this item
               </Link>
-              {canRollback && (
-                <RollbackButton
-                  entityId={change.entityId}
-                  entityType={change.entityType}
-                  targetVersion={rollbackTargetVersion}
-                  currentVersion={change.version}
-                  dataVersion={dataVersion ?? null}
-                  disabled={!change.isActive}
-                />
-              )}
-            </div>
-            {isProtectedDependentRollback && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-                {getProtectedDependentRollbackMessage(change.entityType)}
-              </div>
             )}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed By</div>
-                <div className="mt-1 text-sm font-medium">
-                  {change.userName || "Unknown user"}
-                  {change.userEmail ? ` | ${change.userEmail}` : ""}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Changed On</div>
-                <div className="mt-1 text-sm font-medium">{changedOn}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase text-muted-foreground tracking-wide">Technical ID</div>
-                <div className="mt-1 text-sm font-medium break-all">{change.entityId}</div>
-              </div>
-              {change.parentVersion !== null && (
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide">Parent Version</div>
-                  <div className="mt-1 text-sm font-medium">v{change.parentVersion}</div>
-                </div>
-              )}
-              {change.mergedFromVersion !== null && (
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide">Merged From</div>
-                  <div className="mt-1 text-sm font-medium">v{change.mergedFromVersion}</div>
-                </div>
-              )}
-              {change.changeReason && (
-                <div className="md:col-span-2">
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide">Reason</div>
-                  <div className="mt-1 text-sm">{change.changeReason}</div>
-                </div>
-              )}
-              {change.description && (
-                <div className="md:col-span-2">
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide">Description</div>
-                  <div className="mt-1 text-sm">{change.description}</div>
-                </div>
-              )}
-            </div>
+            {canRollback && (
+              <RollbackButton
+                entityId={change.entityId}
+                entityType={change.entityType}
+                targetVersion={rollbackTargetVersion}
+                currentVersion={change.version}
+              />
+            )}
+            {canRestoreThisVersion && (
+              <RollbackButton entityId={change.entityId} entityType={change.entityType} targetVersion={change.version} mode="restore" />
+            )}
+          </div>
 
-            <Separator />
+          {isProtectedDependentRollback && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+              {getProtectedDependentRollbackMessage(change.entityType)}
+            </div>
+          )}
+
+          <div className="text-sm text-muted-foreground">
+            Changed by {change.userName || "Unknown user"}
+            {change.userEmail ? ` (${change.userEmail})` : ""} on {changedOn}
+            {change.changeReason ? (
+              <>
+                <br />
+                Reason: {change.changeReason}
+              </>
+            ) : null}
+            {change.description && change.description !== change.changeReason ? (
+              <>
+                <br />
+                {change.description}
+              </>
+            ) : null}
+          </div>
+
+          <Separator />
 
             <div className="space-y-6">
               <div>
@@ -298,9 +242,8 @@ export default async function ChangeDetailsPage({ params }: { params: Params }) 
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </Content>
+        </div>
+      </PageContainer>
     </>
   )
 }

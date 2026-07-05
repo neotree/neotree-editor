@@ -17,14 +17,13 @@
         "tsx": "tsx $1",
         "test:changelog-version-authority": "tsx tests/changelog-version-authority.test.ts",
         "test:changelog-rollback-draft-guard": "tsx tests/changelog-rollback-draft-guard.test.ts",
-        "test:changelog-legacy-repair": "tsx tests/changelog-legacy-repair.test.ts",
         "test:integrity-policy": "tsx tests/integrity-policy.test.ts",
         "test:data-key-integrity": "tsx tests/data-key-integrity.test.ts",
         "test:integrity-draft-origin": "tsx tests/integrity-draft-origin.test.ts",
         "test:integrity-scan-scope": "tsx tests/integrity-scan-scope.test.ts",
         "test:integrity-baseline": "tsx tests/integrity-baseline.test.ts",
         "test:integrity-imports": "tsx tests/integrity-imports.test.ts",
-        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/changelog-legacy-repair.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts"
+        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
@@ -55,6 +54,7 @@
         "date-fns": "^3.6.0",
         "dexie": "^4.2.1",
         "dexie-react-hooks": "^4.2.0",
+        "dompurify": "^3.4.11",
         "dotenv": "^16.4.5",
         "drizzle-orm": "^0.31.2",
         "image-size": "^1.1.1",

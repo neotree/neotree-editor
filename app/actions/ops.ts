@@ -1281,9 +1281,9 @@ export async function getEditorDetails(): Promise<{
     const myPendingDeletion = currentUserId ? await opsQueries._countPendingDeletion(currentUserId) : { total: 0, errors: undefined }
     myPendingDeletion.errors?.forEach((e) => errors.push(e))
 
-    const mode = "development"
-
-    shouldPublishData = mode === "development" && (!!drafts.total || !!pendingDeletion.total)
+    // Publishable whenever any drafts or queued deletions exist. (A hardcoded
+    // mode === "development" flag previously gated this but was always true.)
+    shouldPublishData = !!drafts.total || !!pendingDeletion.total
 
     return {
       pendingDeletion: pendingDeletion.total,

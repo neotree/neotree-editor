@@ -30,6 +30,9 @@ export type DataVersionSummary = {
   actionCounts: Record<string, number>
   descriptions: string[]
   rollbackSourceVersion?: number | null
+  // Set when the release was published by rolling back one entity; targetVersion is the
+  // item's own version, not a release number
+  rollbackEntity?: { entityType: string; entityId: string | null; targetVersion: number | null } | null
 }
 
 export type DataVersionSummaryResults = {

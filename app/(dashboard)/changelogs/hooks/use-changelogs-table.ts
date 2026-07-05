@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import axios from "axios"
 
 import { useAlertModal } from "@/hooks/use-alert-modal"
@@ -11,6 +11,10 @@ export type UseChangelogsTableParams = {
   initialTotal?: number
   initialLatestDataVersion?: number | null
   initialSearchValue?: string
+  initialEntityType?: string
+  initialAction?: string
+  initialSort?: string
+  initialPage?: number
 }
 
 export type ChangeLogType = Awaited<ReturnType<typeof getChangeLogs>>["data"][0]
@@ -33,6 +37,10 @@ const sortOptions = [
   { value: "changeCount.asc", label: "Changes (Low to High)" },
 ]
 
+function sanitizeChoice(value: string | undefined, fallback: string) {
+  return typeof value === "string" && value.trim().length ? value.trim() : fallback
+}
+
 function parseVersionSearch(value: string): number | null {
   const trimmed = value.trim().toLowerCase()
   if (!trimmed) return null
@@ -47,6 +55,10 @@ export function useChangelogsTable({
   initialTotal = 0,
   initialLatestDataVersion = null,
   initialSearchValue = "",
+  initialEntityType = "all",
+  initialAction = "all",
+  initialSort = sortOptions[0].value,
+  initialPage = 1,
 }: UseChangelogsTableParams) {
   const [dataVersions, setDataVersions] = useState<DataVersionSummary[]>(initialSummaries)
   const [totalDataVersions, setTotalDataVersions] = useState<number>(initialTotal)
@@ -56,38 +68,43 @@ export function useChangelogsTable({
   const [loading, setLoading] = useState(false)
 
   const [searchValue, setSearchValue] = useState(initialSearchValue)
-  const [entityType, setEntityType] = useState("all")
-  const [action, setAction] = useState("all")
-  const [isActiveOnly, setIsActiveOnly] = useState(false)
-  const [applyFiltersToCounts, setApplyFiltersToCounts] = useState(false)
-  const [sort, setSort] = useState(sortOptions[0].value)
+  // Queries only fire against the debounced value so typing doesn't hit the API per keystroke
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState(initialSearchValue)
+  const [entityType, setEntityType] = useState(sanitizeChoice(initialEntityType, "all"))
+  const [action, setAction] = useState(sanitizeChoice(initialAction, "all"))
+  const [sort, setSort] = useState(
+    sortOptions.some((option) => option.value === initialSort) ? initialSort : sortOptions[0].value,
+  )
 
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(Math.max(1, Number(initialPage) || 1))
   const [itemsPerPage] = useState(25)
 
   const { alert } = useAlertModal()
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchValue(searchValue), 300)
+    return () => clearTimeout(handle)
+  }, [searchValue])
 
   const loadSummaries = useCallback(async () => {
     try {
       setLoading(true)
 
-      const parsedVersion = parseVersionSearch(searchValue)
+      const parsedVersion = parseVersionSearch(debouncedSearchValue)
       const [sortKey, sortDir] = sort.split(".")
 
-      const limit = isActiveOnly ? 1 : itemsPerPage
-      const offset = isActiveOnly ? 0 : (currentPage - 1) * itemsPerPage
+      const limit = itemsPerPage
+      const offset = (currentPage - 1) * itemsPerPage
 
       const res = await axios.post("/api/changelogs/summaries", {
         limit,
         offset,
-        searchTerm: parsedVersion ? undefined : searchValue || undefined,
+        searchTerm: parsedVersion ? undefined : debouncedSearchValue || undefined,
         dataVersions: parsedVersion ? [parsedVersion] : undefined,
         entityTypes: entityType !== "all" ? [entityType] : undefined,
         actions: action !== "all" ? [action] : undefined,
-        applyFiltersToCounts,
         sortBy: sortKey || "publishedAt",
         sortOrder: sortDir || "desc",
-        latestOnly: isActiveOnly,
       })
 
       const { errors, data, total, latestDataVersion: latest } = res.data
@@ -113,7 +130,7 @@ export function useChangelogsTable({
     } finally {
       setLoading(false)
     }
-  }, [alert, action, applyFiltersToCounts, currentPage, entityType, isActiveOnly, itemsPerPage, searchValue, sort])
+  }, [alert, action, currentPage, debouncedSearchValue, entityType, itemsPerPage, sort])
 
   const pagination = useMemo(() => {
     if (!totalDataVersions) return undefined
@@ -126,13 +143,38 @@ export function useChangelogsTable({
     }
   }, [currentPage, itemsPerPage, totalDataVersions])
 
+  const isFirstFilterRender = useRef(true)
   useEffect(() => {
+    // Skip on mount so an initial page from the URL isn't immediately reset
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false
+      return
+    }
     setCurrentPage(1)
-  }, [searchValue, entityType, action, isActiveOnly, sort, applyFiltersToCounts])
+  }, [debouncedSearchValue, entityType, action, sort])
 
   useEffect(() => {
     loadSummaries()
   }, [loadSummaries])
+
+  // Keep filters shareable/bookmarkable without triggering a navigation
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const setOrDelete = (key: string, value: string, defaultValue: string) => {
+      if (value && value !== defaultValue) params.set(key, value)
+      else params.delete(key)
+    }
+
+    setOrDelete("q", debouncedSearchValue.trim(), "")
+    setOrDelete("entityType", entityType, "all")
+    setOrDelete("action", action, "all")
+    setOrDelete("sort", sort, sortOptions[0].value)
+    setOrDelete("page", String(currentPage), "1")
+
+    const query = params.toString()
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`)
+  }, [action, currentPage, debouncedSearchValue, entityType, sort])
 
   useEffect(() => {
     if (!pagination) return
@@ -200,8 +242,6 @@ export function useChangelogsTable({
     setSearchValue("")
     setEntityType("all")
     setAction("all")
-    setIsActiveOnly(false)
-    setApplyFiltersToCounts(false)
     setSort(sortOptions[0].value)
     setCurrentPage(1)
   }, [])
@@ -213,8 +253,6 @@ export function useChangelogsTable({
     searchValue,
     entityType,
     action,
-    isActiveOnly,
-    applyFiltersToCounts,
     sort,
     pagination,
     currentPage,
@@ -223,8 +261,6 @@ export function useChangelogsTable({
     setSearchValue,
     setEntityType,
     setAction,
-    setIsActiveOnly,
-    setApplyFiltersToCounts,
     setSort,
     setCurrentPage,
     loadChangelogs: loadSummaries,
