@@ -6,6 +6,7 @@ import {
   DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY,
   RELEASE_ROLLBACK_MAX_RECENT_DEPTH,
   SCRIPT_CHILD_ENTITY_TYPES,
+  evaluateReleaseRollbackTargetPolicy,
   getRollbackParentVersion,
   isChangeAlreadyAlignedToRollbackTarget,
   isReleaseRollbackWithinRecentWindow,
@@ -98,8 +99,10 @@ export async function _rollbackDataVersion({
   allowDeepRollback = false,
 }: RollbackDataVersionParams): Promise<RollbackDataVersionResponse> {
   const response: RollbackDataVersionResponse = { success: false }
+  const startedAt = Date.now()
   let restoredVersion: number | undefined
   let ownDraftCount = 0
+  let rolledBackEntityCount = 0
 
   try {
     if (!isUuidLike(userId)) throw new Error("Invalid userId")
@@ -137,6 +140,21 @@ export async function _rollbackDataVersion({
         )
       }
 
+      // Age + clean-slate floor apply even with the deep rollback override: releases
+      // published before the floor, or more than the age window ago, are never restorable.
+      const targetReleaseRow = await tx.query.changeLogs.findFirst({
+        where: eq(changeLogs.dataVersion, restoreSourceDataVersion),
+        orderBy: (changeLogs, { desc }) => [desc(changeLogs.dateOfChange)],
+        columns: { dateOfChange: true },
+      })
+      const releaseTargetPolicy = evaluateReleaseRollbackTargetPolicy({
+        targetDataVersion: restoreSourceDataVersion,
+        targetPublishedAt: targetReleaseRow?.dateOfChange ?? null,
+      })
+      if (!releaseTargetPolicy.allowed) {
+        throw new Error(releaseTargetPolicy.reason)
+      }
+
       const targetDataVersion = currentDataVersion + 1
       restoredVersion = restoreSourceDataVersion
 
@@ -159,6 +177,7 @@ export async function _rollbackDataVersion({
       if (!rollbackCandidates.length) {
         throw new Error(`No active entities changed after data version v${restoreSourceDataVersion}`)
       }
+      rolledBackEntityCount = rollbackCandidates.length
 
       // Preflight: ensure each entity has a valid snapshot from the previous published data version (or current if new)
       for (const current of rollbackCandidates) {
@@ -484,6 +503,10 @@ export async function _rollbackDataVersion({
               fromDataVersion: currentDataVersion,
               toDataVersion: targetDataVersion,
               rollbackSourceDataVersion: restoreSourceDataVersion,
+              // Operator choices, so the audit trail shows exactly how this rollback ran
+              createdEntityPolicy,
+              allowDeepRollback,
+              rolledBackEntityCount,
             },
           ],
         }),
@@ -502,10 +525,25 @@ export async function _rollbackDataVersion({
     const ownDraftWarning = buildOwnDraftRollbackWarning(ownDraftCount)
     if (ownDraftWarning) response.warnings = [ownDraftWarning]
 
+    logger.log("rollbackDataVersion completed", {
+      requestedDataVersion,
+      restoredVersion,
+      createdEntityPolicy,
+      allowDeepRollback,
+      rolledBackEntityCount,
+      durationMs: Date.now() - startedAt,
+    })
+
     socket.emit("data_changed", "rollback_data_version")
     return response
   } catch (e: any) {
-    logger.error("_rollbackDataVersion ERROR", e.message)
+    logger.error("_rollbackDataVersion ERROR", e.message, {
+      requestedDataVersion,
+      requestedTargetDataVersion,
+      createdEntityPolicy,
+      allowDeepRollback,
+      durationMs: Date.now() - startedAt,
+    })
     response.errors = [e.message]
     return response
   }

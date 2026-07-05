@@ -215,64 +215,9 @@ export const getChangeLogIntegrityReport: typeof queries._getChangeLogIntegrityR
 }
 
 // MUTATIONS
-export const saveChangeLog: typeof mutations._saveChangeLog = async (params) => {
-  try {
-    const session = await ensureSuperUser()
-    return await mutations._saveChangeLog({
-      ...params,
-      data: {
-        ...params.data,
-        userId: session.user?.userId!,
-      },
-    })
-  } catch (e: any) {
-    logUnexpectedActionError("saveChangeLog ERROR", e)
-    return { errors: [e.message], success: false }
-  }
-}
-
-export const saveChangeLogs: typeof mutations._saveChangeLogs = async (params) => {
-  try {
-    const session = await ensureSuperUser()
-    return await mutations._saveChangeLogs({
-      ...params,
-      data: params.data.map((d) => ({
-        ...d,
-        userId: session.user?.userId!,
-      })),
-    })
-  } catch (e: any) {
-    logUnexpectedActionError("saveChangeLogs ERROR", e)
-    return { errors: [e.message], success: false, saved: 0 }
-  }
-}
-
-export const updateChangeLog: typeof mutations._updateChangeLog = async (params) => {
-  try {
-    const session = await ensureSuperUser()
-    return await mutations._updateChangeLog({
-      ...params,
-      actorUserId: session.user?.userId || null,
-    })
-  } catch (e: any) {
-    logUnexpectedActionError("updateChangeLog ERROR", e)
-    return { errors: [e.message], success: false }
-  }
-}
-
-export const markVersionAsSuperseded: typeof mutations._markVersionAsSuperseded = async (params) => {
-  try {
-    const session = await ensureSuperUser()
-    return await mutations._markVersionAsSuperseded({
-      ...params,
-      actorUserId: session.user?.userId || null,
-    })
-  } catch (e: any) {
-    logUnexpectedActionError("markVersionAsSuperseded ERROR", e)
-    return { errors: [e.message], success: false }
-  }
-}
-
+// Changelog rows are written exclusively by server-side publish/rollback flows.
+// The former saveChangeLog/updateChangeLog action + API surface was removed on purpose:
+// externally-writable changelog rows would undermine the audit trail.
 export const rollbackChangeLog: typeof mutations._rollbackChangeLog = async (params) => {
   try {
     const session = await ensureSuperUser()

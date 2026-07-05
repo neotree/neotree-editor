@@ -10,46 +10,20 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import type { ChangeLogType } from "@/databases/queries/changelogs/_get-change-logs"
-import { getDataVersion, normalizeChanges, resolveEntityTitle } from "@/lib/changelog-utils"
+import {
+  getChangelogActionBadgeClass,
+  getChangelogActionLabel,
+  getChangelogEntityTypeLabel,
+  getDataVersion,
+  normalizeChanges,
+  resolveEntityTitle,
+} from "@/lib/changelog-utils"
 import { getChangeLifecycleStatus } from "@/lib/changelog-status"
 
 type Props = {
   changes: ChangeLogType[]
   dataVersion: number
 }
-
-const entityTypeLabels: Record<string, string> = {
-  script: "Script",
-  screen: "Screen",
-  diagnosis: "Diagnosis",
-  problem: "Problem",
-  config_key: "Config Key",
-  drugs_library: "Drugs Library",
-  data_key: "Data Key",
-  alias: "Alias",
-}
-
-const actionBadgeClasses: Record<string, string> = {
-  create: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  update: "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  delete: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
-  publish: "border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-400",
-  restore: "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  rollback: "border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  merge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
-}
-
-const actionLabels: Record<string, string> = {
-  create: "Created",
-  update: "Updated",
-  delete: "Deleted",
-  publish: "Published",
-  restore: "Restored",
-  rollback: "Rolled back",
-  merge: "Merged",
-}
-
-const defaultActionBadgeClass = "border-muted bg-muted text-muted-foreground"
 
 const lifecycleBadgeClasses: Record<string, string> = {
   active: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
@@ -90,7 +64,7 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
         {sortedChanges.map((change) => {
           const normalizedChanges = normalizeChanges(change)
           const fieldsChanged = normalizedChanges.length
-          const entityLabel = entityTypeLabels[change.entityType as keyof typeof entityTypeLabels] || change.entityType
+          const entityLabel = getChangelogEntityTypeLabel(change.entityType)
           const publishedAt = format(new Date(change.dateOfChange), "PPpp")
           const entityTitle = resolveEntityTitle(change)
           const lifecycle = getChangeLifecycleStatus(change)
@@ -124,9 +98,9 @@ export function DataVersionChangesTable({ changes, dataVersion }: Props) {
                 <div className="flex flex-col gap-2">
                   <Badge
                     variant="outline"
-                    className={cn("w-fit", actionBadgeClasses[change.action] ?? defaultActionBadgeClass)}
+                    className={cn("w-fit", getChangelogActionBadgeClass(change.action))}
                   >
-                    {actionLabels[change.action] || change.action}
+                    {getChangelogActionLabel(change.action)}
                   </Badge>
                   {statusBadge}
                 </div>

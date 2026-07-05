@@ -1,38 +1,45 @@
 "use client"
 
 import { useCallback, useState } from "react"
+import { useRouter } from "next/navigation"
 import axios from "axios"
-import { RotateCcw } from "lucide-react"
+import { History, RotateCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/loader"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 type Props = {
   entityId: string
   entityType: string
   targetVersion?: number | null
-  currentVersion: number
-  dataVersion?: number | null
+  currentVersion?: number | null
   disabled?: boolean
+  // "previous" rolls the active entry back to its parent version;
+  // "restore" restores the entity to a specific historical version.
+  mode?: "previous" | "restore"
 }
 
-export function RollbackButton({ entityId, entityType, targetVersion, currentVersion, dataVersion, disabled }: Props) {
+export function RollbackButton({ entityId, entityType, targetVersion, currentVersion, disabled, mode = "previous" }: Props) {
   const { alert } = useAlertModal()
   const { viewOnly } = useAppContext()
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+
+  const isRestore = mode === "restore"
+  const rollingBackCreation = targetVersion === 0
 
   const handleRollback = useCallback(async () => {
     if (viewOnly) return
@@ -47,38 +54,43 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
       return
     }
 
-    const rollingBackCreation = targetVersion === 0
     try {
       setLoading(true)
       const response = await axios.post("/api/changelogs/rollback", {
         entityId,
         entityType,
         toVersion: targetVersion,
-        changeReason: `Rollback from v${currentVersion} to v${targetVersion}`,
+        changeReason: isRestore
+          ? `Restore to v${targetVersion}`
+          : `Rollback from v${currentVersion ?? "current"} to v${targetVersion}`,
       })
 
       if (response.data?.errors?.length) {
         throw new Error(response.data.errors.join(", "))
       }
 
-      const nextDataVersion = response.data?.data?.dataVersion ?? (dataVersion ?? 0) + 1
+      // The server computes the actual next data version; never predict it client-side.
+      const nextDataVersion = response.data?.data?.dataVersion
+      const releaseSuffix = Number.isFinite(nextDataVersion)
+        ? ` A new changelog entry was published as data version v${nextDataVersion}.`
+        : " A new changelog entry was published."
       const warnings: string[] = response.data?.warnings || []
       const baseMessage = rollingBackCreation
-        ? `Entity rolled back to its pre-creation state. A new changelog entry was created (data v${nextDataVersion}).`
-        : `Restored to v${targetVersion}. A new changelog entry was created (data v${nextDataVersion}).`
+        ? `Entity rolled back to its pre-creation state.${releaseSuffix}`
+        : `Restored this item to its version v${targetVersion}.${releaseSuffix}`
 
       alert({
-        title: "Rollback complete",
+        title: isRestore ? "Restore complete" : "Rollback complete",
         message: [baseMessage, ...warnings].join("\n\n"),
         variant: "success",
         buttonLabel: "Refresh",
-        onClose: () => window.location.reload(),
+        onClose: () => router.refresh(),
       })
       setOpen(false)
     } catch (e: any) {
       const serverErrors: string[] = e?.response?.data?.errors || []
       alert({
-        title: "Rollback failed",
+        title: isRestore ? "Restore failed" : "Rollback failed",
         message: serverErrors.length ? serverErrors.join(", ") : e.message || "An unexpected error occurred while rolling back.",
         variant: "error",
         buttonLabel: "Close",
@@ -86,40 +98,49 @@ export function RollbackButton({ entityId, entityType, targetVersion, currentVer
     } finally {
       setLoading(false)
     }
-  }, [alert, currentVersion, dataVersion, entityId, entityType, targetVersion, viewOnly])
+  }, [alert, currentVersion, entityId, entityType, isRestore, rollingBackCreation, router, targetVersion, viewOnly])
+
+  const confirmationText = rollingBackCreation
+    ? "This will roll this newly created item back to its pre-creation state and publish a new data version."
+    : isRestore
+      ? `This will restore this item to version v${targetVersion} and publish a new data version.`
+      : `This will restore this item from entity version v${currentVersion ?? "current"} to v${targetVersion} and publish a new data version.`
 
   return (
     <div className="relative">
       {loading && <Loader overlay />}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
+      <AlertDialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          // Keep the dialog up while the rollback request is in flight
+          if (loading) return
+          setOpen(nextOpen)
+        }}
+      >
+        <AlertDialogTrigger asChild>
           <Button size="sm" variant="outline" disabled={viewOnly || disabled || loading} className="inline-flex items-center gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Rollback to previous
+            {isRestore ? <History className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+            {isRestore ? `Restore this version (v${targetVersion})` : "Rollback to previous"}
           </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm rollback</DialogTitle>
-            <DialogDescription>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isRestore ? "Confirm restore" : "Confirm rollback"}</AlertDialogTitle>
+            <AlertDialogDescription>
               Rollback does not edit old history. It creates a new published version that restores this item to an earlier state.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-900 dark:text-orange-200">
-            {targetVersion === 0
-              ? `This will roll this newly created item back to its pre-creation state and publish data version v${(dataVersion ?? 0) + 1}.`
-              : `This will restore this item from entity version v${currentVersion} to v${targetVersion} and publish data version v${(dataVersion ?? 0) + 1}.`}
+            {confirmationText}
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button variant="destructive" onClick={handleRollback} disabled={loading}>
-              Confirm rollback
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleRollback} disabled={loading}>
+              {loading ? "Working..." : isRestore ? "Confirm restore" : "Confirm rollback"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { getRollbackSourceVersion } from "@/lib/changelog-rollback"
+import { getEntityRollbackSummary, getRollbackSourceVersion } from "@/lib/changelog-rollback"
 
 type SummaryLogUser = {
   name?: string | null
@@ -66,6 +66,9 @@ export function buildDataVersionSummary(params: {
     entityCounts,
     actionCounts,
     descriptions: Array.from(descriptionsSet).slice(0, 5),
+    // A release restoring the state of an earlier RELEASE. Entity versions never appear
+    // here — a release created by rolling back one item is reported via rollbackEntity.
     rollbackSourceVersion: rollbackEntry ? getRollbackSourceVersion(rollbackEntry.changeLog.changes) : null,
+    rollbackEntity: getEntityRollbackSummary(publishEntry?.changeLog?.changes) ?? null,
   }
 }

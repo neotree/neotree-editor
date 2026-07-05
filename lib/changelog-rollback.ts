@@ -3,7 +3,136 @@ import { createHash } from "crypto"
 export const DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY = "soft_delete" as const
 export const RELEASE_ROLLBACK_MAX_RECENT_DEPTH = 5 as const
 export const SCRIPT_CHILD_ENTITY_TYPES = ["screen", "diagnosis", "problem"] as const
-export const SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT = new Date("2026-04-24T00:00:00.000Z")
+
+// Rows written before this date may carry hashes produced by the legacy writer, which
+// hashed raw JSON.stringify(snapshot) (insertion-order keys, no normalization). Those can
+// never match the canonical hash — jsonb also re-orders keys — so they are auto-repaired
+// instead of blocking rollbacks. The default is the day after the last known legacy row
+// (2026-05-21); environments whose legacy writer ran longer can override it without a
+// deploy via CHANGELOG_HASH_STRICT_AT. Rows after the cutoff are enforced strictly.
+const DEFAULT_SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT = "2026-05-22T00:00:00.000Z"
+
+function resolveStrictEnforcementDate(): Date {
+  const raw = process.env.CHANGELOG_HASH_STRICT_AT
+  if (raw) {
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.valueOf())) return parsed
+  }
+  return new Date(DEFAULT_SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT)
+}
+
+export const SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT = resolveStrictEnforcementDate()
+
+// --- Rollback target age policy ---
+// Rollbacks are an operational undo, not a time machine: targets older than this window
+// can no longer be restored. Child entities (screens, diagnoses, problems) change rarely
+// and mostly move with their script, so they alone may restore an older version, capped
+// at a shallow depth.
+export const ROLLBACK_MAX_TARGET_AGE_DAYS = 31 as const
+export const STALE_CHILD_ROLLBACK_MAX_DEPTH = 5 as const
+
+// Absolute floor: releases published before this date are never restorable ("clean slate"
+// baseline). Overridable per environment via CHANGELOG_ROLLBACK_FLOOR_AT.
+const DEFAULT_ROLLBACK_CLEAN_SLATE_FLOOR = "2026-07-01T00:00:00.000Z"
+
+function resolveCleanSlateFloor(): Date {
+  const raw = process.env.CHANGELOG_ROLLBACK_FLOOR_AT
+  if (raw) {
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.valueOf())) return parsed
+  }
+  return new Date(DEFAULT_ROLLBACK_CLEAN_SLATE_FLOOR)
+}
+
+export const ROLLBACK_CLEAN_SLATE_FLOOR_AT = resolveCleanSlateFloor()
+
+function toValidDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.valueOf()) ? null : date
+}
+
+export function isRollbackTargetOlderThanMaxAge(params: {
+  targetDate?: Date | string | null
+  now?: Date
+  maxAgeDays?: number
+}): boolean {
+  const target = toValidDate(params.targetDate)
+  // A target without a usable date cannot be verified against the window — treat as too old
+  if (!target) return true
+  const now = params.now ?? new Date()
+  const maxAgeDays = Number.isFinite(params.maxAgeDays) ? Number(params.maxAgeDays) : ROLLBACK_MAX_TARGET_AGE_DAYS
+  return now.valueOf() - target.valueOf() > maxAgeDays * 24 * 60 * 60 * 1000
+}
+
+export type RollbackPolicyResult = { allowed: true } | { allowed: false; reason: string }
+
+export function evaluateEntityRollbackTargetPolicy(params: {
+  entityType: string
+  currentVersion?: number | null
+  targetVersion?: number | null
+  targetDate?: Date | string | null
+  now?: Date
+}): RollbackPolicyResult {
+  if (!isRollbackTargetOlderThanMaxAge({ targetDate: params.targetDate, now: params.now })) {
+    return { allowed: true }
+  }
+
+  const isChildEntity = (SCRIPT_CHILD_ENTITY_TYPES as readonly string[]).includes(params.entityType)
+  if (isChildEntity) {
+    const currentVersion = Number(params.currentVersion)
+    const targetVersion = Number(params.targetVersion)
+    const depth = currentVersion - targetVersion
+    if (Number.isFinite(depth) && depth >= 1 && depth <= STALE_CHILD_ROLLBACK_MAX_DEPTH) {
+      return { allowed: true }
+    }
+    return {
+      allowed: false,
+      reason:
+        `This version is older than ${ROLLBACK_MAX_TARGET_AGE_DAYS} days. ` +
+        `A ${params.entityType.replace("_", " ")} can only be restored up to ${STALE_CHILD_ROLLBACK_MAX_DEPTH} versions back once it is that old.`,
+    }
+  }
+
+  return {
+    allowed: false,
+    reason:
+      `Rollback targets older than ${ROLLBACK_MAX_TARGET_AGE_DAYS} days can no longer be restored for this item. ` +
+      `Make the change manually in the editor instead.`,
+  }
+}
+
+export function evaluateReleaseRollbackTargetPolicy(params: {
+  targetDataVersion: number
+  targetPublishedAt?: Date | string | null
+  now?: Date
+}): RollbackPolicyResult {
+  const publishedAt = toValidDate(params.targetPublishedAt)
+  if (!publishedAt) {
+    return {
+      allowed: false,
+      reason: `Release v${params.targetDataVersion} has no publish date recorded, so it cannot be restored.`,
+    }
+  }
+
+  if (publishedAt < ROLLBACK_CLEAN_SLATE_FLOOR_AT) {
+    return {
+      allowed: false,
+      reason:
+        `Release v${params.targetDataVersion} was published before ${ROLLBACK_CLEAN_SLATE_FLOOR_AT.toISOString().slice(0, 10)} ` +
+        `and cannot be restored. Rollback starts from a clean slate after that date.`,
+    }
+  }
+
+  if (isRollbackTargetOlderThanMaxAge({ targetDate: publishedAt, now: params.now })) {
+    return {
+      allowed: false,
+      reason: `Rollback is limited to releases published within the last ${ROLLBACK_MAX_TARGET_AGE_DAYS} days.`,
+    }
+  }
+
+  return { allowed: true }
+}
 
 type RollbackCandidate = {
   entityId: string
@@ -257,6 +386,9 @@ export function wasCreatedInCurrentDataVersion(params: {
   return fallbackPreviousVersion === params.currentVersion
 }
 
+// The release (data) version whose state a rollback restored. Only data-version fields
+// qualify: entity rollback rows carry `toVersion`, which is the item's own version and
+// must never be presented to users as a release number.
 export function getRollbackSourceVersion(changes: any): number | null {
   const entries = Array.isArray(changes) ? changes : []
 
@@ -266,11 +398,30 @@ export function getRollbackSourceVersion(changes: any): number | null {
   const legacyToDataVersion = entries.find((entry) => Number.isFinite(entry?.to_data_version))?.to_data_version
   if (Number.isFinite(legacyToDataVersion)) return Number(legacyToDataVersion)
 
-  const toVersion = entries.find((entry) => Number.isFinite(entry?.toVersion))?.toVersion
-  if (Number.isFinite(toVersion)) return Number(toVersion)
-
-  const legacyToVersion = entries.find((entry) => Number.isFinite(entry?.to_version))?.to_version
-  if (Number.isFinite(legacyToVersion)) return Number(legacyToVersion)
+  const rollbackSourceDataVersion = entries.find((entry) => Number.isFinite(entry?.rollbackSourceDataVersion))
+    ?.rollbackSourceDataVersion
+  if (Number.isFinite(rollbackSourceDataVersion)) return Number(rollbackSourceDataVersion)
 
   return null
+}
+
+export type EntityRollbackSummary = {
+  entityType: string
+  entityId: string | null
+  targetVersion: number | null
+}
+
+// Identifies a release that was published by rolling back a single entity (and its
+// dependents), from the release publish entry's recorded changes. `targetVersion` is the
+// item's own version — distinct from any release number.
+export function getEntityRollbackSummary(changes: any): EntityRollbackSummary | null {
+  const entries = Array.isArray(changes) ? changes : []
+  const entry = entries.find((candidate) => typeof candidate?.rolledBackEntityType === "string" && candidate.rolledBackEntityType)
+  if (!entry) return null
+
+  return {
+    entityType: entry.rolledBackEntityType,
+    entityId: typeof entry.rolledBackEntityId === "string" ? entry.rolledBackEntityId : null,
+    targetVersion: Number.isFinite(entry.rollbackTargetVersion) ? Number(entry.rollbackTargetVersion) : null,
+  }
 }

@@ -6,6 +6,72 @@ export type NormalizedChange = {
   newValue: unknown
 }
 
+// Single source of truth for changelog display labels. Every changelog surface must use
+// these maps — per-component copies drifted and dropped entity types (problem, hospital).
+export const CHANGELOG_ENTITY_TYPE_LABELS: Record<string, string> = {
+  script: "Script",
+  screen: "Screen",
+  diagnosis: "Diagnosis",
+  problem: "Problem",
+  config_key: "Config Key",
+  drugs_library: "Drugs Library",
+  data_key: "Data Key",
+  alias: "Alias",
+  hospital: "Hospital",
+  release: "Release",
+}
+
+export function getChangelogEntityTypeLabel(entityType: string): string {
+  return CHANGELOG_ENTITY_TYPE_LABELS[entityType] || entityType
+}
+
+export const CHANGELOG_ACTION_LABELS: Record<string, string> = {
+  create: "Created",
+  update: "Updated",
+  delete: "Deleted",
+  publish: "Published",
+  restore: "Restored",
+  rollback: "Rolled back",
+  merge: "Merged",
+}
+
+export function getChangelogActionLabel(action: string): string {
+  return CHANGELOG_ACTION_LABELS[action] || action
+}
+
+export const CHANGELOG_ACTION_BADGE_CLASSES: Record<string, string> = {
+  create: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  update: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  delete: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400",
+  publish: "border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-400",
+  restore: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  rollback: "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  merge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+}
+
+export const CHANGELOG_DEFAULT_ACTION_BADGE_CLASS = "border-muted bg-muted text-muted-foreground"
+
+export function getChangelogActionBadgeClass(action: string): string {
+  return CHANGELOG_ACTION_BADGE_CLASSES[action] || CHANGELOG_DEFAULT_ACTION_BADGE_CLASS
+}
+
+// Where in the editor an entity can be opened for editing.
+export function getChangelogEntityEditorHref(change: {
+  entityType: string
+  entityId: string
+  scriptId?: string | null
+}): string | null {
+  if (change.entityType === "script") return `/script/${change.entityId}`
+  if (change.entityType === "screen" && change.scriptId) return `/script/${change.scriptId}/screen/${change.entityId}`
+  if (change.entityType === "diagnosis" && change.scriptId) return `/script/${change.scriptId}/diagnosis/${change.entityId}`
+  if (change.entityType === "problem" && change.scriptId) return `/script/${change.scriptId}/problem/${change.entityId}`
+  if (change.entityType === "config_key") return "/configuration"
+  if (change.entityType === "drugs_library") return `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(change.entityId)}`
+  if (change.entityType === "data_key") return `/data-keys/edit/${encodeURIComponent(change.entityId)}`
+  if (change.entityType === "hospital") return `/hospitals?hospitalId=${encodeURIComponent(change.entityId)}`
+  return null
+}
+
 export function isHistoryRepairChange(change: Pick<ChangeLogType, "description" | "changeReason">) {
   const description = `${change.description || ""} ${change.changeReason || ""}`.toLowerCase()
   return (
