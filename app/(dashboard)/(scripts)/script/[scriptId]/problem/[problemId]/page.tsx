@@ -1,6 +1,7 @@
 import { getProblem, getScript } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
+import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { ProblemForm } from "../../../../components/problems/form";
 import { PageContainer } from "../../../../components/page-container";
 
@@ -44,6 +45,7 @@ export default async function Problems({ params: { problemId, scriptId } }: Prop
             <PageContainer
                 title="Edit problem"
                 backLink={`/script/${scriptId}`}
+                actions={<EntityHistoryButton entityType="problem" entityId={problemId} entityName={problem.data.name} />}
             >
                 <ProblemForm 
                     scriptId={scriptId}

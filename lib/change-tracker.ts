@@ -41,9 +41,7 @@ export class ChangeTracker {
   }
 
   setSnapshot(data: any) {
-    if (this.isInitialized) {
-      return
-    }
+    if (this.isInitialized) return
 
     this.originalSnapshot = JSON.parse(JSON.stringify(data))
     this.isInitialized = true
@@ -55,10 +53,7 @@ export class ChangeTracker {
       return
     }
 
-
     const changes = this.detectChanges(this.originalSnapshot, currentData)
-
-
     const existingChanges = await pendingChangesAPI.getEntityChanges(this.options.entityId, this.options.entityType)
     const existingChangesByPath = new Map(existingChanges.map((change) => [change.fieldPath, change]))
     const entityTitle = this.resolveEntityTitle(currentData)
@@ -128,16 +123,7 @@ export class ChangeTracker {
   private extractTitle(data: any): string | null {
     if (!data || typeof data !== "object") return null
 
-    const candidateKeys = [
-      "title",
-      "name",
-      "label",
-      "key",
-      "printTitle",
-      "displayName",
-      "sectionTitle",
-      "collectionLabel",
-    ]
+    const candidateKeys = ["title", "name", "label", "key", "printTitle", "displayName", "sectionTitle", "collectionLabel"]
 
     for (const key of candidateKeys) {
       const value = data[key]
@@ -186,16 +172,7 @@ export class ChangeTracker {
     }
   }
 
-  private detectChanges(
-    oldObj: any,
-    newObj: any,
-    path = "",
-  ): Array<{
-    path: string
-    name: string
-    oldValue: any
-    newValue: any
-  }> {
+  private detectChanges(oldObj: any, newObj: any, path = ""): Array<{ path: string; name: string; oldValue: any; newValue: any }> {
     const changes: Array<{ path: string; name: string; oldValue: any; newValue: any }> = []
 
     if (this.shouldDiffScreenFields(path) && (Array.isArray(oldObj) || Array.isArray(newObj))) {
@@ -204,56 +181,33 @@ export class ChangeTracker {
       return this.diffScreenFields(previous, next, path)
     }
 
-    // Handle null/undefined cases
     if (oldObj === null || oldObj === undefined) {
       if (newObj !== null && newObj !== undefined && this.isMeaningfulValue(newObj)) {
-        changes.push({
-          path: path || "root",
-          name: path.split(".").pop() || "root",
-          oldValue: oldObj,
-          newValue: newObj,
-        })
+        changes.push({ path: path || "root", name: path.split(".").pop() || "root", oldValue: oldObj, newValue: newObj })
       }
       return changes
     }
 
     if (newObj === null || newObj === undefined) {
       if (this.isMeaningfulValue(oldObj)) {
-        changes.push({
-          path: path || "root",
-          name: path.split(".").pop() || "root",
-          oldValue: oldObj,
-          newValue: newObj,
-        })
+        changes.push({ path: path || "root", name: path.split(".").pop() || "root", oldValue: oldObj, newValue: newObj })
       }
       return changes
     }
 
-    // Handle primitive types
     if (typeof oldObj !== "object" || typeof newObj !== "object") {
       if (!this.areEquivalentValues(oldObj, newObj, path) && this.isMeaningfulValue(newObj)) {
-        changes.push({
-          path: path || "root",
-          name: path.split(".").pop() || "root",
-          oldValue: oldObj,
-          newValue: newObj,
-        })
+        changes.push({ path: path || "root", name: path.split(".").pop() || "root", oldValue: oldObj, newValue: newObj })
       }
       return changes
     }
 
-    // Handle arrays
     if (Array.isArray(oldObj) && Array.isArray(newObj)) {
       if (this.shouldDiffScreenFields(path)) {
         return this.diffScreenFields(oldObj, newObj, path)
       }
       if (!this.areEquivalentValues(oldObj, newObj, path)) {
-        changes.push({
-          path: path || "root",
-          name: path.split(".").pop() || "root",
-          oldValue: oldObj,
-          newValue: newObj,
-        })
+        changes.push({ path: path || "root", name: path.split(".").pop() || "root", oldValue: oldObj, newValue: newObj })
       }
       return changes
     }
@@ -261,17 +215,13 @@ export class ChangeTracker {
     const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)])
 
     Array.from(allKeys).forEach((key) => {
-      if (IGNORED_FIELDS.has(key)) {
-        return
-      }
+      if (IGNORED_FIELDS.has(key)) return
 
       const newPath = path ? `${path}.${key}` : key
       const oldValue = oldObj[key]
       const newValue = newObj[key]
 
-      if (!this.isMeaningfulValue(oldValue) && !this.isMeaningfulValue(newValue)) {
-        return
-      }
+      if (!this.isMeaningfulValue(oldValue) && !this.isMeaningfulValue(newValue)) return
 
       if (
         typeof oldValue === "object" &&
@@ -282,15 +232,8 @@ export class ChangeTracker {
         !Array.isArray(newValue)
       ) {
         changes.push(...this.detectChanges(oldValue, newValue, newPath))
-      } else if (!this.areEquivalentValues(oldValue, newValue, newPath)) {
-        if (this.isMeaningfulValue(newValue)) {
-          changes.push({
-            path: newPath,
-            name: key,
-            oldValue,
-            newValue,
-          })
-        }
+      } else if (!this.areEquivalentValues(oldValue, newValue, newPath) && this.isMeaningfulValue(newValue)) {
+        changes.push({ path: newPath, name: key, oldValue, newValue })
       }
     })
 
@@ -302,11 +245,7 @@ export class ChangeTracker {
     return path === "fields" || path.endsWith(".fields")
   }
 
-  private diffScreenFields(
-    oldFields: any[],
-    newFields: any[],
-    path: string,
-  ): Array<{ path: string; name: string; oldValue: any; newValue: any }> {
+  private diffScreenFields(oldFields: any[], newFields: any[], path: string) {
     const changes: Array<{ path: string; name: string; oldValue: any; newValue: any }> = []
     const oldMap = this.indexFieldsByKey(oldFields)
     const newMap = this.indexFieldsByKey(newFields)
@@ -321,32 +260,19 @@ export class ChangeTracker {
       const fieldPath = `${path}.${key}`
 
       if (!oldField && newField) {
-        changes.push({
-          path: fieldPath,
-          name: `${label} (added)`,
-          oldValue: null,
-          newValue: newField,
-        })
+        changes.push({ path: fieldPath, name: `${label} (added)`, oldValue: null, newValue: newField })
         continue
       }
 
       if (oldField && !newField) {
-        changes.push({
-          path: fieldPath,
-          name: `${label} (removed)`,
-          oldValue: oldField,
-          newValue: null,
-        })
+        changes.push({ path: fieldPath, name: `${label} (removed)`, oldValue: oldField, newValue: null })
         continue
       }
 
       if (oldField && newField) {
         const fieldChanges = this.detectChanges(oldField, newField, fieldPath)
         for (const change of fieldChanges) {
-          changes.push({
-            ...change,
-            name: change.name ? `${label} • ${change.name}` : label,
-          })
+          changes.push({ ...change, name: change.name ? `${label} • ${change.name}` : label })
         }
       }
     }
@@ -368,14 +294,7 @@ export class ChangeTracker {
 
   private resolveFieldLabel(field: any, fallbackKey: string): string {
     if (!field || typeof field !== "object") return fallbackKey
-    const candidates = [
-      field.label,
-      field.title,
-      field.name,
-      field.key,
-      field.fieldId,
-      field.id,
-    ]
+    const candidates = [field.label, field.title, field.name, field.key, field.fieldId, field.id]
     for (const candidate of candidates) {
       if (typeof candidate === "string" && candidate.trim().length) return candidate.trim()
       if (typeof candidate === "number" && Number.isFinite(candidate)) return String(candidate)
@@ -389,29 +308,16 @@ export class ChangeTracker {
     this.isInitialized = false
   }
 
-  // Get all pending changes for this entity
   async getPendingChanges() {
     return await pendingChangesAPI.getEntityChanges(this.options.entityId, this.options.entityType)
   }
 }
 
-// Helper function to create a change tracker
 export function createChangeTracker(options: ChangeTrackerOptions) {
   return new ChangeTracker(options)
 }
 
-const TITLE_CANDIDATE_KEYS = [
-  "title",
-  "name",
-  "label",
-  "key",
-  "printTitle",
-  "sectionTitle",
-  "collectionLabel",
-  "drug",
-  "fluid",
-  "feed",
-]
+const TITLE_CANDIDATE_KEYS = ["title", "name", "label", "key", "printTitle", "sectionTitle", "collectionLabel", "drug", "fluid", "feed"]
 
 function inferEntityTitleFromSnapshot(snapshot?: any): string | null {
   if (!snapshot || typeof snapshot !== "object") return null
@@ -445,10 +351,7 @@ export async function recordPendingDeletionChange({
 }) {
   if (!entityId) return
 
-  const resolvedTitle =
-    entityTitle?.trim() ||
-    inferEntityTitleFromSnapshot(snapshot) ||
-    `${entityType} ${entityId}`
+  const resolvedTitle = entityTitle?.trim() || inferEntityTitleFromSnapshot(snapshot) || `${entityType} ${entityId}`
 
   await pendingChangesAPI.clearEntityChanges(entityId, entityType)
 
