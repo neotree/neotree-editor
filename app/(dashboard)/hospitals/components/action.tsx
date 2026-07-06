@@ -1,6 +1,7 @@
 'use client';
 
-import { MoreVertical, Trash } from "lucide-react"
+import { useState } from "react";
+import { History, MoreVertical, Trash } from "lucide-react"
 
 import {
     DropdownMenu,
@@ -15,21 +16,24 @@ import { useSearchParams } from "@/hooks/use-search-params";
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { useAppContext } from "@/contexts/app";
+import { EntityHistorySheet } from "@/app/(dashboard)/components/entity-history";
 
 type Props = {
     hospital: Awaited<ReturnType<typeof getHospitals>>['data'][0];
     onDelete: () => void;
 };
 
-export function HospitalAction({ 
+export function HospitalAction({
     hospital: {
         hospitalId,
+        name,
         isDraft,
-        draftCreatedByUserId, 
+        draftCreatedByUserId,
     },
-    onDelete, 
+    onDelete,
 }: Props) {
     const searchParams = useSearchParams();
+    const [historyOpen, setHistoryOpen] = useState(false);
 
     const lockStatusParams: LockStatusProps = {
         isDraft: isDraft,
@@ -58,10 +62,15 @@ export function HospitalAction({
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                             onClick={() => searchParams.push({ hospitalId })}
                         >
                             {disabled ? 'View' : 'Edit'}
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                            <History className="mr-2 h-4 w-4" />
+                            View history
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />
@@ -77,6 +86,14 @@ export function HospitalAction({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
+            <EntityHistorySheet
+                entityType="hospital"
+                entityId={hospitalId}
+                entityName={name || undefined}
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+            />
         </>
     );
 }

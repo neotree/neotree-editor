@@ -3,11 +3,12 @@ import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import * as actions from '@/app/actions/data-keys';
 import { getAuthenticatedUserWithRoles } from "@/app/actions/get-authenticated-user";
+import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { DataKeyForm } from '../../../components/form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditDataKeyPage() { 
+export default async function EditDataKeyPage({ params }: { params: { dataKeyId: string; }; }) {
     const [{ isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);
@@ -18,9 +19,12 @@ export default async function EditDataKeyPage() {
             <Title>Data keys</Title>
 
             <Content>
-                <Card className="mb-20">                    
+                <div className="mb-4 flex justify-end">
+                    <EntityHistoryButton entityType="data_key" entityId={params.dataKeyId} />
+                </div>
+                <Card className="mb-20">
                     <CardContent className="p-0">
-                        <DataKeyForm 
+                        <DataKeyForm
                             {...actions}
                             disabled={!canManageDataKeys}
                         />

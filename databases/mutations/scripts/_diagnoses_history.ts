@@ -27,7 +27,8 @@ export async function _saveDiagnosesHistory({
       const diagnosisId = c?.data?.diagnosisId
       if (!diagnosisId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
+      const prev = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
+      const isCreate = !prev
       const changeDescription = isCreate ? "Create diagnosis" : "Update diagnosis"
 
       const changePayload: { action: string; description: string; oldValues: any[]; newValues: any[] } = {
@@ -37,8 +38,12 @@ export async function _saveDiagnosesHistory({
         newValues: [],
       }
 
-      const versionValue = c?.data?.version || 1
-      const nextVersion = isCreate ? 1 : versionValue + 1
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof diagnosesHistory.$inferInsert = {
         version: nextVersion,
@@ -48,8 +53,6 @@ export async function _saveDiagnosesHistory({
       }
 
       if (!isCreate) {
-        const prev = previous.find((prevC) => prevC.diagnosisId === diagnosisId)
-
         Object.keys({ ...c?.data })
           .filter((key) => !["version", "draft"].includes(key))
           .forEach((_key) => {
@@ -67,9 +70,7 @@ export async function _saveDiagnosesHistory({
 
       if (userId) {
         const sanitizedSnapshot = removeHexCharacters(c.data || {})
-        const previousSnapshot = isCreate
-          ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.diagnosisId === diagnosisId) || {})
+        const previousSnapshot = isCreate ? {} : removeHexCharacters(prev || {})
         const changeReason = isCreate
           ? undefined
           : c.draftOrigin === "other"
@@ -80,7 +81,6 @@ export async function _saveDiagnosesHistory({
           entityId: diagnosisId,
           entityType: "diagnosis",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changePayload,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -98,7 +98,8 @@ export async function _saveDiagnosesHistory({
       await executor.insert(diagnosesHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveDiagnosesHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData
