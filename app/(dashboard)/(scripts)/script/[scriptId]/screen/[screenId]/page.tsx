@@ -1,6 +1,7 @@
 import { getScreen, getScript, listScreens } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
+import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { ScreenForm } from "../../../../components/screens/form";
 import { PageContainer } from "../../../../components/page-container";
 
@@ -45,6 +46,7 @@ export default async function Screens({ params: { screenId, scriptId } }: Props)
             <PageContainer
                 title="Edit screen"
                 backLink={`/script/${scriptId}`}
+                actions={<EntityHistoryButton entityType="screen" entityId={screenId} entityName={screen.data.title} />}
             >
                 <ScreenForm 
                     scriptId={scriptId}

@@ -7,10 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 type Props = {
     title?: string;
     backLink?: string;
+    actions?: React.ReactNode;
     children?: React.ReactNode;
 };
 
-export function PageContainer({ title, backLink, children, }: Props) {
+export function PageContainer({ title, backLink, actions, children, }: Props) {
     return (
         <div className="pb-20">
             <Content className="flex flex-col gap-y-4">
@@ -24,6 +25,12 @@ export function PageContainer({ title, backLink, children, }: Props) {
                                     </Link>
                                 )}
                                 <span>{title}</span>
+
+                                {!!actions && (
+                                    <div className="ml-auto flex items-center gap-x-2">
+                                        {actions}
+                                    </div>
+                                )}
                             </div>
                         )}
 
