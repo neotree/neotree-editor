@@ -7,6 +7,8 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { dataKeys, dataKeysDrafts, dataKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveDataKeysHistory } from "./_history"
 import { v4 } from "uuid"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { removeHexCharacters } from "@/databases/utils"
 
 export async function _publishDataKeys(opts?: {
   broadcastAction?: boolean
@@ -20,9 +22,16 @@ export async function _publishDataKeys(opts?: {
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
+    return {
+      success: false,
+      errors: ["Data key publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const executor = opts?.client || db
-    let deleted = await executor.query.pendingDeletion.findMany({
+    const executor = async (client: DbOrTransaction) => {
+    let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.dataKeyId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -38,11 +47,12 @@ export async function _publishDataKeys(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await executor
+      const deletedRows = await client
         .update(dataKeys)
         .set({
           deletedAt,
           uniqueKey: sql`CONCAT(${dataKeys.uniqueKey}, '_', ${dataKeys.uuid})`, // make the unique key available for use
+          version: sql`${dataKeys.version} + 1`,
         })
         .where(
           inArray(
@@ -50,9 +60,13 @@ export async function _publishDataKeys(opts?: {
             deleted.map((c) => c.dataKeyId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.uuid, row]))
 
       const historyPayload = deleted.map((c) => {
-        const nextVersion = (c.dataKey?.version ?? 0) + 1
+        const nextVersion =
+          deletedById.get(c.dataKeyId!)?.version ??
+          getPublishedEntityVersion({ currentVersion: c.dataKey?.version, isCreate: false })
         return {
           version: nextVersion,
           dataKeyId: c.dataKeyId!,
@@ -65,7 +79,7 @@ export async function _publishDataKeys(opts?: {
         }
       })
 
-      await executor.insert(dataKeysHistory).values(historyPayload)
+      await client.insert(dataKeysHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -73,12 +87,14 @@ export async function _publishDataKeys(opts?: {
           const history = historyPayload[index]
           if (!entry?.dataKeyId) continue
 
-          const snapshot = {
+          const previousSnapshot = removeHexCharacters(entry.dataKey ?? {})
+          const snapshot = removeHexCharacters({
             ...(entry.dataKey ?? {}),
             deletedAt,
-          }
+            uniqueKey: [entry.dataKey?.uniqueKey || "", entry.dataKey?.uuid || ""].filter((s) => s).join("_"),
+          })
 
-          const nextVersion = history.version || ((entry.dataKey?.version ?? 0) + 1)
+          const nextVersion = history.version
           changeLogs.push({
             entityId: entry.dataKeyId,
             entityType: "data_key",
@@ -86,17 +102,19 @@ export async function _publishDataKeys(opts?: {
             version: nextVersion,
             dataVersion: opts.dataVersion,
             changes: history.changes,
-            fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
+            fullSnapshot: snapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: opts.publisherUserId,
             dataKeyId: entry.dataKeyId,
-            isActive: false,
+            isActive: true,
           })
         }
       }
     }
 
-    await executor
+    await client
       .delete(pendingDeletion)
       .where(
         and(
@@ -108,7 +126,7 @@ export async function _publishDataKeys(opts?: {
     let updates: (typeof dataKeysDrafts.$inferSelect)[] = []
     let inserts: (typeof dataKeysDrafts.$inferSelect)[] = []
 
-    const res = await executor.query.dataKeysDrafts.findMany({
+    const res = await client.query.dataKeysDrafts.findMany({
       where: !opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts?.userId),
     })
 
@@ -118,8 +136,9 @@ export async function _publishDataKeys(opts?: {
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof dataKeys.$inferSelect)[] = []
+      const successfulUpdates: typeof dataKeysDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.dataKeyId).length) {
-        dataBefore = await executor.query.dataKeys.findMany({
+        dataBefore = await client.query.dataKeys.findMany({
           where: inArray(
             dataKeys.uuid,
             updates.filter((c) => c.dataKeyId).map((c) => c.dataKeyId!),
@@ -130,6 +149,7 @@ export async function _publishDataKeys(opts?: {
       for (const { dataKeyId: _dataKeyId, data: c } of updates) {
         const dataKeyId = _dataKeyId!
         const current = dataBefore.find((d) => d.uuid === dataKeyId)
+        const sourceDraft = updates.find((draft) => draft.dataKeyId === dataKeyId)
 
         const { uuid: __uuid, id, createdAt, updatedAt, deletedAt, ...payload } = c
 
@@ -141,19 +161,21 @@ export async function _publishDataKeys(opts?: {
           continue
         }
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${dataKeys.version} + 1`,
         }
 
-        await executor.update(dataKeys).set(updates).where(eq(dataKeys.uuid, dataKeyId)).returning()
+        const [persisted] = await client.update(dataKeys).set(nextData).where(eq(dataKeys.uuid, dataKeyId)).returning()
+        if (persisted && sourceDraft) successfulUpdates.push({ ...sourceDraft, data: persisted })
       }
 
       const updateChangeLogs = await _saveDataKeysHistory({
-        drafts: updates,
+        drafts: successfulUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client: executor,
+        client,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -161,17 +183,18 @@ export async function _publishDataKeys(opts?: {
       })))
 
       if (errors.length) {
-        results.success = false
-        results.errors = errors
-        return results
+        throw new Error(errors.join(", "))
       }
+
+      updates = successfulUpdates
     }
 
     if (inserts.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof dataKeys.$inferSelect)[] = []
+      const persistedInserts: typeof dataKeysDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.dataKeyId).length) {
-        dataBefore = await executor.query.dataKeys.findMany({
+        dataBefore = await client.query.dataKeys.findMany({
           where: inArray(
             dataKeys.uuid,
             inserts.filter((c) => c.dataKeyId).map((c) => c.dataKeyId!),
@@ -181,20 +204,26 @@ export async function _publishDataKeys(opts?: {
 
       for (const { id, data } of inserts) {
         const dataKeyUuid = data.uuid || v4()
-        const { id: _id, ...payload } = { ...data, uuid: dataKeyUuid }
+        const { id: _id, ...payload } = {
+          ...data,
+          uuid: dataKeyUuid,
+          version: getPublishedEntityVersion({ currentVersion: data.version, isCreate: true }),
+        }
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.uuid = dataKeyUuid
           return d
         })
 
-        await executor.insert(dataKeys).values(payload)
+        const [persisted] = await client.insert(dataKeys).values(payload).returning()
+        const sourceDraft = inserts.find((draft) => draft.id === id)
+        if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
 
       const insertChangeLogs = await _saveDataKeysHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client: executor,
+        client,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -202,45 +231,34 @@ export async function _publishDataKeys(opts?: {
       })))
 
       if (errors.length) {
-        results.success = false
-        results.errors = errors
-        return results
+        throw new Error(errors.join(", "))
       }
+
+      inserts = persistedInserts
     }
 
-    await executor.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
-
-    const published = [
-      ...updates.map((c) => c.dataKeyId!),
-      ...deleted.map((c) => c.dataKeyId!),
-    ]
-
-    if (published.length) {
-      await executor
-        .update(dataKeys)
-        .set({ version: sql`${dataKeys.version} + 1` })
-        .where(inArray(dataKeys.uuid, published))
-    }
+    await client.delete(dataKeysDrafts).where(!opts?.userId ? undefined : eq(dataKeysDrafts.createdByUserId, opts.userId))
 
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
-      if (saveResult.errors?.length) {
-        logger.error("_publishDataKeys changelog error", saveResult.errors.join(", "))
-        throw new Error(saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save data key changelogs")
     }
 
     if (errors.length) {
-      results.success = false
-      results.errors = errors
-    } else {
-      results.success = true
+      throw new Error(errors.join(", "))
+    }
+
+    results.success = true
+    }
+
+    if (opts?.client) {
+      await executor(opts.client)
     }
   } catch (e: any) {
     results.success = false
     results.errors = [e.message]
     logger.error("_publishDataKeys ERROR", e)
-  } finally {
-    return results
   }
+
+  return results
 }

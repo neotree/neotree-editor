@@ -1,6 +1,7 @@
 'use client';
 
-import { Edit, Eye, MoreVertical, Trash } from "lucide-react"
+import { useState } from "react";
+import { Edit, Eye, History, MoreVertical, Trash } from "lucide-react"
 
 import {
     DropdownMenu,
@@ -12,15 +13,17 @@ import { Button } from "@/components/ui/button";
 import { IConfigKeysContext, useConfigKeysContext } from "@/contexts/config-keys";
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { EntityHistorySheet } from "@/app/(dashboard)/components/entity-history";
 
 export function ConfigKeysTableActions({ item }: {
     item: Awaited<ReturnType<IConfigKeysContext['getConfigKeys']>>['data'][0];
 }) {
-    const { 
+    const {
         disabled: _disabled,
-        onDelete, 
-        setActiveItemId, 
+        onDelete,
+        setActiveItemId,
     } = useConfigKeysContext();
+    const [historyOpen, setHistoryOpen] = useState(false);
 
     const lockStatusParams: LockStatusProps = {
         isDraft: item.isDraft,
@@ -54,6 +57,11 @@ export function ConfigKeysTableActions({ item }: {
                         {!disabled ? <><Edit className="mr-2 h-4 w-4" /> Edit</> : <><Eye className="mr-2 h-4 w-4" /> View</>}
                     </DropdownMenuItem>
 
+                    <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                        <History className="mr-2 h-4 w-4" />
+                        View history
+                    </DropdownMenuItem>
+
                     {!disabled && (
                         <DropdownMenuItem
                             onClick={() => setTimeout(() => onDelete([item.configKeyId]), 0)}
@@ -65,6 +73,14 @@ export function ConfigKeysTableActions({ item }: {
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            <EntityHistorySheet
+                entityType="config_key"
+                entityId={item.configKeyId}
+                entityName={(item as any).label || (item as any).key || undefined}
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+            />
         </div>
     );
 }

@@ -15,8 +15,6 @@ import {
   filterScriptsSearchResults,
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseProblemsTableParams = {
   disabled?: boolean
@@ -54,7 +52,7 @@ export function useProblemsTable({
   }, [problemsParam])
 
   const router = useRouter()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -88,20 +86,6 @@ export function useProblemsTable({
               onClose: () => setProblems(_problems),
             })
           } else {
-            await Promise.all(
-              problemsToDelete.map(async (problem) => {
-                if (!problem?.problemId) return
-                await recordPendingDeletionChange({
-                  entityId: problem.problemId,
-                  entityType: "problem",
-                  entityTitle: problem.name || problem.key || "Untitled Problem",
-                  snapshot: problem,
-                  userId: authenticatedUser?.userId,
-                  userName: authenticatedUser?.displayName,
-                  description: `Marked "${problem.name || problem.key || "Untitled Problem"}" for deletion`,
-                })
-              }),
-            )
             setSelected([])
             router.refresh()
             alert({
@@ -121,7 +105,7 @@ export function useProblemsTable({
         },
       )
     },
-    [deleteProblems, confirm, alert, router, problems, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [deleteProblems, confirm, alert, router, problems],
   )
 
   const onSort = useCallback(
@@ -139,24 +123,6 @@ export function useProblemsTable({
 
       setProblems((prev) => ({ ...prev, data: sorted }))
 
-      for (const change of payload) {
-        const originalProblem = problems.data.find((d) => d.problemId === change.problemId)
-        if (originalProblem) {
-          await pendingChangesAPI.addChange({
-            entityType: "problem",
-            entityId: change.problemId,
-            entityTitle: originalProblem.name || originalProblem.key || "Untitled Problem",
-            action: "update",
-            fieldPath: "position",
-            fieldName: "position",
-            oldValue: originalProblem.position,
-            newValue: change.position,
-            userId: authenticatedUser?.userId,
-            userName: authenticatedUser?.displayName,
-          })
-        }
-      }
-
       // await saveProblems({ data: payload, broadcastAction: true, });
 
       // TODO: Replace this with server action
@@ -166,7 +132,7 @@ export function useProblemsTable({
 
       router.refresh()
     },
-    [saveProblems, loadProblems, problems, router, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [saveProblems, loadProblems, problems, router],
   )
 
   const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly])
