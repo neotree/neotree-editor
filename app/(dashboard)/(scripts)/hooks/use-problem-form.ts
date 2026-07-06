@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
@@ -10,8 +10,6 @@ import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { ScriptType } from "@/databases/queries/scripts";
-import { pendingChangesAPI } from "@/lib/indexed-db";
-import { createChangeTracker } from "@/lib/change-tracker";
 
 export type UseProblemFormParams = {
     scriptId: string;
@@ -30,7 +28,7 @@ export function useProblemForm({
 
     const { saveProblems } = useScriptsContext();
     const { alert } = useAlertModal();
-    const { viewOnly, authenticatedUser } = useAppContext();
+    const { viewOnly } = useAppContext();
 
     const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
     const isNewProblem = !formData?.problemId;
@@ -38,21 +36,6 @@ export function useProblemForm({
         () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : uuidv4()),
         [],
     );
-
-    const changeTrackerRef = useRef(
-        formData?.problemId
-            ? createChangeTracker({
-                entityId: formData.problemId,
-                entityType: "problem",
-                userId: authenticatedUser?.userId,
-                userName: authenticatedUser?.displayName,
-                entityTitle: formData?.name || formData?.key || "Problem",
-                resolveEntityTitle: (data) => data?.name || data?.key || data?.description,
-            })
-            : null,
-    );
-
-    const originalSnapshotRef = useRef<ProblemFormDataType | null>(null);
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -81,13 +64,6 @@ export function useProblemForm({
         defaultValues: getDefaultValues(),
     });
 
-    useEffect(() => {
-        if (changeTrackerRef.current && formData && !originalSnapshotRef.current) {
-            originalSnapshotRef.current = formData;
-            changeTrackerRef.current.setSnapshot(formData);
-        }
-    }, [formData]);
-
     const {
         formState: { dirtyFields, },
         handleSubmit,
@@ -98,8 +74,6 @@ export function useProblemForm({
     const save = handleSubmit(async (data) => {
         try {
             setSaving(true);
-
-            const errors: string[] = [];
 
             const problemId = data.problemId || generateProblemId();
             const payloadData = {
@@ -117,26 +91,6 @@ export function useProblemForm({
             const res = response.data as Awaited<ReturnType<typeof saveProblems>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
-
-            if (isNewProblem) {
-
-                await pendingChangesAPI.addChange({
-                    entityType: "problem",
-                    entityId: problemId,
-                    entityTitle: payloadData.name || payloadData.key || "Untitled Problem",
-                    action: "create",
-                    fieldPath: "problem",
-                    fieldName: "New Problem",
-                    oldValue: null,
-                    newValue: payloadData.name || "Untitled Problem",
-                    userId: authenticatedUser?.userId,
-                    userName: authenticatedUser?.displayName,
-                    fullSnapshot: payloadData,
-                });
-            } else if (changeTrackerRef.current && originalSnapshotRef.current) {
-           
-                await changeTrackerRef.current.trackChanges(payloadData, "Problem draft saved");
-            }
 
             router.refresh();
             alert({

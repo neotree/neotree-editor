@@ -196,22 +196,6 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
       maxLength: normalizedMaxLength.value,
     }
 
-    if (form.changeTracker) {
-      const currentFields = form.getValues("fields")
-      const updatedFields =
-        !isEmpty(fieldIndex) && field
-          ? currentFields.map((f, i) => ({
-              ...f,
-              ...(i === fieldIndex ? normalizedData : null),
-            }))
-          : [...currentFields, normalizedData]
-
-      await form.changeTracker.trackChanges(
-        { ...form.getValues(), fields: updatedFields },
-        `Field "${normalizedData.label}" ${field ? "updated" : "added"}`,
-      )
-    }
-
     if (!isEmpty(fieldIndex) && field) {
       form.setValue(
         "fields",

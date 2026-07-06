@@ -1,11 +1,10 @@
-import { and, desc, eq, lt } from "drizzle-orm"
-import { createHash } from "crypto"
+import { and, desc, eq } from "drizzle-orm"
 import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
 import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
-import type { DbClient, DbOrTransaction, TransactionClient } from "@/databases/pg/db-client"
+import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user"
 import {
   aliases,
@@ -20,7 +19,8 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
-import { sql } from "drizzle-orm"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback"
+import { lockChangeLogChain } from "./_rollback-shared"
 
 export type SaveChangeLogData = {
   entityId: string
@@ -31,7 +31,6 @@ export type SaveChangeLogData = {
   changes?: any
   fullSnapshot?: any
   previousSnapshot?: any
-  snapshotHash?: string | null
   description?: string
   changeReason?: string
   parentVersion?: number | null
@@ -152,24 +151,6 @@ const ENTITY_FETCH_CONFIG: Partial<Record<EntityType, EntityFetchConfig>> = {
 }
 
 
-function hashToInt32(value: string): number {
-  let hash = 0
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0
-  }
-  return hash
-}
-
-async function lockChangeLogChain(client: DbOrTransaction, entityType: string, entityId: string) {
-  const key1 = hashToInt32(entityType)
-  const key2 = hashToInt32(entityId)
-  await client.execute(sql`select pg_advisory_xact_lock(${key1}, ${key2})`)
-}
-
-function computeSnapshotHash(snapshot: any) {
-  return createHash("sha256").update(JSON.stringify(snapshot ?? {})).digest("hex")
-}
-
 async function resolveUserId(data: SaveChangeLogData) {
   const rawUserId = typeof data.userId === "string" ? data.userId.trim() : ""
   const hasValidUserId = rawUserId && isUuidLike(rawUserId)
@@ -284,6 +265,37 @@ async function getEntityVersion(client: DbOrTransaction, data: SaveChangeLogData
   return Number(version)
 }
 
+async function setEntityVersion(
+  client: DbOrTransaction,
+  data: SaveChangeLogData & { entityType: VersionedEntityType },
+  currentVersion: number,
+  targetVersion: number,
+) {
+  const config = ENTITY_VERSION_CONFIG[data.entityType]
+  if (!config) throw new Error(`Unknown entityType ${data.entityType}`)
+
+  const rows = await client
+    .update(config.table)
+    .set({ version: targetVersion })
+    .where(and(eq(config.idColumn, data.entityId), eq(config.versionColumn, currentVersion)))
+    .returning({ version: config.versionColumn })
+
+  if (!rows?.[0]) {
+    throw new Error(
+      `Unable to realign ${config.entityLabel} version from ${currentVersion} to ${targetVersion}; entity changed during publish`,
+    )
+  }
+}
+
+function withSnapshotVersion(snapshot: any, version: number) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return snapshot
+  return { ...snapshot, version }
+}
+
+function appendChangeReason(changeReason: string | undefined, reason: string) {
+  return [changeReason, reason].filter(Boolean).join(" | ")
+}
+
 async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: string, entityType: SaveChangeLogData["entityType"]) {
   const rows = await client
     .select({ version: changeLogs.version })
@@ -295,18 +307,88 @@ async function getLatestChangeLogVersion(client: DbOrTransaction, entityId: stri
   return rows?.[0]?.version as number | undefined
 }
 
-async function getEntitySnapshot(client: DbOrTransaction, data: SaveChangeLogData) {
-  const config = ENTITY_FETCH_CONFIG[data.entityType]
-  if (!config) throw new Error(`Unknown entityType ${data.entityType}`)
-
+async function getLatestChangeLog(
+  client: DbOrTransaction,
+  entityId: string,
+  entityType: SaveChangeLogData["entityType"],
+) {
   const rows = await client
     .select()
-    .from(config.table)
-    .where(eq(config.idColumn, data.entityId))
+    .from(changeLogs)
+    .where(and(eq(changeLogs.entityId, entityId), eq(changeLogs.entityType, entityType)))
+    .orderBy(desc(changeLogs.version))
     .limit(1)
 
-  if (!rows?.[0]) throw new Error(`Entity not found for snapshot (${config.entityLabel} ${data.entityId})`)
   return rows[0]
+}
+
+async function reconcileChangeLogGap(params: {
+  client: DbOrTransaction
+  data: SaveChangeLogData
+  entityVersion: number
+  latestChangeLog: typeof changeLogs.$inferSelect
+}) {
+  const { client, data, entityVersion, latestChangeLog } = params
+  const latestVersion = Number(latestChangeLog.version)
+  const recoveredVersion = entityVersion - 1
+  const missingVersionCount = recoveredVersion - latestVersion
+
+  if (missingVersionCount < 1) {
+    return { repaired: false as const, latestVersion }
+  }
+
+  if (data.previousSnapshot === undefined) {
+    return { repaired: false as const, latestVersion }
+  }
+
+  const recoveredFullSnapshot = data.previousSnapshot
+  const recoveredPreviousSnapshot = latestChangeLog.fullSnapshot ?? latestChangeLog.previousSnapshot ?? {}
+  const recoveredTimestamp = new Date()
+
+  const recoveredChangeLog: typeof changeLogs.$inferInsert = {
+    changeLogId: uuid.v4(),
+    entityId: data.entityId,
+    entityType: data.entityType,
+    action: "update",
+    version: recoveredVersion,
+    dataVersion: data.dataVersion ?? latestChangeLog.dataVersion ?? null,
+    changes: [],
+    fullSnapshot: recoveredFullSnapshot,
+    previousSnapshot: recoveredPreviousSnapshot,
+    snapshotHash: computeRollbackSnapshotHash(recoveredFullSnapshot),
+    description: missingVersionCount === 1 ? "Recovered missing changelog snapshot" : "History repaired",
+    changeReason:
+      missingVersionCount === 1
+        ? "Auto-reconciled a single missing changelog version during save"
+        : `Auto-rebaselined changelog history during save after ${missingVersionCount} missing versions`,
+    parentVersion: latestVersion,
+    mergedFromVersion: null,
+    isActive: false,
+    userId: data.userId,
+    scriptId: data.scriptId,
+    screenId: data.screenId,
+    diagnosisId: data.diagnosisId,
+    problemId: data.problemId,
+    configKeyId: data.configKeyId,
+    hospitalId: data.hospitalId,
+    drugsLibraryItemId: data.drugsLibraryItemId,
+    dataKeyId: data.dataKeyId,
+    aliasId: data.aliasId,
+    dateOfChange: recoveredTimestamp,
+  }
+
+  await client.insert(changeLogs).values(recoveredChangeLog)
+
+  logger.log("saveChangeLog auto-reconciled missing version", {
+    entityType: data.entityType,
+    entityId: data.entityId,
+    recoveredVersion,
+    currentEntityVersion: entityVersion,
+    previousLatestVersion: latestVersion,
+    missingVersionCount,
+  })
+
+  return { repaired: true as const, latestVersion: recoveredVersion }
 }
 
 async function ensureBaselineChangeLog({
@@ -329,21 +411,17 @@ async function ensureBaselineChangeLog({
   let snapshotForBaseline = baselineSnapshot ?? data.previousSnapshot
 
   if (snapshotForBaseline === undefined) {
-    try {
-      snapshotForBaseline = await getEntitySnapshot(client, data)
-      logger.error("saveChangeLog baselineSnapshot missing; captured current entity state as baseline", {
-        entityId: data.entityId,
-        entityType: data.entityType,
-      })
-    } catch (e: any) {
+    if (computedVersion <= 1) {
+      snapshotForBaseline = {}
+    } else {
       throw new Error(
-        "baselineSnapshot is required for the first changelog of an entity to capture the pre-change state",
+        "baselineSnapshot or previousSnapshot is required for the first changelog of an existing entity",
       )
     }
   }
 
   const baselineVersion = Math.max(0, computedVersion - 1)
-  const snapshotHash = computeSnapshotHash(snapshotForBaseline)
+  const snapshotHash = computeRollbackSnapshotHash(snapshotForBaseline)
 
   const baseline: typeof changeLogs.$inferInsert = {
     changeLogId: uuid.v4(),
@@ -404,6 +482,9 @@ export async function _saveChangeLog({
       const dataVersion = Number.isFinite(resolvedData.dataVersion) ? Number(resolvedData.dataVersion) : null
       let latestChangeLogVersion: number | undefined
       let baselineVersionCreated: number | undefined
+      let effectiveFullSnapshot = resolvedData.fullSnapshot || {}
+      let effectiveChangeReason = resolvedData.changeReason
+      let realignedVersionFrom: number | undefined
       if (isVersionless) {
         const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
         latestChangeLogVersion = latestVersion
@@ -418,39 +499,81 @@ export async function _saveChangeLog({
         })
 
         if (providedVersion !== null && providedVersion !== computedVersion) {
-          if (providedVersion < computedVersion) {
-            // logger.error("saveChangeLog versionless stale providedVersion, auto-upgrading", {
-            //   entityType: data.entityType,
-            //   entityId: data.entityId,
-            //   providedVersion,
-            //   latestChangeLogVersion: latestVersion,
-            //   computedVersion,
-            // })
-          } else {
-            logger.error("saveChangeLog versionless mismatch", {
-              entityType: resolvedData.entityType,
-              entityId: resolvedData.entityId,
-              providedVersion,
-              latestChangeLogVersion: latestVersion,
-              computedVersion,
-            })
-            throw new Error(
-              `Provided version (${resolvedData.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${resolvedData.entityType}`,
-            )
-          }
+          logger.error("saveChangeLog versionless mismatch", {
+            entityType: resolvedData.entityType,
+            entityId: resolvedData.entityId,
+            providedVersion,
+            latestChangeLogVersion: latestVersion,
+            computedVersion,
+          })
+          throw new Error(
+            `Provided version (${resolvedData.version}) does not match expected changelog version (${computedVersion}) for versionless entity ${resolvedData.entityType}`,
+          )
         }
       } else {
         const entityType = resolvedData.entityType as VersionedEntityType
         const entityVersion = await getEntityVersion(tx, { ...resolvedData, entityType })
         const config = ENTITY_VERSION_CONFIG[entityType]
-        const latestVersion = await getLatestChangeLogVersion(tx, resolvedData.entityId, resolvedData.entityType)
+        const latestChangeLog = await getLatestChangeLog(tx, resolvedData.entityId, resolvedData.entityType)
+        let latestVersion = latestChangeLog?.version
         latestChangeLogVersion = latestVersion
 
-        // Prefer the entity's version, but if legacy data has higher changelog versions already,
-        // continue the changelog sequence to avoid blocking writes.
         if (Number.isFinite(latestVersion)) {
-          const nextSequential = Number(latestVersion) + 1
-          computedVersion = entityVersion <= Number(latestVersion) ? nextSequential : entityVersion
+          const expectedNextVersion = Number(latestVersion) + 1
+          if (entityVersion !== expectedNextVersion) {
+            if (entityVersion < expectedNextVersion) {
+              await setEntityVersion(tx, { ...resolvedData, entityType }, entityVersion, expectedNextVersion)
+              realignedVersionFrom = entityVersion
+              effectiveFullSnapshot = withSnapshotVersion(effectiveFullSnapshot, expectedNextVersion)
+              effectiveChangeReason = appendChangeReason(
+                resolvedData.changeReason,
+                `Auto-realigned ${config.entityLabel} version from ${entityVersion} to ${expectedNextVersion} because changelog history was ahead`,
+              )
+
+              logger.log("saveChangeLog auto-realigned entity version", {
+                entityType: resolvedData.entityType,
+                entityId: resolvedData.entityId,
+                fromVersion: entityVersion,
+                toVersion: expectedNextVersion,
+                latestChangeLogVersion: latestVersion,
+              })
+            } else if (latestChangeLog) {
+              const reconciliation = await reconcileChangeLogGap({
+                client: tx,
+                data: resolvedData,
+                entityVersion,
+                latestChangeLog,
+              })
+
+              if (reconciliation.repaired) {
+                latestVersion = reconciliation.latestVersion
+                latestChangeLogVersion = reconciliation.latestVersion
+              } else {
+                logger.error("saveChangeLog entity/changelog drift", {
+                  entityType: resolvedData.entityType,
+                  entityId: resolvedData.entityId,
+                  entityVersion,
+                  latestChangeLogVersion: latestVersion,
+                  expectedNextVersion,
+                })
+                throw new Error(
+                  `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
+                )
+              }
+            } else {
+              logger.error("saveChangeLog entity/changelog drift", {
+                entityType: resolvedData.entityType,
+                entityId: resolvedData.entityId,
+                entityVersion,
+                latestChangeLogVersion: latestVersion,
+                expectedNextVersion,
+              })
+              throw new Error(
+                `Entity version (${entityVersion}) is out of sync with changelog chain (${latestVersion}); expected ${expectedNextVersion}`,
+              )
+            }
+          }
+          computedVersion = entityVersion < expectedNextVersion ? expectedNextVersion : entityVersion
         } else {
           computedVersion = entityVersion
         }
@@ -463,36 +586,28 @@ export async function _saveChangeLog({
           baselineSnapshot: resolvedData.baselineSnapshot,
         })
 
-        if (providedVersion !== null && providedVersion !== computedVersion) {
-          if (providedVersion < computedVersion) {
-            // logger.error("saveChangeLog stale providedVersion, auto-upgrading", {
-            //   entityType: data.entityType,
-            //   entityId: data.entityId,
-            //   providedVersion,
-            //   entityVersion,
-            //   latestChangeLogVersion: latestVersion,
-            //   computedVersion,
-            // })
-          } else {
-            logger.error("saveChangeLog version mismatch", {
-              entityType: resolvedData.entityType,
-              entityId: resolvedData.entityId,
-              providedVersion,
-              entityVersion,
-              latestChangeLogVersion: latestVersion,
-              computedVersion,
-            })
-            throw new Error(
-              `Provided version (${resolvedData.version}) does not match ${config.entityLabel} version (${computedVersion})`,
-            )
-          }
+        if (providedVersion !== null && providedVersion !== computedVersion && realignedVersionFrom === undefined) {
+          logger.error("saveChangeLog version mismatch", {
+            entityType: resolvedData.entityType,
+            entityId: resolvedData.entityId,
+            providedVersion,
+            entityVersion,
+            latestChangeLogVersion: latestVersion,
+            computedVersion,
+          })
+          throw new Error(
+            `Provided version (${resolvedData.version}) does not match ${config.entityLabel} version (${computedVersion})`,
+          )
         }
       }
 
-      const snapshotHash = resolvedData.snapshotHash || computeSnapshotHash(resolvedData.fullSnapshot)
+      // Always derived from the snapshot actually being stored — a caller-supplied hash
+      // that doesn't match would poison later rollback integrity checks.
+      const snapshotHash = computeRollbackSnapshotHash(effectiveFullSnapshot)
       if (!snapshotHash) throw new Error("snapshotHash is required")
 
       const previousSnapshot = resolvedData.previousSnapshot ?? resolvedData.baselineSnapshot ?? {}
+      const changeTimestamp = new Date()
 
       const changeLogData: typeof changeLogs.$inferInsert = {
         changeLogId,
@@ -502,11 +617,11 @@ export async function _saveChangeLog({
         version: computedVersion,
         dataVersion,
         changes: resolvedData.changes || [],
-        fullSnapshot: resolvedData.fullSnapshot || {},
+        fullSnapshot: effectiveFullSnapshot,
         previousSnapshot,
         snapshotHash,
         description: resolvedData.description,
-        changeReason: resolvedData.changeReason,
+        changeReason: effectiveChangeReason,
         parentVersion:
           resolvedData.parentVersion ??
           (latestChangeLogVersion === undefined ? baselineVersionCreated : latestChangeLogVersion),
@@ -522,10 +637,8 @@ export async function _saveChangeLog({
         drugsLibraryItemId: resolvedData.drugsLibraryItemId,
         dataKeyId: resolvedData.dataKeyId,
         aliasId: resolvedData.aliasId,
-        dateOfChange: new Date(),
+        dateOfChange: changeTimestamp,
       }
-
-      const insertedAt = changeLogData.dateOfChange ?? new Date()
 
       if (changeLogData.isActive) {
         await tx
@@ -533,13 +646,12 @@ export async function _saveChangeLog({
           .set({
             isActive: false,
             supersededBy: computedVersion,
-            supersededAt: insertedAt,
+            supersededAt: changeTimestamp,
           })
           .where(
             and(
               eq(changeLogs.entityId, resolvedData.entityId),
               eq(changeLogs.entityType, resolvedData.entityType),
-              lt(changeLogs.version, computedVersion),
               eq(changeLogs.isActive, true),
             ),
           )
