@@ -1,11 +1,11 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
-import { and, eq, inArray, ne } from "drizzle-orm"
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
+import { getAuthenticatedUser } from "./get-authenticated-user"
 import { _clearPendingDeletion, _processPendingDeletion } from "@/databases/mutations/ops"
 import * as opsQueries from "@/databases/queries/ops"
 import * as scriptsQueries from "@/databases/queries/scripts"
@@ -20,605 +20,1239 @@ import * as dataKeysMutations from "@/databases/mutations/data-keys"
 import * as appUpdatesMutations from "@/databases/mutations/app-updates"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
 import * as appUpdatesQueries from "@/databases/queries/app-updates"
-import { _saveEditorInfo } from "@/databases/mutations/editor-info"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
-import {
-  buildDataKeyIntegrityContext,
-  buildDataKeyIntegrityPublishDetails,
-  buildDataKeyIntegrityPublishErrors,
-  buildDataKeyIntegrityReportFromEntries,
-  getBlockingIntegrityEntries,
-  getDataKeyIntegrityEntryFingerprint,
-  scanDataKeyIntegrity,
-} from "@/lib/data-key-integrity"
-import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from "@/lib/integrity-policy"
-import { evaluateIntegrityScanScope } from "@/lib/integrity-scan-scope"
-import { getAcceptedImportFingerprintLookup, getAcceptedImportScriptAllowanceLookup } from "./integrity-imports"
+import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
 import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout"
 import db from "@/databases/pg/drizzle"
 import {
+  apkReleasesDrafts,
+  appUpdatePoliciesDrafts,
   configKeysDrafts,
-  dataKeys,
   dataKeysDrafts,
   diagnosesDrafts,
   drugsLibraryDrafts,
+  editorInfo,
   hospitalsDrafts,
   pendingDeletion,
   problemsDrafts,
   screensDrafts,
   scriptsDrafts,
 } from "@/databases/pg/schema"
+import { eq, sql } from "drizzle-orm"
 
-const RELEASE_CHANGELOG_ENTITY_ID = "00000000-0000-0000-0000-000000000000"
+export type PendingDraftQueueScope = "all" | "mine"
+export type PendingDraftQueueTab = "all" | "creates" | "updates" | "deletes" | "mine"
+export type PendingDraftQueueSort = "recent" | "oldest" | "creator" | "entity" | "title" | "action"
+export type PendingDraftQueueGroupBy = "parent" | "creator" | "entity"
+export type PendingDraftQueueEntityType =
+  | "script"
+  | "screen"
+  | "diagnosis"
+  | "problem"
+  | "config_key"
+  | "hospital"
+  | "drugs_library"
+  | "data_key"
+  | "alias"
+export type PendingDraftQueueAction = "create" | "update" | "delete"
 
-function buildPreviewEntityMap<T extends Record<string, any>>(
-  items: T[] | undefined,
-  getId: (item: T) => string | undefined,
-) : Map<string, Record<string, any>> {
-  return new Map<string, Record<string, any>>(
-    (items || [])
-      .map((item) => [getId(item), item as Record<string, any>] as const)
-      .filter(([id]) => !!id)
-      .map(([id, item]) => [id as string, item] as const)
-  )
+export type PendingDraftQueueDiffPreview = {
+  field: string
+  before: string
+  after: string
 }
 
-async function resolveIntegrityScriptTitles(
-  entries: Array<{ scriptId?: string; scriptTitle?: string }>
-) {
-  const idsToResolve = Array.from(
-    new Set(
-      entries
-        .filter((entry) => {
-          const scriptId = `${entry.scriptId || ""}`.trim()
-          const scriptTitle = `${entry.scriptTitle || ""}`.trim()
-          return !!scriptId && (!scriptTitle || scriptTitle === scriptId)
-        })
-        .map((entry) => `${entry.scriptId || ""}`.trim())
-    )
-  )
+export type PendingDraftQueueEntry = {
+  id: string
+  entityType: PendingDraftQueueEntityType
+  action: PendingDraftQueueAction
+  title: string
+  description: string
+  entityId: string
+  draftId?: string | null
+  publishedEntityId?: string | null
+  parentEntityId?: string | null
+  parentTitle?: string | null
+  href?: string | null
+  searchHref?: string | null
+  createdAt: string
+  createdByUserId?: string | null
+  createdByName: string
+  createdByEmail?: string | null
+  isUnpublished: boolean
+  source: "draft" | "pending_deletion"
+  statusLabel: string
+  changedFields: string[]
+  changedFieldCount: number
+  diffPreview: PendingDraftQueueDiffPreview[]
+  reviewGroupId: string
+  reviewGroupLabel: string
+  conflictLabels: string[]
+  infoLabels: string[]
+  isStale: boolean
+  ageInDays: number
+  parentHref?: string | null
+}
 
-  if (!idsToResolve.length) return new Map<string, string>()
+export type PendingDraftQueueSummary = {
+  totalEntries: number
+  totalDrafts: number
+  totalDeletes: number
+  totalCreates: number
+  totalUpdates: number
+  uniqueEntities: number
+  entityCounts: Record<string, number>
+  scope: PendingDraftQueueScope
+  scopeLabel: string
+  staleEntries: number
+  conflictEntries: number
+}
 
-  const scriptsRes = await scriptsQueries._getScripts({
-    scriptsIds: idsToResolve,
-    returnDraftsIfExist: true,
-  })
+export type PendingDraftQueueFilters = {
+  scope: PendingDraftQueueScope
+  tab: PendingDraftQueueTab
+  query: string
+  entityType: "all" | PendingDraftQueueEntityType
+  creator: string
+  sort: PendingDraftQueueSort
+  groupBy: PendingDraftQueueGroupBy
+  page: number
+  pageSize: number
+}
 
-  if (scriptsRes.errors?.length) {
-    throw new Error(scriptsRes.errors.join(", "))
+export type PendingDraftQueueMeta = {
+  filters: PendingDraftQueueFilters
+  pagination: {
+    page: number
+    pageSize: number
+    totalEntries: number
+    totalPages: number
+    returnedEntries: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
   }
-
-  return new Map(
-    scriptsRes.data
-      .map((script) => {
-        const title = `${script.title || ""}`.trim()
-        return title ? ([script.scriptId, title] as const) : null
-      })
-      .filter((item): item is readonly [string, string] => !!item)
-  )
+  tabCounts: Record<PendingDraftQueueTab, number>
+  creators: Array<{ value: string; label: string; count: number }>
+  entityTypes: Array<{ value: PendingDraftQueueEntityType; label: string; count: number }>
 }
 
-function assertCanPublishDrafts(user?: { role?: string | null } | null) {
-  const role = `${user?.role || ""}`.trim()
-  const allowed = role === "admin" || role === "super_user"
-
-  if (!allowed) logger.error("assertCanPublishDrafts ERROR", JSON.stringify({ role }))
-  if (!allowed) throw new Error("Forbidden: only admin or super_user can publish drafts")
+function toIsoString(value: Date | string | null | undefined) {
+  if (!value) return new Date(0).toISOString()
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
 
-async function getScopedIntegrityData({
-  userId,
-  policy,
+const PENDING_DRAFT_STALE_DAYS = 14
+const PENDING_DRAFT_PAGE_SIZE = 20
+const entityTypeLabels: Record<PendingDraftQueueEntityType, string> = {
+  script: "Script",
+  screen: "Screen",
+  diagnosis: "Diagnosis",
+  problem: "Problem",
+  config_key: "Config Key",
+  hospital: "Hospital",
+  drugs_library: "Drugs Library",
+  data_key: "Data Key",
+  alias: "Alias",
+}
+const actionLabelByTab: Record<Exclude<PendingDraftQueueTab, "all" | "mine">, PendingDraftQueueAction> = {
+  creates: "create",
+  updates: "update",
+  deletes: "delete",
+}
+const ignoredDiffKeys = new Set([
+  "id",
+  "version",
+  "publishDate",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+  "oldScreenId",
+  "oldScriptId",
+  "oldDiagnosisId",
+  "oldProblemId",
+  "scriptId",
+  "screenId",
+  "diagnosisId",
+  "problemId",
+  "configKeyId",
+  "hospitalId",
+  "itemId",
+  "dataKeyId",
+  "uuid",
+])
+
+function getCreatedByLabel(createdBy?: { displayName?: string | null; email?: string | null } | null) {
+  return createdBy?.displayName || createdBy?.email || "Unknown user"
+}
+
+function buildChangelogSearchHref(entityId?: string | null) {
+  return entityId ? `/changelogs?q=${encodeURIComponent(entityId)}` : null
+}
+
+function summarizeDraftAction(hasPublishedEntity: boolean, noun: string) {
+  return hasPublishedEntity ? `Draft update to published ${noun}` : `New ${noun} draft`
+}
+
+function toPlainRecord(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+}
+
+function previewValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Empty"
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return JSON.stringify(value, null, 2)
+}
+
+function valuesEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function buildDiffPreview({
+  action,
+  draftData,
+  publishedData,
 }: {
-  userId?: string | null
-  policy: ReturnType<typeof getIntegrityPolicyState>["policy"]
-}): Promise<{
-  dataKeysRes: Awaited<ReturnType<typeof dataKeysQueries._getDataKeys>>
-  screensRes: Awaited<ReturnType<typeof scriptsQueries._getScreens>>
-  diagnosesRes: Awaited<ReturnType<typeof scriptsQueries._getDiagnoses>>
-  problemsRes: Awaited<ReturnType<typeof scriptsQueries._getProblems>>
-  shouldRunIntegrityChecks: boolean
-  hasImportChanges: boolean
-  triggerSummary: string[]
-  importAllowanceCandidatesByScript: Record<string, {
-    hasImportDraft: boolean
-    hasDataKeySyncDraft: boolean
-    hasManualDraft: boolean
-    hasPendingDeletion: boolean
-    latestImportManagedUpdatedAt: string | null
-  }>
-}> {
-  const [userDataKeyDrafts, userScriptDrafts, userPendingDeletion] = await Promise.all([
-    db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined }),
-    db.query.scriptsDrafts.findMany({ where: userId ? eq(scriptsDrafts.createdByUserId, userId) : undefined }),
-    db.query.pendingDeletion.findMany({
-      where: userId ? eq(pendingDeletion.createdByUserId, userId) : undefined,
-      columns: {
-        scriptId: true,
-        screenScriptId: true,
-        diagnosisScriptId: true,
-        problemScriptId: true,
-        dataKeyId: true,
-        draftOrigin: true,
-      },
-    }),
-  ])
-
-  const libraryOriginDataKeyDrafts = userDataKeyDrafts.filter((draft) => !!draft.dataKeyId && draft.draftOrigin !== "import")
-  const importOriginDataKeyDrafts = userDataKeyDrafts.filter((draft) => !!draft.dataKeyId && draft.draftOrigin === "import")
-
-  const hasExistingDataKeyLibraryChanges =
-    libraryOriginDataKeyDrafts.length > 0 ||
-    userPendingDeletion.some((entry) => !!entry.dataKeyId)
-  const hasImportOriginDataKeyChanges = importOriginDataKeyDrafts.length > 0
-  const deletedDataKeyIds = new Set(
-    userPendingDeletion
-      .map((entry) => entry.dataKeyId)
-      .filter((id): id is string => !!id)
-  )
-
-  const shouldIgnoreDataKeySyncDrafts = !policy.triggerSources.dataKeyLibraryEdits
-  const shouldClassifyLegacyDataKeySyncDrafts = shouldIgnoreDataKeySyncDrafts && hasExistingDataKeyLibraryChanges
-  const shouldIgnoreImportDrafts = !policy.triggerSources.imports
-  const filteredOrigins = [
-    ...(shouldIgnoreImportDrafts ? ["import"] : []),
-    ...(shouldIgnoreDataKeySyncDrafts && !shouldClassifyLegacyDataKeySyncDrafts ? ["data_key_sync"] : []),
-  ]
-
-  const buildDraftWhereClause = <T extends {
-    createdByUserId: any
-    draftOrigin: any
-  }>(table: T) => {
-    const clauses = [
-      ...(userId ? [eq(table.createdByUserId, userId)] : []),
-      ...filteredOrigins.map((origin) => ne(table.draftOrigin, origin as "import" | "data_key_sync")),
-    ]
-
-    if (!clauses.length) return undefined
-    if (clauses.length === 1) return clauses[0]
-    return and(...clauses)
+  action: PendingDraftQueueAction
+  draftData?: unknown
+  publishedData?: unknown
+}) {
+  if (action === "delete") {
+    return { changedFields: [], diffPreview: [] as PendingDraftQueueDiffPreview[] }
   }
 
-  const [userScreenDrafts, userDiagnosisDrafts, userProblemDrafts] = await Promise.all([
-    db.query.screensDrafts.findMany({
-      where: buildDraftWhereClause(screensDrafts),
-    }),
-    db.query.diagnosesDrafts.findMany({
-      where: buildDraftWhereClause(diagnosesDrafts),
-    }),
-    db.query.problemsDrafts.findMany({
-      where: buildDraftWhereClause(problemsDrafts),
-    }),
-  ])
+  const draft = toPlainRecord(draftData)
+  const published = toPlainRecord(publishedData)
+  const keys = Array.from(new Set([...Object.keys(draft), ...Object.keys(published)]))
+    .filter((key) => !ignoredDiffKeys.has(key))
+    .sort((a, b) => a.localeCompare(b))
 
-  const shouldIncludeDataKeyImpact =
-    (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) ||
-    (policy.triggerSources.imports && hasImportOriginDataKeyChanges) ||
-    (policy.triggerSources.deletions && deletedDataKeyIds.size > 0)
+  const changedFields: string[] = []
+  const diffPreview: PendingDraftQueueDiffPreview[] = []
 
-  const shouldComputeDataKeyImpact =
-    shouldIncludeDataKeyImpact ||
-    shouldClassifyLegacyDataKeySyncDrafts
+  for (const key of keys) {
+    const before = published[key]
+    const after = draft[key]
 
-  const deletedDataKeys = !shouldComputeDataKeyImpact || !deletedDataKeyIds.size
-    ? []
-    : await db.query.dataKeys.findMany({
-        where: inArray(dataKeys.uuid, Array.from(deletedDataKeyIds)),
-      })
-  const dataKeysForImpact = !shouldComputeDataKeyImpact
-    ? []
-    : [
-        ...(((policy.triggerSources.dataKeyLibraryEdits && libraryOriginDataKeyDrafts.length) ||
-            (policy.triggerSources.imports && importOriginDataKeyDrafts.length) ||
-            shouldClassifyLegacyDataKeySyncDrafts)
-          ? userDataKeyDrafts
-              .filter((draft) => {
-                if (!draft.dataKeyId) return false
-                if (draft.draftOrigin === "import") return policy.triggerSources.imports
-                return policy.triggerSources.dataKeyLibraryEdits || shouldClassifyLegacyDataKeySyncDrafts
-              })
-              .map((draft) => ({
-                ...draft.data,
-                uuid: draft.dataKeyId || draft.data.uuid,
-                uniqueKey: draft.data.uniqueKey,
-              }))
-          : []),
-        ...deletedDataKeys,
-      ].filter((item) => !!item.uniqueKey) as dataKeysQueries.DataKey[]
-  const dataKeyImpact = !shouldComputeDataKeyImpact || !dataKeysForImpact.length
-    ? null
-    : await dataKeysMutations._updateDataKeysRefs({
-        dataKeys: dataKeysForImpact,
-        dryRun: true,
-      })
-  const dataKeyImpactScriptIds = dataKeyImpact?.affected?.scripts
-    ?.map((script) => script.scriptId)
-    .filter((id): id is string => !!id) || []
-
-  if (dataKeyImpact?.errors?.length) {
-    return {
-      dataKeysRes: { data: [], errors: dataKeyImpact.errors },
-      screensRes: { data: [], errors: undefined },
-      diagnosesRes: { data: [], errors: undefined },
-      problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks: true,
-      hasImportChanges: false,
-      triggerSummary: [],
-      importAllowanceCandidatesByScript: {},
+    if (action === "create") {
+      const isMeaningful = after !== null && after !== undefined && after !== "" && JSON.stringify(after) !== "[]"
+      if (!isMeaningful) continue
+      changedFields.push(key)
+      diffPreview.push({ field: key, before: "New", after: previewValue(after) })
+      continue
     }
+
+    if (valuesEqual(before, after)) continue
+    changedFields.push(key)
+    diffPreview.push({ field: key, before: previewValue(before), after: previewValue(after) })
   }
-
-  const screenPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.screens, (item) => item.screenId)
-  const diagnosisPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.diagnoses, (item) => item.diagnosisId)
-  const problemPreviewMap = buildPreviewEntityMap(dataKeyImpact?.preview?.problems, (item) => item.problemId)
-  const affectedScreenIds = new Set((dataKeyImpact?.affected?.screens || []).map((item) => item.id).filter(Boolean))
-  const affectedDiagnosisIds = new Set((dataKeyImpact?.affected?.diagnoses || []).map((item) => item.id).filter(Boolean))
-  const affectedProblemIds = new Set((dataKeyImpact?.affected?.problems || []).map((item) => item.id).filter(Boolean))
-
-  const [publishedLegacyScreensRes, publishedLegacyDiagnosesRes, publishedLegacyProblemsRes] =
-    shouldClassifyLegacyDataKeySyncDrafts && dataKeyImpactScriptIds.length
-      ? await Promise.all([
-          scriptsQueries._getScreens({
-            returnDraftsIfExist: false,
-            scriptsIds: dataKeyImpactScriptIds,
-          }),
-          scriptsQueries._getDiagnoses({
-            returnDraftsIfExist: false,
-            scriptsIds: dataKeyImpactScriptIds,
-          }),
-          scriptsQueries._getProblems({
-            returnDraftsIfExist: false,
-            scriptsIds: dataKeyImpactScriptIds,
-          }),
-        ])
-      : [
-          { data: [], errors: undefined },
-          { data: [], errors: undefined },
-          { data: [], errors: undefined },
-        ]
-
-  const legacyPublishedErrors = [
-    ...(publishedLegacyScreensRes.errors || []),
-    ...(publishedLegacyDiagnosesRes.errors || []),
-    ...(publishedLegacyProblemsRes.errors || []),
-  ]
-  if (legacyPublishedErrors.length) {
-    return {
-      dataKeysRes: { data: [], errors: legacyPublishedErrors },
-      screensRes: { data: [], errors: undefined },
-      diagnosesRes: { data: [], errors: undefined },
-      problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks: true,
-      hasImportChanges: false,
-      triggerSummary: [],
-      importAllowanceCandidatesByScript: {},
-    }
-  }
-
-  const publishedScreenMap = buildPreviewEntityMap(publishedLegacyScreensRes.data, (item) => item.screenId)
-  const publishedDiagnosisMap = buildPreviewEntityMap(publishedLegacyDiagnosesRes.data, (item) => item.diagnosisId)
-  const publishedProblemMap = buildPreviewEntityMap(publishedLegacyProblemsRes.data, (item) => item.problemId)
-
-  const {
-    effectiveUserScreenDrafts,
-    effectiveUserDiagnosisDrafts,
-    effectiveUserProblemDrafts,
-    effectiveUserScriptDrafts,
-    nonImportScriptDrafts,
-    nonImportScreenDrafts,
-    nonImportDiagnosisDrafts,
-    nonImportProblemDrafts,
-    hasImportChanges,
-    hasScriptFamilyChanges,
-    importAllowanceCandidatesByScript,
-    shouldRunIntegrityChecks,
-    shouldIncludeDataKeyImpact: evaluatedShouldIncludeDataKeyImpact,
-    affectedScriptIds,
-  } = evaluateIntegrityScanScope({
-    policy,
-    userScriptDrafts,
-    userScreenDrafts,
-    userDiagnosisDrafts,
-    userProblemDrafts,
-    userPendingDeletion,
-    hasExistingDataKeyLibraryChanges,
-    hasImportOriginDataKeyChanges,
-    deletedDataKeyIdsSize: deletedDataKeyIds.size,
-    screenPreviewMap,
-    diagnosisPreviewMap,
-    problemPreviewMap,
-    publishedScreenMap,
-    publishedDiagnosisMap,
-    publishedProblemMap,
-    affectedScreenIds,
-    affectedDiagnosisIds,
-    affectedProblemIds,
-    dataKeyImpactScriptIds,
-  })
-
-  if (!shouldRunIntegrityChecks) {
-    return {
-      dataKeysRes: { data: [], errors: undefined },
-      screensRes: { data: [], errors: undefined },
-      diagnosesRes: { data: [], errors: undefined },
-      problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks,
-      hasImportChanges,
-      triggerSummary: [],
-      importAllowanceCandidatesByScript,
-    }
-  }
-
-  const forceAffectedScopeForImports = !!userId && policy.triggerSources.imports && hasImportChanges
-  const requestedAffectedScope = !!userId && (
-    policy.scanScope === "affected_scripts_only" ||
-    forceAffectedScopeForImports
-  )
-  const hasAffectedScripts = !!affectedScriptIds?.length
-  let shouldLimitToAffectedScripts = requestedAffectedScope
-  if (requestedAffectedScope && !hasAffectedScripts) {
-    if (evaluatedShouldIncludeDataKeyImpact) {
-      logger.error("getScopedIntegrityData WARN", JSON.stringify({
-        message: "No affected scripts were detected for datakey-driven integrity scope; widening to full scope conservatively.",
-        hasExistingDataKeyLibraryChanges,
-        deletedDataKeyIds: deletedDataKeyIds.size,
-        dataKeyImpactScripts: dataKeyImpactScriptIds.length,
-      }))
-      shouldLimitToAffectedScripts = false
-    } else {
-    return {
-      dataKeysRes: { data: [], errors: undefined },
-      screensRes: { data: [], errors: undefined },
-      diagnosesRes: { data: [], errors: undefined },
-      problemsRes: { data: [], errors: undefined },
-      shouldRunIntegrityChecks: false,
-      hasImportChanges,
-      triggerSummary: [],
-      importAllowanceCandidatesByScript,
-    }
-    }
-  }
-
-  const affectedScriptsSet = new Set(affectedScriptIds || [])
-  const scopedUserScreenDrafts = shouldLimitToAffectedScripts
-    ? effectiveUserScreenDrafts.filter((draft) => {
-        const scriptId = draft.scriptId || draft.scriptDraftId
-        return !!scriptId && affectedScriptsSet.has(scriptId)
-      })
-    : effectiveUserScreenDrafts
-  const scopedUserDiagnosisDrafts = shouldLimitToAffectedScripts
-    ? effectiveUserDiagnosisDrafts.filter((draft) => {
-        const scriptId = draft.scriptId || draft.scriptDraftId
-        return !!scriptId && affectedScriptsSet.has(scriptId)
-      })
-    : effectiveUserDiagnosisDrafts
-  const scopedUserProblemDrafts = shouldLimitToAffectedScripts
-    ? effectiveUserProblemDrafts.filter((draft) => {
-        const scriptId = draft.scriptId || draft.scriptDraftId
-        return !!scriptId && affectedScriptsSet.has(scriptId)
-      })
-    : effectiveUserProblemDrafts
-
-  const [publishedDataKeysRes, publishedScreensRes, publishedDiagnosesRes, publishedProblemsRes] = await Promise.all([
-    dataKeysQueries._getDataKeys({ returnDraftsIfExist: false }),
-    shouldLimitToAffectedScripts
-      ? (hasAffectedScripts
-        ? scriptsQueries._getScreens({
-            returnDraftsIfExist: false,
-            scriptsIds: affectedScriptIds,
-          })
-        : Promise.resolve({ data: [], errors: undefined }))
-      : scriptsQueries._getScreens({ returnDraftsIfExist: false }),
-    shouldLimitToAffectedScripts
-      ? (hasAffectedScripts
-        ? scriptsQueries._getDiagnoses({
-            returnDraftsIfExist: false,
-            scriptsIds: affectedScriptIds,
-          })
-        : Promise.resolve({ data: [], errors: undefined }))
-      : scriptsQueries._getDiagnoses({ returnDraftsIfExist: false }),
-    shouldLimitToAffectedScripts
-      ? (hasAffectedScripts
-        ? scriptsQueries._getProblems({
-            returnDraftsIfExist: false,
-            scriptsIds: affectedScriptIds,
-          })
-        : Promise.resolve({ data: [], errors: undefined }))
-      : scriptsQueries._getProblems({ returnDraftsIfExist: false }),
-  ])
-
-  const effectiveUserDataKeyDrafts = userDataKeyDrafts.filter((draft) => {
-    if (draft.draftOrigin === "import" && !policy.triggerSources.imports) return false
-    return true
-  })
-  const publishedDataKeysById = new Map(
-    publishedDataKeysRes.data
-      .filter((item) => !!item.uuid)
-      .map((item) => [item.uuid, item] as const),
-  )
-  const formatDraftDataKeyLabel = (draft: typeof userDataKeyDrafts[number]) => {
-    const published = draft.dataKeyId ? publishedDataKeysById.get(draft.dataKeyId) : undefined
-
-    return (
-      draft.data?.name ||
-      draft.data?.label ||
-      published?.name ||
-      published?.label ||
-      draft.uniqueKey ||
-      draft.uuid
-    )
-  }
-  const triggerSummary: string[] = []
-  const effectiveLibraryOriginDataKeyDrafts = effectiveUserDataKeyDrafts.filter(
-    (draft) => !!draft.dataKeyId && draft.draftOrigin !== "import",
-  )
-
-  if (policy.triggerSources.dataKeyLibraryEdits && hasExistingDataKeyLibraryChanges) {
-    const examples = effectiveLibraryOriginDataKeyDrafts
-      .slice(0, 3)
-      .map((draft) => `"${formatDraftDataKeyLabel(draft)}"`)
-    const dataKeyDraftCount = effectiveLibraryOriginDataKeyDrafts.length
-    const dataKeyDeletionCount = deletedDataKeyIds.size
-    const fragments = [
-      dataKeyDraftCount ? `${dataKeyDraftCount} data key draft${dataKeyDraftCount === 1 ? "" : "s"}` : null,
-      dataKeyDeletionCount ? `${dataKeyDeletionCount} deleted data key${dataKeyDeletionCount === 1 ? "" : "s"}` : null,
-    ].filter(Boolean)
-
-    if (fragments.length) {
-      triggerSummary.push(
-        `Integrity scan triggered by data key library edits: ${fragments.join(" and ")} in your workspace${examples.length ? `, including ${examples.join(", ")}` : ""}.`,
-      )
-    }
-  }
-
-  if (!policy.triggerSources.imports && importOriginDataKeyDrafts.length) {
-    triggerSummary.push(
-      `${importOriginDataKeyDrafts.length} import-origin data key draft${importOriginDataKeyDrafts.length === 1 ? "" : "s"} are present but ignored because Imports is off.`,
-    )
-  }
-
-  if (policy.triggerSources.imports && (hasImportChanges || hasImportOriginDataKeyChanges)) {
-    const importedScriptDraftCount =
-      userScriptDrafts.filter((draft) => draft.draftOrigin === "import").length +
-      userScreenDrafts.filter((draft) => draft.draftOrigin === "import").length +
-      userDiagnosisDrafts.filter((draft) => draft.draftOrigin === "import").length +
-      userProblemDrafts.filter((draft) => draft.draftOrigin === "import").length
-    const importedPendingScriptDeletionCount = userPendingDeletion.filter((entry) => (
-      entry.draftOrigin === "import" &&
-      (!!entry.scriptId || !!entry.screenScriptId || !!entry.diagnosisScriptId || !!entry.problemScriptId)
-    )).length
-    const importedDataKeyDraftCount = importOriginDataKeyDrafts.length
-    const fragments = [
-      importedScriptDraftCount ? `${importedScriptDraftCount} imported script draft${importedScriptDraftCount === 1 ? "" : "s"}` : null,
-      importedPendingScriptDeletionCount ? `${importedPendingScriptDeletionCount} imported pending script deletion${importedPendingScriptDeletionCount === 1 ? "" : "s"}` : null,
-      importedDataKeyDraftCount ? `${importedDataKeyDraftCount} imported data key draft${importedDataKeyDraftCount === 1 ? "" : "s"}` : null,
-    ].filter(Boolean)
-
-    if (fragments.length) {
-      triggerSummary.push(`Integrity scan triggered by imports: ${fragments.join(" and ")} in your workspace.`)
-    }
-  }
-
-  if (policy.triggerSources.scriptEdits && hasScriptFamilyChanges) {
-    const isImportGovernedScript = (scriptId: string | null | undefined) => {
-      if (!scriptId) return false
-      const candidate = importAllowanceCandidatesByScript[scriptId]
-      if (!candidate) return false
-      if (candidate.hasManualDraft) return false
-      return candidate.hasImportDraft || candidate.hasDataKeySyncDraft
-    }
-    const scriptFamilyDraftCount =
-      nonImportScriptDrafts.length +
-      nonImportScreenDrafts.length +
-      nonImportDiagnosisDrafts.length +
-      nonImportProblemDrafts.length
-    const scriptDeletionCount = userPendingDeletion.filter((entry) => (
-      entry.draftOrigin === "import"
-        ? false
-        :
-      [entry.scriptId, entry.screenScriptId, entry.diagnosisScriptId, entry.problemScriptId]
-        .filter((id): id is string => !!id)
-        .some((scriptId) => !isImportGovernedScript(scriptId))
-    )).length
-    const fragments = [
-      scriptFamilyDraftCount ? `${scriptFamilyDraftCount} script-related draft${scriptFamilyDraftCount === 1 ? "" : "s"}` : null,
-      scriptDeletionCount ? `${scriptDeletionCount} pending script deletion${scriptDeletionCount === 1 ? "" : "s"}` : null,
-    ].filter(Boolean)
-
-    if (fragments.length) {
-      triggerSummary.push(`Integrity scan triggered by script edits: ${fragments.join(" and ")} in your workspace.`)
-    }
-  }
-
-  const dataKeysMap = new Map<string, typeof publishedDataKeysRes.data[number]>()
-  publishedDataKeysRes.data.forEach((item) => {
-    dataKeysMap.set(item.uuid, item)
-    dataKeysMap.set(item.uniqueKey, item)
-  })
-  effectiveUserDataKeyDrafts.forEach((draft) => {
-    const data = {
-      ...draft.data,
-      isDraft: true,
-      isDeleted: false,
-      draftCreatedByUserId: draft.createdByUserId,
-    }
-    if (draft.dataKeyId) dataKeysMap.set(draft.dataKeyId, data as typeof publishedDataKeysRes.data[number])
-    dataKeysMap.set(draft.uuid, data as typeof publishedDataKeysRes.data[number])
-    dataKeysMap.set(draft.uniqueKey, data as typeof publishedDataKeysRes.data[number])
-  })
-
-  const screensMap = new Map<string, typeof publishedScreensRes.data[number]>()
-  publishedScreensRes.data.forEach((item) => {
-    screensMap.set(item.screenId, item)
-  })
-  scopedUserScreenDrafts.forEach((draft) => {
-    const data = {
-      ...draft.data,
-      isDraft: true,
-      isDeleted: false,
-      draftCreatedByUserId: draft.createdByUserId,
-    }
-    const primaryId = draft.screenId || draft.screenDraftId
-    if (primaryId) screensMap.set(primaryId, data as typeof publishedScreensRes.data[number])
-    if (draft.screenDraftId) screensMap.set(draft.screenDraftId, data as typeof publishedScreensRes.data[number])
-  })
-
-  const diagnosesMap = new Map<string, typeof publishedDiagnosesRes.data[number]>()
-  publishedDiagnosesRes.data.forEach((item) => {
-    diagnosesMap.set(item.diagnosisId, item)
-  })
-  scopedUserDiagnosisDrafts.forEach((draft) => {
-    const data = {
-      ...draft.data,
-      isDraft: true,
-      isDeleted: false,
-      draftCreatedByUserId: draft.createdByUserId,
-    }
-    const primaryId = draft.diagnosisId || draft.diagnosisDraftId
-    if (primaryId) diagnosesMap.set(primaryId, data as typeof publishedDiagnosesRes.data[number])
-    if (draft.diagnosisDraftId) diagnosesMap.set(draft.diagnosisDraftId, data as typeof publishedDiagnosesRes.data[number])
-  })
-
-  const problemsMap = new Map<string, typeof publishedProblemsRes.data[number]>()
-  publishedProblemsRes.data.forEach((item) => {
-    problemsMap.set(item.problemId, item)
-  })
-  scopedUserProblemDrafts.forEach((draft) => {
-    const data = {
-      ...draft.data,
-      isDraft: true,
-      isDeleted: false,
-      draftCreatedByUserId: draft.createdByUserId,
-    }
-    const primaryId = draft.problemId || draft.problemDraftId
-    if (primaryId) problemsMap.set(primaryId, data as typeof publishedProblemsRes.data[number])
-    if (draft.problemDraftId) problemsMap.set(draft.problemDraftId, data as typeof publishedProblemsRes.data[number])
-  })
 
   return {
-    dataKeysRes: {
-      data: Array.from(new Map(Array.from(dataKeysMap.values()).map((item) => [item.uniqueKey || item.uuid, item])).values())
-        .filter((item) => !deletedDataKeyIds.has(item.uuid)),
-      errors: publishedDataKeysRes.errors,
-    },
-    screensRes: {
-      data: Array.from(new Map(Array.from(screensMap.values()).map((item) => [item.screenId, item])).values()),
-      errors: publishedScreensRes.errors,
-    },
-    diagnosesRes: {
-      data: Array.from(new Map(Array.from(diagnosesMap.values()).map((item) => [item.diagnosisId, item])).values()),
-      errors: publishedDiagnosesRes.errors,
-    },
-    problemsRes: {
-      data: Array.from(new Map(Array.from(problemsMap.values()).map((item) => [item.problemId, item])).values()),
-      errors: publishedProblemsRes.errors,
-    },
-    shouldRunIntegrityChecks,
-    hasImportChanges,
-    triggerSummary,
-    importAllowanceCandidatesByScript,
+    changedFields,
+    diffPreview,
+  }
+}
+
+function normalizePendingDraftQueueFilters(
+  params:
+    | {
+        scope?: PendingDraftQueueScope
+        tab?: PendingDraftQueueTab
+        query?: string
+        entityType?: "all" | PendingDraftQueueEntityType
+        creator?: string
+        sort?: PendingDraftQueueSort
+        groupBy?: PendingDraftQueueGroupBy
+        page?: number
+        pageSize?: number
+      }
+    | undefined,
+  canViewAll: boolean,
+) {
+  const requestedScope = params?.scope === "all" && canViewAll ? "all" : "mine"
+  const tab: PendingDraftQueueTab =
+    params?.tab && ["all", "creates", "updates", "deletes", "mine"].includes(params.tab) ? params.tab : "all"
+
+  return {
+    scope: tab === "mine" ? "mine" : requestedScope,
+    tab,
+    query: typeof params?.query === "string" ? params.query.trim() : "",
+    entityType:
+      params?.entityType && ["all", ...Object.keys(entityTypeLabels)].includes(params.entityType)
+        ? (params.entityType as "all" | PendingDraftQueueEntityType)
+        : "all",
+    creator: typeof params?.creator === "string" ? params.creator : "all",
+    sort: params?.sort && ["recent", "oldest", "creator", "entity", "title", "action"].includes(params.sort) ? params.sort : "recent",
+    groupBy: params?.groupBy && ["parent", "creator", "entity"].includes(params.groupBy) ? params.groupBy : "parent",
+    page: Math.max(1, Number(params?.page) || 1),
+    pageSize: Math.min(100, Math.max(10, Number(params?.pageSize) || PENDING_DRAFT_PAGE_SIZE)),
+  } satisfies PendingDraftQueueFilters
+}
+
+function shouldIncludeDraftRows({ filters, entityType }: { filters: PendingDraftQueueFilters; entityType: PendingDraftQueueEntityType }) {
+  if (filters.tab === "deletes") return false
+  if (filters.entityType !== "all") return filters.entityType === entityType
+  return entityType !== "alias"
+}
+
+function shouldIncludePendingDeletionRows({
+  filters,
+  entityType,
+}: {
+  filters: PendingDraftQueueFilters
+  entityType: PendingDraftQueueEntityType
+}) {
+  if (filters.tab === "creates" || filters.tab === "updates") return false
+  if (filters.entityType !== "all") return filters.entityType === entityType
+  return true
+}
+
+export async function getPendingDraftQueue(params?: {
+  entryId?: string
+  scope?: PendingDraftQueueScope
+  tab?: PendingDraftQueueTab
+  query?: string
+  entityType?: "all" | PendingDraftQueueEntityType
+  creator?: string
+  sort?: PendingDraftQueueSort
+  groupBy?: PendingDraftQueueGroupBy
+  page?: number
+  pageSize?: number
+}): Promise<{
+  success: boolean
+  data: PendingDraftQueueEntry[]
+  summary: PendingDraftQueueSummary
+  meta: PendingDraftQueueMeta
+  errors?: string[]
+}> {
+  try {
+    const session = await isAllowed()
+    const currentUserId = session.user?.userId || null
+    const canViewAll = ["admin", "super_user"].includes(session.user?.role || "")
+    const filters = normalizePendingDraftQueueFilters(params, canViewAll)
+    const createdByFilter = filters.scope === "mine" && currentUserId ? currentUserId : null
+    const includeScripts = shouldIncludeDraftRows({ filters, entityType: "script" })
+    const includeScreens = shouldIncludeDraftRows({ filters, entityType: "screen" })
+    const includeDiagnoses = shouldIncludeDraftRows({ filters, entityType: "diagnosis" })
+    const includeProblems = shouldIncludeDraftRows({ filters, entityType: "problem" })
+    const includeConfigKeys = shouldIncludeDraftRows({ filters, entityType: "config_key" })
+    const includeHospitals = shouldIncludeDraftRows({ filters, entityType: "hospital" })
+    const includeDrugsLibrary = shouldIncludeDraftRows({ filters, entityType: "drugs_library" })
+    const includeDataKeys = shouldIncludeDraftRows({ filters, entityType: "data_key" })
+    const includePendingDeletes =
+      shouldIncludePendingDeletionRows({ filters, entityType: "script" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "screen" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "diagnosis" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "problem" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "config_key" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "hospital" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "drugs_library" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) ||
+      shouldIncludePendingDeletionRows({ filters, entityType: "alias" })
+
+    const whereByUser = <TColumn>(column: TColumn) => (createdByFilter ? eq(column as any, createdByFilter) : undefined)
+
+    const [
+      scriptDraftRows,
+      screenDraftRows,
+      diagnosisDraftRows,
+      problemDraftRows,
+      configKeyDraftRows,
+      hospitalDraftRows,
+      drugsLibraryDraftRows,
+      dataKeyDraftRows,
+      pendingDeletionRows,
+    ] = await Promise.all([
+      includeScripts
+        ? db.query.scriptsDrafts.findMany({
+            where: whereByUser(scriptsDrafts.createdByUserId),
+            with: { createdBy: true, script: true },
+          })
+        : Promise.resolve([]),
+      includeScreens
+        ? db.query.screensDrafts.findMany({
+            where: whereByUser(screensDrafts.createdByUserId),
+            with: { createdBy: true, screen: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeDiagnoses
+        ? db.query.diagnosesDrafts.findMany({
+            where: whereByUser(diagnosesDrafts.createdByUserId),
+            with: { createdBy: true, diagnosis: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeProblems
+        ? db.query.problemsDrafts.findMany({
+            where: whereByUser(problemsDrafts.createdByUserId),
+            with: { createdBy: true, problem: true, script: true, scriptDraft: true },
+          })
+        : Promise.resolve([]),
+      includeConfigKeys
+        ? db.query.configKeysDrafts.findMany({
+            where: whereByUser(configKeysDrafts.createdByUserId),
+            with: { createdBy: true, configKey: true },
+          })
+        : Promise.resolve([]),
+      includeHospitals
+        ? db.query.hospitalsDrafts.findMany({
+            where: whereByUser(hospitalsDrafts.createdByUserId),
+            with: { createdBy: true, hospital: true },
+          })
+        : Promise.resolve([]),
+      includeDrugsLibrary
+        ? db.query.drugsLibraryDrafts.findMany({
+            where: whereByUser(drugsLibraryDrafts.createdByUserId),
+            with: { createdBy: true, item: true },
+          })
+        : Promise.resolve([]),
+      includeDataKeys
+        ? db.query.dataKeysDrafts.findMany({
+            where: whereByUser(dataKeysDrafts.createdByUserId),
+          })
+        : Promise.resolve([]),
+      includePendingDeletes
+        ? db.query.pendingDeletion.findMany({
+            where: whereByUser(pendingDeletion.createdByUserId),
+            with: {
+              createdBy: true,
+              script: true,
+              screen: true,
+              screenScript: true,
+              diagnosis: true,
+              diagnosisScript: true,
+              problem: true,
+              problemScript: true,
+              configKey: true,
+              hospital: true,
+              drugsLibraryItem: true,
+              dataKey: true,
+              alias: true,
+            },
+          })
+        : Promise.resolve([]),
+    ])
+
+    const entries: PendingDraftQueueEntry[] = [
+      ...scriptDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.scriptId || draft.scriptDraftId
+        const diff = buildDiffPreview({
+          action: draft.scriptId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.script,
+        })
+        return {
+          id: `draft:script:${draft.scriptDraftId}`,
+          entityType: "script",
+          action: draft.scriptId ? "update" : "create",
+          title: draft.data.title || draft.data.printTitle || "Untitled Script",
+          description: summarizeDraftAction(!!draft.scriptId, "script"),
+          entityId,
+          draftId: draft.scriptDraftId,
+          publishedEntityId: draft.scriptId,
+          href: entityId ? `/script/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.scriptId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.scriptId,
+          source: "draft",
+          statusLabel: draft.scriptId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: `script:${entityId}`,
+          reviewGroupLabel: draft.data.title || draft.data.printTitle || "Script",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...screenDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.screenId || draft.screenDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.screenId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.screen,
+        })
+        return {
+          id: `draft:screen:${draft.screenDraftId}`,
+          entityType: "screen",
+          action: draft.screenId ? "update" : "create",
+          title: draft.data.title || draft.data.sectionTitle || draft.data.previewTitle || "Untitled Screen",
+          description: summarizeDraftAction(!!draft.screenId, "screen"),
+          entityId,
+          draftId: draft.screenDraftId,
+          publishedEntityId: draft.screenId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/screen/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.screenId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.screenId,
+          source: "draft",
+          statusLabel: draft.screenId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `screen:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Screen Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...diagnosisDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.diagnosisId || draft.diagnosisDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.diagnosisId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.diagnosis,
+        })
+        return {
+          id: `draft:diagnosis:${draft.diagnosisDraftId}`,
+          entityType: "diagnosis",
+          action: draft.diagnosisId ? "update" : "create",
+          title: draft.data.name || draft.data.key || "Untitled Diagnosis",
+          description: summarizeDraftAction(!!draft.diagnosisId, "diagnosis"),
+          entityId,
+          draftId: draft.diagnosisDraftId,
+          publishedEntityId: draft.diagnosisId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/diagnosis/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.diagnosisId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.diagnosisId,
+          source: "draft",
+          statusLabel: draft.diagnosisId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `diagnosis:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Diagnosis Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...problemDraftRows.map((draft): PendingDraftQueueEntry => {
+        const parentEntityId = draft.scriptId || draft.scriptDraftId
+        const entityId = draft.problemId || draft.problemDraftId
+        const parentTitle = draft.script?.title || draft.scriptDraft?.data?.title || draft.scriptDraft?.data?.printTitle || null
+        const diff = buildDiffPreview({
+          action: draft.problemId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.problem,
+        })
+        return {
+          id: `draft:problem:${draft.problemDraftId}`,
+          entityType: "problem",
+          action: draft.problemId ? "update" : "create",
+          title: draft.data.name || draft.data.key || "Untitled Problem",
+          description: summarizeDraftAction(!!draft.problemId, "problem"),
+          entityId,
+          draftId: draft.problemDraftId,
+          publishedEntityId: draft.problemId,
+          parentEntityId,
+          parentTitle,
+          href: parentEntityId && entityId ? `/script/${parentEntityId}/problem/${entityId}` : null,
+          searchHref: buildChangelogSearchHref(draft.problemId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.problemId,
+          source: "draft",
+          statusLabel: draft.problemId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: parentEntityId ? `parent:${parentEntityId}` : `problem:${entityId}`,
+          reviewGroupLabel: parentTitle || "Ungrouped Problem Changes",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: parentEntityId ? `/script/${parentEntityId}` : null,
+        }
+      }),
+      ...configKeyDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.configKeyId || draft.configKeyDraftId
+        const diff = buildDiffPreview({
+          action: draft.configKeyId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.configKey,
+        })
+        return {
+          id: `draft:config_key:${draft.configKeyDraftId}`,
+          entityType: "config_key",
+          action: draft.configKeyId ? "update" : "create",
+          title: draft.data.label || draft.data.key || "Untitled Config Key",
+          description: summarizeDraftAction(!!draft.configKeyId, "configuration key"),
+          entityId,
+          draftId: draft.configKeyDraftId,
+          publishedEntityId: draft.configKeyId,
+          href: "/configuration",
+          searchHref: buildChangelogSearchHref(draft.configKeyId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.configKeyId,
+          source: "draft",
+          statusLabel: draft.configKeyId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:config_key",
+          reviewGroupLabel: "Configuration Keys",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...hospitalDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.hospitalId || draft.hospitalDraftId
+        const diff = buildDiffPreview({
+          action: draft.hospitalId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.hospital,
+        })
+        return {
+          id: `draft:hospital:${draft.hospitalDraftId}`,
+          entityType: "hospital",
+          action: draft.hospitalId ? "update" : "create",
+          title: draft.data.name || "Untitled Hospital",
+          description: summarizeDraftAction(!!draft.hospitalId, "hospital"),
+          entityId,
+          draftId: draft.hospitalDraftId,
+          publishedEntityId: draft.hospitalId,
+          href: `/hospitals?hospitalId=${encodeURIComponent(entityId)}`,
+          searchHref: buildChangelogSearchHref(draft.hospitalId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.hospitalId,
+          source: "draft",
+          statusLabel: draft.hospitalId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:hospital",
+          reviewGroupLabel: "Hospitals",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...drugsLibraryDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.itemId || draft.itemDraftId
+        const diff = buildDiffPreview({
+          action: draft.itemId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: draft.item,
+        })
+        return {
+          id: `draft:drugs_library:${draft.itemDraftId}`,
+          entityType: "drugs_library",
+          action: draft.itemId ? "update" : "create",
+          title: draft.data.drug || draft.data.key || "Untitled Drug",
+          description: summarizeDraftAction(!!draft.itemId, "drugs library item"),
+          entityId,
+          draftId: draft.itemDraftId,
+          publishedEntityId: draft.itemId,
+          href: `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(entityId)}`,
+          searchHref: buildChangelogSearchHref(draft.itemId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: getCreatedByLabel(draft.createdBy),
+          createdByEmail: draft.createdBy?.email || null,
+          isUnpublished: !draft.itemId,
+          source: "draft",
+          statusLabel: draft.itemId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:drugs_library",
+          reviewGroupLabel: "Drugs, Fluids, and Feeds",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...dataKeyDraftRows.map((draft): PendingDraftQueueEntry => {
+        const entityId = draft.dataKeyId || draft.uuid
+        const hrefId = draft.data?.uuid || draft.uuid
+        const diff = buildDiffPreview({
+          action: draft.dataKeyId ? "update" : "create",
+          draftData: draft.data,
+          publishedData: undefined,
+        })
+        return {
+          id: `draft:data_key:${draft.uuid}`,
+          entityType: "data_key",
+          action: draft.dataKeyId ? "update" : "create",
+          title: draft.data.label || draft.data.name || "Untitled Data Key",
+          description: summarizeDraftAction(!!draft.dataKeyId, "data key"),
+          entityId,
+          draftId: draft.uuid,
+          publishedEntityId: draft.dataKeyId,
+          href: `/data-keys/edit/${encodeURIComponent(hrefId)}`,
+          searchHref: buildChangelogSearchHref(draft.dataKeyId),
+          createdAt: toIsoString(draft.updatedAt ?? draft.createdAt),
+          createdByUserId: draft.createdByUserId,
+          createdByName: "Unknown user",
+          createdByEmail: null,
+          isUnpublished: !draft.dataKeyId,
+          source: "draft",
+          statusLabel: draft.dataKeyId ? "Draft update" : "New draft",
+          changedFields: diff.changedFields,
+          changedFieldCount: diff.changedFields.length,
+          diffPreview: diff.diffPreview,
+          reviewGroupId: "entity:data_key",
+          reviewGroupLabel: "Data Keys",
+          conflictLabels: [],
+          infoLabels: [],
+          isStale: false,
+          ageInDays: 0,
+          parentHref: null,
+        }
+      }),
+      ...pendingDeletionRows
+        .filter(
+          (row) =>
+            (shouldIncludePendingDeletionRows({ filters, entityType: "script" }) && row.scriptId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "screen" }) && row.screenId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "diagnosis" }) && row.diagnosisId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "problem" }) && row.problemId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "config_key" }) && row.configKeyId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "hospital" }) && row.hospitalId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "drugs_library" }) && row.drugsLibraryItemId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "data_key" }) && row.dataKeyId) ||
+            (shouldIncludePendingDeletionRows({ filters, entityType: "alias" }) && row.aliasId),
+        )
+        .map((row): PendingDraftQueueEntry => {
+          if (row.scriptId) {
+            return {
+              id: `delete:script:${row.scriptId}:${row.id}`,
+              entityType: "script" as const,
+              action: "delete" as const,
+              title: row.script?.title || row.script?.printTitle || "Untitled Script",
+              description: "Queued for deletion at next publish",
+              entityId: row.scriptId,
+              publishedEntityId: row.scriptId,
+              href: `/script/${row.scriptId}`,
+              searchHref: buildChangelogSearchHref(row.scriptId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: `script:${row.scriptId}`,
+              reviewGroupLabel: row.script?.title || row.script?.printTitle || "Script",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.screenId) {
+            return {
+              id: `delete:screen:${row.screenId}:${row.id}`,
+              entityType: "screen" as const,
+              action: "delete" as const,
+              title: row.screen?.title || row.screen?.sectionTitle || "Untitled Screen",
+              description: "Queued for deletion at next publish",
+              entityId: row.screenId,
+              publishedEntityId: row.screenId,
+              parentEntityId: row.screenScriptId,
+              parentTitle: row.screenScript?.title || row.screenScript?.printTitle || null,
+              href: row.screenScriptId ? `/script/${row.screenScriptId}/screen/${row.screenId}` : null,
+              searchHref: buildChangelogSearchHref(row.screenId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.screenScriptId ? `parent:${row.screenScriptId}` : `screen:${row.screenId}`,
+              reviewGroupLabel: row.screenScript?.title || row.screenScript?.printTitle || "Ungrouped Screen Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.screenScriptId ? `/script/${row.screenScriptId}` : null,
+            }
+          }
+
+          if (row.diagnosisId) {
+            return {
+              id: `delete:diagnosis:${row.diagnosisId}:${row.id}`,
+              entityType: "diagnosis" as const,
+              action: "delete" as const,
+              title: row.diagnosis?.name || row.diagnosis?.key || "Untitled Diagnosis",
+              description: "Queued for deletion at next publish",
+              entityId: row.diagnosisId,
+              publishedEntityId: row.diagnosisId,
+              parentEntityId: row.diagnosisScriptId,
+              parentTitle: row.diagnosisScript?.title || row.diagnosisScript?.printTitle || null,
+              href: row.diagnosisScriptId ? `/script/${row.diagnosisScriptId}/diagnosis/${row.diagnosisId}` : null,
+              searchHref: buildChangelogSearchHref(row.diagnosisId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.diagnosisScriptId ? `parent:${row.diagnosisScriptId}` : `diagnosis:${row.diagnosisId}`,
+              reviewGroupLabel: row.diagnosisScript?.title || row.diagnosisScript?.printTitle || "Ungrouped Diagnosis Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.diagnosisScriptId ? `/script/${row.diagnosisScriptId}` : null,
+            }
+          }
+
+          if (row.problemId) {
+            return {
+              id: `delete:problem:${row.problemId}:${row.id}`,
+              entityType: "problem" as const,
+              action: "delete" as const,
+              title: row.problem?.name || row.problem?.key || "Untitled Problem",
+              description: "Queued for deletion at next publish",
+              entityId: row.problemId,
+              publishedEntityId: row.problemId,
+              parentEntityId: row.problemScriptId,
+              parentTitle: row.problemScript?.title || row.problemScript?.printTitle || null,
+              href: row.problemScriptId ? `/script/${row.problemScriptId}/problem/${row.problemId}` : null,
+              searchHref: buildChangelogSearchHref(row.problemId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: row.problemScriptId ? `parent:${row.problemScriptId}` : `problem:${row.problemId}`,
+              reviewGroupLabel: row.problemScript?.title || row.problemScript?.printTitle || "Ungrouped Problem Changes",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: row.problemScriptId ? `/script/${row.problemScriptId}` : null,
+            }
+          }
+
+          if (row.configKeyId) {
+            return {
+              id: `delete:config_key:${row.configKeyId}:${row.id}`,
+              entityType: "config_key" as const,
+              action: "delete" as const,
+              title: row.configKey?.label || row.configKey?.key || "Untitled Config Key",
+              description: "Queued for deletion at next publish",
+              entityId: row.configKeyId,
+              publishedEntityId: row.configKeyId,
+              href: "/configuration",
+              searchHref: buildChangelogSearchHref(row.configKeyId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:config_key",
+              reviewGroupLabel: "Configuration Keys",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.hospitalId) {
+            return {
+              id: `delete:hospital:${row.hospitalId}:${row.id}`,
+              entityType: "hospital" as const,
+              action: "delete" as const,
+              title: row.hospital?.name || "Untitled Hospital",
+              description: "Queued for deletion at next publish",
+              entityId: row.hospitalId,
+              publishedEntityId: row.hospitalId,
+              href: `/hospitals?hospitalId=${encodeURIComponent(row.hospitalId)}`,
+              searchHref: buildChangelogSearchHref(row.hospitalId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:hospital",
+              reviewGroupLabel: "Hospitals",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.drugsLibraryItemId) {
+            return {
+              id: `delete:drugs_library:${row.drugsLibraryItemId}:${row.id}`,
+              entityType: "drugs_library" as const,
+              action: "delete" as const,
+              title: row.drugsLibraryItem?.drug || row.drugsLibraryItem?.key || "Untitled Drug",
+              description: "Queued for deletion at next publish",
+              entityId: row.drugsLibraryItemId,
+              publishedEntityId: row.drugsLibraryItemId,
+              href: `/drugs-fluids-and-feeds?itemId=${encodeURIComponent(row.drugsLibraryItemId)}`,
+              searchHref: buildChangelogSearchHref(row.drugsLibraryItemId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:drugs_library",
+              reviewGroupLabel: "Drugs, Fluids, and Feeds",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          if (row.dataKeyId) {
+            return {
+              id: `delete:data_key:${row.dataKeyId}:${row.id}`,
+              entityType: "data_key" as const,
+              action: "delete" as const,
+              title: row.dataKey?.label || row.dataKey?.name || "Untitled Data Key",
+              description: "Queued for deletion at next publish",
+              entityId: row.dataKeyId,
+              publishedEntityId: row.dataKeyId,
+              href: `/data-keys/edit/${encodeURIComponent(row.dataKeyId)}`,
+              searchHref: buildChangelogSearchHref(row.dataKeyId),
+              createdAt: toIsoString(row.createdAt),
+              createdByUserId: row.createdByUserId,
+              createdByName: getCreatedByLabel(row.createdBy),
+              createdByEmail: row.createdBy?.email || null,
+              isUnpublished: false,
+              source: "pending_deletion" as const,
+              statusLabel: "Delete queued",
+              changedFields: [],
+              changedFieldCount: 0,
+              diffPreview: [],
+              reviewGroupId: "entity:data_key",
+              reviewGroupLabel: "Data Keys",
+              conflictLabels: [],
+              infoLabels: [],
+              isStale: false,
+              ageInDays: 0,
+              parentHref: null,
+            }
+          }
+
+          return {
+            id: `delete:alias:${row.aliasId}:${row.id}`,
+            entityType: "alias" as const,
+            action: "delete" as const,
+            title: row.alias?.alias || row.alias?.name || "Alias",
+            description: "Queued for deletion at next publish",
+            entityId: row.aliasId || `alias-${row.id}`,
+            publishedEntityId: row.aliasId,
+            href: null,
+            searchHref: buildChangelogSearchHref(row.aliasId),
+            createdAt: toIsoString(row.createdAt),
+            createdByUserId: row.createdByUserId,
+            createdByName: getCreatedByLabel(row.createdBy),
+            createdByEmail: row.createdBy?.email || null,
+            isUnpublished: false,
+            source: "pending_deletion" as const,
+            statusLabel: "Delete queued",
+            changedFields: [],
+            changedFieldCount: 0,
+            diffPreview: [],
+            reviewGroupId: "entity:alias",
+            reviewGroupLabel: "Aliases",
+            conflictLabels: [],
+            infoLabels: [],
+            isStale: false,
+            ageInDays: 0,
+            parentHref: null,
+          }
+        }),
+    ]
+
+    const entityActionMap = new Map<string, Set<PendingDraftQueueAction>>()
+    const parentDraftMap = new Set(
+      entries.filter((entry) => entry.entityType === "script" && entry.source === "draft").map((entry) => entry.entityId),
+    )
+    const parentDeleteMap = new Set(
+      entries
+        .filter((entry) => entry.entityType === "script" && entry.action === "delete")
+        .map((entry) => entry.publishedEntityId || entry.entityId),
+    )
+
+    for (const entry of entries) {
+      const key = `${entry.entityType}:${entry.publishedEntityId || entry.entityId}`
+      const actions = entityActionMap.get(key) || new Set<PendingDraftQueueAction>()
+      actions.add(entry.action)
+      entityActionMap.set(key, actions)
+    }
+
+    const enrichedEntries = entries.map((entry) => {
+      const ageInDays = Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      const conflictLabels = [...entry.conflictLabels]
+      const infoLabels = [...entry.infoLabels]
+      const actionSet = entityActionMap.get(`${entry.entityType}:${entry.publishedEntityId || entry.entityId}`)
+
+      if (actionSet?.has("delete") && (actionSet.has("update") || actionSet.has("create")) && entry.entityType !== "alias") {
+        conflictLabels.push("Has both a draft and a delete queued")
+      }
+
+      if (entry.parentEntityId && parentDraftMap.has(entry.parentEntityId)) {
+        infoLabels.push("Parent script also has a draft")
+      }
+
+      if (entry.parentEntityId && parentDeleteMap.has(entry.parentEntityId)) {
+        conflictLabels.push("Parent script is queued for deletion")
+      }
+
+      if (ageInDays >= PENDING_DRAFT_STALE_DAYS) {
+        infoLabels.push(`Stale for ${ageInDays} days`)
+      }
+
+      return {
+        ...entry,
+        ageInDays,
+        isStale: ageInDays >= PENDING_DRAFT_STALE_DAYS,
+        conflictLabels,
+        infoLabels,
+      }
+    })
+
+    const scopedEntries = params?.entryId ? enrichedEntries.filter((entry) => entry.id === params.entryId) : enrichedEntries
+
+    const creatorCounts = scopedEntries.reduce<Record<string, { label: string; count: number }>>((acc, entry) => {
+      const key = entry.createdByUserId || entry.createdByName
+      if (!acc[key]) acc[key] = { label: entry.createdByName, count: 0 }
+      acc[key].count += 1
+      return acc
+    }, {})
+
+    const entityCounts = scopedEntries.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.entityType] = (acc[entry.entityType] || 0) + 1
+      return acc
+    }, {})
+    const creatorOptions = Object.entries(creatorCounts)
+      .map(([value, data]) => ({ value, label: data.label, count: data.count }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    const entityOptions = Object.entries(entityCounts)
+      .map(([value, count]) => ({
+        value: value as PendingDraftQueueEntityType,
+        label: entityTypeLabels[value as PendingDraftQueueEntityType],
+        count,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+
+    let filteredEntries = scopedEntries.filter((entry) => {
+      if (filters.tab !== "all" && filters.tab !== "mine" && entry.action !== actionLabelByTab[filters.tab]) return false
+      if (filters.entityType !== "all" && entry.entityType !== filters.entityType) return false
+      if (filters.creator !== "all" && (entry.createdByUserId || entry.createdByName) !== filters.creator) return false
+      if (!filters.query) return true
+
+      const query = filters.query.toLowerCase()
+      return [
+        entry.title,
+        entry.description,
+        entry.entityId,
+        entry.parentTitle,
+        entry.createdByName,
+        entry.reviewGroupLabel,
+        entityTypeLabels[entry.entityType],
+        ...entry.changedFields,
+        ...entry.conflictLabels,
+      ]
+        .filter(Boolean)
+        .some((value) => `${value}`.toLowerCase().includes(query))
+    })
+
+    filteredEntries = filteredEntries.sort((left, right) => {
+      if (filters.sort === "oldest") return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      if (filters.sort === "creator")
+        return left.createdByName.localeCompare(right.createdByName) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "entity")
+        return (
+          entityTypeLabels[left.entityType].localeCompare(entityTypeLabels[right.entityType]) ||
+          right.createdAt.localeCompare(left.createdAt)
+        )
+      if (filters.sort === "title") return left.title.localeCompare(right.title) || right.createdAt.localeCompare(left.createdAt)
+      if (filters.sort === "action") return left.action.localeCompare(right.action) || right.createdAt.localeCompare(left.createdAt)
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    })
+
+    const totalEntries = filteredEntries.length
+    const totalPages = Math.max(1, Math.ceil(totalEntries / filters.pageSize))
+    const page = Math.min(filters.page, totalPages)
+    const startIndex = (page - 1) * filters.pageSize
+    const pagedEntries = filteredEntries.slice(startIndex, startIndex + filters.pageSize)
+
+    const uniqueEntities = new Set(scopedEntries.map((entry) => `${entry.entityType}:${entry.entityId}`)).size
+    const totalDeletes = scopedEntries.filter((entry) => entry.action === "delete").length
+    const totalCreates = scopedEntries.filter((entry) => entry.action === "create").length
+    const totalUpdates = scopedEntries.filter((entry) => entry.action === "update").length
+    const staleEntries = scopedEntries.filter((entry) => entry.isStale).length
+    const conflictEntries = scopedEntries.filter((entry) => entry.conflictLabels.length > 0).length
+    const tabCounts = {
+      all: scopedEntries.length,
+      creates: totalCreates,
+      updates: totalUpdates,
+      deletes: totalDeletes,
+      mine: currentUserId ? scopedEntries.filter((entry) => entry.createdByUserId === currentUserId).length : 0,
+    } satisfies Record<PendingDraftQueueTab, number>
+
+    return {
+      success: true,
+      data: pagedEntries,
+      summary: {
+        totalEntries: totalEntries,
+        totalDrafts: scopedEntries.filter((entry) => entry.source === "draft").length,
+        totalDeletes,
+        totalCreates,
+        totalUpdates,
+        uniqueEntities,
+        entityCounts,
+        scope: filters.scope,
+        scopeLabel: filters.scope === "all" ? "Team publish queue" : "Your draft queue",
+        staleEntries,
+        conflictEntries,
+      },
+      meta: {
+        filters: { ...filters, page },
+        pagination: {
+          page,
+          pageSize: filters.pageSize,
+          totalEntries,
+          totalPages,
+          returnedEntries: pagedEntries.length,
+          hasPreviousPage: page > 1,
+          hasNextPage: page < totalPages,
+        },
+        tabCounts,
+        creators: creatorOptions,
+        entityTypes: entityOptions,
+      },
+    }
+  } catch (e: any) {
+    logger.error("getPendingDraftQueue ERROR", e.message)
+    return {
+      success: false,
+      data: [],
+      summary: {
+        totalEntries: 0,
+        totalDrafts: 0,
+        totalDeletes: 0,
+        totalCreates: 0,
+        totalUpdates: 0,
+        uniqueEntities: 0,
+        entityCounts: {},
+        scope: "mine",
+        scopeLabel: "Draft queue",
+        staleEntries: 0,
+        conflictEntries: 0,
+      },
+      meta: {
+        filters: {
+          scope: "mine",
+          tab: "all",
+          query: "",
+          entityType: "all",
+          creator: "all",
+          sort: "recent",
+          groupBy: "parent",
+          page: 1,
+          pageSize: PENDING_DRAFT_PAGE_SIZE,
+        },
+        pagination: {
+          page: 1,
+          pageSize: PENDING_DRAFT_PAGE_SIZE,
+          totalEntries: 0,
+          totalPages: 1,
+          returnedEntries: 0,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+        tabCounts: {
+          all: 0,
+          creates: 0,
+          updates: 0,
+          deletes: 0,
+          mine: 0,
+        },
+        creators: [],
+        entityTypes: [],
+      },
+      errors: [e.message],
+    }
   }
 }
 
@@ -626,28 +1260,42 @@ export async function getEditorDetails(): Promise<{
   errors?: string[]
   shouldPublishData: boolean
   pendingDeletion: number
+  myPendingDeletion: number
   drafts: typeof opsQueries.defaultCountDraftsData
+  myDrafts: typeof opsQueries.defaultCountDraftsData
+  myDraftQueueCount: number
   info: GetEditorInfoResults["data"]
 }> {
   const errors: string[] = []
   let shouldPublishData = false
   try {
+    const authenticatedUser = await getAuthenticatedUser()
     const editorInfo = await _getEditorInfo()
     editorInfo.errors?.forEach((e) => errors.push(e))
 
     const pendingDeletion = await opsQueries._countPendingDeletion()
     pendingDeletion.errors?.forEach((e) => errors.push(e))
+    const currentUserId = authenticatedUser?.userId || null
 
     const { errors: draftsErrors, ...drafts } = await opsQueries._countDrafts()
     draftsErrors?.forEach((e) => errors.push(e))
+    const { errors: myDraftsErrors, ...myDrafts } = currentUserId
+      ? await opsQueries._countDrafts(currentUserId)
+      : { ...opsQueries.defaultCountDraftsData, errors: undefined }
+    myDraftsErrors?.forEach((e) => errors.push(e))
+    const myPendingDeletion = currentUserId ? await opsQueries._countPendingDeletion(currentUserId) : { total: 0, errors: undefined }
+    myPendingDeletion.errors?.forEach((e) => errors.push(e))
 
-    const mode = "development"
-
-    shouldPublishData = mode === "development" && (!!drafts.total || !!pendingDeletion.total)
+    // Publishable whenever any drafts or queued deletions exist. (A hardcoded
+    // mode === "development" flag previously gated this but was always true.)
+    shouldPublishData = !!drafts.total || !!pendingDeletion.total
 
     return {
       pendingDeletion: pendingDeletion.total,
+      myPendingDeletion: myPendingDeletion.total,
       drafts,
+      myDrafts,
+      myDraftQueueCount: myDrafts.total + myPendingDeletion.total,
       errors: errors.length ? errors : undefined,
       shouldPublishData,
       info: editorInfo.data,
@@ -657,17 +1305,18 @@ export async function getEditorDetails(): Promise<{
     return {
       errors: [e.message, ...errors],
       pendingDeletion: 0,
+      myPendingDeletion: 0,
       drafts: opsQueries.defaultCountDraftsData,
+      myDrafts: opsQueries.defaultCountDraftsData,
+      myDraftQueueCount: 0,
       shouldPublishData,
       info: null,
     }
   }
 }
 
-export const revalidatePath = async (
-  path: Parameters<typeof _revalidatePath>[0],
-  type?: Parameters<typeof _revalidatePath>[1],
-) => _revalidatePath(path, type)
+export const revalidatePath = async (path: Parameters<typeof _revalidatePath>[0], type?: Parameters<typeof _revalidatePath>[1]) =>
+  _revalidatePath(path, type)
 
 export const countAllDrafts = async () => {
   try {
@@ -711,17 +1360,8 @@ export const countAllDrafts = async () => {
   }
 }
 
-export async function publishData({
-  scope,
-}: {
-  scope: number
-}) {
-  const results: {
-    success: boolean;
-    errors?: string[];
-    warnings?: string[];
-    blockingDetails?: ReturnType<typeof buildDataKeyIntegrityPublishDetails>;
-  } = { success: true }
+export async function publishData({ scope }: { scope: number }) {
+  const results: { success: boolean; errors?: string[]; warnings?: string[]; blockingDetails?: any } = { success: true }
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -735,191 +1375,36 @@ export async function publishData({
       "create_screens",
       "update_screens",
     ])
-    assertCanPublishDrafts(session.user)
 
     const publisherUserId = session?.user?.userId || null
+    if (!publisherUserId) {
+      // Without a publisher every entity changelog and the release row would be skipped,
+      // minting a data version that is invisible to the changelog UI and rollbacks.
+      throw new Error("Publishing requires an authenticated user")
+    }
 
-    let userId = publisherUserId
+    let userId: string | null = publisherUserId
 
     if (scope === 1) userId = null
 
-    const editorInfoResult = await _getEditorInfo()
-    const currentDataVersion = editorInfoResult.data?.dataVersion || 1
-    const integrityPolicyState = getIntegrityPolicyState(editorInfoResult.data)
-
-    // The next version will be currentDataVersion + 1
-    const nextDataVersion = currentDataVersion + 1
-
-    const integrityChecksEnabled = integrityPolicyState.policy.enforcementMode !== "off"
-    const {
-      dataKeysRes,
-      screensRes,
-      diagnosesRes,
-      problemsRes,
-      shouldRunIntegrityChecks,
-      hasImportChanges,
-      triggerSummary,
-      importAllowanceCandidatesByScript,
-    } = integrityChecksEnabled
-      ? await getScopedIntegrityData({
-          userId,
-          policy: integrityPolicyState.policy,
-        })
-      : {
-          dataKeysRes: { data: [], errors: undefined },
-          screensRes: { data: [], errors: undefined },
-          diagnosesRes: { data: [], errors: undefined },
-          problemsRes: { data: [], errors: undefined },
-          shouldRunIntegrityChecks: false,
-          hasImportChanges: false,
-          triggerSummary: [],
-          importAllowanceCandidatesByScript: {},
-        }
-
-    const integrityErrors = [
-      ...(dataKeysRes.errors || []),
-      ...(screensRes.errors || []),
-      ...(diagnosesRes.errors || []),
-      ...(problemsRes.errors || []),
-    ]
-
-    if (integrityErrors.length) {
-      results.success = false
-      results.errors = integrityErrors
-      return results
-    }
-
-    const integrityContext = shouldRunIntegrityChecks ? buildDataKeyIntegrityContext(dataKeysRes.data) : null
-
-    if (shouldRunIntegrityChecks) {
-      const integrityReport = scanDataKeyIntegrity({
-        dataKeys: dataKeysRes.data,
-        screens: screensRes.data,
-        diagnoses: diagnosesRes.data,
-        problems: problemsRes.data,
-        onlyIssues: true,
-        context: integrityContext || undefined,
-        policy: integrityPolicyState.policy,
-      })
-      const blockingEntries = getBlockingIntegrityEntries(integrityReport.entries)
-      const blockingScriptIds = Array.from(new Set(blockingEntries.map((entry) => entry.scriptId).filter((id): id is string => !!id)))
-      const acceptedImportFingerprints =
-        integrityPolicyState.policy.enforcementMode === "block_new_issues_only" && integrityPolicyState.policy.triggerSources.imports
-          ? await getAcceptedImportFingerprintLookup(
-              blockingScriptIds,
-            )
-          : new Set<string>()
-      const acceptedImportScriptIds =
-        integrityPolicyState.policy.enforcementMode === "block_new_issues_only" &&
-        integrityPolicyState.policy.triggerSources.imports &&
-        hasImportChanges
-          ? await getAcceptedImportScriptAllowanceLookup(blockingScriptIds)
-          : new Map<string, string>()
-      const acceptedImportScriptAllowance = new Set(
-        Array.from(acceptedImportScriptIds.entries())
-          .filter(([scriptId, acceptedAt]) => {
-            const candidate = importAllowanceCandidatesByScript[scriptId]
-            if (!candidate) return false
-            if (candidate.hasManualDraft || candidate.hasPendingDeletion) return false
-            if (!candidate.hasImportDraft && !candidate.hasDataKeySyncDraft) return false
-            if (!candidate.latestImportManagedUpdatedAt) return false
-            return candidate.latestImportManagedUpdatedAt <= acceptedAt
-          })
-          .map(([scriptId]) => scriptId),
+    const { mdmRolloutPolicies } = await db.transaction(async (tx) => {
+      const lockedEditor = await tx.execute<{ id: number; dataVersion: number }>(
+        sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
       )
-      const effectiveBaseline = acceptedImportFingerprints.size
-        ? {
-            ...integrityPolicyState.baseline,
-            fingerprints: Array.from(new Set([
-              ...integrityPolicyState.baseline.fingerprints,
-              ...Array.from(acceptedImportFingerprints),
-            ])),
-          }
-        : integrityPolicyState.baseline
-      const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
-        policy: integrityPolicyState.policy,
-        baseline: effectiveBaseline,
-        blockingEntries,
-        getFingerprint: getDataKeyIntegrityEntryFingerprint,
-      })
-      const importAllowanceFilteredEntries = acceptedImportScriptAllowance.size
-        ? policyEvaluation.enforcedBlockingEntries.filter((entry) => !acceptedImportScriptAllowance.has(entry.scriptId))
-        : policyEvaluation.enforcedBlockingEntries
-      const acceptedImportScriptAllowanceCount =
-        policyEvaluation.enforcedBlockingEntries.length - importAllowanceFilteredEntries.length
-      const enforcedBlockingEntries = importAllowanceFilteredEntries
-      const policyWarnings = policyEvaluation.warnings
-
-      if (policyWarnings.length) {
-        results.warnings = [...(results.warnings || []), policyEvaluation.policyModeMessage, ...policyWarnings]
-      } else if (acceptedImportScriptAllowanceCount > 0) {
-        results.warnings = [
-          ...(results.warnings || []),
-          `Accepted import review allowance suppressed ${acceptedImportScriptAllowanceCount} blocking issue${acceptedImportScriptAllowanceCount === 1 ? "" : "s"} in imported scripts for this publish.`,
-        ]
+      const editor = lockedEditor?.[0]
+      if (!editor?.id || !Number.isFinite(editor.dataVersion)) {
+        throw new Error("Failed to lock editor info")
       }
 
-      if (enforcedBlockingEntries.length) {
-        const scriptTitlesById = await resolveIntegrityScriptTitles(enforcedBlockingEntries)
-        const enrichedBlockingEntries = enforcedBlockingEntries.map((entry) => ({
-          ...entry,
-          scriptTitle: scriptTitlesById.get(entry.scriptId) || entry.scriptTitle,
-        }))
-        const enforcedReport = buildDataKeyIntegrityReportFromEntries(
-          enrichedBlockingEntries,
-        )
-        const publishIntegrityDetails = buildDataKeyIntegrityPublishDetails(
-          enforcedReport
-        )
-        const publishIntegrityErrors = buildDataKeyIntegrityPublishErrors(
-          enforcedReport
-        )
+      const nextDataVersion = Number(editor.dataVersion) + 1
 
-        if (
-          integrityPolicyState.policy.enforcementMode === "block_new_issues_only" &&
-          publishIntegrityDetails
-        ) {
-          // When publish is blocked only by newly introduced issues, send the
-          // user straight into the script registry with the same focused view.
-          publishIntegrityDetails.scripts = publishIntegrityDetails.scripts.map((script) => ({
-            ...script,
-            registryHref: `${script.registryHref}?focus=newly_introduced`,
-            issues: script.issues.map((issue) => ({
-              ...issue,
-              registryHref: `${issue.registryHref}?focus=newly_introduced`,
-            })),
-          }))
-          publishIntegrityDetails.summary = [
-            policyEvaluation.policyModeMessage,
-            ...triggerSummary,
-            "Blocking policy: block new issues only. Existing baseline issues are not blocking this publish.",
-            ...publishIntegrityDetails.summary,
-          ]
-        } else if (publishIntegrityDetails) {
-          publishIntegrityDetails.summary = [policyEvaluation.policyModeMessage, ...triggerSummary, ...publishIntegrityDetails.summary]
-        }
-
-        results.success = false
-        results.errors = publishIntegrityErrors
-        results.blockingDetails = publishIntegrityDetails
-        return results
-      }
-    }
-
-    const failPublish = (errors?: string[]) => {
-      results.success = false
-      results.errors = errors?.length ? errors : ["Publish failed"]
-      return results
-    }
-
-    const publishTransactionResult = await db.transaction(async (tx) => {
       const publishConfigKeys = await configKeysMutations._publishConfigKeys({
         userId,
         publisherUserId,
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishConfigKeys.errors?.length) throw new Error(publishConfigKeys.errors.join(", "))
+      if (!publishConfigKeys.success) throw new Error(publishConfigKeys.errors?.join(", ") || "Failed to publish config keys")
 
       const publishHospitals = await hospitalsMutations._publishHospitals({
         userId,
@@ -927,7 +1412,7 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishHospitals.errors?.length) throw new Error(publishHospitals.errors.join(", "))
+      if (!publishHospitals.success) throw new Error(publishHospitals.errors?.join(", ") || "Failed to publish hospitals")
 
       const publishDrugsLibraryItems = await drugsLibraryMutations._publishDrugsLibraryItems({
         userId,
@@ -935,16 +1420,15 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishDrugsLibraryItems.errors?.length) throw new Error(publishDrugsLibraryItems.errors.join(", "))
+      if (!publishDrugsLibraryItems.success) throw new Error(publishDrugsLibraryItems.errors?.join(", ") || "Failed to publish drugs library items")
 
       const publishDataKeys = await dataKeysMutations._publishDataKeys({
         userId,
         publisherUserId,
         dataVersion: nextDataVersion,
-        allowConfidentialDowngrade: true,
         client: tx,
       })
-      if (publishDataKeys.errors?.length) throw new Error(publishDataKeys.errors.join(", "))
+      if (!publishDataKeys.success) throw new Error(publishDataKeys.errors?.join(", ") || "Failed to publish data keys")
 
       const publishScripts = await scriptsMutations._publishScripts({
         userId,
@@ -952,7 +1436,7 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishScripts.errors?.length) throw new Error(publishScripts.errors.join(", "))
+      if (!publishScripts.success) throw new Error(publishScripts.errors?.join(", ") || "Failed to publish scripts")
 
       const publishScreens = await scriptsMutations._publishScreens({
         userId,
@@ -960,7 +1444,7 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishScreens.errors?.length) throw new Error(publishScreens.errors.join(", "))
+      if (!publishScreens.success) throw new Error(publishScreens.errors?.join(", ") || "Failed to publish screens")
 
       const publishDiagnoses = await scriptsMutations._publishDiagnoses({
         userId,
@@ -968,7 +1452,7 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishDiagnoses.errors?.length) throw new Error(publishDiagnoses.errors.join(", "))
+      if (!publishDiagnoses.success) throw new Error(publishDiagnoses.errors?.join(", ") || "Failed to publish diagnoses")
 
       const publishProblems = await scriptsMutations._publishProblems({
         userId,
@@ -976,7 +1460,7 @@ export async function publishData({
         dataVersion: nextDataVersion,
         client: tx,
       })
-      if (publishProblems.errors?.length) throw new Error(publishProblems.errors.join(", "))
+      if (!publishProblems.success) throw new Error(publishProblems.errors?.join(", ") || "Failed to publish problems")
 
       const publishApkReleases = await appUpdatesMutations._publishApkReleases({
         userId,
@@ -998,72 +1482,24 @@ export async function publishData({
         publisherUserId: publisherUserId || undefined,
         client: tx,
       })
-      if (processPendingDeletion.errors?.length) throw new Error(processPendingDeletion.errors.join(", "))
+      if (!processPendingDeletion.success) throw new Error(processPendingDeletion.errors?.join(", ") || "Failed to publish pending deletions")
 
-      const editorInfoSave = await _saveEditorInfo({
-        increaseVersion: results.success,
-        broadcastAction: false,
-        data: { lastPublishDate: new Date() },
-        client: tx,
-      })
-      if (editorInfoSave.errors?.length) throw new Error(editorInfoSave.errors.join(", "))
+      await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
 
-      return { editorInfoSave, mdmRolloutPolicies }
-    }).catch((error: any) => ({
-      errors: [error?.message || "Publish failed"],
-    }))
-
-    if ("errors" in publishTransactionResult && publishTransactionResult.errors?.length) {
-      return failPublish(publishTransactionResult.errors)
-    }
-
-    const editorInfoSave = ("editorInfoSave" in publishTransactionResult)
-      ? publishTransactionResult.editorInfoSave
-      : { data: null, success: false, errors: ["Publish failed"] }
-
-    const mdmRolloutPolicies = ("mdmRolloutPolicies" in publishTransactionResult)
-      ? publishTransactionResult.mdmRolloutPolicies || []
-      : []
-
-    if (results.success && editorInfoSave.success && editorInfoSave.data?.dataVersion && publisherUserId) {
-      const releaseDataVersion = editorInfoSave.data.dataVersion
-      const now = new Date()
       const releaseLog = await _saveChangeLog({
-        data: {
-          entityId: RELEASE_CHANGELOG_ENTITY_ID,
-          entityType: "release",
-          action: "publish",
-          dataVersion: releaseDataVersion,
-          changes: [
-            {
-              action: "publish",
-              description: `Release v${releaseDataVersion} published`,
-              fromDataVersion: releaseDataVersion - 1,
-              toDataVersion: releaseDataVersion,
-            },
-          ],
-          fullSnapshot: {
-            dataVersion: releaseDataVersion,
-            publishedAt: now.toISOString(),
-            publishedBy: publisherUserId,
-          },
-          previousSnapshot: {},
-          baselineSnapshot: {
-            dataVersion: releaseDataVersion,
-            publishedAt: now.toISOString(),
-            publishedBy: publisherUserId,
-          },
-          description: `Release v${releaseDataVersion} published`,
-          changeReason: `Release v${releaseDataVersion} published`,
-          isActive: false,
+        data: buildReleasePublishChangeLog({
+          dataVersion: nextDataVersion,
           userId: publisherUserId,
-        },
+        }),
+        client: tx,
       })
 
       if (!releaseLog.success) {
-        logger.error("publishData release changelog warning", releaseLog.errors?.join(", ") || "Unknown error")
+        throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
       }
-    }
+
+      return { mdmRolloutPolicies }
+    })
 
     for (const policy of mdmRolloutPolicies) {
       try {
@@ -1094,78 +1530,46 @@ export async function publishData({
   }
 }
 
-export async function discardDrafts({
-  scope,
-}: {
-  scope: number
-}) {
+export async function discardDrafts({ scope }: { scope: number }) {
   const results: { success: boolean; errors?: string[] } = { success: true }
   try {
-    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_diagnoses", "delete_screens"])
+    const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_problems", "delete_screens"])
 
-    let userId = session?.user?.userId
+    let userId: string | null | undefined = session?.user?.userId
 
-    if (scope === 1) userId = undefined
-
-    await configKeysMutations._deleteAllConfigKeysDrafts({ userId })
-    await hospitalsMutations._deleteAllHospitalsDrafts({ userId })
-    await drugsLibraryMutations._deleteAllDrugsLibraryItemsDrafts({ userId })
-    await dataKeysMutations._deleteAllDataKeysDrafts({ userId })
-    await scriptsMutations._deleteAllScriptsDrafts({ userId })
-    await scriptsMutations._deleteAllScreensDrafts({ userId })
-    await scriptsMutations._deleteAllDiagnosesDrafts({ userId })
-    await scriptsMutations._deleteAllProblemsDrafts({ userId })
-    await appUpdatesMutations._deleteAllAppUpdatePolicyDrafts({ userId })
-    await appUpdatesMutations._deleteAllApkReleaseDrafts({ userId })
-    await _clearPendingDeletion({ userId })
-
-    const [
-      remainingConfigKeyDrafts,
-      remainingHospitalDrafts,
-      remainingDrugsDrafts,
-      remainingDataKeyDrafts,
-      remainingScriptDrafts,
-      remainingScreenDrafts,
-      remainingDiagnosisDrafts,
-      remainingProblemDrafts,
-      remainingPendingDeletion,
-    ] = await Promise.all([
-      db.query.configKeysDrafts.findMany({ where: userId ? eq(configKeysDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
-      db.query.hospitalsDrafts.findMany({ where: userId ? eq(hospitalsDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
-      db.query.drugsLibraryDrafts.findMany({ where: userId ? eq(drugsLibraryDrafts.createdByUserId, userId) : undefined, columns: { id: true } }),
-      db.query.dataKeysDrafts.findMany({ where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined, columns: { uuid: true } }),
-      db.query.scriptsDrafts.findMany({ where: userId ? eq(scriptsDrafts.createdByUserId, userId) : undefined, columns: { scriptDraftId: true } }),
-      db.query.screensDrafts.findMany({ where: userId ? eq(screensDrafts.createdByUserId, userId) : undefined, columns: { screenDraftId: true } }),
-      db.query.diagnosesDrafts.findMany({ where: userId ? eq(diagnosesDrafts.createdByUserId, userId) : undefined, columns: { diagnosisDraftId: true } }),
-      db.query.problemsDrafts.findMany({ where: userId ? eq(problemsDrafts.createdByUserId, userId) : undefined, columns: { problemDraftId: true } }),
-      db.query.pendingDeletion.findMany({ where: userId ? eq(pendingDeletion.createdByUserId, userId) : undefined, columns: { id: true } }),
-    ])
-
-    const leftovers = [
-      remainingConfigKeyDrafts.length ? `${remainingConfigKeyDrafts.length} config key draft${remainingConfigKeyDrafts.length === 1 ? "" : "s"}` : null,
-      remainingHospitalDrafts.length ? `${remainingHospitalDrafts.length} hospital draft${remainingHospitalDrafts.length === 1 ? "" : "s"}` : null,
-      remainingDrugsDrafts.length ? `${remainingDrugsDrafts.length} drug/fluid/feed draft${remainingDrugsDrafts.length === 1 ? "" : "s"}` : null,
-      remainingDataKeyDrafts.length ? `${remainingDataKeyDrafts.length} data key draft${remainingDataKeyDrafts.length === 1 ? "" : "s"}` : null,
-      remainingScriptDrafts.length ? `${remainingScriptDrafts.length} script draft${remainingScriptDrafts.length === 1 ? "" : "s"}` : null,
-      remainingScreenDrafts.length ? `${remainingScreenDrafts.length} screen draft${remainingScreenDrafts.length === 1 ? "" : "s"}` : null,
-      remainingDiagnosisDrafts.length ? `${remainingDiagnosisDrafts.length} diagnosis draft${remainingDiagnosisDrafts.length === 1 ? "" : "s"}` : null,
-      remainingProblemDrafts.length ? `${remainingProblemDrafts.length} problem draft${remainingProblemDrafts.length === 1 ? "" : "s"}` : null,
-      remainingPendingDeletion.length ? `${remainingPendingDeletion.length} pending deletion${remainingPendingDeletion.length === 1 ? "" : "s"}` : null,
-    ].filter(Boolean)
-
-    if (leftovers.length) {
-      results.success = false
-      results.errors = [
-        `Discard completed, but draft state still remains in the workspace: ${leftovers.join(", ")}.`,
-      ]
-      return results
+    if (scope === 1) {
+      // Discarding every user's drafts is destructive to other people's work
+      if (!["admin", "super_user"].includes(session?.user?.role || "")) {
+        throw new Error("Only admins can discard drafts belonging to other users")
+      }
+      userId = undefined
     }
+
+    await db.transaction(async (tx) => {
+      const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+
+      await tx.delete(configKeysDrafts).where(byUser(configKeysDrafts.createdByUserId))
+      await tx.delete(hospitalsDrafts).where(byUser(hospitalsDrafts.createdByUserId))
+      await tx.delete(drugsLibraryDrafts).where(byUser(drugsLibraryDrafts.createdByUserId))
+      await tx.delete(dataKeysDrafts).where(byUser(dataKeysDrafts.createdByUserId))
+      await tx.delete(scriptsDrafts).where(byUser(scriptsDrafts.createdByUserId))
+      await tx.delete(screensDrafts).where(byUser(screensDrafts.createdByUserId))
+      await tx.delete(diagnosesDrafts).where(byUser(diagnosesDrafts.createdByUserId))
+      await tx.delete(problemsDrafts).where(byUser(problemsDrafts.createdByUserId))
+      await tx.delete(appUpdatePoliciesDrafts).where(byUser(appUpdatePoliciesDrafts.createdByUserId))
+      await tx.delete(apkReleasesDrafts).where(byUser(apkReleasesDrafts.createdByUserId))
+
+      const clearPendingDeletion = await _clearPendingDeletion({ userId, client: tx })
+      if (!clearPendingDeletion.success) {
+        throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
+      }
+    })
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {
     results.success = false
     results.errors = [e.message]
-    logger.error("publishData ERROR", e.message)
+    logger.error("discardDrafts ERROR", e.message)
   } finally {
     return results
   }

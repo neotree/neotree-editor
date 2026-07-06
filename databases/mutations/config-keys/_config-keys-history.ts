@@ -25,8 +25,14 @@ export async function _saveConfigKeysHistory({
       const configKeyId = c?.data?.configKeyId
       if (!configKeyId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
-      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+      const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
+      const isCreate = !prev
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof configKeysHistory.$inferInsert = {
         version: nextVersion,
@@ -42,8 +48,6 @@ export async function _saveConfigKeysHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.configKeyId === configKeyId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -72,13 +76,12 @@ export async function _saveConfigKeysHistory({
       if (userId) {
         const { ...rest } = c.data || {}
         const sanitizedSnapshot = JSON.parse(JSON.stringify(rest))
-        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(previous.find((prevC) => prevC.configKeyId === configKeyId) || {}))
+        const previousSnapshot = isCreate ? {} : JSON.parse(JSON.stringify(prev || {}))
 
         changeLogsData.push({
           entityId: configKeyId,
           entityType: "config_key",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -93,7 +96,8 @@ export async function _saveConfigKeysHistory({
       await executor.insert(configKeysHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveConfigKeysHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

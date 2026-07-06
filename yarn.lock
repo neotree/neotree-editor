@@ -1977,6 +1977,11 @@
   resolved "https://registry.npmjs.org/@types/stylis/-/stylis-4.2.7.tgz"
   integrity sha512-VgDNokpBoKF+wrdvhAAfS55OMQpL6QRglwTwNC3kIgBrzZxA4WsFj+2eLfEA/uMUDzBcEhYmjSbwQakn/i3ajA==
 
+"@types/trusted-types@^2.0.7":
+  version "2.0.7"
+  resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.7.tgz#baccb07a970b91707df3a3e8ba6896c57ead2d11"
+  integrity sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==
+
 "@types/unist@*", "@types/unist@^3.0.0":
   version "3.0.3"
   resolved "https://registry.npmjs.org/@types/unist/-/unist-3.0.3.tgz"
@@ -2855,14 +2860,14 @@ devlop@^1.0.0, devlop@^1.1.0:
     dequal "^2.0.0"
 
 dexie-react-hooks@^4.2.0:
-  version "4.2.0"
-  resolved "https://registry.npmjs.org/dexie-react-hooks/-/dexie-react-hooks-4.2.0.tgz"
-  integrity sha512-u7KqTX9JpBQK8+tEyA9X0yMGXlSCsbm5AU64N6gjvGk/IutYDpLBInMYEAEC83s3qhIvryFS+W+sqLZUBEvePQ==
+  version "4.4.0"
+  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-4.4.0.tgz#7229ef22b94d2c4e22007cee56c3a37ff2efa379"
+  integrity sha512-ObLXBS5+4BJU8vtSvBx6b9fY6zZYgniAtwxzjCHsUQadgbqYN6935X2/1TWw4Rf2N1aZV1io5/ziox4vKuxABA==
 
 dexie@^4.2.1:
-  version "4.2.1"
-  resolved "https://registry.npmjs.org/dexie/-/dexie-4.2.1.tgz"
-  integrity sha512-Ckej0NS6jxQ4Po3OrSQBFddayRhTCic2DoCAG5zacOfOVB9P2Q5Xc5uL/nVa7ZVs+HdMnvUPzLFCB/JwpB6Csg==
+  version "4.4.4"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.4.4.tgz#ed75e818e6cb4a131a6956095f96f6669cfab464"
+  integrity sha512-jIwsYI8Os2hgnqc6O49YwFDKGc5v5QjGx0wPVp543ip1F53VFAKMLthV2pQosQcVTv3eAskTWYspOx195PM0FQ==
 
 didyoumean@^1.2.2:
   version "1.2.2"
@@ -2902,6 +2907,13 @@ dom-helpers@^5.0.1:
   dependencies:
     "@babel/runtime" "^7.8.7"
     csstype "^3.0.2"
+
+dompurify@^3.4.11:
+  version "3.4.11"
+  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.4.11.tgz#29c8ba496475f279ef4015784068452fb14a0680"
+  integrity sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==
+  optionalDependencies:
+    "@types/trusted-types" "^2.0.7"
 
 dotenv@^16.4.5:
   version "16.6.1"
