@@ -123,7 +123,7 @@ export default function ConditionalExp() {
                             disabled={!canTest}
                             onClick={() => {
                                 const res = evaluateCondition(parseCondition(condition, entries));
-                                alert(parseCondition(condition, entries) + ' ' + res);
+                                alert(res);
                             }}
                         >Test</Button>
                     </div>

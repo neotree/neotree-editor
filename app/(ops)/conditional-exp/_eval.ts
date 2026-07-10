@@ -101,16 +101,20 @@ export function parseCondition(
                 _condition.split(/ includes /gi).map(s => s.trim());
 
             const entryVals = _form.map(e => {
-                let found: string[] = [];
-                const entryVals = e.value || e.values || [];
-                entryVals.forEach(v => {
-                    if (`$${v.key?.toLowerCase?.()}` === key.toLowerCase()) {
-                        const val = Array.isArray(v.value) ? v.value : [v.value];
-                        val.forEach(v => found.push(v.key));
-                    }
-                });
-                return found;
-            }).reduce((acc, arr) => [...acc, ...arr], []);
+                    let found: string[] = [];
+                    const entryVals = e.value || e.values || [];
+                    entryVals.forEach(v => {
+                        if (`$${v.key?.toLowerCase?.()}` === key?.toLowerCase?.()) {
+                            const val = Array.isArray(v.value) ? v.value : [v.value];
+                            val.forEach(v => {
+                                if (v.key) {
+                                    found.push(v.key);
+                                }
+                            });
+                        }
+                    });
+                    return found.filter(v => v);
+                }).reduce((acc, arr) => [...acc, ...arr], []);
 
             _condition = `${vals || ''}`
                 .replace(/\((.*?)\)/, '$1')
