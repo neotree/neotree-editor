@@ -22,7 +22,7 @@ import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
-import { normalizeSearchTerm } from "@/lib/search";
+import { matchesDataKeySearch } from "@/lib/data-keys-search";
 
 
 function paginateData<T>(
@@ -229,20 +229,7 @@ export function DataKeysCtxProvider({
 
 
         if (searchValue) {
-            const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
-
-            if (normalizedValue) {
-                filtered = filtered.filter(dataKey => {
-                    const searchableFields = [
-                        dataKey.name || '',
-                        dataKey.label || '',
-                    ].map(field => field.toLowerCase());
-
-                    return searchableFields.some(field =>
-                        isExactMatch ? field === normalizedValue : field.includes(normalizedValue)
-                    );
-                });
-            }
+            filtered = filtered.filter(dataKey => matchesDataKeySearch(dataKey, searchValue));
         }
 
         return filtered;
