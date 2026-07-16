@@ -41,6 +41,7 @@ export function useTable({ props: _props }: {
 
     const [internalSearchValue, setInternalSearchValue] = useState(''); 
     const searchValue = useDebounce(search?.value || internalSearchValue);
+    const filterRows = search?.filterRows !== false;
     const setSearchValue = useCallback((value = '') => {
         // if (search?.setValue) {
         //     search?.setValue(value);
@@ -125,7 +126,10 @@ export function useTable({ props: _props }: {
         if (mounted.current) {
             let filteredRows: undefined | Parameters<NonNullable<DataTableProps['onFilteredRowsChange']>>[0] = undefined;
             setState(prev => {
-                const rows = getFilteredRows({ rows: prev.unfilteredRows, searchValue, });
+                const rows = getFilteredRows({
+                    rows: prev.unfilteredRows,
+                    searchValue: filterRows ? searchValue : undefined,
+                });
                 if (JSON.stringify(prev.rows) === (JSON.stringify(rows))) return prev;
                 filteredRows = rows.map(r => ({ rowIndex: r.rowIndex, }));
                 return {
@@ -135,7 +139,7 @@ export function useTable({ props: _props }: {
             });
             if (filteredRows) onFilteredRowsChange?.(filteredRows);
         }
-    }, [state.rows, searchValue]);
+    }, [state.rows, searchValue, filterRows]);
 
     useEffect(() => {
         setState(prev => ({
