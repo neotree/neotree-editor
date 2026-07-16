@@ -6,34 +6,39 @@ import { TrashIcon } from 'lucide-react';
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { Button } from '@/components/ui/button';
 import { ActionsBar } from '@/components/actions-bar';
-import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAlertModal } from '@/hooks/use-alert-modal';
+import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { ExportModal } from './export-modal';
-import { buildDeleteConfirmationFooterMessage, buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
-import { Loader } from '@/components/loader';
+import { fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
 import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
 
 export function DataKeysTableBottomActions({ disabled, }: {
     disabled: boolean;
 }) {
-    const [isPreparingDelete, setIsPreparingDelete] = useState(false);
+    const [impactLoading, setImpactLoading] = useState(false);
     const [replacementImpact, setReplacementImpact] = useState<DeleteImpactItem[]>([]);
     const [showReplacementDialog, setShowReplacementDialog] = useState(false);
-    const { confirm } = useConfirmModal();
+    const { alert } = useAlertModal();
     const { selected, setSelected, deleteDataKeys, allDataKeys, deleting } = useDataKeysCtx();
 
     if (disabled || !selected.length) return null;
 
     return (
         <>
-            {isPreparingDelete && <Loader overlay />}
             <DataKeyDeleteReplacementDialog
                 open={showReplacementDialog}
                 onOpenChange={setShowReplacementDialog}
                 impact={replacementImpact}
                 dataKeys={allDataKeys}
                 deleting={deleting}
+                loading={impactLoading}
                 onConfirm={async (replacements) => {
                     const success = await deleteDataKeys(selected.map(s => s.uuid), replacements);
+                    if (success) setShowReplacementDialog(false);
+                    return success;
+                }}
+                onDeleteAnyway={async (replacements) => {
+                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, { allowMissingReplacements: true });
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
@@ -53,25 +58,44 @@ export function DataKeysTableBottomActions({ disabled, }: {
                 <Button
                     variant="destructive"
                     onClick={() => setTimeout(async () => {
-                        try {
-                            setIsPreparingDelete(true);
-                            const uuids = selected.map(s => s.uuid);
-                            const impact = await fetchDataKeyDeleteImpact(uuids);
-                            if (impact.some((item) => item.scripts.length > 0)) {
-                                setReplacementImpact(impact);
-                                setShowReplacementDialog(true);
-                                return;
-                            }
+                        const uuids = selected.map(s => s.uuid);
 
-                            confirm(() => deleteDataKeys(uuids), {
-                                title: 'Delete data keys',
-                                message: buildDeleteConfirmationMessage(impact),
-                                footerMessage: buildDeleteConfirmationFooterMessage(impact),
-                                positiveLabel: 'Delete',
-                                danger: true,
+                        // Child keys can only be deleted together with every
+                        // parent that links them; otherwise they must be
+                        // unlinked from the parent first. The server enforces
+                        // the same rule.
+                        const selectedIds = new Set(uuids);
+                        const blocked = getBlockedChildDeletions({
+                            dataKeys: allDataKeys,
+                            targets: allDataKeys.filter(key => key?.uuid && selectedIds.has(key.uuid)),
+                        });
+                        if (blocked.length) {
+                            alert({
+                                title: 'Cannot delete child data keys',
+                                variant: 'error',
+                                message: blocked
+                                    .map(item => `"${item.name || item.label || item.uniqueKey}" is a child option of ${item.parents.map(p => `"${getDataKeyParentTitle(p)}"`).join(', ')}.`)
+                                    .join(' ') + ' Unlink them from their parent data keys first.',
+                            });
+                            return;
+                        }
+
+                        // Open instantly with a skeleton; the usage check fills it in.
+                        setReplacementImpact([]);
+                        setImpactLoading(true);
+                        setShowReplacementDialog(true);
+                        try {
+                            const impact = await fetchDataKeyDeleteImpact(uuids);
+                            setReplacementImpact(impact);
+                        } catch (e: any) {
+                            setShowReplacementDialog(false);
+                            alert({
+                                title: 'Error',
+                                message: `Failed to check data key usage: ${e.message}`,
+                                variant: 'error',
                             });
                         } finally {
-                            setIsPreparingDelete(false);
+                            setImpactLoading(false);
                         }
                     }, 0)}
                 >

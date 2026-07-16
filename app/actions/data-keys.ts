@@ -1,6 +1,6 @@
 'use server';
 
-import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
+import { GetDataKeysParams, _getDataKeys, _getPendingDeletionDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { _saveDiagnoses, _saveProblems, _saveScreens } from '@/databases/mutations/scripts';
@@ -16,7 +16,7 @@ import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBl
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
-import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
+import { buildDataKeysDeleteImpact, buildDataKeyOptionUnlinkImpact } from '@/lib/data-key-delete-impact';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -352,9 +352,22 @@ export const getDataKeysIntegrity = async (params?: {
     }
 }
 
+export const getPendingDeletionDataKeys = async () => {
+    try {
+        await isAllowed();
+        return await _getPendingDeletionDataKeys();
+    } catch (e: any) {
+        logger.error('getPendingDeletionDataKeys ERROR', e.message);
+        return { data: [], errors: [e.message] };
+    }
+};
+
 export const getDataKeysDeleteImpact = async (params?: {
     dataKeysIds?: string[];
     uniqueKeys?: string[];
+    // When set, reports unlink impact instead: only usages of the keys as
+    // owned options of this parent (screens/fields bound to the parent).
+    scopeParentUniqueKey?: string;
 }): Promise<{
     success: boolean;
     data: Array<{
@@ -393,6 +406,28 @@ export const getDataKeysDeleteImpact = async (params?: {
         ];
 
         if (errors.length) return { success: false, data: [], errors };
+
+        const scopeParentUniqueKey = `${params?.scopeParentUniqueKey || ''}`.trim();
+
+        if (scopeParentUniqueKey) {
+            const requestedIds = new Set((params?.dataKeysIds || []).filter(Boolean));
+            const childUniqueKeys = Array.from(new Set([
+                ...(params?.uniqueKeys || []),
+                ...dataKeysRes.data
+                    .filter((dataKey) => dataKey.uuid && requestedIds.has(dataKey.uuid))
+                    .map((dataKey) => dataKey.uniqueKey),
+            ].filter(Boolean)));
+
+            return {
+                success: true,
+                data: buildDataKeyOptionUnlinkImpact({
+                    dataKeys: dataKeysRes.data,
+                    screens: screensRes.data,
+                    parentUniqueKey: scopeParentUniqueKey,
+                    childUniqueKeys,
+                }),
+            };
+        }
 
         return {
             success: true,

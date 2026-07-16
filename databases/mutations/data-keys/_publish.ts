@@ -18,7 +18,7 @@ export async function _publishDataKeys(opts?: {
   allowConfidentialDowngrade?: boolean
   client?: DbOrTransaction
 }) {
-  const results: { success: boolean; errors?: string[] } = { success: false }
+  const results: { success: boolean; errors?: string[]; deletedUniqueKeys?: string[] } = { success: false }
   const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
@@ -43,6 +43,13 @@ export async function _publishDataKeys(opts?: {
     })
 
     deleted = deleted.filter((c) => c.dataKey)
+
+    // Original (pre-suffix) unique keys of the data keys deleted in this
+    // release — the publish flow uses these to verify no published entity
+    // still references them once every entity type has published.
+    results.deletedUniqueKeys = deleted
+      .map((c) => `${c.dataKey?.uniqueKey || ""}`.trim())
+      .filter(Boolean)
 
     if (deleted.length) {
       const deletedAt = new Date()

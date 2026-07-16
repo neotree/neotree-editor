@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
+import { buildDataKeyParentIndex } from '@/lib/data-key-children';
+import { DataKeyParentsIndicator } from './parents-indicator';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -12,11 +14,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import { useAlertModal } from '@/hooks/use-alert-modal';
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
-import { buildDeleteConfirmationFooterMessage, buildDeleteConfirmationMessage, fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
+import { fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
 import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
 
 export function DataKeysTableRowActions({
@@ -29,14 +31,21 @@ export function DataKeysTableRowActions({
     setCurrentDataKeyUuid: (uuid: string) => void;
 }) {
     const [isTransitionPending, startTransition] = useTransition();
-    const [isPreparingDelete, setIsPreparingDelete] = useState(false);
+    const [impactLoading, setImpactLoading] = useState(false);
     const [replacementImpact, setReplacementImpact] = useState<DeleteImpactItem[]>([]);
     const [showReplacementDialog, setShowReplacementDialog] = useState(false);
 
     const { dataKeys, allDataKeys, deleteDataKeys, deleting } = useDataKeysCtx();
-    const { confirm } = useConfirmModal();
+    const { alert } = useAlertModal();
 
     const dataKey = dataKeys[rowIndex];
+
+    // A key linked as a child option of another key cannot be deleted from the
+    // library — it must be unlinked from its parent(s) first, so the delete
+    // action is hidden and the linked parents are surfaced instead.
+    const parentIndex = useMemo(() => buildDataKeyParentIndex(allDataKeys), [allDataKeys]);
+    const linkedParents = !dataKey?.uniqueKey ? [] : (parentIndex.get(dataKey.uniqueKey) || []);
+    const isChildKey = !!linkedParents.length;
 
     const lockStatusParams: LockStatusProps = {
         isDraft: dataKey?.isDraft,
@@ -52,7 +61,7 @@ export function DataKeysTableRowActions({
 
     return (
         <div className="flex gap-x-2">
-            {(isTransitionPending || isPreparingDelete) && <Loader overlay />}
+            {isTransitionPending && <Loader overlay />}
 
             <DataKeyDeleteReplacementDialog
                 open={showReplacementDialog}
@@ -60,12 +69,20 @@ export function DataKeysTableRowActions({
                 impact={replacementImpact}
                 dataKeys={allDataKeys}
                 deleting={deleting}
+                loading={impactLoading}
                 onConfirm={async (replacements) => {
                     const success = await deleteDataKeys([dataKey.uuid], replacements);
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
+                onDeleteAnyway={async (replacements) => {
+                    const success = await deleteDataKeys([dataKey.uuid], replacements, { allowMissingReplacements: true });
+                    if (success) setShowReplacementDialog(false);
+                    return success;
+                }}
             />
+
+            <DataKeyParentsIndicator parents={linkedParents} />
 
             <LockStatus {...lockStatusParams} />
 
@@ -100,26 +117,24 @@ export function DataKeysTableRowActions({
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        className={cn('text-destructive', disabled && 'hidden')}
+                        className={cn('text-destructive', (disabled || isChildKey) && 'hidden')}
                         onClick={() => setTimeout(async () => {
+                            // Open instantly with a skeleton; the usage check fills it in.
+                            setReplacementImpact([]);
+                            setImpactLoading(true);
+                            setShowReplacementDialog(true);
                             try {
-                                setIsPreparingDelete(true);
                                 const impact = await fetchDataKeyDeleteImpact([dataKey.uuid]);
-                                if (impact.some((item) => item.scripts.length > 0)) {
-                                    setReplacementImpact(impact);
-                                    setShowReplacementDialog(true);
-                                    return;
-                                }
-
-                                confirm(() => deleteDataKeys([dataKey.uuid]), {
-                                    title: 'Delete data key',
-                                    message: buildDeleteConfirmationMessage(impact),
-                                    footerMessage: buildDeleteConfirmationFooterMessage(impact),
-                                    positiveLabel: 'Delete',
-                                    danger: true,
+                                setReplacementImpact(impact);
+                            } catch (e: any) {
+                                setShowReplacementDialog(false);
+                                alert({
+                                    title: 'Error',
+                                    message: `Failed to check data key usage: ${e.message}`,
+                                    variant: 'error',
                                 });
                             } finally {
-                                setIsPreparingDelete(false);
+                                setImpactLoading(false);
                             }
                         }, 0)}
                     >

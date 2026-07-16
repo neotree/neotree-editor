@@ -35,9 +35,15 @@ export async function _getDataKeysRefs({
         if (!uniqueKeys.length) return defaultRes;
         const executor = client || db;
 
+        const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, '\\$&');
         const whereUniqueKey = (column: PgColumn) => or(
-            ...uniqueKeys.map(k => sql`${column}::text like ${`%${k}%`}`),
+            ...uniqueKeys.map(k => sql`${column}::text like ${`%${escapeLikePattern(k)}%`}`),
         );
+
+        // Published rows superseded by a draft must always be excluded, whether or
+        // not that draft still matches the keys — the draft is the current state.
+        const draftedIds = async (rows: PromiseLike<{ id: string | null }[]>) =>
+            (await rows).map(r => r.id!).filter(Boolean);
 
         // diagnoses
         const _diagnosesDrafts = await executor.query.diagnosesDrafts.findMany({
@@ -45,15 +51,17 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.diagnosesDrafts.position),
         });
 
-        const diagnosesIds = _diagnosesDrafts.map(d => d.diagnosisId!).filter(d => d);
+        const diagnosesIds = await draftedIds(executor
+            .select({ id: schema.diagnosesDrafts.diagnosisId })
+            .from(schema.diagnosesDrafts));
 
         const _diagnoses = await executor.query.diagnoses.findMany({
             where: and(
                 or(
                     whereUniqueKey(schema.diagnoses.symptoms),
                     whereUniqueKey(schema.diagnoses.keyId),
-                    !diagnosesIds.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesIds),
                 ),
+                !diagnosesIds.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesIds),
                 isNull(schema.diagnoses.deletedAt),
             ),
             orderBy: asc(schema.diagnoses.position),
@@ -65,15 +73,17 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.problemsDrafts.position),
         });
 
-        const problemsIds = _problemsDrafts.map(d => d.problemId!).filter(d => d);
+        const problemsIds = await draftedIds(executor
+            .select({ id: schema.problemsDrafts.problemId })
+            .from(schema.problemsDrafts));
 
         const _problems = await executor.query.problems.findMany({
             where: and(
                 or(
                     whereUniqueKey(schema.problems.symptoms),
                     whereUniqueKey(schema.problems.keyId),
-                    !problemsIds.length ? undefined : notInArray(schema.problems.problemId, problemsIds),
                 ),
+                !problemsIds.length ? undefined : notInArray(schema.problems.problemId, problemsIds),
                 isNull(schema.problems.deletedAt),
             ),
             orderBy: asc(schema.problems.position),
@@ -85,7 +95,9 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.screensDrafts.position),
         });
 
-        const screensIds = _screensDrafts.map(d => d.screenId!).filter(d => d);
+        const screensIds = await draftedIds(executor
+            .select({ id: schema.screensDrafts.screenId })
+            .from(schema.screensDrafts));
 
         const _screens = await executor.query.screens.findMany({
             where: and(
@@ -94,8 +106,8 @@ export async function _getDataKeysRefs({
                     whereUniqueKey(schema.screens.items),
                     whereUniqueKey(schema.screens.keyId),
                     whereUniqueKey(schema.screens.refIdDataKey),
-                    !screensIds.length ? undefined : notInArray(schema.screens.screenId, screensIds),
                 ),
+                !screensIds.length ? undefined : notInArray(schema.screens.screenId, screensIds),
                 isNull(schema.screens.deletedAt),
             ),
             orderBy: asc(schema.screens.position),

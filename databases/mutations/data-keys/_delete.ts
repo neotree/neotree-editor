@@ -8,6 +8,7 @@ import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
+import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
@@ -16,6 +17,13 @@ export type DeleteDataKeysParams = {
     broadcastAction?: boolean;
     userId?: string | null;
     replacements?: Record<string, string>;
+    /**
+     * "Delete anyway": permits deleting used keys without a replacement. Any
+     * replacements provided are still applied; the remaining references are
+     * removed/cleared from the affected scripts. Never the default — the UI
+     * sets this only after an explicit user confirmation.
+     */
+    allowMissingReplacements?: boolean;
 };
 
 export type DeleteDataKeysResponse = {
@@ -36,6 +44,7 @@ async function applyRequiredDeletionReplacements({
     allDataKeys,
     impact,
     replacements,
+    allowMissingReplacements,
     userId,
     client,
 }: {
@@ -43,6 +52,7 @@ async function applyRequiredDeletionReplacements({
     allDataKeys: DataKey[];
     impact: DataKeyDeleteImpactItem[];
     replacements: Record<string, string>;
+    allowMissingReplacements?: boolean;
     userId?: string | null;
     client: Parameters<typeof _updateDataKeysRefs>[0]["client"];
 }) {
@@ -63,7 +73,21 @@ async function applyRequiredDeletionReplacements({
         const replacementId = `${replacements?.[target.uuid] || ''}`.trim();
         const targetTitle = getDataKeyTitle(target);
 
+        // Parent keys (keys with child options) are never replaced — a valid
+        // replacement would need a superset option pool, which is practically
+        // unsatisfiable. Their references are removed instead; the UI warns
+        // with the affected scripts before allowing it.
+        if ((target.options || []).length) {
+            if (replacementId) {
+                throw new Error(`"${targetTitle}" is a parent data key and cannot be replaced. Delete it without a replacement instead.`);
+            }
+            continue;
+        }
+
         if (!replacementId) {
+            // "Delete anyway": the user explicitly accepted that this key's
+            // references get removed instead of replaced.
+            if (allowMissingReplacements) continue;
             throw new Error(`Choose a replacement before deleting "${targetTitle}" because it is used in scripts.`);
         }
 
@@ -130,7 +154,7 @@ export async function _deleteAllDataKeysDrafts(opts?: {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, }: DeleteDataKeysParams,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 
@@ -153,6 +177,23 @@ export async function _deleteDataKeys(
             if (loadErrors.length) throw new Error(loadErrors[0]);
 
             const targets = dataKeysRes.data.filter((dataKey) => dataKeysIds.includes(dataKey.uuid));
+
+            // Child keys stay deletable only when every parent that links them is
+            // part of the same deletion batch; otherwise the parent would keep a
+            // dangling option reference.
+            const blockedChildDeletions = getBlockedChildDeletions({
+                dataKeys: dataKeysRes.data,
+                targets,
+            });
+            if (blockedChildDeletions.length) {
+                const blocked = blockedChildDeletions[0];
+                const parentTitles = blocked.parents.map((parent) => `"${getDataKeyParentTitle(parent)}"`).join(', ');
+                throw new Error(
+                    `Cannot delete "${blocked.name || blocked.label || blocked.uniqueKey}" because it is a child option of ${parentTitles}. ` +
+                    `Unlink it from the parent data key${blocked.parents.length === 1 ? '' : 's'} first.`,
+                );
+            }
+
             const impact = buildDataKeysDeleteImpact({
                 dataKeys: dataKeysRes.data,
                 screens: screensRes.data,
@@ -167,6 +208,7 @@ export async function _deleteDataKeys(
                     allDataKeys: dataKeysRes.data,
                     impact,
                     replacements,
+                    allowMissingReplacements,
                     userId,
                     client: tx,
                 });
@@ -198,7 +240,7 @@ export async function _deleteDataKeys(
                     .where(inArray(dataKeys.uuid, dataKeysIds));
 
                 const pendingDeletionInsertData = dataKeysArr.filter(s => !s.pendingDeletion).map(s => ({
-                    ...s,
+                    dataKeyId: s.dataKeyId,
                     createdByUserId: userId,
                 }));
 
