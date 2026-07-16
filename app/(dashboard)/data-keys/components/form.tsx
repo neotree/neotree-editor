@@ -581,7 +581,7 @@ function Form({
                 onOpenChange={(open) => {
                     if (!open) setUnlinkDialog(null);
                 }}
-                onConfirm={(replacements) => {
+                onConfirm={({ replacements }) => {
                     (unlinkDialog?.children || []).forEach(child => {
                         const replacementUuid = replacements[child.uuid];
                         const replacement = dataKeys.find(k => k.uuid === replacementUuid);

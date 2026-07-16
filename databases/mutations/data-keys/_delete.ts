@@ -9,6 +9,7 @@ import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/sc
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
+import { resolveScriptRemovalExclusions } from '@/lib/data-key-script-removals';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
@@ -24,6 +25,13 @@ export type DeleteDataKeysParams = {
      * sets this only after an explicit user confirmation.
      */
     allowMissingReplacements?: boolean;
+    /**
+     * Per-script exceptions to a chosen replacement: target uuid -> scriptIds
+     * whose references are REMOVED instead of replaced. Validated against the
+     * freshly computed impact; unknown script ids fall back to the default
+     * action (replace).
+     */
+    scriptRemovals?: Record<string, string[]>;
 };
 
 export type DeleteDataKeysResponse = {
@@ -45,6 +53,7 @@ async function applyRequiredDeletionReplacements({
     impact,
     replacements,
     allowMissingReplacements,
+    scriptRemovals,
     userId,
     client,
 }: {
@@ -53,6 +62,7 @@ async function applyRequiredDeletionReplacements({
     impact: DataKeyDeleteImpactItem[];
     replacements: Record<string, string>;
     allowMissingReplacements?: boolean;
+    scriptRemovals?: Record<string, string[]>;
     userId?: string | null;
     client: Parameters<typeof _updateDataKeysRefs>[0]["client"];
 }) {
@@ -125,6 +135,15 @@ async function applyRequiredDeletionReplacements({
     const replacementKeys = Array.from(replacementKeysById.values());
     if (!replacementKeys.length) return;
 
+    // Per-script exceptions: references in these scripts are left for the strip
+    // step to remove instead of being rewritten to the replacement. Unknown or
+    // stale script ids are dropped so new usage gets the default action.
+    const excludeScriptIdsByAlias = resolveScriptRemovalExclusions({
+        impact,
+        replacements: replacements || {},
+        scriptRemovals: scriptRemovals || {},
+    });
+
     // Only rewrite references that point at the deleted keys. Existing usages of
     // the replacement keys should not be touched by a delete-replace operation.
     const updateRes = await _updateDataKeysRefs({
@@ -134,6 +153,7 @@ async function applyRequiredDeletionReplacements({
         broadcastAction: false,
         matchUniqueKeysByDataKey: aliasesByReplacementUniqueKey,
         includePrimaryUniqueKeys: false,
+        excludeScriptIdsByAlias,
         client,
     });
 
@@ -154,7 +174,7 @@ export async function _deleteAllDataKeysDrafts(opts?: {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, }: DeleteDataKeysParams,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, scriptRemovals = {}, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 
@@ -209,6 +229,7 @@ export async function _deleteDataKeys(
                     impact,
                     replacements,
                     allowMissingReplacements,
+                    scriptRemovals,
                     userId,
                     client: tx,
                 });

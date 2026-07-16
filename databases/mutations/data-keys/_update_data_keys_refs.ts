@@ -27,6 +27,12 @@ export type UpdateDataKeysRefsParams = {
     matchUniqueKeysByDataKey?: Record<string, string[]>;
     // Delete-replace uses alias-only matching so existing replacement usages are not rewritten unnecessarily.
     includePrimaryUniqueKeys?: boolean;
+    /**
+     * Per-script delete granularity: references to these alias uniqueKeys are
+     * NOT rewritten inside the listed scripts — the delete flow's strip step
+     * removes them there instead.
+     */
+    excludeScriptIdsByAlias?: Record<string, string[]>;
     forceFullScan?: boolean;
     client?: DbOrTransaction;
 };
@@ -166,6 +172,7 @@ export async function _updateDataKeysRefs({
     draftOrigin = "data_key_sync",
     matchUniqueKeysByDataKey = {},
     includePrimaryUniqueKeys = true,
+    excludeScriptIdsByAlias = {},
     forceFullScan = false,
     client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
@@ -205,12 +212,28 @@ export async function _updateDataKeysRefs({
             }),
         ));
 
+        const excludedScriptsByAlias = new Map(Object.entries(excludeScriptIdsByAlias)
+            .map(([alias, scriptIds]) => [
+                `${alias || ''}`.trim(),
+                new Set((scriptIds || []).map((scriptId) => `${scriptId || ''}`.trim()).filter(Boolean)),
+            ] as const)
+            .filter(([alias, scriptIds]) => !!alias && !!scriptIds.size));
+
         const getUpdatedDataKey = ({
             uniqueKey,
+            scriptId,
         }: {
             uniqueKey?: string | null;
+            scriptId?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
+                // Per-script exception: this reference is removed by the strip
+                // step instead of being rewritten to the replacement.
+                const normalizedScriptId = `${scriptId || ''}`.trim();
+                if (normalizedScriptId && excludedScriptsByAlias.get(`${uniqueKey}`.trim())?.has(normalizedScriptId)) {
+                    return {};
+                }
+
                 if (includePrimaryUniqueKeys) {
                     const keyById = byUniqueKey.get(uniqueKey);
                     if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
@@ -420,10 +443,12 @@ export async function _updateDataKeysRefs({
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
             const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.refIdDataKey || s.refId,
+                scriptId: s.scriptId,
             });
             trackMatchSource(refMatchSource);
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
+                scriptId: s.scriptId,
             });
             trackMatchSource(screenMatchSource);
 
@@ -452,6 +477,7 @@ export async function _updateDataKeysRefs({
                 : (s.items || []).map((item, itemIndex) => {
                     const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
+                        scriptId: s.scriptId,
                     });
                     trackMatchSource(itemMatchSource);
 
@@ -502,31 +528,37 @@ export async function _updateDataKeysRefs({
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(fieldMatchSource);
 
                 const { dataKey: refKeyDataKey, source: refKeyMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.refKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(refKeyMatchSource);
 
                 const { dataKey: minDateKeyDataKey, source: minDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minDateKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(minDateMatchSource);
 
                 const { dataKey: maxDateKeyDataKey, source: maxDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxDateKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(maxDateMatchSource);
 
                 const { dataKey: minTimeKeyDataKey, source: minTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minTimeKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(minTimeMatchSource);
 
                 const { dataKey: maxTimeKeyDataKey, source: maxTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxTimeKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(maxTimeMatchSource);
 
@@ -547,6 +579,7 @@ export async function _updateDataKeysRefs({
                 const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
                     const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
+                        scriptId: s.scriptId,
                     });
                     trackMatchSource(fieldItemMatchSource);
 
@@ -665,6 +698,7 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: diagnosisDataKey, source: diagnosisMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
+                scriptId: d.scriptId,
             });
             trackMatchSource(diagnosisMatchSource);
 
@@ -685,6 +719,7 @@ export async function _updateDataKeysRefs({
             const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
+                    scriptId: d.scriptId,
                 });
                 trackMatchSource(symptomMatchSource);
 
@@ -729,6 +764,7 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: problemDataKey, source: problemMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
+                scriptId: d.scriptId,
             });
             trackMatchSource(problemMatchSource);
 

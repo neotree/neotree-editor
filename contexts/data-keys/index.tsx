@@ -127,7 +127,10 @@ export type tDataKeysCtx = {
     deleteDataKeys: (
         data: string[],
         replacements?: Record<string, string>,
-        opts?: { allowMissingReplacements?: boolean },
+        opts?: {
+            allowMissingReplacements?: boolean;
+            scriptRemovals?: Record<string, string[]>;
+        },
     ) => Promise<boolean>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
@@ -375,6 +378,7 @@ export function DataKeysCtxProvider({
                     broadcastAction: true,
                     replacements,
                     allowMissingReplacements: opts?.allowMissingReplacements,
+                    scriptRemovals: opts?.scriptRemovals,
                 } satisfies DeleteDataKeysParams,
             });
 
