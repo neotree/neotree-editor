@@ -84,6 +84,7 @@ export function ScriptForm(props: Props) {
 
             <ScriptItemsFab
                 disabled={disabled}
+                scriptId={props.formData?.scriptId}
                 resetForm={() => resetForm(getDefaultFormValues())}
             />
 
