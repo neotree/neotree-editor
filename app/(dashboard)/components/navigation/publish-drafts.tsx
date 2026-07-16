@@ -81,8 +81,25 @@ export function PublishDrafts({ variant }: Props) {
   const [publishBlockingDetails, setPublishBlockingDetails] = useState<DataKeyIntegrityPublishDetails | null>(null)
   const [publishBlockingModalOpen, setPublishBlockingModalOpen] = useState(false)
 
-  const { publishData: _publishData, discardDrafts: _discardDrafts } = useAppContext()
+  const { publishData: _publishData, discardDrafts: _discardDrafts, authenticatedUser } = useAppContext()
   const isCreatingDataKey = pathname === "/data-keys/new"
+
+  // Discarding also restores data keys queued for deletion — surface that so
+  // the choice is informed rather than discovered later.
+  const [pendingDeletionKeys, setPendingDeletionKeys] = useState<{ createdByUserId: string | null }[]>([])
+
+  const fetchPendingDeletions = useCallback(async () => {
+    try {
+      const response = await axios.get<{ data: { createdByUserId: string | null }[] }>("/api/data-keys/pending-deletion")
+      setPendingDeletionKeys(response.data?.data || [])
+    } catch {
+      // non-critical — the info line just stays hidden
+    }
+  }, [])
+
+  const pendingDeletionCount = scope === "1"
+    ? pendingDeletionKeys.length
+    : pendingDeletionKeys.filter((key) => key.createdByUserId === authenticatedUser?.userId).length
 
   const closePublishBlockingModal = useCallback(() => {
     setPublishBlockingModalOpen(false)
@@ -362,7 +379,11 @@ export function PublishDrafts({ variant }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog>
+      <Dialog
+        onOpenChange={(open) => {
+          if (open && variant === "discard") fetchPendingDeletions()
+        }}
+      >
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent>
           {loading && <Loader overlay />}
@@ -388,6 +409,12 @@ export function PublishDrafts({ variant }: Props) {
               ))}
             </RadioGroup>
           </div>
+
+          {variant === "discard" && pendingDeletionCount > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {pendingDeletionCount} data key{pendingDeletionCount === 1 ? "" : "s"} queued for deletion will be restored.
+            </div>
+          )}
 
           <DialogFooter>
             <DialogClose asChild>

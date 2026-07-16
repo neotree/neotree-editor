@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 
-import { buildNormalizedDataKeyMatchKey } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { ScriptItem, ScriptField } from "@/types";
 
@@ -18,33 +17,18 @@ type SyncableObject = Record<string, unknown>;
 type SyncPatch<T> = Partial<T>;
 type SyncPatchBuilder<T extends SyncableObject> = (dataKey: DataKey, current: T) => SyncPatch<T>;
 
+// Existing items are matched to option data keys strictly by keyId — names and
+// labels are NOT unique across the library and must never identify a data key.
 function buildExistingOptionMaps<T extends { keyId?: string; label?: unknown }>(
     items: T[],
-    currentOptions: OptionDataKey[],
-    getKeys: (item: T) => string[],
 ) {
     const byUniqueKey = new Map<string, T>();
-    const byLegacyKey = new Map<string, T>();
 
     for (const item of items) {
         if (item.keyId) byUniqueKey.set(item.keyId, item);
-
-        for (const raw of getKeys(item)) {
-            const value = `${raw || ""}`.trim();
-            if (!value) continue;
-
-            for (const option of currentOptions) {
-                const nameKey = buildNormalizedDataKeyMatchKey(option.name, option.dataType);
-                const labelKey = buildNormalizedDataKeyMatchKey(option.label, option.dataType);
-                const candidateKey = buildNormalizedDataKeyMatchKey(value, option.dataType);
-                if (candidateKey === nameKey || candidateKey === labelKey) {
-                    if (!byLegacyKey.has(option.uniqueKey)) byLegacyKey.set(option.uniqueKey, item);
-                }
-            }
-        }
     }
 
-    return { byUniqueKey, byLegacyKey };
+    return { byUniqueKey };
 }
 
 function takeUnusedExisting<T>(used: Set<T>, ...candidates: Array<T | undefined>) {
@@ -208,18 +192,13 @@ export function rebuildFieldItemsFromDataKeyOptions({
     currentItems?: ExistingFieldItem[];
     optionDataKeys?: OptionDataKey[];
 }): ExistingFieldItem[] {
-    const maps = buildExistingOptionMaps(
-        currentItems,
-        optionDataKeys,
-        (item) => [`${item.value || ""}`, `${item.label || ""}`],
-    );
+    const maps = buildExistingOptionMaps(currentItems);
     const usedExisting = new Set<ExistingFieldItem>();
 
     return optionDataKeys.map((item) => {
         const existing = takeUnusedExisting(
             usedExisting,
             maps.byUniqueKey.get(item.uniqueKey),
-            maps.byLegacyKey.get(item.uniqueKey),
         );
         return {
             ...existing,
@@ -240,18 +219,13 @@ export function rebuildScreenItemsFromDataKeyOptions({
     optionDataKeys?: OptionDataKey[];
     screenType?: string | null;
 }): ExistingScreenItem[] {
-    const maps = buildExistingOptionMaps(
-        currentItems,
-        optionDataKeys,
-        (item) => [`${item.id || ""}`, `${item.key || ""}`, `${item.label || ""}`],
-    );
+    const maps = buildExistingOptionMaps(currentItems);
     const usedExisting = new Set<ExistingScreenItem>();
 
     return optionDataKeys.map((item, index) => {
         const existing = takeUnusedExisting(
             usedExisting,
             maps.byUniqueKey.get(item.uniqueKey),
-            maps.byLegacyKey.get(item.uniqueKey),
         );
         return {
             ...existing,

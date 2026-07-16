@@ -98,6 +98,14 @@ export function DataKeysTableHeader() {
                                     <SelectSeparator />
 
                                     <SelectGroup>
+                                        <SelectLabel>Links</SelectLabel>
+                                        <SelectItem value="parentKeys">Parent keys</SelectItem>
+                                        <SelectItem value="childKeys">Child keys</SelectItem>
+                                    </SelectGroup>
+
+                                    <SelectSeparator />
+
+                                    <SelectGroup>
                                         <SelectLabel>Types</SelectLabel>
                                         {dataKeyTypes.map(o => {
                                             return (

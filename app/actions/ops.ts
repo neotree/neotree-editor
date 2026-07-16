@@ -1449,6 +1449,21 @@ export async function publishData({ scope }: { scope: number }) {
       })
       if (!publishProblems.success) throw new Error(publishProblems.errors?.join(", ") || "Failed to publish problems")
 
+      // Release fence: data keys were deleted before screens/diagnoses/problems
+      // published. If any surviving published entity (or remaining draft) still
+      // references them — e.g. the replacement sync drafts were discarded while
+      // the pending deletion survived — abort the whole release.
+      const deletedDataKeyUniqueKeys = publishDataKeys.deletedUniqueKeys || []
+      if (deletedDataKeyUniqueKeys.length) {
+        const refsCleared = await dataKeysMutations._assertDataKeyRefsCleared({
+          uniqueKeys: deletedDataKeyUniqueKeys,
+          client: tx,
+        })
+        if (!refsCleared.success) {
+          throw new Error(refsCleared.errors?.join(", ") || "Data keys queued for deletion are still referenced")
+        }
+      }
+
       const processPendingDeletion = await _processPendingDeletion({
         userId,
         publisherUserId: publisherUserId || undefined,

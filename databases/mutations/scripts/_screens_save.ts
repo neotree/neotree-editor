@@ -129,14 +129,14 @@ async function resolveScriptReference(
     };
 }
 
-async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string) {
+async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string, client?: DbOrTransaction) {
     const ids = Array.from(new Set(uniqueKeys.filter(Boolean)));
     if (!ids.length) return;
 
     const { _getDataKeys } = await import('@/databases/queries/data-keys');
     const { _saveDataKeys } = await import('@/databases/mutations/data-keys');
 
-    const dataKeysRes = await _getDataKeys({ uniqueKeys: ids, returnDraftsIfExist: true });
+    const dataKeysRes = await _getDataKeys({ uniqueKeys: ids, returnDraftsIfExist: true, client });
     if (dataKeysRes.errors?.length) {
         throw new Error(dataKeysRes.errors.join(', '));
     }
@@ -151,11 +151,14 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
 
     if (!updates.length) return;
 
+    // Join the caller's transaction — opening a fresh one here while the caller
+    // holds locks on the same draft rows would deadlock.
     const saveRes = await _saveDataKeys({
         data: updates,
         userId,
         updateRefs: false,
         broadcastAction: false,
+        client,
     });
 
     if (saveRes.errors?.length || !saveRes.success) {
@@ -225,7 +228,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const q = executor
                             .update(screensDrafts)
                             .set({
                                 data,
@@ -297,7 +300,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
             response.info = info;
         } else {
             if (confidentialDataKeyIds.size) {
-                await promoteDataKeysAsConfidential(Array.from(confidentialDataKeyIds), userId);
+                await promoteDataKeysAsConfidential(Array.from(confidentialDataKeyIds), userId, client);
             }
             response.success = true;
         }

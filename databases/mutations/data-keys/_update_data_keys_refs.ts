@@ -102,6 +102,8 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 
 const SAVE_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_SIZE, 50);
 const SAVE_RETRY_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_RETRY_CONCURRENCY, 5);
+// Bounds the OR-clause size of a single candidate query; queries are chunked, never truncated.
+const LIKE_PATTERN_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_LIKE_CHUNK_SIZE, 240);
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
     if (size <= 0) return [arr];
@@ -126,7 +128,6 @@ function escapeLikePattern(value: string) {
 function buildJsonKeyIdPatterns(uniqueKeys: string[], jsonKeys: string[]) {
     return uniqueKeys
         .filter(Boolean)
-        .slice(0, 120)
         .flatMap((uniqueKey) => {
             const escapedUniqueKey = escapeLikePattern(uniqueKey);
             return jsonKeys.flatMap((jsonKey) => ([
@@ -272,97 +273,105 @@ export async function _updateDataKeysRefs({
         const keyIdPatterns = buildJsonKeyIdPatterns(changedUniqueKeys, screenJsonReferenceKeys);
         const likePatterns = Array.from(new Set([
             ...keyIdPatterns,
-        ])).slice(0, 240);
+        ]));
+        // Chunked so every key is covered no matter how many are updated at once;
+        // truncating the pattern list would silently skip references.
+        const likePatternChunks = chunkArray(likePatterns, LIKE_PATTERN_CHUNK_SIZE);
 
         const candidateScripts = new Set<string>();
+        const addCandidate = (row: { scriptId?: string | null; scriptDraftId?: string | null }) => {
+            if (row.scriptId) candidateScripts.add(row.scriptId);
+            if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+        };
 
-        if (changedUniqueKeys.length || likePatterns.length) {
+        if (changedUniqueKeys.length) {
             const screensPublishedCandidates = await executor
                 .select({ scriptId: screens.scriptId })
                 .from(screens)
                 .where(and(
                     isNull(screens.deletedAt),
                     or(
-                        changedUniqueKeys.length ? inArray(screens.keyId, changedUniqueKeys) : undefined,
-                        changedUniqueKeys.length ? inArray(screens.refIdDataKey, changedUniqueKeys) : undefined,
-                        buildLikeClauses(sql`${screens.fields}`, likePatterns),
-                        buildLikeClauses(sql`${screens.items}`, likePatterns),
+                        inArray(screens.keyId, changedUniqueKeys),
+                        inArray(screens.refIdDataKey, changedUniqueKeys),
                     ),
                 ));
 
-            screensPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
+            screensPublishedCandidates.forEach(addCandidate);
 
             const diagnosesPublishedCandidates = await executor
                 .select({ scriptId: diagnoses.scriptId })
                 .from(diagnoses)
                 .where(and(
                     isNull(diagnoses.deletedAt),
-                    or(
-                        changedUniqueKeys.length ? inArray(diagnoses.keyId, changedUniqueKeys) : undefined,
-                        buildLikeClauses(sql`${diagnoses.symptoms}`, likePatterns),
-                    ),
+                    inArray(diagnoses.keyId, changedUniqueKeys),
                 ));
 
-            diagnosesPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
+            diagnosesPublishedCandidates.forEach(addCandidate);
 
             const problemsPublishedCandidates = await executor
                 .select({ scriptId: problems.scriptId })
                 .from(problems)
                 .where(and(
                     isNull(problems.deletedAt),
+                    inArray(problems.keyId, changedUniqueKeys),
+                ));
+
+            problemsPublishedCandidates.forEach(addCandidate);
+        }
+
+        for (const patternChunk of likePatternChunks) {
+            const screensJsonCandidates = await executor
+                .select({ scriptId: screens.scriptId })
+                .from(screens)
+                .where(and(
+                    isNull(screens.deletedAt),
                     or(
-                        changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
+                        buildLikeClauses(sql`${screens.fields}`, patternChunk),
+                        buildLikeClauses(sql`${screens.items}`, patternChunk),
                     ),
                 ));
 
-            problemsPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
+            screensJsonCandidates.forEach(addCandidate);
 
-            if (likePatterns.length) {
-                const screensDraftCandidates = await executor
-                    .select({
-                        scriptId: screensDrafts.scriptId,
-                        scriptDraftId: screensDrafts.scriptDraftId,
-                    })
-                    .from(screensDrafts)
-                    .where(buildLikeClauses(sql`${screensDrafts.data}`, likePatterns));
+            const diagnosesJsonCandidates = await executor
+                .select({ scriptId: diagnoses.scriptId })
+                .from(diagnoses)
+                .where(and(
+                    isNull(diagnoses.deletedAt),
+                    buildLikeClauses(sql`${diagnoses.symptoms}`, patternChunk),
+                ));
 
-                screensDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
+            diagnosesJsonCandidates.forEach(addCandidate);
 
-                const diagnosesDraftCandidates = await executor
-                    .select({
-                        scriptId: diagnosesDrafts.scriptId,
-                        scriptDraftId: diagnosesDrafts.scriptDraftId,
-                    })
-                    .from(diagnosesDrafts)
-                    .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, likePatterns));
+            const screensDraftCandidates = await executor
+                .select({
+                    scriptId: screensDrafts.scriptId,
+                    scriptDraftId: screensDrafts.scriptDraftId,
+                })
+                .from(screensDrafts)
+                .where(buildLikeClauses(sql`${screensDrafts.data}`, patternChunk));
 
-                diagnosesDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
+            screensDraftCandidates.forEach(addCandidate);
 
-                const problemsDraftCandidates = await executor
-                    .select({
-                        scriptId: problemsDrafts.scriptId,
-                        scriptDraftId: problemsDrafts.scriptDraftId,
-                    })
-                    .from(problemsDrafts)
-                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, likePatterns));
+            const diagnosesDraftCandidates = await executor
+                .select({
+                    scriptId: diagnosesDrafts.scriptId,
+                    scriptDraftId: diagnosesDrafts.scriptDraftId,
+                })
+                .from(diagnosesDrafts)
+                .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, patternChunk));
 
-                problemsDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
-            }
+            diagnosesDraftCandidates.forEach(addCandidate);
+
+            const problemsDraftCandidates = await executor
+                .select({
+                    scriptId: problemsDrafts.scriptId,
+                    scriptDraftId: problemsDrafts.scriptDraftId,
+                })
+                .from(problemsDrafts)
+                .where(buildLikeClauses(sql`${problemsDrafts.data}`, patternChunk));
+
+            problemsDraftCandidates.forEach(addCandidate);
         }
 
         stats.candidateScripts = candidateScripts.size;

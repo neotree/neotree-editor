@@ -23,6 +23,7 @@ import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { normalizeSearchTerm } from "@/lib/search";
+import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 
 
 function paginateData<T>(
@@ -123,7 +124,11 @@ export type tDataKeysCtx = {
         data: DataKeyFormData[],
         cb?: ((error?: string) => void)
     ) => Promise<Awaited<ReturnType<typeof actions.saveDataKeys>>>;
-    deleteDataKeys: (data: string[], replacements?: Record<string, string>) => Promise<boolean>;
+    deleteDataKeys: (
+        data: string[],
+        replacements?: Record<string, string>,
+        opts?: { allowMissingReplacements?: boolean },
+    ) => Promise<boolean>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
@@ -220,8 +225,15 @@ export function DataKeysCtxProvider({
         if (filter) {
             if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'draft') {
+            } else if (filter === 'draft' || filter === 'drafts') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
+            } else if (filter === 'parentKeys') {
+                filtered = filtered.filter(dataKey => !!(dataKey?.options || []).length);
+            } else if (filter === 'childKeys') {
+                const parentIndex = buildDataKeyParentIndex(allDataKeys);
+                filtered = filtered.filter(dataKey => (
+                    !!dataKey?.uniqueKey && !!(parentIndex.get(dataKey.uniqueKey) || []).length
+                ));
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
             }
@@ -364,7 +376,7 @@ export function DataKeysCtxProvider({
         }
     }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
 
-    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements) => {
+    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements, opts) => {
         const keysToDelete = allDataKeys.filter(key => key?.uuid && data.includes(key.uuid));
 
         try {
@@ -375,6 +387,7 @@ export function DataKeysCtxProvider({
                     dataKeysIds: data,
                     broadcastAction: true,
                     replacements,
+                    allowMissingReplacements: opts?.allowMissingReplacements,
                 } satisfies DeleteDataKeysParams,
             });
 
@@ -404,6 +417,10 @@ export function DataKeysCtxProvider({
                 message: e.message,
                 variant: 'error',
             });
+            // A rejected delete usually means the local list is stale (e.g. the
+            // key became a child option elsewhere) — resync so the UI reflects
+            // the state the server enforced.
+            await loadDataKeys();
             return false;
         } finally {
             setDeleting(false);
