@@ -69,6 +69,7 @@ export function DataKeysTable({ disabled, }: {
             inputPlaceholder: 'Search data keys',
             value: searchValue,
             setValue: setSearchValue,
+            filterRows: false,
         },
         noDataMessage: (
             <div className="mt-4 flex flex-col items-center justify-center gap-y-2">
