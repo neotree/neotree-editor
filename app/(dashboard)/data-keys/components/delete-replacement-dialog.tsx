@@ -369,28 +369,26 @@ export function DataKeyDeleteReplacementDialog({
                                 </div>
 
                                 {!!item.scripts.length && (
-                                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                                        {item.scripts.slice(0, 3).map((script) => (
-                                            <a
-                                                key={script.scriptId}
-                                                href={script.usages?.[0]?.href || `/script/${script.scriptId}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-primary hover:bg-primary/10"
-                                            >
-                                                <span>{script.scriptTitle}</span>
-                                                {(script.usages?.length || 0) > 1 && (
-                                                    <span className="text-muted-foreground">×{script.usages!.length}</span>
-                                                )}
-                                                <ExternalLinkIcon className="h-3 w-3" />
-                                            </a>
+                                    <ul className="mt-3 max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border p-1">
+                                        {item.scripts.map((script) => (
+                                            <li key={script.scriptId}>
+                                                <a
+                                                    href={script.usages?.[0]?.href || `/script/${script.scriptId}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center justify-between gap-x-2 rounded px-2 py-1 text-xs hover:bg-accent"
+                                                >
+                                                    <span className="min-w-0 truncate">{script.scriptTitle}</span>
+                                                    <span className="flex shrink-0 items-center gap-x-1 text-muted-foreground">
+                                                        {(script.usages?.length || 0) > 1 && (
+                                                            <span>×{script.usages!.length}</span>
+                                                        )}
+                                                        <ExternalLinkIcon className="h-3 w-3 text-primary" />
+                                                    </span>
+                                                </a>
+                                            </li>
                                         ))}
-                                        {item.scripts.length > 3 && (
-                                            <span className="text-muted-foreground">
-                                                +{item.scripts.length - 3} more
-                                            </span>
-                                        )}
-                                    </div>
+                                    </ul>
                                 )}
 
                                 {parent ? (
