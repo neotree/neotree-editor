@@ -70,13 +70,16 @@ export function DataKeysTableRowActions({
                 dataKeys={allDataKeys}
                 deleting={deleting}
                 loading={impactLoading}
-                onConfirm={async (replacements) => {
-                    const success = await deleteDataKeys([dataKey.uuid], replacements);
+                onConfirm={async ({ replacements, scriptRemovals }) => {
+                    const success = await deleteDataKeys([dataKey.uuid], replacements, { scriptRemovals });
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
-                onDeleteAnyway={async (replacements) => {
-                    const success = await deleteDataKeys([dataKey.uuid], replacements, { allowMissingReplacements: true });
+                onDeleteAnyway={async ({ replacements, scriptRemovals }) => {
+                    const success = await deleteDataKeys([dataKey.uuid], replacements, {
+                        allowMissingReplacements: true,
+                        scriptRemovals,
+                    });
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}

@@ -32,13 +32,16 @@ export function DataKeysTableBottomActions({ disabled, }: {
                 dataKeys={allDataKeys}
                 deleting={deleting}
                 loading={impactLoading}
-                onConfirm={async (replacements) => {
-                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements);
+                onConfirm={async ({ replacements, scriptRemovals }) => {
+                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, { scriptRemovals });
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
-                onDeleteAnyway={async (replacements) => {
-                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, { allowMissingReplacements: true });
+                onDeleteAnyway={async ({ replacements, scriptRemovals }) => {
+                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, {
+                        allowMissingReplacements: true,
+                        scriptRemovals,
+                    });
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}

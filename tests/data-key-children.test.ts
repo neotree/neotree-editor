@@ -7,6 +7,7 @@ import {
   wouldCreateDataKeyCycle,
 } from "../lib/data-key-children"
 import { buildDataKeyOptionUnlinkImpact } from "../lib/data-key-delete-impact"
+import { resolveScriptRemovalExclusions } from "../lib/data-key-script-removals"
 
 const parentA = {
   uuid: "parent-a",
@@ -288,6 +289,60 @@ assert.equal(
   }),
   null,
   "pre-existing options are never re-validated",
+)
+
+// ---- per-script removal exclusions ----
+const removalImpact = [
+  {
+    dataKeyId: "dk-uuid-1",
+    uniqueKey: "weight_kg",
+    options: [],
+    scripts: [
+      { scriptId: "script-1", scriptTitle: "One", usages: [] },
+      { scriptId: "script-2", scriptTitle: "Two", usages: [] },
+    ],
+  },
+  {
+    dataKeyId: "dk-uuid-parent",
+    uniqueKey: "parent_key",
+    options: ["weight_kg"], // parent — never produces exclusions
+    scripts: [{ scriptId: "script-1", scriptTitle: "One", usages: [] }],
+  },
+  {
+    dataKeyId: "dk-uuid-unreplaced",
+    uniqueKey: "unreplaced_key",
+    options: [],
+    scripts: [{ scriptId: "script-3", scriptTitle: "Three", usages: [] }],
+  },
+] as any[]
+
+const exclusions = resolveScriptRemovalExclusions({
+  impact: removalImpact,
+  replacements: {
+    "dk-uuid-1": "replacement-uuid",
+    "dk-uuid-parent": "replacement-uuid-2",
+  },
+  scriptRemovals: {
+    "dk-uuid-1": ["script-2", "script-unknown"], // unknown ids are dropped
+    "dk-uuid-parent": ["script-1"],              // parents never exclude
+    "dk-uuid-unreplaced": ["script-3"],          // no replacement -> removed everywhere anyway
+  },
+})
+
+assert.deepEqual(
+  exclusions,
+  { weight_kg: ["script-2"] },
+  "only replaced non-parent keys produce exclusions, and only for scripts in the fresh impact",
+)
+
+assert.deepEqual(
+  resolveScriptRemovalExclusions({
+    impact: removalImpact,
+    replacements: { "dk-uuid-1": "replacement-uuid" },
+    scriptRemovals: {},
+  }),
+  {},
+  "no exceptions means replace everywhere — the default action",
 )
 
 console.log("data key children tests passed")
