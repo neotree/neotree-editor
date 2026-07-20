@@ -1,5 +1,4 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
-import { v4 } from "uuid"
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
@@ -16,6 +15,9 @@ import {
 } from "@/databases/pg/schema"
 import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
+import { buildPublishedChildScriptReference, resolvePublishedScriptId } from "@/lib/script-draft-publish"
 
 export async function _publishScripts({
   userId,
@@ -27,23 +29,32 @@ export async function _publishScripts({
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const results: { success: boolean; errors?: string[] } = { success: false }
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!client || !Number.isFinite(dataVersion)) {
+    return {
+      success: false,
+      errors: ["Script publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const executor = client || db
+    const executor = client
     const drafts = await executor.query.scriptsDrafts.findMany({
       where: !userId ? undefined : eq(scriptsDrafts.createdByUserId, userId),
     })
-    const scriptDraftToPublishedId = new Map<string, string>()
     const inserts = drafts
       .filter((c) => !c.scriptId)
-      .map((s) => ({
-        ...s,
-        scriptId: s.data.scriptId || v4(),
-        data: { ...s.data, scriptId: s.data.scriptId || v4() },
-      }))
+      .map((draft) => {
+        const resolvedScriptId = resolvePublishedScriptId(draft)
+        return {
+          ...draft,
+          scriptId: resolvedScriptId,
+          data: { ...draft.data, scriptId: resolvedScriptId },
+        }
+      })
     const updates = drafts.filter((c) => c.scriptId)
 
     const errors: string[] = []
@@ -51,6 +62,7 @@ export async function _publishScripts({
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof scripts.$inferSelect)[] = []
+      const persistedUpdates: typeof scriptsDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.scriptId).length) {
         dataBefore = await executor.query.scripts.findMany({
           where: inArray(
@@ -62,20 +74,27 @@ export async function _publishScripts({
 
       for (const { scriptId: _scriptId, data: c } of updates) {
         const scriptId = _scriptId!
-        scriptDraftToPublishedId.set(scriptId, scriptId)
+        const sourceDraft = updates.find((draft) => draft.scriptId === scriptId)
 
         const { scriptId: __scriptId, id, oldScriptId, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${scripts.version} + 1`,
         }
-        await executor.update(scripts).set(updates).where(eq(scripts.scriptId, scriptId))
+        const [persisted] = await executor.update(scripts).set(nextData).where(eq(scripts.scriptId, scriptId)).returning()
+        if (persisted && sourceDraft) {
+          persistedUpdates.push({
+            ...sourceDraft,
+            data: persisted as typeof scriptsDrafts.$inferSelect["data"],
+          })
+        }
 
       }
 
       const updateChangeLogs = await _saveScriptsHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: publisherUserId,
         client: executor,
@@ -88,6 +107,7 @@ export async function _publishScripts({
 
     if (inserts.length) {
       let dataBefore: (typeof scripts.$inferSelect)[] = []
+      const persistedInserts: typeof scriptsDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.scriptId).length) {
         dataBefore = await executor.query.scripts.findMany({
           where: inArray(
@@ -99,33 +119,23 @@ export async function _publishScripts({
 
       const insertData = inserts.map((s) => ({
         ...s.data,
-        scriptId: s.scriptDraftId,
+        scriptId: s.data.scriptId,
+        version: getPublishedEntityVersion({ currentVersion: s.data.version, isCreate: true }),
       }))
 
-      await executor.insert(scripts).values(insertData)
-
-      for (const { scriptId } of insertData) {
-        scriptDraftToPublishedId.set(scriptId, scriptId)
-        await executor
-          .update(screensDrafts)
-          // Detach child drafts from the parent script draft before it is deleted
-          // later in this publish flow, otherwise the FK cascade removes them
-          // before their own publish steps run.
-          .set({ scriptId, scriptDraftId: null })
-          .where(or(eq(screensDrafts.scriptId, scriptId), eq(screensDrafts.scriptDraftId, scriptId)))
-
-        await executor
-          .update(diagnosesDrafts)
-          .set({ scriptId, scriptDraftId: null })
-          .where(or(eq(diagnosesDrafts.scriptId, scriptId), eq(diagnosesDrafts.scriptDraftId, scriptId)))
-
-        await executor
-          .update(problemsDrafts)
-          .set({ scriptId, scriptDraftId: null })
-          .where(or(eq(problemsDrafts.scriptId, scriptId), eq(problemsDrafts.scriptDraftId, scriptId)))
+      const insertedRows = await executor.insert(scripts).values(insertData).returning()
+      for (const insertedRow of insertedRows) {
+        const sourceDraft = inserts.find((draft) => draft.data.scriptId === insertedRow.scriptId)
+        if (sourceDraft) {
+          persistedInserts.push({
+            ...sourceDraft,
+            data: insertedRow as typeof scriptsDrafts.$inferSelect["data"],
+          })
+        }
       }
+
       const insertChangeLogs = await _saveScriptsHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: publisherUserId,
         client: executor,
@@ -136,23 +146,33 @@ export async function _publishScripts({
       })))
     }
 
-    if (scriptDraftToPublishedId.size) {
-      for (const [scriptDraftId, publishedScriptId] of Array.from(scriptDraftToPublishedId.entries())) {
-        await executor
-          .update(screensDrafts)
-          .set({ scriptId: publishedScriptId, scriptDraftId: null })
-          .where(eq(screensDrafts.scriptDraftId, scriptDraftId))
+    // Child drafts retain a cascading foreign key to the script draft. Move
+    // them onto the published script before deleting the parent draft so they
+    // remain available to the child publishers that run next.
+    for (const draft of drafts) {
+      const childScriptReference = buildPublishedChildScriptReference(draft)
 
-        await executor
-          .update(diagnosesDrafts)
-          .set({ scriptId: publishedScriptId, scriptDraftId: null })
-          .where(eq(diagnosesDrafts.scriptDraftId, scriptDraftId))
+      await executor
+        .update(screensDrafts)
+        .set(childScriptReference)
+        .where(eq(screensDrafts.scriptDraftId, draft.scriptDraftId))
 
-        await executor
-          .update(problemsDrafts)
-          .set({ scriptId: publishedScriptId, scriptDraftId: null })
-          .where(eq(problemsDrafts.scriptDraftId, scriptDraftId))
-      }
+      await executor
+        .update(diagnosesDrafts)
+        .set(childScriptReference)
+        .where(eq(diagnosesDrafts.scriptDraftId, draft.scriptDraftId))
+
+      await executor
+        .update(problemsDrafts)
+        .set(childScriptReference)
+        .where(eq(problemsDrafts.scriptDraftId, draft.scriptDraftId))
+
+      // Child deletion requests use the same cascading parent-draft foreign
+      // key. Keep them alive so the child publishers can apply them next.
+      await executor
+        .update(pendingDeletion)
+        .set({ scriptDraftId: null })
+        .where(eq(pendingDeletion.scriptDraftId, draft.scriptDraftId))
     }
 
     let deleted = await executor.query.pendingDeletion.findMany({
@@ -173,18 +193,21 @@ export async function _publishScripts({
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await executor
+      const deletedRows = await executor
         .update(scripts)
-        .set({ deletedAt })
+        .set({ deletedAt, version: sql`${scripts.version} + 1` })
         .where(
           inArray(
             scripts.scriptId,
             deleted.map((c) => c.scriptId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.scriptId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: (c.script!.version ?? 0) + 1,
+        version:
+          deletedById.get(c.scriptId!)?.version ?? getPublishedEntityVersion({ currentVersion: c.script!.version, isCreate: false }),
         scriptId: c.scriptId!,
         changes: {
           action: "delete_script",
@@ -202,25 +225,26 @@ export async function _publishScripts({
           const history = historyPayload[index]
           if (!entry?.scriptId) continue
 
-          const snapshot = removeHexCharacters({
-            ...(entry.script ?? {}),
-            deletedAt,
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.script ?? {},
+            deletedFields: { deletedAt },
+            sanitize: removeHexCharacters,
           })
 
           changeLogs.push({
             entityId: entry.scriptId,
             entityType: "script",
             action: "delete",
-            version: history.version || ((entry.script?.version ?? 0) + 1),
+            version: history.version,
             dataVersion,
             changes: history.changes,
-            fullSnapshot: snapshot,
-            previousSnapshot: snapshot,
-            baselineSnapshot: snapshot,
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: publisherUserId,
             scriptId: entry.scriptId,
-            isActive: false,
+            isActive: true,
           })
         }
       }
@@ -235,25 +259,9 @@ export async function _publishScripts({
         ),
       )
 
-    const published = [
-      // ...inserts.map(c => c.scriptId! || c.scriptDraftId),
-      ...updates.map((c) => c.scriptId!),
-      ...deleted.map((c) => c.scriptId!),
-    ]
-
-    if (published.length) {
-      await executor
-        .update(scripts)
-        .set({ version: sql`${scripts.version} + 1` })
-        .where(inArray(scripts.scriptId, published))
-    }
-
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !client, client: executor })
-      if (saveResult.errors?.length) {
-        logger.error("_publishScripts changelog error", saveResult.errors.join(", "))
-        throw new Error(saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client: executor })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save script changelogs")
     }
 
     results.success = true
@@ -261,7 +269,7 @@ export async function _publishScripts({
     results.success = false
     results.errors = [e.message]
     logger.error("_publishScripts ERROR", e.message)
-  } finally {
-    return results
   }
+
+  return results
 }

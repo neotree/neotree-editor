@@ -76,7 +76,6 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="bg-green-600 text-white hover:bg-green-700"
       >
         <PlusIcon className="mr-2 h-4 w-4" />
         {hasCriteria ? "Update Eligibility Criteria" : "Add Eligibility Criteria"}

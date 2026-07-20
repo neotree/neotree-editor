@@ -196,22 +196,6 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
       maxLength: normalizedMaxLength.value,
     }
 
-    if (form.changeTracker) {
-      const currentFields = form.getValues("fields")
-      const updatedFields =
-        !isEmpty(fieldIndex) && field
-          ? currentFields.map((f, i) => ({
-              ...f,
-              ...(i === fieldIndex ? normalizedData : null),
-            }))
-          : [...currentFields, normalizedData]
-
-      await form.changeTracker.trackChanges(
-        { ...form.getValues(), fields: updatedFields },
-        `Field "${normalizedData.label}" ${field ? "updated" : "added"}`,
-      )
-    }
-
     if (!isEmpty(fieldIndex) && field) {
       form.setValue(
         "fields",
@@ -250,7 +234,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     if (confidential !== inheritedConfidential) {
       setValue("confidential", inheritedConfidential, { shouldDirty: true })
     }
-  }, [confidential, inheritedConfidential, setValue])
+  }, [confidential, inheritedConfidential, setValue]);
+
+  const isKeyDisabled = disabled || !!field;
 
   return (
     <>
@@ -362,12 +348,12 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <SelectDataKey
                     modal
                     value={key}
-                    disabled={disabled}
+                    disabled={isKeyDisabled}
                     type={type}
                     filterDataKeys={(k) => {
                       const opts = screenDataKey?.options || []
-                      if (!screenDataKey) return true
-                      return opts.includes(k.uniqueKey)
+                      if (!screenDataKey) return true;
+                      return opts.includes(k.uniqueKey);
                     }}
                     onChange={([item]) => {
                       setValue("key", item?.name, { shouldDirty: true })
@@ -382,7 +368,13 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   <Label error={!disabled && !label} htmlFor="label">
                     Label *
                   </Label>
-                  <Input {...register("label", { disabled })} name="label" error={!disabled && !label} />
+                  <Input 
+                    {...register("label", { 
+                      disabled: isKeyDisabled, 
+                    })} 
+                    name="label" 
+                    error={!disabled && !label} 
+                  />
                 </div>
               </div>
 
