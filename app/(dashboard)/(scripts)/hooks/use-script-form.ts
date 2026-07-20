@@ -124,8 +124,11 @@ export function useScriptForm(params: UseScriptFormParams) {
       router.refresh()
       alert({
         title: "Success",
-        message: "Draft saved successfully!",
+        message: isNewScript
+          ? "Draft saved successfully. You can now add screens, diagnoses, problems, and print sections."
+          : "Draft saved successfully!",
         variant: "success",
+        onClose: isNewScript && scriptId ? () => router.replace(`/script/${scriptId}`) : undefined,
       })
     }
 
