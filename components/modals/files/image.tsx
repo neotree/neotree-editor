@@ -39,9 +39,13 @@ export function Image({ file, ...props }: ImageProps & {
                 open={isModalOpen}
                 onOpenChange={setIsModalOpen}
             >
-                <DialogTrigger>
+                {/* <DialogTrigger>
                     {img}
-                </DialogTrigger>
+                </DialogTrigger> */}
+
+                <div className="relative">
+                    {img}
+                </div>
 
                 <DialogContent 
                     hideCloseButton
